@@ -35,8 +35,8 @@ available; this programme adds no restricted agent execution mode, container bac
 
 ## Execute the phases
 
-Phases 01 to 05 retain their original scope and can proceed independently. Phases 02 and 03 both
-touch the loaded plugin realm and share the runtime decision, so read them together. That plugin-worker
+Phases 01 to 05 can proceed independently. Phases 02 and 03 both touch the loaded plugin realm, so
+read them together and build 02 first: phase 03's runtime leaves hostnames and SQLite to phase 02. That plugin-worker
 runtime work is distinct from the agent execution mode excluded from this programme.
 
 For tooling, implement phase 06 first, then phase 07's independent diagnostics, phase 08, phase 09,
@@ -48,8 +48,8 @@ the user's request.
 | Phase | PRD | Outcome | Relationship |
 | --- | --- | --- | --- |
 | 01 | [Gate desktop commands by caller](./01-desktop-command-authorization.md) | Acorn's own Tauri commands require the main webview or check their caller, so plugin and preview origins cannot reach them. | None |
-| 02 | [Make the plugin realm policy tamper-resistant](./02-plugin-realm-intrinsics.md) | The network and builtin allowlists survive a plugin that rewrites shared intrinsics. | Pairs with 03 |
-| 03 | [Give the plugin limits an operating-system backstop](./03-runtime-network-and-fs-backstop.md) | The bundled runtime enforces the network and filesystem grants below the JavaScript layer. | Pairs with 02 |
+| 02 | [Make the plugin realm policy tamper-resistant](./02-plugin-realm-intrinsics.md) | The network and builtin allowlists survive a plugin that rewrites shared intrinsics. | Before 03 |
+| 03 | [Move the bundled runtime to Node 26](./03-runtime-network-and-fs-backstop.md) | The runtime refuses sockets to plugins with no network grant. Hostnames and SQLite still rely on 02. | After 02 |
 | 04 | [Confine and time-bound internal tokens](./04-internal-token-confinement.md) | A node on the network refuses internal tokens from remote peers, and a leaked token expires. | None |
 | 05 | [Fence the automation driver out of releases](./05-automation-driver-release-fence.md) | The WebDriver automation server cannot ship in a release build, and refuses cross-origin callers if it runs. | None |
 | 06 | [Review changed agent instructions](./06-instruction-review.md) | Bounded instruction discovery, hash-bound review, and mandatory admission that stops on incomplete checks. | First tooling phase |

@@ -8,7 +8,6 @@
 export { rollbarFetch } from '../server/index'
 export { rollbarProvider } from '../server/provider'
 export { createRollbarFetch } from '../server/routes/rollbar'
-export { ROLLBAR_ITEMS_STALE_AFTER_MS } from '../server/syncPolicy'
 export type {
   RollbarItemDetail,
   RollbarItemMetadata,

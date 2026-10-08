@@ -10,6 +10,8 @@ Opening a menu must not select, open, close, save, or drag the target.
 
 `plugins/editor/src/client/FileTree.tsx` draws virtualized `TreeRow` entries with open/expand actions.
 `plugins/editor/src/client/EditorPane.tsx` draws `DocumentTabs` and retains dirty documents.
+Built-in file and inactive-tab menus are implemented. Reuse their captured targets, custody holds,
+and guarded actions when adding contributed menu rows; do not rebuild the file-operation model.
 `packages/protocol/src/chrome/contextMenus.ts` has four closed menu locations and per-location facts.
 `packages/client-core/src/host/registries/panes/contextMenus.ts` stores typed targets and checks stale
 registrations. `packages/client-core/src/host/chrome/chromeContextMenus.ts` binds loaded menu actions.
@@ -48,8 +50,9 @@ Node, target availability, plugin registration, and task scope immediately befor
    opening per owner list and capture a stable target, not a row object retained after virtualization.
 3. Add desktop right-click and keyboard invocation, returning focus to the surviving target. In the
    terminal, expose an explicit Actions control or command for the focused file/tab, using the same rows.
-4. Keep core file actions and contributed actions in the shared menu. Opening another menu replaces
-   the previous one. Preserve tab close guards, file selection, pinning, and drag behavior.
+4. Keep built-in file and tab actions beside contributed actions in the shared menu. Preserve
+   create/rename/trash admission, descendant recovery, navigation reconciliation, and bulk-close guards.
+   Opening another menu replaces the previous one. Preserve file selection, pinning, and drag behavior.
 5. Add a loaded inspector fixture that reads a supported file through Editor's capability and opens
    its own view. Verify that menu metadata alone does not grant filesystem access.
 

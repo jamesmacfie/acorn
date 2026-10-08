@@ -1,97 +1,56 @@
-# "acorn as shell" versus the permanent tier line
+# Host responsibilities in a plugin workspace
 
-Design notes from the ecosystem-feasibility session (2026-08-14). This file records the one place
-the ecosystem vision collides with a decision this repo already made and defends — and the stance
-adopted, so a future session argues with the reasoning instead of rediscovering the tension.
+Date: October 8, 2026. Status: retained architecture direction.
 
-## The collision
+Use this decision when a plugin proposal requires host privileges.
+[Extensibility](../../extensibility.md) owns the two tiers, and
+[first-party plugins](../../first-party-plugins.md) records the dependencies that keep a plugin compiled.
 
-The vision: acorn becomes a shell. A small core owns only what security requires and what is so
-universal it belongs to everyone; everything else is a plugin, and users compose their acorn from
-plugins the way they like.
+## Keep authority and rendering with the host
 
-The recorded decision it walks into: `docs/extensibility.md § Two tiers, permanently` declares an
-enumerated set of contributions first-party-only, forever — WebSocket stream/channel ownership,
-components rendered inside the shell's own tree, code that runs in the desktop shell process. And explicitly: "the
-second tier will not grow until it can do everything the first can" is *not* the plan. When a
-third-party plugin needs one of those, the recorded answer is review and adoption into
-first-party, not a wider sandbox.
+The host owns authentication, trust records, transport, task/project addressing, storage authority,
+and rendering contracts. Plugins contribute integrations, data sources, panes, tools, themes, and
+workflow behavior through those contracts.
 
-The proof case is Monaco (`docs/loaded-plugin-migration.md`, `docs/editor.md`): a single-file
-editor frame measured 7.93 MiB against the 8 MiB cap and its language workers were undeliverable
-under the frame CSP. The answer was a **host-owned document surface plugins borrow** — core grew
-so the sandbox didn't have to widen. Expect that pattern to repeat for every heavyweight surface:
-terminals, result grids, anything with workers or real bulk.
+A loaded plugin receives data and asynchronous operations through its declared context.
+It does not acquire host privileges because an equivalent compiled plugin has them.
+A request for stream ownership, native dependencies, or a required startup capability needs an
+owner-specific design or first-party adoption.
 
-## The stance
+## Use host components for plugin UI
 
-**Keep the tier line. Bend the vision's letter, keep its spirit.**
+Remote trees let a plugin contribute host components by node name and semantic props.
+The host mounts its own implementation. A tree does not transfer component code into the shell.
+This removes some in-realm UI dependencies, such as Changes' transcript card.
 
-The thin-shell reading requires either accepting that terminals, agent stream rendering, and the
-editor can never be plugins (at which point the shell is not thin), or reversing a security
-boundary this repo built deliberately and documents well. Reversing it buys ideology and costs the
-one thing that differentiates acorn from bb: a real trust boundary under a self-modification loop.
+A host-owned document lets a plugin declare text, language, reads, and saves without shipping an
+editor engine. CodeMirror is the implemented engine. Keep vendor-specific objects out of public
+contracts and preserve document custody at the host.
 
-The spirit survives intact, because the repo already points at it from the other direction:
-`docs/loaded-plugin-migration.md` records that the long-term answer to the first-party/loaded asymmetry
-is to **confine compiled plugins too, not to unconfine manifests**. Followed to its end, that
-produces exactly the right shape:
+These rendering contracts do not remove WebSocket ownership, native library requirements,
+synchronous state, or mandatory capabilities. Assess those separately before a migration.
 
-- **Core owns**: security (trust, tokens, cert pinning, audit), transport (broker, listener,
-  frame bridge), the workspace/task/project model, and a small set of host-owned *surfaces* —
-  the document surface, the terminal, the dashboard renderer — that plugins borrow through
-  vendor-neutral contracts.
-- **Plugins own**: everything integration-shaped (GitHub, Linear, Rollbar, model providers),
-  data-shaped (collections feeding dashboards), and workflow-shaped. Six first-party plugins
-  already live on the loaded tier; the direction is that the rest follow as each move exercises
-  a real seam — never for tidiness (`docs/extensibility.md § Unexercised seams rot`).
+## Preserve authoring and consent
 
-One line of the tier list moved on 2026-08-28. "Components rendered inside the shell's own tree" was
-the reason changes, memory, docker's chrome, and onboarding could never leave. The
-remote component tree ([docs/plugins.md](../../plugins.md) § The tree contract) replaces that
-component with a tree the host mounts from a closed kit, so the reason dissolves without the sandbox
-widening: code still does not cross, a tree of kit node names does. Stream ownership and shell-process code stay on the list.
+An agent can propose a plugin and iterate through an approval-mediated install and development grant.
+The published scaffold, SDK, declarations, reload, and permission-scoped worker are implemented.
+Distribution adds publisher verification; it must preserve the owner's consent to bytes and permissions.
 
-Call it what it is: **a fat, opinionated core with a plugin ecosystem around it** — closer to
-VS Code's actual shape than to its "everything is an extension" folklore. Users still get the
-composable acorn: dashboards, third-party sources, panes, tools, themes, cross-plugin
-contributions. What they don't get is a marketplace terminal replacement, and that is a feature
-of the trust story, not a failure of the vision.
-
-## The differentiator this buys
-
-Worth stating separately, because it is the thing the trade above is *for*, and it survives every
-argument about how thin the shell is.
-
-Every project in `references/` with a plugin story picked one side of the trade: bb has the magical
-loop with no trust boundary; herdr has a real marketplace over a socket API; the rest have no
-third-party story at all. Nobody has **an agent-authored plugin loop behind a real sandbox**. acorn's
-shape — "make my acorn look like X / build me a pane for Y" as a one-session agent task, mediated by
-one human approval, iterating without prompts, distributed later through signed per-hash consent — is
-the pitch no neighbour can copy without rebuilding their security model. That is also why the ordering
-in `work-plan.md` puts containment before discovery: the differentiator is the boundary, so shipping
-discovery over uncontained node halves would have spent it.
-
-The loop, front door, and rung-2 isolated node realm are live (`npm create acorn-plugin`,
-`acorn-plugin-sdk`; `blockers.md § 1`). Package signing is now the remaining gate before strangers
-join through discovery.
-
-## What this stance implies for "only where security needs it" first-party plugins
-
-The phrase in the vision — first-party only "where security needs it and the functionality is so
-common it warrants it" — is already how the tier line is drawn, with one addition this file makes
-explicit: **first-party is also where the sandbox measurably cannot serve the surface.** The
-Monaco finding is the template. When a surface class fails the frame contract, the move is a
-host-owned surface with a borrowed contract, and that contract becomes part of the shell's public
-API to plugins. Each such surface should be treated the way the document surface was: designed
-once, vendor-neutral vocabulary, plugins as consumers — recorded in `docs/plugins.md` when it
-ships.
+Keep local development possible without discovery or a signing service. A mutable folder install
+must disclose its provenance limit. Package signing and discovery have their own
+[implementation plan](./work-plan.md).
 
 ## Revisit conditions
 
-Revisit the thin-shell letter only if rung-3 containment (OS-level sandboxing of plugin node
-halves) ships *and* a frame-tier successor exists that can serve worker-hungry, multi-megabyte
-surfaces without widening the trust story — both at once. The remote component tree is not that
-successor: it serves component-shaped UI, and Monaco, xterm, and the webview stay host-owned or
-rectangles. Short of that, the fat-core shape is
-the honest end state, and roadmap language should say "shell" only in the composability sense.
+Reassess a smaller host only when operating-system isolation and a renderer contract can support
+its concrete consumers without widening their authority. Record crash behavior, resource budgets,
+compatibility, and hostile-package acceptance before moving a responsibility.
+
+Remote trees do not establish those conditions for native or stream owners. Revisit with an actual
+consumer and an approved boundary design, rather than moving code solely to reduce the compiled roster.
+
+## Verify before building
+
+- Trace the requested privilege to its owner and downstream consumers.
+- Compare the request with loaded context, tree, document, and transport contracts.
+- Preserve required startup capabilities and persisted state during an approved move.

@@ -16,7 +16,7 @@ hosted Node, for four reasons:
 - Workers come and go every few minutes. Public addresses and DNS for each would churn, and some
   providers price public IPs per machine.
 - The owner's local Node is behind NAT anyway, so the relay has to exist for
-  [remote access](../remote.md#the-relay-service-acorndev-or-similar).
+  [remote access](../remote.md#coordinate-the-relay).
 
 [Phase 1](./phases/01-node-image.md) uses a public address as a stepping stone. From
 [phase 4](./phases/04-relay.md) on, hosted Nodes stop listening publicly.

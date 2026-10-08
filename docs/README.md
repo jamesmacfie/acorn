@@ -89,7 +89,7 @@ the whole plugin system in one page.
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
 | [dashboards.md](./dashboards.md) | Published dashboard panels over typed data sources, placements, datasets, coverage, and measure history. |
-| [Panel studio](./future/dashboards/README.md) | Proposed redesign of how dashboard panels are created, edited, and previewed, plus derived sources that let plugins build panel data from other sources with their own logic. Twelve phases. |
+| [Dashboard followups](./future/dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision after the implemented studio and derived sources. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
@@ -307,10 +307,6 @@ Each feature landing page above has topic pages in a folder of the same name:
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's
   code on first use, to keep heavy, rarely used routes out of the node's boot graph.
-- [Find in file](./future/find-in-file.md): product requirements for shared inline find and replace
-  controls built from Acorn components across the graphical editors.
-- [Workspace icons](./future/workspace-icons.md): product requirements for workspace icons and images,
-  icons in the desktop switcher, and an optional workspace rail. The TUI keeps its workspace switcher.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
@@ -331,7 +327,7 @@ Restricted agent execution is outside scope. The programme index defines depende
 | [Scope boundaries](./future/security/refused.md) | Excluded execution isolation, format limits, and authority and coverage constraints. |
 | [Phase 01](./future/security/01-desktop-command-authorization.md) | Explicit caller authorization for Acorn's Tauri commands. |
 | [Phase 02](./future/security/02-plugin-realm-intrinsics.md) | Plugin policies that survive shared-intrinsic tampering. |
-| [Phase 03](./future/security/03-runtime-network-and-fs-backstop.md) | A runtime backstop for loaded-plugin network and filesystem grants. |
+| [Phase 03](./future/security/03-runtime-network-and-fs-backstop.md) | Node 26 in the bundle, so plugins with no network grant get no sockets. |
 | [Phase 04](./future/security/04-internal-token-confinement.md) | Loopback confinement, expiry, and renewal for internal tokens. |
 | [Phase 05](./future/security/05-automation-driver-release-fence.md) | Release exclusion and caller checks for the development automation driver. |
 | [Phase 06](./future/security/06-instruction-review.md) | Instruction changes, bounded discovery, digest-bound review, and incomplete-check refusals. |
@@ -340,21 +336,18 @@ Restricted agent execution is outside scope. The programme index defines depende
 | [Phase 09](./future/security/09-managed-mcp-review.md) | Exact MCP packages, disabled install scripts, and actual-connection tool review. |
 | [Phase 10](./future/security/10-secret-publication-checks.md) | Local secret detection, publication gates, exact-operation exceptions, and redacted exports. |
 
-## Future editor improvements
+## Editor acceptance handoff
 
-These product requirements keep everyday file management and editing small. Implement the six phases
-in order; plugin file viewers, inline find controls, and Git merge resolution keep their separate owners.
+The six implementation phases are complete. Review the combined change and finish the full test gate
+and supported-platform acceptance. Plugin file viewers and UI extensions keep separate plans.
 
 | Document | What it holds |
 | --- | --- |
-| [Editor programme](./future/editor/README.md) | Product goal, phase order, ownership, related plans, research, and verification. |
+| [Final Editor acceptance](./future/editor/README.md) | Owners, final review, repository gate, connected host checks, and completion criteria. |
 | [Scope boundaries](./future/editor/refused.md) | Deferred functionality and its reasons. |
-| [Phase 01](./future/editor/01-document-lifecycle.md) | Disk revisions, external-change freshness, save conflicts, recovery, and writer suspension. |
-| [Phase 02](./future/editor/02-file-management.md) | Create, rename, and move to trash through file/folder menus, with document reconciliation. |
-| [Phase 03](./future/editor/03-git-status.md) | Optional Git status provider, file/tab marks, folder summaries, and batched refresh. |
-| [Phase 04](./future/editor/04-tabs-and-navigation.md) | Tab menus, guarded bulk close, reopen, recent quick open, position input, and back/forward. |
-| [Phase 05](./future/editor/05-editing-controls.md) | File status, word wrap, indentation controls, and engine command discovery. |
-| [Phase 06](./future/editor/06-search-and-acceptance.md) | Folder search, include/exclude patterns, ignored-file visibility, tree controls, and release acceptance. |
+| [Editor completion records](./testing/editor-delivery-2026-10-08.md) | Dated implementation and verification notes from the retired six phase plans. |
+| [Phase six evidence](./testing/editor-phase06-2026-10-08.md) | Initial scoped-search and tree acceptance results. |
+| [Phase six followup](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected local flow, measurements, and unavailable checks. |
 
 ## Future UI extension handoffs
 

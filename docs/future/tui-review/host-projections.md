@@ -1,6 +1,6 @@
 # Host projections
 
-Date: 2026-09-27. Status: decisions for terminal-specific presentation.
+Date: October 8, 2026. Status: retained presentation decisions; implementation and open journeys are in the delivery handoff.
 
 The shared closed kit is the right boundary. Product data, command outcomes, and permission rules
 remain shared. A host can choose how to draw them and whether it has a capability. For an unavailable
@@ -9,13 +9,13 @@ acknowledges a press but performs no work.
 
 | Desktop element | Terminal decision | Rationale and success criteria |
 | --- | --- | --- |
-| Lucide and SVG icons | Omit decorative icons. Use explicit text for actions and state; keep structural caret, border, checkbox, and scrollbar marks. | The terminal has no SVG. Users must identify an action without learning an arbitrary symbol table. The review removes the Lucide substitution map from the TUI kit. |
+| Lucide and SVG icons | Omit decorative icons. Use explicit text for actions and state; keep structural caret, border, checkbox, and scrollbar marks. | The terminal has no SVG. Users must identify an action without learning an arbitrary symbol table. The Lucide substitution map has been removed from the TUI kit. |
 | Icon-only buttons | Draw the `label`; wrap or move the action to a second line when space is short. | Labels already exist in the shared component contract. No button can become invisible or `[object Object]`. |
 | Status icons in PR, agent, and Changes rows | Show status words, counts, or a compact text state in the row or focused detail. | Removing a decorative icon must not remove the only distinction between open, closed, failed, active, or selected. Audit every `Icon` call whose `title` is absent. |
 | Desktop side rail and hover tooltips | Keep named Menu, Browse, and Tasks panels. Add a full selected-item line where row truncation loses identity. | Terminal users cannot hover. A narrow list may abbreviate, but selection must reveal the whole name. |
 | Desktop context menus and row ellipsis | Use a menu key or a labeled Actions control. Keep actions in a modal list when the row is narrow. | A trailing run of full labels can consume the row and obscure its title. All actions remain keyboard reachable. |
 | Desktop settings pages and OS pickers | Provide terminal settings panels, typed paths, and text import/export where possible. Hide only operations that require an unavailable host service, with a reason and external path. | Settings are necessary for a standalone app. `acorn.json` is useful for automation but does not replace discoverable setup. |
-| Agent Attach, Export, artifact download | Use the new typed local-path file seam, and verify each caller's full round trip. Show overwrite confirmation and write errors. | The seam now transfers bytes across the host boundary; a local path never reaches the Node. |
+| Agent Attach, Export, artifact download | Use the implemented typed local-path file seam, and verify each caller's full round trip. Show overwrite confirmation and write errors. | The seam transfers bytes across the host boundary; a local path never reaches the Node. |
 | Continue in terminal and terminal drawer | Use the native session list and PTY pane; verify managed resume and exit in a real CLI run. | A mode change must keep a reachable terminal and return route. |
 | Preview webview | Keep gated off. Offer a readable URL and an explicit external-browser instruction when the task supplies one. | A text pane cannot reproduce an interactive browser preview. A missing tab is better than an inert browser frame. |
 | Desktop source-item promotion menu | Use the TUI task picker to create or link a task. Verify the round trip with a connected provider. | `SourcePanel` passes the source's promotion contract to the picker. The source still owns its seed, create, and link steps. |

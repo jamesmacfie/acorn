@@ -936,6 +936,34 @@ describe('managed agent runtime conformance', () => {
     expect((await read()).session.runtimeState).toBe('ready')
   })
 
+  it('cancels only children in the session roster without changing the parent lifecycle', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const cancelChild = vi.fn(async (_id: string) => {})
+    const cancelParent = vi.fn(async () => {})
+    class ChildControlDriver extends TrailingEventDriver {
+      override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+        return { ...await super.start(options), cancelSubagent: cancelChild, cancel: cancelParent }
+      }
+    }
+    const driver = new ChildControlDriver()
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => driver)
+    runtime = new ManagedAgentRuntime({ db: pluginDb.db, dataDir, core, internalEnv: () => ({}),
+      secrets: SECRETS, currentUserId: () => null, registry })
+    const session = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+    await driver.push({ type: 'subagent', subagent: { id: 'child-1', title: 'Child', status: 'running' } })
+    await driver.push({ type: 'subagent', subagent: { id: 'child-2', title: 'Sibling', status: 'running' } })
+    await runtime.cancelSubagent(session.id, 'child-1')
+    expect(cancelChild.mock.calls).toEqual([['child-1']])
+    expect(cancelParent).not.toHaveBeenCalled()
+    expect((await runtime.store.requireSession(session.id)).runtimeState).toBe('ready')
+    await expect(runtime.cancelSubagent(session.id, 'foreign-child')).rejects.toThrow('Subagent not found')
+    expect(cancelChild).toHaveBeenCalledOnce()
+    await runtime.stop()
+    await expect(runtime.cancelSubagent(session.id, 'child-1')).rejects.toThrow('unavailable')
+    expect(cancelChild).toHaveBeenCalledOnce()
+  })
+
   it('keeps a backgrounded subagent running while it streams, quiets it when it goes silent', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()

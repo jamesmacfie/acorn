@@ -1,74 +1,48 @@
-# What is refused, on the record
+# Plugin distribution scope decisions
 
-Part of [docs/future/ecosystem/](./README.md). The refusals this folder already states inline,
-collected so a later session argues with the reasoning instead of with silence. Nothing here is new;
-each entry names where it is argued in full. First collected 2026-08-30.
+Date: October 8, 2026. Status: retained decisions for signing and discovery work.
 
-One of this folder's refusals was overturned and is kept as an entry, at the bottom, because how it
-was overturned is the useful part.
+Use these decisions when implementing [the work plan](./work-plan.md).
+[Extensibility](../../extensibility.md) and [security](../../security.md) own implemented boundaries.
 
-## No discovery surface before containment — **CONDITION CLEARED**
+## Require signing before discovery
 
-Rung 2 now isolates loaded node halves in permission-scoped worker realms. The containment condition
-is therefore cleared; discovery remains refused for the independent package-signing condition below.
-The ordering did its job: there was no interval in which discovery exposed uncontained node halves
-([blockers.md](./blockers.md) § 1, § 2).
+Discovery must select verifiable package bytes from an identifiable publisher.
+Worker isolation is implemented, but it does not establish package identity or supply-chain provenance.
+Complete the signing design and installed-package acceptance before building the listing.
 
-## No plugin auto-update before signing
+## Keep update consent explicit
 
-Packages are hash-pinned and audited, but not signed, and provenance is a recommendation. Every hash
-change re-prompts on purpose. Auto-update before signing would silently install bytes nobody
-consented to ([blockers.md](./blockers.md) § 2; [work-plan.md](./work-plan.md) § What is deliberately
-absent).
+A signed package may add permissions or read more data. Signature verification does not authorize
+that change. Automatic plugin updates need their own consent policy after package signing.
 
-## No marketplace curation that implies review
+## State review status
 
-There could be a listing, but not a curated one: anything that implies review by listing is a promise
-acorn cannot keep. If discovery ever ships it ships unreviewed and says so
-([blockers.md](./blockers.md) § 2).
+A discovery listing must say whether a package receives a code review.
+A publisher identity, signature, or listing is not proof that the code was reviewed.
 
-## No wider frame sandbox
+## Preserve frame and host boundaries
 
-The 8 MiB cap, the no-workers CSP, and `connect-src 'none'` are the boundary, not a blocker. Monaco
-proved some surfaces cannot live in a frame; the answer is a host-owned surface with a borrowed,
-vendor-neutral contract, designed once per surface class (`docs/editor.md`). Widening the
-sandbox instead would buy one surface and cost the trust story
-([blockers.md](./blockers.md) § What is deliberately not on this list).
+Keep the frame size limit, worker restrictions, and network policy.
+Use host-owned documents and remote component trees rather than copying privileged host libraries
+into a loaded plugin or widening its sandbox.
 
-## No thin shell; the fat core is the end state
+The host retains storage authority, transport, rendering, and required capabilities.
+The reference [host responsibilities](./shell-vision.md) describes conditions that would justify
+reassessing that choice. Operating-system isolation needs separate design and acceptance.
 
-The thin-shell letter is only worth reopening if two things land at once: rung-3 OS sandboxing of
-plugin node halves, and a frame-tier successor that can serve worker-hungry, multi-megabyte surfaces
-without widening the trust story. The remote component tree is not that successor — it serves
-component-shaped UI, while Monaco, xterm, and the webview stay host-owned or rectangles. Short of
-both, roadmap language should say "shell" only in the composability sense
-([shell-vision.md](./shell-vision.md) § Revisit conditions).
+## Disclose mutable folder bytes
 
-## No provenance claim on a folder install
+Folder installs remain unpinned development sources. Their mutable bytes do not acquire fetched-archive
+provenance because the installer records a digest at one moment. Preserve the lockfile and prompt disclosure.
 
-A symlinked folder cannot be pinned, so the lockfile records `archiveSha256: null` and empty
-`entrypoints`, a test holds that, and the install form says so in its own sentence. Recording digests
-for a `{ path }` source later would not be a tidy-up; it would be a claim the source cannot support
-([blockers.md](./blockers.md) § 3).
+## Reuse generated contracts
 
-## Not refused, and worth saying
+The generated manifest schema is implemented. Preserve its check against the host's Zod contract.
+Do not replace it with a separately maintained copy during repository extraction or discovery work.
 
-Three things read like refusals and are not. The closed action-verb set and descriptor vocabulary
-grow one designed addition at a time rather than never. Plugin-to-plugin interop is covered
-host-mediated by capabilities, content links, ref resolvers, and five kinds of cooperative extension
-point; only bb-style *uncooperative* extension is refused, and that one is refused permanently
-(`docs/plugins.md § There is no uncooperative extension`). Downgrade support, a `when` expression
-language, and plugin-supplied regexes are refused in their own owning docs, not here.
+## Verify before building
 
-## Overturned: the generated manifest schema
-
-This folder used to record "deliberately not built: a JSON Schema for `acorn-plugin.json`", because a
-second schema is a second source of truth. That is the right answer for a hand-maintained copy and the
-wrong one for a generated file. `packages/plugin-types/acorn-plugin.schema.json` is written out of the
-Zod contract by a test that fails when the two disagree, so there is still one source of truth, and an
-author now gets completion and inline errors before the file is ever loaded
-([README.md](./README.md); `docs/plugins.md § The manifest schema`).
-
-The shape of the reversal is the lesson: the refusal was about duplication, and generating the copy
-removed the duplication rather than accepting it. Check the same thing before restating any refusal
-here.
+- Read the signing design before changing discovery or update policy.
+- Check loaded-package authority, folder provenance, and generated-schema tests after implementation.
+- Reassess a scope decision only with a concrete consumer and its authority and lifecycle requirements.

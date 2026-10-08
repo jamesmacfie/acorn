@@ -1,162 +1,99 @@
-# The compiled tier: the map for shrinking it
+# Compiled plugin migration candidates
 
-From the node-first session (2026-08-15). Nothing here is scheduled. This file is the standing
-answer to "which compiled plugin moves to the loaded tier next, what blocks it, and what gets
-deleted when it goes." It does not change the tier line — `docs/extensibility.md § Two tiers,
-permanently` stands, and so does "do not migrate for tidiness." What the end goal adds is a third
-honest reason to move a plugin, alongside exercising a seam and wanting release cadence:
-**whatever is compiled into the client does not exist for a web or terminal client, and cannot be
-imitated by an agent-authored plugin.** Every compiled integration is a hole in "the node
-provides the UIs."
+Date: October 8, 2026. Status: standing migration assessment; no migration scheduled.
 
-## Where this already stands (good news first)
+Read this page before proposing a compiled plugin move. [First-party plugins](../first-party-plugins.md)
+owns the privilege inventory, and [extensibility](../extensibility.md) owns the permanent tier boundary.
+A move needs a concrete benefit, such as independent releases or a caller that needs a loaded package.
 
-Six plugins are loaded (database, http, linear, model-providers, nodes-file, rollbar) with **zero
-production import edges** into them. A compiled plugin costs one roster line per side
-(`apps/desktop/src/client/plugins.ts`, `apps/node/src/composition/plugins.ts`) and registers
-itself through `ctx`. A loaded plugin can shadow a built-in by id (`composition.ts`) — the
-migration hatch is already wired. The registration-point sprawl this review expected to find was
-already fixed.
+## Starting point
 
-## The census (verified 2026-08-15)
+The loaded source packages are agent-cost, database, http, linear, model-providers, nodes-file,
+rollbar, and sentry-telemetry. nodes-file is not bundled. The other compiled registrations are in
+`apps/node/src/composition/plugins.ts` and `apps/desktop/src/client/plugins.ts`.
 
-Twelve compiled plugins, easiest move first. "Dies with it" lists the private registries whose
-last consumer leaves.
+Remote component trees and cooperative extension points are implemented. Changes' transcript card
+uses `agents:tool-card`, so an in-realm renderer does not block its migration.
+The host owns CodeMirror; editor bundle size is not its migration blocker.
 
-| Plugin | What blocks a move | Dies with it | Call |
-|---|---|---|---|
-| onboarding | Nothing structural — it is a first-run gate that must exist before plugin distribution settles. | — | Honestly core shell, not a plugin. Leave it; costs one line. |
-| notes | `protocol/notes.ts` location type is core addressing; node half writes `.md` files in the data root. | — | Movable when a seam wants it. |
-| changes | Renders inside the agents transcript. | An `extensions` entry on `agents:tool-card`, with either carrier | **Settled, 2026-08-30 (layout phase 9).** Nothing keeps it compiled. The private renderer registry is gone and the card is an ordinary contribution to a `remote` point, which a loaded plugin fills the same way. Stays compiled by preference: it is one of the four panes a task always has. See coupling 3. |
-| context | Hosts the tray that memory renders into (receiving half of the same coupling). | — | Movable only together with memory, and coupling 1 below says why that is now a redesign, not a seam swap. |
-| preview | Drives a shell-owned child webview. | — | **Stays first-party** (desktop extra behind the platform seam). |
-| editor | Monaco in-realm; the host document surface already exists. | — | **Settled, 2026-08-30 (layout phase 9).** Both surfaces are host layouts filled with kit nodes and the plugin ships no stylesheet. What keeps it compiled is Monaco's size: a frame bundle measures 7.93 MiB against an 8.00 MiB cap with no editor UI in it, and its language-service workers cannot be served at all (docs/first-party-plugins.md, the editor row). |
-| docker | Owns the `docker` WS channel and exec streams. Its task status has a loaded-tier shape through an `extensions` item route aimed at `core:task`; no marker seam blocks a move. | — | Closest to movable of the stream owners; its footer badge already has a descriptor twin. |
-| memory | Renders inside context's tray — editable inputs and accept/reject gates, a component in another plugin's surface; `MEMORY_KNOWLEDGE` capability named by the composition root. | client `contextSections` | **Stays first-party while the tray is a component** — the cooperative-seam conversion was attempted and correctly refused (coupling 1 below). |
-| workflows | Publishes `WORKFLOW_CONTROL`, an in-realm function capability consumed by agents' sidebar. | — | Movable once that capability becomes a descriptor/route seam (below). |
-| github | Core data-model coupling: `github_*` columns on the projects row, `Project.github`/`Task.pullNumber` on the wire, core draws PR affordances (`DEFAULT_PANE = 'pr'`, TabRail), `integrationFlows` has no manifest form. | `integrationFlows` | The big one. Gated on the project-row generalization, which is real work and not icon-sized. |
-| agents | Owns the `agent` WS channel; the transcript is a core surface other plugins render into; `AGENTS_RUNTIME` required by the composition root. | — | **Stays first-party** (stream + surface owner). |
-| terminal | Owns PTY streams ("exactly one plugin may own these"); the drawer is a core surface; folder-picker main code. | `drawer` slot (its topbar chip has since gained a manifest form — `slot: 'topbar'`) | **Stays first-party** (stream owner). |
+Use the owning inventory rather than the removed August census. In particular, memory and notes
+provide required capabilities, Docker owns streams, and Editor owns both a PTY channel and persisted
+multi-document state.
 
-One blocker the table does not spell out per row, because it applies to five of them at once: the
-composition root calls `agents`, `notes`, `terminal`, and `workflows` with a `NodePluginDeps` bag,
-and `agents`, `memory`, and `notes` with the data root as a first argument
-(`apps/node/src/composition/plugins.ts`). The loader activates a loaded plugin with its context and
-nothing else, so every one of those arguments has to become a capability, a route, or a
-`ctx.storage` path before the plugin can move. `docs/first-party-plugins.md` lists it as reason F.
+## Assess a candidate
 
-**The honest end state, then:** integrations and data features (github, docker, memory, notes,
-context, workflows, editor) end up loaded; the stream-and-surface owners (terminal, agents,
-preview, changes) are named permanent first-party — they are core features wearing the plugin
-costume, and the costume is cheap enough to keep for uniformity. That end state matches
-`docs/future/ecosystem/shell-vision.md` exactly; this table is its per-plugin ledger.
+| Candidate | Work to assess before a move |
+| --- | --- |
+| Changes | No structural blocker is recorded. Convert route carriers and test a loaded package if independent delivery is wanted. It stays compiled by product preference. |
+| GitHub | Trace `GITHUB_MIRROR` consumers and core project repository fields. Design any authority or addressing change before moving the provider. |
+| Workflows | Trace `WORKFLOWS_RUNNER`, `WORKFLOW_ROUTE`, client `WORKFLOW_CONTROL`, constructor adapters, and extension-point ownership. Define route or capability contracts for actual consumers. |
+| Context | Its persisted state and synchronous context revision need an explicit replacement or a decision to keep that owner compiled. |
+| Editor | Its `$EDITOR` PTY channel, open-file persistence, and multiple documents exceed the loaded document layout. An open-file command alone does not complete the move. |
 
-## The four couplings that need a designed seam (the actual work)
+Agents, terminal, preview, memory, notes, onboarding, browser, and Docker have first-party obligations
+listed in [the inventory](../first-party-plugins.md). Reassess them only with a demonstrated requirement
+and a design for every obligation. Moving a tree into a worker does not replace transport ownership,
+required capabilities, native dependencies, or constructor adapters.
 
-These, not the moves themselves, are the architecture in this file. Each is a place where two
-plugins share a realm today; each has a designed answer that is data-plus-messages.
+## Implement an approved move
 
-**Rewritten 2026-08-28.** Couplings 1 to 3 below were written when the only data-shaped answer was a
-descriptor, and each one concluded "component-shaped, so it stays first-party." There is a third shape
-between descriptor and iframe now: a remote component tree the host mounts from a closed kit
-([docs/plugins.md](../plugins.md) § Descriptors for facts, trees for UI, rectangles for pixels). Under it, memory's tray section becomes a
-tree in a `context:section` slot (layout phase 6), changes' tool card becomes a tree behind
-`contributions.remote` (phase 3, **shipped**), and `WORKFLOW_CONTROL`'s sidebar controls can be a tree
-too. The census table's "stays first-party" calls for changes and memory are therefore superseded; the
-arguments below are kept because they explain why the descriptor answer was refused, which is still
-true. Coupling 4, the projects row, is untouched by the layout programme.
+Follow these steps for one plugin at a time:
 
-1. **memory → context's tray.** The seam this file first prescribed — convert the pair to the
-   cooperative extension point — was attempted when that contract shipped (2026-08-15) and
-   **correctly refused**: the tray is editable inputs and accept/reject gates, a *component*, and
-   converting it would have meant a widget vocabulary on the wire, which the contract refuses on
-   the record. The extension-point seam shipped with a different first consumer
-   (`docs/plugins.md § Cooperative extension points`), and the CSS ownership was fixed separately
-   — the cross-package baseline fell from 12 entries to 5, and context's two remaining entries are
-   shared vocabulary classes, not layout. What remains true: memory moves only if the tray itself
-   is redesigned descriptor-shaped, and nothing currently argues for that. Treat memory as
-   first-party until something does.
-2. **workflows → agents (`WORKFLOW_CONTROL`).** Three function references passed in-realm. The
-   loaded-tier shape already exists: node-side capabilities plus plugin routes — and since the
-   chrome vocabulary grew (context menus, extension points, exclusive slots are manifest keys
-   now), the descriptor path has more room than when this was written. Decide whether the
-   sidebar's controls become descriptors (verbs from the closed set: `runNodeAction`) or a small
-   frame. Either removes the last in-realm function passing between plugins — but heed coupling 1:
-   if the controls turn out to be component-shaped (live inputs, not rows-with-verbs), the honest
-   answer is "stays first-party", not a wider wire format.
-3. **changes → agents (the tool card).** **Settled, 2026-08-29 (layout phase 3), finished 2026-08-30
-   (phase 9).** The argument below was that an inline transcript renderer is a component on a core
-   surface, so the tier line refuses it permanently. The remote tree removed the premise, and phase 9
-   removed the registry: `agents:tool-card` is an ordinary `remote` point, a contributor names the tool
-   kinds it draws in `matches`, and the two carriers are a compiled component and a worker's tree.
-   `AgentToolCallCard` is a `Slot` with the built-in card as its child. Nothing about the card requires
-   first-party status any more.
+1. List production imports, constructor dependencies, capabilities, routes, state, streams, and
+   host-only registrations. Name the consumer of each one.
+2. Use published loaded-plugin contracts for asynchronous data and host components for UI.
+   Keep secrets, storage authority, and required host services with their owners.
+3. Preserve plugin identity, database migrations, stored state, consent, and contribution availability.
+   Define any migration before writing it.
+4. Build and install the package through the real loaded-plugin path. Remove compiled registrations
+   and imports only after its contributions work through that path.
+5. Remove obsolete private registries and reduce architecture baselines to the observed graph.
+   Keep testkit dependencies explicit; do not raise a ceiling to hide a leftover import.
 
-   changes itself stayed compiled, and that is now a preference rather than a constraint — it is one
-   of the four panes a task always has, so it ships with the app. Its renderer was rewritten in the
-   kit for the phase, which is the work that would have to happen either way. Phase 9 finished it: the
-   private registry is gone, so a compiled card and a remote one reach the point the same way and the
-   host arbitrates between them like any other `replace` slot.
-4. **github → the projects row.** `github: { owner, name, repoId }` is a first-class core column
-   family, and core renders PR affordances from it. The move is generalizing "a project's linked
-   external repo/item" into core vocabulary that any provider plugin can fill (the task-origin
-   pattern already does this for tasks). Real work, already flagged in the icons session as
-   "entirely unrelated to icons"; it is the gate on the biggest move and should be designed as
-   its own brief before anyone starts it.
+Acceptance: fresh install, upgrade with saved data, disablement where permitted, failure, reload,
+Node switching, and both supported hosts behave as documented. A required capability remains
+available throughout startup and reconciliation.
 
-## Delete now (no move required)
+## Verify retained cleanup candidates
 
-- **Dead slot ids** `topbar.left` and `task.switcher.extra` — zero consumers anywhere (the
-  manifest slot enum grew to `footer | topbar` without them, which confirms nobody wants them). Still
-  present in `client-core/src/host/registries/extensionPoints/slots.ts` on 2026-08-28, and they outlived the cleanup that
-  would have taken them. Delete them the next time that file is opened.
-- ~~The `themes` registry~~ — resolved: manifest-declared token themes shipped
-  (`docs/ui-design.md § Plugin themes`), so that registry now has its plugin feeder. `styles`
-  stays core-only by decision (style packs are deliberately not contributable).
+These reports need a reproduction before a fix. They are independent of a plugin migration:
 
-## Sequencing rules
+- `topbar.left` and `task.switcher.extra` remain in
+  `packages/client-core/src/host/registries/extensionPoints/slots.ts`. Search callers and compatibility
+  handling before removing either type member.
+- The broker can throw `Unknown node` when an address has no connection. Confirm the caller's
+  connection state and provide a recoverable error if it escapes that model.
+- Earlier reports described a local Node label resetting after identity changes and stale GitHub
+  mirror rows without a visible partial-refresh signal. Reproduce each with a disposable Node.
+- `onSelectTarget` remains optional in reference-panel props. Confirm consumers before removing it.
 
-- A move must still earn itself: exercise a new seam, want its own cadence, or close a named hole
-  for non-desktop clients. Tidiness still loses.
-- **Prefer the move that deletes a registry.** The census column above is the scorecard; a move
-  that retires a private registry shrinks the surface an agent-authored plugin can never reach.
-- Budget for the ratchets: the testkit deep-import baseline sits flush at its ceiling (147
-  imports, exact-set roots), so any move must prune its roots in the same change; and the
-  anti-vacuity floors in `boundaries.test.ts` (package/edge minimums) will need lowering as
-  plugins leave the workspace graph.
+For each confirmed issue, test the observable failure and update its owning reference page.
 
-## Open items from the loaded-plugin migrations
+## Complete loaded-package acceptance
 
-`docs/loaded-plugin-migration.md` recorded the moves of rollbar, model-providers, linear, http, and
-database out of the binary. It was deleted on October 4, 2026, and its history is in Git. These items
-were still open when it went:
+The migration record left live acceptance open for provider surfaces and installer-driven updates.
+Use [desktop and plugin checks](../testing/desktop-and-plugins.md) and the relevant feature checks.
+Record real-token provider reads, update consent, contribution replacement, and state retention.
+For database, verify the composed editor, execution, completions, retained scratch text, and bounded
+result rendering against disposable data. Verify Linear reference panels and HTTP writes separately.
 
-- **The editor's move.** What's left is the open-document verb its ⌘P needs (`docs/editor.md`).
-- **The first loaded consumer of the `overlay` frame target.** The carrier is tested at the manifest
-  and broker boundaries, but no loaded package declares an `overlay` frame, so the path is unexercised
-  end to end.
-- **Release validation:** a real-token soak and an installer-driven update.
-- **Cold-start bare references,** such as a `JIRA-42` with no confirming URL nearby, are deliberately
-  unbuilt. They'd need a bounded host-compiled token grammar, gated on a live connection and on
-  confirmation through the provider's `refResolvers` route. Plugin-supplied regular expressions were
-  rejected: a ReDoS risk, no answer when two providers' patterns collide, and a second pattern language.
-- **Confined URLs stay as they are.** The loaded tier's `/p/:projectId/x/<plugin-id>/` URLs are ugly on
-  purpose. The long-term answer to the asymmetry is to confine compiled plugins too.
-- **Known issues nobody owns yet:** `broker.fetch` throwing `Unknown node` is the only connection
-  failure not modeled as a connection state. The local Node's label resets to "This computer" after
-  an identity change. GitHub's pulls batch keeps previously mirrored rows when part of a pass fails,
-  with no visible signal. `onSelectTarget` on the reference panel props has no caller.
-- **Verification that needs the running app,** across the database, linear, and http moves: the
-  composed database pane (the splitter, ⌘Enter running the just-typed text, completions against a real
-  database, the modals in the bottom region, the scratch document surviving a reopen, and the result
-  grid with a `SELECT` that has no `LIMIT`), linear's panel inside a pull request and its
-  project-scoped view, and http's surfaces, two-click deletes, `bridge.ui.copy`, and agent-context
-  options.
+The overlay carrier has manifest, host, and companion-overlay implementations. Confirm whether a
+loaded package exercises the complete flow before retaining the earlier first-consumer gap.
+
+<a id="open-items-from-the-loaded-plugin-migrations"></a>
+
+## Scope boundaries
+
+Bare references without a confirming URL need a separate bounded host parser and provider
+confirmation design. Require a live provider connection and confirmation through its `refResolvers`
+route. Define how competing providers resolve the same token before implementation.
+Plugin-supplied regular expressions remain excluded.
+Loaded routes remain confined under the plugin's prefix. Cleaner URLs do not justify removing that
+boundary. These decisions are independent of moving a compiled package.
 
 ## Verify before building
 
-Re-run the census: which plugins have `acorn-plugin.config.mjs`; current consumers of each
-host-only registry (`registries/extensionPoints/plugin.ts` vs the manifest's contribution block in
-`plugin/contract.ts`); whether the memory/context tray coupling and `WORKFLOW_CONTROL` still
-exist; whether the projects row still carries `github_*` columns; and the current ratchet numbers
-in `tools/arch/boundaries.test.ts`.
+- Read the composition lists and first-party inventory; repeat the dependency assessment for the candidate.
+- Inspect loaded context types, storage, contribution descriptors, and compatibility rules.
+- Reproduce retained issues and check dated acceptance records before assigning a fix.
+- Run lint, owner and consumer suites, architecture checks, and installed-package acceptance.

@@ -476,6 +476,19 @@ export class ManagedAgentRuntime {
     await this.store.cancelTurn(target)
   }
 
+  async cancelSubagent(sessionId: string, subagentId: string): Promise<void> {
+    const session = await this.store.requireSession(sessionId)
+    if (!session.subagents.some((child) => child.id === subagentId)) throw new Error('Subagent not found in this session.')
+    if (session.archivedAt) throw new Error('This session is archived.')
+    if (session.controller !== 'acorn') throw new Error('This session is controlled outside Acorn.')
+    const cancelled = await this.engine.sessionHandleIfPresent(sessionId, async (handle) => {
+      if (!handle.cancelSubagent) throw new Error('This harness does not support stopping individual subagents.')
+      await handle.cancelSubagent(subagentId)
+      return true
+    })
+    if (!cancelled) throw new Error('The subagent connection is unavailable.')
+  }
+
   async patchQueuedTurn(
     sessionId: string,
     turnId: string,
