@@ -5,7 +5,8 @@
 //
 // "An agent is working here" is not in this list. That belongs to the agents plugin, which knows about
 // both managed sessions and terminal harnesses, and it publishes it through the same marker registry
-// (plugins/agents/src/client/railMarkerContribution.ts).
+// (plugins/agents/src/client/railMarkerContribution.ts). Uncommitted changes are not here either: the
+// changes plugin publishes its added/removed dot (plugins/changes/src/client/railMarker.ts).
 //
 // Priorities here sit above the range contributed markers are clamped to
 // (RAIL_MARKER_PLUGIN_MAX_PRIORITY), so a plugin marker can never push a core lifecycle state out of
@@ -19,7 +20,7 @@ export type RailChecks = 'success' | 'failure' | 'pending' | 'mixed'
 export type RailStatusInputs = {
   checks: RailChecks | null // null when the task has no PR / no checks
   unread: boolean // an unread notice for this task, from any source
-  status: TaskStatus | undefined // live worktree status (dirty / missing)
+  status: TaskStatus | undefined // live worktree status (missing)
   archiving: boolean // guarded teardown in flight for this task
   settingUp: boolean // the project's setup script is still running in this task's new worktree
   pinned: boolean // held at the top of the rail
@@ -46,14 +47,11 @@ export function railStatusMarkers({ checks, unread, status, archiving, settingUp
     markers.push({ id: 'setup', label: 'Setup script running', dotTone: 'ok', busy: true, placements: ['bottom-center'], priority: 290 })
   if (unread)
     markers.push({ id: 'needs', label: 'Unread notifications', icon: 'circle-alert', tone: 'warn', placements: ['top-end', 'bottom-start'], priority: 280 })
-  // Dirty and missing are mutually exclusive: a vanished worktree can't report a file count.
   if (status?.missing)
     markers.push({ id: 'repair', label: 'Worktree missing — needs repair', icon: 'triangle-alert', tone: 'danger', placements: ['bottom-end', 'bottom-start'], priority: 260 })
   if (pinned)
     markers.push({ id: 'pinned', label: 'Pinned to top', icon: 'pin', tone: 'warn', placements: ['top-start', 'bottom-start'], priority: 240 })
   if (checks)
     markers.push({ id: 'checks', label: CHECKS_LABEL[checks], dotTone: CHECK_TONE[checks], placements: ['top-end', 'bottom-end'], priority: 200 })
-  if (!status?.missing && status?.dirty)
-    markers.push({ id: 'dirty', label: `Uncommitted changes (${status.dirtyCount})`, icon: 'pencil', tone: 'warn', placements: ['bottom-end', 'bottom-start'], priority: 180 })
   return markers
 }

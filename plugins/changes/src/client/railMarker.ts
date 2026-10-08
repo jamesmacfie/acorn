@@ -1,5 +1,7 @@
-// The Changes button's top-right corner in the pane rail: green when the uncommitted changes only add
-// lines, red when they only remove them, half of each for both, and nothing on a clean tree.
+// A dot for a task's uncommitted changes, on its row in the task rail and in the top-right corner of
+// the Changes button in the pane rail: green when the changes only add lines, red when they only
+// remove them, half of each for both. Nothing on a clean tree, and nothing outside a git repo, where
+// the status read comes back empty.
 //
 // Read on core's status poll (taskStatusRevision) rather than a clock of its own, and skipped whenever
 // that poll already says the tree is clean, so a clean task costs no read. A task in the project folder
@@ -22,9 +24,9 @@ export function changesDot(changes: readonly LocalChange[]): RailMarkerDot | nul
 }
 
 const LABEL: Partial<Record<RailMarkerDot, string>> = {
-  ok: 'Lines added',
-  bad: 'Lines removed',
-  diff: 'Lines added and removed',
+  ok: 'Uncommitted changes: lines added',
+  bad: 'Uncommitted changes: lines removed',
+  diff: 'Uncommitted changes: lines added and removed',
 }
 
 const [dots, setDots] = createSignal<Record<string, RailMarkerDot | null>>({})
@@ -45,10 +47,12 @@ export const changesRailMarkerContribution: RailMarkerContribution = {
   id: 'changes',
   order: 20,
   markers: (target) => {
-    if (target.kind !== 'pane' || target.id !== 'changes') return []
-    if (taskStatus(target.taskId)?.dirty === false) return []
-    ask(target.taskId, taskStatusRevision())
-    const dot = dots()[target.taskId]
-    return dot ? [{ id: 'lines', label: LABEL[dot]!, dotTone: dot, placements: ['top-end'] }] : []
+    const taskId = target.kind === 'task' ? target.id : target.kind === 'pane' && target.id === 'changes' ? target.taskId : null
+    if (!taskId || taskStatus(taskId)?.dirty === false) return []
+    ask(taskId, taskStatusRevision())
+    const dot = dots()[taskId]
+    if (!dot) return []
+    // A task row's top corners go to notices and the pin, so its dot takes a bottom one.
+    return [{ id: 'lines', label: LABEL[dot]!, dotTone: dot, placements: target.kind === 'task' ? ['bottom-end', 'bottom-start'] : ['top-end'] }]
   },
 }

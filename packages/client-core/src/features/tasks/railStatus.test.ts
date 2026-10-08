@@ -19,22 +19,20 @@ describe('railStatusMarkers', () => {
 
   it('gives every marker a meaning and exactly one representation', () => {
     const markers = railStatusMarkers(inputs({ checks: 'failure', unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 3 }) }))
-    expect(markers.map((m) => m.id)).toEqual(['needs', 'pinned', 'checks', 'dirty'])
+    expect(markers.map((m) => m.id)).toEqual(['needs', 'pinned', 'checks'])
     expect(markers.every((m) => m.label && !!m.icon !== !!m.dotTone && m.placements.length)).toBe(true)
-    expect(markers.find((m) => m.id === 'dirty')?.label).toBe('Uncommitted changes (3)')
   })
 
-  it('shows repair, not dirty, when the worktree is missing', () => {
-    expect(railStatusMarkers(inputs({ status: status({ dirty: true, dirtyCount: 1, missing: true }) })).map((m) => m.id)).toEqual(['repair'])
+  it('leaves uncommitted changes to the changes plugin', () => {
+    expect(railStatusMarkers(inputs({ status: status({ dirty: true, dirtyCount: 1 }) }))).toEqual([])
   })
 
   it('gives every simultaneous state its own corner', () => {
-    // The busiest a core-only row gets: checks, an unread notice, a dirty worktree, pinned.
-    expect(placements({ checks: 'pending', unread: true, pinned: true, status: status({ dirty: true, dirtyCount: 2 }) })).toEqual({
+    // The busiest a core-only row gets: checks, an unread notice, pinned.
+    expect(placements({ checks: 'pending', unread: true, pinned: true })).toEqual({
       needs: 'top-end',
       pinned: 'top-start',
       checks: 'bottom-end',
-      dirty: 'bottom-start',
     })
   })
 
