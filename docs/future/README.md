@@ -16,7 +16,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | --- | --- | --- |
 | [security/](./security/README.md) | Five product requirement documents from a hardening pass: desktop command authorization, plugin realm policy tampering, the bundled-runtime network and filesystem backstop, internal-token confinement when advertised, and the automation-driver release fence. | Proposed, October 7, 2026; implementation not started. |
 | [editor/](./editor/README.md) | Six product requirement phases for document conflicts, file management, Git status, tabs/navigation, editing controls, and scoped search, with combined acceptance and scope boundaries. | Proposed, October 7, 2026; implementation not started. |
-| [url/](./url/README.md) | `acorn://` links, **Copy link**, confirmed task promotion, and `acorn --link`. The [reference](../frontend/acorn-links.md) owns behavior. | Six phases implemented and merged into main, October 8, 2026. Installed-release acceptance remains unverified. |
 | [git-client/](./git-client/README.md) | Built-in Git repository source and task pane: worktrees, commit history, stashes, AI explanations, task/workflow launches, refs/remotes/settings, operations, and conflict resolution. Eight sequential phases with retained screenshot references. | Planned, October 7, 2026; implementation not started. |
 | [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
@@ -64,6 +63,11 @@ beside them; nothing in it waits any more. Ecosystem's shipped rung-2 containmen
 `blockers.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`url/` was implemented, merged into main, and deleted on October 8, 2026.
+[Acorn links](../frontend/acorn-links.md) owns the address forms, Copy link, task promotion,
+desktop and terminal behavior, and the remaining installed-release verification gap. The phase
+plans and verification records remain in Git history.
 
 `project-workspace/` was implemented and deleted on October 8, 2026. [Workspaces and tasks](../workspaces-and-tasks.md)
 owns the `core.workspaces` mode, and [projects and workspaces](../workspaces-and-tasks/projects.md)

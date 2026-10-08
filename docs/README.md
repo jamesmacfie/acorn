@@ -78,22 +78,6 @@ the whole plugin system in one page.
 | [editor.md](./editor.md) | The host-owned editor: the shared surface, what it lends to plugins, and its limits. |
 | [notifications.md](./notifications.md) | What an agent is doing, which changes are worth interrupting for, and the gate every channel hangs off. |
 
-## Acorn links delivery record
-
-The [Acorn links reference](./frontend/acorn-links.md) owns behavior. These pages retain decisions and
-phase evidence. Installed-release acceptance remains open.
-
-| Document | What it holds |
-| --- | --- |
-| [Acorn links plan](./future/url/README.md) | The `acorn://` address format, decisions, safety rules, and how existing addresses map in. |
-| [Refused alternatives](./future/url/refused.md) | What the plan decided not to do, and deferred work. |
-| [Phase 01](./future/url/01-addresses.md) | A pure link parser and builder, and a dispatcher that opens an address in the app. |
-| [Phase 02](./future/url/02-desktop-registration.md) | macOS scheme registration, cold-start delivery, and the dev session `link` verb. |
-| [Phase 03](./future/url/03-copy-link.md) | **Copy link** on tasks, project pages, plugin pages, settings pages, and rail sources. |
-| [Phase 04](./future/url/04-new-task-action.md) | `new-task?url=` through the promote dialog. |
-| [Phase 05](./future/url/05-terminal-link.md) | `acorn --link` for the terminal client. |
-| [Phase 06](./future/url/06-documentation.md) | The reference page and index updates. |
-
 ## Features
 
 | Document | What it holds |
