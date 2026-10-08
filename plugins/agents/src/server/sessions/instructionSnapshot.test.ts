@@ -75,8 +75,24 @@ it('reads UTF-16 and damaged UTF-8, bounds files, and cancels work', async () =>
   expect(snapshot.files.find((file) => file.path === 'CLAUDE.md')?.text).toContain('�')
   write(join(dir, 'nested/AGENTS.md'), 'x'.repeat(1_000_001))
   await expect(scanInstructions(dir, [])).rejects.toThrow(InstructionScanIncomplete)
-  const abort = new AbortController(); abort.abort()
-  await expect(scanInstructions(dir, [], abort.signal)).rejects.toThrow(InstructionScanIncomplete)
+})
+
+it('rejects a pre-aborted clean scan before discovering files', async () => {
+  const dir = root()
+  write(join(dir, 'AGENTS.md'), 'Clean instruction.\n')
+  const abort = new AbortController()
+  abort.abort()
+  await expect(scanInstructions(dir, [], abort.signal)).rejects.toThrow(/did not finish/)
+  expect((await scanInstructions(dir, [])).files).toHaveLength(1)
+})
+
+it('bounds advisory findings for a one-megabyte file of hidden characters', async () => {
+  const dir = root()
+  write(join(dir, 'AGENTS.md'), `x${String.fromCodePoint(0x200b)}\n`.repeat(200_000))
+  const findings = analyzeInstruction(await scanInstructions(dir, []))
+  expect(findings).toHaveLength(2_000)
+  expect(findings[0]).toMatchObject({ category: 'hidden-character', line: 1 })
+  expect(findings.at(-1)).toMatchObject({ category: 'unsupported', detail: expect.stringContaining('Finding limit reached') })
 })
 
 it('refuses when discovered skill files exceed the file quota', async () => {

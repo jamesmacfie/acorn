@@ -1,11 +1,12 @@
 // Bounded, read-only discovery of the repository instructions a managed harness may load.
 import { createHash } from 'node:crypto'
-import { lstat, readdir, readFile, realpath, stat } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { lstat, open, readdir, realpath, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, extname, join, relative, resolve } from 'node:path'
 type SkillFolder = { name: string; dir: string }
 
-export const INSTRUCTION_ANALYZER_VERSION = 1
+export const INSTRUCTION_ANALYZER_VERSION = 2
 const NAMES = new Set(['AGENTS.md', 'AGENTS.override.md', 'CLAUDE.md', 'CLAUDE.local.md'])
 const SKILLS = ['.claude/skills', '.agents/skills', '.codex/skills']
 const EXCLUDED = new Set(['.git', '.acorn', '.turbo', '.venv', 'venv', '__pycache__', 'node_modules', 'vendor', '.pnpm', '.next', 'dist', 'build', 'target', 'coverage'])
@@ -16,6 +17,7 @@ const MAX_DIRECTORIES = 5_000
 const MAX_DEPTH = 20
 const MAX_BYTES = 8 * 1024 * 1024
 const MAX_FILE_BYTES = 1_000_000
+const READ_CHUNK_BYTES = 64 * 1024
 const MAX_MS = 5_000
 export const INSTRUCTION_SCOPE = `root and nested AGENTS.md, AGENTS.override.md, CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md; Claude @imports (five hops); repository ${SKILLS.join(', ')} and delivered plugin skills with supporting files; excludes ${[...EXCLUDED].join(', ')} and ordinary repository symlink directories; scan limits ${MAX_FILES} files, ${MAX_DIRECTORIES} directories, ${MAX_DEPTH} levels, ${MAX_BYTES} bytes, ${MAX_FILE_BYTES} bytes per file, ${MAX_MS} ms; advisory analysis inspects the first 20,000 lines per file and reports at most 2,000 findings`
 
@@ -42,7 +44,8 @@ function decode(bytes: Buffer, required: boolean): string | null {
 export async function scanInstructions(root: string, pluginSkills: readonly SkillFolder[], signal?: AbortSignal): Promise<InstructionSnapshot> {
   const controller = new AbortController()
   const abort = () => controller.abort(signal?.reason)
-  signal?.addEventListener('abort', abort, { once: true })
+  if (signal?.aborted) abort()
+  else signal?.addEventListener('abort', abort, { once: true })
   const timer = setTimeout(() => controller.abort(new Error('Instruction scan timed out.')), MAX_MS)
   const files = new Map<string, InstructionFile>()
   // Preserve each discovered alias in the approval digest, but read one canonical file once.
@@ -53,7 +56,9 @@ export async function scanInstructions(root: string, pluginSkills: readonly Skil
     if (controller.signal.aborted) throw new InstructionScanIncomplete('Instruction scan did not finish. Retry the review or change the setting in Settings > Security and backup.')
   }
   const canonical = async (path: string, optional: boolean): Promise<string | null> => {
-    try { return await realpath(path) }
+    check()
+    let resolved: string
+    try { resolved = await realpath(path) }
     catch (error) {
       if (optional && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         try { await lstat(path) }
@@ -61,24 +66,53 @@ export async function scanInstructions(root: string, pluginSkills: readonly Skil
       }
       throw new InstructionScanIncomplete(`Cannot inspect ${path}. Check its permissions or links, then retry the review.`)
     }
+    check()
+    return resolved
   }
   const label = (path: string) => path.startsWith(root + '/') ? relative(root, path) : path.replace(homedir(), '~')
+  const readBounded = async (path: string, real: string): Promise<Buffer> => {
+    const limit = Math.min(MAX_FILE_BYTES, MAX_BYTES - totalBytes)
+    let handle
+    try { handle = await open(real, constants.O_RDONLY | constants.O_NONBLOCK | (constants.O_NOFOLLOW ?? 0)) }
+    catch { check(); throw new InstructionScanIncomplete(`Cannot open ${label(path)}. Check its permissions or link and retry.`) }
+    try {
+      check()
+      const info = await handle.stat()
+      check()
+      if (!info.isFile()) throw new InstructionScanIncomplete(`${label(path)} is not a regular file. Remove the special input and retry.`)
+      if (info.size > limit) throw new InstructionScanIncomplete(`Instruction scan exceeded its byte limit at ${label(path)}. Reduce the input and retry.`)
+      // One extra byte detects growth after fstat. Retain only bytes actually read, so hundreds
+      // of small files do not each keep a full-size scratch buffer in the canonical cache.
+      const scratch = Buffer.allocUnsafe(Math.min(READ_CHUNK_BYTES, limit + 1))
+      const chunks: Buffer[] = []
+      let length = 0
+      while (length <= limit) {
+        check()
+        const count = Math.min(READ_CHUNK_BYTES, limit + 1 - length)
+        const result = await handle.read(scratch, 0, count, length)
+        check()
+        if (result.bytesRead === 0) break
+        chunks.push(Buffer.from(scratch.subarray(0, result.bytesRead)))
+        length += result.bytesRead
+      }
+      if (length > limit) throw new InstructionScanIncomplete(`Instruction scan exceeded its byte limit at ${label(path)}. Reduce the input and retry.`)
+      return Buffer.concat(chunks, length)
+    } catch (error) {
+      if (error instanceof InstructionScanIncomplete) throw error
+      check()
+      throw new InstructionScanIncomplete(`Cannot read ${label(path)}. Check its permissions and retry.`)
+    } finally { await handle.close() }
+  }
   const file = async (path: string, kind: InstructionFile['kind'], optional = false, depth = 0, chain = new Set<string>()): Promise<void> => {
     check()
     const real = await canonical(path, optional)
     if (!real) return
     if (chain.has(real)) throw new InstructionScanIncomplete(`Instruction import cycle at ${label(path)}. Remove the cycle and retry.`)
-    let info
-    try { info = await stat(path) }
-    catch { throw new InstructionScanIncomplete(`Cannot inspect ${label(path)}. Check its permissions and retry.`) }
-    if (!info.isFile()) throw new InstructionScanIncomplete(`${label(path)} is not a regular file. Remove the special input and retry.`)
     if (files.has(path)) return
     if (files.size >= MAX_FILES) throw new InstructionScanIncomplete('Instruction scan exceeded 500 files. Reduce the discovered inputs and retry.')
-    if (info.size > MAX_FILE_BYTES || totalBytes + info.size > MAX_BYTES) throw new InstructionScanIncomplete(`Instruction scan exceeded its byte limit at ${label(path)}. Reduce the input and retry.`)
     let bytes = canonicalBytes.get(real)
     if (!bytes) {
-      try { bytes = await readFile(path, { signal: controller.signal }) }
-      catch { check(); throw new InstructionScanIncomplete(`Cannot read ${label(path)}. Check its permissions and retry.`) }
+      bytes = await readBounded(path, real)
       canonicalBytes.set(real, bytes)
     }
     check()
@@ -86,7 +120,7 @@ export async function scanInstructions(root: string, pluginSkills: readonly Skil
       throw new InstructionScanIncomplete(`${label(path)} changed its link target during the scan. Retry the review.`)
     }
     totalBytes += bytes.byteLength
-    if (totalBytes > MAX_BYTES) throw new InstructionScanIncomplete('Instruction scan exceeded 8 MiB. Reduce the input and retry.')
+    if (bytes.byteLength > MAX_FILE_BYTES || totalBytes > MAX_BYTES) throw new InstructionScanIncomplete(`Instruction scan exceeded its byte limit at ${label(path)}. Reduce the input and retry.`)
     const supported = kind !== 'skill' || TEXT.has(extname(path).toLowerCase())
     const text = supported ? decode(bytes, true) : null
     files.set(path, { path: label(path), canonicalPath: real, sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength, text, kind, unsupported: text === null })
@@ -141,9 +175,11 @@ export async function scanInstructions(root: string, pluginSkills: readonly Skil
     }
   }
   try {
+    check()
     await walk(root, 0, 'repository', false)
     for (const folder of SKILLS) await walk(join(root, folder), 0, 'skill', true)
     for (const skill of pluginSkills) await walk(skill.dir, 0, 'skill', true)
+    check()
     return { files: [...files.values()].sort((a, b) => a.path.localeCompare(b.path)), scope: INSTRUCTION_SCOPE, version: INSTRUCTION_ANALYZER_VERSION }
   } finally {
     clearTimeout(timer)

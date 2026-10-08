@@ -30,20 +30,25 @@ export function redactInstructionText(text: string): string {
 
 export function analyzeInstruction(snapshot: InstructionSnapshot): InstructionFinding[] {
   const findings: InstructionFinding[] = []
+  const collectionLimit = MAX_FINDINGS + 1
   for (const file of snapshot.files) {
-    if (findings.length >= MAX_FINDINGS) break
+    if (findings.length >= collectionLimit) break
     if (file.unsupported) {
       findings.push({ file: file.path, line: 0, category: 'unsupported', detail: 'Unsupported format; content was not analyzed.' })
       continue
     }
-    const lines = (file.text ?? '').split(/\r?\n/)
-    for (const hidden of hiddenCharactersIn(file.text ?? '', file.path)) {
-      if (findings.length >= MAX_FINDINGS) break
+    const text = file.text ?? ''
+    for (const hidden of hiddenCharactersIn(text, file.path, collectionLimit - findings.length)) {
       findings.push({ file: file.path, line: hidden.line, category: 'hidden-character',
         detail: `${hidden.codePoint} (${HIDDEN_NAMES[hidden.codePoint] ?? 'default ignorable character'})` })
     }
-    for (let index = 0; index < Math.min(lines.length, MAX_LINES) && findings.length < MAX_FINDINGS; index++) {
-      const line = lines[index]!
+    let lineStart = 0
+    let lineNumber = 0
+    while (lineStart < text.length && lineNumber < MAX_LINES && findings.length < collectionLimit) {
+      const newline = text.indexOf('\n', lineStart)
+      const end = newline === -1 ? text.length : newline
+      const line = text.slice(lineStart, end).replace(/\r$/, '')
+      lineNumber++
       for (const rule of RULES) {
         const match = line.match(rule.pattern)
         if (!match) continue
@@ -51,18 +56,20 @@ export function analyzeInstruction(snapshot: InstructionSnapshot): InstructionFi
         if (rule.category === 'domain') {
           try { detail += `: ${new URL(match[0]).hostname}` } catch { /* URL text is still flagged. */ }
         } else detail += `: ${redactInstructionText(match[0]).trim().slice(0, 100)}`
-        findings.push({ file: file.path, line: index + 1, category: rule.category, detail })
-        if (findings.length >= MAX_FINDINGS) break
+        findings.push({ file: file.path, line: lineNumber, category: rule.category, detail })
+        if (findings.length >= collectionLimit) break
       }
+      lineStart = newline === -1 ? text.length : newline + 1
     }
-    if (lines.length > MAX_LINES && findings.length < MAX_FINDINGS) {
+    if (lineStart < text.length && lineNumber === MAX_LINES && findings.length < collectionLimit) {
       findings.push({ file: file.path, line: MAX_LINES, category: 'unsupported', detail: 'Analysis limited to the first 20,000 lines; inspect the full file.' })
     }
   }
-  if (findings.length === MAX_FINDINGS) findings[MAX_FINDINGS - 1] = {
-    file: findings[MAX_FINDINGS - 1]!.file, line: 0, category: 'unsupported', detail: 'Finding limit reached; inspect the full files.',
-  }
-  return findings
+  if (findings.length <= MAX_FINDINGS) return findings
+  return [...findings.slice(0, MAX_FINDINGS - 1), {
+    file: findings[MAX_FINDINGS]!.file, line: 0, category: 'unsupported' as const,
+    detail: 'Finding limit reached; inspect the full files.',
+  }]
 }
 
 export function instructionChanges(

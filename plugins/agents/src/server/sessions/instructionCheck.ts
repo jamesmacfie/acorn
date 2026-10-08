@@ -13,7 +13,8 @@ const MAX_HIDDEN_FINDINGS = 2_000
 export type HiddenCharacter = { file: string; line: number; codePoint: string }
 
 /** The first hidden character on each line of text, reported against its file. */
-export function hiddenCharactersIn(text: string, file: string): HiddenCharacter[] {
+export function hiddenCharactersIn(text: string, file: string, limit = MAX_HIDDEN_FINDINGS): HiddenCharacter[] {
+  const maximum = Math.max(1, Math.min(limit, MAX_HIDDEN_FINDINGS + 1))
   const masked = text.replace(EMOJI, (emoji) => ' '.repeat(emoji.length))
   const found: HiddenCharacter[] = []
   let line = 1
@@ -24,7 +25,7 @@ export function hiddenCharactersIn(text: string, file: string): HiddenCharacter[
     for (; counted < match.index; counted++) if (masked.charCodeAt(counted) === 10) line++
     if (found.at(-1)?.line === line) continue
     found.push({ file, line, codePoint: `U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}` })
-    if (found.length === MAX_HIDDEN_FINDINGS) break
+    if (found.length === maximum) break
   }
   return found
 }

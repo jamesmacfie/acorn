@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SecretService, makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import type { CoreServices } from '@acorn/plugin-api/node'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { InstructionAdmission } from './instructionAdmission'
 import { InstructionReviewStore } from './instructionReviewStore'
 
@@ -71,4 +71,24 @@ it('shows findings for changed files without repeating an unchanged baseline fin
   const changed = await admission.review('task')
   expect(changed.changes.map((change) => change.path)).toEqual(['CLAUDE.md'])
   expect(changed.findings.map((finding) => finding.file)).toEqual(['CLAUDE.md'])
+})
+
+it('cancels before task discovery or encrypted review state is read or written', async () => {
+  const taskLoads = vi.fn(async () => ({ id: 'task', projectId: 'project' }))
+  const cancelled = new InstructionAdmission({
+    identity: { active: () => 'owner' }, prefs: { read: vi.fn() },
+    tasks: { load: taskLoads, requireRoot: vi.fn(async () => dir) },
+  } as unknown as CoreServices, dir, admission.store)
+  const read = vi.spyOn(admission.store, 'get')
+  const save = vi.spyOn(admission.store, 'save')
+  const approve = vi.spyOn(admission.store, 'approve')
+  const abort = new AbortController()
+  abort.abort()
+  await expect(cancelled.review('task', abort.signal)).rejects.toThrow(/cancelled/)
+  await expect(cancelled.approve('task', 'review', abort.signal)).rejects.toThrow(/cancelled/)
+  await expect(cancelled.admit('task', abort.signal)).rejects.toThrow(/cancelled/)
+  expect(taskLoads).not.toHaveBeenCalled()
+  expect(read).not.toHaveBeenCalled()
+  expect(save).not.toHaveBeenCalled()
+  expect(approve).not.toHaveBeenCalled()
 })

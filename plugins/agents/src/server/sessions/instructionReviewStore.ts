@@ -15,13 +15,15 @@ export function snapshotDigest(snapshot: InstructionSnapshot): string {
 export class InstructionReviewStore {
   constructor(private readonly db: PluginDatabase, private readonly secrets: SecretService) {}
 
-  async save(projectId: string, snapshot: InstructionSnapshot): Promise<ReviewMetadata> {
+  async save(projectId: string, snapshot: InstructionSnapshot, signal?: AbortSignal): Promise<ReviewMetadata> {
+    if (signal?.aborted) throw new Error('Instruction review cancelled before storage.')
     const body = JSON.stringify(snapshot.files.map(({ path, text }) => ({ path, text })))
     if (Buffer.byteLength(body) > 8 * 1024 * 1024) throw new Error('Instruction snapshot exceeds 8 MiB.')
     const files = snapshot.files.map(({ text: _text, ...file }) => file)
     const id = randomUUID()
     const now = Date.now()
     const bodyEnc = await this.secrets.seal(body)
+    if (signal?.aborted) throw new Error('Instruction review cancelled before storage.')
     this.db.transaction((tx) => {
       tx.insert(schema.agentInstructionSnapshots).values({
         id, projectId, digest: snapshotDigest(snapshot), scope: snapshot.scope,

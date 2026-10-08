@@ -1,5 +1,18 @@
 # Phase 06: review changed agent instructions
 
+Follow-up review, October 9, 2026. The scanner checks an already-aborted signal before any
+discovery. It opens canonical targets with nonblocking, no-follow flags, verifies the opened handle
+is a regular file, and reads in 64 KiB chunks. The byte quota applies to the data actually read;
+one extra byte detects growth after `fstat` without an unbounded allocation. Cancellation prevents
+review or approval work from starting and prevents a snapshot write if encryption is still pending.
+Required hidden-character admission stops at its first finding. Advisory analysis caps its hidden
+results and walks at most 20,000 lines without allocating a whole-file line array; a reached finding
+limit is marked as incomplete analysis. The analyzer version is 2, so earlier approvals require a
+fresh review. Clean-root pre-abort, simulated file growth and special-file swap, one-megabyte
+pathological analysis, and cancelled encryption have focused regression tests. The scanner,
+admission, encrypted store, route, and 20 queue tests, plugin TypeScript check, and Node service
+build pass. The static service graph remains 3,184,959 B. No unrelated failure was changed.
+
 Completion note, October 9, 2026. **Status: implemented.** The agents plugin now discovers
 repository instruction files, imports, repository skills, delivered plugin skills, and supporting
 files with one bounded scanner. The runtime applies enabled checks at the shared queued-turn

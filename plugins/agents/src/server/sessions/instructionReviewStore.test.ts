@@ -1,6 +1,6 @@
 import { SecretService, makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { createHash } from 'node:crypto'
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as schema from '../../node/schema'
 import { InstructionReviewStore } from './instructionReviewStore'
 import { snapshotDigest } from './instructionReviewStore'
@@ -51,4 +51,17 @@ it('recognizes either of two approved task roots in the same project', async () 
   const pending = await store.save('project', snapshot('third'))
   expect(await store.get(pending.id)).not.toBeNull()
   expect((await store.approved('project'))?.id).toBe(second.id)
+})
+
+it('does not save a review cancelled while encryption is pending', async () => {
+  let finishSeal!: (value: string) => void
+  const seal = vi.fn(() => new Promise<string>((resolve) => { finishSeal = resolve }))
+  const delayed = new InstructionReviewStore(testDb.db, { seal } as unknown as SecretService)
+  const abort = new AbortController()
+  const saving = delayed.save('project', snapshot('instruction'), abort.signal)
+  expect(seal).toHaveBeenCalledOnce()
+  abort.abort()
+  finishSeal('encrypted')
+  await expect(saving).rejects.toThrow(/cancelled/)
+  expect(await testDb.db.select().from(schema.agentInstructionSnapshots)).toEqual([])
 })
