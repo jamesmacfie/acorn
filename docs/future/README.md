@@ -24,7 +24,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
 | [ui-extension/](./ui-extension/README.md) | Contextual plugin UI: link previews, transcript media, workflow bodies, resource actions, detail regions, annotations, selections, document intelligence, fences, and toolbar additions. Fifteen sequential phases after Editor file viewers, ending with documentation. | Planned, October 6, 2026; implementation not started. |
-| [deerflow/](./deerflow/README.md) | Review reasoning, shipped feature references, deferred smaller ideas, and what Acorn refused. | All five phases shipped October 8, 2026; completed plans deleted. Doctor, loop alerts, and edit-and-rerun remain deferred. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 
@@ -62,6 +61,13 @@ beside them; nothing in it waits any more. Ecosystem's shipped rung-2 containmen
 `blockers.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`deerflow/` shipped all five phases and was deleted on October 8, 2026.
+[Composer](../managed-agents/composer.md), [turn operations](../managed-agents/operations.md),
+[transcript search](../managed-agents/transcript-search.md),
+[delegation](../managed-agents/delegation.md), and [workflow execution](../workflows/execution.md)
+own the shipped behavior. The review, completed plans, deferred smaller ideas, and refused
+alternatives remain in Git history.
 
 `url/` was implemented, merged into main, and deleted on October 8, 2026.
 [Acorn links](../frontend/acorn-links.md) owns the address forms, Copy link, task promotion,
