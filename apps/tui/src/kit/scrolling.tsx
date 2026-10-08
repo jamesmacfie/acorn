@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import type { Renderable } from '../tree/compat'
-import { createEffect, createSignal, onCleanup, type JSX } from 'solid-js'
+import { createEffect, createSignal, on, onCleanup, type JSX } from 'solid-js'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import type { Intent } from '@acorn/client-core/kit/keys'
 import { bindKeys } from '../keys/install'
@@ -89,6 +89,9 @@ function bindViewportKeys(box: Renderable, view: Viewport, scrolled: () => void)
 type ViewportProps = {
   children: JSX.Element
   visible?: boolean
+  /** A mounted panel's reading place across remounts. */
+  scrollOffset?: number
+  onChange?: (offset: number) => void
   onBox?: (box: Renderable & Viewport) => void
   /** Called after this viewport moves its own offset, for a caller that windows its content and so
    *  has to know where the offset now is. The wheel does not come through here: it is caught on a box
@@ -144,6 +147,7 @@ function viewportBox(props: ViewportProps): JSX.Element {
   let stuck = true
   let box: Node | undefined
   let content: Node | undefined
+  let restored = false
 
   /** The rows the viewport shows and the rows the content has, from the layout that ran this frame. */
   const fits = (): number => box?.rect.h ?? 0
@@ -162,10 +166,22 @@ function viewportBox(props: ViewportProps): JSX.Element {
     const next = clamp(to)
     setOffset(next)
     stuck = next >= Math.max(0, total() - fits())
+    props.onChange?.(next)
   }
+  const restoreIfReady = (): void => {
+    if (restored || props.scrollOffset === undefined || !box?.rect.h || props.visible === false) return
+    if (props.scrollOffset > 0 && total() <= fits()) return
+    restored = true
+    place(props.scrollOffset)
+  }
+  createEffect(on(() => [props.visible, props.scrollOffset] as const, ([visible]) => {
+    if (visible === false) return
+    restored = false
+    restoreIfReady()
+  }))
   // Geometry changes must not reinterpret a previously bottom-following reader as having
   // scrolled away: a growing transcript still follows, while a shrinking menu clamps its offset.
-  const clampCurrent = (): void => { setOffset(clamp(offset())) }
+  const clampCurrent = (): void => { setOffset(clamp(offset())); restoreIfReady() }
   const move = (rows: number): void => { place(offset() + rows) }
 
   const scrollBy = (delta: number, unit?: 'viewport'): void => {

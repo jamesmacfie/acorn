@@ -1,12 +1,12 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, Show } from 'solid-js'
+import { createSignal, onMount, Show } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
 import { revealCollectionItem } from '@acorn/client-core/kit/keys'
 import { renderFixture } from '../harness'
 import { activeHints } from '../chrome/bindings'
 import { renderCells } from '../kit/render'
-import { ListDetail, Modal, ModalBody, TabPanel, Tabs } from '../kit/grouping'
+import { ListDetail, Modal, ModalBody, TabPanel, Tabs, Toolbar } from '../kit/grouping'
 import { Rectangle } from '../kit/pixels'
 import { enteredRectangle, type CellTerminal } from '../kit/rectangle'
 import { Row, Rows, TreeRow } from '../kit/showing'
@@ -14,6 +14,9 @@ import { Text } from '../kit/showing'
 import { Button, Input } from '../kit/asking'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { focusedRegion, focusedRenderable, onScreen, regionFocus } from './regions'
+import { installCommandLayer } from './commandLayer'
+import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { registerCommands, registerKeybindings } from '@acorn/client-core/host/registries/commands'
 
 // The terminal twin of `client-core/host/keys/keys.test.tsx`: the same intent scenarios against the
 // terminal adapter, so the two adapters cannot drift.
@@ -67,6 +70,31 @@ const TRUST: PluginTrustRequest = {
 }
 
 describe('keys and focus in cells', () => {
+  it('honors a field autofocus request after the command scope closes', async () => {
+    const [open, setOpen] = createSignal(false)
+    const [searching, setSearching] = createSignal(false)
+    const [text, setText] = createSignal('')
+    let frame = await renderCells(() => <>
+      <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'editor', regionId: 'search' }, 0)}>
+        <Button>Tree controls</Button>
+        <Input autofocus={searching()} value={text()} onInput={setText} />
+      </box>
+      <Show when={open()}><Modal title="Command" onDismiss={() => setOpen(false)}>
+        <ModalBody><Button>Command action</Button></ModalBody>
+      </Modal></Show>
+    </>, { width: 60, height: 12 })
+    try {
+      setOpen(true)
+      frame = await frame.press('TAB')
+      expect(frame.text).toContain('Command')
+      setSearching(true)
+      frame = await frame.press('TAB')
+      frame = await frame.press('ESCAPE')
+      frame = await frame.press('n')
+      expect(text()).toBe('n')
+    } finally { frame.done() }
+  })
+
   it('keeps a narrow file row alive through F2 and restores focus for the context key', async () => {
     const [editing, setEditing] = createSignal(false)
     const [menu, setMenu] = createSignal('')
@@ -579,6 +607,35 @@ const cacheBlockers = (engine: object): number => {
 }
 
 describe('the typing shadow', () => {
+  it('keeps a printable command shortcut in the focused search field', async () => {
+    const [text, setText] = createSignal('')
+    let opened = 0
+    const commands = registerCommands([{ id: 'test.open', title: 'Open', category: 'action', palette: true, run: () => { opened++ } }])
+    const bindings = registerKeybindings([{ id: 'test.open.key', command: 'test.open', description: 'Open', category: 'Global', defaultChord: 'n' }])
+    let screen: Awaited<ReturnType<typeof renderCells>> | undefined
+    try {
+      screen = await renderCells(() => {
+        onMount(() => installCommandLayer(keymap()!, {
+          prefs: () => ({}), taskActive: () => true, focusedPane: () => undefined,
+        }))
+        return <box flexDirection="column" flexGrow={1}>
+          <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}><Input value={text()} onInput={setText} /></box>
+          <box ref={regionFocus({ paneId: 'test', regionId: 'button' }, 1)}><Button>Next</Button></box>
+        </box>
+      }, { width: 40, height: 8 })
+      screen = await screen.press('n')
+      expect(text()).toBe('n')
+      expect(opened).toBe(0)
+      screen = await screen.press('TAB')
+      screen = await screen.press('n')
+      expect(opened).toBe(1)
+    } finally {
+      screen?.done()
+      bindings.dispose()
+      commands.dispose()
+    }
+  })
+
   it('lets a bare key reach a field, moves focus with it after the field loses the keys, and blocks no cache', async () => {
     const [text, setText] = createSignal('')
     const [pressed, setPressed] = createSignal('')
@@ -622,4 +679,28 @@ describe('the typing shadow', () => {
       screen.done()
     }
   }, 30_000)
+})
+
+it('reaches a preceding panel control from a focused collection row', async () => {
+  let presses = 0
+  let screen = await renderCells(() => (
+    <HeaderBodyFooter stateKey="list-controls" label="List" regions={{ body: () => <>
+      <Toolbar><Button onPress={() => { presses++ }}>Collapse all</Button><Button>Reveal active</Button></Toolbar>
+      <Button>Show ignored</Button>
+      <Button>New</Button>
+      <Rows id="test-controls" items={[{ key: 'file', label: 'File' }]}>
+        {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
+      </Rows>
+    </> }} />
+  ), { width: 40, height: 8 })
+  try {
+    screen = await screen.press('TAB', { shift: true })
+    screen = await screen.press('k')
+    screen = await screen.press('k')
+    screen = await screen.press('k')
+    screen = await screen.press('RETURN')
+    expect(presses).toBe(1)
+  } finally {
+    screen.done()
+  }
 })

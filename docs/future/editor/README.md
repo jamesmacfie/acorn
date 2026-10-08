@@ -1,6 +1,6 @@
 # Improve everyday editor use
 
-Date: October 7, 2026. Status: phases 01–06 implemented on October 8, 2026; combined release acceptance and the integrated full test gate remain pending. See [phase 06 evidence](../../testing/editor-phase06-2026-10-08.md).
+Date: October 7, 2026. Status: phases 01–06 implemented on October 8, 2026; local combined acceptance is recorded in the [phase 06 follow-up evidence](../../testing/editor-phase06-follow-up-2026-10-08.md). Coordinator integration, whole-branch review, and the unfiltered repository test gate remain pending. Remote/platform checks remain unavailable as detailed in that evidence.
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 
 This programme adds everyday file management, change visibility, navigation, and editing controls

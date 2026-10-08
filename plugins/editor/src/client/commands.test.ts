@@ -1,17 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandExecutionContext, SearchCommand } from '@acorn/plugin-api/client'
 
-const mocks = vi.hoisted(() => ({ files: vi.fn(), reveal: vi.fn() }))
-vi.mock('./editorClient', () => ({ editorApi: () => ({ files: mocks.files }) }))
+const mocks = vi.hoisted(() => ({ files: vi.fn(), reveal: vi.fn(), entry: vi.fn(), folder: vi.fn(), nodeId: 'node-1' }))
+vi.mock('./editorClient', () => ({ editorApi: () => ({ files: mocks.files }), editorApiForNode: (nodeId: string) => ({
+  entry: (taskId: string, path: string) => mocks.entry(nodeId, taskId, path),
+}) }))
+vi.mock('./search/searchState', () => ({ findInFolder: mocks.folder }))
 vi.mock('./editorState', () => ({ requestEditorReveal: mocks.reveal, activeFile: () => 'src/a.ts' }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   activeTaskId: () => 'task-1',
-  activeNodeId: () => 'node-1',
+  activeNodeId: () => mocks.nodeId,
+  focusedPane: () => 'editor',
 }))
 
 import { editorCommands } from './commands'
 import { admitGraphicalEditor } from './editorAdmission'
+import { registerEditorTreeFolders } from './editorTreeState'
 
 // ⌘P, after it stopped being an overlay of its own. What is pinned is what the overlay's own test
 // would have pinned if it had had one: the ranking is over the whole path, the row splits it for
@@ -20,6 +25,10 @@ import { admitGraphicalEditor } from './editorAdmission'
 
 const goTo = editorCommands.find((command) => command.id === 'editor.files.open') as SearchCommand
 const goToLine = editorCommands.find((command) => command.id === 'editor.navigation.go-to-line') as SearchCommand
+const folder = editorCommands.find((command) => command.id === 'editor.search.folder') as {
+  when: (context?: CommandExecutionContext) => boolean
+  run: (context: CommandExecutionContext) => Promise<void>
+}
 
 const context = (taskId: string): CommandExecutionContext => ({
   host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId, paneId: null, surfaceId: null,
@@ -29,6 +38,7 @@ const signal = (): AbortSignal => new AbortController().signal
 describe('go to file', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.nodeId = 'node-1'
     mocks.files.mockResolvedValue(['src/client/App.tsx', 'src/node/boot.ts', 'README.md'])
   })
 
@@ -118,5 +128,54 @@ describe('go to file', () => {
     mocks.reveal.mockClear()
     goToLine.select(rows[0], world)
     expect(mocks.reveal).not.toHaveBeenCalled()
+  })
+})
+
+describe('find in focused folder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks(); mocks.nodeId = 'node-1'
+    return registerEditorTreeFolders('task-1', 'node-1', (path) => path === 'src')
+  })
+  const treeContext = (): CommandExecutionContext => ({ ...context('task-1'), focusedCollection: { id: 'editor.file-tree:["node-1","task-1"]', key: 'src' } })
+
+  it('requires a tree row captured by this task and routes its entry read to the captured Node', async () => {
+    expect(folder.when(context('task-1'))).toBe(false)
+    expect(folder.when({ ...treeContext(), focusedCollection: { ...treeContext().focusedCollection!, key: 'src/file.ts' } })).toBe(false)
+    expect(folder.when({ ...treeContext(), taskId: 'previous-task' })).toBe(false)
+    await folder.run({ ...treeContext(), focusedCollection: { id: 'editor.file-tree:["node-1","previous-task"]', key: 'src' } })
+    expect(mocks.entry).not.toHaveBeenCalled()
+    await folder.run(context('task-1'))
+    expect(mocks.entry).not.toHaveBeenCalled()
+    mocks.entry.mockResolvedValue({ kind: 'folder' })
+    expect(folder.when(treeContext())).toBe(true)
+    expect(folder.when({ ...treeContext(), host: 'tui' })).toBe(true)
+    await folder.run(treeContext())
+    expect(mocks.entry).toHaveBeenCalledWith('node-1', 'task-1', 'src')
+    expect(mocks.folder).toHaveBeenCalledWith('task-1', 'src', 'node-1')
+  })
+
+  it('ignores files and an entry read that finishes after the Node changes', async () => {
+    mocks.entry.mockResolvedValueOnce({ kind: 'file' })
+    await folder.run(treeContext())
+    expect(mocks.folder).not.toHaveBeenCalled()
+    let finish!: (entry: { kind: 'folder' }) => void
+    mocks.entry.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const pending = folder.run(treeContext())
+    mocks.nodeId = 'node-2'
+    finish({ kind: 'folder' })
+    await pending
+    expect(mocks.folder).not.toHaveBeenCalled()
+  })
+
+  it('rejects late entry completion after the captured tree owner unmounts', async () => {
+    const release = registerEditorTreeFolders('task-1', 'node-1', (path) => path === 'src')
+    let finish!: (entry: { kind: 'folder' }) => void
+    mocks.entry.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const pending = folder.run(treeContext())
+    release()
+    finish({ kind: 'folder' })
+    await pending
+    expect(mocks.folder).not.toHaveBeenCalled()
+    expect(folder.when(treeContext())).toBe(false)
   })
 })

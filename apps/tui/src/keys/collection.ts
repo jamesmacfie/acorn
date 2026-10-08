@@ -23,10 +23,12 @@ import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions, type CollectionItem,
 } from '@acorn/client-core/kit/keys'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
+import { bindKeys } from './install'
 import {
   activationEntersMain, focusedRenderable, focusRenderable, markCollection, markItem, moveColumn,
-  scheduleSettle,
+  scheduleSettle, walkStops,
 } from './regions'
+import { STOP } from './tiers'
 
 /**
  * What one item of a collection is handed.
@@ -116,6 +118,11 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       return focusRenderable(box)
     },
     attach: (box) => {
+      // A row is one stop in its panel. Shift+Tab leaves that stop for the preceding
+      // control, including a tree's toolbar and a search's filters. Without this,
+      // the region-wide Shift+Tab skips those controls and traps keyboard readers in
+      // the collection once its active row has been remembered.
+      bindKeys(box, [{ key: 'shift+tab', cmd: () => walkStops(focusedRenderable(), -1) }], STOP)
       onCleanup(registerCollectionReveal(options.id(), (key) => {
         if (options.items().some((item) => item.key === key && !item.disabled)) keys.goTo(key)
       }))

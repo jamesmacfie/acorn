@@ -49,6 +49,8 @@ export type CommandExecutionContext = {
   readonly taskId: string | null
   readonly paneId: string | null
   readonly surfaceId: string | null
+  /** The collection row that held focus before the palette took it. */
+  readonly focusedCollection?: { readonly id: string; readonly key: string }
   readonly navigate?: (path: string) => void
 }
 
@@ -99,7 +101,7 @@ type CommandCommon = {
   /** Discoverable in the palette. A shortcut may still target a command that is not. */
   palette?: boolean
   requires?: HostCapabilityRequirement
-  when?: () => boolean
+  when?: (context?: CommandExecutionContext) => boolean
   /** Which identity this needs; `node` when absent (@acorn/protocol/commands.ts). */
   scope?: CommandScope
   /** Who contributed it, stamped by the host. Core's commands have none. A contributor may not state
@@ -170,8 +172,8 @@ export const commandHint = (command: CommandContribution): string | undefined =>
 /** This command's own two gates, and only its own. An ancestor's availability is inherited by the
  *  projection rather than by this function, because a bare registry entry has no parent to ask
  *  (./graph.ts). */
-export const commandAvailable = (command: CommandContribution): boolean =>
-  hasHostCapability(command.requires) && (command.when?.() ?? true)
+export const commandAvailable = (command: CommandContribution, context?: CommandExecutionContext): boolean =>
+  hasHostCapability(command.requires) && (command.when?.(context) ?? true)
 
 /** Which identity this command is about. `node` when it did not say (@acorn/protocol/commands.ts). */
 export const commandScope = (command: CommandContribution): CommandScope => command.scope ?? DEFAULT_COMMAND_SCOPE
@@ -223,7 +225,7 @@ export const stampCommandOwner = (command: ContributedCommand, ownerId: string):
  */
 export function executeCommand(id: string, context?: CommandExecutionContext): Promise<CommandOutcome> {
   const command = commandRegistry.get(id)
-  if (!command || !commandAvailable(command)) return Promise.resolve(COMMAND_CLOSED)
+  if (!command || !commandAvailable(command, context)) return Promise.resolve(COMMAND_CLOSED)
   // An interactive command is entered at its own frame rather than run, so the id goes to whichever
   // host is drawing a palette (./presenter.ts) and the answer is `stay`: nothing ran, so nothing that
   // was already open should close over it, and a shortcut has nothing to close.

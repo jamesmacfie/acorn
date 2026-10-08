@@ -1,4 +1,4 @@
-import { For, Show, splitProps } from 'solid-js'
+import { createEffect, For, on, Show, splitProps } from 'solid-js'
 import { assistAttrs, claimField, controlAttrs, type ControlOwn } from './controlAttrs'
 
 /** The text-entry kinds a control may be. No `file`, no `range`, no `color`: each of those is a
@@ -49,15 +49,19 @@ export function Input(props: InputProps) {
   )
   const listId = `ui-suggest-${++suggestionSeq}`
   const field = claimField(own.id)
+  let input: HTMLInputElement | undefined
+  createEffect(on(() => own.autofocus, (active) => {
+    // Focusing a retained panel's field must not move its enclosing reading viewport.
+    if (active) input?.focus({ preventScroll: true })
+  }))
   return (
     <>
     <input
       {...controlAttrs(own, 'ui-input', field)}
       {...assistAttrs(own)}
-      ref={rest.ref}
+      ref={(element) => { input = element; if (typeof rest.ref === 'function') rest.ref(element) }}
       name={own.name}
       required={own.required}
-      autofocus={own.autofocus}
       list={props.suggestions ? listId : undefined}
       type={props.type ?? 'text'}
       value={props.value ?? ''}

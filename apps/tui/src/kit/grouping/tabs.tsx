@@ -92,10 +92,14 @@ export function TabPanel(props: {
   id: string
   active: string
   children: JSX.Element
+  scrollOffset?: number
+  onChange?: (offset: number) => void
 }) {
   return (
     <ScrollViewport
       visible={props.active === props.id}
+      scrollOffset={props.scrollOffset}
+      onChange={props.onChange}
       onBox={(box) => registerPanel(props.idPrefix, box)}
     >
       {props.children}

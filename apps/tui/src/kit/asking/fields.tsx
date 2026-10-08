@@ -4,7 +4,7 @@ import type { Renderable } from '../../tree/compat'
 import type { InputProps } from '@acorn/client-core/kit/components/primitives.tsx'
 import type { Size } from '@acorn/client-core/kit/tokens'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { focusWithin } from '../../keys/regions'
+import { focusWithin, requestRenderableFocus } from '../../keys/regions'
 import { STOP } from '../../keys/tiers'
 import { slotColor } from '../../appearance'
 import { boxBorder } from '../roles'
@@ -20,6 +20,10 @@ const fieldColors = () => ({
 })
 
 export function Input(props: InputProps) {
+  let field: Renderable | undefined
+  createEffect(on(() => props.autofocus, (active) => {
+    if (active && field && !field.isDestroyed) onCleanup(requestRenderableFocus(field))
+  }))
   const install = fieldRef({
     value: () => (props.value === undefined ? '' : String(props.value)),
     newline: false,
@@ -34,7 +38,7 @@ export function Input(props: InputProps) {
       flexGrow={props.width === 'narrow' ? 0 : 1}
       {...fieldColors()}
       placeholder={props.placeholder ?? ''}
-      ref={install as (element: Renderable) => void}
+      ref={(element: Renderable) => { field = element; install(element) }}
     />
   )
 }

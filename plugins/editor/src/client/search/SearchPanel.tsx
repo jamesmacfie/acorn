@@ -22,9 +22,11 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   const state = () => taskSearchState(props.taskId, nodeId)
   const change = (update: Parameters<typeof updateTaskSearchState>[1]) => updateTaskSearchState(props.taskId, update, nodeId)
   const [debounced, setDebounced] = createSignal(state().query)
+  const [debouncedFolder, setDebouncedFolder] = createSignal(state().opts.folder)
   const [filterRevision, setFilterRevision] = createSignal(0)
   const [debouncedFilterRevision, setDebouncedFilterRevision] = createSignal(0)
   const [details, setDetails] = createSignal(false)
+  const onScrollChange = (offset: number) => change((old) => old.scrollOffset === offset ? old : { ...old, scrollOffset: offset })
   const filterError = createMemo(() => {
     const { include = [], exclude = [] } = state().opts
     if (include.length > 20 || exclude.length > 20) return 'Use at most 20 patterns in each filter.'
@@ -37,6 +39,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   // Debounces keystrokes so ripgrep does not spawn per character; toggles apply immediately since
   // they are part of the resource source, not debounced.
   const pushDebounced = debounce((q: string) => setDebounced(q), 200)
+  const pushFolder = debounce((folder: string | undefined) => setDebouncedFolder(folder), 200)
   const onInput = (v: string) => {
     change((old) => ({ ...old, query: v, results: undefined, error: '' }))
     pushDebounced(v)
@@ -55,12 +58,17 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     }))
     pushFilters(revision)
   }
-  createEffect(on(() => props.taskId, () => { pushDebounced.cancel(); setDebounced(state().query) }, { defer: true }))
+  createEffect(on(() => props.taskId, () => {
+    pushDebounced.cancel(); pushFolder.cancel()
+    setDebounced(state().query)
+    setDebouncedFolder(state().opts.folder)
+  }, { defer: true }))
+  createEffect(on(() => state().opts.folder, (folder) => pushFolder(folder), { defer: true }))
   const [loading, setLoading] = createSignal(false)
   let disposed = false
   let generation = 0
   let controller: AbortController | undefined
-  const requestKey = createMemo(() => JSON.stringify([activeNodeId(), props.taskId, state().query, debounced(), state().opts,
+  const requestKey = createMemo(() => JSON.stringify([activeNodeId(), props.taskId, state().query, debounced(), debouncedFolder(), state().opts,
     filterRevision(), debouncedFilterRevision(), state().scopeChanged]))
   createEffect(on(requestKey, () => {
     const taskId = props.taskId
@@ -74,6 +82,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     setLoading(false)
     if (activeNodeId() !== nodeId) return
     if (scopeChanged) return
+    if (opts.folder !== debouncedFolder()) return
     if (filterError()) return
     if (filterRevision() !== debouncedFilterRevision()) return
     if (!q || input.trim() !== q) {
@@ -95,6 +104,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     disposed = true
     generation++
     pushDebounced.cancel()
+    pushFolder.cancel()
     pushFilters.cancel()
     controller?.abort()
   })
@@ -114,7 +124,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   // cannot take focus.
   let input: HTMLInputElement | undefined
   createEffect(on(() => props.active, (active) => {
-    if (active) queueMicrotask(() => { if (!disposed && props.active) input?.focus() })
+    if (active) queueMicrotask(() => { if (!disposed && props.active) input?.focus({ preventScroll: true }) })
   }))
 
   const status = () => {
@@ -128,13 +138,15 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   }
 
   return (
-    <TabPanel idPrefix="editor-side" id="search" active={props.active ? 'search' : 'files'}>
+    <TabPanel idPrefix="editor-side" id="search" active={props.active ? 'search' : 'files'}
+      scrollOffset={state().scrollOffset} onChange={onScrollChange}>
       {/* Stacked, not a row: the sidebar is narrow, and an input sharing it with three toggles
           leaves about a hundred pixels to type a query into. Two sm strips, so both sit on the pane's
           inset, and the count rides at the end of the toggles. */}
       <Toolbar size="sm" ariaLabel="Search">
         <Input
           ref={input}
+          autofocus={props.active}
           kind="filter"
           size="sm"
           label="Search in files"
@@ -163,8 +175,8 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
       <Button expanded={details()} onPress={() => setDetails(!details())}>Search details</Button>
       <Show when={details()}>
         <Stack gap="none">
-          <Input label="Files to include" value={state().includeText} onInput={(value) => setPatterns('include', value)} />
-          <Input label="Files to exclude" value={state().excludeText} onInput={(value) => setPatterns('exclude', value)} />
+          <Input label="Files to include" placeholder="Files to include" value={state().includeText} onInput={(value) => setPatterns('include', value)} />
+          <Input label="Files to exclude" placeholder="Files to exclude" value={state().excludeText} onInput={(value) => setPatterns('exclude', value)} />
           <Text emphasis="muted">Comma-separated ripgrep globs. Excludes win. A literal comma in a pattern is unsupported. Hidden and ignored files are skipped.</Text>
         </Stack>
       </Show>

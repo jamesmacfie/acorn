@@ -140,6 +140,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
 | [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
 | [testing/editor-phase06-2026-10-08.md](./testing/editor-phase06-2026-10-08.md) | Dated Editor phase 06 fixture and acceptance evidence. |
+| [testing/editor-phase06-follow-up-2026-10-08.md](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected desktop/terminal checks, and measured Editor acceptance. |
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |

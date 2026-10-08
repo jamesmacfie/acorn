@@ -3,14 +3,15 @@ import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { SearchResult } from '../../shared/search'
+import type { SearchOpts } from '../../shared/search'
 
-const requests: { query: string; task: string; signal: AbortSignal; resolve: (result: SearchResult) => void }[] = []
+const requests: { query: string; task: string; opts: SearchOpts; signal: AbortSignal; resolve: (result: SearchResult) => void }[] = []
 vi.mock('./searchClient', () => ({
-  findInFiles: (task: string, query: string, _opts: unknown, options: { signal: AbortSignal }) =>
-    new Promise<SearchResult>((resolve) => { requests.push({ task, query, signal: options.signal, resolve }) }),
+  findInFiles: (task: string, query: string, opts: SearchOpts, options: { signal: AbortSignal }) =>
+    new Promise<SearchResult>((resolve) => { requests.push({ task, query, opts, signal: options.signal, resolve }) }),
 }))
 const { default: SearchPanel } = await import('./SearchPanel')
-const { updateTaskSearchState } = await import('./searchState')
+const { taskSearchState, updateTaskSearchState } = await import('./searchState')
 let dispose: (() => void) | undefined
 let host: HTMLElement
 const result = (path: string): SearchResult => ({ files: [{ path, hits: [{ line: 1, col: 1, endCol: 2, preview: 'x' }] }], truncated: false })
@@ -73,6 +74,46 @@ it('retains the task query, folder, filters, and results after remount', async (
   expect(host.textContent).toContain('src/good.tsx')
 })
 
+it('restores the result viewport when search remounts', async () => {
+  const task = 'reading-place-test'
+  updateTaskSearchState(task, (state) => ({ ...state, query: 'needle', results: result('src/far.ts') }))
+  host = document.createElement('div'); document.body.append(host)
+  const mount = () => render(() => <QueryClientProvider client={new QueryClient()}>
+    <SearchPanel taskId={task} active />
+  </QueryClientProvider>, host)
+  dispose = mount()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  const viewport = host.querySelector<HTMLElement>('.ui-tab-panel')!
+  viewport.scrollTop = 321
+  viewport.dispatchEvent(new Event('scroll'))
+  expect(taskSearchState(task).scrollOffset).toBe(321)
+  dispose(); host.replaceChildren()
+  dispose = mount()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  expect(host.querySelector<HTMLElement>('.ui-tab-panel')?.scrollTop).toBe(321)
+  expect(host.textContent).toContain('src/far.ts')
+})
+
+it('keeps the result viewport when the hidden panel resets its DOM scroll', async () => {
+  const task = 'hidden-reading-place-test'
+  updateTaskSearchState(task, (state) => ({ ...state, query: 'needle', results: result('src/far.ts') }))
+  const [active, setActive] = createSignal(true)
+  host = document.createElement('div'); document.body.append(host)
+  dispose = render(() => <QueryClientProvider client={new QueryClient()}>
+    <SearchPanel taskId={task} active={active()} />
+  </QueryClientProvider>, host)
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  const viewport = host.querySelector<HTMLElement>('.ui-tab-panel')!
+  viewport.scrollTop = 321
+  setActive(false)
+  viewport.scrollTop = 0
+  viewport.dispatchEvent(new Event('scroll'))
+  expect(taskSearchState(task).scrollOffset).toBe(321)
+  setActive(true)
+  await new Promise((resolve) => requestAnimationFrame(resolve))
+  expect(viewport.scrollTop).toBe(321)
+})
+
 it('aborts work when scope or filters change and ignores late results', async () => {
   const task = 'scoped-search-test'
   host = document.createElement('div'); document.body.append(host)
@@ -80,8 +121,10 @@ it('aborts work when scope or filters change and ignores late results', async ()
   input('needle')
   await vi.waitFor(() => expect(requests).toHaveLength(1))
   updateTaskSearchState(task, (state) => ({ ...state, opts: { ...state.opts, folder: 'src' }, results: undefined }))
-  await vi.waitFor(() => expect(requests).toHaveLength(2))
   expect(requests[0].signal.aborted).toBe(true)
+  expect(requests).toHaveLength(1)
+  await vi.waitFor(() => expect(requests).toHaveLength(2))
+  expect(requests[1].opts.folder).toBe('src')
   const details = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Search details')!
   details.click()
   const include = host.querySelectorAll<HTMLInputElement>('input')[1]
@@ -99,4 +142,19 @@ it('aborts work when scope or filters change and ignores late results', async ()
   await vi.waitFor(() => expect(host.textContent).toContain('Each pattern must be at most 256 characters.'))
   await new Promise((resolve) => setTimeout(resolve, 250))
   expect(requests).toHaveLength(3)
+})
+
+it('debounces clearing a folder scope and sends the task root after aborting', async () => {
+  const task = 'scope-clear-test'
+  updateTaskSearchState(task, (state) => ({ ...state, opts: { folder: 'src' } }))
+  host = document.createElement('div'); document.body.append(host)
+  dispose = render(() => <QueryClientProvider client={new QueryClient()}><SearchPanel taskId={task} active /></QueryClientProvider>, host)
+  input('needle')
+  await vi.waitFor(() => expect(requests).toHaveLength(1))
+  const clear = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Clear folder scope')!
+  clear.click()
+  expect(requests[0].signal.aborted).toBe(true)
+  expect(requests).toHaveLength(1)
+  await vi.waitFor(() => expect(requests).toHaveLength(2))
+  expect(requests[1].opts.folder).toBeUndefined()
 })

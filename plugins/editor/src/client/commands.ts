@@ -1,7 +1,6 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
-  activeCollectionItem,
   activeNodeId,
   activeTaskId,
   fuzzyScore,
@@ -10,11 +9,11 @@ import {
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
-import { editorApi } from './editorClient'
+import { editorApi, editorApiForNode } from './editorClient'
 import { activeFile, requestEditorReveal } from './editorState'
 import { pruneRecentToListing } from './editorNavigation'
 import { graphicalEditorAdmitted } from './editorAdmission'
-import { collapseEditorTreeDirectories, EDITOR_TREE_COLLECTION } from './editorTreeState'
+import { collapseEditorTreeDirectories, editorTreeCollectionId, captureEditorTreeFolder } from './editorTreeState'
 import { findInFolder } from './search/searchState'
 import { focusedPane } from '@acorn/plugin-api/client'
 
@@ -96,12 +95,16 @@ export const editorCommands: readonly ContributedCommand[] = [
   {
     id: 'editor.search.folder', title: 'Find in focused folder', category: 'navigation', palette: true,
     scope: 'task', requires: { plugin: 'editor' },
-    when: () => { const taskId = activeTaskId(); return !!taskId && focusedPane(taskId) === 'editor' && !!activeCollectionItem(EDITOR_TREE_COLLECTION) },
+    when: (context) => !!context?.taskId && context.taskId === activeTaskId() && context.nodeId === activeNodeId()
+      && context.focusedCollection?.id === editorTreeCollectionId(context.taskId, context.nodeId)
+      && !!captureEditorTreeFolder(context.taskId, context.nodeId, context.focusedCollection.key),
     run: async (context) => {
-      const path = activeCollectionItem(EDITOR_TREE_COLLECTION)
+      const path = context.taskId && context.focusedCollection?.id === editorTreeCollectionId(context.taskId, context.nodeId) ? context.focusedCollection.key : undefined
       if (!path || !context.taskId || context.nodeId !== activeNodeId() || context.taskId !== activeTaskId()) return
-      const target = await editorApi().entry(context.taskId, path)
-      if (target.kind === 'folder' && context.nodeId === activeNodeId() && context.taskId === activeTaskId())
+      const current = captureEditorTreeFolder(context.taskId, context.nodeId, path)
+      if (!current) return
+      const target = await editorApiForNode(context.nodeId).entry(context.taskId, path)
+      if (target.kind === 'folder' && current() && context.nodeId === activeNodeId() && context.taskId === activeTaskId())
         findInFolder(context.taskId, path, context.nodeId)
     },
   },

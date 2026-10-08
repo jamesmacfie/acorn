@@ -48,7 +48,11 @@ export type EditorApi = {
 export const editorApi = (queryClient?: QueryClient): EditorApi => {
   const registered = queryClient ? queryOwner(queryClient) : undefined
   const nodeId = registered === undefined ? activeNodeId() : registered
-  return {
+  return editorApiForNode(nodeId)
+}
+
+/** Keep a command's request on the Node captured before the palette opened. */
+export const editorApiForNode = (nodeId: string | null): EditorApi => ({
   root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId), { nodeId }).then((r) => r.root),
   list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath), { nodeId }),
   ignored: (taskId, relPath, names) => writeJson<IgnoreEntries>(editorIgnoredRoute(taskId), {
@@ -92,8 +96,7 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
       }
       throw cause
     }),
-}
-}
+})
 
 /** The task's checkout path, in the query cache so a hover can warm it and a remount can skip it. */
 export const editorRootKey = (taskId: string): readonly unknown[] => ['editor', 'root', taskId]

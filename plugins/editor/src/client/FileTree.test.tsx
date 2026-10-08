@@ -194,6 +194,21 @@ describe('the editor file tree', () => {
     expect(host.textContent).toContain('Git unavailable')
   })
 
+  it('shows a refreshed listing while its replacement ignore metadata is pending', async () => {
+    listing.mockImplementation(async () => [{ name: 'build', dir: true }])
+    let finishIgnore!: (result: { available: true; ignored: string[] }) => void
+    ignored.mockResolvedValueOnce({ available: true, ignored: ['build'] })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishIgnore = resolve }))
+    mount(vi.fn(), { hideIgnored: true })
+    await vi.waitFor(() => expect(ignored).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(ignored).toHaveBeenCalledTimes(2))
+    expect(host.textContent).toContain('build')
+    finishIgnore({ available: true, ignored: [] })
+    await vi.waitFor(() => expect(host.querySelector('[title="build"]')).not.toBeNull())
+  })
+
   it('keeps a large listing virtual and shows a status badge without opening the file', async () => {
     listing.mockResolvedValueOnce(Array.from({ length: 10_000 }, (_, index) => ({ name: `${index}.txt`, dir: false })))
     const status = projectFileStatus({ kind: 'ready', changes: [{ path: '0.txt', status: 'untracked', staged: false }] })
@@ -283,4 +298,18 @@ it('stops a superseded reveal before opening its next directory or acknowledging
   await Promise.resolve(); await Promise.resolve()
   expect(listing.mock.calls.some(([, path]) => path === 'one/nested')).toBe(false)
   expect(onRevealed).toHaveBeenCalledTimes(1)
+})
+
+it('does not finish a cached-listing reveal after Collapse all', async () => {
+  setEditorTreeDirectoryOpen(taskId, 'src', true)
+  const [reveal, setReveal] = createSignal<{ path: string; revision: number } | null>(null)
+  const onRevealed = vi.fn()
+  mount(vi.fn(), { reveal, onRevealed })
+  await vi.waitFor(() => expect(host.textContent).toContain('app.ts'))
+  setReveal({ path: 'src/app.ts', revision: 1 })
+  const collapse = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Collapse all folders')!
+  collapse.click()
+  await Promise.resolve(); await Promise.resolve()
+  expect(onRevealed).not.toHaveBeenCalled()
+  expect(host.textContent).not.toContain('app.ts')
 })

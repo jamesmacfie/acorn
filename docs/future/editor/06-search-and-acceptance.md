@@ -1,5 +1,16 @@
 # Phase 06: scope search and finish acceptance
 
+> **Follow-up completion note — October 8, 2026.** Both ripgrep passes use joined bounded cleanup;
+> regex validation survives empty filters, and scope/pattern replacement is debounced after abort.
+> Live Node/task tree capture, mounted-folder availability, listing/read tokens, reveal fences, and
+> the public host viewport seam protect stale work and retain the actual result reading place.
+> Filtered searches use three ripgrep processes: default/glob filename intersection and filtered text.
+> The fixture includes a valid large image and staged/conflicted Git states. Connected local desktop
+> and terminal controls, restart/rename/recovery, and measured counts/bounds are recorded in the
+> [follow-up evidence](../../testing/editor-phase06-follow-up-2026-10-08.md), with exact package results.
+> Remote/platform/native-dialog checks remain unavailable. Coordinator integration, whole-branch
+> review, and the unfiltered repository gate remain pending; this task does not run the full gate.
+
 > **Implementation note — October 8, 2026.** Editor search accepts a task-confined folder and
 > validated include/exclude globs, retains task-scoped search state through hiding and remount, and
 > fences stale requests and result navigation. A bounded ripgrep file-list pass applies glob

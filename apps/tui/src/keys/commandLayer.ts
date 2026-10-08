@@ -22,7 +22,7 @@ import {
   keybindingRegistry, resolveKeybindings, type KeybindingPrefs, type ResolvedKeybinding,
 } from '@acorn/client-core/host/registries/commands'
 import type { TuiKeymap } from './install'
-import { scopeDepth } from './regions'
+import { focusedRenderable, isField, scopeDepth } from './regions'
 import { COMMAND } from './tiers'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 
@@ -89,6 +89,8 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
   createEffect(() => {
     // Read once, here, rather than per key from inside a matcher.
     const depth = scopeDepth()
+    const node = focusedRenderable()
+    const typing = !!node && isField(node)
     const commands = commandRegistry.entries()
       // `enabled` was this field's home and it was a matcher. A command the host cannot run is a
       // command the palette must not offer and the footer must not name, and dropping it from the
@@ -115,10 +117,10 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
         // behind the dialog need no gate of their own: they are focus-within and the focus is
         // inside the dialog, so they never fire (./regions.ts § Scopes).
         //
-        // The other half of the old gate, "not while somebody is typing", is the typing shadow's
-        // now: it sits above this tier and claims every bare key while a field has the keys, so
-        // this layer says nothing about typing at all (./tiers.ts § TYPING).
-        if (isBareKey(key) && depth > 1) return []
+        // The typing shadow claims navigation keys. Commands may bind any printable bare key,
+        // including plugin keys absent from that finite intent table. Rebuild this layer on focus
+        // changes so those bindings disappear while a field owns text input.
+        if (isBareKey(key) && (depth > 1 || typing)) return []
         // No `desc` or `group` on the binding, unlike the DOM installer's: this engine's compiler
         // has no field for either and drops them with a warning, and the command they resolve to
         // carries both anyway, which is where the footer reads them from (../chrome/bindings.ts).

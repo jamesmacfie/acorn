@@ -36,12 +36,17 @@ export async function searchInFiles(core: SearchCoreServices, taskId: string, qu
     ? await listFilteredPaths(root, folder, opts.include ?? [], opts.exclude ?? [], signal) : undefined
   if (signal?.aborted) throw new SearchFailure('cancelled', 'Search was cancelled.')
   if (await core.tasks.root(taskId) !== root) throw new SearchFailure('unavailable_root', 'The task worktree changed during search.')
-  if (allowedPaths && !allowedPaths.size) return { files: [], truncated: false }
   const args = ['--json', '--no-config']
   if (!opts.regex) args.push('--fixed-strings')
   if (!opts.caseSensitive) args.push('--ignore-case')
   if (opts.wholeWord) args.push('--word-regexp')
-  args.push('--', query, folder)
+  // The filename pass owns the final include/exclude set. Hand the same bounded globs
+  // to the text pass too, so it does not scan large files that cannot contribute a hit.
+  for (const pattern of opts.include ?? []) args.push('--glob', pattern)
+  for (const pattern of opts.exclude ?? []) args.push('--glob', pattern.startsWith('!') ? pattern : `!${pattern}`)
+  // Ripgrep still parses a regex when no filename survives the filters. Search closed stdin in
+  // that case so an invalid expression remains an error without scanning excluded files.
+  args.push('--', query, allowedPaths && !allowedPaths.size ? '-' : folder)
   const result = await runRipgrep(root, args, { signal, allowedPaths })
   if (await core.tasks.root(taskId) !== root) throw new SearchFailure('unavailable_root', 'The task worktree changed during search.')
   return result

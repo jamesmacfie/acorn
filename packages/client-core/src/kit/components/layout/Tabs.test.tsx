@@ -1,7 +1,36 @@
-import { createSignal } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
-import { Tabs } from './Tabs'
+import { TabPanel, Tabs } from './Tabs'
+
+it('restores a retained panel offset when remote props and content arrive after mounting', async () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const [ready, setReady] = createSignal(false)
+  const [offset, setOffset] = createSignal<number>()
+  const dispose = render(() => <TabPanel idPrefix="delayed" id="search" active="search" scrollOffset={offset()}>
+    <Show when={ready()}><div>Late results</div></Show>
+  </TabPanel>, host)
+  try {
+    const panel = host.querySelector<HTMLElement>('.ui-tab-panel')!
+    let position = 0
+    Object.defineProperty(panel, 'scrollTop', {
+      configurable: true,
+      get: () => position,
+      set: (offset: number) => { position = ready() ? offset : 0 },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(position).toBe(0)
+    setOffset(321)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(position).toBe(0)
+    setReady(true)
+    await vi.waitFor(() => expect(position).toBe(321))
+  } finally {
+    dispose()
+    host.remove()
+  }
+})
 
 // A remote tree's props are validated one at a time and a bad one is dropped, so a node can be asked
 // to draw without a prop its type says is required. Throwing here unmounts the region the tree is in,

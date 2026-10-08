@@ -73,6 +73,16 @@ export function registerCollectionReveal(id: string, reveal: (key: string) => vo
   return () => { if (live.get(id) === reveal) live.delete(id) }
 }
 
+/** The row that actually has DOM focus when a host opens a command session. */
+export function focusedCollectionTarget(): { id: string; key: string } | undefined {
+  const focused = typeof document === 'undefined' ? null : document.activeElement
+  if (!focused?.isConnected || focused.closest('[hidden], [aria-hidden="true"]')) return undefined
+  const row = focused.closest<HTMLElement>('[data-collection-key]')
+  const id = row?.closest<HTMLElement>('[data-collection-id]')?.dataset.collectionId
+  const key = row?.dataset.collectionKey
+  return id && key ? { id, key } : undefined
+}
+
 /** The DOM's own role vocabulary, so a node cannot invent one. */
 type AriaRole = NonNullable<JSX.HTMLAttributes<HTMLElement>['role']>
 
@@ -161,12 +171,14 @@ export function createCollection(options: CollectionOptions): Collection {
     reveal,
     containerProps: {
       ref: (element: HTMLElement) => bindIntents(element, COLLECTION_INTENTS, keys.handle),
+      'data-collection-id': id,
       role: options.role,
       'aria-orientation': options.role === 'tablist' && options.orientation !== 'horizontal' ? 'vertical' : undefined,
       get 'aria-activedescendant'() { return active() ? itemId(active()!) : undefined },
       onKeyDown,
     },
     itemProps: (key: string) => ({
+      'data-collection-key': key,
       get id() { return itemId(key) },
       role: options.itemRole ?? (options.role ? ITEM_ROLES[options.role] : undefined),
       // Roving: one item in the collection is tab-reachable and the arrows move within it. A getter,

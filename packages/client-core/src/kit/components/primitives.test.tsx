@@ -1,7 +1,7 @@
 import { createSignal, For } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Card } from './primitives'
+import { Card, Input } from './primitives'
 
 // Card's `focus` is a navigation command, spent on the rising edge and not replayed. A pane derives it
 // from a row it rebuilds on every streamed event, so the prop is re-notified while its value stays true.
@@ -22,6 +22,26 @@ afterEach(() => {
   dispose?.()
   dispose = undefined
   host.remove()
+})
+
+it('focuses an input on an autofocus edge without reclaiming focus on value updates', () => {
+  const [active, setActive] = createSignal(true)
+  const [value, setValue] = createSignal('query')
+  let reference: HTMLInputElement | undefined
+  dispose = render(() => <>
+    <Input autofocus={active()} value={value()} ref={(element) => { reference = element }} />
+    <button type="button">Elsewhere</button>
+  </>, host)
+  const input = host.querySelector('input')!
+  const button = host.querySelector('button')!
+  expect(reference).toBe(input)
+  expect(document.activeElement).toBe(input)
+  button.focus()
+  setValue('updated query')
+  expect(document.activeElement).toBe(button)
+  setActive(false)
+  setActive(true)
+  expect(document.activeElement).toBe(input)
 })
 
 describe('Card reveal', () => {

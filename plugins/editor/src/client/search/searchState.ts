@@ -11,9 +11,10 @@ export type SearchState = {
   scopeChanged: boolean
   includeText: string
   excludeText: string
+  scrollOffset: number
 }
 
-const empty = (): SearchState => ({ query: '', opts: {}, error: '', scopeChanged: false, includeText: '', excludeText: '' })
+const empty = (): SearchState => ({ query: '', opts: {}, error: '', scopeChanged: false, includeText: '', excludeText: '', scrollOffset: 0 })
 const keyOf = (taskId: string, nodeId: string | null) => JSON.stringify([nodeId, taskId])
 const [states, setStates] = createSignal<ReadonlyMap<string, SearchState>>(new Map())
 

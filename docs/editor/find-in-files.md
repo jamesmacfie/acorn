@@ -34,8 +34,18 @@ Excludes win. Negative globs belong in the exclude field; literal commas in patt
 Each field accepts 20 patterns of at most 256 characters, with a combined 4 KiB limit. The Node
 rejects invalid filters, missing folders, and symlink scopes outside the task before searching.
 
-Filtered searches run one bounded ripgrep filename pass to select paths, then search text with
-ripgrep's ordinary ignore and hidden-file defaults. The filename pass uses ripgrep glob rules;
-there is no shell expansion or separate JavaScript matcher. Query, scope, filters, results, and
-reading place remain in the Node/task session when the sidebar is hidden or remounted. A rename or
-trash affecting the scope leaves a reset action instead of redirecting the search.
+Filtered searches intersect ripgrep's default filename listing with its glob-filtered listing,
+then pass the same bounded globs to the text search. This uses three processes and preserves
+default ignore and hidden-file rules, which positive globs can otherwise override. Excluded large
+text files are not scanned. Ripgrep owns glob matching; there is no shell expansion or JavaScript
+matcher. Each pass joins process closure after cancellation, overflow, or its timeout, with
+SIGTERM followed by SIGKILL when needed. An invalid regex remains an error when no path is selected.
+
+Scope and pattern changes abort immediately and debounce the replacement by 200 ms. Query, scope,
+filters, results, and reading place remain in the Node/task session through hiding and remount.
+`TabPanel` carries the serialized `scrollOffset` and reports changes through the kit's `onChange`
+event. The host restores after remote result rows arrive. A rename or trash affecting the scope
+leaves a reset action instead of redirecting the search. The focused-folder command captures a live
+tree row whose collection identity includes its Node and task before the palette takes focus.
+Only visible folders in the mounted tree are admitted. Editor resolves the entry through the
+explicit Node and rejects completion after the captured tree owner unmounts.

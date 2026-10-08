@@ -59,3 +59,11 @@ it('keeps hidden and ignored files out of default search, including in a Unicode
   const result = await searchInFiles(core, 'task', 'needle', { folder: '-scope ü', include: ['*.tsx'] })
   expect(result.files.map((file) => file.path)).toEqual(['-scope ü/visible.tsx'])
 })
+
+it('validates regex through bundled ripgrep when the include matches no files', async () => {
+  const { core } = await fixture()
+  await expect(searchInFiles(core, 'task', '[', { regex: true, include: ['*.never'] }))
+    .rejects.toMatchObject({ code: 'invalid_query' })
+  expect(await searchInFiles(core, 'task', 'needle', { regex: true, include: ['*.never'] }))
+    .toEqual({ files: [], truncated: false })
+})

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/solid-query'
-import { createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeNodeId, prefsOptions, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, copyText, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, ToggleButton, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
@@ -8,7 +8,7 @@ import { editorApi, type EditorEntry } from './editorClient'
 import type { FileTarget, TrashAvailability } from '../contract/api'
 import type { ArmedFileAction } from './fileActionModel'
 import { createFileActionModel } from './fileActionModel'
-import { collapseEditorTreeDirectories, editorTreeDirectoryOpen, EDITOR_TREE_COLLECTION, setEditorTreeDirectoryOpen } from './editorTreeState'
+import { collapseEditorTreeDirectories, editorTreeDirectoryOpen, editorTreeCollectionId, registerEditorTreeFolders, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { type FileTreeRevealRequest } from './fileTreeReveal'
 import { findInFolder, searchScopePathChanged } from './search/searchState'
 import { pathContains } from './editorState'
@@ -17,9 +17,6 @@ import type { FileStatusProjection } from './fileStatusModel'
 
 const badgeTone = (tone: 'muted' | 'ok' | 'accent' | 'danger'): 'neutral' | 'ok' | 'accent' | 'danger' =>
   tone === 'muted' ? 'neutral' : tone
-
-/** The collection id, so the reveal below and the host's stored place agree on one name. */
-const TREE = EDITOR_TREE_COLLECTION
 
 export default function FileTree(props: {
   taskId: string
@@ -36,6 +33,7 @@ export default function FileTree(props: {
   const queryClient = useQueryClient()
   const registeredNode = queryOwner(queryClient)
   const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const treeId = () => editorTreeCollectionId(props.taskId, nodeId)
   const api = editorApi(queryClient)
   const prefs = createQuery(() => prefsOptions(true))
   const showIgnored = () => readEditorShowIgnored(prefs.data)
@@ -55,6 +53,8 @@ export default function FileTree(props: {
   const [actionError, setActionError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const loading = new Map<string, { generation: number; run: Promise<boolean> }>()
+  const ignoreReads = new Map<string, number>()
+  let ignoreReadId = 0
   let generation = 0
   let disposed = false
   let taskId = props.taskId
@@ -71,19 +71,27 @@ export default function FileTree(props: {
       if (!live(revision, task)) return false
       setErrors((current) => { const next = new Map(current); next.delete(dir); return next })
       setListings((current) => new Map(current).set(dir, entries))
+      const read = ++ignoreReadId
+      ignoreReads.set(dir, read)
+      // A fresh listing has no verified ignore classification yet. Show its entries until Git
+      // answers, so a stale hidden set never suppresses names added or changed by this listing.
+      setIgnoreByDir((current) => { const next = new Map(current); next.delete(dir); return next })
       void Promise.resolve().then(() => api.ignored(task, dir, entries.map((entry) => entry.name))).then((result) => {
-        if (!live(revision, task)) return
+        if (!live(revision, task) || ignoreReads.get(dir) !== read) return
         setIgnoreByDir((current) => new Map(current).set(dir, result.available
           ? { ignored: new Set(result.ignored) } : { ignored: new Set(), error: result.reason }))
       }).catch((cause: unknown) => {
-        if (live(revision, task)) setIgnoreByDir((current) => new Map(current).set(dir, {
+        if (live(revision, task) && ignoreReads.get(dir) === read) setIgnoreByDir((current) => new Map(current).set(dir, {
           ignored: new Set(), error: cause instanceof Error ? cause.message : 'Git ignore rules are unavailable.',
         }))
       })
       return true
     }).catch((cause: unknown) => {
-      if (live(revision, task)) setErrors((current) => new Map(current).set(dir,
-        cause instanceof Error ? cause.message : 'Unable to read directory.'))
+      if (live(revision, task)) {
+        ignoreReads.delete(dir)
+        setIgnoreByDir((current) => new Map(current).set(dir, { ignored: new Set(), error: 'Ignore filtering unavailable while the directory listing is stale.' }))
+        setErrors((current) => new Map(current).set(dir, cause instanceof Error ? cause.message : 'Unable to read directory.'))
+      }
       return false
     }).finally(() => {
       if (loading.get(dir) === entry) loading.delete(dir)
@@ -122,6 +130,7 @@ export default function FileTree(props: {
     taskId = next
     generation++
     loading.clear()
+    ignoreReads.clear()
     setErrors(new Map())
     setListings(new Map())
     setIgnoreByDir(new Map())
@@ -145,6 +154,7 @@ export default function FileTree(props: {
       disposed = true
       release()
       generation++
+      ignoreReads.clear()
       offWorktree()
       offReconnect()
       if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') window.removeEventListener('focus', focus)
@@ -167,7 +177,7 @@ export default function FileTree(props: {
   const restoreFocus = (path: string) => queueMicrotask(() => {
     const rows = items()
     const surviving = rows.some((item) => item.key === path) ? path : rows[0]?.key
-    if (surviving && !disposed) revealCollectionItem(TREE, surviving)
+    if (surviving && !disposed) revealCollectionItem(treeId(), surviving)
   })
   const dismissMenu = () => {
     const closing = armed()
@@ -229,7 +239,7 @@ export default function FileTree(props: {
         const segments = reveal.split('/').slice(0, -1)
         let parent = ''
         for (const segment of segments) { parent = parent ? `${parent}/${segment}` : segment; setEditorTreeDirectoryOpen(operationTask, parent, true, nodeId); await load(parent) }
-        revealCollectionItem(TREE, reveal)
+        revealCollectionItem(treeId(), reveal)
       }
       setBusy(false)
       closeAction(reveal ?? current.target.path)
@@ -268,6 +278,7 @@ export default function FileTree(props: {
   const collapseAll = () => {
     generation++
     loading.clear()
+    ignoreReads.clear()
     collapseEditorTreeDirectories(taskId, nodeId)
     setListings((current) => new Map([['', current.get('') ?? []]]))
     setIgnoreByDir((current) => new Map(current.has('') ? [['', current.get('')!]] : []))
@@ -300,6 +311,10 @@ export default function FileTree(props: {
     return rows
   })
 
+  createEffect(on(() => props.taskId, (task) => {
+    onCleanup(registerEditorTreeFolders(task, nodeId, (path) => items().some((item) => item.key === path && item.dir)))
+  }))
+
   // Expansion outlives this component, while its lazy listings do not. Rebuild every retained open
   // branch as its parent listing arrives, so returning to the pane cannot show an open twist beside
   // an empty folder. This also restores nested branches in order without fetching collapsed ones.
@@ -318,9 +333,11 @@ export default function FileTree(props: {
   // listing has arrived, and `revealCollectionItem` is a no-op for a key the collection does not hold.
   createEffect(on(() => [props.taskId, props.reveal] as const, ([, request]) => {
     if (!request) return
-    setTemporaryReveal(request.path)
     const task = taskId
-    const current = () => !disposed && task === taskId && props.reveal?.revision === request.revision
+    const revision = generation
+    const current = () => live(revision, task) && props.reveal?.revision === request.revision
+    if (!current()) return
+    setTemporaryReveal(request.path)
     void (async () => {
       if (!await load('') || !current()) return
       const segments = request.path.split('/').slice(0, -1)
@@ -332,7 +349,7 @@ export default function FileTree(props: {
         if (!await load(dir) || !current()) return
       }
       if (!current()) return
-      revealCollectionItem(TREE, request.path)
+      revealCollectionItem(treeId(), request.path)
       props.onRevealed(request.revision)
     })()
   }))
@@ -384,9 +401,9 @@ export default function FileTree(props: {
         </> : <Button disabled={busy()} onPress={() => void act()}>Confirm</Button>}
       </Modal.Actions>
     </Modal>}
-    {(HOST !== 'tui' || !dialog() && menuPath() === null) && <Rows
+    {(HOST !== 'tui' || !dialog() && menuPath() === null) && <Show when={treeId()} keyed>{(id) => <Rows
       virtual
-      id={TREE}
+      id={id}
       tree
       ariaLabel="Worktree files"
       items={items()}
@@ -467,7 +484,7 @@ export default function FileTree(props: {
             })} />}
         </TreeRow>
       }}
-    </Rows>}
+    </Rows>}</Show>}
     </Stack>
   )
 }
