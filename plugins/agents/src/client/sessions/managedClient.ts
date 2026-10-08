@@ -151,10 +151,10 @@ export const managedAgentApi = {
     jsonWrite<AgentSessionMcp>(sessionRoute(sessionId, '/mcp'), 'PUT', { enabled }),
   regenerateTitle: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/regenerate-title'), 'POST'),
-  setGoal: (sessionId: string, objective: string | null) =>
-    jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal'), 'PUT', { objective }),
-  resumeGoal: (sessionId: string) =>
-    jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal/resume'), 'POST'),
+  setGoal: (sessionId: string, objective: string | null, options: AgentOrigin = {}) =>
+    jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal'), 'PUT', { objective }, false, options),
+  resumeGoal: (sessionId: string, options: AgentOrigin = {}) =>
+    jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal/resume'), 'POST', undefined, false, options),
   handoff: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/handoff-terminal'), 'POST'),
   resumeManaged: (sessionId: string) =>

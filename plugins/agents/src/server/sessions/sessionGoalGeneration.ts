@@ -109,6 +109,7 @@ export class SessionGoalGeneration {
 
   private async evaluate(sessionId: string, turnId: string, signal: AbortSignal): Promise<void> {
     const snapshot = await this.ports.store.exportSnapshot(sessionId)
+    if (signal.aborted || this.stopped) return
     const session = snapshot.session
     const goal = session.goal
     const turn = snapshot.turns.find((item) => item.id === turnId)
@@ -116,7 +117,7 @@ export class SessionGoalGeneration {
     if (snapshot.turns.at(-1)?.id !== turnId) return
     if (snapshot.turns.some((item) => item.id !== turn.id && ['queued', 'dispatching', 'active'].includes(item.status))) return
     if (goal.verdict?.turnId === turnId) {
-      if (goal.verdict.blocker === 'goal_not_met_yet') await this.continue(session, turn, goal.verdict)
+      if (goal.verdict.blocker === 'goal_not_met_yet') await this.continue(session, turn, goal.verdict, signal)
       return
     }
     const events = snapshot.events.filter((item) => item.turnId === turnId)
@@ -124,6 +125,7 @@ export class SessionGoalGeneration {
     const evaluationKey = `goal-eval:${turnId}`
     const saved = await this.ports.store.operationResult<{ objective: string; verdict: AgentGoalVerdict }>(
       evaluationKey, 'session.goal.evaluate')
+    if (signal.aborted || this.stopped) return
     if (saved?.objective === goal.objective) verdict = saved.verdict
     else if (turn.status === 'failed') {
       verdict = { ...goalCheckFailure(turnId), blocker: 'run_failed', reason: 'The agent turn failed.' }
@@ -134,9 +136,11 @@ export class SessionGoalGeneration {
       else {
         const controller = new AbortController()
         const abort = () => controller.abort(signal.reason)
-        signal.addEventListener('abort', abort, { once: true })
+        if (signal.aborted) abort()
+        else signal.addEventListener('abort', abort, { once: true })
         const timeout = setTimeout(() => controller.abort(new Error('goal_check_timeout')), TIMEOUT_MS)
         try {
+          if (controller.signal.aborted || this.stopped) return
           const result = await this.ports.models.generateText({
             userId, backendId: `${HARNESS_BACKEND_PREFIX}${session.profileId}`,
             input: {
@@ -159,18 +163,21 @@ export class SessionGoalGeneration {
     }
     if (signal.aborted || this.stopped) return
     if ((await this.ports.store.snapshot(sessionId)).turns.at(-1)?.id !== turnId) return
+    if (signal.aborted || this.stopped) return
     await this.ports.store.saveOperation(evaluationKey, 'session.goal.evaluate', { objective: goal.objective, verdict }, sessionId)
+    if (signal.aborted || this.stopped) return
     const decision = goalDecision(session, turn, verdict, events)
     const applied = await this.goals.apply(sessionId, goal.objective, verdict, decision.status,
       decision.continuations, decision.noProgress)
     if (!applied) return
     this.ports.publish(applied)
-    if (decision.status === 'active') await this.continue(applied, turn, verdict)
+    if (decision.status === 'active') await this.continue(applied, turn, verdict, signal)
   }
 
-  private async continue(session: AgentSession, turn: AgentTurn, verdict: AgentGoalVerdict): Promise<void> {
-    if (this.stopped || session.goal?.status !== 'active') return
+  private async continue(session: AgentSession, turn: AgentTurn, verdict: AgentGoalVerdict, signal: AbortSignal): Promise<void> {
+    if (signal.aborted || this.stopped || session.goal?.status !== 'active') return
     const latest = await this.ports.store.snapshot(session.id)
+    if (signal.aborted || this.stopped) return
     if (latest.turns.at(-1)?.id !== turn.id) return
     if (latest.turns.some((item) => item.id !== turn.id && ['queued', 'dispatching', 'active'].includes(item.status))) return
     await this.ports.enqueue(session.id, goalContinuationPrompt(session.goal.objective, verdict.reason), `goal:${turn.id}`)

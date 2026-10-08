@@ -1,7 +1,9 @@
-import { createEffect, createSignal, on, Show } from 'solid-js'
+import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { Alert, Button, Field, Inline, Input, Modal, Stack, Text } from '@acorn/plugin-api/ui'
+import { activeNodeId } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../../contract/wire.ts'
 import { managedAgentApi } from './managedClient'
+import { managedAgentStore } from './managedStore'
 import { consumeSessionGoalEditor } from './sessionGoalCommand'
 
 export default function SessionGoal(props: { session: AgentSession; openToken: number; onUpdate(session: AgentSession): void }) {
@@ -9,6 +11,15 @@ export default function SessionGoal(props: { session: AgentSession; openToken: n
   const [objective, setObjective] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
+  let mounted = true
+  let actionVersion = 0
+  onCleanup(() => { mounted = false; actionVersion++ })
+  createEffect(on(() => [activeNodeId(), props.session.id] as const, () => {
+    actionVersion++
+    setOpen(false)
+    setBusy(false)
+    setError('')
+  }, { defer: true }))
   const eligible = () => props.session.kind === 'interactive' && props.session.controller === 'acorn'
     && !props.session.archivedAt
   const showEditor = () => {
@@ -22,17 +33,22 @@ export default function SessionGoal(props: { session: AgentSession; openToken: n
   })
 
   const update = async (action: 'set' | 'clear' | 'resume') => {
+    const sessionId = props.session.id
+    const owner = managedAgentStore.captureRead(sessionId)
+    const version = ++actionVersion
+    const ownsView = () => mounted && version === actionVersion && props.session.id === sessionId && owner.current()
     setBusy(true)
     setError('')
     try {
-      const updated = action === 'resume' ? await managedAgentApi.resumeGoal(props.session.id)
-        : await managedAgentApi.setGoal(props.session.id, action === 'clear' ? null : objective().trim())
+      const updated = action === 'resume' ? await managedAgentApi.resumeGoal(sessionId, owner)
+        : await managedAgentApi.setGoal(sessionId, action === 'clear' ? null : objective().trim(), owner)
+      if (!ownsView() || updated.id !== sessionId) return
       props.onUpdate(updated)
       setOpen(false)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to update the goal.')
+      if (ownsView()) setError(caught instanceof Error ? caught.message : 'Unable to update the goal.')
     } finally {
-      setBusy(false)
+      if (ownsView()) setBusy(false)
     }
   }
 

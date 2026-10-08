@@ -55,7 +55,8 @@ use their configured default. A failed or invalid check blocks the goal and does
 Only a verdict that says useful work remains queues another **Goal** turn. A goal stops after eight
 continuations or two consecutive goal turns without a tool call or file change. **Stop** pauses an
 active goal. **Resume** queues a turn to carry on. A restart interrupts an active provider turn and
-pauses its goal; a completed turn whose check was interrupted is checked after startup. The session
+pauses its goal, as does a provider disconnect during a turn. A dispatch failure blocks the goal.
+A completed turn whose check was interrupted is checked after startup. The session
 row stores the objective, counters, status, and last verdict, so every client sees the same state.
 
 The goal route is device-only: `PUT /v1/p/agents/sessions/:id/goal` accepts an objective or `null`

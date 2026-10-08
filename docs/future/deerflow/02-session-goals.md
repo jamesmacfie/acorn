@@ -8,10 +8,17 @@ composer control, and palette command. Claude uses the `haiku` alias for checks;
 their configured default because they expose no stable cheap alias. The service bundle ceiling rose
 by 4,000 bytes for the lazy goal coordinator. Workflow and delegated sessions remain outside this
 phase; later phases can read the additive goal fields without changing their own result rules.
-Focused goal and route tests, affected typechecks, targeted oxlint, migration and architecture checks,
-the final full suite (36 package tasks), and real desktop and TUI checks pass. The desktop check
+Initial verification included focused goal and route tests, affected typechecks, targeted oxlint,
+migration and architecture checks, the full suite (36 package tasks), and real desktop and TUI checks.
+The desktop check
 also verified the phase 1 same-task session reference picker, exclusion of the receiving session,
 and its draft chip and preview.
+
+Review follow-up, October 8, 2026: Goal writes now pin the originating Node and discard stale UI
+replies. Pause and shutdown fence pending ledger and verdict reads before a judge can start. A provider
+disconnect pauses an active goal; dispatch failure blocks it, and Stop pauses it. Focused ownership,
+cancellation, and terminal-path tests, affected typechecks, and targeted oxlint cover these changes.
+The coordinator owns the next full suite after all phases are integrated.
 
 Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 

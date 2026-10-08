@@ -787,8 +787,10 @@ export class ManagedAgentEngine {
   protected async onProviderClosed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void> {
     if (!this.processes.owns(generation)) return
     const message = safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets)
+    const interruptedTurnId = this.processes.current(sessionId)?.activeTurnId
     await this.store.interruptActiveTurn(sessionId, message)
     if (!this.processes.owns(generation)) return
+    if (interruptedTurnId) await this.pauseGoal(sessionId)
     await this.store.expirePendingRequests(sessionId)
     if (!this.processes.owns(generation)) return
     const turnId = this.processes.takeActive(generation)
@@ -1017,6 +1019,7 @@ export class ManagedAgentEngine {
       // recorded as a provider failure.
       await this.stopLive(sessionId)
       await this.store.interruptActiveTurn(sessionId, 'The task was archived while the provider turn was active.')
+      if (turnId) await this.pauseGoal(sessionId)
       await this.store.expirePendingRequests(sessionId)
       if (turnId) this.endTurnSpan(turnId, 'interrupted')
       await this.record(sessionId, null, {

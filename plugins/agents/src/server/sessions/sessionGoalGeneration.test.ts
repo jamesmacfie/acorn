@@ -11,6 +11,12 @@ import { SessionGoalStore } from './sessionGoalStore'
 const answer = (blocker: string) => JSON.stringify({ satisfied: blocker === 'none', blocker,
   reason: 'More work remains.', evidence_summary: 'The tests have not run.', relied_on_assumption: false })
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
+
 describe('session goal generation', () => {
   let ctx: TestNodeContext
   let store: AgentStore
@@ -129,5 +135,46 @@ describe('session goal generation', () => {
     await pausing
     await vi.waitFor(async () => expect((await store.requireSession(session.id)).goal?.status).toBe('paused'))
     expect(enqueued).toEqual([])
+  })
+
+  it('does not start a judge after pause during the ledger read', async () => {
+    const { session, turn } = await settled()
+    const snapshot = await store.exportSnapshot(session.id)
+    const held = deferred<typeof snapshot>()
+    vi.spyOn(store, 'exportSnapshot').mockReturnValueOnce(held.promise)
+    generation.check(session.id, turn.id)
+    const pausing = generation.pause(session.id)
+    held.resolve(snapshot)
+    await pausing
+    expect(generateText).not.toHaveBeenCalled()
+    expect((await store.requireSession(session.id)).goal?.status).toBe('paused')
+  })
+
+  it('does not start a judge after shutdown during the saved-verdict read', async () => {
+    const { session, turn } = await settled()
+    const held = deferred<null>()
+    vi.spyOn(store, 'operationResult').mockReturnValueOnce(held.promise)
+    generation.check(session.id, turn.id)
+    await vi.waitFor(() => expect(store.operationResult).toHaveBeenCalledOnce())
+    const stopping = generation.stop()
+    held.resolve(null)
+    await stopping
+    expect(generateText).not.toHaveBeenCalled()
+    expect(enqueued).toEqual([])
+  })
+
+  it('does not enqueue a continuation after pause during its final snapshot read', async () => {
+    const { session, turn } = await settled()
+    const readSnapshot = store.snapshot.bind(store)
+    const held = deferred<Awaited<ReturnType<typeof store.snapshot>>>()
+    let reads = 0
+    vi.spyOn(store, 'snapshot').mockImplementation((id) => ++reads === 2 ? held.promise : readSnapshot(id))
+    generation.check(session.id, turn.id)
+    await vi.waitFor(() => expect(reads).toBe(2))
+    const pausing = generation.pause(session.id)
+    held.resolve(await readSnapshot(session.id))
+    await pausing
+    expect(enqueued).toEqual([])
+    expect((await store.requireSession(session.id)).goal?.status).toBe('paused')
   })
 })
