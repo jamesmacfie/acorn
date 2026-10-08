@@ -62,7 +62,9 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: 3,176,006 B after combining the instruction check, goal admission callbacks, and
 // reconnect Stop handling. The measured graph adds no dependency; the feature operations remain
 // lazy. Add 2 KB for these acceptance and lifecycle paths, keeping less than 1 KB of margin.
-const limits = { ceiling: 3_177_000, floor: 1_000_000 }
+// 2026-10-08: the Git plugin registers at boot. Its worktree route loads after activation through a
+// dynamic import; the built static graph is 3,185,838 B. Keep about 1 KB for bundler variation.
+const limits = { ceiling: 3_187_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

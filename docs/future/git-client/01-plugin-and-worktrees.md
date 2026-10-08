@@ -1,3 +1,46 @@
+> Completion note, October 9, 2026: Implemented on `phase-1-plugin-and-worktrees`.
+>
+> The compiled Git plugin is registered in Node, desktop, and terminal. Its project-scoped source
+> lists Git's NUL-delimited worktree roster, bounded status and commit summaries, missing and locked
+> registrations, and Acorn task owners. The task pane shows the recorded branch and checkout identity.
+> Paired-device cleanup accepts an observation hash, rechecks the roster and owners under a
+> repository-local guard, and refuses main, locked, dirty, unreadable, or owned worktrees. Prune
+> checks every affected registration. The external worktree manager remains installed for phase 04.
+>
+> Project-folder tasks own their mapped checkout, and aliased project paths resolve to one canonical
+> repository identity. The terminal host now installs the shared project lookup so the Git task pane
+> appears for Git projects. The source and pane use the public plugin seams; core retains task archive.
+> A cleanup response updates the cache only while its original Node and project remain selected;
+> changing the selected worktree also leaves that detail's navigation and feedback alone.
+> The terminal startup ceiling is 730,000 B after a measured 729,573 B build. Git modules remain
+> outside the startup closure. The Node service ceiling is 3,187,000 B after a measured 3,185,838 B
+> build, with the Git route loaded during plugin initialization. Architecture checks treat the word
+> `git` as core VCS vocabulary but still reject explicit Git plugin package, route, and source ids
+> in core packages.
+>
+> Checks on October 9: real Git fixture tests 5/5; architecture boundaries, doc paths, and source
+> fields 60/60; terminal startup, source switching, and source filtering 13/13; plugin, Node, desktop,
+> and terminal package type checks passed; oxlint on touched source passed; desktop staging and
+> terminal production builds passed. Desktop acceptance used isolated sessions `git-phase01e` and
+> `git-phase01-nav`: it showed worktree and task detail, opened the task and repository source,
+> removed a clean unowned fixture worktree, and hid Git after switching to a non-Git project. The
+> final inspected screenshot is `.acorn/agent-dev/git-phase01-nav/screenshots/git-worktrees-final.png`.
+> Terminal acceptance used `git-phase01-tui` with the generated `tui-navigation` desktop fixture
+> data: workspace switching, Git source and task pane navigation, keyboard row selection, clean
+> worktree removal, and a visible refusal after an external edit to a second fixture worktree.
+> Reproduce with `--fixture tui-navigation --workspaces on` in `dev:agent`, then start
+> `apps/tui/scripts/agent/session.mjs --data-dir <desktop-session>/data --cols 120 --rows 40`;
+> add a clean linked checkout under the fixture directory with `git worktree add`.
+>
+> Environment and unrelated checks: frozen offline install lacked the cached `drizzle-kit` tarball,
+> and online install could not resolve the registry. Local dependency links were repaired from the
+> parent checkout for verification. `pnpm test:focus` attempted to chmod the parent checkout's
+> `node-pty` helper and failed with `EPERM`; direct focused Vitest passed without rebuilding it.
+> `tools/arch/docCitations.test.ts` still fails because `docs/api-reference/plugin-routes.md` has
+> 201 lines at both this branch and `HEAD`, above its 200-line limit. That file was not changed here.
+> Later phases can reuse the Git plugin's typed inventory and guarded cleanup contract; they should
+> keep task archive in core and preserve the external manager through phase 04 acceptance.
+
 # Phase 01: plugin and worktrees
 
 Date: October 7, 2026. Status: planned; implementation not started. Dependencies: none.
