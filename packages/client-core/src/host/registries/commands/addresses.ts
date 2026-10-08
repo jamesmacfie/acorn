@@ -58,7 +58,9 @@ function queryParams(raw: string | undefined): Map<string, string[]> | null {
   return params
 }
 
-/** One decode at each component boundary. No browser or renderer state is loaded here. */
+/** One decode at each component boundary. No browser or renderer state is loaded here.
+ * See docs/frontend/acorn-links.md § Input and authority.
+ */
 export function parseLink(href: string): LinkResult {
   if (href.length > MAX_LINK_LENGTH) return refuse(href, 'Link is too long')
   // Read the raw path before URL normalizes dot segments. A normalized `/p/a/../b` would name a
@@ -107,7 +109,9 @@ export function parseLink(href: string): LinkResult {
   return { kind: 'address', address: { nodeId: authority, ...place } }
 }
 
-/** Build the stable, copyable navigation forms. Node IDs are written explicitly. */
+/** Build the stable, copyable navigation forms. Node IDs are written explicitly.
+ * See docs/frontend/acorn-links.md § Address forms.
+ */
 export function buildLink(nodeId: string, place: Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' }>): string {
   if (!hostPattern.test(nodeId)) throw new Error('Invalid Node ID')
   const values = place.kind === 'task' ? [place.taskId, place.pane, place.item]

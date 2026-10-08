@@ -69,6 +69,9 @@ for its tooltip then, and leave out headers and toolbars.
 
 ## Content links
 
+The external `open?url=` and `new-task?url=` forms use these recognisers. For their dispatch and
+promotion rules, see [Acorn links](../frontend/acorn-links.md).
+
 `match` and its captured `item` are optional when the descriptor exists to open a record by kind and
 item ID. `openPane` and `openOverlay` must name surfaces declared by this plugin. `presentations`
 advertises the destinations the host can offer. The host stamps the plugin identity; a target kind
@@ -92,6 +95,10 @@ stamps the plugin id onto every recognizer and resolves the panel by provider, s
 point a link at another plugin's panel. Taking a route also selects the rail source that owns it.
 
 ## Routes
+
+A project route can receive an `acorn://` link without plugin code. Its path is best effort: changing
+it breaks old links, and an unavailable path falls back to the project. See
+[Acorn links](../frontend/acorn-links.md) for the address contract.
 
 A `routes` entry gives a project-scoped surface a URL. Its `path` is confined at parse time to the
 prefix the host mints from the plugin id, `/p/:projectId/x/<plugin-id>/`, so it can't claim core's

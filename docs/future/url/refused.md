@@ -1,6 +1,7 @@
 # Acorn links: refused alternatives
 
-Date: October 7, 2026. Status: planned; implementation not started.
+Date: October 8, 2026. Status: retained decisions for the implemented link scheme; installed-release
+acceptance remains unverified.
 Read the [plan](./README.md) before you change these boundaries.
 
 ## Refused alternatives

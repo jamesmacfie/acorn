@@ -26,7 +26,9 @@ export type AddressHost = {
 let host: AddressHost | null = null
 const waiting = new Set<() => void>()
 
-/** A host registers only after its node cache, plugin routes, and startup restore are ready. */
+/** A host registers only after its node cache, plugin routes, and startup restore are ready.
+ * See docs/frontend/acorn-links.md § Input and authority.
+ */
 export function registerAddressHost(next: AddressHost): () => void {
   host = next
   for (const wake of waiting) wake()

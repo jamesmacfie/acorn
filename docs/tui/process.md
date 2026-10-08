@@ -77,6 +77,8 @@ store's. A revoked token shows as `revoked` in the footer and stops reconnecting
 
 ## Open a link
 
+For the address grammar and test recipes, see [Acorn links](../frontend/acorn-links.md).
+
 `acorn --link 'acorn://<node>/<place>'` opens a shared place in the terminal client. The Node slot
 is a paired Node ID, or `local` for this machine's data root. A link never starts pairing. `--link`
 cannot be combined with `--node` or `--task`. The client validates the address before opening a Node;

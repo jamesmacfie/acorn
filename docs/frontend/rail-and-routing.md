@@ -123,3 +123,4 @@ plugin paths whose source does not declare `projectScoped`. Selecting another so
 route behind, so that route alone is not enough to decide what the reader sees.
 The task row and rail source menus use their clicked target, even when a different task or source is
 active. The project page action lives in the topbar menu.
+For the external address contract, see [Acorn links](./acorn-links.md).

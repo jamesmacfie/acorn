@@ -4,8 +4,9 @@ This plan adds an `acorn://` link scheme that opens the desktop app on a task, a
 plugin page, a settings page, or a rail source. Read it before you build a phase. It holds the
 decisions the phase files depend on.
 
-Date: October 8, 2026. Status: phases 01 through 05 implemented; phase 06 planned. A browser extension that builds
-these links is out of scope and has its own plan.
+Date: October 8, 2026. Status: six phases implemented; installed-release acceptance remains
+unverified. [Acorn links](../../frontend/acorn-links.md) owns the shipped contract. A browser
+extension that builds these links is out of scope and has its own plan.
 
 ## Goal
 

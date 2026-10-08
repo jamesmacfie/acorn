@@ -1,7 +1,31 @@
 # Phase 06: documentation
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: phases 02, 03, 04,
-and 05.
+## Completion note, October 8, 2026
+
+Added `docs/frontend/acorn-links.md` as the owning reference for the address grammar, dispatch,
+Copy link, task promotion, terminal limits, and developer test recipes. The route-owning plugin
+descriptor page explains linkable project pages and the cost of renaming a path. Frontend, terminal,
+testing, plugin, and document indexes link to the reference. The phase 01 parser and dispatcher
+comments cite its sections. The programme index records six implemented phases and keeps the plan
+as a delivery record.
+
+The reference follows the implemented contracts rather than the original examples: a task pane
+needs no item, `local` is device-relative, **Add project** targets `workspaces#projects`, and terminal
+navigation requires a view registered in that host. Only the release packaging config declares the
+scheme. The reference includes desktop and terminal agent recipes; those exercise application
+dispatch, not operating-system registration.
+
+Frozen dependencies installed with Node 26.9. Client-core, desktop, and TUI scoped lint passed.
+The architecture suite passed 86 of 87 checks. Its sole failure is the three missing generated
+Tauri schema paths in the unrelated desktop security design; desktop staging generates them. No
+full repository gate or release bundle ran in this phase. Installed-release acceptance remains
+unverified: phase 02's three disposable bundle attempts failed during host Rust proc-macro
+compilation before an `.app` existed. The live GitHub promotion and loaded-plugin terminal smoke
+could not use fixture connections; focused tests cover those contracts. The coordinator should run
+the final repository gates and revisit installed delivery when a disposable bundle can build.
+
+Date: October 8, 2026. Status: implemented; installed-release acceptance unverified. Dependencies:
+phases 02, 03, 04, and 05.
 Read the [plan](./README.md) and [the refused alternatives](./refused.md).
 
 ## Deliverable
