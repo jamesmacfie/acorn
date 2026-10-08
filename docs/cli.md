@@ -105,6 +105,6 @@ inspectable resource to stdout. In JSON mode the error is one object with its co
   caller set it. Open a new terminal afterwards. The action won't replace a command it didn't install.
   If no writable directory is on `PATH`, create `~/.local/bin`, add it to `PATH`, and try again. Moving
   the app or checkout means clicking the action again. This command is headless.
-- **From a standalone Node archive**, run `node bin/acorn.mjs --help` after `npm install --omit=dev`.
+- **From a standalone Node archive**, run `node bin/acorn.mjs --help` after `npm ci --omit=dev`.
   The archive's launcher includes both the CLI and the terminal client, and a package manager exposes
   its `acorn` bin when the archive is installed as a package ([node distribution](./node-distribution.md)).

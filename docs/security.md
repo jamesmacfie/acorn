@@ -66,6 +66,39 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md).
 
+## Hidden characters in instruction files
+
+Some characters draw as nothing in an editor or a diff: zero-width and direction characters, the soft
+hyphen, fillers, variation selectors, and Unicode tag characters. A line in `CLAUDE.md`, `AGENTS.md`,
+or a skill can carry instructions that nobody reviewing it saw, and a harness reads those files
+itself, with no tool call for a hook to see.
+
+**Check instruction files before each agent turn**, under Settings > Security and backup, is off by
+default. When it's on, the agents plugin's own `agents:before-send` handler reads the root
+instruction files and the files they import with `@path`, the repo's `.claude/skills`,
+`.agents/skills`, and `.codex/skills` folders, and every plugin skill a session may load. If any holds
+a character in Unicode's `Default_Ignorable_Code_Point` set, outside a real emoji sequence, it
+refuses the turn and names the file and line. The code is in
+`plugins/agents/src/server/sessions/instructionCheck.ts`.
+
+The check reads as a harness does rather than as a careful reader would, because a file it skipped
+is one the harness may still read:
+
+- It follows `@path` imports up to five hops and enters linked skill folders.
+- A text file with a NUL byte or an invalid UTF-8 byte is still read, and a byte order mark selects
+  UTF-16. Only a non-text file in a skill folder that isn't valid UTF-8, such as an image, is skipped.
+- A file over 1 MB, or more than 500 files in all, refuses the turn instead of being skipped.
+
+The switch is the `checkInstructionFiles` field of the [agent defaults](./managed-agents/defaults.md),
+whose write route takes only a device, so an agent can't turn it off. The check has these limits:
+
+- It covers turns that acorn sends: managed chats, workflow steps, and delegated agents. Text you type
+  into a harness in a terminal doesn't pass `agents:before-send`.
+- It doesn't read nested `CLAUDE.md` or `AGENTS.md` files that no instruction file imports, which a
+  harness loads later when it works in that folder, or a file that changes partway through a turn.
+- An unexpected failure, or the hook's 5-second timeout, lets the turn through.
+- Text that legitimately uses a zero-width joiner or non-joiner, such as Persian, is refused too.
+
 ## Pages
 
 <a id="transport-and-auth"></a>

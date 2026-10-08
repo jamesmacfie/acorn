@@ -135,6 +135,9 @@ const security: SearchDeclaration = {
   sections: [
     { id: 'encryption', label: 'Disk encryption', rows: ['Full-disk encryption'] },
     { id: 'backup', label: 'Backup', rows: ['Save to'], keywords: ['archive path'] },
+    // The agents plugin's section, drawn through CORE_SECURITY_POINT and declared here for search, as
+    // Storage and memory declares its agents section.
+    { id: 'agent-instructions', label: 'Agent instruction files', rows: ['Check instruction files before each agent turn'], keywords: ['hidden characters', 'unicode', 'prompt injection', 'CLAUDE.md', 'AGENTS.md', 'skills'] },
   ],
 }
 const audit: SearchDeclaration = {

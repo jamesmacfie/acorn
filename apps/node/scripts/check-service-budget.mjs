@@ -56,7 +56,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // Delegation check contracts and durable report assembly add about 7 KiB to the boot graph.
 // 2026-10-08: host attendance validation, store acceptance/recovery, and per-event routing add about
 // 4 KB. Prompt text and request handling load on first use; static graph: about 3,174,000 B.
-const limits = { ceiling: 3_174_000, floor: 1_000_000 }
+// 2026-10-08: 3,156,347 B with the instruction file check. The scan loads on first use. What runs at
+// boot is the agents `before-send` handler registration, the `checkInstructionFiles` field's
+// validation, and the `core:security` point id, so the ceiling moves by 1 KB.
+const limits = { ceiling: 3_175_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

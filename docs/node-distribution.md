@@ -117,7 +117,7 @@ host passes an override, so tests and `pnpm dev:node` can pin a list without wri
 ```sh
 tar -xzf acorn-node-*.tgz
 cd acorn-node-*
-npm install --omit=dev
+npm ci --omit=dev
 npm rebuild
 ACORN_DATA_DIR=/var/lib/acorn-node npm start
 node bin/acorn.mjs --help
@@ -163,7 +163,9 @@ The root manifest's `acornStandalone` policy pins the keymap provider to the rel
 workspace, and its optional Solid adapter peer follows the standalone Solid dependency through a
 package-specific override. The test checks the pin against the source declaration and the lockfile.
 
-The workspace lockfile pins exact versions and integrity hashes. The standalone manifest carries ranges
-and overrides but no npm lockfile, so a later install can resolve different compatible versions. The
-floors cover reviewed advisories. They don't make the install reproducible or cover advisories published
-after the review.
+The workspace lockfile pins exact versions and integrity hashes. npm can't read it, so the packer
+resolves an npm `package-lock.json` from the generated manifest and ships it in the archive. Every
+operator who runs `npm ci` gets the same versions, and npm checks each download against the recorded
+hash. The packer passes `--before` with the `minimumReleaseAge` from `pnpm-workspace.yaml`, so a version
+published within that window can't enter the lockfile. The npm lockfile is resolved when you pack,
+not copied from the pnpm one, so a range can pick a newer compatible version than the workspace tested.
