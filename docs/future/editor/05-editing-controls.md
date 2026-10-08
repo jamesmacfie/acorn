@@ -1,6 +1,60 @@
 # Phase 05: expose editing controls and state
 
-Date: October 7, 2026. Status: proposed product requirements; implementation not started.
+> **Follow-up — October 8, 2026.** The status strip now follows the active graphical document,
+> image preview, or PTY at the stable bottom of Editor. A typed kit status variant supplies primary,
+> essential, secondary, and action slots; its CSS no longer selects English labels or child order.
+> The full relative path is kept in the label and tip, with width-based clipping. Position and
+> custody save state remain visible at 800 px; Details retains secondary facts. Selection length
+> sums CodeMirror ranges in UTF-16 units without copying large selected text. Status menus close on
+> tab change, and held callbacks are fenced by the current task, Node, tab, and graphical admission
+> where they change presentation defaults.
+>
+> Owner tests now exercise live registered commands and save routing, search and markers across
+> reconfiguration, dirty undo and remount, manual indentation with CRLF, a million-unit selection,
+> and stale status actions. Editor passed 183 tests (1 skipped), TUI 684 (2 skipped), plugin API 14,
+> architecture 87, and lint 37 tasks. Client core passed 2,468 with its two previously reproduced
+> workspace-route/CSS-token failures; desktop built and passed 171 tests with its 11 previously
+> reproduced activation snapshot failures. Isolated desktop screenshots inspected after the move:
+> `status-bottom-light.png`, `status-bottom-wrapped.png`, `status-bottom-narrow.png`, and
+> `status-bottom-dark.png` in `.acorn/agent-dev/phase05-controls/screenshots/`. The isolated TUI
+> showed README's available path, Details, Copy path, and Markdown facts at 80×24 and 120×40;
+> it did not claim a cursor or save state. The full unfiltered repo gate remains for the coordinator
+> after phase 06.
+>
+> **Completion note — October 8, 2026.** Editor now presents relative path, cursor position,
+> language, inferred or chosen indentation, nonempty aggregate selection length, and custody save
+> state in a compact strip. The path has explicit copy and tree reveal actions. A narrow strip hides
+> secondary facts in Details while retaining position and save state. Save failure keeps its detailed
+> banner and offers Retry save through custody; changed or deleted disk content and recovered drafts
+> keep their existing resolution actions. PTY and read-only previews show only facts they own.
+>
+> Word wrap defaults off at device scope and can be overridden per open document for the session.
+> A CodeMirror compartment reconfigures the admitted graphical document without changing text or
+> its undo history. Indentation uses the first 200 lines and at most 64 KiB, preferring consistent
+> two-, four-, or eight-space steps or tabs; ambiguous samples use the device default of two spaces.
+> Manual mode and width affect subsequent indentation and tab display only. Presentation overrides
+> follow successful folder or file rename and are pruned with their task or Node. Focused host
+> commands use the live admitted document for find, replace, line operations, comment, next match,
+> undo/redo, and indent/outdent. Go to line retains the phase 04 command and history path. The
+> shared find panel is still future work, so these commands invoke CodeMirror's search panel.
+> The engine remains lazy and the kit has no CodeMirror dependency.
+>
+> **Verification and limits.** The Editor suite passed 178 tests (1 skipped); TUI passed 682
+> (2 skipped), protocol 294, plugin API 14, architecture 87, and lint passed all 37 tasks. Client
+> core passed 2,468 and retained its known workspace-route and CSS shadow-token failures. One
+> telemetry test failed only in an earlier concurrent package run and passed in a focused rerun;
+> the final package run had only the two known failures. The isolated desktop build showed a clean
+> Saved file, recovered draft, inferred indentation, and checked Word wrap with visibly wrapped
+> JSON lines. An external disk edit produced a real Changed on disk conflict and preserved the
+> local draft. The live save-failure banner was not induced; custody and pane tests cover failure
+> and retry. Final screenshots in `.acorn/agent-dev/phase05-controls/screenshots/` show the strip
+> at a narrow width in dark and light themes (`status-narrow-final.png`, `status-light-final.png`),
+> wrapped text (`wrapped-final.png`), and the focused palette command
+> (`palette-focused-final.png`). TUI built with all 49 runtime imports resolved and rendered at
+> 80×24 and 120×40; its editor detail was exercised by the TUI package suite. The final unfiltered
+> repository gate remains with the coordinator after phase 06.
+
+Date: October 7, 2026. Status: completed October 8, 2026.
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 Dependency: [phase 04](./04-tabs-and-navigation.md).
 

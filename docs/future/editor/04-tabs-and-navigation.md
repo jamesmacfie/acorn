@@ -1,6 +1,57 @@
 # Phase 04: manage tabs and navigate files
 
-Date: October 7, 2026. Status: proposed product requirements; implementation not started.
+> **Completion note — October 8, 2026.** Editor now distinguishes duplicate basenames with the
+> shortest parent suffix. Each tab has an inactive-target menu for keeping a preview, guarded single
+> and ordered bulk close, path copy, and tree reveal. Bulk close captures tab generations, asks the
+> existing custody guard to save each target, supports cancellation, stops on an edit or failure,
+> and reports a live owner's partial result. Reopen retains the last 20 successful explicit closes
+> per Node/task session as path and tab-order index only; reopened tabs are kept. A separate 100-place
+> Node/task session history records deliberate file switches and jumps, replays without recording,
+> branches after back, and skips confirmed missing files with a notice. Rename and trash reconcile open
+> and closed references after the captured owner's successful operation.
+>
+> A follow-up fences pending replay and reopen reads against newer navigation and metadata path
+> changes. Transient read failures leave history and closed entries retryable; only a confirmed
+> missing reopen target is removed. The selected tab menu releases its counted custody hold before
+> invoking guarded close.
+>
+> Empty quick open puts up to 50 valid device-recent activations before the deduplicated listing;
+> nonempty queries keep whole-path fuzzy ranking. Exact colon-bearing filenames win before parsing
+> positive one-based `:line[:column]` suffixes. Selection is fenced to the palette's captured
+> Node/task and uses a retained reveal with clamped cursor placement. Desktop browser storage and
+> the terminal host's file-backed device preference adapter store recency at the address documented
+> in [scope rules](../../state-ownership/scope-rules.md); task archive and Node removal prune it.
+> Editor owns metadata, document custody owns text and saves, and the kit only presents optional
+> tab menus. The planned canonical resource-action tab target has not shipped, so the adapter stays
+> private to Editor. Terminal-session tabs retain their existing controls. Focused reopen and
+> back/forward chords use the host keymap, including the terminal drawer's separate reopen chord.
+>
+> **Verification and limits.** Pane tests cover delayed save, replacement-tab identity, bulk
+> failure/cancellation with newer tabs, replay branching, and positioned reveal. Desktop snapshots
+> and screenshots in `.acorn/agent-dev/phase04-tabs-desktop/screenshots/` show an inactive README
+> menu while another file stays active, a reopened kept tab, and the corrected line-12 column-4
+> cursor (`quickopen-position-fixed.png`). Native Cmd+P, Alt+Left/Right from tab focus, and
+> Cmd+Shift+T reached the Editor commands. TUI driver snapshots at 80×24 and 120×40 show quick
+> open and the live inactive-tab target: Left moved the menu caret to `module-0013.ts` while
+> `module-0014.ts` stayed active, and Shift+F10 opened the former's menu. The 80×24 menu scrolled
+> to **Reveal in file tree** with Down; 120×40 displayed every action. Escape returned focus to the
+> strip, and **Keep open** allowed a second tab without preview replacement. `ACORN_TUI_KEYS_TRACE`
+> showed the Editor detail region receiving the tab-strip stop. A normal click activates a tab;
+> its adjacent `⋯` targets the inactive tab's menu. The TUI driver does not expose a graphical
+> cursor. Native dialogs and child webviews are outside the
+> driver. A live desktop bulk-close attempt with an unwritable fixture parent closed all three
+> tabs; it did not induce a save failure, so partial failure is verified by the pane test only.
+> Follow-up pane tests use delayed reads to show that newer deliberate navigation and later replay
+> win; they also cover transient retry, stale reopen, and dirty close from a held menu. Editor passed
+> 171 tests (1 skipped), TUI 682 (2 skipped), plugin API 14, terminal 199,
+> and protocol 294 and Node core 1,636 from unchanged shared-cache inputs. Client core passed
+> 2,468 and retained the two known workspace-route and CSS shadow-token failures; desktop passed
+> 171 and retained its 11 activation snapshot failures. Full lint passed 37 tasks and architecture
+> passed 87 tests. These two existing client-core failures and 11 desktop snapshots also appear in
+> the prior phase's completion record. Later work can add a live guarded-save failure fixture;
+> this phase's pane test covers that behavior.
+
+Date: October 7, 2026. Status: completed October 8, 2026.
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 Dependency: [phase 03](./03-git-status.md).
 

@@ -90,7 +90,7 @@ Each plugin's list is short on purpose:
 
 | Plugin | Commands |
 | --- | --- |
-| Editor | Quick open and find in files |
+| Editor | Quick open, go to line, find in files, reopen closed file, and back/forward navigation |
 | GitHub | A changed-file finder, a pull request finder, create a pull request, and its rail source |
 | Agents | Agent Center, a session search, the two harness terminals, and two settings |
 | Docker | An open action and one search over containers, images, volumes, and networks |

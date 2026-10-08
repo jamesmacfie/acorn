@@ -54,6 +54,7 @@ export { tip } from '@acorn/client-core/kit/components/overlays/tips.tsx'
 export { createArmedConfirm } from '@acorn/client-core/kit/lib'
 export { modelProviderFailure } from '@acorn/client-core/kit/lib'
 export { default as CopyButton } from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
+export { copyText } from '@acorn/client-core/kit/lib'
 // The field that completes what is typed after a sigil and colours what it has completed. `mentions`
 // is the short form (one list of logins after `@`); `sources` and `segments` are the general one, and
 // what the agents composer's `@file` / `/command` / `$skill` draft is written against.

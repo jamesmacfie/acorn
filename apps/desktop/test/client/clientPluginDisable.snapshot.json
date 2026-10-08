@@ -23,7 +23,11 @@
       "context.open",
       "source.docker.open",
       "docker.find",
+      "editor.tree.collapse",
+      "editor.tree.reveal-active",
+      "editor.search.folder",
       "editor.files.open",
+      "editor.navigation.go-to-line",
       "editor.search.open",
       "source.github.open",
       "memory.search",
@@ -80,7 +84,8 @@
       "github:summary-badges"
     ],
     "extensions": [
-      "agents.storage",       "agents.security",
+      "agents.storage",
+      "agents.security",
       "agents.loop-coverage",
       "changes.tool-card",
       "github.push-actions",
@@ -221,7 +226,11 @@
         "editor"
       ],
       "commands": [
+        "editor.tree.collapse",
+        "editor.tree.reveal-active",
+        "editor.search.folder",
         "editor.files.open",
+        "editor.navigation.go-to-line",
         "editor.search.open"
       ],
       "persistedStateSlices": [

@@ -5,9 +5,11 @@
 // a drawer tab per edited file, none of which "editing this file right now" wants. What is left is a
 // client-minted id, a socket, and a spawn that is torn down on kill or disconnect.
 import { spawn as ptySpawn, type IPty } from 'node-pty'
+import { lstat } from 'node:fs/promises'
 import type { CompiledPluginBroadcast } from '@acorn/plugin-api/node'
 import type { EditorClientFrame } from '../shared/editorPty'
 import type { EditorCoreServices } from './editor'
+import { claimEditorPty } from './editorPtyOwners'
 
 const MAX_PTYS_PER_CONN = 8
 const clampDim = (value: number, fallback: number, max: number) =>
@@ -22,6 +24,11 @@ export function registerEditorWsChannel(events: CompiledPluginBroadcast, core: E
   // `null` is a slot claimed by an open that has not finished resolving the worktree yet, so the
   // per-connection ceiling and the duplicate-id check both count it.
   const ptys = new Map<object, Map<string, IPty | null>>()
+  const claims = new Map<object, Map<string, () => void>>()
+  const release = (conn: object, id: string) => {
+    claims.get(conn)?.get(id)?.()
+    claims.get(conn)?.delete(id)
+  }
 
   events.channel('editor', {
     onFrame(rawFrame, send, conn) {
@@ -41,9 +48,19 @@ export function registerEditorWsChannel(events: CompiledPluginBroadcast, core: E
             const abs = root && core.fs.resolveInRoot(root, path)
             const bail = () => {
               mine.delete(ptyId)
+              release(conn, ptyId)
               send({ channel: 'editor:pty:exit', ptyId, code: 1 })
             }
             if (!abs) return bail()
+            try {
+              const drop = await claimEditorPty(root, path)
+              if (!mine.has(ptyId)) { drop(); return }
+              const owned = claims.get(conn) ?? new Map<string, () => void>()
+              owned.set(ptyId, drop)
+              claims.set(conn, owned)
+              if (await core.tasks.root(taskId) !== root || core.fs.resolveInRoot(root, path) !== abs) return bail()
+              await lstat(abs)
+            } catch { return bail() }
             const env = process.env as Record<string, string>
             let pty: IPty
             try {
@@ -65,6 +82,7 @@ export function registerEditorWsChannel(events: CompiledPluginBroadcast, core: E
             pty.onData((data) => send({ channel: 'editor:pty:out', ptyId, data }))
             pty.onExit(({ exitCode }) => {
               mine.delete(ptyId)
+              release(conn, ptyId)
               send({ channel: 'editor:pty:exit', ptyId, code: exitCode })
             })
           })()
@@ -82,6 +100,7 @@ export function registerEditorWsChannel(events: CompiledPluginBroadcast, core: E
           const mine = ptys.get(conn)
           mine?.get(frame.ptyId)?.kill()
           mine?.delete(frame.ptyId) // also releases a slot still claimed by an unresolved open
+          release(conn, frame.ptyId)
           return
         }
         default:
@@ -90,6 +109,8 @@ export function registerEditorWsChannel(events: CompiledPluginBroadcast, core: E
     },
     onDisconnect: (conn) => {
       for (const pty of ptys.get(conn)?.values() ?? []) pty?.kill()
+      for (const id of claims.get(conn)?.keys() ?? []) release(conn, id)
+      claims.delete(conn)
       ptys.delete(conn)
     },
   })

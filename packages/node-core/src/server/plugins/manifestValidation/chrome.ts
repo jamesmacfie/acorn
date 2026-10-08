@@ -6,6 +6,7 @@ export function validateChrome(refs: ManifestReferences): void {
   const { sources, slots, contextMenus, commands, keybindings, frames } = manifest.contributions
   sources.forEach((entry, i) => {
     if (entry.items !== undefined) route(entry.items, ['contributions', 'sources', i, 'items'])
+    if (entry.search !== undefined) route(entry.search, ['contributions', 'sources', i, 'search'])
     if (entry.tree && !manifest.client) {
       ctx.addIssue({ code: 'custom', path: ['contributions', 'sources', i, 'tree'], message: 'a remote-tree source requires a client bundle' })
     }

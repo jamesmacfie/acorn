@@ -27,7 +27,11 @@ export const shouldPersistQueryKey = (key: QueryKey): boolean => {
 // persistence, while failed queries are not useful offline cache entries. The persister's maxAge
 // applies to the snapshot as a whole; without this per-entry gate, opening Acorn regularly refreshes
 // the snapshot timestamp and can carry years-old PRs forward forever.
+//
+// A query that sets `meta: { persist: false }` stays in memory only. Search answers do: restoring one
+// after a relaunch would show an old provider answer as though it had just arrived.
 export const shouldPersistQuery = (query: Query): boolean =>
   defaultShouldDehydrateQuery(query)
+  && query.meta?.persist !== false
   && shouldPersistQueryKey(query.queryKey)
   && query.state.dataUpdatedAt >= Date.now() - PERSISTED_QUERY_MAX_AGE_MS

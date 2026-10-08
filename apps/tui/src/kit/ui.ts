@@ -24,6 +24,9 @@ export {
   ToggleButton,
 } from './asking'
 export { Fallback, Only, Rectangle } from './pixels'
+import { copyToTerminal } from './copy'
+/** OSC 52 where the terminal advertises support; otherwise the caller shows the path. */
+export async function copyText(text: string): Promise<boolean> { return copyToTerminal(text) }
 // The canvas, as the indented list. Its own file because it reaches into two of the three above.
 export { Graph } from './graph'
 export type { GraphCard } from '@acorn/client-core/kit/components/content'

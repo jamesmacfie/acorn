@@ -45,6 +45,20 @@ export function nextActive(list: OpenFile[], closed: string, current: string | n
 // --- Signal store ---
 export type TaskEditorState = { files: OpenFile[]; active: string | null }
 const [byTask, setByTask] = createSignal<Record<string, TaskEditorState>>({})
+// A tab's identity survives dirty-flag projections but changes when that path is closed/reopened.
+const tabInstances = new Map<string, Map<string, object>>()
+const instanceMap = (taskId: string) => {
+  let instances = tabInstances.get(taskId)
+  if (!instances) { instances = new Map(); tabInstances.set(taskId, instances) }
+  return instances
+}
+export const editorTabIdentity = (taskId: string, path: string): object | undefined => {
+  if (!openFiles(taskId).some((file) => file.path === path)) return undefined
+  const instances = instanceMap(taskId)
+  let identity = instances.get(path)
+  if (!identity) { identity = {}; instances.set(path, identity) }
+  return identity
+}
 
 const stateFor = (taskId: string): TaskEditorState => byTask()[taskId] ?? { files: [], active: null }
 export const openFiles = (taskId: string): OpenFile[] => stateFor(taskId).files
@@ -54,16 +68,65 @@ function update(taskId: string, fn: (s: TaskEditorState) => TaskEditorState): vo
   setByTask((prev) => ({ ...prev, [taskId]: fn(prev[taskId] ?? { files: [], active: null }) }))
 }
 
-export const editorOpen = (taskId: string, path: string, ephemeral: boolean): void =>
+export const editorOpen = (taskId: string, path: string, ephemeral: boolean): void => {
+  const before = new Set(openFiles(taskId).map((file) => file.path))
+  const instances = instanceMap(taskId)
+  if (!before.has(path)) instances.set(path, {})
   update(taskId, (s) => ({ files: openFileIn(s.files, path, ephemeral), active: path }))
+  const after = new Set(openFiles(taskId).map((file) => file.path))
+  for (const old of before) if (!after.has(old)) instances.delete(old)
+}
+export const editorReopen = (taskId: string, path: string, index: number): void => {
+  const existed = !!editorTabIdentity(taskId, path)
+  if (!existed) instanceMap(taskId).set(path, {})
+  update(taskId, (state) => {
+    const files = [...state.files]
+    if (!files.some((file) => file.path === path)) files.splice(Math.min(index, files.length), 0, { path, ephemeral: false, dirty: false })
+    else return { files: promoteFile(files, path), active: path }
+    return { files, active: path }
+  })
+}
 export const editorPromote = (taskId: string, path: string): void => update(taskId, (s) => ({ ...s, files: promoteFile(s.files, path) }))
-export const editorClose = (taskId: string, path: string): void =>
+export const editorClose = (taskId: string, path: string): void => {
   update(taskId, (s) => ({ files: closeFile(s.files, path), active: nextActive(s.files, path, s.active) }))
+  instanceMap(taskId).delete(path)
+}
 export const editorSetDirty = (taskId: string, path: string, dirty: boolean): void =>
   update(taskId, (s) => ({ ...s, files: setFileDirty(s.files, path, dirty) }))
 export const editorActivate = (taskId: string, path: string): void => update(taskId, (s) => ({ ...s, active: path }))
 
+/** One synchronous state change keeps tab order, preview, dirtiness, and active identity together. */
+export const movePathsInEditorState = (state: TaskEditorState, from: string, to: string): TaskEditorState => ({
+  files: state.files.map((file) => ({ ...file, path: movedPath(file.path, from, to) })),
+  active: state.active ? movedPath(state.active, from, to) : null,
+})
+export const editorMovePaths = (taskId: string, from: string, to: string): void => {
+  update(taskId, (s) => movePathsInEditorState(s, from, to))
+  const instances = instanceMap(taskId)
+  for (const [path, identity] of Array.from(instances)) if (pathContains(from, path)) { instances.delete(path); instances.set(movedPath(path, from, to), identity) }
+}
+
+export const removePathsInEditorState = (state: TaskEditorState, path: string): TaskEditorState => {
+  const removed = state.files.filter((file) => pathContains(path, file.path))
+  const files = state.files.filter((file) => !pathContains(path, file.path))
+  return { files, active: state.active && removed.some((file) => file.path === state.active) ? files[0]?.path ?? null : state.active }
+}
+export const editorRemovePaths = (taskId: string, path: string): void => {
+  update(taskId, (s) => removePathsInEditorState(s, path))
+  for (const key of instanceMap(taskId).keys()) if (pathContains(path, key)) instanceMap(taskId).delete(key)
+}
+
+export const captureTaskEditorState = (taskId: string): TaskEditorState => {
+  const state = stateFor(taskId)
+  return { files: state.files.map((file) => ({ ...file })), active: state.active }
+}
+
+export const pathContains = (parent: string, child: string): boolean => !parent || child === parent || child.startsWith(`${parent}/`)
+export const movedPath = (path: string, from: string, to: string): string =>
+  pathContains(from, path) ? `${to}${path.slice(from.length)}` : path
+
 export function evictEditorState(taskId: string): void {
+  tabInstances.delete(taskId)
   setByTask((current) => {
     if (!(taskId in current)) return current
     const next = { ...current }
@@ -117,6 +180,7 @@ export { byTask as editorStateByTask }
 // (docs/state-ownership/scope-rules.md § Scope rules). Writing each scope under the active node's storage key leaks one
 // node's state into another's namespace.
 export function clearEditorStates(): void {
+  tabInstances.clear()
   setByTask({})
 }
 

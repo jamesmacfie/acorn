@@ -38,6 +38,45 @@ The editor pane and the host's document surface share one theme and one language
 every other pane's boot graph. CodeMirror reads no browser global at module scope, so a plugin test
 can import it under Node.
 
+## Find in a file
+
+Every graphical editor has the same find and replace panel, drawn with the kit's controls instead of
+CodeMirror's stock inputs. That's the editor pane, the host document surface, and the embedded code
+box. `search.ts` exports `editorSearch()`, which each one adds beside `basicSetup`. `basicSetup`'s
+keymap still opens the panel.
+
+CodeMirror owns the query, the matching, the highlights, the selection, the replacement, and undo.
+`search.ts` gives CodeMirror the panel through `search({ createPanel })`, reads its search state for
+display, and turns each click into one of CodeMirror's commands. A replacement is an ordinary
+transaction, so it reaches the caller's update listener, autosave or `onChange`, and undo history
+like a keystroke. The panel lives in the editor state, so each open file keeps its own query and
+open panel, and a swapped state rebuilds the panel against the new document.
+
+What the reader gets:
+
+- A bottom strip with the find field, the match count, previous and next, **Match case**, **Whole
+  word**, **Regular expression**, **Select all matches**, a **Replace** disclosure, and close. A
+  narrow pane wraps the buttons onto a second line.
+- **Replace** opens a second row with a replacement field, **Replace next**, and **Replace all**.
+  It starts collapsed each time the panel opens, unless the editor's **Replace in file** command
+  opened it through `openReplacePanel(view)`. Its text stays in the query, so collapsing the row
+  keeps it. A read-only document has no **Replace** control. **Replace next** follows CodeMirror's
+  rule: the first press selects the next match, and the press after that replaces it.
+- The count reads `3/17` when the selection is on a match, and `17 matches` when it's not. Counting
+  stops at 1,000 matches (`MAX_COUNTED_MATCHES`) and shows `1000+`. Navigation never depends on the
+  count. The count is cached per document and query, so moving the cursor doesn't search again.
+- An invalid regular expression marks the field invalid and shows the reason in the count's place.
+- Cmd+F (Ctrl+F) opens the panel or selects the query, seeded from the selection. Enter and
+  Shift+Enter move between matches, Enter in the replacement field runs **Replace next**, and
+  Cmd+G, F3, and their Shift forms keep working. Escape closes the panel, puts focus back in the
+  editor, and stops there, so it doesn't also take the reader out of the editor's `Rectangle`.
+- Matches use `--find-hit-bg` and the current match `--find-current-bg`, the colors the diff's find
+  marks use.
+
+The panel's view, `FindPanel.tsx`, loads on first use rather than as an import. The entrypoint has to
+load in a plugin's Node tests, and a `.tsx` module can't. The terminal client's alias returns an empty
+extension.
+
 ## Pages
 
 <a id="the-contract"></a>

@@ -27,6 +27,15 @@ describe('query cache persistence policy', () => {
     expect(shouldPersistQuery(successful!)).toBe(true)
   })
 
+  it('keeps a query that opts out of persistence in memory only', () => {
+    const client = new QueryClient()
+    const searchKey: readonly unknown[] = ['plugin-chrome-search', 'linear', 'linear-issues', 'p1', 'crash']
+    const query = client.getQueryCache().build(client, { queryKey: searchKey, meta: { persist: false } })
+    client.setQueryData(searchKey, { items: [], incomplete: false })
+    expect(query.state.status).toBe('success')
+    expect(shouldPersistQuery(query)).toBe(false)
+  })
+
   it('does not carry stale entries forward when a newer cache snapshot is written', () => {
     const client = new QueryClient()
     const oldKey: readonly unknown[] = ['pull', 'acorn', 'desktop', '1']

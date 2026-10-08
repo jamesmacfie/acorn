@@ -1,10 +1,11 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import { editorBridge } from '../server/editor'
+import { lazyEditorBridge } from '../server/lazyEditorBridge'
 import { registerEditorWsChannel } from '../server/wsChannel'
-import { searchBridge } from '../server/search'
+import { lazySearchBridge } from '../server/lazySearchBridge'
 import { editor, EDITOR } from '../server/routes/editor'
 import { search, SEARCH } from '../server/routes/search'
 import { EDITOR_LINE_MARKERS } from '../contract/lineMarkers'
+import { EDITOR_FILE_STATUS } from '../contract/fileStatus'
 
 export const editorPlugin = (): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
@@ -13,6 +14,7 @@ export const editorPlugin = (): NodePlugin => {
     label: 'Editor',
     init: (ctx) => {
       ctx.extensionPoints.declare(EDITOR_LINE_MARKERS, 'Editor line markers')
+      ctx.extensionPoints.declare(EDITOR_FILE_STATUS, 'Editor file status')
       // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks): a formatter's
       // turn at the text on its way to disk. A veto is allowed too, so a lint-on-save can refuse.
       ctx.hooks.declare({
@@ -25,13 +27,14 @@ export const editorPlugin = (): NodePlugin => {
         timeoutMs: 2_000,
       })
       routeDisposables = [
-        ctx.capabilities.provide(EDITOR, editorBridge(
+        ctx.capabilities.provide(EDITOR, lazyEditorBridge(
           ctx.core,
           ctx.events.worktreeStatus,
           ctx.hooks,
           () => ctx.extensionPoints.handlers(EDITOR_LINE_MARKERS).map((entry) => entry.value),
+          () => ctx.extensionPoints.handlers(EDITOR_FILE_STATUS).map((entry) => entry.value),
         )),
-        ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
+        ctx.capabilities.provide(SEARCH, lazySearchBridge(ctx.core)),
       ]
       // `$EDITOR` in a throwaway PTY, for a reader who edits in terminal mode. It rides the one
       // authenticated WebSocket, so it is part of this plugin's surface: drop it and the routes keep

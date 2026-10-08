@@ -10,7 +10,7 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: (...args: unknown[]) => writeJson(...args),
 }))
 
-const { chromeDeps, readAnnotationMarks, sanitizeRailItem, scopedSourceItemsPath, unwatchChrome, watchChrome } = await import('./chromeData')
+const { chromeDeps, readAnnotationMarks, readRailSearch, sanitizeRailItem, scopedSourceItemsPath, unwatchChrome, watchChrome } = await import('./chromeData')
 const wsClient = await import('../../infra/node/wsClient')
 const { _resetPluginChannels } = await import('../plugins/pluginChannel')
 
@@ -22,6 +22,29 @@ describe('descriptor source scope', () => {
       .toBe('/v1/p/board/items?status=open&project=project-1')
     expect(scopedSourceItemsPath('/v1/p/board/items', undefined))
       .toBe('/v1/p/board/items')
+  })
+})
+
+describe('descriptor source search', () => {
+  beforeEach(() => readJson.mockReset())
+
+  it('sends the reader\'s text and the routed project, and sanitizes every row', async () => {
+    readJson.mockResolvedValueOnce({ items: [{ id: 'a:1', title: 'Crash' }, { id: 'no title' }], incomplete: true })
+    const result = await readRailSearch('linear', '/v1/p/linear/rail-search', 'node-1', 'crash', 'project-1', new AbortController().signal)
+    expect(readJson.mock.calls[0][0]).toBe('/v1/p/linear/rail-search?project=project-1&q=crash')
+    expect(result).toEqual({ items: [{ id: 'a:1', title: 'Crash' }], incomplete: true })
+  })
+
+  it('cuts an oversized answer and calls it incomplete', async () => {
+    readJson.mockResolvedValueOnce({ items: Array.from({ length: 150 }, (_, at) => ({ id: `r${at}`, title: 'Row' })) })
+    const result = await readRailSearch('linear', '/v1/p/linear/rail-search', 'node-1', 'row', undefined, new AbortController().signal)
+    expect(result.items).toHaveLength(100)
+    expect(result.incomplete).toBe(true)
+  })
+
+  it('refuses a search route outside the plugin\'s namespace', async () => {
+    await expect(readRailSearch('linear', '/v1/p/rollbar/rail-search', 'node-1', 'x', undefined, new AbortController().signal))
+      .rejects.toThrow('linear may not read')
   })
 })
 

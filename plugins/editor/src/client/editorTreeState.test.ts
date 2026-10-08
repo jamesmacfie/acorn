@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  collapseEditorTreeDirectories,
   editorTreeDirectoryOpen,
   evictEditorTreeState,
+  moveEditorTreeDirectories,
   setEditorTreeDirectoryOpen,
 } from './editorTreeState'
 
@@ -16,6 +18,9 @@ describe('editor tree state', () => {
 
     setEditorTreeDirectoryOpen('tree-nested', 'src', true)
     expect(editorTreeDirectoryOpen('tree-nested', 'src/core')).toBe(true)
+    collapseEditorTreeDirectories('tree-nested')
+    expect(editorTreeDirectoryOpen('tree-nested', 'src')).toBe(false)
+    expect(editorTreeDirectoryOpen('tree-nested', 'src/core')).toBe(false)
   })
 
   it('scopes expansion by task and evicts only the archived task', () => {
@@ -28,5 +33,16 @@ describe('editor tree state', () => {
     evictEditorTreeState('tree-task-a')
     expect(editorTreeDirectoryOpen('tree-task-a', 'src')).toBe(false)
     expect(editorTreeDirectoryOpen('tree-task-b', 'test')).toBe(true)
+  })
+
+  it('keeps equal task IDs on different Nodes independent during an in-flight move', () => {
+    setEditorTreeDirectoryOpen('same-task', 'src', true, 'first-node')
+    setEditorTreeDirectoryOpen('same-task', 'src', true, 'second-node')
+    setEditorTreeDirectoryOpen('same-task', 'src/old', true, 'first-node')
+    moveEditorTreeDirectories('same-task', 'src/old', 'src/new', 'first-node')
+    expect(editorTreeDirectoryOpen('same-task', 'src/new', 'first-node')).toBe(true)
+    expect(editorTreeDirectoryOpen('same-task', 'src/old', 'first-node')).toBe(false)
+    expect(editorTreeDirectoryOpen('same-task', 'src/new', 'second-node')).toBe(false)
+    expect(editorTreeDirectoryOpen('same-task', 'src', 'second-node')).toBe(true)
   })
 })

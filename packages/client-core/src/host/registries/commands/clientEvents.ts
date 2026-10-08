@@ -14,6 +14,7 @@ export type PaneIntent =
   // covers the fold into the editor pane). It has to be an intent for the same reason `editor:reveal`
   // is: the pane may not be mounted yet, and the request has to survive until it is.
   | { kind: 'editor:search' }
+  | { kind: 'editor:tree-reveal'; path: string }
   | { kind: 'integration:show-ref'; ref: ExternalRef }
   | { kind: 'context:reveal'; sectionId: string; itemId?: string } // → pane 'context'
   // A row a plugin's declarative rail source was selected on, carried to that plugin's own pane

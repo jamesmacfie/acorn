@@ -51,6 +51,13 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Last workspace and the two-workspace shortcut pair | Active Node's app-scoped preferences |
 | Workspace and task selection | Node and workspace or task |
 | Draft editor and comment text, and a Changes commit message | Client and current task |
+| Editor recent files | Device `localStorage`, keyed by Node and task; at most 50 paths |
+| Editor search query, filters, folder, results, and reading place | Node/task session state, evicted with the task |
+| Show ignored files | Device preference; on unless explicitly disabled |
+| Editor close and navigation history | Session memory keyed by Node and task; at most 20 closes and 100 locations |
+| Editor word wrap default | Device preference `editor_word_wrap`; off when absent |
+| Editor indentation fallback | Device preference `editor_indentation`; two spaces when absent or invalid |
+| Editor per-tab wrap and indentation choices | Session memory keyed by Node, task, and path; rename moves them, close, trash, archive, and Node removal prune them |
 | Provider data and task mutations | Owning Node |
 | Computer Use app-access grants ([app-access approval](../managed-agents/app-access.md#app-access-approval)) | The Computer Use integration on the Node's computer. The Node keeps only the decision |
 
@@ -88,6 +95,14 @@ events onto scopes. A live roster clears, such as the agent list, terminal sessi
 because it fetches again for the new Node within a tick. Durable memory is keyed, such as editor scroll,
 the active terminal tab, or the workspace view, because switching back should restore it.
 [Reading places](./reading-places.md) covers list, timeline, and diff positions.
+
+Editor recent paths live at `acorn:editor:recent:v1:<encoded-node-id>:<encoded-task-id>` on the
+device. The desktop writes browser `localStorage`; the terminal host's file-backed `localStorage`
+adapter writes its private `device-prefs.json`. Opening the file palette prunes paths absent from
+the current listing and keeps at most 50 paths per Node/task. Archiving a task or removing a Node
+deletes its device entries. Closed-tab order (20) and navigation locations (100) are session-only
+Editor metadata under the same Node/task owner. Open tabs and document recovery retain their
+separate Node and custody owners.
 
 ## Particular decisions
 

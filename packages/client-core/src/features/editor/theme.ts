@@ -118,6 +118,12 @@ function currentTheme(): Extension {
       '.cm-gutters': { backgroundColor: token('--bg'), color: token('--text-faint'), borderRight: `1px solid ${token('--border')}` },
       '.cm-activeLineGutter': { backgroundColor: token('--bg-hover'), color: token('--text-muted') },
       '.cm-panels': { backgroundColor: token('--bg-subtle'), color: token('--text') },
+      // Find takes the tokens the diff's find marks use, so a match looks the same in both. The
+      // search package's own light and dark defaults name two classes, which is why these selectors
+      // spell out the editor and the line: a shorter one loses on specificity.
+      '&.cm-editor .cm-panels.cm-panels-bottom': { borderTop: `1px solid ${token('--border')}` },
+      '&.cm-editor .cm-line .cm-searchMatch': { backgroundColor: token('--find-hit-bg') },
+      '&.cm-editor .cm-line .cm-searchMatch-selected': { backgroundColor: token('--find-current-bg') },
       '.cm-tooltip': { backgroundColor: token('--bg-subtle'), color: token('--text'), border: `1px solid ${token('--border-strong')}` },
       '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: token('--bg-selected'), color: token('--text') },
     }, { dark }),

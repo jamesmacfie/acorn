@@ -11,6 +11,11 @@ bundled into them, and into the helper, except the native addons and run-time pa
 `apps/node/externals.ts` lists. Staging copies those packages' installed graphs under
 `dist/helper/node_modules` without pnpm links, so the installed helper and service resolve them from
 app resources. Shared dependencies are hoisted to keep NSIS paths under Windows' legacy limit.
+The Node build also produces `exclusive-rename` and its capability manifest on macOS and Linux.
+It compiles the small helper during build, and an unavailable builder records an unavailable
+capability. Desktop staging and the standalone pack copy both files with the service. The running
+Node checks the manifest's host platform and architecture before exposing Editor rename; it never
+compiles on the user's first rename. A cross-built or unsupported host leaves rename disabled.
 `scripts/nodeRuntimePackages.ts` owns the shared runtime package list.
 The stage script resolves one supported target triple before copying packages. For `node-pty` 1.1.0,
 `apps/desktop/scripts/native-package-files.mjs` keeps the selected `prebuilds/<platform>-<arch>`

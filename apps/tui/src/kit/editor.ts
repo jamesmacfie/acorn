@@ -15,7 +15,7 @@
 //
 // Graphical engine imports and state construction belong to the DOM Rectangle's mount.
 // The terminal host retains the shared text custody API without importing grammars or views.
-export { documentCustody, recoverDocumentCustody, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
+export { documentCustody, recoverDocumentCustody, fileDocumentCustodies, reserveDocumentDestinations, reserveFileSourceCustodies, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
@@ -36,6 +36,12 @@ export const shouldHighlightDocument = (_characters: number): boolean => false
 /** The palette is already the terminal's: OpenTUI paints from the same theme tokens the rest of this
  *  host reads (./roles.ts), and there is no second stylesheet to hand a colour list to. */
 export const editorTheme = (): Extension => []
+
+/** No find panel: this host's editor is the file's text, and the reader's own `$EDITOR` has its own
+ *  search. */
+export const editorSearch = (): Extension => []
+
+export const openReplacePanel = (_view: EditorView): boolean => false
 
 export const refreshEditorTheme = (_view: EditorView): void => {}
 

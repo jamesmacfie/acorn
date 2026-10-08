@@ -16,14 +16,14 @@ describe('resolveKeybindings', () => {
     expect(resolved[1]).toMatchObject({ chord: null, conflict: 'first' })
   })
 
-  it('allows the same chord in different pane scopes but not against task scope', () => {
+  it('allows pane chords to shadow a task chord only in their own focused pane', () => {
     const panes = resolveKeybindings([
       binding({ id: 'one', defaultChord: 'meta+f', when: 'pane', pane: 'pr' }),
       binding({ id: 'two', defaultChord: 'meta+f', when: 'pane', pane: 'editor' }),
     ])
     expect(panes.map((item) => item.chord)).toEqual(['meta+f', 'meta+f'])
     const task = resolveKeybindings([...panes, binding({ id: 'task', defaultChord: 'meta+f', when: 'task' })])
-    expect(task[2].conflict).toBe('one')
+    expect(task.map((item) => item.chord)).toEqual(['meta+f', 'meta+f', 'meta+f'])
   })
 
   it('uses canonical overrides and retains explicit unbound state', () => {

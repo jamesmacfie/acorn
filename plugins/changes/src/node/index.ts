@@ -1,11 +1,11 @@
 import { type NodePlugin } from '@acorn/plugin-api/node'
 import { localGitAgentTools } from '../server/agentTools'
-import { changesArchiveConcern } from '../server/archiveCheck'
 import { CHANGES_HOOKS, localGitBridge } from '../server/localGit'
 import { localGit, LOCAL_GIT } from '../server/routes/localGit'
 import { reviewNotesRoutes } from '../server/routes/reviewNotes'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
-import { uncommittedEditorLineMarkers } from '../server/editorLineMarkers'
+import { EDITOR_FILE_STATUS } from '@acorn/plugin-editor/contract/fileStatus.ts'
+import { changesEditorFileStatus } from '../server/editorFileStatus'
 
 export const changesPlugin = (): NodePlugin => {
   let capability: { dispose(): void } | null = null
@@ -33,11 +33,17 @@ export const changesPlugin = (): NodePlugin => {
     capability = ctx.capabilities.provide(LOCAL_GIT, bridge)
     ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
       id: 'uncommitted',
-      value: uncommittedEditorLineMarkers(ctx.core),
+      value: { kind: 'uncommitted', read: async (taskId, path, source) =>
+        (await import('../server/editorLineMarkers')).uncommittedEditorLineMarkers(ctx.core).read(taskId, path, source) },
+    })
+    ctx.extensionPoints.handle(EDITOR_FILE_STATUS, {
+      id: 'worktree',
+      value: changesEditorFileStatus(ctx.core),
     })
     // Task check: warns about uncommitted work the archive would discard
     // (docs/plugins/task-checks.md § Task checks; details in main/archiveCheck.ts).
-    ctx.taskChecks.register({ id: 'uncommitted', check: (task) => changesArchiveConcern(bridge, task) })
+    ctx.taskChecks.register({ id: 'uncommitted', check: async (task) =>
+      (await import('../server/archiveCheck')).changesArchiveConcern(bridge, task) })
     ctx.routes.register(localGit, { prefix: '/tasks', note: '/:id/local/*' })
     // local_changes, local_diff, and git_log. Same module as the bridge above, so the agent and the
     // review pane cannot disagree about the working tree.

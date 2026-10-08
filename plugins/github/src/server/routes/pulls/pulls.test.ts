@@ -122,4 +122,48 @@ describe('pulls list (serve-then-revalidate via the sync engine)', () => {
     const [sync] = await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
     expect(sync.fetchedAt).toBeGreaterThan(stale)
   })
+
+  // The list's Search field (docs/github-integration/surfaces.md § Searching pull requests).
+  const search = (q: string, state = 'open') => app.fetch(
+    new Request(`http://acorn.test/api/repos/Runn-Fast/runn/pulls/search?state=${state}&q=${encodeURIComponent(q)}`),
+    { DB: core.db, ...testSecretEnv(ENC_KEY) } as Env,
+  )
+
+  it('search: fixes the repository and tab, and quotes the reader\'s words', async () => {
+    vi.mocked(gh).mockResolvedValueOnce(responseJson({
+      total_count: 120,
+      incomplete_results: false,
+      items: [{ number: 7, title: 'Old sync fix', state: 'closed', draft: false, user: { login: 'ann' }, updated_at: '2026-01-01T00:00:00Z' }],
+    }))
+
+    const res = await search('sync repo:evil/x', 'closed')
+    expect(res.status).toBe(200)
+    const [, path] = vi.mocked(gh).mock.calls[0]
+    const q = new URL(`https://api.github.com${path}`).searchParams.get('q')
+    // A typed qualifier is text to match, so it cannot widen the search to another repository.
+    expect(q).toBe('"sync" "repo:evil/x" repo:Runn-Fast/runn is:pr is:closed')
+    expect(await res.json()).toEqual({
+      pulls: [{
+        number: 7, title: 'Old sync fix', state: 'closed', draft: false, author: 'ann', headRef: null, baseRef: null,
+        updatedAt: Date.parse('2026-01-01T00:00:00Z'), mergeable: null, mergeStateStatus: null, autoMergeEnabled: false,
+      }],
+      total: 120,
+      incomplete: true,
+    })
+  })
+
+  it('search: looks a pasted number up exactly when it is in the selected tab', async () => {
+    vi.mocked(gh).mockResolvedValueOnce(responseJson(ghPull))
+
+    const res = await search('#42')
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/42')
+    expect(await res.json()).toEqual({ pulls: [publicPull], total: 1, incomplete: false })
+  })
+
+  it('search: reports GitHub refusing the search', async () => {
+    vi.mocked(gh).mockResolvedValueOnce(new Response('{}', { status: 403, headers: { 'x-ratelimit-remaining': '0' } }))
+
+    const res = await search('sync')
+    expect(res.status).toBe(429)
+  })
 })

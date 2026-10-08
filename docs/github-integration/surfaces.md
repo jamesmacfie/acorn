@@ -23,6 +23,27 @@ keyed by file, line and side, the same shape the changes pane opens over the wor
 `github:summary-badges` is a `stack` slot on the overview, so github's own facts stay and up to four
 contributors are added beside them ([plugins.md](../plugins.md) § Cooperative extension points).
 
+## Searching pull requests
+
+The pull list's **Search** field narrows the loaded tab at once by number, title, author, or branch.
+Once the text settles, it asks the Node's `/repos/:owner/:repo/pulls/search` route, which searches
+GitHub in this repository and the selected Open or Closed tab, beyond the loaded pages. The debounce,
+minimum, and length are the rail's ([searching a source](../plugins/descriptors.md#searching-a-source)).
+
+The route builds the query from the route's repository, `is:pr`, and the tab, and quotes each typed
+word, so a word such as `repo:other/name` is text to match, not a qualifier
+(`pullSearchQuery` in `plugins/github/src/server/routes/pulls/pulls.ts`). A pasted number is looked
+up exactly first. It returns one page of 50 with GitHub's total, and marks it incomplete when GitHub
+holds more or reports an incomplete search. The list then says how many it's showing. Search has its
+own GitHub rate limit, and a refusal keeps the loaded matches with a line saying the search failed.
+
+A search hit carries no branch. **Create task** reads the pull's detail for its head branch before it
+creates the task, and reports an error if the branch still isn't known. Answers are cached under
+`pull-search`, apart from the list, and never persisted.
+
+The open list's mirror reads one 100-item page from GitHub, so it can miss open pull requests in a
+very busy repository. Search doesn't depend on the mirror and finds them.
+
 ## Conversation
 
 The conversation is `PrConversation` in `plugins/github/src/client/pullDetail/Conversation.tsx`, a kit

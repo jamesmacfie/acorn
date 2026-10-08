@@ -151,7 +151,7 @@ export { refResolutionsOptions } from '@acorn/client-core/host/registries/panes'
 export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 // Put a named collection's item in view, for a pane answering "show me this one" from somewhere else.
 // The host owns scroll, the same way it owns selection, so a pane never selects a row out of the DOM.
-export { revealCollectionItem } from '@acorn/client-core/kit/keys'
+export { activeCollectionItem, revealCollectionItem } from '@acorn/client-core/kit/keys'
 export { agentContextContributions } from '@acorn/client-core/host/registries/sources'
 // The tone of a tool call's status dot. Shared because two plugins draw that dot: agents owns the
 // `agents:tool-card` point and changes fills it.
@@ -224,7 +224,7 @@ export type { HostCapabilityRequirement, HostRequirement } from '@acorn/client-c
 export { clientCapability, clientCapabilityId, requireClientCapability } from '@acorn/client-core/infra/node'
 export { parseJson } from '@acorn/client-core/infra/persistence'
 export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence'
-export { PersistedSliceKeys, PrefKeys } from '@acorn/client-core/infra/persistence'
+export { PersistedSliceKeys, PrefKeys, storageKeyFor } from '@acorn/client-core/infra/persistence'
 export { saveJsonPref, savePref } from '@acorn/client-core/features/settings/savePref.ts'
 // The one shared "Generate with" default. Here rather than on ./ui because none of it is a component:
 // a plugin's Generate dialog reads the pick, resolves it against the backends it was given, and writes

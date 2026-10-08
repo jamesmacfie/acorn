@@ -1,5 +1,6 @@
 export { paneCollapseKey, sidebarCollapse, sidebarCollapsed } from './layout/collapseState.ts'
 export { createArmedConfirm } from './controls/confirm.ts'
+export { copyText } from './controls/clipboard.ts'
 export { debounce } from './state/debounce.ts'
 export { clearLocal, deviceStorage, readLocal, writeLocal } from './state/deviceStorage.ts'
 export {

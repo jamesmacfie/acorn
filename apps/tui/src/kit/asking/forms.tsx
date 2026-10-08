@@ -50,7 +50,8 @@ export function KeyValueEditor(props: {
 export function FindBar(props: {
   query: string
   onQuery: (query: string) => void
-  count?: { current: number; total: number }
+  count?: { current: number; total: number; more?: boolean }
+  error?: string
   onNext: () => void
   onPrev: () => void
   onClose?: () => void
@@ -63,10 +64,12 @@ export function FindBar(props: {
     <box flexDirection="row" gap={1}>
       <Line tone="accent">/</Line>
       <Input kind="filter" placeholder={props.placeholder ?? 'Find…'} value={props.query} onInput={props.onQuery} />
-      <Show when={props.count}>
-        {(count) => (
-          <Line role="muted">{count().total ? `${count().current}/${count().total}` : 'no matches'}</Line>
-        )}
+      <Show when={props.error}>{(error) => <Line tone="danger">{error()}</Line>}</Show>
+      <Show when={!props.error && props.count}>
+        {(count) => {
+          const total = () => `${count().total}${count().more ? '+' : ''}`
+          return <Line role="muted">{!count().total ? 'no matches' : count().current ? `${count().current}/${total()}` : `${total()} matches`}</Line>
+        }}
       </Show>
       {slot(props.status)}
       {slot(props.toggles)}

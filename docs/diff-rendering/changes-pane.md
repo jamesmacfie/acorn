@@ -6,6 +6,14 @@ part of [diff rendering](../diff-rendering.md). The plugin lives in `plugins/cha
 
 ## One status read
 
+Editor asks Changes for a separate status-only projection through the declared
+`editor:file-status` Node point. It reuses the porcelain parser and core's two-second
+worktree status cache. The read omits both `numstat` commands, per-file disk stamps, and
+patch generation. Changes verifies the task's checkout before answering; a missing Git
+repository is a normal empty state, while a Git failure remains an error that Editor can
+mark stale. Core keys this cache by the checkout's real path, so task aliases join one
+read and either alias can invalidate it.
+
 Behind the pane's document is one resource, `LocalStatus`. It carries the branch, its upstream, and
 how far the branch is ahead and behind, beside the file list, so no two regions of the panel can
 describe different trees. It's one `git status --porcelain=v2 --branch --untracked-files=all` call,

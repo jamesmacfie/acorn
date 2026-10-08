@@ -10,6 +10,7 @@ import { useNavigate } from '../kit/router'
 import { routedProjectId } from './routing'
 import { closeOverlay, openOverlay } from './state'
 import type { ShellModel } from './model'
+import { focusedCollectionTarget } from '../keys/regions'
 
 // The terminal's half of the palette: which identity a session captures here, and nothing else.
 //
@@ -44,6 +45,7 @@ export function createShellPalette(model: ShellModel): CommandSession {
     taskId: activeTaskId() ?? null,
     paneId: null,
     surfaceId: null,
+    focusedCollection: focusedCollectionTarget(),
     // Same as the desktop's: the shell's navigator, for a closed chrome verb that addresses a URL
     // rather than a task's layout (../kit/router.ts).
     navigate,

@@ -486,6 +486,14 @@ export function focusRenderable(node: Renderable | undefined): boolean {
   return true
 }
 
+let requestedFocus: Renderable | undefined
+/** Retain an autofocus request until its node is reachable after a closing scope. */
+export function requestRenderableFocus(node: Renderable): () => void {
+  requestedFocus = node
+  scheduleSettle()
+  return () => { if (requestedFocus === node) requestedFocus = undefined }
+}
+
 /** Whether a renderable could hold the keys right now: on screen, focusable, and inside the top
  *  scope. What `ensureFocus` asks about the node that has them, and `focusRenderable` about a node
  *  it is asked to move them to. */
@@ -506,6 +514,15 @@ const remembered = (of: Memory): Renderable | undefined => {
 export const focusedItem = (): boolean => {
   const node = focusedNode()
   return !!node && isItem(node)
+}
+
+/** The collection row under the terminal caret before a palette takes focus. */
+export const focusedCollectionTarget = (): { id: string; key: string } | undefined => {
+  const node = focusedNode()
+  const identity = node ? itemIdentity(node) : undefined
+  if (!identity) return undefined
+  const split = identity.indexOf('\0')
+  return split > 0 ? { id: identity.slice(0, split), key: identity.slice(split + 1) } : undefined
 }
 
 export const markItem = (box: Renderable, pick?: () => void, identity?: string): void => {
@@ -751,6 +768,13 @@ const onPlaceholder = (node: Renderable): boolean => {
 
 /** Keep valid focus. Otherwise restore the top scope or enter the claimed, opening, or first region. */
 function ensureFocus(): void {
+  if (requestedFocus?.isDestroyed) requestedFocus = undefined
+  if (reachable(requestedFocus)) {
+    const requested = requestedFocus
+    requestedFocus = undefined
+    focusRenderable(requested)
+    return
+  }
   const node = focusedNode()
   if (reachable(node) && !onPlaceholder(node)) {
     revealInViewports(node)
@@ -808,6 +832,7 @@ export function _resetRegions(): void {
   // against an empty store, which is harmless, but the next render's first `scheduleSettle` is
   // swallowed as a duplicate and the screen opens with the keys nowhere.
   settleQueued = false
+  requestedFocus = undefined
   groups.length = 0
   groupByBox.clear()
   groupByRef.clear()

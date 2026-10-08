@@ -1,9 +1,35 @@
 import { createRoot, createSignal } from 'solid-js'
+import { render } from 'solid-js/web'
 import { afterEach, expect, it } from 'vitest'
-import { createCollection, revealCollectionItem } from './collection'
+import { createCollection, focusedCollectionTarget, revealCollectionItem } from './collection'
 import { _resetCollectionState, collectionState } from './collectionState'
 
 afterEach(_resetCollectionState)
+
+it('captures the live focused row rather than the retained roving key', () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  let retain!: (key: string) => void
+  const dispose = render(() => {
+    const collection = createCollection({ id: () => 'tree.node.task', role: 'tree', items: () => [
+      { key: 'old', label: 'Old' }, { key: 'live', label: 'Live' },
+    ] })
+    retain = collection.focus
+    return <><div {...collection.containerProps}>
+      <button {...collection.itemProps('old')}>Old</button>
+      <button {...collection.itemProps('live')}>Live</button>
+    </div><input /></>
+  }, host)
+  try {
+    host.querySelectorAll('button')[1].focus()
+    retain('old')
+    expect(focusedCollectionTarget()).toEqual({ id: 'tree.node.task', key: 'live' })
+    host.querySelector('div')!.hidden = true
+    expect(focusedCollectionTarget()).toBeUndefined()
+    host.querySelector('input')!.focus()
+    expect(focusedCollectionTarget()).toBeUndefined()
+  } finally { dispose(); host.remove() }
+})
 
 it('resolves row ids and tab stops with linear work on mount and refresh', () => {
   createRoot((dispose) => {

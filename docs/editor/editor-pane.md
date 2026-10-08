@@ -47,6 +47,19 @@ Tabs decide what's kept. Replacing a clean preview tab releases its text, saved 
 Promoted and dirty tabs keep their state when the pane is toggled on the same task. Archiving a scope
 evicts view state only for its own Node, so equal IDs on two Nodes keep separate positions.
 
+Duplicate basenames gain the shortest parent suffix that distinguishes the open paths. Each desktop
+tab has its own menu, including inactive tabs. In the terminal strip, arrows move a separate tab
+caret without activating it, and Shift+F10 opens that caret tab's menu below the strip. A normal
+terminal click activates the file; the adjacent `⋯` targets its menu without activation. The menu
+scrolls its focused action when the narrow detail column cannot show every item. Its write hold
+starts before focus leaves the document and ends before a selected guarded close begins.
+Close others, to the right, and all capture their ordered targets and ask the pane's guarded close
+for each one. A save failure, conflict, or intervening edit stops the run and reports how many closed.
+Only successful explicit closes enter the 20-entry session reopen stack. Reopen checks the Node file
+before opening it and inserts a kept tab at its former tab order position. A closed preview reopens
+as kept. Preview replacement and trash do not
+count as closes.
+
 ### Graphical admission
 
 The build's host token decides whether graphical editing is supported. On the desktop, remembered
@@ -69,6 +82,33 @@ changes, and reads the image again when the window regains focus.
 
 ## The file tree
 
+**Show ignored files** is a device preference, on by default. Ignored rows are muted and named
+accessibly; turning it off hides them. Explicit reveal temporarily shows an ignored active path.
+The tree still shows dotfiles and excludes `.git` and `node_modules` from listings. An unavailable
+ignore read leaves entries visible and shows its error. **Collapse all folders** clears retained
+descendant expansions; **Reveal active file** opens ancestors and scrolls to the row.
+
+### Git status
+
+Changes supplies a task-wide, read-only Git status snapshot through Editor's optional
+`editor:file-status` Node point. Editor serves it at
+`GET /v1/p/editor/tasks/:id/editor/file-status` and groups paths for its tree and tabs. The
+tree lists files independently of this read. A missing provider or a checkout without Git
+shows ordinary names. A transient read failure keeps the previous marks and shows a stale
+explanation. A plugin roster change clears marks before the next read.
+
+The badges use Changes' status words: `M` modified, `A` added, `?` untracked, `R` renamed,
+`!` conflicted, and `D` deleted. A deleted file has no phantom tree row, but an open tab may
+carry `D`. The tooltip names staged, unstaged, or both scopes and gives the source path for
+a rename. One path has one badge even when both scopes change. Conflict wins over rename,
+then added, untracked, modified, and deleted. The dirty-buffer dot remains separate.
+
+Folders count distinct changed descendant paths, including deleted files absent from a
+listing. A conflict gives its parent folders the danger tone. Editor computes these counts
+from the snapshot without opening folders. The terminal draws the same letters and names
+the active tab's status. Git deletion does not decide whether a document can save: the
+disk revision read still owns **Deleted on disk** and recovery.
+
 The file tree uses the kit's virtual `Rows` and passes measured placement to `TreeRow`. Rows follow
 stable keys when expanding moves them. Before viewport geometry arrives, the tree admits at most 12
 rows. A reveal waits for usable geometry, including in a restored hidden pane. The terminal client
@@ -80,13 +120,58 @@ focus refresh loaded directories, parents first. The worktree event carries no p
 directory refreshes, including collapsed ones, and unopened directories stay unloaded. A failed
 refresh keeps the last listing and shows **Retry**.
 
+The tree's ellipsis, right-click, and focused-row menu show file actions without opening a preview or
+saving a draft. F2 renames the focused row. On the terminal, Shift+F10 opens its menu and Ctrl+N
+opens the worktree root's New menu from a focused row. The terminal stacks a 12-line file list above
+the document at narrow widths and uses a name dialog; the desktop keeps name entry in an available
+row. Root creation has an optional relative destination folder, so it can create beside an open
+file. A terminal without OSC 52 clipboard support shows a selected path for manual copy. Names are
+single basenames, including dotfiles. Create uses an
+exclusive Node operation and opens a file as a kept tab. Rename stays in the same folder. Both
+operations leave Git staging and imports alone.
+
+**Move to trash…** names the task and entry and warns when a folder's descendants are affected. The
+menu disables it when the owning Node lacks a supported trash command. An unsaved descendant needs
+**Save and move to trash**; a failed or conflicted save stops the action. Opening the menu suspends
+ordinary writes before focus changes, including closed drafts kept in device recovery. A confirmed
+operation keeps its hold until the Node reply and local tab and recovery changes finish. Cancel is
+disabled while the operation is running; a partial result blocks old writers and explains where to
+resolve the draft. Node entry IDs detect a replaced file even after an explicit save changes ctime.
+A confirmed rename updates open tabs, document custody, recovery, view state, and expanded paths;
+confirmed trash retires affected tabs and local recovery. Rename uses a Node build artifact that
+calls the host's atomic exclusive rename primitive on macOS or Linux. An ordinary Node host does not
+compile code when a person renames a file. The action is disabled when this Node build has no helper
+for its platform or architecture and fails closed when the volume lacks the primitive. Quick-open
+reads a fresh file list each time; the Node
+invalidates Git status
+and broadcasts worktree changes to task aliases. Restore trashed entries from the owning Node's
+system Trash. The editor has no permanent-delete action or in-app trash browser.
+
+Rename also rewrites closed-tab, navigation, and device recent paths under the captured Node and
+task. Trash prunes those references. These records contain paths and positions, never document text.
+
 ## Reload on focus
 
-When the window regains focus, the pane reads the open file again, because an agent edits the same
-worktree. A clean document reloads quietly. A dirty or saving one is left alone, so a reload never
-overwrites your unsaved edits. The reload checks its read generation, the document, its text, edit
-revision, and dirty state after the response. Applying text from disk doesn't schedule an autosave.
-It's a plain window listener, because the platform seam carries no focus signal.
+Window focus, worktree invalidation, reconnect, and **Reload status** revalidate the active text
+file. Bursts share one active-file refresh at a time. Inactive cached files become stale and
+revalidate before the pane shows them. An unchanged
+read leaves the buffer, undo history, selection, and save timer alone. Changed disk text replaces a
+clean buffer and clamps its cursor and scroll. A dirty draft stays visible and pauses automatic saves
+when the disk revision diverges. A failed read retains the useful text. A missing file shows
+**Deleted on disk**; connection failures show a separate read error.
+
+**Compare** renders the disk snapshot against the live draft through the shared read-only diff rows.
+**Reload from disk** confirms before discarding a dirty draft. **Overwrite disk…** confirms the
+named file and snapshot revision captured when its confirmation appears, so a tab switch or newer
+disk version makes that decision fail. Reload confirmation follows the same rule; when disk already
+contains the draft text it preserves the editor's selection and undo history. **Recreate file…** uses an
+absence precondition. **Save as…** writes a separate path under the task root. **Retry save** handles
+ordinary write failures. None of these actions stages a file.
+
+## File status and editing controls
+
+See [editing controls](./editing-controls.md) for the strip, wrap and indentation settings, and
+focused graphical commands.
 
 ## Editing in your own editor
 
@@ -109,28 +194,5 @@ or changing tabs mid-edit drops the cache the same way.
 
 ## From the command palette
 
-The plugin's client half registers two commands (`plugins/editor/src/client/commands.ts`). Both
-declare `requires: { plugin: 'editor' }`:
-
-| Command | Kind | Chord | What it does |
-| --- | --- | --- | --- |
-| Go to file (`editor.files.open`) | `search`, task-scoped | `⌘P` | Lists the task's worktree and opens the pick |
-| Find in files… (`editor.search.open`) | action | `⌘⇧F` | Opens the editor pane on its search panel |
-
-`⌘P` is bound `global` with an `active` check for an open task, and `⌘⇧F` is bound `task`
-(`plugins/editor/src/client/index.ts`). `plugins/editor/src/client/commands.test.ts` checks three
-things about **Go to file**:
-
-- It ranks over the whole path. A row draws as a file name with its folder dimmed, but the score uses
-  `src/client/App.tsx` whole, so a query like `client/App` matches across the join. That's why the
-  command ranks its own rows instead of using the host's `localSearch`, which scores title and
-  subtitle apart.
-- An empty query shows the listing, in `git ls-files` order. `minQueryLength` and `debounceMs` are
-  both `0`. The command returns at most 100 rows, and the session draws at most 50. A failed listing
-  isn't cached, so Enter on the error tries again.
-- Picking a row shows the editor pane and opens the file as a preview tab, as a click in the tree
-  does.
-
-The terminal client draws the same palette session, so it gets **Go to file** too. Editing,
-autosave, `⌘S`, and the terminal-editor switch stay in the pane, because they're about the buffer on
-screen.
+See [file navigation](./file-navigation.md) for quick open, positioned reveals, reopen, and
+back/forward commands on both hosts.

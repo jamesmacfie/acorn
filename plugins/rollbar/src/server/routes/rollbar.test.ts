@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeTestRequestContext } from '@acorn/plugin-api/testkit'
 import { createRollbarFetch } from './rollbar'
 
@@ -225,5 +225,69 @@ describe('Rollbar palette search', () => {
 
     const response = await fetch(new Request('http://rollbar.test/palette/issues?projectId=project-1&q=boom'), context)
     expect((await response.json() as { items: unknown[] }).items).toHaveLength(50)
+  })
+})
+
+// The rail's Search field (docs/integrations/rollbar.md § Rail search). Rollbar's own items search,
+// asked of the mapped connections only, past the three mirrored pages, and never written to the mirror.
+describe('Rollbar rail search', () => {
+  const apiItem = (counter: number, over: Record<string, unknown> = {}) => ({
+    id: 1000 + counter, counter, title: `Error ${counter}`, level: 'error', environment: 'production',
+    status: 'active', total_occurrences: 3, first_occurrence_timestamp: 1, last_occurrence_timestamp: counter, ...over,
+  })
+
+  const setup = async (answer: (token: string) => { status?: number; items?: unknown[] }) => {
+    const asked: { token: string; url: string }[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: { headers: Record<string, string> }) => {
+      const token = init.headers['X-Rollbar-Access-Token']
+      asked.push({ token, url })
+      const reply = answer(token)
+      if (reply.status) return new Response('{}', { status: reply.status })
+      return new Response(JSON.stringify({ err: 0, result: { items: reply.items ?? [] } }))
+    }))
+    const connections = [{ id: 'rollbar-a', label: 'A' } as never, { id: 'rollbar-b', label: 'B' } as never]
+    const fetchRoutes = createRollbarFetch({
+      byId: async (id) => ({ id, workspaceId: 'workspace-1' } as never),
+      externalProjects: async () => [
+        { connectionId: 'rollbar-a', externalId: 'a', projectId: '' },
+        { connectionId: 'rollbar-c', externalId: 'c', projectId: '' },
+      ],
+    })
+    const context = await makeTestRequestContext({
+      plugin: 'rollbar',
+      principal: { kind: 'device', userId: 'user-1', deviceId: 'device-1' },
+      providers: {
+        connections: async () => connections,
+        withConnections: (async (_provider: string, visit: (row: unknown, key: string) => unknown) =>
+          (await Promise.all(connections.map((row: { id: string }) => visit(row, `token-${row.id}`)))).filter((value) => value !== undefined)) as never,
+      },
+    })
+    const search = (q: string) => fetchRoutes(new Request(`http://rollbar.test/rail-search?project=project-1&q=${encodeURIComponent(q)}`), context)
+    return { asked, search }
+  }
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('asks Rollbar\'s search for active items in the mapped connection only', async () => {
+    const { asked, search } = await setup(() => ({ items: [apiItem(412), apiItem(7, { status: 'resolved' })] }))
+    const response = await search('TypeError')
+    expect(response.status).toBe(200)
+    expect(asked).toHaveLength(1)
+    expect(asked[0].token).toBe('token-rollbar-a')
+    expect(asked[0].url).toContain('/items?status=active&page=1&query=TypeError')
+    const body = await response.json() as { items: { id: string; short: string }[]; incomplete: boolean }
+    // A resolved item the reader's own query reached is still not an active one.
+    expect(body.items.map((row) => row.id)).toEqual(['rollbar-a:412'])
+    expect(body.incomplete).toBe(false)
+  })
+
+  it('says the answer is incomplete when the page was full', async () => {
+    const { search } = await setup(() => ({ items: Array.from({ length: 100 }, (_, at) => apiItem(at + 1)) }))
+    expect(await (await search('error')).json()).toMatchObject({ incomplete: true })
+  })
+
+  it('reports a total failure', async () => {
+    const { search } = await setup(() => ({ status: 500 }))
+    expect((await search('error')).status).toBe(502)
   })
 })

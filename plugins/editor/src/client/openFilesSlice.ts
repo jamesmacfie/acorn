@@ -1,4 +1,5 @@
-import { parseJson, PersistedSliceKeys, type PersistedStateSlice } from '@acorn/plugin-api/client'
+import { parseJson, PersistedSliceKeys, savePref, storageKeyFor, type PersistedStateSlice } from '@acorn/plugin-api/client'
+import type { QueryClient } from '@tanstack/solid-query'
 import { editorStateByTask, hydrateTaskEditorState, type TaskEditorState } from './editorState'
 
 // The editor's own persisted-state descriptor: open tabs and the active tab, per task. Owned here
@@ -39,4 +40,13 @@ export const editorOpenFilesSlice: PersistedStateSlice<TaskEditorState> = {
     values: editorStateByTask,
     hydrate: hydrateTaskEditorState,
   },
+}
+
+/** Finish an in-flight file action for the Node that admitted it, even after its pane was evicted. */
+export async function persistCapturedEditorOpenFiles(
+  queryClient: QueryClient, nodeId: string | null, taskId: string, state: TaskEditorState,
+): Promise<void> {
+  const key = storageKeyFor(editorOpenFilesSlice, taskId, nodeId)
+  const value = JSON.stringify(editorOpenFilesSlice.codec.serialize(state))
+  await savePref(queryClient, key, value, { throwOnFailure: true })
 }

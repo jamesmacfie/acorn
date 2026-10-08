@@ -11,8 +11,14 @@ import {
   Alert, Button, EmptyState, Icon, Inline, Input, Menu, Row, RowActions, Rows, sidebarCollapsed,
   StatusDot, Tabs, Text, Toolbar, UserAvatar,
 } from '@acorn/plugin-api/ui'
+import { debounce } from '@acorn/plugin-api/client'
+import {
+  DEFAULT_COMMAND_SEARCH_DEBOUNCE_MS,
+  DEFAULT_COMMAND_SEARCH_MIN_QUERY,
+  MAX_COMMAND_SEARCH_QUERY,
+} from '@acorn/protocol/commands.ts'
 import { prefetchOpenPulls, schedulePullSummaryPrefetch } from './prefetch'
-import { closedPullsInfiniteOptions, pullDetailOptions, pullsOptions } from './queries'
+import { closedPullsInfiniteOptions, pullDetailOptions, pullSearchOptions, pullsOptions } from './queries'
 import { type Pull } from '../shared/api'
 import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterStore'
@@ -108,8 +114,43 @@ export default function PullList() {
     },
   ))
 
-  // Client-side text filter over the loaded tab (title / author / #number).
-  const shown = createMemo(() => filterPulls(list(), collapsed() ? '' : filter()))
+  // Search: the loaded tab narrows as the reader types (title / author / #number), and once the text
+  // settles GitHub is asked for matches past the loaded pages, in this repository and tab. Its answer
+  // replaces the local matches, which stay on screen until it arrives or if it fails. Collapsed, the
+  // field is out of sight, so nothing is filtered or searched.
+  const searchText = () => (collapsed() ? '' : filter().trim())
+  const outbound = () => {
+    const query = searchText().slice(0, MAX_COMMAND_SEARCH_QUERY)
+    return query.length >= DEFAULT_COMMAND_SEARCH_MIN_QUERY ? query : ''
+  }
+  const [settled, setSettled] = createSignal('')
+  const settle = debounce(setSettled, DEFAULT_COMMAND_SEARCH_DEBOUNCE_MS)
+  onCleanup(settle.cancel)
+  createEffect(() => {
+    const query = outbound()
+    if (query) settle(query)
+    else {
+      settle.cancel()
+      setSettled('')
+    }
+  })
+  // Keyed by repository, tab and text, so an answer for another scope is never drawn for this one.
+  const search = createQuery(() => pullSearchOptions(owner(), repo(), tab(), settled(), repoKnown() && !!settled() && settled() === outbound()))
+  const searchStatus = (): 'idle' | 'local' | 'searching' | 'done' | 'failed' => {
+    if (!searchText()) return 'idle'
+    if (!outbound()) return 'local'
+    if (settled() !== outbound() || search.isPending) return 'searching'
+    return search.isError ? 'failed' : 'done'
+  }
+  const shown = createMemo(() => (searchStatus() === 'done' ? search.data?.pulls ?? [] : filterPulls(list(), searchText())))
+  const searchNotice = () => {
+    if (searchStatus() === 'searching') return 'Searching GitHub…'
+    if (searchStatus() === 'failed') return "Couldn't search GitHub. Showing loaded matches."
+    if (searchStatus() === 'done' && search.data?.incomplete) {
+      return `Showing ${search.data.pulls.length} of ${search.data.total} matches. Add to the search to narrow it.`
+    }
+    return undefined
+  }
   const items = createMemo(() => shown().map((pull) => ({
     key: String(pull.number),
     label: `#${pull.number} ${pull.title}`,
@@ -135,17 +176,22 @@ export default function PullList() {
   // and branch. That makes this the only place a create failure can be reported, so keep the error
   // path: a node-offline createTask otherwise throws an uncaught rejection and the click looks dead.
   const [taskError, setTaskError] = createSignal('')
+  //
+  // A search hit carries no branch, so its detail is read first rather than inventing one.
   async function openAsTask(pull: Pull) {
     setTaskError('')
     const projectId = params.projectId
-    if (!projectId || !owner() || !repo() || !pull.headRef) return
+    if (!projectId || !owner() || !repo()) return
     try {
+      const headRef = pull.headRef
+        ?? (await queryClient.fetchQuery(pullDetailOptions(owner(), repo(), String(pull.number), true))).pull?.headRef
+      if (!headRef) throw new Error("This pull request's branch isn't available, so a task can't be created for it.")
       const task = await promotePullToTask(queryClient, {
         projectId,
         owner: owner(),
         repo: repo(),
         number: String(pull.number),
-        headRef: pull.headRef,
+        headRef,
       })
       activateTaskSignals(task, { pane: 'pr' })
       navigate(pathForTask(task))
@@ -183,7 +229,7 @@ export default function PullList() {
     // `openAsTask` exactly as it was — find the PR's task or make one, with its Linear links — and
     // it now sits beside whatever else offers an `item.row` action, "Start workflow…" first among
     // them. Two registrations with opposite checks, so the label says which of the two it will do.
-    const isPull = (target: ItemRowTarget) => target.providerId === 'github' && !!(target.item as Pull).headRef
+    const isPull = (target: ItemRowTarget) => target.providerId === 'github' && typeof (target.item as Pull).number === 'number'
     const rows = registerContextMenuItems([
       {
         id: 'github.pull.create-task',
@@ -232,9 +278,12 @@ export default function PullList() {
         {/* Under the strip rather than beside it. Open and Closed choose which list this is; the filter
             is about the list that choice produced, and squeezed into the tab row it had no room and no
             inset of its own. */}
-        <Toolbar size="sm" ariaLabel="Filter pull requests">
-          <Input kind="filter" placeholder="Filter…" value={filter()} onInput={setFilter} />
+        <Toolbar size="sm" ariaLabel="Search pull requests">
+          <Input kind="filter" placeholder="Search…" value={filter()} onInput={setFilter} />
         </Toolbar>
+        <Show when={shown().length ? searchNotice() : undefined}>
+          {(notice) => <EmptyState align="start" size="sm" busy={searchStatus() === 'searching'}>{notice()}</EmptyState>}
+        </Show>
       </Show>
       <Show when={taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
       <Show
@@ -282,7 +331,11 @@ export default function PullList() {
           when={items().length}
           fallback={
             <EmptyState align="start" size="sm">
-              {!collapsed() && filter().trim() ? 'No pull requests match.' : tab() === 'open' ? 'No open pull requests.' : 'No closed pull requests.'}
+              {searchStatus() === 'idle'
+                ? tab() === 'open' ? 'No open pull requests.' : 'No closed pull requests.'
+                : searchStatus() === 'searching' ? 'Searching GitHub…'
+                  : searchStatus() === 'failed' ? "No loaded pull requests match, and GitHub couldn't be searched."
+                    : 'No pull requests match.'}
             </EmptyState>
           }
         >

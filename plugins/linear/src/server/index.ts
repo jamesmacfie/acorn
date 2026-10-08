@@ -78,6 +78,20 @@ export const PROJECT_ISSUES_QUERY = `query($filter: IssueFilter) {
     }
   }
 }`
+// The rail's Search field, one bounded page per connection (docs/integrations/linear.md § Rail search).
+// The row fields without labels, which are what makes a page of issues expensive, and `pageInfo` so a
+// connection holding more matches says so instead of looking finished.
+export const RAIL_SEARCH_PAGE = 50
+export const RAIL_SEARCH_QUERY = `query($filter: IssueFilter) {
+  issues(filter: $filter, first: ${RAIL_SEARCH_PAGE}) {
+    nodes {
+      id identifier title url description branchName priority priorityLabel updatedAt
+      state { name type color } assignee { name }
+    }
+    pageInfo { hasNextPage }
+  }
+}`
+
 /**
  * The mapped ids split into the clauses `IssueFilter` wants, one per kind that is actually mapped.
  *

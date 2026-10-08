@@ -13,9 +13,11 @@
 export { editorTheme, refreshEditorTheme, watchEditorTheme } from '@acorn/client-core/features/editor'
 export { languageForPath, shouldHighlightDocument } from '@acorn/client-core/features/editor'
 export { applyViewState, captureViewState, type EditorViewState } from '@acorn/client-core/features/editor'
+// Find and replace drawn with the kit's controls (client-core features/editor/search.ts).
+export { editorSearch, openReplacePanel } from '@acorn/client-core/features/editor'
 // A code box that is not a document: the library and the theme, and the caller keeps the text
 // (client-core features/editor/embed.ts). Workflows' JSON tab is the case.
 export { mountEmbeddedEditor } from '@acorn/client-core/features/editor'
 export type { EmbeddedEditor } from '@acorn/client-core/features/editor'
 
-export { documentCustody, recoverDocumentCustody, type DocumentCustody } from '@acorn/client-core/features/editor'
+export { documentCustody, recoverDocumentCustody, fileDocumentCustodies, reserveDocumentDestinations, reserveFileSourceCustodies, type DocumentCustody } from '@acorn/client-core/features/editor'

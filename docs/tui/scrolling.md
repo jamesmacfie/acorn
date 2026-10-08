@@ -12,6 +12,10 @@ reveals the active key by the smallest step, and the wheel moves the window with
 `Grid` keeps its exception: a virtualized row has no node, so the arrows move `selected` and the view
 follows.
 
+`Shift+Tab` leaves a collection row for the preceding panel control. Tree controls and search filters
+remain reachable after the collection remembers its active row. An `Input autofocus` request waits
+in the focus owner while a command scope is open, then lands when that scope closes.
+
 `Timeline` goes the other way. The shared focus-role table calls it a collection, and the desktop roves
 over its turns. Here a turn is a `Card`, a stop only where it takes an `onPress`. So the stops in a pull
 request conversation are the controls and composers inside the turns, and you read the text between
@@ -53,6 +57,9 @@ the turns, not the box that fills the region, so opening a menu doesn't drag the
 desktop, it doesn't restore you to the turn you left. Finding a turn needs per-turn geometry a viewport
 doesn't publish, so `NODE_SUPPORT` marks the node `reduced`: a list drawn again opens at the newest
 turn. A mounted viewport keeps its offset.
+
+`TabPanel scrollOffset` restores a feature-owned reading place after content layout, and `onChange`
+reports viewport moves. These values also cross the remote kit contract as JSON and a semantic event.
 
 A viewport's height comes from `flexBasis: 0` on a flex line, and the content inside is free-sized, so
 a viewport nested in a viewport has nothing to bound it. One scroller per column, and the pane says

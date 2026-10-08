@@ -1,10 +1,10 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { For, type JSX } from 'solid-js'
+import { createSignal, For, onCleanup, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import { COLLECTION_INTENTS, createCollectionIntents, type Intent } from '@acorn/client-core/kit/keys'
 import { Line, slot } from '../cells'
 import { bindKeys } from '../../keys/install'
-import { enterParent, markParent, moveRegion, walkStops } from '../../keys/regions'
+import { enterParent, markEntry, markParent, moveRegion, scheduleSettle, walkStops } from '../../keys/regions'
 import { stop } from '../../keys/stops'
 import { PARENT } from '../../keys/tiers'
 import { ScrollViewport } from '../scrolling'
@@ -92,10 +92,14 @@ export function TabPanel(props: {
   id: string
   active: string
   children: JSX.Element
+  scrollOffset?: number
+  onChange?: (offset: number) => void
 }) {
   return (
     <ScrollViewport
       visible={props.active === props.id}
+      scrollOffset={props.scrollOffset}
+      onChange={props.onChange}
       onBox={(box) => registerPanel(props.idPrefix, box)}
     >
       {props.children}
@@ -104,17 +108,19 @@ export function TabPanel(props: {
 }
 /** One line of tab labels with a `×` on the current one. */
 export function DocumentTabs(props: {
-  tabs: readonly { id: string; label: string; dirty?: boolean; status?: 'ok' | 'warn' | 'muted'; ephemeral?: boolean; pending?: boolean; title?: string }[]
+  tabs: readonly { id: string; label: string; dirty?: boolean; status?: 'ok' | 'warn' | 'muted'; ephemeral?: boolean; pending?: boolean; title?: string; fileStatus?: { letter: string; label: string; tone: 'muted' | 'ok' | 'accent' | 'danger' } }[]
   active: string
   onActivate: (id: string) => void
   onClose?: (id: string) => void
   onPromote?: (id: string) => void
+  menu?: (id: string, control?: { open: () => boolean; onOpenChange: (open: boolean) => void }) => JSX.Element
   actions?: JSX.Element
   idPrefix: string
   ariaLabel: string
   /** DOM pane-header geometry; terminal tabs remain one text row. */
   level?: 'pane'
 }) {
+  const [menuOpen, setMenuOpen] = createSignal(false)
   // A horizontal collection, the same shape `SegmentedControl` is and for the same reason: there is
   // nothing per tab to focus in one run of text, so the strip holds the keys and `←`/`→` move the
   // value. The list rules — what wraps, where the first press lands — are the shared ones
@@ -128,7 +134,9 @@ export function DocumentTabs(props: {
     items: () => props.tabs.map((tab) => ({ key: tab.id, label: tab.label })),
     orientation: 'horizontal',
     // Moving opens, which is what a document strip means: a reader walking the tabs is reading them.
-    selectOnMove: true,
+    // Editor exposes an action target independent of the document. Terminal session tabs keep
+    // their established select-on-arrow behavior because they do not supply a menu.
+    selectOnMove: !props.menu,
     selected: () => props.active,
     onSelect: (id) => props.onActivate(id),
     land: () => {},
@@ -137,10 +145,11 @@ export function DocumentTabs(props: {
   const control = stop({
     on: {
       ...Object.fromEntries(COLLECTION_INTENTS.map((intent) => [intent, () => keys.handle(intent)])),
+      menu: () => { if (!props.menu || !keys.active()) return false; setMenuOpen(true); return true },
       // The collection declines `activate` because `onItem` is false — there is no per-tab renderable
       // to stand on — so Enter is answered here: it re-opens whatever the caret is already on, which
       // is how a reader gets back to the document after walking away from it.
-      activate: () => { props.onActivate(props.active); return true },
+      activate: () => { props.onActivate(keys.active() ?? props.active); return true },
       delete: () => {
         if (!props.onClose) return false
         props.onClose(props.active)
@@ -149,22 +158,45 @@ export function DocumentTabs(props: {
     } as Partial<Record<Intent, () => boolean>>,
   })
   return (
-    <box flexDirection="row" gap={2} ref={control.ref}>
+    <box flexDirection="column" ref={(element: Renderable) => { control.ref(element); markEntry(element) }}>
+    <box flexDirection="row" gap={2}>
       {/* The caret every collection draws, for the reason the pane strip gives: the current tab is
           already marked, and a mark that means two things means neither (../chrome/PaneRow.tsx). */}
       <Line tone="accent">{control.focused() ? '\u203a' : ' '}</Line>
       <For each={props.tabs}>
-        {(tab) => (
-          <Line
-            role={props.active === tab.id ? 'strong' : 'body'}
-            tone={tab.dirty ? 'accent' : tab.status === 'warn' ? 'warn' : undefined}
-          >
-            {tab.label}{tab.dirty ? ' ●' : ''}{props.active === tab.id && props.onClose ? ' ×' : ''}
-          </Line>
-        )}
+        {(tab) => (<>
+          <box height={1} flexShrink={0} ref={(element: Renderable) => {
+            // A normal click still opens the document. The separate action mark below targets an
+            // inactive tab without opening it, matching the desktop's per-tab menu button.
+            element.onMouseDown = () => { if (props.menu) keys.goTo(tab.id); props.onActivate(tab.id) }
+            onCleanup(() => { element.onMouseDown = undefined })
+          }}>
+            <Line
+              role={props.active === tab.id ? 'strong' : 'body'}
+              tone={tab.dirty ? 'accent' : tab.status === 'warn' ? 'warn' : undefined}
+            >
+              {props.menu && keys.active() === tab.id ? '›' : ''}{tab.label}{tab.fileStatus ? ` [${tab.fileStatus.letter}]` : ''}{tab.dirty ? ' ●' : ''}{props.active === tab.id && props.onClose ? ' ×' : ''}
+            </Line>
+          </box>
+          {props.menu && <box height={1} flexShrink={0} ref={(element: Renderable) => {
+            element.onMouseDown = () => { keys.goTo(tab.id); setMenuOpen(true) }
+            onCleanup(() => { element.onMouseDown = undefined })
+          }}><Line tone="muted"> ⋯ </Line></box>}
+        </>)}
       </For>
+      <Line role="muted">{props.tabs.find((tab) => tab.id === props.active)?.fileStatus?.label ?? ''}</Line>
       <box flexGrow={1} />
       {slot(props.actions)}
+    </box>
+      {/* A closed Menu has its own focus stop. Mount it only when invoked so region entry lands on
+          this strip and its Left/Right/Shift+F10 keys can target inactive tabs. */}
+      {props.menu && menuOpen() && keys.active() ? <box flexDirection="row">{slot(props.menu(keys.active()!, {
+        open: menuOpen,
+        onOpenChange: (open) => {
+          setMenuOpen(open)
+          if (!open) scheduleSettle()
+        },
+      }))}</box> : null}
     </box>
   )
 }

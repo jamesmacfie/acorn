@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { SearchResult } from '../../shared/search'
+import type { SearchOpts, SearchResult } from '../../shared/search'
 import { SearchFailure } from '../../shared/search'
 import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
@@ -12,7 +12,7 @@ import { type AppEnv, respondError, routeCapability, setRouteTestCapability, via
 export type SearchBridge = {
   findInFiles(taskId: string, query: string, opts: SearchOpts, request?: Request): Promise<SearchResult>
 }
-export type SearchOpts = { caseSensitive: boolean; wholeWord: boolean; regex: boolean }
+export type { SearchOpts } from '../../shared/search'
 
 export const SEARCH = routeCapability<SearchBridge>('editor.searchRoute')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
@@ -23,9 +23,20 @@ export const setSearchBridge = (bridge: SearchBridge | null): void => setRouteTe
 const searchBody = z.object({
   query: z.string().min(1),
   opts: z
-    .object({ caseSensitive: z.boolean(), wholeWord: z.boolean(), regex: z.boolean() })
+    .object({
+      caseSensitive: z.boolean(), wholeWord: z.boolean(), regex: z.boolean(),
+      folder: z.string().min(1).max(4096),
+      include: z.array(z.string().min(1).max(256)).max(20),
+      exclude: z.array(z.string().min(1).max(256)).max(20),
+    })
     .partial()
     .optional(),
+}).superRefine((body, ctx) => {
+  const patterns = [...(body.opts?.include ?? []), ...(body.opts?.exclude ?? [])]
+  if (body.opts?.include?.some((pattern) => pattern.startsWith('!')))
+    ctx.addIssue({ code: 'custom', message: 'Negative patterns belong in Files to exclude.' })
+  if (patterns.reduce((bytes, pattern) => bytes + Buffer.byteLength(pattern), 0) > 4096)
+    ctx.addIssue({ code: 'custom', message: 'Search filters exceed 4 KiB.' })
 })
 
 export const search = new Hono<AppEnv>().post('/:id/search', async (c) => {
@@ -37,12 +48,15 @@ export const search = new Hono<AppEnv>().post('/:id/search', async (c) => {
       caseSensitive: opts?.caseSensitive ?? false,
       wholeWord: opts?.wholeWord ?? false,
       regex: opts?.regex ?? false,
+      ...(opts?.folder !== undefined ? { folder: opts.folder } : {}),
+      ...(opts?.include !== undefined ? { include: opts.include } : {}),
+      ...(opts?.exclude !== undefined ? { exclude: opts.exclude } : {}),
     }, new Request(c.req.url, { signal: c.req.raw.signal })))
   } catch (error) {
     // RPC errors retain machine codes even when the remote prototype differs.
     const code = error instanceof SearchFailure ? error.code : (error as { code?: string })?.code
     if (!code) throw error
-    const status = code === 'invalid_query' ? 400 : code === 'unavailable_root' ? 404
+    const status = code === 'invalid_query' || code === 'invalid_filter' ? 400 : code === 'unavailable_root' || code === 'invalid_scope' ? 404
       : code === 'cancelled' ? 409 : code === 'timeout' ? 504 : 500
     return respondError(c, status, code)
   }

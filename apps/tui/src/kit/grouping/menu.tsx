@@ -10,6 +10,7 @@ import { bindKeys } from '../../keys/install'
 import { focusedRenderable, pushScope, walkStops } from '../../keys/regions'
 import { stop } from '../../keys/stops'
 import { LIST, OVERLAY_OWN } from '../../keys/tiers'
+import { ScrollViewport } from '../scrolling'
 
 /** Draw a menu below its trigger and contain focus while it is open. */
 export function Menu(props: {
@@ -18,13 +19,17 @@ export function Menu(props: {
   placement?: string
   ariaLabel: string
   open?: () => boolean
+  onBeforeOpen?: () => void
   onOpenChange?: (open: boolean) => void
   disabled?: () => boolean
+  /** Keep long pane menus scrollable when the host gives their inline panel little height. */
+  maxVisibleRows?: number
   children: (context: { close: () => void }) => JSX.Element
 }) {
   const [local, setLocal] = createSignal(false)
   const open = () => props.open?.() ?? local()
   const set = (next: boolean) => {
+    if (next) props.onBeforeOpen?.()
     setLocal(next)
     props.onOpenChange?.(next)
   }
@@ -35,22 +40,23 @@ export function Menu(props: {
     opens: true,
   })
   return (
-    // An open menu takes a full row so its list does not inherit the trigger's narrow width.
-    <box flexDirection="column" {...(open() ? { flexBasis: '100%' as const } : {})}>
+    // The column stretches this box to the list width. A 100% flex basis here consumes the
+    // list's height after dismissal and pushes the surviving rows below the viewport.
+    <box flexDirection="column">
       {/* The trigger's characters are the caller's; the box around them is the stop. */}
       <box flexDirection="row" flexShrink={0} ref={control.ref}>
         {props.trigger({ open, toggle: () => set(!open()), focused: control.focused })}
       </box>
       <Show when={open()}>
         {/* Mount the trap with the list so closing it releases the keys. */}
-        <MenuList close={() => set(false)}>{props.children({ close: () => set(false) })}</MenuList>
+        <MenuList close={() => set(false)} maxVisibleRows={props.maxVisibleRows}>{props.children({ close: () => set(false) })}</MenuList>
       </Show>
     </box>
   )
 }
 
 /** Own the focus scope and keys for an open menu. */
-function MenuList(props: { close: () => void; children: JSX.Element }) {
+function MenuList(props: { close: () => void; children: JSX.Element; maxVisibleRows?: number }) {
   trapKeys(() => props.close())
   return (
     <box
@@ -58,6 +64,9 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
       {...boxBorder('surface')}
       paddingLeft={1}
       paddingRight={1}
+      height={props.maxVisibleRows === undefined ? undefined : props.maxVisibleRows + 2}
+      flexShrink={1}
+      minHeight={props.maxVisibleRows === undefined ? undefined : 3}
       ref={(element: Renderable) => {
         // Closing the list disposes this scope and restores the trigger's keys.
         onCleanup(pushScope(element))
@@ -81,7 +90,9 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
         })
       }}
     >
-      {props.children}
+      {/* A long menu near the bottom of a narrow pane may have fewer rows than actions. Its
+          viewport reveals the focused item as Up/Down walks it. Short menus keep natural height. */}
+      {props.maxVisibleRows === undefined ? props.children : <ScrollViewport>{props.children}</ScrollViewport>}
     </box>
   )
 }

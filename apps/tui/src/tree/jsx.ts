@@ -99,6 +99,7 @@ export type SpanProps = TextProps
 
 export type ScrollBoxProps = FlexProps & {
   ref?: Ref<Renderable>
+  onSizeChange?: () => void
   /** How many rows the viewport has scrolled its content by. The component owns the number and this
    *  is where paint and the read-back read it (../kit/scrolling.tsx, ../layout/pass.ts). */
   offset?: number

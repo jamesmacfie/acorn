@@ -1,6 +1,46 @@
 # Phase 02: manage files from the tree
 
-Date: October 7, 2026. Status: proposed product requirements; implementation not started.
+> **Completion note — October 8, 2026.** Task-addressed create, rename, and move-to-trash routes
+> now rederive roots and entry identities on the owning Node. File and folder operations suspend
+> captured open and persisted descendant drafts before a menu can change focus, join admitted saves,
+> reserve destination custody before mutation, and keep their suspension through local reconciliation
+> even if the dialog closes or the pane retires. Rename moves recovery, text, view state, and tabs;
+> trash requires deliberate saves of every dirty descendant and retires their old callbacks. Same
+> kind external replacement is refused using a stable entry ID separate from ctime-sensitive
+> freshness. The Node serializes Editor writes and file actions across checkout aliases, checks
+> external editor PTYs, protects Git metadata and the root, and handles leaf symlink entries.
+>
+> **Decisions and limits.** macOS uses `/usr/bin/trash`, Linux uses `gio trash`, and Windows reports
+> trash unavailable; there is no permanent-delete fallback. Node has no exclusive `fs.rename`, so
+> a small helper calls macOS `RENAME_EXCL` or Linux `RENAME_NOREPLACE`. The Node build produces its
+> binary and manifest, and existing desktop and standalone staging copies them. Ordinary renames
+> never compile C on the running host. An unavailable helper disables Rename and the route fails closed.
+> Case-only rename uses a temporary sibling and reports its actual path if rollback fails. A
+> successful trash adapter exit is checked against source disappearance. macOS file and folder trash
+> were exercised through the route; the protected `~/.Trash` could not be listed in this sandbox.
+> Linux GIO and remote hosts were unavailable for a live adapter check.
+>
+> **Verification.** Custody and file-action tests cover delayed writes, late document acquisition,
+> closed recovery, same-kind replacement, no-clobber destination races, and an in-flight Node switch
+> with the same task ID on both Nodes. The isolated desktop driver created a file, canceled inline
+> rename with Escape, renamed with Enter, and moved it to Trash; screenshots showed tree and tab
+> reconciliation. In an isolated terminal at 80×24 and 120×40, focus reached the tree, F2 opened
+> the name field, Escape canceled, Enter renamed, Shift+F10 opened the full action menu, Ctrl+N
+> opened root creation, and create/trash confirmation and cancel restored focus to surviving rows.
+> Key trace showed F2 and Shift+F10 matched and were handled on the focused row. At 80×24 list and
+> detail stack so the tree remains reachable. Package tests: TUI 678 passed/2 skipped; Editor 144
+> passed/1 skipped; plugin API 14 passed; client-core 2466 passed with 2 previously reproduced
+> parent-baseline failures; Node 272 passed with 1 previously reproduced parent-baseline golden
+> failure; desktop 171 passed with 11 previously reproduced parent-baseline activation snapshot
+> failures. Architecture 87 passed. Affected package lint passed. No unfiltered repository suite ran.
+>
+> **For later phases.** Keep counted custody holds and destination reservations until the Node
+> result and local reconciliation finish. A partial Node or local result leaves drafts write-blocked
+> with an actual-path recovery message. Remote device drafts remain a phase 01 reconciliation matter;
+> local Trash is never assumed to represent a remote Node. Plugin resource-action registration and
+> preview renderers remain outside this phase.
+
+Date: October 8, 2026. Status: complete.
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 Dependency: [phase 01](./01-document-lifecycle.md).
 

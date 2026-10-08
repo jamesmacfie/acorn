@@ -11,9 +11,10 @@ lockfile install order, with the plugin ID breaking ties. The losing binding is 
 a conflict. No fallback chord is invented.
 
 `resolveKeybindings` applies the overrides, the order, and the conflict rule before the engine sees
-anything, and hands the engine one binding per chord. A losing binding arrives with a null chord and
-registers nothing. That's why Settings can show it as a conflict while the keyboard acts as if it
-weren't there.
+anything. A losing binding arrives with a null chord and registers nothing. Pane and task bindings
+may share a chord: both hosts try the focused pane binding first, then the task binding when focus
+is elsewhere. Other overlapping defaults still conflict. Settings can show a conflict while the
+keyboard acts as if the losing binding weren't there.
 
 Settings stores overrides by command ID in the device's `keybindings` preference. A `null` or empty
 override unbinds a command, and resetting it restores the default.
@@ -49,6 +50,11 @@ looked at the diff wouldn't be a shortcut ([pane models](../panes/models.md) § 
 and two bindings on one chord leave the loser with nothing.
 
 ## Plugin shortcuts
+
+Editor registers **Toggle word wrap** at `meta+alt+w` while a graphical text file is focused. The
+binding can be changed or removed in Keyboard shortcuts. Find, Replace, comment, line, selection,
+indent, undo, and redo actions are also discoverable in the focused Editor palette. CodeMirror keeps
+its text-editing chords inside the document; the host binding is the one shortcut owner for wrapping.
 
 Loaded plugins declare canonical `meta+ctrl+alt+shift+key` chords against commands in their own
 manifest. The host qualifies both IDs as `plugin.<plugin-id>.<command-id>`, refuses bare keys, and

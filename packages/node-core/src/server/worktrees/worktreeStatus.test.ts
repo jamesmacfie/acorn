@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -62,6 +62,41 @@ describe('the coalesced worktree status read', () => {
     const [left, right] = await Promise.all([worktreeStatus(worktree), worktreeStatus(worktree)])
     expect(statuses()).toBe(1)
     expect(left).toEqual(right)
+  })
+
+  it('shares reads and invalidation between checkout aliases', async () => {
+    const alias = join(dir, 'alias')
+    symlinkSync(worktree, alias)
+    await Promise.all([worktreeStatus(worktree), worktreeStatus(alias)])
+    expect(statuses()).toBe(1)
+    writeFileSync(join(worktree, 'alias-change.txt'), 'new')
+    invalidateWorktreeStatus(alias)
+    expect((await worktreeStatus(worktree)).dirty).toBe(true)
+    expect(statuses()).toBe(2)
+  })
+
+  it('does not join an aliased status run invalidated while it is pending', async () => {
+    const alias = join(dir, 'alias')
+    symlinkSync(worktree, alias)
+    const before = worktreeStatus(alias)
+    invalidateWorktreeStatus(worktree)
+    const after = worktreeStatus(worktree)
+    await Promise.all([before, after])
+    expect(statuses()).toBe(2)
+  })
+
+  it('answers two 10,000-path readers with one status subprocess', async () => {
+    const many = join(worktree, 'many')
+    mkdirSync(many)
+    for (let index = 0; index < 10_000; index++) writeFileSync(join(many, `${index}.txt`), '')
+    const started = performance.now()
+    const [left, right] = await Promise.all([worktreeStatus(worktree), worktreeStatus(worktree)])
+    const elapsed = Math.round(performance.now() - started)
+    expect(left.count).toBe(10_000)
+    expect(right).toEqual(left)
+    expect(statuses()).toBe(1)
+    // Measurement, not a timing assertion: CI hosts have different disks.
+    console.info(`10,000-path status: ${elapsed} ms, ${statuses()} subprocess`)
   })
 
   it('runs git zero times for a caller inside the window', async () => {

@@ -59,6 +59,8 @@ const scopesConflict = (a: KeybindingContribution, b: KeybindingContribution): b
   const aScope = a.when ?? 'global'
   const bScope = b.when ?? 'global'
   if (aScope === 'pane' && bScope === 'pane') return a.pane === b.pane
+  // A pane binding can shadow a task binding only while that pane owns focus.
+  if ((aScope === 'pane' && bScope === 'task') || (aScope === 'task' && bScope === 'pane')) return false
   return true
 }
 

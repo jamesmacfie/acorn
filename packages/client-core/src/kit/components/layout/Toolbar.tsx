@@ -3,22 +3,39 @@ import type { JSX } from 'solid-js'
 /* Toolbar: the bar strip. `bar` is the bordered pane strip; `actions` is the borderless
    end-aligned form or modal footer. No arrow-key roving, because most of these mix inputs and
    buttons, where roving hurts. Not for tab strips or the topbar, which have their own semantics. */
-export function Toolbar(props: {
+export type ToolbarProps = {
   variant?: 'bar' | 'actions'
   size?: 'sm' | 'md'
   ariaLabel?: string
   children: JSX.Element
-}) {
+} | {
+  /** A compact fact strip. Only `secondary` yields to a narrow container. */
+  variant: 'status'
+  size?: 'sm' | 'md'
+  ariaLabel?: string
+  primary: JSX.Element
+  secondary?: JSX.Element
+  essential: JSX.Element
+  actions?: JSX.Element
+  children?: never
+}
+
+export function Toolbar(props: ToolbarProps) {
   const variant = () => props.variant ?? 'bar'
   return (
     <div
       class="ui-toolbar"
       data-variant={variant()}
       data-size={props.size ?? 'md'}
-      role={variant() === 'bar' ? 'toolbar' : undefined}
-      aria-label={variant() === 'bar' ? props.ariaLabel : undefined}
+      role={variant() === 'actions' ? undefined : 'toolbar'}
+      aria-label={variant() === 'actions' ? undefined : props.ariaLabel}
     >
-      {props.children}
+      {props.variant === 'status' ? <>
+        <span class="ui-toolbar-status-primary">{props.primary}</span>
+        <span class="ui-toolbar-status-secondary">{props.secondary}</span>
+        <span class="ui-toolbar-status-essential">{props.essential}</span>
+        <span class="ui-toolbar-status-actions">{props.actions}</span>
+      </> : props.children}
     </div>
   )
 }
