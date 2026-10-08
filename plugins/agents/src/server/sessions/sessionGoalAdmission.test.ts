@@ -35,7 +35,7 @@ it('applies admission refusals and prompt changes to goal turns', async () => {
     let finishAdmission!: () => void
     hook.mockImplementationOnce(async (_point, payload) => {
       await new Promise<void>((resolve) => { finishAdmission = resolve })
-      return { ok: true, payload }
+      return { ok: true, payload: { ...payload, text: String(payload.text) } }
     })
     const controller = new AbortController()
     const cancelled = runtime.enqueueTurn(session.id, {

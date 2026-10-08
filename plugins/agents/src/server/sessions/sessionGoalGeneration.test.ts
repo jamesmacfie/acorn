@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { makeTestNodeContext, type CoreServices, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { AgentSession } from '../../contract/wire.ts'
@@ -26,7 +26,7 @@ describe('session goal generation', () => {
   let enqueued: Array<{ sessionId: string; key: string }>
   let published: AgentSession[]
   let generateText: ReturnType<typeof vi.fn>
-  let enqueue: ReturnType<typeof vi.fn>
+  let enqueue: Mock<(sessionId: string, prompt: string, key: string) => Promise<void>>
 
   beforeEach(() => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
