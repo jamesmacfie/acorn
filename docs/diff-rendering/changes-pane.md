@@ -4,6 +4,10 @@ This page covers the Changes pane's side of the diff viewer: the one status read
 tree's document is built, the file list, discard, the branch bar, and what the panel refuses. It's
 part of [diff rendering](../diff-rendering.md). The plugin lives in `plugins/changes`.
 
+The pane is missing from a task's pane rail when the task's project isn't a Git repository. The pane
+shows while the project list is still loading, and in the terminal client, which doesn't load the
+list.
+
 ## One status read
 
 Editor asks Changes for a separate status-only projection through the declared
