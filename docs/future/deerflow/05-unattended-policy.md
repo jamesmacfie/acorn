@@ -1,6 +1,52 @@
 # Unattended turn policy
 
-Status: proposed, October 6, 2026. Not started. Part of the [DeerFlow review](./README.md).
+Completion note, October 8, 2026: The agents store resolves and persists attendance at turn
+acceptance, alongside the provider policy snapshot. This includes direct goal enqueue, plan
+implementation, workflow continuations, usage-limit retries, and admitted plugin follow-ups. The
+host passes workflow posture through the internal execution capability. HTTP and tool bodies do
+not supply attendance; protected session configuration cannot replace the host bootstrap snapshot.
+Unknown host posture and persisted attendance fail. Legacy turns are backfilled before dispatch or
+idempotent acceptance, using the saved session snapshot or the original attended/supervised default.
+Goals remain restricted to interactive sessions.
+
+Autonomous permissions reject once, and questions/forms cancel with a recorded policy reason.
+Requests are recorded already resolved, without pending attention or waiting on a person. Parked
+request callbacks also cover provider startup before a handle exists. Autonomous plugin hook asks
+deny immediately. Supervised requests retain their existing human path. A final message starting
+with `BLOCKED:` fails managed workflow execution without continuation or review.
+
+Decisions and deviations: Claude and Codex have session-level system/developer instruction channels,
+so host admission saves `config.initialAttendance`, and a workflow session keeps that posture.
+Claude retains its original appended prompt on resume; Codex modes can supply their own instructions.
+The runtime therefore also prepends attendance instructions to every unattended turn, including
+contributed ACP harnesses, legacy resumes, and follow-ups. A saved workflow session reused without an
+explicit posture retains its saved policy. Headless profiles have no managed request channel and
+retain their existing behavior. The desktop retry action removes host policy fields before HTTP
+admission. Prompt text and request settlement are lazy modules; the remaining acceptance, recovery,
+and event routing increased the Node static graph to 3,173,645 bytes, with a 4,000-byte ceiling increase.
+
+Verification: Locked dependencies installed in this worktree on Node 26.8.1. Focused agents tests
+covered attendance persistence/recovery, goals, requests, startup, hook asks, workflow results,
+follow-ups, usage-limit continuation, plan handoff, HTTP admission, configuration authority, harness
+channels, and desktop retry. Focused workflow runner tests covered both posture values and blocked
+step failure. Affected agents, workflows, Node, desktop, published types, and architecture typechecks;
+targeted oxlint; architecture boundaries, public contracts, documentation paths/citations; and the
+Node service build/budget passed. Existing unrelated oxlint warnings remain. No root test or lint ran.
+
+Real-app coverage: `dev:agent -- --session phase5-autonomous --fixture unattended-policy` ran a fake
+managed harness through the actual runtime and `createSessionExecute` before opening the desktop.
+It verified rejection/cancellation of a permission, question, and form, three resolved saved requests,
+and one blocked turn without continuation. The task Agent pane snapshot and inspected screenshot
+show all three policy cards, the blocked reply, and no answer/approval controls. The app was stopped.
+This verifies runtime settlement and rendering from saved data, plus restart reads; it does not claim
+a live commercial-harness question or a running workflow graph in the desktop. Permission controls
+were unchanged. The workflow graph and driver protocols have separate focused tests.
+
+Later phases: Extend the goal judge to unattended sessions only if explicitly scoped; it should map
+`BLOCKED:` to a user-input blocker. Supervised deadlines and headless interaction policy remain
+outside this phase. Keep these future phase documents until coordinator cleanup.
+
+Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 
 ## Problem and outcome
 
