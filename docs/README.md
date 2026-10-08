@@ -391,6 +391,22 @@ These pages describe planned work, not shipped behavior. The first release ends 
 | [Phase 07](./future/git-client/07-operations.md) | Task operations, recovery controls, and Editor/Changes conflict handoff. |
 | [Phase 08](./future/git-client/08-conflict-resolution.md) | Three-way resolution, safe result saving/staging, and combined acceptance. |
 
+## Future performance handoffs
+
+These planned phases reduce shipped bytes and startup work, explain loading progress, and export
+performance measurements to Sentry. They do not describe shipped behavior.
+
+| Document | What it holds |
+| --- | --- |
+| [Performance programme](./future/performance/README.md) | Decisions, phase order, dated starting evidence, owners, and scope. |
+| [Phase 01: Measurements](./future/performance/01-measurements-and-sentry.md) | Startup and feature milestones, artifact inventories, consent, and Sentry export. |
+| [Phase 02: Packaging](./future/performance/02-runtime-packaging.md) | Installed Claude, removal of the SDK executable, and reviewed runtime files. |
+| [Phase 03: Minification](./future/performance/03-production-minification.md) | Production service and plugin minification, diagnostics, and graph-based budgets. |
+| [Phase 04: Startup UX](./future/performance/04-startup-and-loading-ux.md) | Changing startup messages, failure recovery, and feature loading placeholders. |
+| [Phase 05: Renderer loading](./future/performance/05-selective-renderer-loading.md) | Smaller eager imports, contribution readiness, and first-use behavior. |
+| [Phase 06: Server loading](./future/performance/06-selective-server-loading.md) | Shared lazy handlers, route ordering, and required startup obligations. |
+| [Phase 07: Acceptance](./future/performance/07-acceptance-and-budgets.md) | Combined gates, packaged-host checks, before-and-after measurements, and live Sentry evidence. |
+
 ## Plugin topic pages
 
 Each plugin landing page above has topic pages in a folder of the same name:
