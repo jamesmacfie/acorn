@@ -22,6 +22,8 @@ export function Tabs(props: {
   /** DOM pane-header geometry; terminal tabs remain one text row. */
   level?: 'pane'
   actions?: JSX.Element
+  /** A remote tree's spelling of `actions`: its controls arrive as child nodes. */
+  children?: JSX.Element
 }) {
   const step = (delta: 1 | -1): boolean => {
     const at = props.tabs.findIndex((tab) => tab.id === props.active)
@@ -80,7 +82,7 @@ export function Tabs(props: {
         )}
       </For>
       <box flexGrow={1} />
-      {slot(props.actions)}
+      {slot(props.actions ?? props.children)}
     </box>
   )
 }
