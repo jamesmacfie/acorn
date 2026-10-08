@@ -93,10 +93,12 @@ as with workspace deletion while workspaces are on.
 
 ## The first-run wizard
 
-A Node with no projects opens the first-run wizard in `plugins/onboarding`. Its welcome step asks
-whether to keep projects separate or group them into workspaces when `core.workspaces` is unset.
-Separate projects is the default choice. The wizard saves the answer before it adds a project, and
-the Node fixes the mode after that write. If the mode is already set, the wizard shows the saved
+A Node with no projects opens the first-run wizard in `plugins/onboarding`. After the welcome step,
+the **Layout** step asks whether to keep projects separate or group them into workspaces when
+`core.workspaces` is unset. Each choice shows a small picture of example projects arranged that
+way. Separate projects is the default choice. **Continue** saves the answer before the wizard adds a
+project, and the Node fixes the mode after that write. If the mode is already set when the wizard
+opens, it leaves the **Layout** step out. Going back to the step after answering shows the saved
 answer without offering another choice. The following steps add projects by folder or from GitHub,
 name them, pick a model for text generation, and finish.
 

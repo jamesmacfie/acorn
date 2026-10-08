@@ -317,7 +317,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 /* A row in a collapsed sidebar. The rail is one column wide and the row's mark is centred in it, so
    the row drops its inline padding and the left accent marker with it: at 48px a 2px marker beside a
    14px glyph reads as a misaligned icon rather than as selection. The selected row says so with its
-   background alone, the way a rail button does.
+   background alone, the way a rail button does. The marker goes by its width, not its colour, since a
+   transparent one still takes its width from the left and pushes the mark off centre.
 
    `title` and `aria-label` still carry the name, and `data-tip` (kit/components/layout/Row.tsx) turns that
    into the app's own tooltip on hover and on focus, which is the whole reason a rail row is legible
@@ -327,9 +328,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   min-height: var(--tabrail-w);
   height: var(--tabrail-w);
   padding: 0;
-  border-left-color: transparent;
+  border-left-width: 0;
 }
-.ui-row[data-collapsed][data-selected] { border-left-color: transparent; }
 .ui-row-collapsed {
   display: flex;
   flex-direction: column;
@@ -846,6 +846,16 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-segment[aria-checked='true'] { color: var(--text); background: var(--bg-selected); }
 .ui-segment:disabled { opacity: 0.5; cursor: default; }
 .ui-segment:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
+/* Segments with a detail: equal columns, a head with a radio mark, and the picture under it. The
+   unchosen picture fades so the choice reads from across the room, not only from the mark. Cards in
+   a picture are miniatures, so they take the pack's small radius rather than a full card's. */
+.ui-segments[data-detail] { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; width: 100%; }
+.ui-segments[data-detail] .ui-segment { display: flex; flex-direction: column; align-items: stretch; padding: 0; text-align: left; }
+.ui-segment-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: var(--divider); }
+.ui-segment-radio { flex: none; width: var(--icon-size); height: var(--icon-size); border: var(--control-border); border-radius: var(--radius-circle); }
+.ui-segment[aria-checked='true'] .ui-segment-radio { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 35%, transparent 40%); }
+.ui-segment-detail { display: block; padding: var(--space-5); --radius-surface: var(--radius-sm); }
+.ui-segment[aria-checked='false'] .ui-segment-detail { opacity: 0.5; }
 
 /* Pressed must read differently from hover in every pack, or a toggle's state is invisible the
    moment the pointer is over it. */
@@ -1333,6 +1343,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
    `>` on the column so a `ListDetail` nested inside the detail keeps its own headers. */
 .ui-listdetail[data-list='collapsed'] > .ui-listdetail-list .section-header { display: none; }
+/* An empty list's words wrap to a letter a line at that width, so they go the way of the header. Its
+   icon or spinner fits, and stays. */
+.ui-listdetail[data-list='collapsed'] > .ui-listdetail-list :is(.ui-empty-title, .ui-empty-text, .ui-empty-action) { display: none; }
 .ui-listdetail[data-list='collapsed'] > .ui-listdetail-list::before {
   content: '';
   display: block;
