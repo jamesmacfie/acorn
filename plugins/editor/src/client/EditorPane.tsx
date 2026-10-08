@@ -525,9 +525,9 @@ export default function EditorPane(props: { task: Task }) {
   const selectedCharacters = () => {
     statusVersion()
     if (!view || currentPath !== active() || mode() !== 'graphical' || imagePath() || ptyPath()) return 0
-    let count = 0
-    for (const range of view.state.selection.ranges) for (const _character of view.state.doc.sliceString(range.from, range.to)) count++
-    return count
+    // CodeMirror offsets count UTF-16 code units. This stays proportional to selection ranges,
+    // even when the reader selects a generated file with millions of characters.
+    return view.state.selection.ranges.reduce((count, range) => count + range.to - range.from, 0)
   }
   const statusSave = () => {
     statusVersion()
@@ -545,6 +545,7 @@ export default function EditorPane(props: { task: Task }) {
     statusVersion()
     return presentationFor(nodeId, taskId, active() ?? '').wrap ?? readEditorWordWrap(prefs.data)
   }
+  const statusCurrent = (path: string) => live() && activeTaskId() === taskId && active() === path
 
   // Whatever `$EDITOR` was pointed at is no longer what this pane has cached, so the cached state goes
   // and the graphical view reads the file back off disk when it next shows it. That is the whole
@@ -1197,27 +1198,7 @@ export default function EditorPane(props: { task: Task }) {
               </>
             }
           />
-          <Show when={active()}>{(path) => <EditorStatus
-            path={path()}
-            position={statusPosition()}
-            selection={selectedCharacters()}
-            language={languageName(languageIdForPath(path()))}
-            indentation={statusIndentation()}
-            defaultIndentation={readEditorIndentation(prefs.data)}
-            save={statusSave()}
-            preview={!!imagePath()}
-            external={!!ptyPath()}
-            wrap={statusWrap()}
-            defaultWrap={readEditorWordWrap(prefs.data)}
-            onToggleWrap={toggleWrap}
-            onDefaultWrap={(value) => { void saveEditorWordWrap(queryClient, value) }}
-            onCopy={() => copyPath(false)}
-            onReveal={revealActiveFile}
-            onIndentation={setIndentation}
-            onDefaultIndentation={(value) => { void saveEditorIndentation(queryClient, value) }}
-            onRetry={() => { void save(path()) }}
-          />}</Show>
-          {/* Under the strip rather than in it: a sentence does not fit a 48-pixel bar. */}
+          {/* A failure needs room for a sentence and its resolution actions. */}
           <Show when={bulkRun()}>{(run) => <Alert variant="banner" tone="warn">Closing files… <Button onPress={() => run().cancel()}>Cancel close</Button></Alert>}</Show>
           <Show when={saveErr()}><Alert variant="banner" tone="danger">{saveErr()}</Alert></Show>
           <Show when={active() && diskState()}>
@@ -1268,6 +1249,25 @@ export default function EditorPane(props: { task: Task }) {
           } keyed>
             {(path) => <EditorTerminal taskId={taskId} path={path} onExit={(code) => onEditorExit(path, code)} />}
           </Show>
+          <Show when={active()} keyed>{(path) => <EditorStatus
+            path={path}
+            position={statusPosition()}
+            selection={selectedCharacters()}
+            language={languageName(languageIdForPath(path))}
+            indentation={statusIndentation()}
+            save={statusSave()}
+            preview={!!imagePath()}
+            external={!!ptyPath()}
+            wrap={statusWrap()}
+            defaultWrap={readEditorWordWrap(prefs.data)}
+            onToggleWrap={() => { if (statusCurrent(path)) toggleWrap() }}
+            onDefaultWrap={(value) => { if (statusCurrent(path) && graphicalView()) void saveEditorWordWrap(queryClient, value) }}
+            onCopy={() => { if (statusCurrent(path)) copyPath(false) }}
+            onReveal={() => { if (statusCurrent(path)) revealActiveFile() }}
+            onIndentation={(value) => { if (statusCurrent(path)) setIndentation(value) }}
+            onDefaultIndentation={(value) => { if (statusCurrent(path) && graphicalView()) void saveEditorIndentation(queryClient, value) }}
+            onRetry={() => { if (statusCurrent(path)) void save(path) }}
+          />}</Show>
         </ListDetail>
       </Show>
     </Show>

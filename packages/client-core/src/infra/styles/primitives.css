@@ -717,13 +717,13 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    never the state or the buttons at the end of the bar. */
 .ui-toolbar > .ui-toolbar-spacer ~ * { flex: none; }
 
-/* A plugin cannot ship a stylesheet. Keep the Editor's file facts in the host's toolbar skin. */
-.ui-toolbar[aria-label='File status'] {
+/* Status bars keep their essential facts and actions visible when their own width narrows. */
+.ui-toolbar[data-variant='status'] {
   container-type: inline-size;
   min-width: 0;
 }
 
-.ui-toolbar[aria-label='File status'] > .ui-text:first-child {
+.ui-toolbar-status-primary {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -731,13 +731,17 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   white-space: nowrap;
 }
 
-.ui-toolbar[aria-label='File status'] > :is(.ui-text[data-emphasis='mono']:not(:first-child), .ui-text:nth-last-child(2)) {
+.ui-toolbar-status-secondary,
+.ui-toolbar-status-essential,
+.ui-toolbar-status-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
   flex: none;
 }
 
 @container (max-width: 680px) {
-  .ui-toolbar[aria-label='File status'] > .ui-text:not(:first-child):not([data-emphasis='mono']):not(:nth-last-child(2)),
-  .ui-toolbar[aria-label='File status'] > button:first-of-type {
+  .ui-toolbar-status-secondary {
     display: none;
   }
 }

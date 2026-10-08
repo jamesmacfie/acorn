@@ -1006,6 +1006,17 @@ describe('the kit in cells', () => {
   })
 
   it.each(drawable(cases))('%s', drawCase, 20_000)
+  it.each([80, 120])('shows status essentials and details at %i columns', async (width) => {
+    const frame = await renderCells(() => <Toolbar variant="status" ariaLabel="File status"
+      primary={<Text>src/deep/example.ts</Text>}
+      secondary={<Text>TypeScript Spaces: 2</Text>}
+      essential={<Text>Ln 12, Col 4 Saved</Text>}
+      actions={<Button onPress={() => {}}>Details</Button>}
+    />, { width, height: 4 })
+    try {
+      for (const fact of ['src/deep/example.ts', 'Ln 12, Col 4', 'Saved', 'Details', 'Spaces: 2']) has(frame, fact)
+    } finally { frame.done() }
+  })
   // The held half, as skips rather than as absences, so the report says which node is waiting and why
   // (§ HELD).
   if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)

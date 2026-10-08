@@ -1,13 +1,15 @@
 # File status and editing controls
 
 The strip below the active file shows its relative path, one-based line and column, language,
-indentation, selection length, and save state. Selection length adds every selected range. **Copy
-path** copies the full relative path, including when the strip abbreviates a long path. **Details**
+indentation, selection length, and save state. Selection length sums CodeMirror ranges in UTF-16
+document units, without copying selected text; multiple selections are aggregated. **Copy path**
+copies the full relative path even when the visible label is clipped by the available width. **Details**
 offers tree reveal, indentation choices, and a retry for ordinary save failures. The detailed error
 stays in the banner. Conflict and deletion actions stay in their existing banner. Image previews show
 **Read-only preview** without text position or indentation. A PTY shows **External editor** without
 claiming to know its cursor or save state. The terminal client shows the file facts it has without
-constructing CodeMirror state.
+constructing CodeMirror state. The strip sits after the active document or preview, so its position
+stays stable as the editor changes mode.
 
 The strip derives **Saved**, **Unsaved**, **Saving…**, and **Save failed** from document custody. A
 write acknowledgement for an earlier edit leaves a later edit **Unsaved**. Recovered drafts,

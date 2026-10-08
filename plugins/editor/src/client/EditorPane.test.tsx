@@ -80,7 +80,7 @@ vi.mock('./EditorTerminal', () => ({
 }))
 
 const { default: EditorPane } = await import('./EditorPane')
-const { activeFile, editorClose, editorOpen, openFiles, requestEditorReveal } = await import('./editorState')
+const { activeFile, editorActivate, editorClose, editorOpen, openFiles, requestEditorReveal } = await import('./editorState')
 const { saveEditorMode } = await import('./editorPrefs')
 const { editorViewState } = await import('./editorViewState')
 
@@ -150,13 +150,155 @@ const editor = async (host: HTMLElement): Promise<EditorView> =>
 const showing = async (view: () => EditorView, text: string) =>
   vi.waitFor(() => expect(view().state.doc.toString()).toContain(text))
 
-const runEditorCommand = (id: string) => {
+const editorCommand = (id: string) => {
   const command = commandRegistry.entries().find((entry) => entry.id === id)
   if (!command || !('run' in command)) throw new Error(`Missing action command: ${id}`)
+  return command
+}
+const runEditorCommand = (id: string) => {
+  const command = editorCommand(id)
   command.run({ nodeId: null, workspaceId: null, projectId: null, taskId: null, paneId: null, surfaceId: null })
 }
 
 describe('the editor pane', () => {
+  it('counts a million selected UTF-16 units without changing the file', async () => {
+    disk.set('large.txt', 'x'.repeat(1_000_000))
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'large.txt', false)
+    await showing(() => view, 'xxxx')
+    view.dispatch({ selection: { anchor: 0, head: view.state.doc.length } })
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('1000000 selected')
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('keeps status actions on their admitted tab when a menu outlives a switch', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    const oldWrap = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((item) => item.textContent?.includes('Word wrap'))!
+    editorOpen(taskId, 'b.ts', false)
+    await vi.waitFor(() => expect(view.state.doc.toString()).toBe('const b = 2\n'))
+    expect(document.querySelector('[aria-label="File status details"]')).toBeNull()
+    oldWrap.click()
+    expect(view.contentDOM.classList.contains('cm-lineWrapping')).toBe(false)
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('runs discovered graphical commands on the live document and saves their edits', async () => {
+    disk.set('a.ts', 'const a = 1\nconst b = 2\n')
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    setActiveTaskId(taskId)
+    setFocusedPane(taskId, 'editor')
+    await vi.waitFor(() => expect(view.state.languageDataAt('commentTokens', 0).length).toBeGreaterThan(0))
+    const available = (action: string) => editorCommand(`editor.edit.${action}`).when?.() ?? true
+    expect(available('undo')).toBe(false)
+    expect(available('redo')).toBe(false)
+    for (const action of ['find', 'replace', 'comment', 'duplicate', 'move-up', 'move-down', 'select-next', 'indent', 'outdent']) {
+      expect(available(action)).toBe(true)
+    }
+    runEditorCommand('editor.edit.find')
+    expect(host.querySelector('.cm-search')).not.toBeNull()
+    runEditorCommand('editor.edit.replace')
+    expect(host.querySelector<HTMLInputElement>('.cm-search input[name="replace"]')).toBe(document.activeElement)
+    view.dispatch({ selection: { anchor: 0 } })
+    runEditorCommand('editor.edit.select-next')
+    expect(write).not.toHaveBeenCalled()
+    runEditorCommand('editor.edit.comment')
+    expect(view.state.doc.toString()).toContain('// const a = 1')
+    expect(available('undo')).toBe(true)
+    runEditorCommand('editor.edit.duplicate')
+    const duplicated = view.state.doc.toString()
+    expect(duplicated.match(/const a = 1/g)).toHaveLength(2)
+    runEditorCommand('editor.edit.move-down')
+    expect(view.state.doc.toString()).not.toBe(duplicated)
+    runEditorCommand('editor.edit.move-up')
+    runEditorCommand('editor.edit.undo')
+    expect(available('redo')).toBe(true)
+    runEditorCommand('editor.edit.redo')
+    saveChord(view)
+    await vi.waitFor(() => expect(write).toHaveBeenCalled())
+    expect(disk.get('a.ts')).toBe(view.state.doc.toString())
+    editorOpen(taskId, 'b.ts', false)
+    await vi.waitFor(() => expect(view.state.doc.toString()).toBe('const b = 2\n'))
+    runEditorCommand('editor.edit.duplicate')
+    expect(view.state.doc.toString()).toContain('const b = 2\nconst b = 2')
+    expect(disk.get('a.ts')).not.toContain('const b = 2\nconst b = 2')
+    setActiveNode('other-node')
+    expect(available('duplicate')).toBe(false)
+    const before = view.state.doc.toString()
+    runEditorCommand('editor.edit.duplicate')
+    expect(view.state.doc.toString()).toBe(before)
+  })
+
+  it('keeps dirty undo, search, markers, and session presentation across reconfiguration', async () => {
+    disk.set('a.ts', 'first\n  second\n')
+    const first = mount()
+    const view = await editor(first.host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'second')
+    setActiveTaskId(taskId)
+    setFocusedPane(taskId, 'editor')
+    await vi.waitFor(() => expect(view.contentDOM.querySelector('.cm-line-pull-request')).not.toBeNull())
+    view.dispatch({ selection: { anchor: 3 } })
+    view.scrollDOM.scrollTop = 25
+    runEditorCommand('editor.edit.find')
+    const search = first.host.querySelector('.cm-search')
+    runEditorCommand('editor.toggle-word-wrap')
+    expect(view.contentDOM.querySelector('.cm-line-pull-request')).not.toBeNull()
+    expect(first.host.querySelector('.cm-search')).toBe(search)
+    expect(view.state.selection.main.head).toBe(3)
+    expect(view.scrollDOM.scrollTop).toBe(25)
+    view.dispatch({ changes: { from: 0, insert: 'changed ' } })
+    expect(editorCommand('editor.edit.undo').when?.()).toBe(true)
+    first.host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    const tabs4 = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find((item) => item.textContent?.includes('Tabs: 4'))!
+    tabs4.click()
+    expect(first.host.querySelector('[aria-label="File status"]')?.textContent).toContain('Tabs: 4')
+    expect(first.host.querySelector('.cm-search')).toBe(search)
+    expect(editorCommand('editor.edit.undo').when?.()).toBe(true)
+    expect(write).not.toHaveBeenCalled()
+    editorOpen(taskId, 'b.ts', false)
+    await vi.waitFor(() => expect(view.state.doc.toString()).toBe('const b = 2\n'))
+    editorActivate(taskId, 'a.ts')
+    await showing(() => view, 'changed first')
+    expect(view.contentDOM.classList.contains('cm-lineWrapping')).toBe(true)
+    expect(first.host.querySelector('[aria-label="File status"]')?.textContent).toContain('Tabs: 4')
+    first.unmount()
+    const second = mount(true)
+    const remounted = await editor(second.host)
+    await showing(() => remounted, 'changed first')
+    expect(remounted.contentDOM.classList.contains('cm-lineWrapping')).toBe(true)
+    expect(second.host.querySelector('[aria-label="File status"]')?.textContent).toContain('Tabs: 4')
+    expect(editorCommand('editor.edit.undo').when?.()).toBe(true)
+    runEditorCommand('editor.edit.undo')
+    expect(remounted.state.doc.toString()).toBe('first\n  second\n')
+  })
+
+  it('uses chosen indentation for later commands without rewriting CRLF text', async () => {
+    disk.set('a.ts', 'first\r\n  second\r\n')
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'second')
+    setActiveTaskId(taskId)
+    setFocusedPane(taskId, 'editor')
+    host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    const tabs4 = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find((item) => item.textContent?.includes('Tabs: 4'))!
+    tabs4.click()
+    expect(view.state.doc.toString()).toBe('first\r\n  second\r\n')
+    view.dispatch({ selection: { anchor: view.state.doc.line(2).from } })
+    runEditorCommand('editor.edit.indent')
+    expect(view.state.doc.toString()).toBe('first\r\n\t  second\r\n')
+    runEditorCommand('editor.edit.outdent')
+    expect(view.state.doc.toString()).toBe('first\r\n  second\r\n')
+  })
+
   it('shows live file facts and reconfigures wrap without a write or state replacement', async () => {
     const { host } = mount()
     const view = await editor(host)
@@ -167,6 +309,7 @@ describe('the editor pane', () => {
     expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('a.ts')
     expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('Ln 1, Col 1')
     expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('Saved')
+    expect(rectangle(host, 'editor')!.compareDocumentPosition(host.querySelector('[aria-label="File status"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     view.dispatch({ selection: EditorSelection.create([EditorSelection.range(0, 5), EditorSelection.range(6, 7)]) })
     expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('6 selected')
     const originalState = view.state
@@ -961,6 +1104,9 @@ describe('the editor pane', () => {
       editorOpen(taskId, 'sub/photo.webp', false)
       await vi.waitFor(() => expect(host.querySelector('img[alt="photo.webp"]')?.getAttribute('src')).toBe('blob:editor-image'))
       expect(host.querySelector('.cm-editor')).toBeNull()
+      expect(host.querySelector('img')!.compareDocumentPosition(host.querySelector('[aria-label="File status"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('Read-only preview')
+      expect(host.querySelector('[aria-label="File status"]')?.textContent).not.toContain('Ln 1')
       expect(readImage).toHaveBeenCalledWith(taskId, 'sub/photo.webp')
       expect(read).not.toHaveBeenCalledWith(taskId, 'sub/photo.webp')
       expect(write).not.toHaveBeenCalledWith(taskId, 'sub/photo.webp', expect.anything())
@@ -999,6 +1145,9 @@ describe('the editor pane', () => {
     await saveEditorMode(queryClient, 'terminal')
     await vi.waitFor(() => expect(rectangle(host, 'pty')).toBeTruthy())
     expect(rectangle(host, 'editor')).toBeNull()
+    expect(rectangle(host, 'pty')!.compareDocumentPosition(host.querySelector('[aria-label="File status"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('External editor')
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).not.toContain('Saved')
 
     // And back: the graphical editor returns, showing the file.
     await saveEditorMode(queryClient, 'graphical')

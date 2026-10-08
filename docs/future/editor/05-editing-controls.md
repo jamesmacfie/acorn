@@ -1,5 +1,26 @@
 # Phase 05: expose editing controls and state
 
+> **Follow-up — October 8, 2026.** The status strip now follows the active graphical document,
+> image preview, or PTY at the stable bottom of Editor. A typed kit status variant supplies primary,
+> essential, secondary, and action slots; its CSS no longer selects English labels or child order.
+> The full relative path is kept in the label and tip, with width-based clipping. Position and
+> custody save state remain visible at 800 px; Details retains secondary facts. Selection length
+> sums CodeMirror ranges in UTF-16 units without copying large selected text. Status menus close on
+> tab change, and held callbacks are fenced by the current task, Node, tab, and graphical admission
+> where they change presentation defaults.
+>
+> Owner tests now exercise live registered commands and save routing, search and markers across
+> reconfiguration, dirty undo and remount, manual indentation with CRLF, a million-unit selection,
+> and stale status actions. Editor passed 183 tests (1 skipped), TUI 684 (2 skipped), plugin API 14,
+> architecture 87, and lint 37 tasks. Client core passed 2,468 with its two previously reproduced
+> workspace-route/CSS-token failures; desktop built and passed 171 tests with its 11 previously
+> reproduced activation snapshot failures. Isolated desktop screenshots inspected after the move:
+> `status-bottom-light.png`, `status-bottom-wrapped.png`, `status-bottom-narrow.png`, and
+> `status-bottom-dark.png` in `.acorn/agent-dev/phase05-controls/screenshots/`. The isolated TUI
+> showed README's available path, Details, Copy path, and Markdown facts at 80×24 and 120×40;
+> it did not claim a cursor or save state. The full unfiltered repo gate remains for the coordinator
+> after phase 06.
+>
 > **Completion note — October 8, 2026.** Editor now presents relative path, cursor position,
 > language, inferred or chosen indentation, nonempty aggregate selection length, and custody save
 > state in a compact strip. The path has explicit copy and tree reveal actions. A narrow strip hides
