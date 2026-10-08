@@ -1,11 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { credentialFileFromEnv } from '../server/auth/credentialFile'
 
 const DATA_DIR = process.env.ACORN_DATA_DIR ?? ''
 // A fixed origin, used when there is no data root to resolve from. That is the test path (and any
 // caller wiring this up by hand); the app always passes ACORN_DATA_DIR.
 const STATIC_URL = process.env.ACORN_API_URL ?? ''
 const API_TOKEN = process.env.ACORN_API_TOKEN ?? ''
+const TOKEN_FILE = credentialFileFromEnv(process.env)
 // The agent session id (provenance): stamped on notes/memory writes server-side. Transport
 // metadata, never a tool arg. Sent on every call so the harness can attribute writes.
 const SESSION_ID = process.env.ACORN_SESSION_ID ?? ''
@@ -14,6 +16,16 @@ const TOOL_CEILING = process.env.ACORN_TOOL_CEILING ?? ''
 export type ApiResult = { ok: true; data: unknown } | { ok: false; kind: 'acorn-not-running' | 'api-error'; detail: string }
 
 let cachedUrl: string | null = null
+
+function currentToken(): string {
+  if (!TOKEN_FILE) return API_TOKEN
+  try { return readFileSync(TOKEN_FILE, 'utf8') }
+  catch {
+    // Only a pre-file tmux environment may use its launch token until reconciliation creates the
+    // stable file. An explicitly supplied file must fail closed if it disappears.
+    return process.env.ACORN_API_TOKEN_FILE ? '' : API_TOKEN
+  }
+}
 
 // Read the port the node most recently bound. Returns '' when the root holds no port yet (a node
 // that has never listened) or is unreadable, which surfaces as 'acorn-not-running', the honest
@@ -48,7 +60,7 @@ async function apiCall(path: string, init?: RequestInit): Promise<ApiResult> {
       const res = await fetch(`${base}${path}`, {
         ...init,
         headers: {
-          'x-acorn-internal': API_TOKEN,
+          'x-acorn-internal': currentToken(),
           ...(SESSION_ID ? { 'x-acorn-session-id': SESSION_ID } : {}),
           ...(TOOL_CEILING ? { 'x-acorn-tool-ceiling': TOOL_CEILING } : {}),
           ...(init?.body ? { 'content-type': 'application/json' } : {}),

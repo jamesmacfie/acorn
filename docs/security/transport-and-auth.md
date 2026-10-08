@@ -10,6 +10,10 @@ route or a socket channel. It's part of the [security model](../security.md).
 - A Node binds `127.0.0.1` over TLS 1.3 and rejects an unexpected `Host` header.
   [Node distribution](../node-distribution.md#reaching-a-node-from-another-machine) covers binding
   beyond loopback.
+- An internal credential is accepted only when the TCP socket peer is loopback. This applies to HTTP,
+  `/v1/events`, and `/v1/tunnel`, including an advertised listener. `Host`, `Forwarded`, and
+  `X-Forwarded-For` cannot establish the peer. A missing peer address fails closed. Paired device
+  bearers remain valid from remote peers.
 - The certificate is self-signed, kept in the Node's data root, and pinned by fingerprint in the
   helper's broker. A changed fingerprint is a hard stop.
 - The helper schema and the broker both check a renderer's request path as a same-origin absolute

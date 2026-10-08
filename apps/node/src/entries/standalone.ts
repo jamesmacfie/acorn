@@ -11,7 +11,7 @@ import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { createScheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth'
-import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth'
+import { renewingInternalEnv } from '@acorn/node-core/server/auth'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { disabledPluginsStore } from '@acorn/node-core/server/plugins'
 import { PLUGIN_STATE } from '@acorn/node-core/server/pluginHost'
@@ -83,13 +83,13 @@ reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 // (docs/plugins/activation.md § Activation) and this node answers /v1/core/tasks/:id/archive for a task's live
 // sessions.
 let apiUrl = ''
-const internalEnv: InternalEnvFactory = (claims) => ({
+const credentials = renewingInternalEnv(runtime.INTERNAL_TOKEN, root.dir, () => ({
   ACORN_API_URL: apiUrl,
   ACORN_NODE_ID: runtime.NODE_ID,
-  ACORN_API_TOKEN: mintInternalToken(runtime.INTERNAL_TOKEN, claims),
   ACORN_DATA_DIR: root.dir,
   NODE_EXTRA_CA_CERTS: join(root.dir, 'tls', 'cert.pem'),
-})
+}))
+const internalEnv = credentials.internalEnv
 let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
@@ -189,7 +189,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
     pluginState: async () => { pluginStateCapability.dispose(); pluginStateBridge.dispose() },
     plugins: () => plugins.dispose(),
     sqlite: async () => runtime.DB.close(),
-    dataRoot: async () => root.release(),
+    dataRoot: async () => { credentials.dispose(); root.release() },
   })
   if (outcome === 'timeout') log.warn('drain exceeded its deadline; exiting anyway')
   // The last chance a sink gets, and where `ACORN_PERF=1` prints its histograms.

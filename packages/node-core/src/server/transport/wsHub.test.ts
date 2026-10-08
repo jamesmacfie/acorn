@@ -1,11 +1,11 @@
 import { mintInternalToken } from '../auth/internalTokens'
-import { createServer, type Server } from 'node:http'
+import { createServer, type IncomingMessage, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DeviceService } from '../auth/deviceTokens'
 import { decodeIdFrame, WS_BINARY_ID_BYTES, WS_PATH, WS_VIEWERS_HEADER, WS_MAX_VIEWERS, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
-import { _resetWsHub, attachWsHub, disposeWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
+import { _resetWsHub, attachWsHub, authorizeWsUpgrade, disposeWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
 type TestStreamMsg = Parameters<StreamSink>[0]
 
 // Headless verification of the delicate transport bits the smoke suite (S4) can't cover in a unit:
@@ -241,6 +241,15 @@ describe('wsHub auth', () => {
     const ws = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })
     expect(ws.readyState).toBe(WebSocket.OPEN)
     ws.close()
+  })
+
+  it('refuses internal upgrades from a remote socket while keeping the paired bearer', async () => {
+    const request = (headers: Record<string, string>) => ({
+      headers: { host, ...headers }, socket: { remoteAddress: '192.0.2.12' },
+    }) as unknown as IncomingMessage
+    const deps = { internalToken: INTERNAL, allowedHosts: new Set([host]), devices }
+    expect(await authorizeWsUpgrade(request({ 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }), 'x-forwarded-for': '127.0.0.1' }), deps)).toBeNull()
+    expect(await authorizeWsUpgrade(request({ authorization: `Bearer ${DEVICE_TOKEN}` }), deps)).toEqual({ deviceId: 'd1' })
   })
 
   it('rejects a wrong internal token', async () => {

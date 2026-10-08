@@ -15,6 +15,10 @@ The Node gives the MCP process only what it needs:
 
 - `ACORN_DATA_DIR`: the data root, used to resolve the preferred or bound port.
 - `ACORN_API_TOKEN`: an HMAC task-scoped internal token.
+- `ACORN_API_TOKEN_FILE`: a task child file with the current token. The MCP server reads it for
+  every request, including after a Node restart. A preexisting tmux shell can locate the same file
+  from its data root, task ID, and session ID without this variable. A missing explicitly supplied
+  file fails closed; an older shell may use its launch token until the derived file appears.
 - `NODE_EXTRA_CA_CERTS`: the Node's self-signed certificate, for normal TLS validation.
 - The task and session identifiers, plus the allowlisted process environment. The token, not the
   environment or a request header, is authoritative for the session ID and the tool ceiling.
@@ -28,9 +32,10 @@ The harness bridge, `loop-hook.js`, runs from a harness's own command hook under
 and reaches the Node the same way, with the same task token
 ([harness bridges](./managed-agents/loop-hooks.md#the-bridge-program)).
 
-The endpoint is resolved at call time, because Node ports are ephemeral. The signing key persists, so a
-tmux-reattached process still authenticates after a Node restart, and rotating the key revokes every
-outstanding token.
+The endpoint and current token are resolved at call time: Node ports are ephemeral and a launch token
+expires after 48 hours. The Node refreshes the same signed scope, task, session, and ceiling in the
+file every 12 hours and at boot, so a tmux-reattached process can authenticate after a restart.
+Rotating the signing key revokes every outstanding token.
 
 ## Tool surface
 
@@ -98,8 +103,8 @@ never writes the signed token into the user's config file (`acornMcpServers` in 
 
 The declaration names the whole launch environment rather than relying on inheritance, because an agent
 may scrub credential-shaped names from what it passes its children. DeepSeek's does, and a stdio server
-that loses `ACORN_API_TOKEN` fails every call. The token is declared again on every start, because the
-previous one is dead.
+that loses `ACORN_API_TOKEN_FILE` fails after the launch token expires. The token file is declared again
+on every start, because it is the reattach credential source.
 
 A standalone Node offers no server through either path. It gets no service handshake, so it never learns
 the staging directory its `mcp.js` is in (`configureAcornMcp` in

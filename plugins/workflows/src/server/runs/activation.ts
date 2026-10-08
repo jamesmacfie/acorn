@@ -112,22 +112,27 @@ export const createWorkflowExecution = (
           stderrTail: `Profile '${profile.id}' has no ${opts.mode === 'ai' ? 'one-shot structured' : 'headless'} mode.`,
         }
       }
-      const env = buildSessionEnv({
-        taskId,
-        cwd,
-        task: task && project
-          ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
-          : null,
-        // 'task'-scoped, bound to the step's own task: a workflow step is a child process, so it
-        // is denied the owner's provider credentials and confined to this task's tool surface.
-        env: {
-          ...internalEnv({ scope: 'task', taskId, toolCeiling: opts.tools ?? {} }),
-          // Transitional transport metadata for older MCP proxies. Authorization uses only the
-          // signed claim above.
-          ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}),
-        },
-      })
-      return runHeadless(argv, { cwd, env, timeoutMs: opts.timeoutMs, signal: opts.signal, onEvent: opts.onEvent, adapter: profile.streamJson })
+      const credentials = internalEnv({ scope: 'task', taskId, toolCeiling: opts.tools ?? {} })
+      try {
+        const env = buildSessionEnv({
+          taskId,
+          cwd,
+          task: task && project
+            ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
+            : null,
+          // 'task'-scoped, bound to the step's own task: a workflow step is a child process, so it
+          // is denied the owner's provider credentials and confined to this task's tool surface.
+          env: {
+            ...credentials,
+            // Transitional transport metadata for older MCP proxies. Authorization uses only the
+            // signed claim above.
+            ACORN_TOOL_CEILING: encodeToolCeiling(opts.tools ?? {}),
+          },
+        })
+        return await runHeadless(argv, { cwd, env, timeoutMs: opts.timeoutMs, signal: opts.signal, onEvent: opts.onEvent, adapter: profile.streamJson })
+      } finally {
+        internalEnv.release?.(credentials)
+      }
     },
     // Handoffs are notes, in plugins/notes' store, resolved at call time. Its capability id lives
     // in a contract/, so this is a sanctioned edge rather than a coupling.

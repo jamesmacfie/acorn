@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth'
-import { mintInternalToken, type InternalEnvFactory } from '@acorn/node-core/server/auth'
+import { renewingInternalEnv } from '@acorn/node-core/server/auth'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
@@ -96,6 +96,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   let pluginStateCapability: { dispose(): void } | null = null
   let scheduler: ReturnType<typeof createScheduler> | null = null
   let schedulerCapability: { dispose(): void } | null = null
+  let stopInternalCredentials = () => {}
 
   stateChanged('migrating')
   let dataRoot: DataRoot
@@ -162,7 +163,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
         dbClosed = true
         db.close()
       },
-      dataRoot: async () => dataRoot.release(),
+      dataRoot: async () => { stopInternalCredentials(); dataRoot.release() },
     })
     if (outcome === 'timeout') stopLog.warn('drain exceeded its deadline; exiting anyway')
     stateChanged('stopped')
@@ -182,20 +183,20 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     setWorktreesRoot(worktreesDir)
     // The four values a spawned child needs, and why each is a factory call rather than a record. See
     // docs/mcp.md § Launch environment and docs/authentication.md § Internal tokens. The signing key
-    // persists across restarts so a tmux-reattached agent session keeps authenticating, and the port
-    // is ephemeral so a baked URL would point at nothing.
+    // persists across restarts; a session's file receives a fresh token at boot and on the refresh
+    // timer. The port is ephemeral, so a baked URL would point at nothing.
     //
-    // Seeding the token here and assigning `apiUrl` right after `startListener` binds is enough,
-    // because every consumer calls this factory at spawn time rather than at wire time. The ordering
-    // that matters is that these bridges are installed before any request can arrive.
+    // The factory mints on demand and `apiUrl` is assigned after binding. The ordering that matters
+    // is that these bridges are installed before any request can arrive.
     let apiUrl = ''
-    const internalEnv: InternalEnvFactory = (claims) => ({
+    const credentials = renewingInternalEnv(runtime.INTERNAL_TOKEN, config.dataDir, () => ({
       ACORN_API_URL: apiUrl,
       ACORN_NODE_ID: runtime.NODE_ID,
-      ACORN_API_TOKEN: mintInternalToken(runtime.INTERNAL_TOKEN, claims),
       ACORN_DATA_DIR: config.dataDir,
       NODE_EXTRA_CA_CERTS: join(config.dataDir, 'tls', 'cert.pem'),
-    })
+    }))
+    const internalEnv = credentials.internalEnv
+    stopInternalCredentials = credentials.dispose
 
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))

@@ -264,6 +264,16 @@ function killTmuxSession(name: string) {
   }
 }
 
+function refreshTmuxCredentials(name: string, env: Record<string, string>) {
+  // The original shell keeps its launch environment, but later MCP children inherit tmux's
+  // session environment. Update both the token and its renewable file path on reattach, including
+  // sessions created before the file path existed.
+  for (const key of ['ACORN_API_TOKEN', 'ACORN_API_TOKEN_FILE']) {
+    const value = env[key]
+    if (value) execFileSync('tmux', ['set-environment', '-t', name, key, value], { env: childEnv(), stdio: 'ignore' })
+  }
+}
+
 function listTmuxSessions(): Set<string> {
   try {
     const out = execFileSync('tmux', ['list-sessions', '-F', '#{session_name}'], { encoding: 'utf8', env: childEnv() })
@@ -686,6 +696,7 @@ export async function reconcileTmux() {
     // the reconcile pass.
     try {
       if (row.backend === 'tmux' && row.tmuxSession && alive.has(row.tmuxSession)) {
+        refreshTmuxCredentials(row.tmuxSession, engine.env({ scope: 'task', taskId: row.taskId, sessionId: row.id }))
         const task = await engine.core.tasks.load(row.taskId)
         assertOwner(engine)
         // isWorktree is derived, not persisted: tasks.worktreePath is the truth, so recompute it here and

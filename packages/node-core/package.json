@@ -13,6 +13,7 @@
     "./server/agentProfiles/types.ts": "./src/server/agentProfiles/types.ts",
     "./server/agentTools": "./src/server/agentTools/public.ts",
     "./server/auth": "./src/server/auth/public.ts",
+    "./server/auth/credentialFile.ts": "./src/server/auth/credentialFile.ts",
     "./server/background.ts": "./src/server/background.ts",
     "./server/bindings.ts": "./src/server/bindings.ts",
     "./server/blobs.ts": "./src/server/blobs.ts",

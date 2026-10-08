@@ -1,5 +1,4 @@
-// Internal tokens: scope and signing (docs/security/credentials.md § Credential handling for the scope split and
-// the signing-key lifecycle).
+// Internal tokens: scope, signing, and expiry (docs/security/credentials.md § Credential handling).
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { normalizeToolCeiling, toolCeilingSchema, type ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
@@ -30,11 +29,13 @@ const PREFIX = 'acorn_it_'
 // payload or signature containing an underscore produced more than the expected number of parts and
 // every such token failed to verify. Caught by auth.test.ts on the first run.
 const SEPARATOR = '.'
+export const INTERNAL_TOKEN_LIFETIME_MS = 48 * 60 * 60 * 1000
 const internalClaimsPayloadSchema = z.strictObject({
   s: z.enum(['service', 'task']),
   t: z.string().min(1).optional(),
   n: z.string().min(1).optional(),
   c: toolCeilingSchema.optional(),
+  e: z.number().int().positive(),
 })
 const b64 = (value: Buffer | string): string => Buffer.from(value).toString('base64url')
 
@@ -44,12 +45,13 @@ export function mintInternalToken(key: string, claims: InternalClaims): string {
   if (!key) throw new Error('Cannot mint an internal token without a signing key.')
   if (claims.scope === 'task' && !claims.taskId) throw new Error("A 'task'-scoped internal token requires a taskId.")
   // Short keys keep the token out of the way in `env` output: s=scope, t=taskId, n=sessioN,
-  // c=effective tool Ceiling.
+  // c=effective tool Ceiling, e=expiry in milliseconds since the epoch.
   const payload = b64(JSON.stringify({
     s: claims.scope,
     ...(claims.taskId ? { t: claims.taskId } : {}),
     ...(claims.sessionId ? { n: claims.sessionId } : {}),
     ...(claims.toolCeiling ? { c: normalizeToolCeiling(claims.toolCeiling) } : {}),
+    e: Date.now() + INTERNAL_TOKEN_LIFETIME_MS,
   }))
   return `${PREFIX}${payload}${SEPARATOR}${sign(key, payload)}`
 }
@@ -58,9 +60,7 @@ export function mintInternalToken(key: string, claims: InternalClaims): string {
 // Uniformly null, so a caller cannot distinguish "malformed" from "forged" (the same rule pairing
 // already follows).
 //
-// Tokens do not expire. Reattached tmux agents retain the environment of the boot that spawned them, so
-// scope and signing-key rotation provide the operational boundary and revocation lever.
-export function verifyInternalToken(key: string, token: string): InternalClaims | null {
+function signedClaims(key: string, token: string): (InternalClaims & { expiresAt: number }) | null {
   if (!key || !token) return null
   if (!token.startsWith(PREFIX)) return null
   const parts = token.slice(PREFIX.length).split(SEPARATOR)
@@ -78,10 +78,29 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
       taskId: decoded.data.t,
       sessionId: decoded.data.n,
       toolCeiling: decoded.data.c ? normalizeToolCeiling(decoded.data.c) : undefined,
+      expiresAt: decoded.data.e,
     }
   } catch {
     return null
   }
+}
+
+// All failures share the same null result, including expiry. A renewal file can be refreshed by the
+// Node after restart using the signed claims, but an expired token presented to HTTP never authenticates.
+export function verifyInternalToken(key: string, token: string): InternalClaims | null {
+  const claims = signedClaims(key, token)
+  if (!claims || claims.expiresAt <= Date.now()) return null
+  const { expiresAt: _expiresAt, ...principalClaims } = claims
+  return principalClaims
+}
+
+// Node-owned credential files are the sole caller. This preserves every signed scope and ceiling;
+// it cannot turn an expired task token into a service token or change its task.
+export function renewInternalToken(key: string, token: string): string | null {
+  const claims = signedClaims(key, token)
+  if (!claims) return null
+  const { expiresAt: _expiresAt, ...sameClaims } = claims
+  return mintInternalToken(key, sameClaims)
 }
 
 // The environment a spawned child needs to call this node back, with a token minted for that child's
@@ -90,4 +109,9 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
 //
 // ACORN_API_URL is absent from the claims: it is a property of the listener, not the
 // caller, so the composition root closes over it and fills it in once the port is known.
-export type InternalEnvFactory = (claims: InternalClaims) => Record<string, string>
+export type InternalEnvFactory = {
+  (claims: InternalClaims): Record<string, string>
+  // A bounded child such as a workflow step releases its renewable file when it exits. Session
+  // children keep theirs across reattach and therefore never call this method.
+  release?(env: Record<string, string>): void
+}

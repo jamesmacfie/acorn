@@ -51,8 +51,10 @@ export function makeTestCoreServices(testDb: TestDb, userId: string | null = nul
 // The secret-bearing half of a test `Env`: the raw key and the SecretService binding every
 // credential read goes through (server/core/secrets.ts). docs/testing/layers.md § The testkit has why these are
 // minted together.
-export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService } {
-  return { SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey) }
+export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService; incoming: Env['incoming'] } {
+  // Direct app.fetch tests have no socket. Give their existing internal-token requests the same peer
+  // as the real listener; security tests override this with a remote or missing peer explicitly.
+  return { SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey), incoming: { socket: { remoteAddress: '127.0.0.1' } } as Env['incoming'] }
 }
 
 // The 64-hex session key every test in the repo uses (docs/testing/layers.md § The testkit).

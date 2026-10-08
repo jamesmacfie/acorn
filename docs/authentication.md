@@ -125,8 +125,11 @@ import needs a device, even for service callers, because it administers core pro
 
 A workflow or delegated managed session persists its tool ceiling, and the runtime includes it when it
 mints the token. The agent-tool route enforces only the signed ceiling. `ACORN_TOOL_CEILING` and
-`x-acorn-tool-ceiling` are compatibility metadata and can't widen authority. Tokens don't expire.
-Rotating the signing key is the revocation, which tmux sessions that outlive a Node restart need.
+`x-acorn-tool-ceiling` are compatibility metadata and can't widen authority. Internal tokens expire
+after 48 hours and authenticate only from a loopback socket peer. Session children receive a token
+file that the Node refreshes without widening those signed claims, including after a restart.
+Workflow child files are refreshed while their steps run and removed when the child ends. Rotating
+the signing key still revokes all outstanding tokens.
 
 The GitHub credential is an integration secret, not part of `Principal`. GitHub routes read it through
 `plugins/github/src/server/githubToken.ts`, so an internal caller that can reach a GitHub route can spend

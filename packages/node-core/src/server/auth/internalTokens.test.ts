@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mintInternalToken, verifyInternalToken } from './internalTokens'
 
 const KEY = 'signing-key-0123456789'
@@ -37,8 +37,19 @@ describe('scoped internal tokens', () => {
   it('refuses a token signed with a different key', () => {
     const token = mintInternalToken(KEY, { scope: 'service' })
     expect(verifyInternalToken('another-key-0123456789', token)).toBeNull()
-    // Rotating the signing key is the revocation lever, since these tokens don't expire.
+    // Rotation still revokes every outstanding token before its expiry.
     expect(verifyInternalToken(KEY, token)).not.toBeNull()
+  })
+
+  it('expires with the same null result as a forged token', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-10-09T00:00:00Z'))
+      const token = mintInternalToken(KEY, { scope: 'task', taskId: 'task-1' })
+      vi.advanceTimersByTime(48 * 60 * 60 * 1000)
+      expect(verifyInternalToken(KEY, token)).toBeNull()
+      expect(verifyInternalToken(KEY, `${token}x`)).toBeNull()
+    } finally { vi.useRealTimers() }
   })
 
   it('refuses a tampered payload, a tampered signature, and a truncated token', () => {

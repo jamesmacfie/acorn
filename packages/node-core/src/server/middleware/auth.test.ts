@@ -12,6 +12,42 @@ const app = new Hono<AppEnv>()
   .get('/', (c) => c.json({ principal: c.get('principal') }))
 
 describe('machine identity binding', () => {
+  it('accepts only the socket peer, regardless of forwarded headers, and fails closed without one', async () => {
+    const token = mintInternalToken('internal', { scope: 'service' })
+    const env = {
+      INTERNAL_TOKEN: 'internal',
+      ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
+      ...testSecretEnv(ENC_KEY),
+    } as unknown as Env
+    const request = new Request('http://acorn.test/', {
+      headers: { 'x-acorn-internal': token, host: '127.0.0.1', forwarded: 'for=127.0.0.1', 'x-forwarded-for': '127.0.0.1' },
+    })
+    for (const address of ['192.0.2.12', undefined]) {
+      const incoming = address ? { socket: { remoteAddress: address } } : undefined
+      const response = await app.fetch(request, { ...env, incoming } as Env)
+      expect(await response.json()).toEqual({ principal: null })
+    }
+    const response = await app.fetch(request, env)
+    expect(await response.json()).toMatchObject({ principal: { kind: 'internal', scope: 'service' } })
+  })
+
+  it('maps an expired loopback token and a forged token to the same null principal', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-10-09T00:00:00Z'))
+      const token = mintInternalToken('internal', { scope: 'service' })
+      vi.advanceTimersByTime(48 * 60 * 60 * 1000)
+      const env = {
+        INTERNAL_TOKEN: 'internal',
+        ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
+        ...testSecretEnv(ENC_KEY),
+      } as unknown as Env
+      for (const presented of [token, `${token}x`]) {
+        const response = await app.fetch(new Request('http://acorn.test/', { headers: { 'x-acorn-internal': presented } }), env)
+        expect(await response.json()).toEqual({ principal: null })
+      }
+    } finally { vi.useRealTimers() }
+  })
   it('maps the internal token to the explicit active identity without querying cached rows', async () => {
     const response = await app.fetch(
       new Request('http://acorn.test/', { headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) } }),
@@ -121,6 +157,13 @@ describe('device bearer', () => {
     expect(await response.json()).toMatchObject({
       principal: { kind: 'device', userId: 'bob', deviceId: 'dev-1' },
     })
+  })
+
+  it('accepts a paired bearer from a remote socket', async () => {
+    const authenticate = vi.fn().mockResolvedValue({ deviceId: 'dev-remote' })
+    const env = { ...envWith({ authenticate }), incoming: { socket: { remoteAddress: '192.0.2.12' } } } as Env
+    const response = await withBearer('Bearer acorn_dt_token', env)
+    expect(await response.json()).toMatchObject({ principal: { kind: 'device', deviceId: 'dev-remote' } })
   })
 
   it('resolves no principal when the device is unknown or revoked', async () => {

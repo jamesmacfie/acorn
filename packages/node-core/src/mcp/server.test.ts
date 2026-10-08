@@ -1,12 +1,13 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createServer, type Server } from 'node:https'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ensureCert } from '../server/transport/tls'
+import { sessionCredentialPath } from '../server/auth/credentialFile'
 
 // Integration test over real stdio JSON-RPC (docs/mcp.md, docs/agent-tools.md § Projections). This
 // test stubs the loopback surface the server proxies to and asserts the projection: list mirrors the
@@ -228,6 +229,41 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     } finally {
       client.kill()
     }
+  }, 30_000)
+
+  it('reads a refreshed token file for a reattached MCP process', async () => {
+    const tokenFile = join(dataDir, 'current-token')
+    writeFileSync(tokenFile, 'first-token')
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: caPath,
+      ACORN_API_TOKEN: 'expired-launch-token', ACORN_API_TOKEN_FILE: tokenFile,
+    })
+    try {
+      await client.init()
+      await client.send('tools/call', { name: 'task_current', arguments: {} })
+      writeFileSync(tokenFile, 'renewed-token')
+      await client.send('tools/call', { name: 'task_current', arguments: {} })
+      rmSync(tokenFile)
+      await client.send('tools/call', { name: 'task_current', arguments: {} })
+      expect(posts.map((post) => post.internal)).toEqual(['first-token', 'renewed-token', ''])
+    } finally { client.kill() }
+  }, 30_000)
+
+  it('finds a migrated tmux session file from its existing task and session environment', async () => {
+    const tokenFile = sessionCredentialPath(dataDir, 't1', 'old-session')
+    mkdirSync(dirname(tokenFile), { recursive: true })
+    rmSync(tokenFile, { force: true })
+    const client = new McpClient({
+      ACORN_TASK_ID: 't1', ACORN_SESSION_ID: 'old-session', ACORN_DATA_DIR: dataDir,
+      NODE_EXTRA_CA_CERTS: caPath, ACORN_API_TOKEN: 'old-launch-token',
+    })
+    try {
+      await client.init()
+      await client.send('tools/call', { name: 'task_current', arguments: {} })
+      writeFileSync(tokenFile, 'renewed-token')
+      await client.send('tools/call', { name: 'task_current', arguments: {} })
+      expect(posts.map((post) => post.internal)).toEqual(['old-launch-token', 'renewed-token'])
+    } finally { client.kill() }
   }, 30_000)
 
   it('announces a changed description even when the tool names stay the same', async () => {

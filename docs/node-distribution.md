@@ -90,7 +90,8 @@ machine reached by both an IP and a hostname. With it set the listener binds `0.
 `Host` as well as loopback. Every other `Host` gets a 403, which keeps a DNS-rebinding page out.
 
 What stands between the network and the Node is a device bearer token and a rate-limited pairing code,
-so advertise only on a network you trust. An SSH tunnel, `ssh -N -L <port>:127.0.0.1:<port>`, reaches a
+so advertise only on a network you trust. Internal child tokens are accepted only from the socket's
+loopback peer, even on an advertised listener. An SSH tunnel, `ssh -N -L <port>:127.0.0.1:<port>`, reaches a
 loopback-only Node with no exposure, as long as the local and remote ports match, because the `Host`
 guard compares the port too.
 
