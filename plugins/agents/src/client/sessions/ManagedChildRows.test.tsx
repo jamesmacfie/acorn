@@ -87,6 +87,18 @@ describe('live delegated child rows', () => {
     expect(loadSnapshot).toHaveBeenCalledTimes(2)
   })
 
+  it('hides a child whose task is not in the active task list', () => {
+    setSessions([child('one'), child('orphan', { taskId: 'archived-task', runtimeState: 'ready' })])
+    setDelegations({ one: lineage('one', 'parent'), orphan: lineage('orphan', 'parent') })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <ManagedChildRows parentSessionId="parent" parentTaskId="parent-task" />, host)
+    hosts.push(() => { dispose(); host.remove() })
+
+    expect(host.querySelectorAll('[role="option"]')).toHaveLength(1)
+    expect(host.textContent).not.toContain('orphan')
+  })
+
   it('opens the child task and managed session and exposes the kit keyboard focus stop', () => {
     setSessions([child('one', { taskId: 'child-task' })])
     setDelegations({ one: lineage('one', 'parent') })

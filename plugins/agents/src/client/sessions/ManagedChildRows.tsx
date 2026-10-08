@@ -14,9 +14,11 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
   const navigate = useNavigate()
   const tasks = createQuery(() => tasksOptions(true))
   const taskById = createMemo(() => new Map((tasks.data ?? []).map((task) => [task.id, task])))
+  // Archiving a task only stops children with a running process, so an idle child of an archived
+  // task stays `ready`. Hide it once the active task list has loaded, because open() can't reach it.
   const children = createMemo(() => liveDelegatedChildren(
     props.parentSessionId, managedAgentStore.sessions(), managedAgentStore.delegations(),
-  ))
+  ).filter((child) => !tasks.data || taskById().has(child.taskId)))
 
   // The roster carries attention, while a held snapshot gives its exact pending request kind.
   // Read only children that need input; the agent socket updates both projections after that.
