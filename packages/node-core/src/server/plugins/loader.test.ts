@@ -288,6 +288,122 @@ describe('the isolated node realm', () => {
     await loaded[0].plugin.dispose?.()
   })
 
+  it('keeps every builtin entry point gated after a plugin rewrites policy intrinsics', async () => {
+    install('tamper-builtins', manifest('tamper-builtins'), `
+      const rewritten = []
+      for (const [target, key, value] of [
+        [Set.prototype, 'has', () => true],
+        [String.prototype, 'replace', () => 'path'],
+        [String.prototype, 'split', () => ['path']],
+        [String.prototype, 'indexOf', () => -1],
+        [RegExp.prototype, Symbol.replace, () => 'path'],
+        [Array.prototype, 'map', () => ['path']],
+        [Array.prototype, Symbol.iterator, function* () { yield 'path' }],
+        [Function.prototype, 'call', () => true],
+      ]) {
+        try { target[key] = value; rewritten.push(true) } catch { rewritten.push(false) }
+      }
+      const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
+      const errors = []
+      for (const name of ['node:net', 'node:child_process', 'node:sqlite']) {
+        for (const load of [() => require(name), () => process.getBuiltinModule(name), () => import(name)]) {
+          try { await load(); errors.push(null) } catch (error) { errors.push(error.message) }
+        }
+      }
+      export default { name: 'tamper-builtins', rewritten, errors, init() {} }
+    `)
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded[0].plugin).toMatchObject({
+      rewritten: Array(8).fill(false),
+      errors: [
+        "acorn: loaded plugin 'tamper-builtins' may not require 'node:net'",
+        "acorn: loaded plugin 'tamper-builtins' may not load builtin 'node:net'",
+        "acorn: loaded plugin 'tamper-builtins' may not import 'node:net'",
+        "acorn: loaded plugin 'tamper-builtins' may not require 'node:child_process'",
+        "acorn: loaded plugin 'tamper-builtins' may not load builtin 'node:child_process'",
+        "acorn: loaded plugin 'tamper-builtins' may not import 'node:child_process'",
+        "acorn: loaded plugin 'tamper-builtins' may not require 'node:sqlite'",
+        "acorn: loaded plugin 'tamper-builtins' may not load builtin 'node:sqlite'",
+        "acorn: loaded plugin 'tamper-builtins' may not import 'node:sqlite'",
+      ],
+    })
+    await loaded[0].plugin.dispose?.()
+  })
+
+  it('checks the native URL after a plugin changes Web API globals and accessors', async () => {
+    install('tamper-network', manifest('tamper-network', { permissions: { node: { net: ['allowed.example'] } } }), `
+      const NativeRequest = Request
+      const check = (input) => {
+        try {
+          const pending = fetch(input, { signal: AbortSignal.abort() })
+          void pending.catch(() => {})
+          return 'allowed'
+        } catch (error) { return error.message }
+      }
+      const allowedRequest = new NativeRequest('https://allowed.example/')
+      const deniedRequest = new NativeRequest('https://blocked.example/')
+      try { Set.prototype.has = () => true } catch {}
+      try { String.prototype.indexOf = () => -1 } catch {}
+      const rewritten = []
+      for (const [target, key, value] of [
+        [URL.prototype, 'hostname', 'allowed.example'],
+        [URL.prototype, 'href', 'https://blocked.example/'],
+        [NativeRequest.prototype, 'url', 'https://allowed.example/'],
+      ]) {
+        try { Object.defineProperty(target, key, { get: () => value }); rewritten.push(true) }
+        catch { rewritten.push(false) }
+      }
+      globalThis.URL = class { hostname = 'allowed.example' }
+      globalThis.Request = class {}
+      export default {
+        name: 'tamper-network',
+        rewritten,
+        allowed: check('https://allowed.example/'),
+        denied: check('https://blocked.example/'),
+        deniedRequest: check(deniedRequest),
+        allowedRequest: check(allowedRequest),
+        init() {},
+      }
+    `)
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded[0].plugin).toMatchObject({
+      rewritten: [false, false, false],
+      allowed: 'allowed',
+      denied: "acorn: loaded plugin 'tamper-network' may not reach 'blocked.example'",
+      deniedRequest: "acorn: loaded plugin 'tamper-network' may not reach 'blocked.example'",
+      allowedRequest: 'allowed',
+    })
+    await loaded[0].plugin.dispose?.()
+  })
+
+  it('keeps declared builtin and hostname grants while refusing undeclared builtins', async () => {
+    install('granted', manifest('granted', { permissions: { node: { sockets: true, net: ['allowed.example'] } } }), `
+      const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
+      const granted = [typeof require('node:net').createConnection,
+        typeof process.getBuiltinModule('node:net').createConnection,
+        typeof (await import('node:net')).createConnection]
+      let denied
+      try { require('node:sqlite') } catch (error) { denied = error.message }
+      let host
+      try {
+        const pending = fetch('https://allowed.example/', { signal: AbortSignal.abort() })
+        void pending.catch(() => {})
+        host = 'allowed'
+      } catch (error) { host = error.message }
+      export default { name: 'granted', granted, denied, host, init() {} }
+    `)
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded[0].plugin).toMatchObject({
+      granted: ['function', 'function', 'function'],
+      denied: "acorn: loaded plugin 'granted' may not require 'node:sqlite'",
+      host: 'allowed',
+    })
+    await loaded[0].plugin.dispose?.()
+  })
+
   it('retains dependency provenance when a previously loaded package file is removed', async () => {
     const dir = install('removed-parent', manifest('removed-parent'), `import { loadLater } from './later.js';
       export default { name: 'removed-parent', init(ctx) {
