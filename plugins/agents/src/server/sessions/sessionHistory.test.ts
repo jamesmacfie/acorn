@@ -62,4 +62,13 @@ describe('own-session history tools', () => {
     expect((await search.handler({ query: 'secret' }, claim) as { hits: unknown[] }).hits).toEqual([])
     expect(await read.handler({ seq: first.seq, offset: 5_000 }, claim)).toMatchObject({ nextOffset: null, truncated: false })
   })
+
+  it('caps the raw FTS snippet before pasted-content wrapping', async () => {
+    const own = await store.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, provider)
+    await store.recordEvent(own.id, null, { type: 'user_message', text: `needle ${'x'.repeat(1_000)}` })
+    const hits = await store.searchSessionHistory(own.id, 'needle')
+    expect(hits).toHaveLength(1)
+    expect(hits[0]!.excerpt).toHaveLength(600)
+    expect(hits[0]!.excerpt).toContain('needle')
+  })
 })

@@ -696,7 +696,7 @@ export class AgentSessionRepository {
   async searchSessionHistory(sessionId: string, query: string, role?: HistoryRole, limit = 8): Promise<HistoryHit[]> {
     const [projection, history] = await Promise.all([this.ensureSearchProjection(), import('./sessionHistory')])
     return this.db.transaction((tx) => {
-      projection.catchUp(tx)
+      projection.catchUp(tx, sessionId)
       return history.searchSessionHistory(tx, sessionId, query, role, limit)
     })
   }

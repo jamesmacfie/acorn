@@ -47,7 +47,8 @@ message JSON.
 ledger after harness compaction. Both tools require a signed task and session claim. The agents plugin
 checks that the claimed session belongs to the task and accepts no session ID in either input. The
 read tier admits the tools by default, including in delegated and workflow sessions unless a session's
-tool ceiling narrows access.
+tool ceiling narrows access. Both tools catch up only the claimed session's search projection before
+reading it.
 
 Search uses quoted FTS5 words and returns eight ranked events by default, with a maximum of 20. Its
 optional `user`, `assistant`, or `tool` role filter runs before the limit. Each result has an event
