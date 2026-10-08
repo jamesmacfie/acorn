@@ -1,5 +1,48 @@
 # Phase 07: explain the effective security controls
 
+## Completion note: October 9, 2026
+
+Status: implemented with explicit unknown and unsupported evidence. **Check this node** now lives in
+the existing agents `core:security` section. Its two device-only routes provide scope choices and an
+on-demand report. Findings carry stable IDs, owner and scope, time, separate evidence state and
+severity, source, limit, and action. The page keeps one report only, expires it after five minutes,
+aborts requests and rejects late replies on Node or scope change, and stops its freshness timer on
+unmount. The terminal client uses its existing desktop fallback for this core page.
+
+The collector reads stored instruction settings and approved snapshot metadata, managed MCP
+definitions, core tool preferences, and a selected running session's recorded harness options and
+tool ceiling. Core supplies a narrow registered tool-name and risk catalog so the report can show
+effective per-tool grants after the selected ceiling. It describes Claude's every-call bridge and Codex's permission-only coverage as
+configured, with no executable probe. Static project reads use the canonical project path, fixed
+filenames, `O_NOFOLLOW`, and 32 KiB file caps. The report does not execute configured code or return
+arguments, environment or header values, URL credentials or query strings, or provider output.
+Current-session permission evidence is separate from the next-session default. A changed default
+cannot overwrite live evidence.
+
+Unknown remains explicit for unobserved harness executable versions and restrictions, global or
+harness-owned MCP servers, plugin grants and development state, skills, pending packages, last
+pre-turn check time and incomplete or blocked history, and detailed dependency policy. The
+instruction admission contract retains approved snapshot metadata but no per-turn outcome history.
+The plugin host offers no narrow passive diagnostics capability for its grants. Phase 08 should
+replace the static project policy summary with its typed dependency result. Phase 09 should add its
+managed MCP review result without exposing command arguments or credentials. Neither should call a
+configured executable from this route. No disk-encryption wire change was made.
+
+Evidence: focused agents collector (four tests), route (two tests), and UI cancellation (two tests)
+pass. The fixtures include a malicious command name, synthetic argument, header, environment and URL
+secrets, a symlink escape, conflicting session/default permissions, unknown metadata, and a 4-second
+deadline. Agents and Node TypeScript checks pass; architecture tests pass (87 tests). The Node
+service build passes at 3,187,622 B after tracing its boot route, with a documented 2 KB ceiling
+increase. The isolated desktop fixture displayed configured and unknown results on its one paired
+Node; a screenshot was saved under the task's ignored `.acorn/agent-dev` directory. The terminal
+settings test passes (five tests). The installed desktop helper reported Node 24.21.0; the build
+tooling used Node 26.9.0. No harness version probe was run, because its passive safety was not
+established. Earlier phase evidence names Claude Code 2.1.292 and Codex 0.159.2, but those versions
+were not independently checked in this fixture. Manual gaps: the fixture had no running session or
+second Node, so live-session and Node-switch presentation were verified by focused tests, not by
+desktop interaction. The desktop driver could not select the fixture project from its popover after
+the option reference went stale; project read and scope clearing have focused tests.
+
 Date: October 8, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.
 Dependency: can start independently; integrate phase 06 when its admission contract exists.

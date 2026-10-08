@@ -49,6 +49,9 @@ export type CoreProcService = {
 export type CoreServices = {
   /** Verify provenance that the authenticated tool route minted for one signed invocation. */
   agentToolProvenance?: { verify(input: import('../agentTools/provenance').AgentToolProvenance): boolean | Promise<boolean> }
+  /** Registered names and risk tiers only. Diagnostics combines this catalog with owner preferences
+   *  and a session ceiling; a loaded plugin receives no grant for this facet. */
+  agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
@@ -106,6 +109,10 @@ export function createCoreServices(options: {
   const models = createModelService(options.db, options.secrets)
   return {
     agentToolProvenance: { verify: verifyAgentToolProvenance },
+    agentTools: {
+      catalog: async () => (await import('../agentTools/registry')).agentToolContributions()
+        .map(({ name, risk }) => ({ name, risk })),
+    },
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
     // real modules rather than a second declaration that can drift off them.
     fs: fs satisfies CoreFsService,

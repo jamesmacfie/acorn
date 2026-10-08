@@ -1,9 +1,11 @@
+import { lazy } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createSettingSave, readJson, writeJson } from '@acorn/plugin-api/client'
 import { Checkbox, SettingRow, SettingsSection } from '@acorn/plugin-api/ui'
 import { agentSessionDefaultsRoute, type AgentSessionDefaults } from '../../shared/sessionDefaults'
 import { agentSessionDefaultsQueryKey } from './sessionDefaultsClient'
 import InstructionReviewPanel from './InstructionReviewPanel'
+const SecurityDiagnosticsPanel = lazy(() => import('./SecurityDiagnosticsPanel'))
 
 // This plugin's section of Settings > Security and backup, drawn in core's `core:security` point. The
 // switches enable required checks in the managed-turn dispatcher on the selected Node.
@@ -74,6 +76,7 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
           onChange={(next) => save.run(() => write('reviewChangedInstructions', next))} />
       </SettingRow>
       <InstructionReviewPanel nodeId={props.nodeId} />
+      <SecurityDiagnosticsPanel nodeId={props.nodeId} />
     </SettingsSection>
   )
 }

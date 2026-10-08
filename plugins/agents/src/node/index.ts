@@ -34,6 +34,7 @@ import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
 import { agentMcpServers, AGENT_MCP_SERVERS } from '../server/routes/mcpServers'
 import { agentLoopHooks, AGENT_LOOP_HOOKS } from '../server/routes/loopHook'
 import { agentInstructionReview, AGENT_INSTRUCTION_REVIEW } from '../server/routes/instructionReview'
+import { agentSecurityDiagnostics, AGENT_SECURITY_DIAGNOSTICS } from '../server/routes/securityDiagnostics'
 import { claudeHandoffMcp, codexHandoffMcp } from '../server/profiles/mcpCommands'
 import { sessionMcpSelection } from '../shared/mcpServers'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
@@ -116,6 +117,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let mcpServersRoute: { dispose(): void } | null = null
   let loopHooksRoute: { dispose(): void } | null = null
   let instructionReviewRoute: { dispose(): void } | null = null
+  let securityDiagnosticsRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
   let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
@@ -343,6 +345,22 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         tasks: async () => (await core.tasks.active()).map(({ id, title, projectId }) => ({ id, title, projectId })),
         admission: () => runtime!.instructionAdmission(),
       })
+      securityDiagnosticsRoute = ctx.capabilities.provide(AGENT_SECURITY_DIAGNOSTICS, {
+        check: async (nodeId, userId, scope, signal) => {
+          const { collectSecurityDiagnostics } = await import('../server/securityDiagnostics')
+          return collectSecurityDiagnostics({
+            core,
+            defaults: (owner) => readAgentSessionDefaults(core.prefs, owner),
+            session: (id) => runtime!.store.requireSession(id).catch(() => null),
+            managedMcp: () => runtime!.mcpServers.list(),
+            instructionApproval: async (projectId) => (await runtime!.instructionAdmission()).store.approved(projectId),
+          }, nodeId, userId, scope, signal)
+        },
+        scopes: async () => {
+          const { securityScopeChoices } = await import('../server/securityDiagnostics')
+          return securityScopeChoices(core, async () => (await runtime!.store.listSessions({ limit: 100 })).sessions)
+        },
+      })
       projectChanged = ctx.events.on('project:changed', (event) => {
         if (typeof event.projectId !== 'string') return
         const projectId = event.projectId
@@ -373,6 +391,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents' })
       ctx.routes.register(agentInstructionReview, { prefix: '', note: 'device-only instruction review and approval' })
+      ctx.routes.register(agentSecurityDiagnostics, { prefix: '', note: 'device-only passive security diagnostics' })
 
       // Settings → MCP servers (docs/mcp.md § Your own servers). The test reveals the server's secrets
       // the way a session start does, and redacts them out of whatever the server printed.
@@ -477,6 +496,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
       instructionReviewRoute?.dispose()
+      securityDiagnosticsRoute?.dispose()
       projectChanged?.dispose()
       mcpServersRoute?.dispose()
       loopHooksRoute?.dispose()

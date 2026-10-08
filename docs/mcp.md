@@ -124,6 +124,14 @@ routes are device-only.
 
 ## Your own servers
 
+**Check this node** in Settings > Security and backup reads the managed server definitions without
+connecting to them. It reports enabled state, transport, a known executable family or a custom
+executable label, and flags common unpinned package runners and shell or download commands. The
+response excludes arguments, environment entries, headers, credentials, and URL paths and query
+strings. A running session's MCP panel can report harness state, but there is no passive cached
+contract for global or harness-owned servers. The diagnostic calls those unknown rather than treating
+the managed list as complete. This check does not replace the explicit **Test** action below.
+
 Settings → MCP servers holds the servers acorn declares to agent sessions: a list, then one server's
 editor with **Save**, **Cancel**, and **Remove server**. It links to MCP config files, and that page
 links back, because the two have different owners. The agents plugin owns these, one row per server in

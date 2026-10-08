@@ -71,7 +71,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // The scanner, analyzer, and encrypted snapshot store load on first review or required admission;
 // only route registration, the settings field, and the dispatch call site join the boot graph.
 // Leave about 1 KB for the same narrow registration paths as the previous limits.
-const limits = { ceiling: 3_186_000, floor: 1_000_000 }
+// 2026-10-09: 3,187,622 B after security diagnostics route registration, its owner-scoped bridge,
+// and a narrow, lazy tool-catalog service. The collector and project file reads load only when the
+// owner presses Check this node; the device gate and capability registration must be at boot.
+// Add 2 KB, leaving 378 B.
+const limits = { ceiling: 3_188_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

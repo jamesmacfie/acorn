@@ -2,6 +2,7 @@
 
 This page is the map of acorn's security model: the trust boundaries, what's out of scope, and which
 page owns each control. Read it before you change anything that crosses a boundary.
+For the device-only **Check this node** report, see [security diagnostics](./security/security-diagnostics.md).
 
 acorn is single-owner software. A paired device has full owner authority for its Node. So the controls
 protect the transport, credential custody, process boundaries, repository data, and untrusted provider
