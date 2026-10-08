@@ -859,7 +859,7 @@ export class ManagedAgentEngine {
           if (
             failure === 'safe_transient'
             && !this.processes.accepted(generation)
-            && turn.attempt + 1 < 3
+            && turn.attempt < 3
           ) {
             const message = safeProviderMessage(
               error,
@@ -873,7 +873,7 @@ export class ManagedAgentEngine {
             await this.record(session.id, turn.id, {
               type: 'diagnostic',
               level: 'warning',
-              message: `Provider rejected the turn before accepting output; retrying (${turn.attempt + 2}/3).`,
+              message: `Provider rejected the turn before accepting output; retrying (${turn.attempt + 1}/3).`,
             })
             await this.record(session.id, turn.id, {
               type: 'session_state',

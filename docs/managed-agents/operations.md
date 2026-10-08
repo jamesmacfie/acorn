@@ -49,6 +49,10 @@ Only a turn moves a session into `working`. An event with no turn records into t
 marks the session unread without claiming work. **Stop** settles a session that reports work with no
 turn to cancel.
 
+**Stop** remains available while a session reports `reconnecting`. It cancels a live turn through
+the provider. If the turn has already ended, it stops the provider generation and pending recovery,
+expires pending requests, and records `stopped`. Sending another turn resumes the session.
+
 ## Session goals
 
 An interactive session can hold one goal of up to 2,000 characters. Set it from the conversation or

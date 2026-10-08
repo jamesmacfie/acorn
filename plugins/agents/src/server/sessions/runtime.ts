@@ -448,8 +448,16 @@ export class ManagedAgentRuntime {
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id
     if (!target) {
-      // A working session can have no active turn. Settle it so queued input can dispatch.
       const session = await this.store.getSession(sessionId)
+      // Disconnect interrupts the turn before recovery starts. Stop must retire that recovery,
+      // including a live provider that incorrectly reports reconnecting without an active turn.
+      if (session?.runtimeState === 'reconnecting') {
+        await this.engine.stopLive(sessionId)
+        await this.store.expirePendingRequests(sessionId)
+        await this.engine.record(sessionId, null, { type: 'session_state', state: 'stopped' })
+        return
+      }
+      // A working session can have no active turn. Settle it so queued input can dispatch.
       if (!session || !['working', 'waiting', 'cancelling'].includes(session.runtimeState)) return
       await this.store.expirePendingRequests(sessionId)
       await this.engine.record(sessionId, null, { type: 'session_state', state: 'ready' })

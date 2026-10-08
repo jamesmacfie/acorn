@@ -20,7 +20,7 @@ const stoppable = (state: AgentRuntimeState) => canStopAgent({ runtimeState: sta
 
 describe('canStopAgent', () => {
   it('covers the states a cancel request can reach, and only those', () => {
-    expect(RUNTIME_STATES.filter(stoppable)).toEqual(['working', 'waiting', 'cancelling'])
+    expect(RUNTIME_STATES.filter(stoppable)).toEqual(['working', 'waiting', 'cancelling', 'reconnecting'])
   })
 
   it('lets a second stop through while the first is still landing', () => {
