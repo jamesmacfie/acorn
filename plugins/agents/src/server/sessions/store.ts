@@ -884,4 +884,18 @@ export class AgentStore extends AgentSessionRepository {
       ))
     return rows.map(mapAgentTurn)
   }
+
+  /** Startup recovery for checks, including terminal-owned turns that have no report destination. */
+  async settledUncheckedDelegationTurns(): Promise<AgentTurn[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.agentTurns)
+      .where(and(
+        eq(schema.agentTurns.source, 'delegation'),
+        inArray(schema.agentTurns.status, ['completed', 'failed', 'cancelled', 'interrupted']),
+        sql`json_type(${schema.agentTurns.effectivePolicyJson}, '$.checks') = 'array'`,
+        sql`json_type(${schema.agentTurns.effectivePolicyJson}, '$.checkResults') IS NULL`,
+      ))
+    return rows.map(mapAgentTurn)
+  }
 }

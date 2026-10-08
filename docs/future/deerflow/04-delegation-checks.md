@@ -1,5 +1,22 @@
 # Checks on delegated work
 
+Review follow-up, October 8, 2026: settlement now has one in-flight owner per child turn and
+reloads durable results before inspection. Terminal-owned turns are checked on settlement and
+reconciled after restart; managed plugin follow-ups determine the final outcome. Deleted task roots
+produce persisted unverified verdicts. An isolated desktop fixture seeds a settled holds/fails
+report for visual inspection without changing execution permissions.
+
+Verification for the follow-up: focused delegation, follow-up, checks, desktop seeder, and architecture
+boundary/doc/contract tests passed; agents and desktop typechecks and targeted oxlint passed. The
+real desktop snapshot and inspected screenshot show both verdicts on the report card with the
+child's pasted markers hidden. The fixture proves rendering from saved report data; it does not
+exercise a live checked child under the managed harness. The earlier Phase 3 live
+`session_history_search` and `session_history_read` verification remains valid. No later phase
+depends on a new check contract. Node typecheck passed. The architecture package typecheck still
+fails at its existing `agentContract.test.ts` activity-frame mutual type assertion; the targeted
+architecture tests pass.
+
+
 Completion note, October 8, 2026: `agent_spawn` and `agent_prompt` accept up to eight host checks.
 The child turn stores the check requests and, once settled, the host stores bounded verdicts and an
 observation time on that turn. Reports and `agent_read` reuse those verdicts after restart. File
@@ -13,10 +30,9 @@ Verification: focused delegation, check, report-card, and service-budget tests; 
 typechecks; targeted oxlint; and boundary, contract, documentation citation, and path checks passed.
 The desktop app launched and a managed Codex session used `session_history_search` and
 `session_history_read` with its signed session claim to recover its stored prompt text, completing
-Phase 3's live tool check. A live checked-child report and screenshot remain unverified: execute tools
-were off in the isolated app, and automatic approval review rejected enabling that persistent
-security setting. The report-card rendering test covers the visible verdict list. The coordinator
-can run the live report check if execute tools are already enabled in an authorized test session.
+Phase 3's live tool check. A live checked-child report was unavailable because execute tools were
+off in the isolated app, and automatic approval review rejected enabling that persistent setting.
+The review follow-up above verifies the report card with seeded settled data instead.
 
 Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 

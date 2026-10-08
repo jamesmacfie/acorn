@@ -17,7 +17,7 @@ const checks = z.array(z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('file-nonempty'), path: checkPath }),
   z.object({ kind: z.literal('json-valid'), path: checkPath }),
   z.object({ kind: z.literal('commits-ahead') }),
-])).max(8).describe('Up to eight host-run checks after this turn settles. File paths are relative to the child task worktree. File checks establish existence, size, or JSON syntax, not correctness. commits-ahead requires worktree isolation. Verdicts appear in the report and agent_read.')
+])).max(8).describe('Up to eight host-run checks when this delegated operation settles, after plugin follow-ups. File paths are relative to the child task worktree. File checks establish existence, size, or JSON syntax, not correctness. commits-ahead requires worktree isolation. Verdicts appear in the report and agent_read.')
 
 export const agentSpawnInputSchema = z.object({
   title: z.string().trim().min(1).max(500)
@@ -76,4 +76,4 @@ export type AgentWaitInput = z.infer<typeof agentWaitInputSchema>
 export type AgentCancelInput = z.infer<typeof agentCancelInputSchema>
 export type AgentCheck = z.infer<typeof checks>[number]
 export type CheckVerdict = { check: AgentCheck; status: 'holds' | 'fails' | 'unverified'; reason: string }
-export type CheckResults = { checkedAt: number; verdicts: CheckVerdict[] }
+export type CheckResults = { checkedAt: number; outcomeTurnId?: string; outcome?: 'completed' | 'failed' | 'cancelled' | 'interrupted'; verdicts: CheckVerdict[] }

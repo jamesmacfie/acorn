@@ -930,9 +930,18 @@ describe('agent delegation service', () => {
         const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
           checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(parent.taskId, parent.id))
         await finish(child.sessionId!, child.turnId!, 'I wrote output.txt.')
-        const first = await checked.reports.checkResults((await sessions.turn(child.turnId!))!)
+        const stale = (await sessions.turn(child.turnId!))!
+        const inspect = vi.spyOn(ctx.core.fs, 'confineExistingFile')
+        const [first, simultaneous] = await Promise.all([
+          checked.reports.checkResults(stale), checked.reports.checkResults(stale),
+          checked.reports.deliver(child.turnId!).then(() => checked.reports.checkResults(stale)),
+        ])
+        expect(simultaneous).toEqual(first)
+        expect(inspect).toHaveBeenCalledTimes(1)
         expect(first?.verdicts[0]?.status).toBe('holds')
         await rm(join(path, 'output.txt'))
+        expect(await checked.reports.checkResults(stale)).toEqual(first)
+        expect(inspect).toHaveBeenCalledTimes(1)
 
         const restarted = new AgentDelegationService(runtime, service.store, async () => terminals,
           { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
@@ -945,6 +954,57 @@ describe('agent delegation service', () => {
         const page = await restarted.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 100 }, context(parent.taskId, parent.id, 'read'))
         expect(page.items).toContainEqual(expect.objectContaining({ type: 'checks', results: first }))
       } finally { await rm(path, { recursive: true, force: true }) }
+    })
+
+    it('checks a terminal-owned child at settlement and recovers a missed broadcast at startup', async () => {
+      const path = await mkdtemp(join(tmpdir(), 'acorn-delegation-terminal-check-'))
+      try {
+        await writeFile(join(path, 'output.txt'), 'ready')
+        vi.spyOn(ctx.core.tasks, 'root').mockResolvedValue(path)
+        const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
+          { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+        const owner = await managedCaller()
+        terminals = [terminal('terminal-owner', owner.taskId)]
+        const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
+          checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(owner.taskId, 'terminal-owner'))
+        await finish(child.sessionId!, child.turnId!, 'Done.')
+        await checked.reports.reconcile()
+        await vi.waitFor(async () => expect((await sessions.turn(child.turnId!))?.effectivePolicy.checkResults).toBeDefined())
+        await rm(join(path, 'output.txt'))
+        const page = await checked.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 100 }, context(owner.taskId, 'terminal-owner'))
+        expect(page.items).toContainEqual(expect.objectContaining({ type: 'checks', results: expect.objectContaining({
+          outcome: 'completed', verdicts: [expect.objectContaining({ status: 'holds' })],
+        }) }))
+      } finally { await rm(path, { recursive: true, force: true }) }
+    })
+
+    it('persists unverified checks when the child task root is unavailable', async () => {
+      vi.spyOn(ctx.core.tasks, 'root').mockRejectedValue(new Error('Task deleted'))
+      const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
+        { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+      const parent = await managedCaller()
+      const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
+        checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(parent.taskId, parent.id))
+      await finish(child.sessionId!, child.turnId!, 'Done.')
+      await checked.reports.deliver(child.turnId!)
+      expect((await sessions.turn(child.turnId!))?.effectivePolicy.checkResults).toMatchObject({
+        verdicts: [{ status: 'unverified' }],
+      })
+      expect(await reports(parent.id)).toHaveLength(1)
+    })
+
+    it('records an unverified terminal-owned check for a cancelled turn', async () => {
+      const owner = await managedCaller()
+      terminals = [terminal('terminal-owner', owner.taskId)]
+      const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
+        { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+      const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
+        checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(owner.taskId, 'terminal-owner'))
+      await sessions.cancelTurn(child.turnId!)
+      await checked.reports.deliver(child.turnId!)
+      expect((await sessions.turn(child.turnId!))?.effectivePolicy.checkResults).toMatchObject({
+        outcome: 'cancelled', verdicts: [{ status: 'unverified', reason: 'Turn cancelled.' }],
+      })
     })
 
     it('refuses commits-ahead on shared isolation at spawn and prompt', async () => {

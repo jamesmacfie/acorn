@@ -17,7 +17,7 @@ import { TurnFollowUps } from './turnFollowUps'
 // Unattended follow-ups at the agents/workflows boundary (docs/managed-agents/unattended-follow-ups.md):
 // a scripted driver, a deterministic reviewer, and the real messenger.
 
-type Reply = { text: string; usage?: AgentUsage; hold?: boolean }
+type Reply = { text: string; usage?: AgentUsage; hold?: boolean; fail?: boolean }
 
 describe('agents:turn-follow-up', () => {
   let ctx: TestNodeContext
@@ -40,7 +40,7 @@ describe('agents:turn-follow-up', () => {
       delegationLive: (turn) => reports.operationLive(turn),
       deadlineMs,
     })
-    reports = new DelegationReports(runtime, new AgentDelegationStore(ctx.storage.open()), async () => followUps)
+    reports = new DelegationReports(runtime, new AgentDelegationStore(ctx.storage.open()), async () => followUps, ctx.core)
     messages = new SessionMessages({ runtime, entries: () => senders, notice: () => {}, followUps: async () => followUps })
   }
   let senders: { id: string; pluginId: string; value: { connect(sender: SessionMessenger): void } }[]
@@ -73,7 +73,8 @@ describe('agents:turn-follow-up', () => {
         const finish = async (reply: Reply) => {
           await options.onEvent({ type: 'assistant_message', text: reply.text })
           if (reply.usage) await options.onEvent({ type: 'usage', usage: reply.usage })
-          await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+          if (reply.fail) await options.onEvent({ type: 'error', code: 'fixture_failure', message: 'Follow-up failed.', retryable: false })
+          else await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
           active = false
         }
         return {
@@ -248,12 +249,12 @@ describe('agents:turn-follow-up', () => {
   })
 
   describe('a delegated turn', () => {
-    const delegated = async (reply: Reply) => {
+    const delegated = async (reply: Reply, effectivePolicy: Record<string, unknown> = {}) => {
       const owner = await runtime.store.createSession({ taskId: 'task-1', providerId: 'scripted', profileId: 'scripted', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
       const child = await runtime.store.createSession({ taskId: 'task-1', providerId: 'scripted', profileId: 'scripted', kind: 'delegated', config: {} }, await new FakeAgentDriver().probe())
       replies = [reply]
       const turn = await runtime.enqueueTurn(child.id, {
-        input: [{ type: 'text', text: 'Write add().' }], source: 'delegation', effectivePolicy: { reportTo: owner.id }, idempotencyKey: randomUUID(),
+        input: [{ type: 'text', text: 'Write add().' }], source: 'delegation', effectivePolicy: { reportTo: owner.id, ...effectivePolicy }, idempotencyKey: randomUUID(),
       })
       await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('completed'))
       return { owner, child, turn }
@@ -277,6 +278,24 @@ describe('agents:turn-follow-up', () => {
       expect(body).toContain('A plugin sent it notes')
       // After the report, the operation is closed.
       expect(await sender.queue(note({ taskId: 'task-1', sessionId: turn.sessionId, turnId: turn.id }))).toEqual({ ok: false, reason: 'operation-closed' })
+    })
+
+    it('records an unverified check against a failed plugin follow-up outcome', async () => {
+      const sender = await messenger('acorn-advisor')
+      reviewer('acorn-advisor', async (window) => {
+        await sender.queue(note(window))
+        replies.push({ text: 'Could not finish.', fail: true })
+      })
+      const { owner, turn } = await delegated({ text: 'Done.' }, { checks: [{ kind: 'file-exists', path: 'output.txt' }] })
+      await reports.deliver(turn.id)
+      const [report] = (await turnsOf(owner.id)).filter((candidate) => candidate.source === 'delegation_report')
+      const followUp = (await runtime.store.followUpTurns(turn.sessionId, turn.id))[0]!
+      expect(followUp.status).toBe('failed')
+      expect(report?.effectivePolicy.checkResults).toMatchObject({
+        outcome: 'failed', outcomeTurnId: followUp.id,
+        verdicts: [{ status: 'unverified', reason: 'Turn failed.' }],
+      })
+      expect((report!.input[0] as { text: string }).text).toContain('Outcome: failed')
     })
 
     it('sends no report and cancels the notes when the owner cancels a note', async () => {

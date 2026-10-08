@@ -69,11 +69,15 @@ and unmarked, it would reach the owner as a request. The transcript hides the ta
 reports as refused. The report queues behind the owner's work and doesn't steer an active turn.
 
 When the owner declares `checks`, the host records their verdicts and observation time on the child
-turn's effective policy before queuing the report. The report puts these host facts after the child's
+turn's effective policy when the delegated operation settles. Plugin follow-up notes join that
+operation, so the checks use the last note's outcome after all notes finish. The stored results name
+that outcome and turn ID. The report puts these host facts after the child's
 `<pasted_content>` block. `agent_read` returns the same verdicts, and the transcript draws them in
-the report card. Startup reconciliation uses the saved verdicts instead of inspecting changed files.
-File reads use core's worktree confinement. An absent file fails; an escaping path or unavailable
-worktree is unverified. Failed, cancelled, and interrupted turns leave every check unverified.
+the report card. Terminal-owned children are checked at settlement too, without an owner report.
+Startup reconciliation checks settled turns missed by the broadcast and reuses saved verdicts
+instead of inspecting changed files. File reads use core's worktree confinement. An absent file
+fails; an escaping path, deleted task, or unavailable worktree is unverified. Failed, cancelled,
+and interrupted final turns leave every check unverified.
 For `commits-ahead`, the host compares the child branch's HEAD with the commit recorded before its
 first turn. A shared child has no separate branch, so the input rejects that check.
 

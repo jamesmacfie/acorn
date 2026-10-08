@@ -12,7 +12,7 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import { createProject } from '@acorn/node-core/server/projects.ts'
 import { openDataRoot } from '@acorn/node-core/server/storage'
 import { makeTestNodeContext } from '@acorn/node-core/testkit'
-import { seedLargeSession } from '@acorn/plugin-agents/testkit'
+import { seedDelegationCheckReport, seedLargeSession } from '@acorn/plugin-agents/testkit'
 import { seedReviewNotes } from '@acorn/plugin-changes/testkit'
 
 // Seeds an agent-automation data root before the window starts (docs/local-development/agent-drivers.md
@@ -33,9 +33,9 @@ const workspaces = args['--workspaces']
 const profile = (args['--profile'] || 'small') as LargeSurfaceProfile
 const seed = Number(args['--seed'] || 1)
 if (!dataDir || !projectPath || !isAbsolute(dataDir) || !isAbsolute(projectPath)) {
-  throw new Error('Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation --profile small|scale|canonical --seed N]')
+  throw new Error('Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation|delegation-checks --profile small|scale|canonical --seed N]')
 }
-if (fixture && fixture !== 'large-surfaces' && fixture !== 'tui-navigation') throw new Error(`Unknown fixture: ${fixture}`)
+if (fixture && fixture !== 'large-surfaces' && fixture !== 'tui-navigation' && fixture !== 'delegation-checks') throw new Error(`Unknown fixture: ${fixture}`)
 if (workspaces !== undefined && workspaces !== 'on' && workspaces !== 'off') throw new Error('--workspaces must be on or off.')
 if (!['small', 'scale', 'canonical'].includes(profile) || !Number.isInteger(seed)) throw new Error('Profile must be small, scale or canonical, and seed an integer.')
 
@@ -93,7 +93,7 @@ try {
       const now = Date.now()
       const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
       await db.insert(schema.tasks).values({
-        id: taskId, title: fixture === 'tui-navigation' ? 'Review changed files' : `Large surfaces (${profile})`,
+        id: taskId, title: fixture === 'tui-navigation' ? 'Review changed files' : fixture === 'delegation-checks' ? 'Delegation check report' : `Large surfaces (${profile})`,
         icon: null, origin: 'local', projectId: result.project.id,
         branch: null, skipSetup: true, pullNumber: null, worktreePath: null, status: 'active', parentId: null,
         sort: (value ?? -1) + 1, createdAt: now, updatedAt: now, archivedAt: null,
@@ -144,7 +144,9 @@ try {
       const agents = makeTestNodeContext({ plugin: { name: 'agents' }, dataDir })
       let session: Awaited<ReturnType<typeof seedLargeSession>>
       try {
-        session = await seedLargeSession(agents.storage.open(), agents.core, { taskId, profile, seed })
+        session = fixture === 'delegation-checks'
+          ? await seedDelegationCheckReport(agents.storage.open(), agents.core, taskId)
+          : await seedLargeSession(agents.storage.open(), agents.core, { taskId, profile, seed })
       } finally {
         agents.cleanup()
       }

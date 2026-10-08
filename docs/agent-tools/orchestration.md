@@ -68,7 +68,8 @@ When a turn declares `resultSchema`, the agents plugin adds the result contract 
 validates the returned JSON. `agent_read` reports a diagnostic instead of returning malformed output.
 `checks` accepts up to eight entries: `file-exists`, `file-nonempty`, and `json-valid` take a path
 relative to the child's task worktree; `commits-ahead` requires worktree isolation. The host checks
-them after a completed turn. An unfinished turn yields `unverified` verdicts. The JSON check reads at
+them when the delegated operation settles, after any plugin follow-up. A failed, cancelled, or
+interrupted final turn yields `unverified` verdicts. The JSON check reads at
 most 1 MiB plus one byte and rejects invalid UTF-8. A check establishes an observed fact, not the
 correctness of the child's work. See [managed delegation](../managed-agents/delegation.md#reports-back-to-the-owner)
 for persistence and reporting.

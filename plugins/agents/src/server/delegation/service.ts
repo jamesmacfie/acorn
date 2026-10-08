@@ -434,8 +434,10 @@ export class AgentDelegationService {
       if (!turn || turn.sessionId !== session.id) continue
       // The owner is reading this result itself, so a report still waiting in its queue says it twice.
       await this.reports.withdraw(context.sessionId!, turnId)
-      const checks = await this.reports.checkResults(turn)
-      if (checks) items.push({ type: 'checks', results: checks, turnId, seq })
+      if (Array.isArray(turn.effectivePolicy.checks) && turn.effectivePolicy.checks.length) {
+        const checks = await this.reports.checkResults(turn)
+        if (checks) items.push({ type: 'checks', results: checks, turnId, seq })
+      }
       const resultSchema = turnResultSchema(turn)
       if (!resultSchema) continue
       const text = assistantResult(await this.runtime.store.eventsForTurn(turnId))

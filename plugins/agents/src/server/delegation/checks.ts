@@ -20,11 +20,11 @@ export function savedCheckResults(turn: AgentTurn): CheckResults | null {
 export class DelegationChecks {
   constructor(private readonly core: Pick<CoreServices, 'tasks' | 'fs' | 'git'>) {}
 
-  async runInRoot(turn: AgentTurn, root: string | null, baseCommit: string | undefined): Promise<CheckResults> {
+  async runInRoot(turn: AgentTurn, root: string | null, baseCommit: string | undefined, finalTurn: AgentTurn = turn): Promise<CheckResults> {
     const verdicts: CheckVerdict[] = []
     for (const check of turnChecks(turn)) {
-      if (turn.status !== 'completed') {
-        verdicts.push({ check, status: 'unverified', reason: `Turn ${turn.status}.` })
+      if (finalTurn.status !== 'completed') {
+        verdicts.push({ check, status: 'unverified', reason: `Turn ${finalTurn.status}.` })
         continue
       }
       if (!root) {
@@ -33,7 +33,7 @@ export class DelegationChecks {
       }
       verdicts.push(await this.evaluate(check, root, baseCommit))
     }
-    return { checkedAt: Date.now(), verdicts }
+    return { checkedAt: Date.now(), outcomeTurnId: finalTurn.id, outcome: finalTurn.status as CheckResults['outcome'], verdicts }
   }
 
   private async evaluate(check: AgentCheck, root: string, baseCommit: string | undefined): Promise<CheckVerdict> {
