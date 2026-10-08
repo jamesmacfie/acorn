@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, on, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import type { InputProps } from '@acorn/client-core/kit/components/primitives.tsx'
 import type { Size } from '@acorn/client-core/kit/tokens'
@@ -21,7 +21,8 @@ const fieldColors = () => ({
 
 export function Input(props: InputProps) {
   let field: Renderable | undefined
-  createEffect(on(() => props.autofocus, (active) => {
+  const autofocus = createMemo(() => props.autofocus)
+  createEffect(on(autofocus, (active) => {
     if (active && field && !field.isDestroyed) onCleanup(requestRenderableFocus(field))
   }))
   const install = fieldRef({

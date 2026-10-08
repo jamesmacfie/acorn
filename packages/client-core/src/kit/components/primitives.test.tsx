@@ -25,11 +25,10 @@ afterEach(() => {
 })
 
 it('focuses an input on an autofocus edge without reclaiming focus on value updates', () => {
-  const [active, setActive] = createSignal(true)
-  const [value, setValue] = createSignal('query')
+  const [row, setRow] = createSignal({ active: true, value: 'query' })
   let reference: HTMLInputElement | undefined
   dispose = render(() => <>
-    <Input autofocus={active()} value={value()} ref={(element) => { reference = element }} />
+    <Input autofocus={row().active} value={row().value} ref={(element) => { reference = element }} />
     <button type="button">Elsewhere</button>
   </>, host)
   const input = host.querySelector('input')!
@@ -37,10 +36,10 @@ it('focuses an input on an autofocus edge without reclaiming focus on value upda
   expect(reference).toBe(input)
   expect(document.activeElement).toBe(input)
   button.focus()
-  setValue('updated query')
+  setRow({ active: true, value: 'updated query' })
   expect(document.activeElement).toBe(button)
-  setActive(false)
-  setActive(true)
+  setRow({ active: false, value: 'updated query' })
+  setRow({ active: true, value: 'updated query' })
   expect(document.activeElement).toBe(input)
 })
 

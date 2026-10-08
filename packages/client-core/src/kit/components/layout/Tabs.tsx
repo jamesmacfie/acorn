@@ -129,6 +129,7 @@ export const TabPanel = (props: {
     }
   }
   createEffect(on(() => [props.active === props.id, props.scrollOffset] as const, ([active, offset], previous) => {
+    if (previous && active === previous[0] && offset === previous[1]) return
     stopRestore()
     if (!active && previous?.[0]) {
       if (panel?.scrollTop) lastVisibleOffset = panel.scrollTop

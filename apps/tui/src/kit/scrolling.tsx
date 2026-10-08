@@ -174,7 +174,8 @@ function viewportBox(props: ViewportProps): JSX.Element {
     restored = true
     place(props.scrollOffset)
   }
-  createEffect(on(() => [props.visible, props.scrollOffset] as const, ([visible]) => {
+  createEffect(on(() => [props.visible, props.scrollOffset] as const, ([visible, offset], previous) => {
+    if (previous && visible === previous[0] && offset === previous[1]) return
     if (visible === false) return
     restored = false
     restoreIfReady()
