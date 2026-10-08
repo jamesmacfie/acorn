@@ -7,11 +7,11 @@ import type { RevisionDetail } from '../shared/api'
 import { revisionOptions } from './historyClient'
 import { revisionSource } from './revisionSource'
 
-export function RevisionView(props: { projectId: string; taskId?: string; id: string | null; onCommit: (id: string) => void }) {
-  const [base, setBase] = createSignal<string | null | undefined>(undefined)
+export function RevisionView(props: { projectId: string; taskId?: string; id: string | null; onCommit: (id: string) => void; stashBase?: string }) {
+  const [base, setBase] = createSignal<string | null | undefined>(props.stashBase)
   const [file, setFile] = createSignal('')
   const scope = createMemo(() => JSON.stringify([activeNodeId(), props.projectId, props.taskId, props.id]))
-  createEffect(on(scope, () => { setBase(undefined); setFile('') }, { defer: true }))
+  createEffect(on(scope, () => { setBase(props.stashBase); setFile('') }, { defer: true }))
   const detail = createQuery(() => revisionOptions(props.projectId, props.id ?? '', base()))
   const current = createMemo(() => {
     const response = detail.data
@@ -48,14 +48,14 @@ export function RevisionView(props: { projectId: string; taskId?: string; id: st
           ]} />
           <Show when={revision().commit.refs.length}><For each={revision().commit.refs}>{(ref) => <Badge>{ref}</Badge>}</For></Show>
         </Stack></Fold>
-        <Show when={revision().commit.parents.length} fallback={<Text emphasis="muted">Root commit · compared with the empty tree</Text>}>
+        <Show when={!props.stashBase}><Show when={revision().commit.parents.length} fallback={<Text emphasis="muted">Root commit · compared with the empty tree</Text>}>
           <SectionHeader>Parents</SectionHeader>
           <For each={revision().commit.parents}>{(parent, index) => <Button variant="ghost" onPress={() => props.onCommit(parent)}>
             Parent {index() + 1} · {parent.slice(0, 12)}
           </Button>}</For>
           <Select label="Compare with parent" value={revision().base ?? ''} options={revision().commit.parents.map((parent, index) => ({ value: parent, label: `Parent ${index + 1} · ${parent.slice(0, 12)}` }))}
             onChange={setBase} />
-        </Show>
+        </Show></Show>
         <Show when={revision().omitted}><Alert tone="warn">{revision().omitted}</Alert></Show>
         <Fold label="Changed files" count={revision().files.length} defaultOpen={revision().files.length <= 5}>
             <Rows id={`git-files:${activeNodeId()}:${props.projectId}:${props.id}:${revision().base}`} ariaLabel="Changed files"

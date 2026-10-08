@@ -6,6 +6,7 @@ import { createHistoryModel } from './historyModel'
 import { HistoryRows } from './HistoryRows'
 import { RevisionView } from './RevisionView'
 import { WorktreeDetail, WorktreeList } from './WorktreeBrowse'
+import { StashSourceDetail, StashSourceList } from './StashBrowse'
 
 const path = (projectId: string, id?: string) => `/p/${encodeURIComponent(projectId)}/x/git/history${id ? `/${id}` : ''}`
 
@@ -25,11 +26,15 @@ export function GitSourceList() {
   const navigate = useNavigate()
   const base = useMatch(() => '/p/:projectId/x/git/worktrees')
   const entry = useMatch(() => '/p/:projectId/x/git/worktrees/:worktreeId')
+  const stashBase = useMatch(() => '/p/:projectId/x/git/stashes')
+  const stashEntry = useMatch(() => '/p/:projectId/x/git/stashes/:stashId')
   const worktrees = () => !!base() || !!entry()
+  const stashes = () => !!stashBase() || !!stashEntry()
   return <Stack gap="section">
-    <Button variant={worktrees() ? 'ghost' : 'solid'} onPress={() => navigate(path(params.projectId))}>History</Button>
+    <Button variant={worktrees() || stashes() ? 'ghost' : 'solid'} onPress={() => navigate(path(params.projectId))}>History</Button>
+    <Button variant={stashes() ? 'solid' : 'ghost'} onPress={() => navigate(`/p/${encodeURIComponent(params.projectId)}/x/git/stashes`)}>Stashes</Button>
     <Button variant={worktrees() ? 'solid' : 'ghost'} onPress={() => navigate(`/p/${encodeURIComponent(params.projectId)}/x/git/worktrees`)}>Worktrees</Button>
-    <Show when={worktrees()} fallback={<HistoryList />}><WorktreeList /></Show>
+    <Show when={stashes()} fallback={<Show when={worktrees()} fallback={<HistoryList />}><WorktreeList /></Show>}><StashSourceList /></Show>
   </Stack>
 }
 
@@ -38,7 +43,10 @@ export function GitSourceDetail() {
   const navigate = useNavigate()
   const base = useMatch(() => '/p/:projectId/x/git/worktrees')
   const entry = useMatch(() => '/p/:projectId/x/git/worktrees/:worktreeId')
+  const stashBase = useMatch(() => '/p/:projectId/x/git/stashes')
+  const stashEntry = useMatch(() => '/p/:projectId/x/git/stashes/:stashId')
   const worktrees = () => !!base() || !!entry()
-  return <Show when={worktrees()} fallback={<RevisionView projectId={params.projectId} id={params.commitId ?? null}
-    onCommit={(id) => { setSelectedSource('git'); navigate(path(params.projectId, id)) }} />}><WorktreeDetail /></Show>
+  const stashes = () => !!stashBase() || !!stashEntry()
+  return <Show when={stashes()} fallback={<Show when={worktrees()} fallback={<RevisionView projectId={params.projectId} id={params.commitId ?? null}
+    onCommit={(id) => { setSelectedSource('git'); navigate(path(params.projectId, id)) }} />}><WorktreeDetail /></Show>}><StashSourceDetail /></Show>
 }

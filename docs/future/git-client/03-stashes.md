@@ -1,5 +1,80 @@
 # Phase 03: stashes and checkout admission
 
+## Completion note, October 9, 2026
+
+**Status:** Implemented on `phase-3-stashes-and-checkout-admission`. Git now has a Stashes source
+and task-pane entry in both hosts. The Node lists immutable stash objects, current selectors,
+whole-roster fingerprints, bases, origin branches, and captured untracked paths. Detail uses the
+Phase 02 revision viewer for tracked changes and an empty-tree comparison for captured untracked
+content; stash index and untracked parents are not drawn as ordinary history merges. Create requires
+a message, defaults to tracked files, and offers include-untracked and keep-index. Apply and pop
+require an explicit clean target task and offer restore-index. Apply keeps the stash; a successful
+pop removes it; a conflicting pop keeps it and names conflicted files with a Changes action. Drop
+has a second destructive confirmation. Failed dialogs retain typed input. The external worktree
+manager remains installed for Phase 04.
+
+**Admission map and ordering:** Core owns a per-Git-common-directory admission queue exposed through
+its public plugin service. This unifies project-folder tasks, linked worktrees, and project aliases.
+Agents enters it before persisting a queued turn or Codex plan continuation; dispatch, permission
+waits, questions, retries, resumed turns, cancellation settlement, and restart recovery are read
+from durable session/turn state. Workflows enters it before persisting a start or retry; running,
+gated, cancelling, child, recovered, and human-gate runs remain busy through their durable rows.
+Core enters it for lazy task root/setup, task worktree restore, archive tree claim, and task status
+archive/restore. A stash checkout write takes the same queue, checks every task sharing the checkout,
+including archived tasks with unsettled owner work, through both owner readers, then checks the
+actual mapped target, Git operation, and dirty
+state. Missing readers or unknown activity refuse the write; idle sessions without work are eligible.
+An owner admitted first appears in the write's durable read. A write admitted first delays new work
+until Git finishes. Workflow ticks, including retry ticks, start after admission releases because a
+tick can enqueue an Agent turn. Archive claims are visible until teardown settles. Every queue
+releases in `finally` on refusal or failure.
+
+**Mutation decisions and limits:** Paired-device routes strictly validate mapped IDs, captured
+target path, selector, object, roster fingerprint, options, and drop confirmation. A separate
+repository queue serializes stash reflog mutations, including aliases, and rechecks the roster under
+that queue. Pop applies the immutable object before dropping the freshly checked selector. Duplicate
+objects still require the exact selected entry; a shifted roster is refused. Git and Changes are
+invalidated after an attempted checkout command, including partial failure. External Git processes
+do not join Acorn's process-local queue, so a reflog change between final check and command cannot
+be transactional. No automatic stash/reset/clean/discard or fictitious conflict continuation was
+added.
+
+**Focused checks:** Real temporary Git repository stash tests passed (five tests), covering tracked,
+untracked, ignored, keep-index, restore-index, apply/pop/conflict/drop, no-change, duplicate objects,
+stale selection, and moved or missing targets. Core admission tests passed (four, including
+controlled races),
+Core archive/worktree tests passed (29), Agents checkout activity tests passed (two) and runtime queue
+tests passed (18), Workflow activity tests passed (two) and nested dispatch tests passed (eight).
+Git pane/revision model tests passed (four). Relevant architecture rules passed (65). Git, Core,
+desktop, and terminal type checks, touched-source oxlint, Node production build and service budget
+(3,195,199/3,200,000 bytes), and diff whitespace passed. Agents type check retains two unchanged
+`AgentPane.test.tsx` missing-`turnId` fixture errors; Workflows type check retains one unchanged
+`workflowMapLifecycle.test.ts` null-`HeadlessArgv` fixture error. Touched-source oxlint reports the
+existing `worktree.test.ts:21` fetch-option warning. The unchanged
+`docs/api-reference/plugin-routes.md` has 201 lines against the 200-line doc citation limit. Root
+lint and full test were deliberately not run for this phase.
+
+**Real hosts, October 9:** Desktop `git-phase03b` used `pnpm dev:agent -- --session git-phase03b
+--fixture tui-navigation --workspaces on`; the disposable fixture repository was
+`.acorn/agent-dev/git-phase03b/fixture/repo`. It showed create with include-untracked and target,
+captured file content, apply, dirty-pop refusal with retained input, successful pop, confirmed drop,
+and conflict pop with a retained stash and Changes conflict. Inspected screenshots:
+`screenshot-1791492843631.png` (detail), `screenshot-1791493249499.png` (drop), and
+`screenshot-1791495498156.png` (conflict) under that session's `screenshots/` directory.
+Terminal `git-phase03-tui` used `pnpm dev:tui:agent -- --session git-phase03-tui --fixture
+tui-navigation --profile small --seed 3 --workspaces on`, with `pnpm dev:tui:agent:ui -- --session
+git-phase03-tui resize 120 40` and `resize 80 24`. Both sizes showed the target/options dialog;
+120×40 also showed captured untracked content, apply, preserved dirty-pop input, successful pop,
+drop confirmation, and a conflicting pop with `README.md` in Changes. Conflict reproduction used
+the disposable fixture only: stash a `README.md` edit, commit a different edit to the same line,
+then pop. The terminal was relaunched with `--no-build --link
+acorn://local/p/51d7f256-58ed-4f1a-8489-086b426ef14d/x/git/stashes`; UI driver `snapshot`,
+`press`, `resize`, and `type` (SGR mouse) exercised the controls. Both sessions were stopped.
+
+**Later phases:** Preserve the common-directory guard and explicit target identity when adding
+further Git writes. Use the existing Changes/Editor intent for conflicts and keep stash detail on
+the Phase 02 bounded, cancelable revision source. Do not reinterpret stash parents as merge lanes.
+
 Date: October 7, 2026. Status: planned; implementation not started.
 Depends on [phase 02](./02-history-and-diffs.md).
 Read the [full implementation context](./README.md), especially

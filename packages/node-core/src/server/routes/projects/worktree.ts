@@ -1,4 +1,5 @@
 import { recordSetupDecision } from '../../taskScripts/setup'
+import { admitCheckout } from '../../core/checkoutAdmission'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type { TeardownResult } from '../../storage/archive'
@@ -60,7 +61,7 @@ async function capturePreviewUrl(
 ): Promise<{ ok: boolean; url?: string; reason?: string }> {
   const script = rawScript?.trim()
   if (!script) return { ok: false, reason: 'no script configured' }
-  const cwd = await taskRoot(db, taskId)
+  const cwd = await admitCheckout(db, taskId, () => taskRoot(db, taskId))
   if (!cwd) return { ok: false, reason: 'no worktree yet — open a terminal first' }
   const task = await loadTask(db, taskId)
   const project = task ? await projectForTask(db, task) : null
@@ -144,7 +145,8 @@ export const worktree = new Hono<AppEnv>()
     if (!isDir(project.path)) return c.json({ ok: true })
     // Eager pre-create is best-effort: a stale/unavailable worktree throws now, and this route's job
     // is only to get the setup script in early. The surface that actually needs the cwd will say so.
-    await resolveTaskCwd(db, task, project.path).catch((e) => log.warn(`pre-create skipped: ${describeError(e).message}`))
+    await admitCheckout(db, task.id, () => resolveTaskCwd(db, task, project.path ?? undefined))
+      .catch((e) => log.warn(`pre-create skipped: ${describeError(e).message}`))
     broadcastWorktreeStatusChanged({ taskId }) // rail/footer pick up the new worktree
     return c.json({ ok: true })
   })

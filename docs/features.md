@@ -28,10 +28,11 @@ integration](./github-integration.md) and [diff rendering](./diff-rendering.md).
 
 ## Git repository
 
-The Git source browses pinned commit history, read-only revision diffs, and registered worktrees for
-the selected project. A task's Git pane starts on its branch history and labels its checkout.
-Working files, staging, and committing stay in Changes. See [Git history](./git-client/history.md)
-and [Git worktrees](./git-client/worktrees.md).
+The Git source browses pinned commit history, read-only revision diffs, registered worktrees, and
+repository stashes for the selected project. A task's Git pane starts on its branch history, labels
+its checkout, and offers stash actions. Working files, staging, and committing stay in Changes. See
+[Git history](./git-client/history.md), [Git worktrees](./git-client/worktrees.md), and
+[Git stashes](./git-client/stashes.md).
 
 ## Task panes
 

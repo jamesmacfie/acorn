@@ -39,6 +39,7 @@ export type RunStepOptions = HeadlessOpts & {
 export type StepRunRequest = Omit<RunStepOptions, 'profileId'>
 
 export type RunnerDeps = {
+  admitWork?<T>(taskId: string, action: () => Promise<T>): Promise<T>
   invalidStepKind?: (id: string, problems: readonly string[]) => void
   dataAccess?: import('../steps/data').WorkflowDataServices['access']
   runStep(taskId: string, def: WorkflowStepDef, opts: RunStepOptions): Promise<AgentSessionExecuteResult>

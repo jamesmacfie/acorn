@@ -1,5 +1,6 @@
 import { taskScriptEvidence, type TaskScriptEvidenceService } from '../taskScripts/service'
-import type { AppDatabase } from '../db'
+import { schema, type AppDatabase } from '../db'
+import { TASK_REF_COLUMNS } from '../worktrees/taskWorktree'
 import type { ActiveIdentityStore } from '../activeIdentity'
 import { createContextService, type ContextService } from './context'
 import { createDataSourceService, type DataSourceService } from './data'
@@ -14,6 +15,7 @@ import { createTaskService, type CompiledTaskService, type TaskService } from '.
 import { createProjectService, type CompiledProjectService, type ProjectService } from './projectRefs'
 import { createTelemetryService, type TelemetryService } from './telemetry'
 import { verifyAgentToolProvenance } from '../agentTools/provenance'
+import { createCheckoutAdmission, registerCheckoutAdmission, type CheckoutAdmission } from './checkoutAdmission'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
 //
@@ -53,6 +55,7 @@ export type CoreServices = {
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
   git: CoreGitService
+  checkoutAdmission: CheckoutAdmission
   // Every child process: env allowlist, process-group kill, bounded capture.
   proc: CoreProcService
   // Use-scoped credential access; scrubs the plaintext out of anything thrown from its scope.
@@ -100,8 +103,20 @@ export function createCoreServices(options: {
   // a process-local identity by omission. Tests pass memoryIdentityStore() from server/activeIdentity.ts.
   activeIdentity: ActiveIdentityStore
 }): CompiledCoreServices {
-  const tasks = createTaskService(options.db)
+  const rawTasks = createTaskService(options.db)
   const projects = createProjectService(options.db, options.activeIdentity)
+  const checkoutAdmission = createCheckoutAdmission(rawTasks, projects, git,
+    async () => options.db.select(TASK_REF_COLUMNS).from(schema.tasks).all())
+  registerCheckoutAdmission(options.db, checkoutAdmission)
+  const tasks: CompiledTaskService = {
+    ...rawTasks,
+    root: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.root(taskId)),
+    requireRoot: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.requireRoot(taskId)),
+    resolveCwd: (task, baseCheckout) => task
+      ? checkoutAdmission.admitWork(task.id, () => rawTasks.resolveCwd(task, baseCheckout))
+      : rawTasks.resolveCwd(task, baseCheckout),
+    runConfig: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.runConfig(taskId)),
+  }
   const identity = createIdentityService(options.activeIdentity)
   const models = createModelService(options.db, options.secrets)
   return {
@@ -110,6 +125,7 @@ export function createCoreServices(options: {
     // real modules rather than a second declaration that can drift off them.
     fs: fs satisfies CoreFsService,
     git: git satisfies CoreGitService,
+    checkoutAdmission,
     proc: proc satisfies CoreProcService,
     secrets: options.secrets,
     tasks,

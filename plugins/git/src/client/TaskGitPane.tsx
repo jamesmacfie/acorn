@@ -5,6 +5,7 @@ import { Alert, Badge, Button, EmptyState, Facts, Row, Rows, SectionHeader, Stac
 import type { GitPaneModel } from './paneModel'
 import { HistoryRows } from './HistoryRows'
 import { RevisionView } from './RevisionView'
+import { StashDetail, StashList } from './StashBrowse'
 
 type Props = { task: Task; model: GitPaneModel }
 
@@ -14,7 +15,9 @@ export function GitPaneList(props: Props) {
   const items = createMemo(() => entries().map((entry) => ({ key: entry.id, label: entry.branch ?? entry.path })))
   return <Stack gap="section">
     <Button variant={props.model.section() === 'history' ? 'solid' : 'ghost'} onPress={() => props.model.setSection('history')}>History</Button>
+    <Button variant={props.model.section() === 'stashes' ? 'solid' : 'ghost'} onPress={() => props.model.setSection('stashes')}>Stashes</Button>
     <Button variant={props.model.section() === 'worktrees' ? 'solid' : 'ghost'} onPress={() => props.model.setSection('worktrees')}>Worktrees</Button>
+    <Show when={props.model.section() === 'stashes'}><StashList projectId={props.task.projectId} selected={props.model.stashId()} onSelect={props.model.setStashId} /></Show>
     <Show when={props.model.section() === 'history'}>
       <Show when={props.model.missingBranch()}><Alert tone="warn">Task branch {props.task.branch} is unavailable. Showing repository history and HEAD.</Alert></Show>
       <Button variant="ghost" onPress={() => { setSelectedSource('git'); navigate(`/p/${encodeURIComponent(props.task.projectId)}/x/git/history`) }}>Open repository history</Button>
@@ -47,6 +50,7 @@ export function GitPaneDetail(props: Props) {
   const repoPath = () => `/p/${encodeURIComponent(props.task.projectId)}/x/git/worktrees`
   return <>
     <Show when={props.model.section() === 'history'}><RevisionView projectId={props.task.projectId} taskId={props.task.id} id={props.model.commitId()} onCommit={props.model.setCommitId} /></Show>
+    <Show when={props.model.section() === 'stashes'}><StashDetail projectId={props.task.projectId} task={props.task} selected={props.model.stashId()} onSelect={props.model.setStashId} /></Show>
     <Show when={props.model.section() === 'worktrees'}>
     <Stack gap="section">
     <SectionHeader>{selectedIsOwn() ? 'Task checkout' : 'Other worktree'}</SectionHeader>

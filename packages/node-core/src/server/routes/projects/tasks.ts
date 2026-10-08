@@ -1,4 +1,5 @@
 import { recordSetupDecision } from '../../taskScripts/setup'
+import { checkoutAdmissionFor } from '../../core/checkoutAdmission'
 import { taskScripts } from '../../taskScripts/service'
 import { taskArchiveTree } from '../../storage/archive'
 import { randomUUID } from 'node:crypto'
@@ -282,7 +283,7 @@ export const tasks = new Hono<AppEnv>()
     const archiveTree = patch.status === 'archived' ? taskArchiveTree(db, id) : []
     if (archiveTree.some((task) => !mayActOnTask(c, task.id))) return respondError(c, 404, 'not_found')
     const archivedTasks = archiveTree.filter((task) => task.status !== 'archived')
-    db.transaction((tx) => {
+    const update = async () => db.transaction((tx) => {
       tx.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id)).run()
       for (const task of archivedTasks) {
         if (task.id !== id) tx.update(schema.tasks)
@@ -290,6 +291,11 @@ export const tasks = new Hono<AppEnv>()
           .where(eq(schema.tasks.id, task.id)).run()
       }
     })
+    if (patch.status) {
+      const admission = checkoutAdmissionFor(db)
+      if (admission) await admission.admitWork(id, update)
+      else await update()
+    } else await update()
     // The client archives this way when it has no terminal plugin to run the full archive route. The
     // worktree stays, but the task's plugin work still stops (server/pluginHost/hooks.ts §
     // core:task-archiving). After the write, so nothing can start new work on the task in between.

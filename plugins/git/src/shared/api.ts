@@ -44,3 +44,15 @@ export type RevisionFile = { path: string; oldPath: string | null; status: strin
 export type RevisionDetail = { commit: Commit; base: string | null; files: RevisionFile[]; topology: import('@acorn/diff-document/document').DiffDocumentTopology; omitted: string | null }
 export const historyRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/history`
 export const revisionRoute = (projectId: string, id: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/revisions/${encodeURIComponent(id)}`
+
+export type Stash = {
+  id: string; objectId: string; selector: string; fingerprint: string; message: string; originBranch: string | null;
+  createdAt: number; base: string; untrackedParent: string | null; untrackedFiles: string[]
+}
+export type StashRoster = { projectId: string; repository: string; stashes: Stash[]; fingerprint: string }
+export type StashSelection = Pick<Stash, 'objectId' | 'selector' | 'fingerprint'>
+export type StashCreate = { taskId: string; expectedPath: string; message: string; includeUntracked: boolean; keepIndex: boolean }
+export type StashApply = { taskId: string; expectedPath: string; selection: StashSelection; restoreIndex: boolean }
+export type StashDrop = { selection: StashSelection; confirm: true }
+export type StashResult = { ok: boolean; error: string | null; conflicts: string[]; roster: StashRoster | null; changed: boolean }
+export const stashesRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/stashes`

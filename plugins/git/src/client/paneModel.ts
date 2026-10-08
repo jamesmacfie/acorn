@@ -9,7 +9,8 @@ export function createGitPaneModel(task: Task) {
   const queryClient = useQueryClient()
   const inventory = createQuery(() => worktreesOptions(task.projectId))
   const [selected, setSelected] = createSignal<string | null>(null)
-  const [section, setSection] = createSignal<'history' | 'worktrees'>('history')
+  const [section, setSection] = createSignal<'history' | 'stashes' | 'worktrees'>('history')
+  const [stashId, setStashId] = createSignal<string | null>(null)
   const [commitId, setCommitId] = createSignal<string | null>(null)
   const [missingBranch, setMissingBranch] = createSignal(false)
   const branchRef = () => task.branch ? `refs/heads/${task.branch}` : null
@@ -39,7 +40,7 @@ export function createGitPaneModel(task: Task) {
     const rows = inventory.data?.worktrees
     if (id && rows && !rows.some((entry) => entry.id === id)) setSelected(null)
   })
-  return { inventory, selected, setSelected, section, setSection, commitId, setCommitId, history, missingBranch, refreshHistory }
+  return { inventory, selected, setSelected, section, setSection, stashId, setStashId, commitId, setCommitId, history, missingBranch, refreshHistory }
 }
 
 export type GitPaneModel = ReturnType<typeof createGitPaneModel>

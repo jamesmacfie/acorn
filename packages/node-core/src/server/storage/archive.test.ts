@@ -8,6 +8,7 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
 import { taskScripts } from '../taskScripts/service'
 import { createTaskService } from '../core/tasks'
+import { registerCheckoutAdmission, type CheckoutAdmission } from '../core/checkoutAdmission'
 import { worktreeBranchDirName } from '../worktrees/pathGuards'
 import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
 import { computeTaskStatuses, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
@@ -61,6 +62,7 @@ describe('archiveTask teardown ordering', () => {
     git(checkout, 'worktree', 'add', '-q', '-b', 'feat/x', worktree)
     realWorktree = realpathSync(worktree)
     t = makeTestDb()
+    registerCheckoutAdmission(t.db, { admitWork: async (_taskId: string, action: () => Promise<unknown>) => action() } as unknown as CheckoutAdmission)
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'ws1', name: 'W', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({

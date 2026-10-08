@@ -66,7 +66,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // dynamic import; the built static graph is 3,185,838 B. Keep about 1 KB for bundler variation.
 // 2026-10-09: history and revision routes remain dynamically loaded; the measured boot graph is
 // 3,186,368 B, 632 B below the same ceiling.
-const limits = { ceiling: 3_187_000, floor: 1_000_000 }
+// 2026-10-09: checkout admission must be present before owner plugins initialize and register their
+// activity readers. Stash routes remain lazy. The measured static graph is 3,194,672 B; leave about
+// 5 KB for bundler variation while keeping the admission coordinator in the boot graph.
+const limits = { ceiling: 3_200_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
