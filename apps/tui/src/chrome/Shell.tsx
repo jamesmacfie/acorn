@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type Accessor, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack, type Accessor, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
@@ -48,13 +48,8 @@ import { createShellPalette } from './paletteSession'
 import { registerNavigationCommands } from './navigationCommands'
 import { CheatSheet } from './CheatSheet'
 import type { SetupStep } from './Setup'
-import { SetupHost } from './SetupHost'
-import { PromotionHost } from './PromotionHost'
 import { promotionRequest } from './promotionStore'
-import { SessionsHost } from './SessionsHost'
-import { FileDialog } from './FileDialog'
 import { activeFilePrompt } from './filePrompt'
-import { SettingsHost } from './SettingsHost'
 import { closeSettings, openSettings, settingsPlace } from './settingsStore'
 import { Confirmation } from './Confirmation'
 import { activeConfirmation } from './confirmStore'
@@ -77,6 +72,13 @@ import type { ResolvedTerminalLink } from './link'
 // and a stop that does nothing is a hole a reader falls into (../keys/regions.ts § moveRegion).
 const STRIP_ORDER = -50
 const log = createLogger('tui-link')
+// These screens mount only when their overlay opens. Keeping their hosts out of the shell's static
+// chunk also keeps their fallback UI and dependencies out of the measured first-frame graph.
+const SetupHost = lazy(() => import('./SetupHost').then(({ SetupHost }) => ({ default: SetupHost })))
+const PromotionHost = lazy(() => import('./PromotionHost').then(({ PromotionHost }) => ({ default: PromotionHost })))
+const SessionsHost = lazy(() => import('./SessionsHost').then(({ SessionsHost }) => ({ default: SessionsHost })))
+const FileDialog = lazy(() => import('./FileDialog').then(({ FileDialog }) => ({ default: FileDialog })))
+const SettingsHost = lazy(() => import('./SettingsHost').then(({ SettingsHost }) => ({ default: SettingsHost })))
 
 export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void; link?: Address; linkReady?: Accessor<boolean> }) {
   const model = createShellModel()

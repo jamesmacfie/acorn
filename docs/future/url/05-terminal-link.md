@@ -1,5 +1,24 @@
 # Phase 05: terminal client
 
+## Integration completion note, October 8, 2026
+
+After the `url` branch incorporated main's Node switching and workspace grouping, the TUI build
+measured a 727,783-byte pre-render closure, exceeding the unchanged 723,000-byte guard by 4,783
+bytes. The combined Shell had bundled five screens used only when an overlay opens—setup,
+promotion, terminal sessions, file dialog, and Settings—into the first-frame `App` chunk. Loading
+those hosts when their overlays open reduced that chunk from 42,924 to 37,529 bytes and the complete
+startup closure by the same 5,395 bytes, to 722,388 bytes across 166 chunks. Help and confirmation
+remain eager for their immediate key and prompt behavior. The pure address parser still loads before
+Node connection; the link resolver and plugin roster remain deferred. No ceiling or external-import
+rule changed.
+
+The TUI build passed its startup and runtime-import checks. Scoped TUI TypeScript and targeted
+oxlint passed; the focused chrome, linked-place, cross-workspace link, deferred-request, and source
+switch tests passed (40 tests). Oxlint still reports the existing `no-useless-spread` warning in
+Shell's keybinding preferences. Architecture passed 86 of 87 checks; its only failure is the three
+generated Tauri schema paths missing before desktop staging in the unrelated security design. No
+full repository, desktop, or release gate ran here.
+
 ## Second follow-up completion note, October 8, 2026
 
 The terminal resolves an `open?url=` claim once after selected-Node contributions register. The
