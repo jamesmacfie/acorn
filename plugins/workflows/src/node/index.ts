@@ -1,4 +1,5 @@
 import { describeError, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
+import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
@@ -13,7 +14,6 @@ import { workflowScheduleService, workflowScheduleTarget, workflowScheduleBridge
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
-import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory

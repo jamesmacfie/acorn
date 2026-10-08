@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activateTaskSignals, activeNodeId, nodeReady, pathForTask, projectsOptions, tasksOptions, type Task } from '@acorn/plugin-api/client'
@@ -60,9 +60,10 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
   const [targetPath, setTargetPath] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const [result, setResult] = createSignal<StashResult | null>(null)
+  const [feedback, setFeedback] = createSignal<{ result: StashResult; targetTaskId: string } | null>(null)
   const [captured, setCaptured] = createSignal<{ nodeId: string | null; projectId: string; selection: Stash | null } | null>(null)
   const submission = createStashSubmission()
+  onCleanup(submission.invalidate)
   const stash = createMemo(() => state.roster.data?.stashes.find((item) => item.id === props.selected) ?? null)
   const availableTasks = () => (tasks.data ?? []).filter((task) => task.status === 'active')
   const pathOf = (task: Task | undefined) => task?.worktreePath ?? projects.data?.find((project) => project.id === task?.projectId)?.path ?? ''
@@ -71,19 +72,20 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
     submission.invalidate()
     if (next === 'create') { setMessage(''); setIncludeUntracked(false); setKeepIndex(false) }
     if (next === 'apply' || next === 'pop') setRestoreIndex(false)
-    setAction(next); setError(''); setResult(null); setBusy(false)
+    setAction(next); setError(''); setFeedback(null); setBusy(false)
     setCaptured({ nodeId: activeNodeId(), projectId: props.projectId, selection: stash() })
     selectTask(props.task?.id ?? availableTasks()[0]?.id ?? '')
   }
-  const close = () => { submission.invalidate(); setAction(null) }
+  const close = () => { submission.invalidate(); setAction(null); setBusy(false) }
   const run = async () => {
     const snapshot = captured(), operation = action()
     if (!snapshot || !operation) return
     if (snapshot.nodeId !== activeNodeId() || snapshot.projectId !== props.projectId) {
       setError('Node or project changed. Close and reopen this action.'); return
     }
-    const task = props.task ?? availableTasks().find((item) => item.id === taskId())
-    if (operation !== 'drop' && (!task || task.id !== taskId())) {
+    const submittedTaskId = taskId()
+    const task = props.task ?? availableTasks().find((item) => item.id === submittedTaskId)
+    if (operation !== 'drop' && (!task || task.id !== submittedTaskId)) {
       setError('Target task moved or is unavailable. Close and reopen this action.'); return
     }
     if (operation !== 'create' && !snapshot.selection) { setError('Stash selection is unavailable. Refresh and reopen.'); return }
@@ -98,18 +100,19 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
     if (operation !== 'drop' && (!expectedPath || pathOf(task) !== expectedPath)) { setError('Target checkout moved or is unavailable. Close and reopen this action.'); return }
     setBusy(true); setError('')
     await submission.run({
+      targetTaskId: submittedTaskId,
       request: () => operation === 'create'
-        ? stashActions.create(snapshot.projectId, { taskId: taskId(), expectedPath, message: message(), includeUntracked: includeUntracked(), keepIndex: keepIndex() })
+        ? stashActions.create(snapshot.projectId, { taskId: submittedTaskId, expectedPath, message: message(), includeUntracked: includeUntracked(), keepIndex: keepIndex() })
         : operation === 'drop'
           ? stashActions.drop(snapshot.projectId, { selection: selection!, confirm: true })
-          : stashActions[operation](snapshot.projectId, { taskId: taskId(), expectedPath, selection: selection!, restoreIndex: restoreIndex() }),
+          : stashActions[operation](snapshot.projectId, { taskId: submittedTaskId, expectedPath, selection: selection!, restoreIndex: restoreIndex() }),
       refreshCaptured: () => {
         void queryClient.invalidateQueries({ queryKey: stashKey })
         void queryClient.invalidateQueries({ queryKey: worktreeKey })
       },
       currentScope: () => snapshot.nodeId === activeNodeId() && snapshot.projectId === props.projectId && action() === operation,
-      success: (response) => {
-        setResult(response)
+      success: (response, targetTaskId) => {
+        setFeedback({ result: response, targetTaskId })
         if (response.ok) close()
         else setError(response.error ?? 'Git refused the stash operation.')
       },
@@ -121,15 +124,15 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
     const target = (tasks.data ?? []).find((item) => item.id === targetId)
     if (target) { activateTaskSignals(target, { pane: 'changes' }); navigate(pathForTask(target)) }
   }
-  createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { close(); setResult(null); setError('') }, { defer: true }))
+  createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { close(); setFeedback(null); setError('') }, { defer: true }))
   createEffect(on(() => props.selected, () => setContentView('tracked'), { defer: true }))
   return <Stack gap="section">
     <SectionHeader>Repository stashes</SectionHeader>
     <Button onPress={() => open('create')}>Create stash</Button>
     <Show when={state.roster.error}><Alert tone="warn">{String(state.roster.error)}</Alert></Show>
-    <Show when={!action() ? result() : null}>{(feedback) => <Alert tone={feedback().ok ? 'ok' : 'warn'}>{feedback().ok ? 'Stash operation completed.' : feedback().error}</Alert>}</Show>
-    <Show when={result()?.conflicts?.length}><Alert tone="warn">Conflicts: {result()!.conflicts!.join(', ')}. Resolve them in Changes or Editor.</Alert>
-      <Button onPress={() => openChanges(taskId())}>Open Changes</Button></Show>
+    <Show when={!action() ? feedback() : null}>{(item) => <Alert tone={item().result.ok ? 'ok' : 'warn'}>{item().result.ok ? 'Stash operation completed.' : item().result.error}</Alert>}</Show>
+    <Show when={feedback()?.result.conflicts?.length}><Alert tone="warn">Conflicts: {feedback()!.result.conflicts!.join(', ')}. Resolve them in Changes or Editor.</Alert>
+      <Button onPress={() => openChanges(feedback()?.targetTaskId ?? '')}>Open Changes</Button></Show>
     <Show when={stash()} fallback={<EmptyState title="Select a stash">Select a stash to inspect or apply it.</EmptyState>}>
       {(selected) => <>
         <Facts grouping="rows" items={[
@@ -171,8 +174,8 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
           </Show>
         </Show>
         <Show when={error()}><Alert tone="warn">{error()}</Alert></Show>
-        <Show when={result()?.conflicts?.length}><Alert tone="warn">Conflicted files: {result()!.conflicts!.join(', ')}. The stash was retained.</Alert>
-          <Button onPress={() => { close(); openChanges(taskId()) }}>Open Changes</Button></Show>
+        <Show when={feedback()?.result.conflicts?.length}><Alert tone="warn">Conflicted files: {feedback()!.result.conflicts!.join(', ')}. The stash was retained.</Alert>
+          <Button onPress={() => { const targetId = feedback()?.targetTaskId ?? ''; close(); openChanges(targetId) }}>Open Changes</Button></Show>
       </Stack></Modal.Body>
       <Modal.Actions>
         <Button variant="ghost" onPress={close}>Cancel</Button>

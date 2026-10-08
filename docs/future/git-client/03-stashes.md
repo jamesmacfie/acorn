@@ -1,5 +1,14 @@
 # Phase 03: stashes and checkout admission
 
+## Final UI follow-up, October 9, 2026
+
+Stash feedback now retains the submitted target task ID through a deferred response. Both conflict
+actions open Changes for that task even if the dialog's target selector changes after submission.
+Disposing the detail view invalidates pending visible callbacks, and closing a dialog clears its
+busy state. The Agents and Workflows checkout activity imports were moved beside their module's
+other imports. The focused deferred-response tests (three) and Git type check passed; no host flow
+needed repeating for this client-only correction.
+
 ## Review follow-up, October 9, 2026
 
 **Status:** Correctness fixes after review on `phase-3-stashes-and-checkout-admission`. Core's

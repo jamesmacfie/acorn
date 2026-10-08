@@ -4,10 +4,11 @@ export function createStashSubmission() {
   return {
     invalidate: () => { generation++ },
     async run<T>(options: {
+      targetTaskId: string
       request: () => Promise<T>
       refreshCaptured: () => void
       currentScope: () => boolean
-      success: (value: T) => void
+      success: (value: T, targetTaskId: string) => void
       failure: (error: unknown) => void
       settled: () => void
     }): Promise<void> {
@@ -15,7 +16,7 @@ export function createStashSubmission() {
       try {
         const value = await options.request()
         options.refreshCaptured()
-        if (own === generation && options.currentScope()) options.success(value)
+        if (own === generation && options.currentScope()) options.success(value, options.targetTaskId)
       } catch (error) {
         options.refreshCaptured()
         if (own === generation && options.currentScope()) options.failure(error)
