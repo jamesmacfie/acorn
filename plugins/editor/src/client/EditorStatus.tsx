@@ -19,7 +19,7 @@ export default function EditorStatus(props: {
   onRetry: () => void
 }) {
   return <Toolbar variant="status" size="sm" ariaLabel="File status"
-    primary={<Inline gap="none">
+    primary={<Inline>
       <Text emphasis="mono" tip={props.path}>{props.path}</Text>
       <Toolbar.Group>
         <IconButton icon="file" label="Copy relative path" onPress={() => props.onCopy(false)} />
