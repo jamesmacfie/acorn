@@ -34,6 +34,7 @@ export const SUBSCRIBABLE_CHANNELS = [
   'runtime:focus-changed',
   'tasks:changed',
   'workspace:changed',
+  'workspaces-mode:changed',
   'workspace-projects:changed',
   'connection:changed',
   'head:changed',
@@ -54,6 +55,7 @@ const CHANNEL_DESCRIPTIONS = {
   'runtime:focus-changed': { text: 'See which pane and region of this window has keyboard focus', icon: 'radio' },
   'tasks:changed': { text: 'Receive notice when this node’s tasks change', icon: 'radio' },
   'workspace:changed': { text: 'Receive notice when this node’s scopes change', icon: 'radio' },
+  'workspaces-mode:changed': { text: 'See when this node changes how it groups projects', icon: 'radio' },
   'workspace-projects:changed': { text: 'See when external project links on this node change', icon: 'radio' },
   // Named for what the owner is consenting to rather than for the frame: the payload carries a provider
   // id and a status, so a plugin granted this learns which of their accounts stopped working and when

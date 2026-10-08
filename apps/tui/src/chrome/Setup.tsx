@@ -39,7 +39,9 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const mode = () => {
     const preferences = loadedPrefs()
     const roster = loadedProjects()
-    return savedMode() ?? (preferences && roster ? workspacesMode(preferences[WORKSPACES_PREF_KEY], roster.length) : undefined)
+    return preferences && roster
+      ? workspacesMode(preferences[WORKSPACES_PREF_KEY] ?? savedMode(), roster.length)
+      : savedMode()
   }
   const nodeId = activeNodeId()
   let disposed = false

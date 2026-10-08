@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Index, lazy, onCleanup, Show, Suspense } from 'solid-js'
+import { createEffect, createMemo, createSignal, Index, lazy, onCleanup, Show, Suspense } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
@@ -107,6 +107,13 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   // Read once: a Node that had its answer before the wizard opened never shows the question, while
   // one answered here keeps the step, so Back still lands on it and shows the answer.
   const steps = mode() ? STEPS.filter((entry) => entry.id !== 'arrange') : STEPS
+  // Another client can turn grouping on while this wizard is open. Keep its step history, but
+  // follow the refreshed answer after our own save settles rather than following its optimistic value.
+  createEffect(() => {
+    if (busy()) return
+    const stored = props.workspacesPreference
+    if (stored === 'on' || stored === 'off') setMode(stored)
+  })
   const nodeId = activeNodeId()
   let disposed = false
   onCleanup(() => { disposed = true })
@@ -171,7 +178,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
     setError('')
     try {
       const selected = choice()
-      // The Node fixes this preference on its first write. Do not start project creation until it
+      // The Node stores this preference before projects are added. Do not start project creation until it
       // has accepted the answer; an optimistic cache update alone is not enough.
       if (!await savePref(queryClient, WORKSPACES_PREF_KEY, selected, { throwOnFailure: true })) return
       if (!stillHere()) return
@@ -306,8 +313,10 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
       <Show when={step() === 'arrange'}>
         <Stack gap="row">
           <Heading level={2}>Choose a layout</Heading>
-          <Show when={!mode()} fallback={<Text emphasis="muted">Your projects {mode() === 'on' ? 'are grouped into workspaces' : 'stay separate'}. You can't change this later.</Text>}>
-            <Text emphasis="muted" wrap>Pick how acorn organizes your projects. You can't change this later.</Text>
+          <Show when={!mode()} fallback={<Text emphasis="muted" wrap>{mode() === 'on'
+            ? "Your projects are grouped into workspaces. You can't switch back to separate projects."
+            : 'Your projects stay separate. You can group them into workspaces later in Settings.'}</Text>}>
+            <Text emphasis="muted" wrap>Pick how acorn organizes your projects. You can group projects into workspaces later, but you can't separate them again.</Text>
             <SegmentedControl
               ariaLabel="How to arrange projects"
               options={[

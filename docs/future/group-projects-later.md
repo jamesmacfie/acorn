@@ -2,7 +2,10 @@
 
 Date: October 8, 2026
 
-Status: Proposed. Implementation not started.
+Status: Implemented October 8, 2026. [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project)
+owns the shipped rule. The event is `workspaces-mode:changed { mode: 'on' | 'off' }`, published after
+a changed preference write commits. Clients invalidate the source Node's preferences, including
+inactive fleet Nodes. The requirements and decision record below are retained.
 
 This product requirements document lets a Node that keeps each project separate switch to grouped
 workspaces after first run. The switch goes one way. A grouped Node still can't go back to separate

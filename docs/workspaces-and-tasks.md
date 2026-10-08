@@ -22,9 +22,14 @@ after a create, rename, appearance change, or delete.
 The Node stores `core.workspaces` as `on` or `off`. While on, a workspace can group projects.
 While off, each project owns one workspace with the same name. If the preference is unset,
 the Node uses `on` when projects exist and `off` when none do. Project creation stores that
-choice with the project. Once stored, the mode cannot change. Switching would move projects
-between workspaces, and a workspace's Home boards, notes, saved queries, workflow definitions, and
-Linear and Rollbar links don't move with them.
+choice with the project. Settings can switch `off` to `on` after confirmation. This writes one
+preference row without changing project or workspace rows. Each paired workspace becomes an ordinary
+grouped workspace with the same ID, name, and data. The Node publishes `workspaces-mode:changed { mode }`
+after commit, and desktop and terminal clients refetch that Node's preferences and update their wording.
+
+Grouped workspaces can't switch back to separate projects. A workspace can hold several projects,
+and its Home boards, notes, saved queries, workflow definitions, and Linear and Rollbar links have no
+rule for which project would inherit them.
 
 A project belongs to one workspace. It's a folder on the Node's machine, either a plain folder or a
 Git checkout. The project row in `packages/node-core/src/server/db/schema.ts` holds a stable opaque

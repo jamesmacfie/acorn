@@ -10,6 +10,8 @@ import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
 import { ProjectTable, type ProjectGroup } from './ProjectTable'
 import { createWorkspacesMode } from './workspacesMode'
+import { activeCacheId } from '../../infra/node/activeNode'
+import { GroupProjectsSection } from './GroupProjectsSection'
 import './projects.css'
 
 // Settings → Overview: every project on the node in one table, grouped under the workspace it belongs
@@ -84,50 +86,55 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
   }
 
   return (
-    <SettingsSection
-      id="projects"
-      label="Projects"
-      help={mode() === 'on' ? 'A project is a folder on this computer, and workspaces group them. Add a folder, or import repositories from GitHub.' : 'Add a folder, or import repositories from GitHub.'}
-      actions={
-        <>
-          <Show when={mode() === 'on'}><Button onPress={() => setNewWorkspace('')}>New workspace</Button></Show>
-        </>
-      }
-    >
-      <Stack>
-        <AddProjectControls />
-        <Show when={error()}><Alert>{error()}</Alert></Show>
-        <Show when={projects.isError}><Alert>Couldn't load projects.</Alert></Show>
+    <>
+      <SettingsSection
+        id="projects"
+        label="Projects"
+        help={mode() === 'on' ? 'A project is a folder on this computer, and workspaces group them. Add a folder, or import repositories from GitHub.' : 'Add a folder, or import repositories from GitHub.'}
+        actions={
+          <>
+            <Show when={mode() === 'on'}><Button onPress={() => setNewWorkspace('')}>New workspace</Button></Show>
+          </>
+        }
+      >
+        <Stack>
+          <AddProjectControls />
+          <Show when={error()}><Alert>{error()}</Alert></Show>
+          <Show when={projects.isError}><Alert>Couldn't load projects.</Alert></Show>
 
-        {/* Revealed on demand rather than a form sitting permanently above the table, where it read as
-            the primary action on a page whose primary action is adding a project. */}
-        <Show when={mode() === 'on' && newWorkspace() !== null}>
-          <form class="ws-add-form" onSubmit={addWorkspace}>
-            <Input
-              label="Workspace name"
-              placeholder="Workspace name"
-              value={newWorkspace() ?? ''}
-              ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-              onInput={(value) => setNewWorkspace(value)}
-              onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNewWorkspace(null) } }}
-            />
-            <Button submit disabled={busy() || !newWorkspace()?.trim()}>Add</Button>
-            <Button variant="ghost" onPress={() => setNewWorkspace(null)}>Cancel</Button>
-          </form>
-        </Show>
+          {/* Revealed on demand rather than a form sitting permanently above the table, where it read as
+              the primary action on a page whose primary action is adding a project. */}
+          <Show when={mode() === 'on' && newWorkspace() !== null}>
+            <form class="ws-add-form" onSubmit={addWorkspace}>
+              <Input
+                label="Workspace name"
+                placeholder="Workspace name"
+                value={newWorkspace() ?? ''}
+                ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
+                onInput={(value) => setNewWorkspace(value)}
+                onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNewWorkspace(null) } }}
+              />
+              <Button submit disabled={busy() || !newWorkspace()?.trim()}>Add</Button>
+              <Button variant="ghost" onPress={() => setNewWorkspace(null)}>Cancel</Button>
+            </form>
+          </Show>
 
-        <Show when={mode()}><ProjectTable
-          groups={groups()}
-          workspaces={workspaces.data ?? []}
-          taskCount={taskCount}
-          groupHeads={mode() === 'on'}
-          allowMove={mode() === 'on'}
-          openProject={(id) => props.navigate(projectSettingsTarget(id))}
-          openWorkspace={(id) => props.navigate(workspaceSettingsTarget(id))}
-          mapFolder={(id) => void mapFolder(id)}
-          refresh={refresh}
-        /></Show>
-      </Stack>
-    </SettingsSection>
+          <Show when={mode()}><ProjectTable
+            groups={groups()}
+            workspaces={workspaces.data ?? []}
+            taskCount={taskCount}
+            groupHeads={mode() === 'on'}
+            allowMove={mode() === 'on'}
+            openProject={(id) => props.navigate(projectSettingsTarget(id))}
+            openWorkspace={(id) => props.navigate(workspaceSettingsTarget(id))}
+            mapFolder={(id) => void mapFolder(id)}
+            refresh={refresh}
+          /></Show>
+        </Stack>
+      </SettingsSection>
+      <Show when={mode() === 'off'}>
+        <Show when={activeCacheId()} keyed>{(_nodeId) => <GroupProjectsSection />}</Show>
+      </Show>
+    </>
   )
 }

@@ -1,4 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueryObserver } from '@tanstack/solid-query'
+import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
+import { prefsOptions } from '../queries'
+import { readJson } from './apiClient'
+import { _resetFleet, clientFor, setCacheStorage } from './fleet'
+import { watchWorkspaceChanges } from '../../features/workspaces/watchWorkspaceChanges'
 import type { NodeStatus, NodeTransportError } from '@acorn/protocol/broker.ts'
 import { activeToasts, dismissToast } from '../../features/notifications/toast'
 import { setActiveNode } from './activeNode'
@@ -16,9 +22,11 @@ type Bridge = {
   emitBytes(frame: Uint8Array, nodeId?: string): void
   emitStatus(state: NodeStatus['state'], nodeId?: string): void
   emitError(error: NodeTransportError, nodeId?: string): void
+  preferences: Record<string, Record<string, string>>
 }
 
 function installBridge(): Bridge {
+  const preferences: Bridge['preferences'] = {}
   const sent: { nodeId: string; frame: unknown }[] = []
   const frameHandlers: ((nodeId: string, frame: unknown) => void)[] = []
   const byteHandlers: ((nodeId: string, frame: Uint8Array) => void)[] = []
@@ -29,7 +37,10 @@ function installBridge(): Bridge {
   // requests too, even if this suite never sends one.
   const acorn = {
     desktop: true,
-    nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
+    nodeFetch: async (nodeId: string, request: { path: string }) => {
+      if (request.path !== prefsRoute) throw new Error(`Unexpected request: ${request.path}`)
+      return { status: 200, headers: { 'content-type': 'application/json' }, body: new TextEncoder().encode(JSON.stringify(preferences[nodeId])) }
+    },
     nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => {
       frameHandlers.push(cb)
@@ -47,6 +58,7 @@ function installBridge(): Bridge {
   }
   ;(globalThis as { window?: unknown }).window = { acorn }
   return {
+    preferences,
     sent,
     // The nodeId defaults to the active node, so every existing case reads as before; the fleet cases
     // below pass a second node explicitly.
@@ -77,6 +89,36 @@ afterEach(() => {
 const framesSent = () => bridge.sent.map((s) => s.frame)
 
 describe('wsClient', () => {
+  it('refetches another client’s preferences on a grouping event and keeps other Nodes separate', async () => {
+    setCacheStorage({ getItem: async () => undefined, setItem: async () => {}, removeItem: async () => {} })
+    const first = clientFor('n1').client
+    const second = clientFor('n2').client
+    first.setQueryData(prefsKey, { 'core.workspaces': 'off' })
+    second.setQueryData(prefsKey, { 'core.workspaces': 'off' })
+    Object.assign(bridge.preferences, { n1: { 'core.workspaces': 'off' }, n2: { 'core.workspaces': 'on' } })
+    const observer = new QueryObserver(second, {
+      ...prefsOptions(true), queryFn: ({ signal }) => readJson<Record<string, string>>(prefsRoute, { nodeId: 'n2', signal }),
+    })
+    const unsubscribe = observer.subscribe(() => {})
+    const off = watchWorkspaceChanges()
+    const activeModes: string[] = []
+    const offActive = client.wsOnNodeEvent('workspaces-mode:changed', ({ mode }) => activeModes.push(mode))
+    try {
+      // A separate client committed the write on n2. This client's fresh cache moves only on the event.
+      expect(observer.getCurrentResult().data?.['core.workspaces']).toBe('off')
+      bridge.emitFrame({ channel: 'workspaces-mode:changed', mode: 'on' }, 'n2')
+      await vi.waitFor(() => expect(observer.getCurrentResult().data?.['core.workspaces']).toBe('on'))
+      expect(first.getQueryData(prefsKey)).toEqual({ 'core.workspaces': 'off' })
+      expect(activeModes).toEqual([])
+      bridge.emitFrame({ channel: 'workspaces-mode:changed', mode: 'on' }, 'n1')
+      expect(activeModes).toEqual(['on'])
+      expect(first.getQueryState(prefsKey)?.isInvalidated).toBe(true)
+      off()
+      first.setQueryData(prefsKey, { 'core.workspaces': 'off' })
+      bridge.emitFrame({ channel: 'workspaces-mode:changed', mode: 'on' }, 'n1')
+      expect(first.getQueryState(prefsKey)?.isInvalidated).toBe(false)
+    } finally { off(); offActive(); unsubscribe(); _resetFleet() }
+  })
   it('shows a generic transport refusal to the user without changing sibling Node status', () => {
     client.wsConnect()
     bridge.emitError({ code: 'viewers_unsupported', message: 'Upgrade this Node for another window.' })

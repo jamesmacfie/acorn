@@ -189,6 +189,27 @@ describe('terminal setup route', () => {
     }, 30_000,
   )
 
+  it('follows a later grouping change while setup still holds its saved separate answer', async () => {
+    let client!: QueryClient
+    const screen = await renderFixture({ cache: (queryClient) => {
+      client = queryClient
+      client.setQueryData(prefsKey, {})
+      client.setQueryData(projectsKey, [])
+    } })
+    const hook = intercept('PUT', '/v1/core/prefs', async () => reply({ key: 'core.workspaces', value: 'off' }))
+    try {
+      await screen.until('Keep each project separate')
+      expect(await screen.reach('Continue')).toBe(true)
+      await screen.press('RETURN')
+      await screen.until('1. Choose a project')
+      client.setQueryData(prefsKey, { 'core.workspaces': 'on' })
+      expect(await screen.until('Back to workspaces')).toContain('2. Choose a project in')
+      expect(await screen.reach('Back to workspaces')).toBe(true)
+      await screen.press('RETURN')
+      expect(await screen.until('1. Choose a workspace')).toContain('Create workspace')
+    } finally { hook.restore(); screen.done() }
+  }, 30_000)
+
   it('creates an off-mode project without a workspaceId', async () => {
     const screen = await renderFixture({ cache: (client) => {
       client.setQueryData(prefsKey, { 'core.workspaces': 'off' })

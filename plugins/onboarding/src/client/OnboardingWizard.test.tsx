@@ -75,15 +75,16 @@ function mount(mode?: WorkspacesMode, options: { unmountOnClose?: boolean } = {}
   host = document.createElement('div')
   document.body.append(host)
   const [open, setOpen] = createSignal(true)
+  const [preference, setPreference] = createSignal(mode)
   const onClose = vi.fn(() => { if (options.unmountOnClose) setOpen(false) })
   dispose = render(() => (
     <QueryClientProvider client={client}>
       <Show when={open()}>
-        <OnboardingWizard workspacesPreference={mode} onClose={onClose} />
+        <OnboardingWizard workspacesPreference={preference()} onClose={onClose} />
       </Show>
     </QueryClientProvider>
   ), host)
-  return { onClose }
+  return { onClose, setPreference }
 }
 
 async function advanceToDone() {
@@ -145,6 +146,7 @@ describe('first-run workspace choice', () => {
   ] as const)('saves %s before entering Add a project', async (mode, label) => {
     mount()
     await toLayout()
+    expect(view().textContent).toContain("You can group projects into workspaces later, but you can't separate them again.")
     radio(label)!.click()
     expect(radio(label)?.getAttribute('aria-checked')).toBe('true')
     click('Continue')
@@ -233,14 +235,21 @@ describe('first-run workspace choice', () => {
     await vi.waitFor(() => expect(platform.createWorkspace).toHaveBeenCalledWith('Team'))
   })
 
-  it('keeps the saved answer fixed after navigating back', async () => {
-    mount()
+  it.each(['off', 'on'] as const)('shows the saved %s answer and its one-way rule after navigating back', async (mode) => {
+    const { setPreference } = mount()
     await toLayout()
+    radio(mode === 'off' ? 'Keep each project separate' : 'Group projects into workspaces')!.click()
     click('Continue')
     await waitForText('Add your first project')
     click('Back')
-    await waitForText('stay separate')
+    await waitForText(mode === 'off'
+      ? 'Your projects stay separate. You can group them into workspaces later in Settings.'
+      : "Your projects are grouped into workspaces. You can't switch back to separate projects.")
     expect(view().querySelectorAll('[role="radio"]')).toHaveLength(0)
+    if (mode === 'off') {
+      setPreference('on')
+      await waitForText("Your projects are grouped into workspaces. You can't switch back to separate projects.")
+    }
     click('Continue')
     await waitForText('Add your first project')
     expect(writes).toHaveLength(1)

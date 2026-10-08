@@ -97,10 +97,21 @@ A Node with no projects opens the first-run wizard in `plugins/onboarding`. Afte
 the **Layout** step asks whether to keep projects separate or group them into workspaces when
 `core.workspaces` is unset. Each choice shows a small picture of example projects arranged that
 way. Separate projects is the default choice. **Continue** saves the answer before the wizard adds a
-project, and the Node fixes the mode after that write. If the mode is already set when the wizard
+project. The step says, "Pick how acorn organizes your projects. You can group projects into
+workspaces later, but you can't separate them again." If the mode is already set when the wizard
 opens, it leaves the **Layout** step out. Going back to the step after answering shows the saved
 answer without offering another choice. The following steps add projects by folder or from GitHub,
 name them, pick a model for text generation, and finish.
+
+The saved separate answer says, "Your projects stay separate. You can group them into workspaces
+later in Settings." The grouped answer says, "Your projects are grouped into workspaces. You can't
+switch back to separate projects."
+
+On a separate-projects Node, open desktop **Settings** → **Projects** → **Overview**, then press
+**Group projects** twice to confirm. The control states that grouping can't be undone, disables
+while saving, and shows the Node's message if it fails. After success, the page and every open
+client use workspace wording. The section is absent on grouped Nodes. No project or workspace data
+moves. The terminal client follows the change but offers no grouping control.
 
 `shouldShowOnboarding` opens it when there are no projects and no `onboarded` preference. Finishing
 and skipping both write the preference, so the wizard opens once. Skipping before answering leaves
