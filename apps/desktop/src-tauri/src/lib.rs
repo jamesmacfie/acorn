@@ -7,6 +7,7 @@ mod external_urls;
 mod footprint;
 mod helper;
 mod keychain;
+mod links;
 mod menu;
 #[cfg(target_os = "macos")]
 mod notifications;
@@ -107,6 +108,7 @@ pub fn run() {
     }
 
     builder
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         // The bridge handles external links itself. The plugin's default click interceptor
         // invokes an opener command the renderer has no permission to call and cancels the link.
@@ -148,6 +150,7 @@ pub fn run() {
             commands::pick_files,
             commands::save_file,
             external_urls::open_external_url,
+            links::take_pending_links,
             commands::reveal_data_folder,
             commands::open_config_file,
             commands::force_quit,
@@ -179,6 +182,7 @@ pub fn run() {
         .on_menu_event(|app, event| menu::on_menu_event(app.app_handle(), event.id().as_ref()))
         .setup(move |app| {
             let handle = app.handle().clone();
+            links::start(&handle)?;
             if let Some(options) = reset_options.clone() {
                 let fixture = options.fixture;
                 let state = reset_stage::validate(&handle, options, PACKAGED)

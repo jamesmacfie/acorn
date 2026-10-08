@@ -276,6 +276,15 @@ describe('the shell', () => {
     expect(caretRow(closed)).toBe(before)
   }, 30_000)
 
+  it('offers Copy link for the visible place', async () => {
+    const screen = await renderFixture({ width: 100, height: 28 })
+    await screen.press('k', { ctrl: true })
+    for (const letter of 'copy link') await screen.press(letter)
+    const frame = await screen.frame()
+    screen.done()
+    expect(frame).toContain('Copy link')
+  }, 30_000)
+
   it('walks into a command group on return and back out of it on escape', async () => {
     const commands = registerFixtureCommands()
     const screen = await renderFixture({ width: 100, height: 28 })

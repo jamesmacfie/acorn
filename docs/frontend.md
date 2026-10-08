@@ -67,6 +67,9 @@ registries, slots, the three gates, and the platform seam's verbs.
 [Rail and routing](./frontend/rail-and-routing.md) covers rail source gates and visibility, rail
 markers and node stats, the router, core URLs, and how a source claims tasks.
 
+[Acorn links](./frontend/acorn-links.md) defines the external address forms, Copy link, desktop and
+terminal delivery, and the extension and test points.
+
 <a id="node-data-access"></a>
 <a id="typed-data-authoring"></a>
 <a id="startup-readiness"></a>

@@ -64,6 +64,8 @@ const TASKS_ROWS = 7
  *  the pane come back (../keys/regions.ts § moveColumn). */
 const RAIL = 0
 
+export const sourceCollectionId = (workspaceId: string): string => `chrome.rail.sources.${workspaceId}`
+
 /** Before every region a layout registers, so the cycle reads down the screen (./Shell.tsx). */
 const MENU_ORDER = -130
 const BROWSE_ORDER = -120
@@ -203,7 +205,7 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
             // Collection state is a place within one roster. A workspace switch replaces that
             // roster, so a workspace being visited for the first time starts on its first row
             // instead of inheriting the previous workspace's active source.
-            id={`chrome.rail.sources.${props.model.workspace()?.id ?? 'loading'}`}
+            id={sourceCollectionId(props.model.workspace()?.id ?? 'loading')}
             ariaLabel="Sources"
             items={sourceRows()}
             selected={selectedSource()}

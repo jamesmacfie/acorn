@@ -14,7 +14,9 @@ if (graph.entry !== 'main.js' || !graph.roots.includes(graph.entry) || !graph.ch
 
 // Complete minified startup graph, including bundled Zod. Updated from the App-only unminified
 // metric in October 2026; external runtime packages are reported separately, never hidden as bytes.
-const CEILING = 720_000
+// Phase 05's pure address parser and the linked-source Menu identity add about 2.5 KB to the
+// measured pre-render closure. The roster and linked-place resolver still load after first frame.
+const CEILING = 723_000
 const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes', 'drizzle-orm', 'RemoteTree-', 'TreeHost-', 'roster-']
 
 const closure = new Set()

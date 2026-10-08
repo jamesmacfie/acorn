@@ -10,7 +10,7 @@
 // here invents a second layout state: `layoutForTask` stays the durable truth on both hosts, and a
 // task opened in the app afterwards finds the pane this shell left it on.
 
-import { dispatchLayout, layoutForTask, activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
+import { dispatchLayout, layoutForTask, activeTaskId, focusedPane, setFocusedPane } from '@acorn/client-core/features/tasks/tasks.ts'
 import { defaultLayout } from '@acorn/client-core/features/tasks'
 import {
   paneAvailable, paneContribution, paneContributions, type PaneContribution,
@@ -30,6 +30,11 @@ export const panesFor = (task: Task): PaneContribution[] =>
  */
 export function shownPane(task: Task): PaneContribution | undefined {
   const layout = layoutForTask(task.id) ?? defaultLayout()
+  const focused = focusedPane(task.id)
+  if (focused && layout.panes.includes(focused)) {
+    const pane = paneContribution(focused)
+    if (pane && paneAvailable(pane, task)) return pane
+  }
   for (const id of layout.panes) {
     const pane = paneContribution(id)
     if (pane && paneAvailable(pane, task)) return pane
@@ -39,8 +44,10 @@ export function shownPane(task: Task): PaneContribution | undefined {
 
 /** Show one. The reducer keeps pinned panes, which on this host means they stay in the row a desktop
  *  would draw them in; only the first is on screen here. */
-export const showPane = (task: Task, paneId: string): void =>
+export const showPane = (task: Task, paneId: string): void => {
   dispatchLayout(task.id, { type: 'show', pane: paneId })
+  setFocusedPane(task.id, paneId)
+}
 
 /**
  * The pane chords, as the shell answers them. Wraps, and refuses when there is nothing to move to so

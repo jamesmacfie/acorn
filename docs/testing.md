@@ -88,3 +88,7 @@ evidence. Don't rewrite them.
 
 Use `pnpm dev:agent` for an isolated desktop session and `pnpm dev:tui:agent` for an isolated
 terminal session. [Agent drivers](./local-development/agent-drivers.md) has the commands.
+
+For link-specific renderer and terminal recipes, see [Acorn links](./frontend/acorn-links.md#extend-and-test-links).
+The desktop driver exercises renderer dispatch, not macOS scheme registration. Installed-release
+delivery remains unverified because the disposable app build failed before producing an `.app`.

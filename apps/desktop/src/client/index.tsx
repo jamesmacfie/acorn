@@ -24,6 +24,7 @@ import { startDeviceConfigSync } from '@acorn/client-core/infra/persistence/devi
 import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
 import { bootMark, emitBootSpans } from './boot'
+import { startDesktopLinks } from './links'
 
 const noop = () => null
 
@@ -73,6 +74,7 @@ window.addEventListener('pagehide', () => void flushTelemetry())
 
 // The first mark of the cold-start account (./boot.ts).
 bootMark('script start')
+void startDesktopLinks()
 
 // A WS drop means the client missed events, and there is no cursor into history to replay from, so
 // the remedy is to mark everything stale and let whatever is on screen refetch

@@ -9,6 +9,7 @@ import { IconButton } from '../../kit/components/inputs/IconButton'
 type OverflowMenuProps = {
   onSettings: () => void
   onClearCache: () => void | Promise<void>
+  onCopyLink?: () => void
 }
 
 export default function OverflowMenu(props: OverflowMenuProps) {
@@ -23,6 +24,7 @@ export default function OverflowMenu(props: OverflowMenuProps) {
       {(menu) => (
         <>
           <Menu.Item context={menu} onSelect={() => props.onSettings()}>Settings</Menu.Item>
+          {props.onCopyLink && <Menu.Item context={menu} onSelect={() => props.onCopyLink?.()}>Copy link</Menu.Item>}
           <Menu.Separator />
           <Menu.Item context={menu} onSelect={() => void props.onClearCache()}>Clear cache</Menu.Item>
           {/* ponytail: a plain reload, no prop threaded through — the host has nothing to add to it. */}

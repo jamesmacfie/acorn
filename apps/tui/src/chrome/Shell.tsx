@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack, type Accessor, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
@@ -8,14 +8,18 @@ import { WORKSPACES_PREF_KEY, workspacesMode } from '@acorn/protocol/workspacesM
 import { workspaceWords } from '@acorn/client-core/features/workspaces'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { focusedPane, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
-import { clientEvents, registerCommands } from '@acorn/client-core/host/registries/commands'
+import { buildLink, clientEvents, registerCommands, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
+import { sourceIsProjectScoped } from '@acorn/client-core/host/registries/sources'
+import { currentPath } from '../kit/router'
+import { copyToTerminal } from '../kit/copy'
 import { pendingTerminalTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { Dynamic } from '../tree/renderer'
@@ -29,7 +33,7 @@ import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { installRestore } from './restore'
 import { chooseProject, installRouting, routedProjectId } from './routing'
-import { closeOverlay, openOverlay, topOverlay } from './state'
+import { closeOverlay, isOverlayOpen, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
 import { Rail, railCells } from './Rail'
 import { PANES, SOURCE, topology } from './topology'
@@ -44,16 +48,15 @@ import { createShellPalette } from './paletteSession'
 import { registerNavigationCommands } from './navigationCommands'
 import { CheatSheet } from './CheatSheet'
 import type { SetupStep } from './Setup'
-import { SetupHost } from './SetupHost'
-import { PromotionHost } from './PromotionHost'
 import { promotionRequest } from './promotionStore'
-import { SessionsHost } from './SessionsHost'
-import { FileDialog } from './FileDialog'
 import { activeFilePrompt } from './filePrompt'
-import { SettingsHost } from './SettingsHost'
-import { closeSettings, openSettings } from './settingsStore'
+import { closeSettings, openSettings, settingsPlace } from './settingsStore'
 import { Confirmation } from './Confirmation'
 import { activeConfirmation } from './confirmStore'
+import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
+import { placeRestored } from './state'
+import { startLinkRequest } from './linkRequest'
+import type { ResolvedTerminalLink } from './link'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
 // top of it all.
@@ -68,8 +71,16 @@ import { activeConfirmation } from './confirmStore'
 // down the screen: rail, pane strip, the pane's own regions. The footer is not in it — it is a label,
 // and a stop that does nothing is a hole a reader falls into (../keys/regions.ts § moveRegion).
 const STRIP_ORDER = -50
+const log = createLogger('tui-link')
+// These screens mount only when their overlay opens. Keeping their hosts out of the shell's static
+// chunk also keeps their fallback UI and dependencies out of the measured first-frame graph.
+const SetupHost = lazy(() => import('./SetupHost').then(({ SetupHost }) => ({ default: SetupHost })))
+const PromotionHost = lazy(() => import('./PromotionHost').then(({ PromotionHost }) => ({ default: PromotionHost })))
+const SessionsHost = lazy(() => import('./SessionsHost').then(({ SessionsHost }) => ({ default: SessionsHost })))
+const FileDialog = lazy(() => import('./FileDialog').then(({ FileDialog }) => ({ default: FileDialog })))
+const SettingsHost = lazy(() => import('./SettingsHost').then(({ SettingsHost }) => ({ default: SettingsHost })))
 
-export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void }) {
+export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void; link?: Address; linkReady?: Accessor<boolean> }) {
   const model = createShellModel()
   // One session for the whole shell, not one per open: `./Palette.tsx` is mounted only while the
   // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
@@ -148,6 +159,46 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // …and where the last run left off: the workspace that was open, and from there the per-workspace
   // memory of what was open in it (./restore.ts).
   installRestore(model, () => prefs.data)
+  const [settingsReady, setSettingsReady] = createSignal(false)
+  const reportLinkError = (error: unknown): void => log.warn('could not open terminal link', error)
+  const [resolvedLink, setResolvedLink] = createSignal<{
+    place: ResolvedTerminalLink
+    open: (place: ResolvedTerminalLink, model: ShellModel) => void
+  } | null>(null)
+  let loadingLink = false
+  let linked = false
+  let cancelLinkRequest: (() => void) | undefined
+  onCleanup(() => cancelLinkRequest?.())
+  createEffect(() => {
+    const link = props.link
+    if (!link || loadingLink || !props.linkReady?.() || !placeRestored() || !model.ready() || !settingsReady()) return
+    loadingLink = true
+    cancelLinkRequest = startLinkRequest({
+      load: () => import('./link'),
+      apply: ({ resolveTerminalLink, openTerminalLink }) => setResolvedLink({
+        place: resolveTerminalLink(link, model), open: openTerminalLink,
+      }),
+      currentNodeId: activeNodeId,
+      nodeId: props.nodeId,
+      onError: reportLinkError,
+    })
+  })
+  createEffect(() => {
+    const resolved = resolvedLink()
+    if (!resolved || linked || activeNodeId() !== props.nodeId) return
+    // A project source is visible only after the destination workspace's provider scope answers.
+    // Switch first, then let this effect run again with that workspace's source list.
+    const projectId = resolved.place.projectId
+    const owner = projectId && model.workspaces().find((workspace) => workspace.projects.some((project) => project.id === projectId))
+    if (owner && model.workspace()?.id !== owner.id) {
+      model.chooseWorkspace(owner.id)
+      return
+    }
+    if (!model.sourcesReady()) return
+    linked = true
+    try { resolved.open(resolved.place, model) }
+    catch (error) { reportLinkError(error) }
+  })
 
   // A bundle this device has never decided about. Raised rather than opened by a key, because nobody
   // asked for it: the distribution pass found code a node is offering and nothing runs until the
@@ -218,6 +269,16 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // The shell's own commands. Registered rather than written into a key handler, so each one is also
   // a palette row and each chord is one the reader can rebind, which is what every other command in
   // the app already is (docs/command-palette-and-shortcuts.md).
+  const linkPlace = (): Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' }> | null => {
+    if (isOverlayOpen('settings')) return { kind: 'settings', ...(settingsPlace().pageId ? { pageId: settingsPlace().pageId } : {}) }
+    const source = selectedSource()
+    if (!source) {
+      const task = model.task()
+      if (!task) return null
+      return taskPlace(task, focusedPane(task.id))
+    }
+    return sourcePlaceFromPath(currentPath(), source, sourceIsProjectScoped(source))
+  }
   onMount(() => {
     const quit = () => {
       // A node this TUI started dies with it, and a reader who typed `q` by accident should not
@@ -227,6 +288,13 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       else props.onQuit()
     }
     const commands = registerCommands([
+      { id: 'core.copy-link', title: 'Copy link', category: 'action', palette: true,
+        when: () => !!linkPlace(), run: () => {
+          const place = linkPlace()
+          if (!place) return
+          const href = buildLink(props.nodeId, place)
+          return copyToTerminal(href) ? { effect: 'close' as const } : { effect: 'stay' as const, status: href }
+        } },
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
       { id: 'core.settings.open', title: 'Open settings', hint: 'every settings page, grouped as on the desktop', category: 'navigation', palette: true, run: () => openSettings() },
@@ -286,7 +354,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   onMount(() => {
     let unregister: (() => void) | undefined
     let live = true
-    void import('./settingsPages').then(({ registerCoreSettingsPages }) => { if (live) unregister = registerCoreSettingsPages() })
+    void import('./settingsPages').then(({ registerCoreSettingsPages }) => {
+      if (live) { unregister = registerCoreSettingsPages(); setSettingsReady(true) }
+    })
     const offEvent = clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))
     const offTarget = registerNoticeTargetHandler('settings', (_taskId, target) => openSettings(target.resourceId))
     onCleanup(() => { live = false; offTarget(); offEvent(); unregister?.() })

@@ -69,6 +69,7 @@ the whole plugin system in one page.
 | Document | What it holds |
 | --- | --- |
 | [frontend.md](./frontend.md) | Renderer composition, the package layout, and how the shell is put together. |
+| [frontend/acorn-links.md](./frontend/acorn-links.md) | External Acorn addresses, Copy link, desktop and terminal behavior, safety, and test recipes. |
 | [ui-design.md](./ui-design.md) | The closed component kit, the appearance axes, and the design tokens. |
 | [panes.md](./panes.md) | The layout model and the pane vocabulary. |
 | [native-overlays.md](./native-overlays.md) | Native composition, input routing, presentation authority, supported platforms, and degraded behavior. |
@@ -360,21 +361,6 @@ These planned handoffs follow Editor file viewers. They do not describe shipped 
 | [Phase 12](./future/ui-extension/12-rail-status.md) | Consenting source and task-pane status annotations. |
 | [Phase 13](./future/ui-extension/13-acceptance.md) | Combined gates, packed examples, host checks, and lifetime measurements. |
 | [Phase 14](./future/ui-extension/14-documentation.md) | Final reference, authoring, example, and index updates. |
-
-## Future Acorn links
-
-These pages describe planned work, not shipped behavior.
-
-| Document | What it holds |
-| --- | --- |
-| [Acorn links plan](./future/url/README.md) | The `acorn://` address format, decisions, safety rules, and how existing addresses map in. |
-| [Refused alternatives](./future/url/refused.md) | What the plan decided not to do, and deferred work. |
-| [Phase 01](./future/url/01-addresses.md) | A pure link parser and builder, and a dispatcher that opens an address in the app. |
-| [Phase 02](./future/url/02-desktop-registration.md) | macOS scheme registration, cold-start delivery, and the dev session `link` verb. |
-| [Phase 03](./future/url/03-copy-link.md) | **Copy link** on tasks, project pages, plugin pages, settings pages, and rail sources. |
-| [Phase 04](./future/url/04-new-task-action.md) | `new-task?url=` through the promote dialog. |
-| [Phase 05](./future/url/05-terminal-link.md) | `acorn --link` for the terminal client. |
-| [Phase 06](./future/url/06-documentation.md) | The reference page and index updates. |
 
 ## Future Git client handoff
 

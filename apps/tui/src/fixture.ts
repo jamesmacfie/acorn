@@ -96,6 +96,8 @@ const SECOND_PROJECT = {
   github: { owner: 'runn-fast', name: 'second', repoId: 2 },
 }
 
+export const SECOND_TASK: Task = { ...TASK, id: 'task-2', title: 'second task', projectId: SECOND_PROJECT.id }
+
 const AGENT_PROVIDERS = [{
   id: 'claude',
   profileId: 'claude',
@@ -498,16 +500,25 @@ const json = (value: unknown) => ({
         plugins: ['agents', 'browser', 'changes', 'docker', 'editor', 'github', 'memory', 'notes', 'preview', 'terminal', 'workflows']
           .map((name) => ({ name, required: false, disabled: false, running: true, state: 'active', active: null })),
       })
-      if (path === '/v1/core/integrations') return json({ integrations: [GITHUB_INTEGRATION], providers: [] })
+      if (path === '/v1/core/integrations') return json({
+        integrations: [GITHUB_INTEGRATION],
+        providers: process.env.ACORN_FIXTURE_LINK_SCOPES ? [{ id: 'github', supportsProjects: true }] : [],
+      })
       if (path === '/v1/core/workspaces') return json([
         { id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] },
         ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE
           ? [{ id: 'ws-2', name: 'second', projects: [{ id: SECOND_PROJECT.id, name: SECOND_PROJECT.name }] }]
           : []),
       ])
-      if (path === '/v1/core/workspaces/ws-1/external-projects') return json({ projects: [] })
-      if (path === '/v1/core/workspaces/ws-2/external-projects') return json({ projects: [] })
-      if (path === '/v1/core/tasks') return json([TASK])
+      if (path === '/v1/core/workspaces/ws-1/external-projects') return json({
+        projects: process.env.ACORN_FIXTURE_LINK_SCOPES && !process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
+          ? [{ integrationId: 'github', externalId: 'runn-fast/acorn' }] : [],
+      })
+      if (path === '/v1/core/workspaces/ws-2/external-projects') return json({
+        projects: process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
+          ? [{ integrationId: 'github', externalId: 'runn-fast/second' }] : [],
+      })
+      if (path === '/v1/core/tasks') return json([TASK, ...(process.env.ACORN_FIXTURE_LINK_SCOPES ? [SECOND_TASK] : [])])
       // A descriptor source's items, for the one test that drives a `SourcePanel` list rather than a
       // first-party source's own regions (./sourceFilter.test.tsx). Three titles, two of which share a
       // word, so a filter can be shown to keep some rows and drop others.

@@ -76,7 +76,7 @@ export default function Topbar(own: { value?: unknown }) {
         </Show>
         <Show when={props().node}>{(node) => <NodeChip nodeId={node().id} compact={props().nodes.length <= 1} query={{}} />}</Show>
         <NestedChromeSlot slotRef={props().slots.right} />
-        <OverflowMenu onSettings={props().openSettings} onClearCache={props().clearCache} />
+        <OverflowMenu onSettings={props().openSettings} onClearCache={props().clearCache} onCopyLink={props().copyLink} />
       </div>
     </div>
   )

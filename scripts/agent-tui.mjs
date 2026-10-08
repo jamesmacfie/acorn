@@ -73,6 +73,8 @@ async function main() {
     '--session', options.session, '--data-dir', dataDir,
     '--cols', String(options.cols), '--rows', String(options.rows), '--keyboard', options.keyboard,
     ...(options.reuse ? ['--reuse'] : []),
+    ...(options.link ? ['--link', options.link] : []),
+    ...(!options.build ? ['--no-build'] : []),
   ])
 }
 

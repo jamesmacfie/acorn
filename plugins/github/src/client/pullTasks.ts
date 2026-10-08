@@ -1,5 +1,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { tasksRoute } from '@acorn/protocol/api.ts'
+import { integrationsRoute, projectsRoute, tasksRoute, workspaceExternalProjectsRoute,
+  type IntegrationsResponse, type Project, type ProjectsResponse, type WorkspaceExternalProjectsResponse,
+} from '@acorn/protocol/api.ts'
 import {
   createTask,
   integrationsOptions,
@@ -13,7 +15,7 @@ import {
   type Task,
 } from '@acorn/plugin-api/client'
 import type { Integration } from '@acorn/protocol/api.ts'
-import type { Pull } from '../shared/api'
+import { pullRoute, type PullDetail } from '../shared/api'
 import type { PullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
@@ -46,13 +48,22 @@ export async function linearConnectionForProject(
   projectId: string,
   linears: readonly Integration[],
 ): Promise<string | null> {
+  return connectionForProject(projectId, linears,
+    () => queryClient.ensureQueryData(projectsOptions(true)),
+    (workspaceId) => queryClient.ensureQueryData(workspaceExternalProjectsOptions(workspaceId, true)))
+}
+
+async function connectionForProject(
+  projectId: string,
+  linears: readonly Integration[],
+  loadProjects: () => Promise<Project[]>,
+  loadMappings: (workspaceId: string) => Promise<WorkspaceExternalProjectsResponse>,
+): Promise<string | null> {
   if (linears.length <= 1) return linears[0]?.id ?? null
-  const projects = await queryClient.ensureQueryData(projectsOptions(true)).catch(() => [])
+  const projects = await loadProjects().catch(() => [] as Project[])
   const workspaceId = projects.find((project) => project.id === projectId)?.workspaceId
   if (!workspaceId) return null
-  const mapped = await queryClient
-    .ensureQueryData(workspaceExternalProjectsOptions(workspaceId, true))
-    .catch(() => ({ projects: [] }))
+  const mapped = await loadMappings(workspaceId).catch(() => ({ projects: [] }))
   const connected = new Set(linears.map((connection) => connection.id))
   const candidates = new Set(
     mapped.projects
@@ -73,25 +84,7 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
   const existing = activeTaskForPull(tasks, target.projectId, pullNumber)
   if (existing) return existing
 
-  // Seed task links from the same warmed detail body regardless of which UI started the promotion.
-  // A task link needs an unambiguous connection, which `linearConnectionForProject` settles.
-  const detail = await queryClient
-    .ensureQueryData(pullDetailOptions(target.owner, target.repo, target.number, true))
-    .catch(() => undefined)
-  const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
-  const linears = (integrations?.integrations ?? [])
-    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
-  const linearId = await linearConnectionForProject(queryClient, target.projectId, linears)
-  const links = linearId
-    ? scanContentRefs([detail?.pull?.body])
-        .filter((ref) => ref.providerId === 'linear')
-        .map((ref) => ({
-          connectionId: linearId,
-          identifier: ref.item,
-          ref: { displayId: ref.item, url: ref.url },
-        }))
-    : []
-
+  const links = await linksForPull(queryClient, target)
   const task = await createTask({
     origin: 'github-pr',
     projectId: target.projectId,
@@ -103,27 +96,71 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
   return task
 }
 
+// A task link needs an unambiguous connection. Both the direct PR action and the confirmation
+// dialog derive links here, so they record the same references from the PR body.
+async function linksForPull(queryClient: QueryClient, target: PullRef & { projectId: string }) {
+  const detail = await queryClient
+    .ensureQueryData(pullDetailOptions(target.owner, target.repo, target.number, true))
+    .catch(() => undefined)
+  const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
+  const linears = (integrations?.integrations ?? [])
+    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
+  const linearId = await linearConnectionForProject(queryClient, target.projectId, linears)
+  return linksFromBody(detail?.pull?.body, linearId)
+}
+
+function linksFromBody(body: string | null | undefined, linearId: string | null) {
+  return linearId
+    ? scanContentRefs([body])
+        .filter((ref) => ref.providerId === 'linear')
+        .map((ref) => ({
+          connectionId: linearId,
+          identifier: ref.item,
+          ref: { displayId: ref.item, url: ref.url },
+        }))
+    : []
+}
+
+// The URL resolver already fetched the full detail. Prepare from that item and read only the
+// connection metadata needed for its references; no second PR read or detached query cache.
+async function linksForResolvedPull(pull: NonNullable<PullDetail['pull']>, projectId: string) {
+  const integrations = await readJson<IntegrationsResponse>(integrationsRoute).catch(() => null)
+  const linears = (integrations?.integrations ?? [])
+    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
+  const linearId = await connectionForProject(projectId, linears,
+    async () => (await readJson<ProjectsResponse>(projectsRoute)).projects,
+    (workspaceId) => readJson<WorkspaceExternalProjectsResponse>(workspaceExternalProjectsRoute(workspaceId)))
+  return linksFromBody(pull.body, linearId)
+}
+
 /**
- * The source's promotion contract, for the one caller that is not this plugin: the shared
- * promote-to-task modal, which the workflows plugin opens from a pull request's row menu
- * (docs/workflows/starting-runs.md § Starting a run). Without it the modal has no way to turn a pull into a task
- * and refuses to draw.
+ * The source's promotion contract for the shared promote-to-task modal. Workflows opens it from
+ * a pull request row (docs/workflows/starting-runs.md § Starting a run); Acorn links open it after
+ * the content recogniser resolves a PR URL.
  *
- * Deliberately thinner than `promotePullToTask` above. It keeps the half that matters — a pull that
- * already has an active task gets that task rather than a second one, which is what "attach to the
- * PR's task" means here — and drops the Linear link seeding, which needs the warmed detail cache and
- * therefore a QueryClient this contract has no way to hand over. The list's own **Create task** row
- * still runs the full path. There is no `attachToCurrentTask`: a pull request is recorded on the task
+ * There is no `attachToCurrentTask`: a pull request is recorded on the task
  * row as `pullNumber`, not as a link, so attaching one to somebody else's task is not a thing.
  */
-export const githubPullPromotion: NonNullable<SourceContribution<Pull>['promotion']> = {
+export const githubPullPromotion: NonNullable<SourceContribution<NonNullable<PullDetail['pull']>>['promotion']> = {
+  fromContentLink: async (target) => {
+    if (target.kind !== 'pr' || typeof target.owner !== 'string' || typeof target.repo !== 'string' || typeof target.number !== 'string') return null
+    const detail = await readJson<PullDetail>(pullRoute(target.owner, target.repo, target.number))
+    return detail.pull
+  },
+  existingTask: async (target, projectId) => {
+    const number = Number(target.number)
+    if (target.kind !== 'pr' || !Number.isSafeInteger(number) || number <= 0) return undefined
+    const tasks = await readJson<Task[]>(tasksRoute)
+    return activeTaskForPull(tasks, projectId, number)
+  },
   canPromote: (pull, context) => !!context.projectId && !!pull.headRef,
-  prepare: (pull, context) => ({
+  prepare: async (pull, context) => ({
     origin: 'github-pr',
     projectId: context.projectId,
     title: pull.title,
     branch: pull.headRef ?? context.branch,
     pullNumber: pull.number,
+    links: await linksForResolvedPull(pull, context.projectId),
   }),
   create: async (seed) => {
     const tasks = await readJson<Task[]>(tasksRoute).catch(() => [] as Task[])

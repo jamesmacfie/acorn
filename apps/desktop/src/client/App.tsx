@@ -28,6 +28,9 @@ import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/cl
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins, clientPluginsReady } from './activate'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { registerAddressHostWhenReady } from './addressHostRegistration'
+import { PromoteToTaskModal } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
 import { clearCache } from './clearCache'
 import { topbarBreadcrumb } from './breadcrumb'
 import TaskView from './TaskView'
@@ -46,7 +49,7 @@ import { createAppStartupRestore } from '@acorn/client-core/infra/persistence'
 import { createTaskDeepLink } from '@acorn/client-core/features/tasks'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { SourceSurface } from '@acorn/client-core/host/registries/sources/SourceSurface.tsx'
-import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands'
+import { CREATE_TASK_ROUTE, copyLink, projectPath, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
 import { availableSources } from '@acorn/client-core/features/tabs'
 import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -72,7 +75,9 @@ const WorkspaceRail = lazy(() => import('@acorn/client-core/features/workspaces/
 // Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
 export default function App() {
+  const linkLog = createLogger('links')
   const queryClient = useQueryClient()
+  const mountedNodeId = activeNodeId()
   const params = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -82,6 +87,8 @@ export default function App() {
   // call, so a deep link that arrives while settings is open still navigates. With no target it opens on
   // the last page used; a target is `settings/<pageId>#<sectionId>` or a bare page id.
   const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
+  const [settingsLink, setSettingsLink] = createSignal<{ nodeId: string; place: Extract<Place, { kind: 'settings' }> } | null>(null)
+  const [linkPromotion, setLinkPromotion] = createSignal<{ projectId: string; sourceId: string; item: unknown; itemTitle: string } | null>(null)
   const openSettings = (target?: string): void => { setSettingsRequest(target ? { target } : {}) }
   // Panes deep-link here rather than receiving an `openSettings` prop: the layer is the shell's, and
   // threading a callback through every pane that might ever want one is worse than one event.
@@ -90,6 +97,24 @@ export default function App() {
   // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
   // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.
   const inTaskView = () => !selectedSource() && !!activeTask()
+  const visibleLinkPlace = (): Extract<Place, { kind: 'task' | 'project' | 'source' }> | null => {
+    if (inTaskView()) {
+      const task = activeTask()!
+      return taskPlace(task, focusedPane(task.id))
+    }
+    const source = selectedSource()
+    if (!source) return null
+    return isNew() ? null : sourcePlaceFromPath(location.pathname, source, sourceIsProjectScoped(source))
+  }
+  const copyVisibleLink = () => {
+    if (settingsRequest()) {
+      const settings = settingsLink()
+      if (settings) void copyLink(settings.nodeId, settings.place)
+      return
+    }
+    const place = visibleLinkPlace()
+    if (place) void copyLink(activeNodeId(), place)
+  }
   const termOpen = () => inTaskView() && isTerminalOpen(activeTaskId())
   const toggleTerm = () => {
     const id = activeTaskId()
@@ -117,6 +142,8 @@ export default function App() {
   // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.
   onMount(() => {
     const commands = registerCommands([
+      { id: 'core.copy-link', title: 'Copy link', category: 'action', palette: true,
+        when: () => settingsRequest() ? !!settingsLink() : !!visibleLinkPlace(), run: copyVisibleLink },
       { id: 'core.settings.open', title: 'Open settings', hint: 'on the page you used last', category: 'navigation', palette: true, run: () => openSettings() },
       {
         id: 'core.project.add', title: 'Add project', hint: 'from a folder', category: 'workspace', palette: true,
@@ -378,6 +405,8 @@ export default function App() {
     if (on) emitBootSpans()
   })
 
+  let explicitProjectPath: string | undefined
+
   // Whatever source was selected has to still be on offer. A workspace switch can take one away:
   // a browse source only appears where its provider is connected and the workspace links one of its
   // projects, and neither is a fact about the source alone.
@@ -385,6 +414,9 @@ export default function App() {
     const current = selectedSource()
     const connected = integrations.data?.integrations
     if (!current || !connected) return
+    // The linked source may belong to the workspace we are entering, not the one still on screen.
+    const workspace = activeWorkspace()
+    if (explicitProjectPath && (!workspace || !workspaceOwnsPath(workspace, explicitProjectPath))) return
     if (!availableSources(connected, sourceScope()).some((source) => source.id === current)) {
       setSelectedSource(defaultSourceId() ?? null)
     }
@@ -413,6 +445,7 @@ export default function App() {
       tasks: tasks.data ?? [],
       defaultSource: defaultSourceId() ?? '',
       rememberedView: workspaceView(ws.id),
+      explicitProjectPath: explicitProjectPath === location.pathname ? explicitProjectPath : undefined,
     })
     if (plan.kind === 'restore-task') {
       activateTaskSignals(plan.task)
@@ -443,6 +476,39 @@ export default function App() {
     setPlaceRestored(true)
   })
 
+  // A linked project chooses its own route and source. Keep that choice when the route enters a
+  // workspace whose remembered view points elsewhere; ordinary workspace-picker changes still
+  // restore their remembered view.
+  createEffect(() => {
+    if (!mountedNodeId || !placeRestored() || !clientPluginsReady()) return
+    const unregister = registerAddressHostWhenReady({
+      nodeId: mountedNodeId,
+      navigate: (path) => navigate(path),
+      openProject: (path, source) => {
+        setLinkPromotion(null)
+        explicitProjectPath = path
+        setSelectedSource(source)
+        navigate(path)
+      },
+      openTask: (taskId, path, linkedTask) => {
+        setLinkPromotion(null)
+        const task = linkedTask ?? tasks.data?.find((candidate) => candidate.id === taskId)
+        if (!task) return false
+        if (linkedTask) queryClient.setQueryData<Task[]>(tasksKey, (current = []) =>
+          current.some((candidate) => candidate.id === linkedTask.id)
+            ? current.map((candidate) => candidate.id === linkedTask.id ? linkedTask : candidate)
+            : [...current, linkedTask])
+        activateTaskSignals(task)
+        navigate(path)
+        return true
+      },
+      hasProject: (projectId) => !!queryClient.getQueryData<Project[]>(projectsKey)?.some((project) => project.id === projectId),
+      loadProjects: async () => { await queryClient.ensureQueryData(projectsOptions(true)) },
+      showPromotion: setLinkPromotion,
+    }, (error) => linkLog.warn('Could not prepare loaded plugin routes for an Acorn link', error))
+    onCleanup(unregister)
+  })
+
   // The route is the authority for what actually opened. Wait until the saved pair and the startup
   // destination have both landed, or a transient first route would displace the previous workspace.
   createEffect(() => {
@@ -461,6 +527,9 @@ export default function App() {
     ([ws, , , , ready]) => {
       if (!ws || !ready) return
       if (enteredWorkspaceId && enteredWorkspaceId !== ws.id) openWorkspaceView(ws)
+      if (explicitProjectPath === location.pathname && workspaceOwnsPath(ws, location.pathname)) {
+        explicitProjectPath = undefined
+      }
       enteredWorkspaceId = ws.id
       // Read again rather than taken from the arguments, because opening the workspace may have
       // just changed them.
@@ -551,6 +620,7 @@ export default function App() {
       },
       clearCache: () => clearCache(queryClient),
       addProject: () => { const mode = workspaceMode(); if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined) },
+      copyLink: visibleLinkPlace()?.kind === 'project' ? copyVisibleLink : undefined,
     }
   }
   const coreTopbar = registerCoreExclusiveSlot('topbar', Topbar)
@@ -621,8 +691,36 @@ export default function App() {
           (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
+      {/* The modal snapshots eligible tasks and used branches when it mounts. Wait for both lists
+          before mounting so a cold Node does not offer an empty attachment/branch context. */}
+      <Show keyed when={linkPromotion() && params.projectId === linkPromotion()!.projectId
+        && projects.data?.some((project) => project.id === linkPromotion()!.projectId)
+        && tasks.data && workspaces.data ? linkPromotion() : null}>
+        {(promotion) => {
+          const projectTasks = (tasks.data ?? []).filter((task) => task.projectId === promotion.projectId)
+          const workspaceProjects = new Set(workspaceForProject(workspaces.data, promotion.projectId)?.projects.map((project) => project.id) ?? [])
+          const ready = (task: Task) => {
+            setLinkPromotion(null)
+            void queryClient.invalidateQueries({ queryKey: tasksKey })
+            activateTaskSignals(task)
+            navigate(pathForTask(task))
+          }
+          return <PromoteToTaskModal
+            providerId={promotion.sourceId}
+            item={promotion.item}
+            itemTitle={promotion.itemTitle}
+            headerLabel="Create task"
+            attachTasks={(tasks.data ?? []).filter((task) => task.status === 'active' && workspaceProjects.has(task.projectId))}
+            existingBranches={projectTasks.flatMap((task) => task.branch ? [task.branch] : [])}
+            onClose={() => setLinkPromotion(null)}
+            onCreated={ready}
+            onAttached={ready}
+          />
+        }}
+      </Show>
       <Show when={settingsRequest()}>
-        {(request) => <Portal><SettingsView request={request()} onClose={() => setSettingsRequest(null)} /></Portal>}
+        {(request) => <Portal><SettingsView request={request()} onClose={() => { setSettingsRequest(null); setSettingsLink(null) }}
+          onLinkPlace={setSettingsLink} onCopyLink={copyVisibleLink} /></Portal>}
       </Show>
       {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}
       <WillConfirmationHost />

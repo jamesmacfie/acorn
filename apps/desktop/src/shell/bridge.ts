@@ -252,6 +252,10 @@ const toWireBody = (body: unknown): WireFetchBody | undefined => {
 }
 
 const acorn = {
+  links: {
+    subscribe: async (wake: () => void) => listen<string>('acorn:open-link', wake),
+    takePending: () => invoke<string[]>('take_pending_links'),
+  },
   // No async boundary: the context leaves before the renderer starts synchronous work.
   reportResponsiveness: (params: ResponsivenessPulse) => {
     if (liveSocket?.readyState === WebSocket.OPEN) liveSocket.send(JSON.stringify({ id: nextId++, method: 'renderer-pulse', params }))

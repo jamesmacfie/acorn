@@ -16,6 +16,11 @@ export {
   settingsPageCommands,
 } from './coreCommands.ts'
 export { CREATE_TASK_ROUTE, PROJECT_ROUTE, TASK_ROUTE, projectPath } from './corePaths.ts'
+export { buildLink, parseLink, MAX_LINK_LENGTH } from './addresses.ts'
+export { copyLink, projectPlaceFromPath, sourcePlaceFromPath, taskPlace } from './copyLink.ts'
+export type { Address, Place, LinkRefusal, LinkResult } from './addresses.ts'
+export { openAddress, openLink, registerAddressHost, reportLinkFailure } from './addressOpening.ts'
+export type { AddressHost } from './addressOpening.ts'
 export { KeybindingDispatcher, keybindingRegistry, registerKeybindings, resolveKeybindings } from './keybindings.ts'
 export type { KeybindingPrefs, ResolvedKeybinding } from './keybindings.ts'
 export { localSearch } from './localSearch.ts'

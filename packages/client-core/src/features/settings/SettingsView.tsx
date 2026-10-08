@@ -129,7 +129,12 @@ function landOnSection(page: () => HTMLElement | undefined, section: string): ()
   }
 }
 
-export default function SettingsView(props: { request: SettingsRequest; onClose: () => void }) {
+export default function SettingsView(props: {
+  request: SettingsRequest
+  onClose: () => void
+  onLinkPlace?: (link: { nodeId: string; place: { kind: 'settings'; pageId?: string; sectionId?: string } } | null) => void
+  onCopyLink?: () => void
+}) {
   const workspaces = createQuery(() => workspacesOptions(true))
   // Read for search only: their names are what someone types to find the page that holds them.
   const projects = createQuery(() => projectsOptions(true))
@@ -351,6 +356,13 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
   // The node a page's body reads. The switcher's on a page that follows it, and the active node on every
   // other one, because a body bound to the ambient API client can read nothing else.
   const pageNode = () => (current()?.page.followsNodeSwitcher ? switchedNode() : activeNodeId())
+  createEffect(() => {
+    const nodeId = pageNode()
+    const selected = selection()
+    props.onLinkPlace?.(nodeId && current() ? {
+      nodeId, place: { kind: 'settings', pageId: selected.page, ...(selected.section ? { sectionId: selected.section } : {}) },
+    } : null)
+  })
 
   const context: SettingsPageContext = {
     get scope() {
@@ -665,6 +677,9 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
                   <div class="settings-title-line">
                     <h1 class="settings-title">{detail()?.title() ?? resolved().name}</h1>
                     <span class="settings-scopes">{scopeChip(resolved())}</span>
+                    <Show when={props.onCopyLink}>
+                      <IconButton icon="copy" label="Copy link" onPress={() => props.onCopyLink?.()} />
+                    </Show>
                     <span class="settings-close">
                       <IconButton icon="x" label="Close settings" tipKey="Esc" onPress={close} />
                     </span>

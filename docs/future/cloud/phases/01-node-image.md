@@ -110,7 +110,7 @@ Record, for at least 20 runs each:
 - Image size, and memory and CPU at idle and during an agent turn.
 
 If warm create-to-handshake is not well under 15 seconds, leaving room for enrollment and adoption,
-repeat the measurement on one alternative provider from [hosting and cost](../hosting-and-cost.md#candidates-as-of-2026-09-11).
+repeat the measurement on one alternative provider from [hosting and cost](../hosting-and-cost.md#candidates-as-of-2026-10-08).
 
 Price the measured CPU, memory, storage, and transfer at the provider's current rates.
 

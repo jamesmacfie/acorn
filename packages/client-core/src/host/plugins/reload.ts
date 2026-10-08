@@ -32,6 +32,13 @@ export async function reconcileDevicePluginChange(): Promise<void> {
   syncPluginContributions()
 }
 
+/** A linked place may name a loaded route. The distribution queue includes the device pass and
+ * earlier fleet reads; finish the selected node's pass and register its contributions before routing. */
+export async function preparePluginContributionsForNode(nodeId: string): Promise<void> {
+  await syncPluginDistribution({ nodeIds: [nodeId] })
+  syncPluginContributions()
+}
+
 /** Plugin lifecycle events are fleet control events. Ordinary task streams still obey the active
  * node WebSocket filter. The status effect tracks transitions, so reconnects read again. */
 export function watchPluginChanges(): () => void {

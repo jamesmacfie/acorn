@@ -43,6 +43,7 @@ export type ShellModel = {
    *  empty array, which reads the same as a node with nothing on it, so anything that must not act on
    *  a guess asks this instead (./restore.ts). */
   ready: Accessor<boolean>
+  sourcesReady: Accessor<boolean>
   /** A successful project roster, distinct from a pending or failed read. */
   projects: Accessor<readonly Project[] | undefined>
 }
@@ -178,7 +179,7 @@ export function createShellModel(): ShellModel {
   }
 
   return {
-    workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready,
+    workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready, sourcesReady,
     projects: () => projectsQuery.isSuccess && !projectsQuery.isFetching ? projectsQuery.data : undefined,
   }
 }

@@ -246,6 +246,7 @@ export type PluginDeviceInstallResult = { hash: string; pluginId: string; versio
 // The preload object, shaped as the groups above rather than as a flat bag, so the adapters below are
 // projections instead of translations. Everything is optional: an older preload, or none at all.
 type AcornPreload = {
+  links?: { subscribe: (wake: () => void) => Promise<() => void>; takePending: () => Promise<string[]> }
   rendererLayer?: RendererLayer
   desktop?: boolean
   platform?: string
@@ -304,6 +305,9 @@ const acornGlobal = (): AcornPreload | undefined => (typeof window === 'undefine
 export const reportResponsiveness = (pulse: ResponsivenessPulse): void => acornGlobal()?.reportResponsiveness?.(pulse)
 
 export const isDesktopHost = (): boolean => !!acornGlobal()?.desktop
+
+/** The shell buffers OS URLs until the renderer has installed its listener. */
+export const desktopLinks = () => acornGlobal()?.links ?? null
 
 // 'darwin' | 'win32' | 'linux' when a desktop shell is hosting; undefined otherwise.
 export const hostPlatform = (): string | undefined => acornGlobal()?.platform

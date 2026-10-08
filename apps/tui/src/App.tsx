@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, lazy, Show, type JSX } from 'solid-js'
+import { createEffect, lazy, Show, type Accessor, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksOptions } from '@acorn/client-core/infra/queries.ts'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -21,6 +21,7 @@ import { setDocumentSurface } from '@acorn/client-core/host/frames/documentSurfa
 import { LAYOUTS } from './layouts'
 import { RemoteTree } from './plugins/remoteTreeLoader'
 import { Shell } from './chrome/Shell'
+import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
 import { resetChromeForNodeSwitch } from './chrome/state'
 import { resetSettings } from './chrome/settingsStore'
 import { resetConfirmations } from './chrome/confirmStore'
@@ -127,6 +128,8 @@ export function App(props: {
   nodeId: string
   supervised: boolean
   task?: string
+  link?: Address
+  linkReady?: Accessor<boolean>
   onNoTask?: (id: string) => void
   onQuit: () => void
 }) {
@@ -150,7 +153,8 @@ export function App(props: {
       <QueryClientProvider client={client}>
         <Telemetry />
         <TaskArg id={nodeId === props.nodeId ? props.task : undefined} onMissing={props.onNoTask}>
-          <Shell nodeId={nodeId} supervised={props.supervised && nodeId === props.nodeId} onQuit={props.onQuit} />
+          <Shell nodeId={nodeId} supervised={props.supervised && nodeId === props.nodeId} onQuit={props.onQuit}
+            link={nodeId === props.nodeId ? props.link : undefined} linkReady={props.linkReady} />
         </TaskArg>
       </QueryClientProvider>
     )
