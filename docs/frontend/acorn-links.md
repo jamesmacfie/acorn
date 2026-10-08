@@ -118,6 +118,6 @@ pnpm dev:tui:agent:ui -- --session links-tui stop
 
 Run `pnpm test:focus @acorn/client-core src/host/registries/commands/addresses.test.ts` for parser
 changes. The renderer test checks dispatch, not operating-system delivery. Installed-release
-acceptance remains unverified: three disposable macOS bundle attempts failed during host Rust
-proc-macro compilation before an `.app` was produced. Use an installed disposable bundle to check
-cold, running, and minimized delivery when that build is available.
+acceptance remains unverified because host release compilation fails on Rust proc-macro
+dependencies before packaging an `.app`. Use an installed disposable bundle to check cold,
+running, and minimized delivery when that build is available.

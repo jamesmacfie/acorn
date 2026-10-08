@@ -8,6 +8,28 @@ Date: October 8, 2026. Status: six phases implemented; installed-release accepta
 unverified. [Acorn links](../../frontend/acorn-links.md) owns the shipped contract. A browser
 extension that builds these links is out of scope and has its own plan.
 
+## Combined verification, October 8, 2026
+
+The task branch integrates main at `a630f360a`, including project-first navigation and Node shell
+remounts. Final review preserved edits made during promotion preparation and tied preparation,
+writes, and completion callbacks to the dialog's Node and lifetime. Its 14 focused tests pass.
+
+Full `pnpm lint` passed all 37 tasks. Full `pnpm test` passed 35 of 36 tasks, including all product JavaScript
+suites and 66 Rust tests. Architecture ran before desktop staging generated the three Tauri schema
+files cited by a security design; its rerun passed all 87 checks after staging. The baseline route,
+CSS, and contribution snapshot failures recorded in earlier phase notes are resolved by main.
+
+The combined terminal build passed at 722,388 bytes in 166 startup chunks under the 723,000-byte
+guard, with all 47 external runtime imports resolving. Five overlay hosts load when opened, while
+Help and confirmation remain eager. The final affected terminal tests passed all 70 cases; scoped
+terminal and client-core lint passed after the review fixes.
+
+A disposable release build with identifier `com.acorn.desktop.url-acceptance` failed before
+packaging with Rust `E0463` for `zerofrom_derive`, repeating the earlier host proc-macro failure.
+No app was installed and no scheme handler was changed. macOS cold, running, minimised, and cold
+loaded-plugin delivery therefore remain unverified. Diagnostic logs are in
+`/tmp/url-final-{lint,test,architecture,tui-build,tui-focused,promotion,bundle}.log` on the test host.
+
 ## Goal
 
 Let something outside Acorn, such as a note, a chat message, a shell script, or a browser extension,
