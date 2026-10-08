@@ -42,6 +42,19 @@ network, so a tunnelled first request would still let page script reach services
 private network. Only a Node that custody marks local can supply a loadable preview URL. Switching a
 pane to a remote Node evicts its kept-alive native view.
 
+## Desktop automation driver
+
+The desktop's separate WebDriver server runs only in a debug build with Cargo's
+`agent-automation` feature. The shell's `compile_error!` in
+`apps/desktop/src-tauri/src/lib.rs` refuses that feature when release assertions are disabled, so
+the release build cannot include the driver. The debug server binds `127.0.0.1` on desktop and
+accepts only a single `Host` for its selected `127.0.0.1:<port>` endpoint. It refuses a foreign or
+duplicate `Origin` before routing any command. Acorn's Node driver sends no `Origin`; a matching
+same-origin value is also accepted. This check blocks browser cross-origin and DNS rebinding
+requests. It does not authenticate another local process that can send its own headers. The vendored
+plugin's Android debug path binds all interfaces, and this desktop endpoint policy does not support
+its WiFi driver mode.
+
 ## Agent browser tools
 
 Agent browser tools drive the Node's own browser, through `plugins/browser`, never the person's

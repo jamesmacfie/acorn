@@ -18,6 +18,10 @@ session manifest under `.acorn/agent-dev/my-change/`. The session doesn't share 
 development data root or take the production shell's single-instance lock, so it can run beside
 another acorn checkout.
 
+The WebDriver endpoint accepts the chosen `127.0.0.1` port in `Host` and no `Origin`, as sent by
+the Node driver. A client that sends `Origin` must use that same HTTP endpoint. The server refuses
+other hosts, ports, and origins before handling a command.
+
 The launcher adds the current checkout as a local project. These flags change that:
 
 | Flag | Effect |

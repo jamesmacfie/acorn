@@ -7,6 +7,7 @@ use tokio::runtime::Runtime as TokioRuntime;
 use tokio::sync::RwLock;
 
 pub mod handlers;
+mod caller;
 pub mod response;
 pub mod router;
 
@@ -77,7 +78,10 @@ pub fn start<R: Runtime + 'static>(app: AppHandle<R>, port: u16) {
 
         rt.block_on(async {
             let state = Arc::new(AppState::new(app));
-            let router = router::create_router(state);
+            let router = router::create_router(state).layer(axum::middleware::from_fn_with_state(
+                port,
+                caller::require_local_endpoint,
+            ));
 
             // On Android, bind to all interfaces for WiFi accessibility
             // On other platforms, bind to localhost only for security
