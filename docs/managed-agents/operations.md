@@ -32,6 +32,14 @@ reorder, edit, or deferred continuation can't dispatch a stale head. The earlies
 blocks later turns in its session. Workflow work gets a dispatch slot after five interactive or
 automation turns.
 
+The store captures provider settings and host attendance at the same acceptance boundary, including
+goal turns that the engine queues directly. Interactive and imported sessions resolve to `attended`,
+delegated sessions to `supervised`, and workflow sessions to `supervised` under `gated` or
+`autonomous` under the host's autonomous posture. Plugin follow-ups inherit their admitted origin's
+attendance. Usage-limit continuations retain the original row and policy. Unknown persisted values
+fail before dispatch. Legacy turns without attendance are backfilled durably from the host session
+snapshot; older sessions without that snapshot use their original attended or supervised behavior.
+
 The coordinator runs on events. It scans when a turn is queued, a provider starts, or a turn settles. A
 scan that started nothing runs again if a call arrived during it, and reconciliation runs one scan at
 boot. One plugin-database statement selects queue heads and their sessions through the partial

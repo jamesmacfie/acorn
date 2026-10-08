@@ -64,7 +64,7 @@ export class ProviderEventMaterializer {
     }
     // The subject and the parked-request handles stay in the driver's event; only the request is kept.
     const event = boundProviderEvent(
-      providerEvent.type === 'permission_request' ? providerEvent.request : providerEvent,
+      providerEvent.type === 'permission_request' || providerEvent.type === 'input_request' ? providerEvent.request : providerEvent,
       this.secretValues,
     )
     if (event.type === 'tool') {

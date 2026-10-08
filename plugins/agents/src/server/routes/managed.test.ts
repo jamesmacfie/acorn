@@ -81,6 +81,26 @@ const executionControls = [
 describe('managed execution requires device authority', () => {
   afterEach(() => setManagedAgentsBridge(null))
 
+  it.each(['attendance', 'initialAttendance', 'followUpOf', 'continuationOf', 'posture'])('refuses host-owned %s in HTTP policy JSON', async (key) => {
+    const enqueue = vi.fn(async () => ({}))
+    setManagedAgentsBridge(fake({ enqueueTurn: enqueue as never }))
+    const result = await authed().fetch(req('/api/sessions/s1/turns', 'POST', {
+      input: [{ type: 'text', text: 'Continue' }], effectivePolicy: { [key]: 'autonomous' },
+    }), {} as Env)
+    expect(result.status).toBe(400)
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
+  it.each(['attendance', 'posture'])('refuses host-owned top-level %s in HTTP turns', async (key) => {
+    const enqueue = vi.fn(async () => ({}))
+    setManagedAgentsBridge(fake({ enqueueTurn: enqueue as never }))
+    const result = await authed().fetch(req('/api/sessions/s1/turns', 'POST', {
+      input: [{ type: 'text', text: 'Continue' }], [key]: 'autonomous',
+    }), {} as Env)
+    expect(result.status).toBe(400)
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
   it.each(executionControls)('denies internal callers before runtime access: %s %s', async (method, path, body) => {
     const ownership = vi.fn(unreached('taskIdForSession'))
     setManagedAgentsBridge(fake({ taskIdForSession: ownership }))

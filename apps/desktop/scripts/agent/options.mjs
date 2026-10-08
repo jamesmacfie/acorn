@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { repoRoot, validateSessionName } from './state.mjs'
 
-const FIXTURES = ['large-surfaces', 'tui-navigation', 'delegation-checks']
+const FIXTURES = ['large-surfaces', 'tui-navigation', 'delegation-checks', 'unattended-policy']
 const PROFILES = ['small', 'scale', 'canonical']
 
 export function parseAgentSessionOptions(argv) {

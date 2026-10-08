@@ -20,6 +20,7 @@ import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
+import { persistedAttendance, sessionAttendance } from './attendance'
 import { readAgentConcurrency } from '../concurrencyStore'
 import { AGENT_IDLE_STOP_CHOICES, defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
@@ -595,6 +596,7 @@ export class ManagedAgentEngine {
     return answerLoopHook({
       hooks: this.hooks,
       session: (sessionId) => this.store.getSession(sessionId),
+      turn: (turnId) => this.store.turn(turnId),
       taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
       live: (sessionId) => this.processes.current(sessionId),
       materialize: (sessionId, turnId, event) => this.eventMaterializer.map(sessionId, turnId, event),
@@ -684,18 +686,31 @@ export class ManagedAgentEngine {
     if (!live || live.closing || !this.processes.owns(generation)) return
     this.processes.heard(generation, !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type))
     const turnId = live.activeTurnId
-    if (event.type === 'permission_request') {
-      // Before the event queue, and loaded on first use (./permissionPolicy.ts). The asking turn is the
-      // one captured above, however long the hook takes.
-      const { settlePermissionRequest } = await import('./permissionPolicy')
-      return settlePermissionRequest({
-        hooks: this.hooks,
-        session: () => this.store.requireSession(sessionId),
-        taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
-        materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
+    if (event.type === 'request' || event.type === 'permission_request' || event.type === 'input_request') {
+      const session = await this.store.requireSession(sessionId)
+      const turn = turnId ? await this.store.turn(turnId) : null
+      const attendance = turn
+        ? persistedAttendance(turn.effectivePolicy, { session, source: turn.source }) : sessionAttendance(session)
+      const { settleAutonomousRequest } = await import('./requestPolicy')
+      if (await settleAutonomousRequest({
+        attendance,
         owned: () => this.processes.owns(generation),
+        materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
         accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
-      }, event)
+        respond: (requestId, resolution) => this.withSessionHandle(generation, (handle) => handle.resolveRequest(requestId, resolution)),
+      }, event)) return
+      if (event.type === 'permission_request') {
+        const { settlePermissionRequest } = await import('./permissionPolicy')
+        return settlePermissionRequest({
+          attendance,
+          hooks: this.hooks,
+          session: () => this.store.requireSession(sessionId),
+          taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+          materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
+          owned: () => this.processes.owns(generation),
+          accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
+        }, event)
+      }
     }
     for (const normalized of await this.eventMaterializer.map(sessionId, turnId, event)) {
       if (!this.processes.owns(generation)) return
@@ -810,7 +825,11 @@ export class ManagedAgentEngine {
     this.processes.beginDispatch(generation)
     await this.store.dispatchTurn(turn.id)
     try {
+      turn = await this.store.restoreTurnAttendance(turn.id)
       const input = turn.continuationInput ?? turn.input
+      const { attendanceInstructions } = await import('./attendanceInstructions')
+      const instructions = attendanceInstructions(persistedAttendance(turn.effectivePolicy, { session, source: turn.source }))
+      const driverInput = instructions ? [{ type: 'text' as const, text: instructions }, ...input] : input
       await this.record(session.id, turn.id, {
         type: 'user_message',
         text: agentTurnInputText({ ...turn, input }),
@@ -835,7 +854,7 @@ export class ManagedAgentEngine {
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
-      this.processes.sendTurn(generation, { turn, input, attachments },
+      this.processes.sendTurn(generation, { turn, input: driverInput, attachments },
         async (result) => {
           if (!this.processes.owns(generation)) return
           if (result.providerTurnRef) await this.store.setTurnProviderRef(turn.id, result.providerTurnRef)

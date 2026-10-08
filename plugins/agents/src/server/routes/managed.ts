@@ -331,6 +331,9 @@ export const managedAgents = new Hono<AppEnv>()
     const key = idempotencyKey(c.req.raw.headers)
     if (!key) return respondError(c, 400, 'idempotency_key_required')
     const body = await c.req.json().catch(() => null)
+    if (typeof body === 'object' && body != null && ('attendance' in body || 'posture' in body)) {
+      return respondError(c, 400, 'bad_request')
+    }
     const parsed = enqueueAgentTurnSchema.safeParse(
       typeof body === 'object' && body != null ? { ...body, idempotencyKey: key } : body,
     )

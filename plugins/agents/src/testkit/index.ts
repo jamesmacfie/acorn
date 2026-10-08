@@ -7,4 +7,5 @@
 export { agentDriverRegistry } from '../server/drivers/registry'
 export { LARGE_SESSION_OLDEST_MARKER, LARGE_SESSION_PROFILES, largeSessionTurns, seedLargeSession } from './largeSession'
 export { seedDelegationCheckReport } from './delegationChecks'
+export { seedUnattendedPolicy } from './unattendedPolicy'
 export type { LargeSessionProfile, LargeSessionTurn } from './largeSession'

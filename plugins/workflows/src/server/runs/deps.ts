@@ -23,6 +23,7 @@ export type RunStepOptions = HeadlessOpts & {
   tools?: ToolCeiling
   workflowRunId?: string
   workflowStepId?: string
+  posture?: 'gated' | 'autonomous'
   sessionTitle?: string
   requireManagedSession?: boolean
   managedSessionId?: string

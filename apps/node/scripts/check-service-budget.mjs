@@ -54,7 +54,9 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // and recovery calls. Verdict parsing and evaluation stay behind a dynamic import. The remaining
 // registration grows the static graph to 3,159,369 B, so the ceiling moves by 4 KB.
 // Delegation check contracts and durable report assembly add about 7 KiB to the boot graph.
-const limits = { ceiling: 3_170_000, floor: 1_000_000 }
+// 2026-10-08: host attendance validation, store acceptance/recovery, and per-event routing add about
+// 4 KB. Prompt text and request handling load on first use; static graph: about 3,174,000 B.
+const limits = { ceiling: 3_174_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

@@ -19,6 +19,11 @@ Node-wide and accepts device and service callers, and task callers use the filte
 Managed delegation and workflows call guarded capabilities and the runtime directly. None of these
 HTTP rules replace tool permissions, signed ceilings, or delegation admission.
 
+The host resolves turn attendance. Turn HTTP bodies cannot set `attendance` or `posture`, and
+`effectivePolicy` cannot set `attendance`, `initialAttendance`, `posture`, `followUpOf`, or
+`continuationOf`. Workflow execution and plugin follow-up admission pass their origin through
+host-only contracts. A caller's session configuration cannot override `initialAttendance`.
+
 ## Standing memory
 
 Session admission reads Memory's optional `agents.standingContext.v1` capability and stores the
@@ -55,7 +60,7 @@ reader about 25 times a second. The pane's read mark needs the live sequence, so
 
 The run pane also uses the IDs to find a running step's session, before the step row records its
 `agentSessionId`. A configuration replacement keeps `workflowRunId`, `workflowStepId`,
-`delegationSpawnId`, the `customAgent` snapshot, `toolCeiling`, and `mcpServers`, and can't add,
+`delegationSpawnId`, the `customAgent` snapshot, `initialAttendance`, `toolCeiling`, and `mcpServers`, and can't add,
 change, or remove them. Dedicated MCP selection can change the server list after it checks Settings.
 A fork carries its source's identity and authority snapshots. `kind: 'workflow'` and the workflow
 config marker both exclude a session from managed delegation.

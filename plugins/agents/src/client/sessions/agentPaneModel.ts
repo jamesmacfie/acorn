@@ -281,12 +281,15 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     const turn = [...(value?.turns ?? [])].reverse()
       .find((candidate) => candidate.status === 'failed' || candidate.status === 'interrupted')
     if (!session || !turn) return
+    // A retry is fresh host admission. Do not send saved attendance or internal operation origins.
+    const { attendance: _attendance, initialAttendance: _bootstrap, posture: _posture,
+      followUpOf: _followUp, continuationOf: _continuation, ...policy } = turn.effectivePolicy
     await action(async () => {
       await managedAgentApi.enqueue(session.id, {
         input: turn.input,
         source: 'interactive',
         effectivePolicy: {
-          ...turn.effectivePolicy,
+          ...policy,
           retryOfTurnId: turn.id,
           includePartialHistory: true,
         },

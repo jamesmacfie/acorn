@@ -7,7 +7,7 @@ import { createEffect, createRoot, Suspense } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { withQueryClient } from './queryClient.helper'
-import type { AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentWsFrame } from '../../contract/wire.ts'
+import type { AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentTurn, AgentWsFrame } from '../../contract/wire.ts'
 
 let deliver: (frame: AgentWsFrame) => void = () => {}
 vi.mock('./wsChannel', () => ({
@@ -25,9 +25,13 @@ const session = {
 
 const sessions = vi.fn(async () => ({ sessions: [session], delegations: [], nextCursor: null }))
 const patch = vi.fn(async (_id: string, body: { lastReadSeq: number }) => ({ ...session, lastEventSeq: body.lastReadSeq, ...body }))
+const enqueue = vi.fn(async (_id: string, _body: unknown) => ({}))
+const snapshot = vi.fn(async () => ({ session, turns: [] as AgentTurn[], events: [], requests: [] }))
 const providers = vi.fn(async (_force?: boolean): Promise<AgentProviderDescriptor[]> => [])
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
+    enqueue: (id: string, body: unknown) => enqueue(id, body),
+    snapshot: () => snapshot(),
     providers: (force?: boolean) => providers(force),
     sessions: () => sessions(),
     patch: (id: string, body: { lastReadSeq: number }) => patch(id, body),
@@ -56,6 +60,9 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   vi.useRealTimers()
+  enqueue.mockClear()
+  snapshot.mockReset()
+  snapshot.mockImplementation(async () => ({ session, turns: [], events: [], requests: [] }))
   managedAgentStore.clear()
   providers.mockReset()
   providers.mockImplementation(async () => [])
@@ -175,4 +182,26 @@ it('reads the providers from the cache on the next task, and refreshes them with
   expect(providers).toHaveBeenLastCalledWith(true)
   expect(second.model.choices().map((choice) => choice.provider.id)).toEqual(['claude', 'codex'])
   second.dispose()
+})
+
+
+it('retries a saved turn through fresh host admission without copying host policy fields', async () => {
+  const turn: AgentTurn = { id: 'failed', sessionId: 's1', ordinal: 0, source: 'workflow', status: 'failed',
+    providerTurnRef: null, stopReason: null, usage: null, error: null, attempt: 1, createdAt: 0, startedAt: 0, completedAt: 1, input: [{ type: 'text', text: 'Work' }],
+    effectivePolicy: { attendance: 'autonomous', initialAttendance: 'autonomous', posture: 'autonomous',
+      followUpOf: 'origin', continuationOf: 'origin', model: 'opus', effort: 'high' } }
+  snapshot.mockResolvedValue({ session: { ...session, lastEventSeq: 0 }, turns: [turn], events: [], requests: [] })
+  managedAgentStore.upsertSession(session)
+  await managedAgentStore.loadSnapshot(session.id)
+  const { model, dispose } = createRoot((dispose) => ({
+    model: withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => false })), dispose,
+  }))
+  model.sessionActions().find((action) => action.id === 'retry')!.run()
+  await settle()
+  expect(enqueue).toHaveBeenCalledWith('s1', {
+    input: turn.input, source: 'interactive',
+    effectivePolicy: { model: 'opus', effort: 'high', retryOfTurnId: 'failed', includePartialHistory: true },
+  })
+  expect(model.error()).toBe('')
+  dispose()
 })

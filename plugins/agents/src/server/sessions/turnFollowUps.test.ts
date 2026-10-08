@@ -118,7 +118,7 @@ describe('agents:turn-follow-up', () => {
     })
   const turnsOf = async (sessionId: string) => (await runtime.store.snapshot(sessionId, 0)).turns
 
-  it('runs a blocker’s correction before the step publishes, and publishes the correction', async () => {
+  it.each(['gated', 'autonomous'] as const)('runs a blocker’s correction under %s before the step publishes', async (posture) => {
     replies = [
       { text: 'Done.\n```json\n{"ok": false}\n```', usage: { inputTokens: 100, outputTokens: 10, cost: { amount: 0.5, currency: 'USD' } } },
       { text: 'Fixed add().\n```json\n{"ok": true}\n```', usage: { inputTokens: 40, outputTokens: 4, cost: { amount: 0.25, currency: 'USD' } } },
@@ -129,7 +129,7 @@ describe('agents:turn-follow-up', () => {
       windows.push(window)
       expect(await sender.queue(note(window))).toMatchObject({ ok: true })
     })
-    const result = await step()
+    const result = await step({ posture })
     expect(result).toMatchObject({ status: 'ok', capture: { result: expect.stringContaining('Fixed add()'), structuredOutput: { ok: true } } })
     // Both turns are the step's: its usage and cost are theirs together.
     expect(result!.capture.usage).toMatchObject({ inputTokens: 140, outputTokens: 14 })
@@ -138,7 +138,7 @@ describe('agents:turn-follow-up', () => {
     expect(windows).toEqual([expect.objectContaining({ turnId: original!.id, owner: 'workflow', taskId: 'task-1' })])
     expect(correction).toMatchObject({
       source: 'plugin', status: 'completed',
-      effectivePolicy: { followUpOf: original!.id, sentBy: { pluginId: 'acorn-advisor' }, workflowRunId: 'run-1', workflowStepId: original!.effectivePolicy.workflowStepId },
+      effectivePolicy: { attendance: posture === 'autonomous' ? 'autonomous' : 'supervised', followUpOf: original!.id, sentBy: { pluginId: 'acorn-advisor' }, workflowRunId: 'run-1', workflowStepId: original!.effectivePolicy.workflowStepId },
     })
     expect(correction!.effectivePolicy.reportTo).toBeUndefined()
     expect(correction!.input[0]).toMatchObject({ text: expect.stringContaining('fenced `json` result block again') })

@@ -115,7 +115,7 @@ export type AgentRequestState = {
   expiresAt: number | null
   createdAt: number
   resolvedAt: number | null
-  /** Present when a policy plugin refused the request at `agents:before-permission`. */
+  /** Present when unattended policy or a permission policy plugin resolved the request before attention. */
   blocked?: { by: string; reason: string }
 }
 

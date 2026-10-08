@@ -84,6 +84,10 @@ first turn. A shared child has no separate branch, so the input rejects that che
 The key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is the
 `turn-changed` broadcast, which isn't durable, so startup reconciliation queues any missing reports.
 
+A delegated turn is supervised: requests still wait for a person, and the child receives the
+turn-ending instruction. The Node saves this attendance on each turn, including a plugin note that
+joins the delegated operation.
+
 When a delegated turn pauses on a permission, question, or elicitation, the `request-changed` event
 queues an informational report keyed `delegation-request:<request id>`. It names the child, the kind,
 and bounded request text. A person resolves the request in the child's pane. No agent tool grants

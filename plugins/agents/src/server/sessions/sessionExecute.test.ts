@@ -197,6 +197,7 @@ describe('agents.sessionExecute config options', () => {
     const policy = driver.turns[0]!.turn.effectivePolicy
     expect(policy.model).toBe('opus')
     expect(policy.effort).toBe('high')
+    expect(driver.turns[0]!.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('A message with no tool call in it ends your turn') })
   })
 
   it('mints the managed session token from its persisted tool ceiling', async () => {
@@ -278,11 +279,11 @@ describe('agents.sessionExecute config options', () => {
       stepId: `step-${randomUUID()}`,
     })
     await withContext('diff --git a/x b/x')
-    expect(driver.turns[0]!.input.map((part) => part.type)).toEqual(['text', 'context'])
-    expect(driver.turns[0]!.input[1]).toMatchObject({ label: 'Output of get-diff', content: 'diff --git a/x b/x' })
+    expect(driver.turns[0]!.input.map((part) => part.type)).toEqual(['text', 'text', 'context'])
+    expect(driver.turns[0]!.input[2]).toMatchObject({ label: 'Output of get-diff', content: 'diff --git a/x b/x' })
 
     await withContext('x'.repeat(600 * 1024))
-    const [only, ...rest] = driver.turns[1]!.input
+    const [, only, ...rest] = driver.turns[1]!.input
     expect(rest).toEqual([])
     expect(only?.type === 'text' && only.text).toContain('<acorn-context source="workflow.upstream" label="Output of get-diff">')
   })
@@ -327,6 +328,27 @@ describe('agents.sessionExecute config options', () => {
       expect(outcome?.status).toBe('error')
       expect(outcome?.stderrTail).toContain('The model declined this request.')
       expect(driver.turns).toHaveLength(1)
+    })
+
+    it('keeps autonomous attendance when a saved workflow session is reused without a posture override', async () => {
+      const session = await runtime.createSession({ taskId, providerId: 'claude', profileId: 'claude-code', kind: 'workflow', config: {} }, 'saved-autonomous', 'autonomous')
+      driver.replies = [{ text: 'Done.', stopReason: 'end_turn' }]
+      const outcome = await createSessionExecute(runtime)({ taskId, profileId: 'claude-code', title: 'Workflow', prompt: 'Continue', managedSessionId: session.id })
+      expect(outcome?.status).toBe('ok')
+      expect(driver.turns[0]?.turn.effectivePolicy.attendance).toBe('autonomous')
+    })
+
+    it('fails a BLOCKED result without sending a continuation', async () => {
+      driver.replies = [{ text: 'BLOCKED: Need the owner to choose a deployment target.', stopReason: 'end_turn' }]
+      const outcome = await createSessionExecute(runtime)({
+        taskId, profileId: 'claude-code', title: 'Workflow', prompt: 'Deploy', schema: answerSchema,
+        posture: 'autonomous', runId: 'run-1', stepId: 'step-blocked',
+      })
+      expect(outcome?.status).toBe('error')
+      expect(outcome?.stderrTail).toBe('BLOCKED: Need the owner to choose a deployment target.')
+      expect(driver.turns).toHaveLength(1)
+      expect(driver.turns[0]?.turn.effectivePolicy.attendance).toBe('autonomous')
+      expect(driver.turns[0]?.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('BLOCKED:') })
     })
   })
   describe('complete workflow capture', () => {

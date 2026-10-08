@@ -11,6 +11,8 @@ import { AgentSessionRepository } from './sessionRepository'
 import { isActiveSubagent } from './stateMachine'
 import { DEFAULT_SESSION_TITLE, deterministicSessionTitle } from './sessionTitle'
 import { codexModeOption, codexPlanHandoffState } from '../../shared/codexPlanHandoff'
+import { persistedAttendance, resolveAttendance, sessionAttendance, type TurnAttendanceContext, type WorkflowPosture } from './attendance'
+import { effectiveTurnPolicy } from './turnPolicy'
 
 export type EnqueueTurnOutcome = {
   turn: AgentTurn
@@ -77,18 +79,11 @@ export class AgentStore extends AgentSessionRepository {
         source: 'interactive',
         status: 'queued',
         inputJson: JSON.stringify([{ type: 'text', text: prompt }]),
-        effectivePolicyJson: JSON.stringify({
-          ...policy,
-          mode: 'default',
-          acceptedPlanItemId: itemId,
-          acceptedPlanTurnId: lastRow.id,
-          providerAdvertisedPolicy: nextOptions.flatMap((option) =>
-            ['permission', 'mode', 'model', 'reasoning'].includes(option.category)
-              ? [{ id: option.id, label: option.label, category: option.category, value: option.currentValue }]
-              : []),
-          providerStatusAuthority: session.statusAuthority,
-          capturedAt: timestamp,
-        }),
+        effectivePolicyJson: JSON.stringify(effectiveTurnPolicy(
+          { ...session, config: { ...session.config, configOptions: nextOptions } },
+          { ...policy, mode: 'default', acceptedPlanItemId: itemId, acceptedPlanTurnId: lastRow.id },
+          resolveAttendance(session, 'interactive'), timestamp,
+        )),
         idempotencyKey: key,
         createdAt: timestamp,
       }).run()
@@ -96,10 +91,10 @@ export class AgentStore extends AgentSessionRepository {
       return { turn: mapAgentTurn(turnRow), inserted: true }
     })
     if (result.inserted) await this.lifecycle.announceTurn(result.turn.id)
-    return result
+    return { ...result, turn: await this.restoreTurnAttendance(result.turn.id) }
   }
 
-  async createSession(input: CreateAgentSessionInput, provider: AgentProviderDescriptor): Promise<AgentSession> {
+  async createSession(input: CreateAgentSessionInput, provider: AgentProviderDescriptor, posture?: WorkflowPosture): Promise<AgentSession> {
     const timestamp = now()
     const id = randomUUID()
     await this.db.insert(schema.agentSessions).values({
@@ -117,7 +112,7 @@ export class AgentStore extends AgentSessionRepository {
       attention: 'none',
       statusAuthority: provider.statusAuthority,
       title: input.title ?? DEFAULT_SESSION_TITLE,
-      configJson: JSON.stringify(input.config),
+      configJson: JSON.stringify({ ...input.config, initialAttendance: resolveAttendance(input, 'interactive', posture) }),
       parentSessionId: input.parentSessionId ?? null,
       parentTurnId: input.parentTurnId ?? null,
       createdAt: timestamp,
@@ -340,7 +335,7 @@ export class AgentStore extends AgentSessionRepository {
       .where(eq(schema.agentSessions.id, sessionId))
   }
 
-  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<EnqueueTurnOutcome> {
+  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput, context: TurnAttendanceContext = {}): Promise<EnqueueTurnOutcome> {
     const [existing] = await this.db
       .select()
       .from(schema.agentTurns)
@@ -348,12 +343,30 @@ export class AgentStore extends AgentSessionRepository {
       .limit(1)
     if (existing) {
       return {
-        turn: mapAgentTurn(existing),
+        turn: await this.restoreTurnAttendance(existing.id),
         inserted: false,
         firstTurnFallback: null,
         sessionAfterRename: null,
       }
     }
+
+    const session = await this.requireSession(sessionId)
+    const posture = context.posture ?? (session.kind === 'workflow'
+      ? sessionAttendance(session) === 'autonomous' ? 'autonomous' : 'gated'
+      : undefined)
+    const resolved = resolveAttendance(session, input.source, posture)
+    if (session.config.initialAttendance !== undefined && sessionAttendance(session) !== resolved) {
+      throw new Error('Turn attendance does not match the session bootstrap policy.')
+    }
+    const originId = context.originTurnId
+    const origin = typeof originId === 'string' ? await this.turn(originId) : null
+    if (originId !== undefined && (!origin || origin.sessionId !== sessionId)) {
+      throw new Error('Turn continuation origin is unavailable in this session.')
+    }
+    const attendance = origin
+      ? persistedAttendance(origin.effectivePolicy, { session, source: origin.source })
+      : resolved
+    if (attendance !== resolved) throw new Error('The continuation origin has a different attendance policy.')
 
     const attachmentParts = input.input.flatMap((part, position) =>
       part.type === 'attachment' || part.type === 'image'
@@ -397,7 +410,7 @@ export class AgentStore extends AgentSessionRepository {
       source: input.source,
       status: 'queued',
       inputJson: JSON.stringify(input.input),
-      effectivePolicyJson: JSON.stringify(input.effectivePolicy),
+      effectivePolicyJson: JSON.stringify(effectiveTurnPolicy(session, input.effectivePolicy, attendance, timestamp)),
       idempotencyKey: input.idempotencyKey,
       createdAt: timestamp,
     })
@@ -434,6 +447,25 @@ export class AgentStore extends AgentSessionRepository {
     const turn = mapAgentTurn(row)
     await this.lifecycle.announceTurn(turn.id)
     return { turn, inserted: true, firstTurnFallback, sessionAfterRename }
+  }
+
+  /** Backfill pre-policy turns before dispatch or an idempotent acceptance returns them. */
+  async restoreTurnAttendance(turnId: string): Promise<AgentTurn> {
+    const turn = await this.turn(turnId)
+    if (!turn) throw new Error('Agent turn not found.')
+    const session = await this.requireSession(turn.sessionId)
+    const attendance = persistedAttendance(turn.effectivePolicy, { session, source: turn.source })
+    if (turn.effectivePolicy.attendance !== undefined) return turn
+    const row = this.db.transaction((tx) => {
+      const current = tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).get()
+      if (!current) throw new Error('Agent turn not found.')
+      const policy = JSON.parse(current.effectivePolicyJson) as Record<string, unknown>
+      const value = policy.attendance === undefined ? attendance : persistedAttendance(policy)
+      const effectivePolicyJson = JSON.stringify({ ...policy, attendance: value })
+      tx.update(schema.agentTurns).set({ effectivePolicyJson }).where(eq(schema.agentTurns.id, turnId)).run()
+      return { ...current, effectivePolicyJson }
+    })
+    return mapAgentTurn(row)
   }
 
   /**

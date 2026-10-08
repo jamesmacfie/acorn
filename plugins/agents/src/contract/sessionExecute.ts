@@ -32,6 +32,8 @@ export type AgentSessionExecuteRequest = {
   // the basis of the idempotency keys, so a retried step doesn't double-spend a turn.
   runId?: string
   stepId?: string
+  /** Resolved from the workflow run by the workflows plugin, never from an HTTP or tool body. */
+  posture?: 'gated' | 'autonomous'
   onEvent?: (event: StreamEvent) => void
   signal?: AbortSignal
 }
