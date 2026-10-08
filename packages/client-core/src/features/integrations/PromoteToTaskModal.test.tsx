@@ -10,6 +10,8 @@ vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ get data() { return [{ id: 'p1', name: 'acorn', vcs: 'git' }] } }),
 }))
 vi.mock('../../infra/queries', () => ({ projectsOptions: () => ({}) }))
+let nodeId = 'node-a'
+vi.mock('../../infra/node/activeNode', () => ({ activeNodeId: () => nodeId }))
 vi.mock('../tasks/taskBridge', () => ({
   taskBridge: () => ({ project: { get: async () => ({ config: { branchPrefix: null } }) } }),
 }))
@@ -20,6 +22,7 @@ let dispose: (() => void) | undefined
 const registered: Disposable[] = []
 const created = vi.fn(async () => TASK)
 const attached = vi.fn(async () => {})
+const onCreated = vi.fn()
 let seedBranch = 'james/typeerror'
 let prepareOverride: (() => Promise<{ origin: string; projectId: string; title: string; branch: string }>) | null = null
 
@@ -38,7 +41,7 @@ const mount = (action?: PromoteTaskAction, attachTasks: Task[] = []) => {
   dispose = render(() => (
     <PromoteToTaskModal providerId="rollbar" item={{ id: 'RB-4412' }} itemTitle="TypeError in pullsBatch"
       headerLabel="Promote item" attachTasks={attachTasks} existingBranches={[]}
-      {...(action ? { action } : {})} onClose={() => {}} onCreated={() => {}} onAttached={() => {}} />
+      {...(action ? { action } : {})} onClose={() => {}} onCreated={onCreated} onAttached={() => {}} />
   ), host)
 }
 
@@ -51,16 +54,45 @@ const type = (element: HTMLInputElement, value: string) => {
 const settle = async () => { for (let tick = 0; tick < 4; tick += 1) await Promise.resolve() }
 
 afterEach(() => {
+  nodeId = 'node-a'
   seedBranch = 'james/typeerror'
   prepareOverride = null
   created.mockClear()
   attached.mockClear()
+  onCreated.mockClear()
   dispose?.()
   host?.remove()
   for (const handle of registered.splice(0)) handle.dispose()
 })
 
 describe('the optional task action', () => {
+  it('does not navigate when creation completes after the dialog unmounts', async () => {
+    let release!: (task: Task) => void
+    created.mockImplementationOnce(() => new Promise((resolve) => { release = resolve }))
+    mount()
+    await settle()
+    primary().click()
+    await settle()
+    expect(created).toHaveBeenCalledOnce()
+    dispose?.()
+    dispose = undefined
+    release(TASK)
+    await settle()
+    expect(onCreated).not.toHaveBeenCalled()
+  })
+
+  it('does not create when the Node changes during confirmed preparation', async () => {
+    mount()
+    await settle()
+    let release!: (seed: { origin: string; projectId: string; title: string; branch: string }) => void
+    prepareOverride = () => new Promise((resolve) => { release = resolve })
+    primary().click()
+    nodeId = 'node-b'
+    release({ origin: 'github-pr', projectId: 'p1', title: 'Fix deploy', branch: 'feature/deploy' })
+    await settle()
+    expect(created).not.toHaveBeenCalled()
+  })
+
   it('does not create or attach when the confirmation is cancelled', async () => {
     mount(undefined, [TASK])
     await settle()
@@ -128,6 +160,18 @@ describe('the branch field', () => {
     release({ origin: 'github-pr', projectId: 'p1', title: 'Fix deploy', branch: 'feature/deploy' })
     await settle()
     expect(inputs().map((input) => input.value)).toEqual(['Fix deploy', 'feature/deploy'])
+    expect(created).not.toHaveBeenCalled()
+  })
+
+  it('keeps edits made while the promotion seed is loading', async () => {
+    let release!: (seed: { origin: string; projectId: string; title: string; branch: string }) => void
+    prepareOverride = () => new Promise((resolve) => { release = resolve })
+    mount()
+    type(inputs()[0], 'My title')
+    type(inputs()[1], 'my-branch')
+    release({ origin: 'github-pr', projectId: 'p1', title: 'Suggested title', branch: 'suggested-branch' })
+    await settle()
+    expect(inputs().map((input) => input.value)).toEqual(['My title', 'my-branch'])
     expect(created).not.toHaveBeenCalled()
   })
 
