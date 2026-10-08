@@ -413,6 +413,7 @@
 /* As the kit node does: a label and a count have no room in a rail, and the rail's icon already says
    which list this is. See primitives.css § ListDetail for why this is a rule and not a prop. */
 .layout-region-list[data-collapsed] .section-header { display: none; }
+.layout-region-list[data-collapsed] :is(.ui-empty-title, .ui-empty-text, .ui-empty-action) { display: none; }
 /* The divider and the collapse control are `CollapseEdge`, the kit's own node, so their styling is
    in primitives.css § ListDetail rather than here. */
 /* The control rides the divider, half over each column's first bar, so those two bars make room for

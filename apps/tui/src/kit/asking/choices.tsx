@@ -111,9 +111,10 @@ export function ToggleButton(props: ButtonProps & { pressed: boolean; onPressedC
   )
 }
 
-/** `( a | [b] | c )`, the selected one in brackets. */
+/** `( a | [b] | c )`, the selected one in brackets. An option's `detail` is a desktop picture and isn't
+ *  drawn here: the labels carry the choice in a row of text. */
 export function SegmentedControl<T extends string>(props: {
-  options: readonly { value: T; label: string }[]
+  options: readonly { value: T; label: string; detail?: JSX.Element }[]
   value: T
   onChange: (value: T) => void
   size?: Extract<Size, 'sm' | 'md'>

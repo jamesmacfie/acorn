@@ -17,7 +17,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [security/](./security/README.md) | Five product requirement documents from a hardening pass: desktop command authorization, plugin realm policy tampering, the bundled-runtime network and filesystem backstop, internal-token confinement when advertised, and the automation-driver release fence. | Proposed, October 7, 2026; implementation not started. |
 | [editor/](./editor/README.md) | Six product requirement phases for document conflicts, file management, Git status, tabs/navigation, editing controls, and scoped search, with combined acceptance and scope boundaries. | Proposed, October 7, 2026; implementation not started. |
 | [url/](./url/README.md) | `acorn://` links, **Copy link**, confirmed task promotion, and `acorn --link`. The [reference](../frontend/acorn-links.md) owns behavior. | Six phases implemented, October 8, 2026. Installed-release acceptance remains unverified. |
-| [project-workspace/](./project-workspace/README.md) | Project-first installs: each project gets its own workspace, the UI says "project", Default is never created, a core screen prompts for a first project, and the first-run wizard asks whether to group projects. Six sequential phases from the Node rule to the terminal client. | Implemented and integrated with main, October 8, 2026; validation complete. |
 | [git-client/](./git-client/README.md) | Built-in Git repository source and task pane: worktrees, commit history, stashes, AI explanations, task/workflow launches, refs/remotes/settings, operations, and conflict resolution. Eight sequential phases with retained screenshot references. | Planned, October 7, 2026; implementation not started. |
 | [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
@@ -38,6 +37,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [editor-files.md](./editor-files.md) | Letting plugins render files in the editor pane: one `replace` point keyed by file, a read-only file capability, and a catalogue of renderers for third-party plugins. | Design proposal, 2026-09-29. Not started. |
+| [group-projects-later.md](./group-projects-later.md) | Letting a separate-projects Node switch to grouped workspaces from Settings, one way only, with a Node change event so every client rewords live, then the first-run **Layout** wording that promises it. | Product requirements, October 8, 2026. Implementation not started. |
 | [find-in-file.md](./find-in-file.md) | Shared inline find and replace controls built from Acorn components, with CodeMirror search ownership, keyboard behavior, lifecycle rules, and acceptance criteria. | Product requirements, October 7, 2026. Implementation not started. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
@@ -64,6 +64,11 @@ beside them; nothing in it waits any more. Ecosystem's shipped rung-2 containmen
 `blockers.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`project-workspace/` was implemented and deleted on October 8, 2026. [Workspaces and tasks](../workspaces-and-tasks.md)
+owns the `core.workspaces` mode, and [projects and workspaces](../workspaces-and-tasks/projects.md)
+owns the one-project rule and the first-run **Layout** step. Its refused alternatives and deferred
+list remain in Git history. [Group projects later](./group-projects-later.md) picks up one deferred item.
 
 `outdated-review-comments.md` was implemented and deleted on October 7, 2026.
 [Review locations](../github-integration/mirror.md#review-locations) owns provider status, historical

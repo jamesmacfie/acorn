@@ -56,6 +56,13 @@ const click = (label: string) => {
   element!.click()
 }
 const waitForText = async (value: string) => vi.waitFor(() => expect(view().textContent).toContain(value))
+// A layout option's button also holds its picture, so it is found by its radio role and label.
+const radio = (label: string) => [...view().querySelectorAll<HTMLButtonElement>('[role="radio"]')]
+  .find((element) => element.textContent?.startsWith(label))
+const toLayout = async () => {
+  click('Get started')
+  await waitForText('Choose a layout')
+}
 
 function mount(mode?: WorkspacesMode, options: { unmountOnClose?: boolean } = {}) {
   stored = mode ? { 'core.workspaces': mode } : {}
@@ -137,9 +144,10 @@ describe('first-run workspace choice', () => {
     ['on', 'Group projects into workspaces'],
   ] as const)('saves %s before entering Add a project', async (mode, label) => {
     mount()
-    if (mode === 'on') click('Group projects into workspaces')
-    expect(view().textContent).toContain(label)
-    click('Get started')
+    await toLayout()
+    radio(label)!.click()
+    expect(radio(label)?.getAttribute('aria-checked')).toBe('true')
+    click('Continue')
     await waitForText('Add your first project')
     expect(writes).toEqual([{ key: 'core.workspaces', value: mode }])
     expect(stored['core.workspaces']).toBe(mode)
@@ -147,11 +155,12 @@ describe('first-run workspace choice', () => {
 
   it('waits for a save and leaves an error visible for retry', async () => {
     mount()
+    await toLayout()
     pendingWrite = new Promise<void>((resolve) => { releaseWrite = resolve })
-    click('Get started')
+    click('Continue')
     await vi.waitFor(() => expect(writes).toHaveLength(1))
     expect(view().textContent).not.toContain('Add your first project')
-    expect(button('Get started')?.disabled).toBe(true)
+    expect(button('Continue')?.disabled).toBe(true)
     releaseWrite!()
     await waitForText('Add your first project')
 
@@ -160,12 +169,13 @@ describe('first-run workspace choice', () => {
     pendingWrite = undefined
     releaseWrite = undefined
     mount()
+    await toLayout()
     saveError = new Error('Preference unavailable')
-    click('Get started')
+    click('Continue')
     await waitForText('Preference unavailable')
     expect(view().textContent).not.toContain('Add your first project')
     saveError = undefined
-    click('Get started')
+    click('Continue')
     await waitForText('Add your first project')
   })
 
@@ -180,9 +190,10 @@ describe('first-run workspace choice', () => {
 
   it.each(['off', 'on'] as const)('uses saved %s mode without offering a choice', async (mode) => {
     mount(mode)
-    expect(view().querySelectorAll('[role="radio"]')).toHaveLength(0)
+    expect(view().textContent).not.toContain('Layout')
     click('Get started')
     await waitForText('Add your first project')
+    expect(view().querySelectorAll('[role="radio"]')).toHaveLength(0)
     expect(writes).toHaveLength(0)
   })
 
@@ -224,12 +235,13 @@ describe('first-run workspace choice', () => {
 
   it('keeps the saved answer fixed after navigating back', async () => {
     mount()
-    click('Get started')
+    await toLayout()
+    click('Continue')
     await waitForText('Add your first project')
     click('Back')
+    await waitForText('stay separate')
     expect(view().querySelectorAll('[role="radio"]')).toHaveLength(0)
-    expect(view().textContent).toContain('stay separate')
-    click('Get started')
+    click('Continue')
     await waitForText('Add your first project')
     expect(writes).toHaveLength(1)
   })

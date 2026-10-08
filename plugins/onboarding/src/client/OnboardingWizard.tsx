@@ -25,19 +25,22 @@ import {
 } from '@acorn/plugin-api/ui'
 
 import { AddedTally } from './AddedTally'
+import { GroupedProjects, SeparateProjects } from './ArrangementPictures'
 import { saveOnboardingCompletion } from './onboardingCompletion'
 
 const GithubConnect = lazy(() => import('./GithubConnect'))
 const AiSetup = lazy(() => import('./AiSetup'))
 
-type Step = 'welcome' | 'add' | 'github' | 'organize' | 'ai' | 'done'
+type Step = 'welcome' | 'arrange' | 'add' | 'github' | 'organize' | 'ai' | 'done'
 
 // The steps the host draws in its indicator. `github` is a detour on the way to `organize`, so it
 // shares `add`'s place in the strip rather than taking an entry of its own, which is what the
 // hand-drawn dot strip's `DOT_OF` map used to say. `welcome` has a place of its own, so the host
-// draws Next on it and Back on the step after it, which is the GitHub detour's way out.
+// draws Next on it and Back on the step after it, which is the GitHub detour's way out. `arrange`
+// asks how to arrange projects, and the wizard drops it when the Node already has an answer.
 export const STEPS = [
   { id: 'welcome', label: 'Welcome' },
+  { id: 'arrange', label: 'Layout' },
   { id: 'add', label: 'Add a project' },
   { id: 'organize', label: 'Name' },
   { id: 'ai', label: 'Generate with AI' },
@@ -101,6 +104,9 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
     props.workspacesPreference === 'on' || props.workspacesPreference === 'off' ? props.workspacesPreference : undefined,
   )
   const [choice, setChoice] = createSignal<WorkspacesMode>('off')
+  // Read once: a Node that had its answer before the wizard opened never shows the question, while
+  // one answered here keeps the step, so Back still lands on it and shows the answer.
+  const steps = mode() ? STEPS.filter((entry) => entry.id !== 'arrange') : STEPS
   const nodeId = activeNodeId()
   let disposed = false
   onCleanup(() => { disposed = true })
@@ -159,7 +165,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   const finish = () => close(added()[0] ? projectPath(added()[0].id) : undefined)
   const skip = () => close()
 
-  async function advanceWelcome() {
+  async function saveArrangement() {
     if (mode()) return go('add')
     setBusy(true)
     setError('')
@@ -266,9 +272,9 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   // strip cannot tell which of the two you came from. Forward off `organize` is the save.
   const onStep = (id: string) => {
     if (busy()) return
-    const order = STEPS.map((entry) => entry.id) as string[]
+    const order = steps.map((entry) => entry.id) as string[]
     if (order.indexOf(id) < order.indexOf(place(step()))) return back()
-    if (step() === 'welcome') return void advanceWelcome()
+    if (step() === 'arrange') return void saveArrangement()
     if (step() === 'organize') return void saveNames()
     go(id as Step)
   }
@@ -292,20 +298,25 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
           <Heading level={2}>Welcome to acorn</Heading>
           <Text emphasis="muted" wrap>
             acorn is where you run coding tasks on your projects, with agents, terminals, and editors side
-            by side. Setup takes about a minute.
+            by side. Let's get you set up. It takes about a minute.
           </Text>
-          <Show when={!mode()} fallback={<Text emphasis="muted">Projects will {mode() === 'on' ? 'be grouped into workspaces' : 'stay separate'} on this Node.</Text>}>
-            <Field label="How do you want to arrange your projects?">
-              <SegmentedControl
-                ariaLabel="How to arrange projects"
-                options={[
-                  { value: 'off', label: 'Keep each project separate' },
-                  { value: 'on', label: 'Group projects into workspaces' },
-                ]}
-                value={choice()}
-                onChange={setChoice}
-              />
-            </Field>
+        </Stack>
+      </Show>
+
+      <Show when={step() === 'arrange'}>
+        <Stack gap="row">
+          <Heading level={2}>Choose a layout</Heading>
+          <Show when={!mode()} fallback={<Text emphasis="muted">Your projects {mode() === 'on' ? 'are grouped into workspaces' : 'stay separate'}. You can't change this later.</Text>}>
+            <Text emphasis="muted" wrap>Pick how acorn organizes your projects. You can't change this later.</Text>
+            <SegmentedControl
+              ariaLabel="How to arrange projects"
+              options={[
+                { value: 'off', label: 'Keep each project separate', detail: <SeparateProjects /> },
+                { value: 'on', label: 'Group projects into workspaces', detail: <GroupedProjects /> },
+              ]}
+              value={choice()}
+              onChange={setChoice}
+            />
           </Show>
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
         </Stack>
@@ -488,7 +499,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
       <Wizard
         stateKey="onboarding"
         label="Set up acorn"
-        steps={STEPS}
+        steps={steps}
         current={place(step())}
         onStep={onStep}
         canAdvance={canAdvance() && !busy()}

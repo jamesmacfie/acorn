@@ -107,7 +107,8 @@ export function Row(props: {
    *  Passing it is what collapses the row, so a caller hands it down from the same signal its column
    *  reads (../../lib/layout/collapseState.ts) and the two cannot disagree. Leading, body, meta and trailing
    *  all give way to it, along with depth, nesting and revealed controls, which are about a width
-   *  this row no longer has.
+   *  this row no longer has. So does `variant`: a stacked row pins its content to the top, and the
+   *  mark belongs in the middle.
    *
    *  It has the row's existing height to work in, never more: a virtualized list takes its row height
    *  from a token read off the document root (../../lib/layout/metrics.ts), so a taller collapsed row is a
@@ -157,7 +158,7 @@ export function Row(props: {
         data-depth={props.depth && !collapsed() ? String(props.depth) : undefined}
         data-reveal={props.reveal && !collapsed() ? '' : undefined}
         data-density={props.density ?? 'default'}
-        data-variant={props.variant ?? 'default'}
+        data-variant={collapsed() ? 'default' : props.variant ?? 'default'}
         data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
         title={props.tip ? undefined : props.title}
         data-tip={tipText()}
@@ -201,7 +202,7 @@ export function Row(props: {
       data-depth={props.depth && !collapsed() ? String(props.depth) : undefined}
       data-reveal={props.reveal && !collapsed() ? '' : undefined}
       data-density={props.density ?? 'default'}
-      data-variant={props.variant ?? 'default'}
+      data-variant={collapsed() ? 'default' : props.variant ?? 'default'}
       data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
       title={props.tip ? undefined : props.title}
       data-tip={tipText()}
