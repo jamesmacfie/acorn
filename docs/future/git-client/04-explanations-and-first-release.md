@@ -27,16 +27,22 @@ explicit and does not enter those caches. A 70-file fixture with long metadata, 
 content, and tracked plus captured-untracked text exceeding the combined patch budget
 measured at most 60 summaries, 12 KiB metadata, and 40 KiB combined patch input; each
 excluded category was named. Production Node service is 3,197,524/3,200,000 bytes;
-terminal startup after the paired-node fix is 729,607/730,000 bytes.
+terminal startup after the shared viewport fix is 729,629/730,000 bytes.
 
 **Real hosts:** Isolated desktop `git-phase04` used the disposable two-commit, 22-file
 repository and a captured-untracked stash. A locally installed one-shot model fixture
 appeared beside Claude Code and Codex in the shared picker. The desktop showed
 generation, cancel, provider failure then retry, retained revision-scoped answers,
 and a cancelled request when the selected revision changed; the service logged its
-abort in 8,264 ms and late output did not appear under the new selection. After the
-final build it showed a complete, wrapped answer with named binary and 40 KiB patch
-omissions. Isolated terminal `git-phase04-tui` selected the same fixture model and
+abort in 8,264 ms and late output did not appear under the new selection. A rebuilt
+desktop host showed a complete, multiline fixture answer in the narrow revision
+column, including `END-OF-FIXTURE-ANSWER-04` and named binary and 40 KiB patch
+omissions. Its live `Text` had `data-wrap`, computed `white-space: normal`, and visible
+overflow; scrolling the detail 700 px brought the end marker into view. The earlier
+one-line screenshot was stale and was removed. The inspected current screenshots are
+`.acorn/agent-dev/git-phase04/screenshots/git-explanation-multiline-current.png` and
+`.acorn/agent-dev/git-phase04/screenshots/git-explanation-long-scrolled-current.png`.
+Isolated terminal `git-phase04-tui` selected the same fixture model and
 showed the stash answer, captured-untracked file, and named omissions at 120×40.
 `git-phase04-tui2` showed commit model choice, generation, cancellation, provider
 failure, retry, and a recovered answer. `git-phase04-scope-tui` at 120×40 selected
@@ -46,10 +52,12 @@ The root showed **Explain commit** without the delayed answer. A second slow cal
 the root was followed by `ctrl+k`, **Switch node**, and the paired remote fixture;
 the remote's own History 3 and task sentinel appeared, with no local explanation.
 The model process log recorded cancellation in 20,656 ms, and switching back still
-showed no late result. The driver input trace is in the isolated session's
-`.acorn/agent-dev/tui/git-phase04-scope-tui/logs/input.jsonl`; the desktop screenshot
-is `.acorn/agent-dev/git-phase04/screenshots/git-explanation-root.png`. Reproduce
-the mouse action with `dev:tui:agent:ui type $'\033[<0;44;14M\033[<0;44;14m'`,
+showed no late result. A long fixture answer exposed a shared terminal viewport bug:
+its scrollbar covered the last character of some wrapped lines. The viewport now
+reserves that cell. At 120×40 the rebuilt terminal showed complete `fixture` words;
+four `pagedown` presses reached the full end marker and named omissions. The driver
+input trace is in `.acorn/agent-dev/tui/git-phase04-scope-tui/logs/input.jsonl`.
+Reproduce the mouse action with `dev:tui:agent:ui type $'\033[<0;44;14M\033[<0;44;14m'`,
 then use the driver `press` and `snapshot` commands above. One earlier terminal
 driver click inadvertently used Claude Code before the fixture was selected;
 ordinary automated tests and these follow-up checks made no paid model call.
@@ -85,7 +93,11 @@ fix. Touched-source oxlint and relevant architecture boundaries, doc paths, sour
 fields, and published plugin surface passed. The terminal production build passed
 startup and runtime-import checks. The saved-node fix was also exercised in the
 connected terminal host: its public Node switch reached the second Node's own Git
-history instead of reporting **Unknown node**.
+history instead of reporting **Unknown node**. Focused terminal scrolling and kit
+catalog files passed 147 tests (2 skipped). The new text-preservation case failed
+against the old viewport (`abcdefghijklmnopqrst` lost `l`) and passed with the fix.
+Terminal TypeScript, touched-source oxlint, and the production startup/runtime-import
+checks passed after that change.
 The sole architecture failure is unchanged `docs/api-reference/plugin-routes.md` at
 201 lines against the 200-line limit. Root lint and full `pnpm test` were deliberately
 deferred to the coordinator's all-eight-phase gate. The unrelated AgentPane turnId,

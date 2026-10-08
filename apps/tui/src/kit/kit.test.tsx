@@ -66,7 +66,7 @@ const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => l
 /** The text inside a `Textarea`, which is two frames in: the panel each case is drawn in, and the
  *  field's own border inside it (./asking/fields.tsx § Textarea). */
 const fieldLines = (frame: Frame, count: number): string[] =>
-  frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/[│█]+$/, '').trimEnd())
+  frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/(?:\s*[│█])+\s*$/, '').trimEnd())
 
 const noteFile = {
   path: 'src/login.ts',

@@ -258,8 +258,8 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
  * so it took a cell of layout while it was visible — and that is a cycle: the content's height
  * depends on the width it wraps at, the width depends on whether the bar is showing, and the bar
  * depends on the height. A frame that resolves that cycle by iterating is a frame that can fail to
- * settle. Overlaying it costs the rightmost column of a scrolling document and no oscillation. No
- * frame the old painter drew held a visible bar, so nothing measured the difference either way.
+ * settle. The viewport always reserves that rightmost cell for the overlaid bar, so wrapped text
+ * remains readable whether the bar is showing or not, without a width cycle.
  *
  * The thumb and track match the virtual list in `../kit/showing/collection.tsx`.
  */
