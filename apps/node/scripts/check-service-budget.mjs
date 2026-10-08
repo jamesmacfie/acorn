@@ -74,8 +74,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-09: 3,187,622 B after security diagnostics route registration, its owner-scoped bridge,
 // and a narrow, lazy tool-catalog service. The collector and project file reads load only when the
 // owner presses Check this node; the device gate and capability registration must be at boot.
-// Add 2 KB, leaving 378 B.
-const limits = { ceiling: 3_188_000, floor: 1_000_000 }
+// Phase 07 follow-up: the passive provider-cache and admission readers plus boot-time wiring for
+// the lazy plugin projection add 1,080 B. measure:service-graph confirms pluginSecurity.ts is not
+// statically reachable. Add 1 KB to the ceiling; the final measured graph leaves 298 B.
+const limits = { ceiling: 3_189_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

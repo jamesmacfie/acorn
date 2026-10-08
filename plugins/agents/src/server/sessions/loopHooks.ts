@@ -160,12 +160,22 @@ export async function loopCoverage(
   if (!permission && !before && !after) return { harnesses: [] }
   return {
     harnesses: providers.filter((provider) => provider.installed).map((provider) => {
-      const reports = (capability: AgentCapability) => provider.capabilities.includes(capability)
+      const coverage = reportedLoopCoverage(provider)
       return {
         label: provider.label,
-        beforeTool: before && reports('loop_before_tool') ? 'every' : permission && reports('permissions') ? 'asked' : 'none',
-        afterTool: after && reports('loop_after_tool'),
+        beforeTool: before && coverage.beforeTool === 'every' ? 'every' : permission && coverage.permissionRequests ? 'asked' : 'none',
+        afterTool: after && coverage.afterTool,
       }
     }),
+  }
+}
+
+/** Capability interpretation shared by loop hooks and passive security diagnostics. */
+export function reportedLoopCoverage(provider: Pick<AgentProviderDescriptor, 'capabilities'>): { beforeTool: 'every' | 'asked' | 'none'; afterTool: boolean; permissionRequests: boolean } {
+  const reports = (capability: AgentCapability) => provider.capabilities.includes(capability)
+  return {
+    beforeTool: reports('loop_before_tool') ? 'every' : reports('permissions') ? 'asked' : 'none',
+    afterTool: reports('loop_after_tool'),
+    permissionRequests: reports('permissions'),
   }
 }

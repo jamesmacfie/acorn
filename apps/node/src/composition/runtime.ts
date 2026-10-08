@@ -249,6 +249,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       reloadHost: plugins,
     })
     const provided = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
+    core.pluginSecurity = { snapshot: async () => (await import('@acorn/node-core/server/pluginHost/pluginSecurity.ts')).pluginSecuritySnapshot(pluginStateBridge) }
     pluginStateCapability = { dispose: () => { provided.dispose(); pluginStateBridge.dispose() } }
 
     wireAgentTools({ db, secrets: runtime.SECRETS, env: runtime })

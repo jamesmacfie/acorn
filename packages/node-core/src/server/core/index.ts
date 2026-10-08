@@ -52,6 +52,8 @@ export type CoreServices = {
   /** Registered names and risk tiers only. Diagnostics combines this catalog with owner preferences
    *  and a session ceiling; a loaded plugin receives no grant for this facet. */
   agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
+  /** Bounded passive plugin facts; supplied by the composition root after the host starts. */
+  pluginSecurity?: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.

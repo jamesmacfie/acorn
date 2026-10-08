@@ -1,12 +1,14 @@
-import { open, realpath } from 'node:fs/promises'
+import { open, realpath, type FileHandle } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { join } from 'node:path'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolPermissions.ts'
 import { AGENT_TOOLS_PERMS_PREF_KEY } from '@acorn/protocol/api.ts'
 import { isToolWithinCeiling, parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { AgentSession } from '../contract/wire.ts'
+import type { AgentProviderDescriptor } from '../contract/wire.ts'
+import type { InstructionAdmissionObservation } from './sessions/instructionAdmission'
+import { reportedLoopCoverage } from './sessions/loopHooks'
 import type { AgentSessionDefaults } from '../shared/sessionDefaults'
 import type { AgentMcpServer } from '../shared/mcpServers'
 import type { SecurityDiagnostics, SecurityFinding, SecurityScope, SecurityScopeChoices, SecurityEvidenceState, SecuritySeverity } from '../shared/securityDiagnostics'
@@ -17,11 +19,12 @@ const MAX_SERVERS = 64
 const EXPIRES_MS = 5 * 60_000
 
 export type SecurityDiagnosticPorts = {
-  core: Pick<CoreServices, 'projects' | 'tasks' | 'fs' | 'prefs' | 'agentTools'>
+  core: Pick<CoreServices, 'projects' | 'tasks' | 'fs' | 'prefs' | 'agentTools' | 'pluginSecurity'>
   defaults(userId: string): Promise<AgentSessionDefaults>
   session(id: string): Promise<AgentSession | null>
   managedMcp(): Promise<AgentMcpServer[]>
-  instructionApproval?(projectId: string): Promise<{ scope: string; approvedAt: number | null } | null>
+  instructionObservation?(projectId: string | null, taskId: string | null): Promise<InstructionAdmissionObservation | null>
+  observedProvider?(id: string): AgentProviderDescriptor | null
 }
 
 export async function securityScopeChoices(
@@ -47,7 +50,7 @@ async function fixedFile(ports: SecurityDiagnosticPorts, root: string, name: str
   if (signal.aborted) throw new Error('cancelled')
   const path = ports.core.fs.resolveInRoot(root, name)
   if (!path) throw new Error('outside project root')
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW).catch((error: NodeJS.ErrnoException) => {
+  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK).catch((error: NodeJS.ErrnoException) => {
     if (error.code === 'ENOENT') return null
     throw error
   })
@@ -58,11 +61,25 @@ async function fixedFile(ports: SecurityDiagnosticPorts, root: string, name: str
     const resolved = await realpath(path)
     const canonical = await realpath(root)
     if (resolved !== canonical && !resolved.startsWith(canonical + '/')) throw new Error('outside project root')
-    const bytes = Buffer.alloc(stat.size)
-    await file.read(bytes, 0, stat.size, 0)
-    if (signal.aborted) throw new Error('cancelled')
-    return bytes.toString('utf8')
+    return await readBoundedFile(file, signal)
   } finally { await file.close() }
+}
+
+/** Handles short reads and growth after fstat without ever buffering more than the cap. */
+export async function readBoundedFile(file: Pick<FileHandle, 'read'>, signal: AbortSignal): Promise<string> {
+  const chunks: Buffer[] = []
+  let offset = 0
+  while (true) {
+    if (signal.aborted) throw new Error('cancelled')
+    const chunk = Buffer.alloc(Math.min(4096, MAX_FILE_BYTES + 1 - offset))
+    const { bytesRead } = await file.read(chunk, 0, chunk.length, offset)
+    if (bytesRead === 0) break
+    offset += bytesRead
+    if (offset > MAX_FILE_BYTES) throw new Error('file grew beyond limit')
+    chunks.push(chunk.subarray(0, bytesRead))
+  }
+  if (signal.aborted) throw new Error('cancelled')
+  return Buffer.concat(chunks).toString('utf8')
 }
 
 export async function collectSecurityDiagnostics(
@@ -113,14 +130,13 @@ export async function collectSecurityDiagnostics(
       add('harness.identity', 'agents', 'observed', 'info', 'managed session',
         `${harness} session; driver ${driver} ${version}.`,
         'The executable version and harness filesystem or network restrictions are not recorded on this session.', 'Inspect the harness settings and its own configuration.')
-      const coverage = session.providerId === 'claude-code' || session.providerId === 'claude'
-        ? 'Every tool call can reach the before-tool hook; completed calls can reach the after-tool hook.'
-        : session.providerId === 'codex'
-          ? 'The permission hook sees permission requests only.'
-          : 'This harness has no recorded loop coverage.'
-      add('harness.loop', 'agents', session.providerId === 'codex' || session.providerId.startsWith('claude') ? 'configured_only' : 'unknown',
-        'attention', 'built-in harness bridge', coverage,
-        'Hook registration and host policies can differ. This does not prove filesystem or network confinement.', 'See Managed agents > Loop hooks.')
+      const descriptor = ports.observedProvider?.(session.providerId)
+      const coverage = descriptor?.installed ? reportedLoopCoverage(descriptor) : null
+      add('harness.loop', 'agents', coverage ? coverage.beforeTool === 'none' && !coverage.afterTool ? 'unsupported' : 'observed' : 'unknown',
+        'attention', 'last observed harness capabilities', coverage
+          ? `${coverage.beforeTool === 'every' ? 'Before-tool capability covers every call' : coverage.beforeTool === 'asked' ? 'Permission capability covers requests only' : 'No before-tool capability reported'}; ${coverage.afterTool ? 'after-tool capability reported' : 'no after-tool capability reported'}.`
+          : 'No passive harness capability descriptor is available.',
+        'Reported capabilities describe bridge reach, not registered hooks, host policy, or filesystem and network confinement.', 'See Managed agents > Loop hooks.')
       add('harness.restrictions', 'agents', 'unknown', 'attention', 'managed session metadata',
         'Executable version, filesystem restrictions, and network restrictions were not recorded as passive session evidence.',
         'A driver profile or mode name does not prove operating-system confinement.', 'Inspect the harness configuration and verify restrictions manually.')
@@ -138,7 +154,7 @@ export async function collectSecurityDiagnostics(
     add('instructions.checks', 'agents', 'configured_only', defaults.checkInstructionFiles || defaults.reviewChangedInstructions ? 'info' : 'attention',
       'agents:session-defaults:v1',
       `Hidden-character check ${defaults.checkInstructionFiles ? 'enabled' : 'disabled'}; changed-instruction approval ${defaults.reviewChangedInstructions ? 'enabled' : 'disabled'}.`,
-      'Scope: discovered repository AGENTS.md, CLAUDE.md, supported imports and skills, plus delivered plugin skills. Global harness files may be outside it. Incomplete and blocked outcomes are not retained as diagnostic history.',
+      'Scope: discovered repository AGENTS.md, CLAUDE.md, supported imports and skills, plus delivered plugin skills. Global harness files may be outside it. Only the latest observed admission per task is kept in memory.',
       'Settings > Security and backup > Agent instruction files.')
     const options = session?.config.configOptions
     const permission = Array.isArray(options) ? options.find((option: unknown) =>
@@ -160,17 +176,36 @@ export async function collectSecurityDiagnostics(
       'A failed read does not mean checks are disabled.', 'Retry Check this node.')
   }
 
-  if (projectId && ports.instructionApproval) {
+  if (projectId) add('instructions.approval', 'agents', 'unknown', 'attention', 'encrypted instruction review store',
+    'Current approval status is not available to this passive check.',
+    'Validating a stored approval decrypts instruction bodies. This diagnostic does not read them or start a scan.',
+    'Settings > Security and backup > Review instruction files.')
+
+  if (ports.instructionObservation && (projectId || session?.taskId)) {
     try {
-      const approval = await bounded(() => ports.instructionApproval!(projectId))
-      add('instructions.approval', 'agents', approval ? 'configured_only' : 'unknown', 'attention', 'instruction review store',
-        approval ? `Approved instruction snapshot from ${new Date(approval.approvedAt ?? 0).toISOString()}; scope recorded.` : 'No approved instruction snapshot was found.',
-        approval ? 'Approval is a prior snapshot, not proof that files still match. Last checked time and blocked outcomes are not retained.' : 'No scan was run by this diagnostic.',
-        'Settings > Security and backup > Review instruction files.')
+      const observation = await bounded(() => ports.instructionObservation!(projectId, session?.taskId ?? null))
+      add('instructions.latest', 'agents', observation ? 'observed' : 'unknown', observation?.outcome === 'blocked' || observation?.outcome === 'incomplete' ? 'warning' : 'info',
+        'in-memory pre-turn admission', observation
+          ? `Last check ${new Date(observation.checkedAt).toISOString()}: ${observation.outcome}.`
+          : 'No pre-turn instruction check has been observed for this scope in this Node process.',
+        'One latest outcome per task is retained in memory, with no report history. This diagnostic does not run a scan.',
+        'Settings > Security and backup > Agent instruction files.')
     } catch {
-      add('instructions.approval', 'agents', 'failed', 'attention', 'instruction review store', 'Instruction approval metadata could not be read.',
-        'This does not establish whether instructions are safe or approved.', 'Retry or review instruction files.')
+      add('instructions.latest', 'agents', 'failed', 'attention', 'in-memory pre-turn admission', 'Latest admission outcome could not be read.',
+        'No diagnostic scan was run.', 'Retry Check this node.')
     }
+  }
+
+  try {
+    const snapshot = ports.core.pluginSecurity ? await bounded(() => ports.core.pluginSecurity!.snapshot()) : null
+    add('plugins.grants', 'core', snapshot ? 'observed' : 'unknown', snapshot?.executableGrants || snapshot?.developmentEnabled || snapshot?.pendingReview ? 'attention' : 'info',
+      'core plugin host state', snapshot
+        ? `${snapshot.packages} installed packages; ${snapshot.executableGrants} active executable grants; ${snapshot.developmentEnabled} development modes enabled; ${snapshot.skillsApproved} enabled approved skills, ${snapshot.skillsUnapproved} enabled unapproved skills; ${snapshot.pendingReview} pending changed packages.`
+        : 'Passive plugin host facts are unavailable.',
+      'Counts omit package names, declarations and grant contents. Host access and plugins outside Acorn remain outside this view.', 'Settings > Plugins.')
+  } catch {
+    add('plugins.grants', 'core', 'failed', 'attention', 'core plugin host state', 'Plugin host facts could not be read.',
+      'A failed read does not mean grants are absent.', 'Settings > Plugins.')
   }
 
   try {

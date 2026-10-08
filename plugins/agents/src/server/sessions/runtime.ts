@@ -129,6 +129,8 @@ export class ManagedAgentRuntime {
   processFootprint = (...args: Parameters<ManagedAgentEngine['processFootprint']>) => this.engine.processFootprint(...args)
   diskFootprint = (now?: number) => this.engine.diskFootprint(now)
   instructionAdmission = () => this.engine.instructionAdmission()
+  observedInstructionAdmission = () => this.engine.observedInstructionAdmission()
+  observedProvider = (id: string) => this.engine.observedProvider(id)
 
   /** Read once per spawn so the delegation ledger can retain the resolved choices for recovery. */
   async spawnedAgentDefaults(): Promise<SpawnedAgentDefaults> {

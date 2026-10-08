@@ -405,6 +405,12 @@ export class ManagedAgentEngine {
     return this.withAdvertisedOptions(await this.probeProviders(force))
   }
 
+  /** Last already observed descriptor. Diagnostics must never trigger a provider probe. */
+  observedProvider(id: string): AgentProviderDescriptor | null {
+    return this.providerCache?.generation === this.registry.generation
+      ? this.providerCache.descriptors.find((provider) => provider.id === id) ?? null : null
+  }
+
   /** Probes discover availability; connected sessions advertise the actual model and effort values.
    *  Read them on every request so a cached probe doesn't hide newly connected session options. */
   private async withAdvertisedOptions(descriptors: AgentProviderDescriptor[]): Promise<AgentProviderDescriptor[]> {
@@ -829,6 +835,11 @@ export class ManagedAgentEngine {
       ])
       return new InstructionAdmission(this.core, this.instructionDataDir, new InstructionReviewStore(this.db, this.instructionSecrets))
     })()
+  }
+
+  /** Do not initialize the admission store merely to answer diagnostics. */
+  observedInstructionAdmission(): Promise<InstructionAdmission | null> {
+    return this.instructionAdmissionPromise ?? Promise.resolve(null)
   }
 
   cancelInstructionScan(turnId: string): void {

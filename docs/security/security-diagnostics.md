@@ -18,9 +18,11 @@ that a control is off. The selected session's observed settings take precedence 
 next session.
 
 The check reads stored agent defaults, the selected session's recorded harness options and tool
-ceiling, approved instruction snapshot metadata, managed MCP definitions, core agent-tool preferences,
-the verified tool catalog, and fixed project files. It reads at most 32 KiB from each named project file after resolving the
-project's canonical root. It does not execute configuration code, package managers, MCP servers,
+ceiling, the last already observed harness capability descriptor, the latest in-memory pre-turn
+admission outcome for the selected task or project, managed MCP definitions, core plugin-host counts,
+core agent-tool preferences, the verified tool catalog, and fixed project files. It reads at most
+32 KiB from each named project file after resolving the project's canonical root. It does not execute
+configuration code, package managers, MCP servers,
 hooks, harness probes, models, or credential validation. It returns no raw argument, header,
 environment entry, credential value, or provider output.
 
@@ -30,11 +32,16 @@ names, exact `ignore-scripts` booleans, and a simple numeric `minimumReleaseAge`
 YAML collections or prove that every install follows those files. It cannot apply pnpm policy to npm,
 npx, Python, or arbitrary scripts. Detailed dependency parsing belongs to phase 08.
 
-The report marks global harness configuration, plugin executable grants, development mode, skill
-approval, pending packages, and any other fact without a passive owner contract as unknown. It does
-not retain each pre-turn instruction outcome or prove that an old approved snapshot still matches.
-Harness bridge coverage is a configured description, not proof of enforcement. A running session's
-MCP panel may have more harness-reported state than this passive report. Phase 09 owns managed MCP
+The plugin host reports counts of active executable grants, enabled development modes, enabled
+approved and unapproved skills, and pending changed packages. It does not expose package names or
+declarations.
+Admission retains at most one recent passed, blocked, or incomplete outcome per task for up to 100 tasks
+in this Node process; it has no persistence or report history. No observation remains after a restart.
+Current approval status remains unknown because validation would decrypt stored instruction bodies.
+An old approved snapshot still does not prove current files match. Harness loop coverage comes only
+from an already observed provider descriptor; absent metadata stays unknown. Reported capability reach
+does not prove hook registration or enforcement. Global harness configuration remains unknown. A
+running session's MCP panel may have more harness-reported state than this passive report. Phase 09 owns managed MCP
 installation and review.
 
 The Node owner retains host access. Findings describe evidence, not a security score or a containment

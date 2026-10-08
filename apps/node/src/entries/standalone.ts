@@ -124,6 +124,7 @@ const pluginStateBridge = await buildPluginStateBridge({
   reloadHost: plugins,
 })
 const pluginStateCapability = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
+core.pluginSecurity = { snapshot: async () => (await import('@acorn/node-core/server/pluginHost/pluginSecurity.ts')).pluginSecuritySnapshot(pluginStateBridge) }
 
 // Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
 // functions over the database; neither needs a window.

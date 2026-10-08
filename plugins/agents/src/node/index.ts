@@ -353,7 +353,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             defaults: (owner) => readAgentSessionDefaults(core.prefs, owner),
             session: (id) => runtime!.store.requireSession(id).catch(() => null),
             managedMcp: () => runtime!.mcpServers.list(),
-            instructionApproval: async (projectId) => (await runtime!.instructionAdmission()).store.approved(projectId),
+            instructionObservation: async (projectId, taskId) => (await runtime!.observedInstructionAdmission())?.latest(projectId, taskId) ?? null,
+            observedProvider: (id) => runtime!.observedProvider(id),
           }, nodeId, userId, scope, signal)
         },
         scopes: async () => {
