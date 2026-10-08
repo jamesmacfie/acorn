@@ -28,6 +28,7 @@ import {
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
 import { Graph } from './graph'
+import { HistoryMark } from './historyMark'
 import { Line } from './cells'
 import { _resetCollections } from '../keys/collection'
 import { focusedRenderable } from '../keys/regions'
@@ -541,6 +542,13 @@ const CASES: Case[] = [
       expect(lineWith(frame, 'review').indexOf('review'))
         .toBeGreaterThan(lineWith(frame, 'investigate').indexOf('investigate'))
     },
+  },
+  {
+    node: 'HistoryMark',
+    draws: 'reduced: a commit dot, optional lane number, and continuation mark',
+    render: () => <HistoryMark slot={{ id: 'commit', lane: 1, lanes: [0, 1], parentLanes: [1], continuation: true, disconnected: false }} />,
+    size: { width: 12, height: 2 },
+    check: (frame) => has(frame, '●⋯ 2'),
   },
   {
     node: 'Meter',

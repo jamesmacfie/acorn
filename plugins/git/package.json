@@ -1,7 +1,7 @@
 {
   "name": "@acorn/plugin-git",
   "version": "1.0.0",
-  "description": "Repository worktrees and task checkout identity in both Acorn clients.",
+  "description": "Repository worktrees, history, and revision diffs in both Acorn clients.",
   "private": true,
   "type": "module",
   "exports": {
@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@tanstack/solid-query": "^5.101.0",
     "hono": "catalog:",
+    "zod": "catalog:",
     "solid-js": "catalog:",
     "@solidjs/router": "^0.16.1"
   },

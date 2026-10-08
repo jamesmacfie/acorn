@@ -17,6 +17,7 @@ import {
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
 import { Graph } from './graph'
+import { HistoryMark } from './historyMark'
 
 // The kit, as a lookup from a name to the component that draws it in cells. The terminal host's
 // sibling of `client-core/host/tree/components.ts`, with the same key type and the same rule: one
@@ -39,7 +40,7 @@ export const KIT_COMPONENTS: KitTable = {
   // remote tree only under a name of their own.
   ModalBody, ModalActions, TabPanel, ToolbarSpacer, SettingsSection, SettingRow,
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
-  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
+  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, HistoryMark, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
   FileHead, StackedDiff, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, IconButton, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,

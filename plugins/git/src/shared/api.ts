@@ -33,3 +33,14 @@ export type CleanupResult = { ok: boolean; error?: string; inventory: WorktreeIn
 
 export const inventoryRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/worktrees`
 export const cleanupRoute = (projectId: string, observation: string) => `${inventoryRoute(projectId)}/${encodeURIComponent(observation)}/remove`
+
+export type Commit = {
+  id: string; parents: string[]; author: { name: string; email: string; at: number };
+  committer: { name: string; email: string; at: number }; subject: string; message: string; refs: string[]
+}
+export type HistoryFilter = { ref: string | null; field: 'message' | 'author' | 'hash'; query: string }
+export type HistoryPage = { commits: Commit[]; refs: string[]; nextCursor: string | null; observation: string; searched: number; limit: number; omitted: string | null }
+export type RevisionFile = { path: string; oldPath: string | null; status: string; oldMode: string; newMode: string; oldId: string; newId: string; binary: boolean; omission: string | null }
+export type RevisionDetail = { commit: Commit; base: string | null; files: RevisionFile[]; topology: import('@acorn/diff-document/document').DiffDocumentTopology; omitted: string | null }
+export const historyRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/history`
+export const revisionRoute = (projectId: string, id: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/revisions/${encodeURIComponent(id)}`

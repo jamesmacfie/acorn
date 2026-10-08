@@ -26,6 +26,13 @@ draft actions, and a create form. The diff viewer has unified and split modes, s
 word-level changes, viewed-file state, inline threads, and context you expand on demand. See [GitHub
 integration](./github-integration.md) and [diff rendering](./diff-rendering.md).
 
+## Git repository
+
+The Git source browses pinned commit history, read-only revision diffs, and registered worktrees for
+the selected project. A task's Git pane starts on its branch history and labels its checkout.
+Working files, staging, and committing stay in Changes. See [Git history](./git-client/history.md)
+and [Git worktrees](./git-client/worktrees.md).
+
 ## Task panes
 
 Each task shows a row of panes. These ship with acorn:
@@ -33,6 +40,7 @@ Each task shows a row of panes. These ship with acorn:
 - `agents`: managed Claude Code and Codex sessions, requests, context, artifacts, and lifecycle.
 - `pr`: linked pull-request review.
 - `changes`: the uncommitted diff, staging, commit and push, and review notes.
+- `git`: branch history, revision files and diffs, and task checkout identity.
 - `notes`: task, workspace, and global Markdown notes.
 - `context`: choose, preview, size, and send task context.
 - `editor`: worktree files, code editing, and ripgrep search.

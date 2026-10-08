@@ -128,6 +128,8 @@ export { Grid } from '@acorn/client-core/kit/components/layout'
 // plugin may not draw for itself — no raw DOM, no SVG — so the kit draws it and the terminal host
 // draws the same cards as an indented list. See docs/ui-design/closed-kit.md § The closed kit.
 export { Graph } from '@acorn/client-core/kit/components/content'
+export { HistoryMark, historyLayout } from '@acorn/client-core/kit/components/content'
+export type { HistoryNode, HistorySlot } from '@acorn/client-core/kit/components/content'
 export type { GraphCard } from '@acorn/client-core/kit/components/content'
 export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib'
 // The container a run of `Row`s or `TreeRow`s lives in. It is what makes a list keyboard-operable:

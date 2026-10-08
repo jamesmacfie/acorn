@@ -50,8 +50,9 @@ it('keeps selection through observation changes and clears it only when its entr
 it('invalidates for worktree, local and remote task, and reconnect events for its lifetime', () => {
   createRoot((stop) => { dispose = stop; createGitPaneModel({ projectId: 'project' } as never) })
   for (const callbacks of Object.values(subscriptions)) for (const callback of callbacks) callback()
-  expect(invalidateQueries).toHaveBeenCalledTimes(3)
+  expect(invalidateQueries).toHaveBeenCalledTimes(6)
   expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['git-worktrees', 'node-a', 'project'] })
+  expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['git-history', 'node-a', 'project', null, 'message', ''] })
   dispose()
   expect(Object.values(subscriptions).every((callbacks) => callbacks.size === 0)).toBe(true)
 })

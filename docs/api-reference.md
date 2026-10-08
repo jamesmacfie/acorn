@@ -49,6 +49,7 @@ tasks, run targets, task scripts, data sources, queries, and dashboards.
 [Plugin routes](./api-reference/plugin-routes.md) lists the route families of GitHub, agents,
 terminal, changes, editor, Docker, notes, memory, preview, browser, and the loaded plugins, with the
 GitHub pull request and Changes diff document contracts.
+The Git plugin's history and revision routes are in [Git history](./git-client/history.md#routes).
 
 <a id="terminal-workflows-and-execution"></a>
 

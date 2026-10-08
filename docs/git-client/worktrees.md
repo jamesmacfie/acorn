@@ -2,6 +2,7 @@
 
 The compiled Git plugin shows registered worktrees for the selected project's repository. This page
 covers its first slice: inventory, task checkout identity, and guarded cleanup.
+For commit browsing and revision diffs, see [Git history](./history.md).
 
 ## Ownership and routes
 

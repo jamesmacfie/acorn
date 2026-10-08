@@ -64,6 +64,8 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // lazy. Add 2 KB for these acceptance and lifecycle paths, keeping less than 1 KB of margin.
 // 2026-10-08: the Git plugin registers at boot. Its worktree route loads after activation through a
 // dynamic import; the built static graph is 3,185,838 B. Keep about 1 KB for bundler variation.
+// 2026-10-09: history and revision routes remain dynamically loaded; the measured boot graph is
+// 3,186,368 B, 632 B below the same ceiling.
 const limits = { ceiling: 3_187_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)

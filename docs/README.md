@@ -94,6 +94,7 @@ the whole plugin system in one page.
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
 | [git-client/worktrees.md](./git-client/worktrees.md) | Git worktree inventory, task ownership, and guarded cleanup in both clients. |
+| [git-client/history.md](./git-client/history.md) | Pinned history pages, read-only revision diffs, limits, and routes in both clients. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
 | [schedules/plugin-schedules.md](./schedules/plugin-schedules.md) | How a plugin declares a schedule, overrides, lifecycle, and trust. |
 | [schedules/user-schedules.md](./schedules/user-schedules.md) | User schedule targets, consent, workflow schedules, routes, and Settings. |
