@@ -16,7 +16,7 @@ The relay carries encrypted bytes but cannot interpret them.
 
 The web app administers teams, roles, billing, Node inventory, and plugin policy. Desktop and TUI
 do the work. A browser workspace needs its own token custody, browser-valid TLS, and plugin UI
-sandbox. [Remote access](../remote.md#web-client-what-changes-and-what-doesnt) records those costs.
+sandbox. [Remote access](../remote.md#build-a-single-node-browser-host) records those costs.
 The project and Node contracts must leave the future client possible.
 
 ## No execution-only worker for the first task Node

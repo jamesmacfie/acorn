@@ -143,7 +143,7 @@ Package results are recorded after the final fixes. No unfiltered `pnpm test` ru
 The test audit retains distinct process, regex, debounce, focus capture, ignore-read, reveal, viewport,
 and terminal-key regressions. It adds no production export used only by tests.
 
-The [phase 01–05 completion notes](../future/editor/README.md) provide the earlier guarded-save,
+The [phase 01–05 completion notes](./editor-delivery-2026-10-08.md) provide the earlier guarded-save,
 trash, conflict, navigation/history, formatter, terminal-editor handoff, and Git projection evidence.
 This follow-up reran the connected rename/restart/recovery path and phase 06 controls; it does not
 claim every earlier native/platform check was repeated.

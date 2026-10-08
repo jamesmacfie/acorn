@@ -14,6 +14,8 @@ Reuse batched annotation delivery and owner drawing. Do not create a worker or p
 `packages/client-core/src/host/annotations/AnnotationMarks.tsx` draws accepted marks.
 `packages/client-core/src/host/annotations/taskAnnotations.ts` is the core task precedent.
 `plugins/editor/src/contract/lineMarkers.ts` is a separate line/range contract that stays unchanged.
+Built-in Git marks use `editor:file-status`, typed in `plugins/editor/src/contract/fileStatus.ts`.
+Preserve that task-level status read and folder grouping. It is separate from contributed file annotations.
 
 Read [annotations](../../plugins/rows-and-annotations.md) and [line markers](../../editor/line-markers.md).
 

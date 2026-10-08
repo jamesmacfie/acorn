@@ -1,9 +1,9 @@
 # Keep the editor programme focused
 
-Date: October 7, 2026. Status: scope decisions for proposed requirements; implementation not started.
+Date: October 8, 2026. Status: retained scope decisions for the implemented editor and its acceptance handoff.
 
 This page records what the editor usability programme excludes and why. Read it before expanding
-a phase. These decisions keep everyday editing useful without requiring Acorn to maintain a full IDE.
+the acceptance work. These decisions keep everyday editing useful without requiring Acorn to maintain a full IDE.
 
 ## Leave advanced code tooling to separate work
 
@@ -11,7 +11,7 @@ Language servers, project symbol indexing, semantic refactoring, diagnostics, de
 and inline AI completion need separate product and process-lifecycle decisions. None is required to
 create, rename, delete, inspect, or navigate a file.
 
-Shared inline find/replace controls belong to [Find in file](../find-in-file.md). Plugin document
+Shared inline find and replace is implemented in [Editor](../../editor.md#find-in-a-file). Plugin document
 intelligence belongs to [the UI extension programme](../ui-extension/09-document-intelligence.md).
 Do not duplicate either to make an editor phase appear complete.
 
@@ -27,9 +27,9 @@ tracked bytes and permanently remove unrelated untracked work with semantics dif
 ## Defer broader file management
 
 Duplicate, move-to-folder, drag-and-drop, multiselect filesystem actions, and filesystem operation
-undo remain later work. Rename in phase 02 stays within the parent directory. These broader actions
+undo remain later work. Rename stays within the parent directory. These broader actions
 need destination and collision behavior, descendant custody transfer, partial results, and tests.
-Create/rename/trash addresses the reported friction first.
+Create, rename, and trash are implemented.
 
 Permanent deletion is excluded. On Nodes where system trash is unsupported, report that limitation
 instead of deleting irreversibly. A portable Node recycle store is a separate decision with storage,

@@ -1,6 +1,6 @@
 # Phase 1: the Node image on cloud hardware
 
-Status: proposed, 2026-09-29.
+Date: October 8, 2026. Status: proposed; Node image and hosted deployment unbuilt.
 
 ## Goal
 
@@ -27,8 +27,8 @@ A self-hoster can use this on its own. It is the first cloud-shaped thing acorn 
 - `node-pty` is the only native module, and `apps/node/externals.ts` lists the packages installed
   beside the bundle.
 - A standalone Node has no bundled loaded plugins unless `ACORN_BUNDLED_PLUGINS_DIR` names a folder.
-- [The bundle design](../../bundle.md#docker-2026-08-22) sketches a two-stage image and names three
-  container decisions. None of it is built. No Dockerfile exists for acorn.
+- [The bundle design](../../bundle.md#docker-2026-08-22) records the container requirements and release
+  dependencies. No Dockerfile exists for acorn.
 
 ## In scope
 
@@ -52,7 +52,7 @@ Add `apps/node/Dockerfile` (new). Recommended shape:
 
 - Build stage from `node:24-bookworm-slim` that runs `pnpm pack:node`, installs the externals, and
   compiles `node-pty`.
-- Runtime stage from the same base, with `git`, `openssl`, `tmux`, `ripgrep`, `ca-certificates`,
+- Runtime stage from the same base, with `git`, `tmux`, `ripgrep`, `ca-certificates`,
   and the agent CLIs acorn drives (Claude Code and Codex to start).
 - The built loaded plugins copied into the image, with `ACORN_BUNDLED_PLUGINS_DIR` pointing at them,
   so the image carries the same plugins as the desktop.
@@ -73,9 +73,9 @@ name you dial, such as `localhost`. The Node binds all interfaces only when some
 six identity words with the banner. Enter the code. The Node should appear, and the Fleet source
 should appear in the rail.
 
-**Checkpoint 3: TUI pairs.** Check whether the TUI and CLI can pair a remote Node by address. If
-they can, pair and open the workspace. If they cannot, record it as a gap. [Phase 3](./03-team-node.md)
-needs TUI access to a remote Node.
+**Checkpoint 3: TUI pairs.** The TUI and CLI support remote pairing through `--node`.
+Pair and open the container workspace using that implemented path. [Phase 3](./03-team-node.md)
+needs this container acceptance, not another pairing implementation.
 
 **Checkpoint 4: real work in the container.** On the container Node, connect GitHub through the
 device flow, add a project by cloning a repository into `/data`, create a task, and run a Claude
@@ -136,7 +136,7 @@ and pair to it by following only the written recipe.
 
 - [Node distribution](../../../node-distribution.md): a container section, with the port rule, the
   advertise rule, and the volume.
-- [The bundle design](../../bundle.md): mark the Docker section shipped.
+- [Node packaging](../../bundle.md): record the implemented image and remaining release requirements.
 
 ## Open questions
 
@@ -153,7 +153,7 @@ and pair to it by following only the written recipe.
 7. What volume size does a single self-hosted Node need, and how does a person grow it?
 8. How does a person get the pairing code without reading logs? A provider console command, a
    one-time URL, or waiting for the account-based flow in phase 3.
-9. Can the TUI and CLI pair a remote Node by address? If not, what is the smallest change?
+9. Which automated and live checks prove the implemented TUI and CLI pairing path against the image?
 10. How do provider health checks work against a Node that answers only pinned HTTPS? `GET /v1/node`
     is unauthenticated, but the provider must accept a self-signed certificate or use a TCP check.
 

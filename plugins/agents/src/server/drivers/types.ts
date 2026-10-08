@@ -119,6 +119,8 @@ export interface AgentDriverSession {
   readonly pid?: number
   sendTurn(options: AgentDriverTurnOptions): Promise<{ providerTurnRef?: string }>
   cancel(): Promise<void>
+  /** Interrupts one provider-native child without cancelling the session's own turn. */
+  cancelSubagent?(subagentId: string): Promise<void>
   resolveRequest(providerRequestId: string, resolution: unknown): Promise<void>
   setConfig?(optionId: string, value: string): Promise<AgentConfigOption[] | void>
   fork?(): Promise<string>

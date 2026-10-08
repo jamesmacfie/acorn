@@ -1,7 +1,9 @@
 # Plugin renderers for files in the editor
 
-Status: design proposal, 2026-09-29. Not started. Raster image preview shipped the same day as a
-built-in branch of the editor ([editor.md](../editor.md)); nothing here is built.
+Date: October 8, 2026. Status: file-viewer extension proposed; implementation not started.
+
+Built-in image previews, file menus, tab navigation, and Git status are implemented.
+[Editor](../editor.md) owns those contracts. This plan adds contributed viewers and confined reads.
 
 ## Summary
 
@@ -25,10 +27,12 @@ PTY in terminal mode, `ImagePreview` when `imageTypeForPath` in
 `plugins/editor/src/contract/imagePreview.ts` recognises the extension, and CodeMirror otherwise.
 Every new format is another branch in the pane and another dependency in the editor bundle.
 
-The editor already opens two seams to other plugins, both on the node:
+Editor declares these Node extension points and hooks:
 
 - `editor:line-markers`, declared in `plugins/editor/src/node/index.ts` and typed in
   `plugins/editor/src/contract/lineMarkers.ts`. Changes and GitHub fill it.
+- `editor:file-status`, declared in the same Node entrypoint and typed in
+  `plugins/editor/src/contract/fileStatus.ts`. Changes supplies a task-level status snapshot.
 - The `before-save` hook, in the same file.
 
 It declares no client extension point, so no plugin can draw in the pane.
@@ -163,7 +167,8 @@ by file actions, annotations, selections, and document language services:
 - Add no action, annotation, language-service, or generic nested-slot API in this work. The later
   phases add their own bounded contracts. Frames and side-by-side rendering retain their deferrals.
 
-Revised October 6, 2026, to prepare for those consumers. The implementation status remains unchanged.
+The read capability and client point remain unbuilt. Preserve the implemented tab controls and
+document custody when adding them; a preview must not save or discard a dirty buffer.
 
 ## Renderer catalogue
 

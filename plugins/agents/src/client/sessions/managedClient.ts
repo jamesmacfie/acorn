@@ -132,6 +132,8 @@ export const managedAgentApi = {
     ),
   cancel: (sessionId: string, turnId?: string) =>
     jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/cancel'), 'POST', turnId ? { turnId } : {}),
+  cancelSubagent: (sessionId: string, subagentId: string) =>
+    jsonWrite<{ ok: true }>(sessionRoute(sessionId, `/subagents/${encodeURIComponent(subagentId)}/cancel`), 'POST', {}),
   resolve: (sessionId: string, requestId: string, resolution: unknown) =>
     jsonWrite<AgentRequest>(
       sessionRoute(sessionId, `/requests/${encodeURIComponent(requestId)}/resolve`),

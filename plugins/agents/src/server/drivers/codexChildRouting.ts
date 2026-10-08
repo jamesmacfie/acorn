@@ -90,6 +90,7 @@ const titleFromAgentPath = (path: string | null): string | undefined =>
 
 type ChildState = {
   agentPath: string | null
+  turnId: string | null
   /** Whether this child has ever been seen working. A child's first `thread/status/changed` is `idle`,
    *  before it starts, so mapping that to a settled row would flash "Idle" on a subagent that has not
    *  run yet. Idle only means resumable-and-done once it has been active. */
@@ -119,6 +120,10 @@ export class CodexChildRouter {
     // A resumed session can learn its root id after traffic has started. Anything registered under
     // that id was the parent all along, and leaving it registered would intercept the parent forever.
     if (threadId) this.#children.delete(threadId)
+  }
+
+  activeTurnId(subagentId: string): string | null {
+    return this.#children.get(subagentId)?.turnId ?? null
   }
 
   route(notification: JsonRpcNotification): CodexRouted {
@@ -172,7 +177,7 @@ export class CodexChildRouter {
       if (agentPath && !existing.agentPath) existing.agentPath = agentPath
       return existing
     }
-    const created: ChildState = { agentPath, active: false }
+    const created: ChildState = { agentPath, active: false, turnId: null }
     this.#children.set(threadId, created)
     return created
   }
@@ -185,6 +190,10 @@ export class CodexChildRouter {
     subagentId: string,
     child: ChildState,
   ): AgentNormalizedEvent[] {
+    if (notification.method === 'turn/started') {
+      child.turnId = stringValue(asObject(notification.params.turn)?.id)
+    }
+    if (notification.method === 'turn/completed' || notification.method === 'thread/closed') child.turnId = null
     const roster = (subagent: Omit<AgentSubagentUpdate, 'id'>): AgentNormalizedEvent =>
       ({ type: 'subagent', subagent: { id: subagentId, ...subagent } })
     return normalizeCodexNotification(notification).flatMap((event): AgentNormalizedEvent[] => {

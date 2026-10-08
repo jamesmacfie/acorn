@@ -15,7 +15,9 @@ for contextual UI. It does not introduce an unused extension framework.
 `packages/client-core/src/host/registries/extensionPoints/extensionPoints.ts` owns registrations.
 `packages/plugin-sdk/src/remote/public.ts` exposes a chrome-only `Slot({ slotRef })`.
 
-The baseline has no Editor client point. The prerequisite must have supplied `editor:document`, live
+Built-in file menus, tab actions, and `editor:file-status` are implemented. They do not provide
+the public file-viewer, resource-menu, or annotation contracts in this programme. The baseline has no
+Editor client point. The prerequisite must have supplied `editor:document`, live
 text/revision props, an owner-held source toggle, fallback rendering, and confined read-only bytes.
 Its matching key must remain separate from the case-preserving worktree-relative `path`.
 

@@ -6,7 +6,7 @@ The terminal's focus model is a strength. One focused region owns the keys, a ca
 the panel border lights, and Escape climbs out through a defined topology. Keep that model. The work
 is to make the user's destination, available action, and result clear at each level.
 
-The findings below record the initial review. [The implementation pass](./README.md#implementation-pass-on-2026-09-27)
+The findings below record the initial review. [The implementation pass](./README.md#starting-point)
 adds recovery, a setup route, terminal sessions, and a full selected-task title. The settings
 redesign closed the Settings P0 on 2026-09-30. The remaining success criteria still need their
 terminal journeys.
