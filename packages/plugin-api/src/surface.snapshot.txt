@@ -612,6 +612,8 @@ testkit/client: provideClientCapability
 testkit/client: refPanelRegistry
 testkit/client: refreshFleet
 testkit/client: setActiveNode
+testkit/client: setActiveTaskId
+testkit/client: setFocusedPane
 testkit/client: setProjectsLookup
 testkit/ws-client: _resetWsClient
 testkit: AppDatabase

@@ -73,6 +73,10 @@ export const PrefKeys = {
   // PTY (plugins/editor/src/client/editorPrefs.ts). The device's, like `theme`: it names a program
   // installed on this machine, and the other client paired with the same node may not have it.
   editorMode: 'editor_mode',
+  // Device default for graphical text wrapping. Open tabs may override it for this session.
+  editorWordWrap: 'editor_word_wrap',
+  // Fallback when a text file's indentation sample is ambiguous.
+  editorIndentation: 'editor_indentation',
   taskLayoutsScoped: 'core:task-layouts',
   // Where you were looking in each workspace, one key per workspace (features/tasks/tasks.ts).
   // The node's, like the pane layouts above and for the same reason: it is keyed by that node's

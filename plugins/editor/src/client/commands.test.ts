@@ -11,6 +11,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
 }))
 
 import { editorCommands } from './commands'
+import { admitGraphicalEditor } from './editorAdmission'
 
 // ⌘P, after it stopped being an overlay of its own. What is pinned is what the overlay's own test
 // would have pinned if it had had one: the ranking is over the whole path, the row splits it for
@@ -107,9 +108,15 @@ describe('go to file', () => {
 
   it('accepts only positive line coordinates for a focused file jump', async () => {
     const world = context('task-1')
+    expect(await goToLine.query('12:4', world, signal())).toEqual([])
+    const release = admitGraphicalEditor('node-1', 'task-1', 'src/a.ts')
     expect(await goToLine.query('0:4', world, signal())).toEqual([])
     const rows = await goToLine.query('12:4', world, signal())
     goToLine.select(rows[0], world)
     expect(mocks.reveal).toHaveBeenCalledWith('task-1', 'src/a.ts', 12, 4)
+    release()
+    mocks.reveal.mockClear()
+    goToLine.select(rows[0], world)
+    expect(mocks.reveal).not.toHaveBeenCalled()
   })
 })

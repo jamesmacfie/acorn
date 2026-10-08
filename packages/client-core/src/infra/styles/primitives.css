@@ -716,6 +716,31 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 /* Everything past the spacer is a control, and a control keeps its full width. The title gives way,
    never the state or the buttons at the end of the bar. */
 .ui-toolbar > .ui-toolbar-spacer ~ * { flex: none; }
+
+/* A plugin cannot ship a stylesheet. Keep the Editor's file facts in the host's toolbar skin. */
+.ui-toolbar[aria-label='File status'] {
+  container-type: inline-size;
+  min-width: 0;
+}
+
+.ui-toolbar[aria-label='File status'] > .ui-text:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-toolbar[aria-label='File status'] > :is(.ui-text[data-emphasis='mono']:not(:first-child), .ui-text:nth-last-child(2)) {
+  flex: none;
+}
+
+@container (max-width: 680px) {
+  .ui-toolbar[aria-label='File status'] > .ui-text:not(:first-child):not([data-emphasis='mono']):not(:nth-last-child(2)),
+  .ui-toolbar[aria-label='File status'] > button:first-of-type {
+    display: none;
+  }
+}
 /* Which the title can only do if its own text is out of the bar's arithmetic: `flex-basis: 0` means
    the heading asks for nothing and takes what the controls leave, so no length of session title can
    push a button off the end. The spacer stands down when there is a heading, because two items that

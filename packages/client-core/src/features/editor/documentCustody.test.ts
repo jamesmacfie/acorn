@@ -80,8 +80,11 @@ describe('document custody', () => {
   it('acknowledges formatter output while a later human edit wins', async () => {
     const document = owner()
     document.edit(text('unformatted'))
+    const writing: boolean[] = []
+    const unsubscribe = document.subscribe(() => writing.push(document.writing))
     let resolve!: (value: { text: string; revision: string }) => void
     const saving = document.flush(() => new Promise((done) => { resolve = done }))
+    expect(writing).toContain(true)
     document.edit(text('later edit'))
     resolve({ text: 'formatted', revision: 'exact-file-revision' })
     await saving
@@ -89,6 +92,8 @@ describe('document custody', () => {
     expect(document.acknowledged.toString()).toBe('formatted')
     expect(document.acknowledgedRevision).toBe('exact-file-revision')
     expect(document.dirty).toBe(true)
+    expect(writing.at(-1)).toBe(false)
+    unsubscribe()
   })
 
   it('applies formatting when the submitted edit is still current', async () => {

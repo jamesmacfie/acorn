@@ -162,6 +162,11 @@ contains the draft text it preserves the editor's selection and undo history. **
 absence precondition. **Save as…** writes a separate path under the task root. **Retry save** handles
 ordinary write failures. None of these actions stages a file.
 
+## File status and editing controls
+
+See [editing controls](./editing-controls.md) for the strip, wrap and indentation settings, and
+focused graphical commands.
+
 ## Editing in your own editor
 
 The pane can hold your own editor instead of CodeMirror. The device preference `editor_mode` set to

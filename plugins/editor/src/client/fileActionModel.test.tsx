@@ -39,7 +39,7 @@ it('holds old writers through a delayed folder rename, menu dismissal, and pane 
   custody.flushRecovery()
   const owner = pool()
   const release = custody.retain()
-  owner.files.set('dir/a.ts', { custody, state: custody.state, release, language: [], mount: {}, markersReadAt: 0, markersGeneration: 0 })
+  owner.files.set('dir/a.ts', { custody, state: custody.state, release, language: [], indentation: { mode: 'spaces', width: 2 }, mount: {}, markersReadAt: 0, markersGeneration: 0 })
   editorOpen(taskId, 'dir/a.ts', true)
   editorSetDirty(taskId, 'dir/a.ts', true)
   editorOpen(taskId, 'dir/preview.ts', true)

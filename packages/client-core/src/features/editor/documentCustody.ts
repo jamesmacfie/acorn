@@ -188,6 +188,7 @@ export class DocumentCustody {
       }
     }
     this.pending = run()
+    for (const listener of this.listeners) listener()
     return this.pending
   }
 

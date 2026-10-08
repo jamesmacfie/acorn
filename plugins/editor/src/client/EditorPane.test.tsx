@@ -3,10 +3,11 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { EditorView } from '@codemirror/view'
+import { EditorSelection } from '@codemirror/state'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
-import { commandRegistry, setActiveNode } from '@acorn/plugin-api/testkit/client'
+import { commandRegistry, setActiveNode, setActiveTaskId, setFocusedPane } from '@acorn/plugin-api/testkit/client'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -102,6 +103,7 @@ beforeEach(() => {
   disk.set('b.ts', 'const b = 2\n')
 })
 afterEach(() => {
+  setActiveTaskId(null)
   cleanups.splice(0).forEach((dispose) => dispose())
   write.mockReset()
   write.mockImplementation(async (_taskId, path, content) => { disk.set(path, content); return { ok: true } })
@@ -155,6 +157,34 @@ const runEditorCommand = (id: string) => {
 }
 
 describe('the editor pane', () => {
+  it('shows live file facts and reconfigures wrap without a write or state replacement', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    setActiveTaskId(taskId)
+    setFocusedPane(taskId, 'editor')
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('a.ts')
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('Ln 1, Col 1')
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('Saved')
+    view.dispatch({ selection: EditorSelection.create([EditorSelection.range(0, 5), EditorSelection.range(6, 7)]) })
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('6 selected')
+    const originalState = view.state
+    runEditorCommand('editor.toggle-word-wrap')
+    expect(view.state).not.toBe(originalState)
+    expect(view.state.doc.eq(originalState.doc)).toBe(true)
+    expect(view.state.selection.eq(originalState.selection)).toBe(true)
+    expect(view.contentDOM.classList.contains('cm-lineWrapping')).toBe(true)
+    expect(write).not.toHaveBeenCalled()
+    runEditorCommand('editor.toggle-word-wrap')
+    expect(write).not.toHaveBeenCalled()
+    setFocusedPane(taskId, 'agent')
+    host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    const wrap = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((item) => item.textContent?.includes('Word wrap'))!
+    wrap.click()
+    expect(view.contentDOM.classList.contains('cm-lineWrapping')).toBe(true)
+    expect(write).not.toHaveBeenCalled()
+  })
   const saveChord = (view: EditorView) => view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
     key: 's', code: 'KeyS', keyCode: 83, ctrlKey: true, bubbles: true,
   }))
@@ -171,6 +201,7 @@ describe('the editor pane', () => {
     view.dispatch({ changes: { from: 0, insert: '// unsent\n' } })
     host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
     await vi.waitFor(() => expect(host.textContent).toContain('formatter veto'))
+    expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('Save failed')
     expect(openFiles(taskId)).toMatchObject([{ path: 'a.ts', dirty: true }])
     expect(view.state.doc.toString()).toContain('// unsent')
     host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()

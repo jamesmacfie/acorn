@@ -1,5 +1,6 @@
 import { activeNodeId, clientEvents, onScopeEvicted } from '@acorn/plugin-api/client'
 import { movedPath, pathContains } from './editorState'
+import { prunePresentation } from './editorPresentation'
 
 export type EditorLocation = { path: string; line: number; column: number; scroll: number }
 type ClosedTab = { path: string; index: number }
@@ -97,6 +98,7 @@ export function reconcileEditorMetadata(nodeId: string | null, taskId: string, f
   try { storage()?.setItem(recentKey(nodeId, taskId), JSON.stringify(next)) } catch { /* Device storage may be unavailable. */ }
 }
 const evictTask = (nodeId: string | null, taskId: string) => {
+  prunePresentation(nodeId, taskId)
   sessions.delete(key(nodeId, taskId))
   recents.delete(recentKey(nodeId, taskId))
   try { storage()?.removeItem(recentKey(nodeId, taskId)) } catch { /* Device storage may be unavailable. */ }
@@ -108,6 +110,7 @@ onScopeEvicted((event) => {
 // The TUI has the same runtime archive event but no desktop scope-eviction adapter.
 clientEvents.on('runtime:task-archived', ({ taskId }) => evictTask(activeNodeId(), taskId))
 clientEvents.on('runtime:node-removed', ({ nodeId }) => {
+  prunePresentation(nodeId)
   for (const address of sessions.keys()) if (JSON.parse(address)[0] === nodeId) sessions.delete(address)
   const prefix = `acorn:editor:recent:v1:${encodeURIComponent(nodeId)}:`
   for (const address of recents.keys()) if (address.startsWith(prefix)) recents.delete(address)

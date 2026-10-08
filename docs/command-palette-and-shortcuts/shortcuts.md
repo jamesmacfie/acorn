@@ -51,6 +51,11 @@ and two bindings on one chord leave the loser with nothing.
 
 ## Plugin shortcuts
 
+Editor registers **Toggle word wrap** at `meta+alt+w` while a graphical text file is focused. The
+binding can be changed or removed in Keyboard shortcuts. Find, Replace, comment, line, selection,
+indent, undo, and redo actions are also discoverable in the focused Editor palette. CodeMirror keeps
+its text-editing chords inside the document; the host binding is the one shortcut owner for wrapping.
+
 Loaded plugins declare canonical `meta+ctrl+alt+shift+key` chords against commands in their own
 manifest. The host qualifies both IDs as `plugin.<plugin-id>.<command-id>`, refuses bare keys, and
 doesn't offer `typing-exempt` to plugins. A `surface` binding is tied to a surface the same manifest

@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, S
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
+import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
 import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, copyText, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
@@ -23,6 +24,11 @@ import type { EditorReadResult } from '../contract/api'
 import { createFileStatusReader } from './fileStatusReader'
 import { historyIsCurrent, historyStep, navigate, nextClosed, noteActivated, noteClosed, takeClosedIfCurrent, type EditorLocation } from './editorNavigation'
 import { tabLabels } from './tabLabels'
+import EditorStatus from './EditorStatus'
+import { EDITOR_ACTIONS, actionAvailable, runEditorAction } from './editorActions'
+import { forgetPresentation, inferIndentation, languageName, presentationFor, saveLabel, setPresentation, type Indentation } from './editorPresentation'
+import { readEditorIndentation, readEditorWordWrap, saveEditorIndentation, saveEditorWordWrap } from './editorPrefs'
+import { admitGraphicalEditor } from './editorAdmission'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -43,6 +49,8 @@ const telemetry = telemetryFor('editor')
 // default, and everything to the left of the box is untouched either way.
 export default function EditorPane(props: { task: Task }) {
   let engine: typeof import('./editorEngine') | undefined
+  let wrapCompartment: InstanceType<typeof import('./editorEngine').Compartment> | undefined
+  let indentationCompartment: InstanceType<typeof import('./editorEngine').Compartment> | undefined
   let surfaceGeneration = 0
   const warmedText = new Map<string, Promise<EditorReadResult>>()
   const graphical = HOST === 'dom'
@@ -54,6 +62,8 @@ export default function EditorPane(props: { task: Task }) {
   const fileStatus = createFileStatusReader(api, taskId, () => !disposed && activeNodeId() === nodeId)
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
+  const [statusVersion, setStatusVersion] = createSignal(0)
+  const updateStatus = () => setStatusVersion((value) => value + 1)
   const [diskState, setDiskState] = createSignal<'changed' | 'deleted' | 'read-failed' | 'unknown' | 'recovered' | null>(null)
   const [armedDecision, setArmedDecision] = createSignal<FileDecision | null>(null)
   const [compare, setCompare] = createSignal(false)
@@ -78,6 +88,7 @@ export default function EditorPane(props: { task: Task }) {
   // file.
   let currentPath: string | null = null
   let currentCustody: DocumentCustody | undefined
+  let releaseAdmission: (() => void) | undefined
   let showGeneration = 0
   // The pane model retains open view states; the document owner retains failed dirty work.
   const pool = paneModel<EditorPool>('editor', taskId, () => createEditorDocumentPool(api, taskId))
@@ -147,7 +158,7 @@ export default function EditorPane(props: { task: Task }) {
     watchCustody(path, entry)
     entry.state = entry.custody.state ?? entry.state
     if (entry.mount === mountToken) return entry.state
-    entry.state = entry.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(path, entry.language)) }).state
+    entry.state = entry.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(path, entry.language, entry.indentation)) }).state
     entry.mount = mountToken
     entry.custody.state = entry.state
     return entry.state
@@ -264,7 +275,14 @@ export default function EditorPane(props: { task: Task }) {
       id: 'editor.navigation.forward', title: 'Go forward in editor', category: 'navigation', palette: true,
       when: () => activeTaskId() === taskId && focusedPane(taskId) === 'editor',
       run: () => { void replay(1) },
-    }])
+    }, {
+      id: 'editor.toggle-word-wrap', title: 'Toggle word wrap', category: 'action', palette: true,
+      when: () => !!focusedGraphicalView(), run: toggleWrap,
+    }, ...EDITOR_ACTIONS.map((action) => ({
+      id: `editor.edit.${action.id}`, title: action.title, category: 'action' as const, palette: true,
+      when: () => { const admitted = focusedGraphicalView(); return !!admitted && actionAvailable(engine!, admitted, action.id) },
+      run: () => { const admitted = graphicalView(); if (admitted) runEditorAction(engine!, admitted, action.id) },
+    }))])
     onCleanup(() => commands.dispose())
   })
 
@@ -272,6 +290,33 @@ export default function EditorPane(props: { task: Task }) {
   const scheduleSave = debounce((p: string) => void save(p), 1500)
 
   const isDirty = (path: string): boolean => pool.files.get(path)?.custody.dirty ?? false
+
+  const graphicalView = (): EditorView | undefined => live() && activeTaskId() === taskId
+    && mode() === 'graphical' && currentPath === active() && !imagePath() && !ptyPath() ? view : undefined
+  const focusedGraphicalView = (): EditorView | undefined => focusedPane(taskId) === 'editor' ? graphicalView() : undefined
+  const toggleWrap = () => {
+    const admitted = graphicalView()
+    const path = currentPath
+    if (!admitted || !path) return
+    const next = !(presentationFor(nodeId, taskId, path).wrap ?? readEditorWordWrap(prefs.data))
+    setPresentation(nodeId, taskId, path, { ...presentationFor(nodeId, taskId, path), wrap: next })
+    admitted.dispatch({ effects: wrapCompartment!.reconfigure(next ? engine!.EditorView.lineWrapping : []) })
+    remember(path, admitted.state)
+    updateStatus()
+  }
+  const setIndentation = (indentation: Indentation) => {
+    const path = active()
+    const entry = path ? pool.files.get(path) : undefined
+    if (!path || !entry || !graphicalView()) return
+    entry.indentation = indentation
+    setPresentation(nodeId, taskId, path, { ...presentationFor(nodeId, taskId, path), indentation })
+    view!.dispatch({ effects: indentationCompartment!.reconfigure([
+      engine!.indentUnit.of(indentation.mode === 'tabs' ? '\t' : ' '.repeat(indentation.width)),
+      engine!.EditorState.tabSize.of(indentation.width),
+    ]) })
+    remember(path, view!.state)
+    updateStatus()
+  }
 
   // Stash the current file's scroll/cursor so it can be restored after a tab swap or a remount.
   const saveViewState = () => {
@@ -316,12 +361,15 @@ export default function EditorPane(props: { task: Task }) {
   // explicit-flush chord. Built per path, because the language is the file's and the update listener
   // has to name the file it is reporting on.
   // Grammar installation follows usable text and stays within the same document entry.
-  const perFile = (path: string, language: Extension): Extension[] => [
+  const perFile = (path: string, language: Extension, indentation: Indentation): Extension[] => [
     engine!.basicSetup,
     editorTheme(),
     engine!.lineMarkerExtension(),
     language,
+    wrapCompartment!.of(presentationFor(nodeId, taskId, path).wrap ?? readEditorWordWrap(prefs.data) ? engine!.EditorView.lineWrapping : []),
+    indentationCompartment!.of([engine!.indentUnit.of(indentation.mode === 'tabs' ? '\t' : ' '.repeat(indentation.width)), engine!.EditorState.tabSize.of(indentation.width)]),
     engine!.EditorView.updateListener.of((update) => {
+      if (currentPath === path && (update.docChanged || update.selectionSet)) updateStatus()
       if (!update.docChanged || applyingAcknowledgement || !live()) return
       const entry = pool.files.get(path)
       if (!entry) return
@@ -358,6 +406,8 @@ export default function EditorPane(props: { task: Task }) {
     void import('./editorEngine').then((loaded) => {
       if (!live() || admitted !== surfaceGeneration) return
       engine = loaded
+      wrapCompartment = new loaded.Compartment()
+      indentationCompartment = new loaded.Compartment()
       view = new loaded.EditorView({ state: emptyState(), parent: element })
       stopTheme = watchEditorTheme(view)
       const restore = active()
@@ -372,6 +422,8 @@ export default function EditorPane(props: { task: Task }) {
       if (view && currentPath) remember(currentPath, view.state)
       currentPath = null
       currentCustody = undefined
+      releaseAdmission?.()
+      releaseAdmission = undefined
       stopTheme?.()
       stopTheme = undefined
       view?.destroy()
@@ -448,6 +500,12 @@ export default function EditorPane(props: { task: Task }) {
   // rather than value, so its source is a memo and not an inline getter.
   const prefs = createQuery(() => prefsOptions(true))
   const mode = createMemo(() => readEditorMode(prefs.data))
+  createEffect(() => {
+    const defaultWrap = readEditorWordWrap(prefs.data)
+    const path = currentPath
+    if (view && path && presentationFor(nodeId, taskId, path).wrap === undefined)
+      view.dispatch({ effects: wrapCompartment!.reconfigure(defaultWrap ? engine!.EditorView.lineWrapping : []) })
+  })
   const imagePath = createMemo(() => mode() === 'graphical' && imageTypeForPath(active() ?? '') ? active() : null)
   createEffect(on(active, (path) => {
     if (!path || graphical && !imageTypeForPath(path)) return
@@ -457,6 +515,36 @@ export default function EditorPane(props: { task: Task }) {
   }))
   const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
   const [ptyPath, setPtyPath] = createSignal<string | null>(null)
+  const statusPosition = () => {
+    statusVersion()
+    if (!view || currentPath !== active() || mode() !== 'graphical' || imagePath() || ptyPath()) return undefined
+    const head = view.state.selection.main.head
+    const line = view.state.doc.lineAt(head)
+    return `Ln ${line.number}, Col ${head - line.from + 1}`
+  }
+  const selectedCharacters = () => {
+    statusVersion()
+    if (!view || currentPath !== active() || mode() !== 'graphical' || imagePath() || ptyPath()) return 0
+    let count = 0
+    for (const range of view.state.selection.ranges) for (const _character of view.state.doc.sliceString(range.from, range.to)) count++
+    return count
+  }
+  const statusSave = () => {
+    statusVersion()
+    const entry = active() ? pool.files.get(active()!) : undefined
+    if (!entry || ptyPath() || imagePath()) return undefined
+    return saveLabel(entry.custody, diskState())
+  }
+  const statusIndentation = () => {
+    statusVersion()
+    return mode() === 'graphical' && !imagePath() && !ptyPath() && active()
+      ? pool.files.get(active()!)?.indentation
+      : undefined
+  }
+  const statusWrap = () => {
+    statusVersion()
+    return presentationFor(nodeId, taskId, active() ?? '').wrap ?? readEditorWordWrap(prefs.data)
+  }
 
   // Whatever `$EDITOR` was pointed at is no longer what this pane has cached, so the cached state goes
   // and the graphical view reads the file back off disk when it next shows it. That is the whole
@@ -512,6 +600,7 @@ export default function EditorPane(props: { task: Task }) {
     if (!live() || !view || admitted !== surfaceGeneration || !files().some((file) => file.path === relPath)) return null
     // Optional grammar and marker work never gate usable text.
     const custody = recovery ?? documentCustody(address, content, loaded?.revision)
+    const indentation = presentationFor(nodeId, taskId, relPath).indentation ?? inferIndentation(custody.current.toString(), readEditorIndentation(prefs.data))
     const language: Extension = []
     const pooled = pool.files.get(relPath)
     if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
@@ -522,7 +611,7 @@ export default function EditorPane(props: { task: Task }) {
     try {
       state = telemetry.measure('editor.state.create', () => engine!.EditorState.create({
         doc: custody.current,
-        extensions: perFile(relPath, activeLanguage),
+        extensions: perFile(relPath, activeLanguage, indentation),
       }), { highlighted })
     } catch (error) {
       // A grammar is optional presentation. If a parser rejects ordinary-sized input, keep the file
@@ -532,11 +621,11 @@ export default function EditorPane(props: { task: Task }) {
         'document.characters': content.length,
       })
       activeLanguage = []
-      state = engine!.EditorState.create({ doc: custody.current, extensions: perFile(relPath, activeLanguage) })
+      state = engine!.EditorState.create({ doc: custody.current, extensions: perFile(relPath, activeLanguage, indentation) })
     }
-    if (custody.state) state = custody.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(relPath, activeLanguage)) }).state
+    if (custody.state) state = custody.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(relPath, activeLanguage, indentation)) }).state
     custody.state = state
-    const entry: PooledFile = { state, custody, release: custody.retain(), language: activeLanguage, mount: mountToken, markersReadAt: 0, markersGeneration: 0 }
+    const entry: PooledFile = { state, custody, release: custody.retain(), language: activeLanguage, indentation, mount: mountToken, markersReadAt: 0, markersGeneration: 0 }
     saved.set(relPath, custody.acknowledged)
     pool.files.set(relPath, entry)
     watchCustody(relPath, entry)
@@ -552,7 +641,7 @@ export default function EditorPane(props: { task: Task }) {
       if (!live() || pool.files.get(relPath) !== entry || (Array.isArray(grammar) && !grammar.length)) return
       entry.language = grammar
       if (!view) { entry.mount = {}; return }
-      const effects = engine!.StateEffect.reconfigure.of(perFile(relPath, grammar))
+      const effects = engine!.StateEffect.reconfigure.of(perFile(relPath, grammar, entry.indentation))
       if (view && currentPath === relPath) {
         view.dispatch({ effects })
         remember(relPath, view.state)
@@ -568,6 +657,7 @@ export default function EditorPane(props: { task: Task }) {
       saved.set(path, entry.custody.acknowledged)
       entry.state = entry.custody.state ?? entry.state
       if (!live()) return
+      if (currentPath === path) updateStatus()
       if (entry.custody.error) setSaveErr(entry.custody.error)
       if (entry.custody.writeBlock && currentPath === path) scheduleSave.cancel()
       if (view && currentPath === path && !view.state.doc.eq(entry.custody.current)) {
@@ -617,6 +707,8 @@ export default function EditorPane(props: { task: Task }) {
     if (currentPath) remember(currentPath, view.state)
     currentPath = null
     currentCustody = undefined
+    releaseAdmission?.()
+    releaseAdmission = undefined
     if (!view.state.readOnly) view.dispatch({ effects: engine!.StateEffect.appendConfig.of([engine!.EditorState.readOnly.of(true), engine!.EditorView.editable.of(false)]) })
     const state = await stateFor(relPath).catch((cause: unknown) => {
       if (live() && active() === relPath) setSaveErr(cause instanceof Error ? cause.message : 'Could not load this file.')
@@ -632,8 +724,11 @@ export default function EditorPane(props: { task: Task }) {
     if (!live() || !view || active() !== relPath || pool.files.get(relPath) !== entryAtShow || admitted !== showGeneration) return
     currentPath = relPath
     currentCustody = entryAtShow.custody
+    releaseAdmission = admitGraphicalEditor(nodeId, taskId, relPath)
+    updateStatus()
     noteActivated(nodeId, taskId, relPath)
     view.setState(adopt(relPath, entryAtShow))
+    updateStatus()
     // A cached state carries the theme it was built with, so a file opened before a theme change
     // comes back wearing the old one until this line.
     refreshEditorTheme(view)
@@ -723,7 +818,7 @@ export default function EditorPane(props: { task: Task }) {
       return
     }
     if (outcome.kind === 'replace') {
-      const state = engine!.EditorState.create({ doc: disk.text, extensions: perFile(path, entry.language) })
+      const state = engine!.EditorState.create({ doc: disk.text, extensions: perFile(path, entry.language, entry.indentation) })
       entry.state = custody.state = state
       if (view && currentPath === path) {
         view.setState(state)
@@ -835,6 +930,7 @@ export default function EditorPane(props: { task: Task }) {
     pool.files.delete(relPath)
     saved.delete(relPath)
     forgetEditorViewState(taskId, relPath, nodeId)
+    forgetPresentation(nodeId, taskId, relPath)
     if (options.focus !== false && HOST === 'dom') queueMicrotask(focusSurvivor)
     return true
   }
@@ -983,6 +1079,7 @@ export default function EditorPane(props: { task: Task }) {
       pool.files.delete(path)
       saved.delete(path)
       forgetEditorViewState(taskId, path, nodeId)
+      forgetPresentation(nodeId, taskId, path)
     }
   })
 
@@ -997,6 +1094,8 @@ export default function EditorPane(props: { task: Task }) {
         if (currentPath) remember(currentPath, view.state)
         currentPath = null
         currentCustody = undefined
+        releaseAdmission?.()
+        releaseAdmission = undefined
         view.setState(emptyState())
       }
     }, { defer: true }),
@@ -1098,6 +1197,26 @@ export default function EditorPane(props: { task: Task }) {
               </>
             }
           />
+          <Show when={active()}>{(path) => <EditorStatus
+            path={path()}
+            position={statusPosition()}
+            selection={selectedCharacters()}
+            language={languageName(languageIdForPath(path()))}
+            indentation={statusIndentation()}
+            defaultIndentation={readEditorIndentation(prefs.data)}
+            save={statusSave()}
+            preview={!!imagePath()}
+            external={!!ptyPath()}
+            wrap={statusWrap()}
+            defaultWrap={readEditorWordWrap(prefs.data)}
+            onToggleWrap={toggleWrap}
+            onDefaultWrap={(value) => { void saveEditorWordWrap(queryClient, value) }}
+            onCopy={() => copyPath(false)}
+            onReveal={revealActiveFile}
+            onIndentation={setIndentation}
+            onDefaultIndentation={(value) => { void saveEditorIndentation(queryClient, value) }}
+            onRetry={() => { void save(path()) }}
+          />}</Show>
           {/* Under the strip rather than in it: a sentence does not fit a 48-pixel bar. */}
           <Show when={bulkRun()}>{(run) => <Alert variant="banner" tone="warn">Closing files… <Button onPress={() => run().cancel()}>Cancel close</Button></Alert>}</Show>
           <Show when={saveErr()}><Alert variant="banner" tone="danger">{saveErr()}</Alert></Show>

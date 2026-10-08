@@ -3,12 +3,14 @@ import type { EditorState, Extension, Text } from '@codemirror/state'
 import type { DocumentCustody } from '@acorn/plugin-api/ui/editor'
 import type { EditorApi } from './editorClient'
 import type { EditorReadResult } from '../contract/api'
+import type { Indentation } from './editorPresentation'
 
 export type PooledFile = {
   state: EditorState
   custody: DocumentCustody
   release: () => void
   language: Extension
+  indentation: Indentation
   mount: object
   markersReadAt: number
   markersGeneration: number

@@ -12,6 +12,8 @@ import {
 import { editorApi } from './editorClient'
 import { activeFile, requestEditorReveal } from './editorState'
 import { pruneRecentToListing } from './editorNavigation'
+import { graphicalEditorAdmitted } from './editorAdmission'
+import { focusedPane } from '@acorn/plugin-api/client'
 
 // ⌘P, and the two commands that were already here.
 //
@@ -121,9 +123,11 @@ export const editorCommands: readonly ContributedCommand[] = [
   {
     id: 'editor.navigation.go-to-line', kind: 'search', title: 'Go to line',
     category: 'navigation', palette: true, scope: 'task', requires: { plugin: 'editor' },
+    when: () => { const taskId = activeTaskId(); const path = taskId && activeFile(taskId); return !!taskId && !!path && focusedPane(taskId) === 'editor' && graphicalEditorAdmitted(activeNodeId(), taskId, path) },
     placeholder: 'Line or line:column…', minQueryLength: 1, debounceMs: 0,
     query: async (text, context) => {
-      if (context.nodeId !== activeNodeId() || !context.taskId || !activeFile(context.taskId)) return []
+      if (context.nodeId !== activeNodeId() || !context.taskId || !activeFile(context.taskId)
+        || !graphicalEditorAdmitted(context.nodeId, context.taskId, activeFile(context.taskId)!)) return []
       const match = /^([1-9]\d*)(?::([1-9]\d*))?$/.exec(text.trim())
       if (!match) return []
       const line = Number(match[1]); const column = match[2] ? Number(match[2]) : 1
@@ -136,7 +140,8 @@ export const editorCommands: readonly ContributedCommand[] = [
     select: (item, context): CommandOutcome => {
       const selected = lineItems.get(item)
       if (context.nodeId !== activeNodeId() || context.taskId !== activeTaskId() || !context.taskId
-        || selected?.context !== context || selected.path !== item.ref) return COMMAND_CLOSED
+        || selected?.context !== context || selected.path !== item.ref
+        || !graphicalEditorAdmitted(context.nodeId, context.taskId, selected.path)) return COMMAND_CLOSED
       requestEditorReveal(context.taskId, selected.path, selected.line, selected.column)
       return COMMAND_CLOSED
     },
