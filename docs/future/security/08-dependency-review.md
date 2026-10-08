@@ -1,5 +1,12 @@
 # Phase 08: explain dependency and install-policy changes
 
+## Integration note: October 9, 2026
+
+The coordinator merged all three Phase 08 commits and updated the new route test's stale analyzer
+version assertion to version 2. Focused parser, Changes model and pane, local Git routes, and agents
+diagnostics checks passed (106 tests), as did the Changes TypeScript check. Full repository checks
+remain deferred until the remaining phases land.
+
 ## Final correctness note: October 9, 2026
 
 Pnpm importer versions now resolve ordinary and scoped `name@version` coordinates as well as alias
