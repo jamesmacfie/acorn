@@ -117,7 +117,7 @@ export function workflowDispatchProblems(args: {
   if (step.agent) {
     if (typeof step.agent !== 'object' || Array.isArray(step.agent)) return [...errors, `${label} agent must be a configuration object`]
     const agent = step.agent
-    errors.push(...unexpectedFields(agent, ['prompt', 'profileId', 'model', 'configOptions', 'schema', 'onFailure']).map(field => `${label} agent has unsupported field '${field}'`))
+    errors.push(...unexpectedFields(agent, ['prompt', 'goal', 'profileId', 'model', 'configOptions', 'schema', 'onFailure']).map(field => `${label} agent has unsupported field '${field}'`))
     if (typeof agent.prompt !== 'string' || !agent.prompt.trim()) errors.push(`${label} agent needs a prompt`)
     if (agent.onFailure !== undefined && !['continue', 'stop'].includes(agent.onFailure)) errors.push(`${label} agent onFailure must be continue or stop`)
     if (agent.model !== undefined && typeof agent.model !== 'string') errors.push(`${label} agent model must be a string`)
@@ -130,6 +130,7 @@ export function workflowDispatchProblems(args: {
       try { parseDataSchema(agent.schema) } catch (error) { errors.push(`${label} agent schema: ${error instanceof Error ? error.message : 'Invalid result schema'}`) }
     }
     if (/\$\{/.test(agent.prompt ?? '')) errors.push(`${label} agent prompt receives the current item automatically; template references are not supported`)
+    if (typeof agent.goal === 'string' && /\$\{/.test(agent.goal)) errors.push(`${label} agent goal is plain text; template references are not supported`)
   }
   if (step.childWorkflow && targets) {
     const ref = step.childWorkflow.ref

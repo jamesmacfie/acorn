@@ -32,7 +32,7 @@ export type ParsedWorkflow = GroundedWorkflow | { error: string }
  *  reads as the type it mirrors. */
 const DEF_KEYS = ['baseline', 'maxDescendants', 'maxConcurrency', 'formatVersion', 'name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'outputs', 'steps']
 const STEP_KEYS = [
-  'id', 'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt',
+  'id', 'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt', 'goal',
   'schema', 'policy', 'maxIterations', 'requiresRun', 'agent', 'childWorkflow', 'items', 'itemKey',
   'title', 'form', 'branches', 'with', 'tools', 'budget',
 ]
@@ -301,7 +301,7 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
       add(notes, code, `Step '${step.name}' set '${key}', ${why}, so it was dropped.`, step.name)
     })
     if (isRecord(ahead.agent)) {
-      ahead = { ...ahead, agent: pruneKeys(ahead.agent, ['prompt', 'profileId', 'schema', 'onFailure'], (key, code) => {
+      ahead = { ...ahead, agent: pruneKeys(ahead.agent, ['prompt', 'goal', 'profileId', 'schema', 'onFailure'], (key, code) => {
         add(notes, code, `Step '${step.name}' agent set '${key}', which a generated workflow cannot set, so it was dropped.`, step.name)
       }) }
     }

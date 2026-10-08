@@ -11,6 +11,7 @@ import { Chip, ChipRow, Field, Text, Textarea } from '@acorn/plugin-api/ui'
 export default function PromptField(props: {
   label: string
   hint?: string
+  placeholder?: string
   value: string
   required?: boolean
   disabled?: boolean
@@ -41,7 +42,7 @@ export default function PromptField(props: {
         disabled={props.disabled}
         invalid={!!required.error()}
         value={props.value}
-        placeholder="What this step should do."
+        placeholder={props.placeholder ?? 'What this step should do.'}
         onBlur={required.touch}
         onInput={change}
       />

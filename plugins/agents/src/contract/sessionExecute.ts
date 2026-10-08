@@ -1,6 +1,32 @@
 import { agentProfileRegistry, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
+import type { AgentGoalVerdict } from './wire.ts'
+
+/** The longest completion condition a step may carry, after rendering. */
+export const MAX_AGENT_GOAL_CHARS = 2_000
+
+/** Usage across the turns and checks a step owns so far. An unknown value stays unknown. */
+export type AgentExecuteUsage = { costUsd: number | null; usage: HeadlessResult['capture']['usage'] }
+
+/** Where a step's completion condition stands (docs/workflows/agent-steps.md § Completion conditions).
+ *  `checking` and `continuing` are progress. The rest are terminal: `stopped` means the step ended for
+ *  a reason of its own (a refusal, `BLOCKED:`, a failed turn, cancellation, a timeout, or the budget). */
+export type AgentExecuteGoalStatus = 'checking' | 'continuing' | 'satisfied' | 'blocked' | 'exhausted' | 'unavailable' | 'stopped'
+
+export type AgentExecuteGoalSummary = {
+  objective: string
+  status: AgentExecuteGoalStatus
+  /** Goal continuations queued so far. Result repairs are counted separately. */
+  continuations: number
+  repairs: number
+  /** The last check's verdict, which carries its reason and evidence summary. */
+  verdict: AgentGoalVerdict | null
+  /** The turns Acorn queued on its own, in order, and why. */
+  automaticTurns: { turnId: string; reason: 'goal' | 'repair' }[]
+  /** Why the step ended, when it ended without the goal satisfied. */
+  reason?: string
+}
 
 export type AgentSessionExecuteRequest = {
   taskId: string
@@ -34,14 +60,29 @@ export type AgentSessionExecuteRequest = {
   stepId?: string
   /** Resolved from the workflow run by the workflows plugin, never from an HTTP or tool body. */
   posture?: 'gated' | 'autonomous'
+  /** A completion condition, already rendered. The step continues in the same session until a
+   *  check finds it satisfied, or the step reaches a blocker or a limit. Needs a profile with a
+   *  one-shot mode, because the check runs through it. */
+  goal?: string
+  /**
+   * Asked before each turn Acorn queues on its own (a goal continuation or a result repair) and
+   * before each completion check, with the usage so far. Return a reason to stop, or null to go on.
+   * The step then ends with status `error` and that reason. A check never consumes a turn.
+   */
+  admitAutomatic?: (request: { kind: 'turn' | 'check'; usage: AgentExecuteUsage }) => Promise<string | null>
+  /** Each change to the completion condition's state, for a live view of the step. */
+  onGoal?: (summary: AgentExecuteGoalSummary) => void
   onEvent?: (event: StreamEvent) => void
   signal?: AbortSignal
 }
 
+/** The step's outcome, plus its completion condition's final state when it had one. */
+export type AgentSessionExecuteResult = HeadlessResult & { goal?: AgentExecuteGoalSummary }
+
 // Resolves to null when the profile has no managed driver; the caller then owns the fallback. The
 // result covers every turn the step owns, including plugin notes that joined it: the last turn's output,
 // and usage across them all (docs/managed-agents/unattended-follow-ups.md).
-export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promise<HeadlessResult | null>
+export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promise<AgentSessionExecuteResult | null>
 
 export const AGENTS_SESSION_EXECUTE = capabilityId<AgentSessionExecute>('agents.sessionExecute')
 

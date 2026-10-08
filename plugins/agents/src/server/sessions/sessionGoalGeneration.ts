@@ -1,17 +1,12 @@
-import { agentProfileRegistry, type CoreServices, type PluginDatabase } from '@acorn/plugin-api/node'
-import { HARNESS_BACKEND_PREFIX } from '@acorn/protocol/modelProviders.ts'
+import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentGoalVerdict, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { AgentStore } from './store'
 import { SessionGoalStore } from './sessionGoalStore'
-import { GOAL_JUDGE_SYSTEM, goalCheckFailure, goalContinuationPrompt, goalDecision, goalEvidence, parseGoalVerdict } from './sessionGoal'
+import { goalCheckFailure, goalContinuationPrompt, goalDecision, goalJudgeUnavailable, judgeGoal, type GoalJudgePorts } from './sessionGoal'
 
-const TIMEOUT_MS = 30_000
-
-type GoalPorts = {
+type GoalPorts = GoalJudgePorts & {
   store: AgentStore
   db: PluginDatabase
-  models: CoreServices['models']
-  currentUserId(): string | null
   publish(session: AgentSession): void
   enqueue(sessionId: string, prompt: string, key: string, signal?: AbortSignal): Promise<void>
 }
@@ -130,34 +125,15 @@ export class SessionGoalGeneration {
     else if (turn.status === 'failed') {
       verdict = { ...goalCheckFailure(turnId), blocker: 'run_failed', reason: 'The agent turn failed.' }
     } else {
-      const userId = this.ports.currentUserId()
-      const profile = agentProfileRegistry.get(session.profileId)
-      if (!userId || !profile?.aiArgv) verdict = goalCheckFailure(turnId)
+      if (goalJudgeUnavailable(this.ports, session.profileId)) verdict = goalCheckFailure(turnId)
       else {
-        const controller = new AbortController()
-        const abort = () => controller.abort(signal.reason)
-        if (signal.aborted) abort()
-        else signal.addEventListener('abort', abort, { once: true })
-        const timeout = setTimeout(() => controller.abort(new Error('goal_check_timeout')), TIMEOUT_MS)
         try {
-          if (controller.signal.aborted || this.stopped) return
-          const result = await this.ports.models.generateText({
-            userId, backendId: `${HARNESS_BACKEND_PREFIX}${session.profileId}`,
-            input: {
-              system: GOAL_JUDGE_SYSTEM,
-              prompt: goalEvidence(goal.objective, snapshot.events),
-              ...(session.profileId === 'claude-code' ? { modelId: 'haiku' } : {}),
-              maxOutputTokens: 500,
-              signal: controller.signal,
-            }, timeoutMs: TIMEOUT_MS,
-          })
-          verdict = parseGoalVerdict(result.text, turnId)
+          verdict = (await judgeGoal(this.ports, {
+            profileId: session.profileId, objective: goal.objective, events: snapshot.events, turnId, signal,
+          })).verdict
         } catch {
           if (signal.aborted) return
           verdict = goalCheckFailure(turnId)
-        } finally {
-          clearTimeout(timeout)
-          signal.removeEventListener('abort', abort)
         }
       }
     }

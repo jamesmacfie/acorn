@@ -101,7 +101,10 @@ the active session and queued items. Files already edited stay in the parent fol
 Each item uses a frozen, terminal one-agent run internally so dispatch reservations, usage budgets,
 record history, cancellation, and retry retain one lifecycle owner. These runs appear through item
 history rather than as separate entries in the task’s workflow list. The ordered `children` output
-includes each item’s status, `agentSessionId`, `result`, error, and declared outputs. Item history
+includes each item’s status, `agentSessionId`, `result`, error, and declared outputs. An agent with a
+`goal` gives each item a completion condition of its own, checked in that item's session
+([agent steps](./agent-steps.md#completion-conditions)). Each item's `goal` summary carries its
+status, continuation count, and last reason. Item history
 has **Open session**, **Open item run**, and **Retry attempt** actions. Retrying a failed attempt
 reuses its session and frozen item; successful items remain done. Retry and **Run again** reject an
 item while another item session is active in the task.

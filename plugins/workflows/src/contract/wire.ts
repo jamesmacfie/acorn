@@ -99,6 +99,9 @@ export type WorkflowStepRow = {
   // The bundle handed to the step: the rendered prompt, and `childTaskId` for a step the runner gave
   // its own task and checkout. The run pane reads the second to link to that task.
   inputsJson?: string | null
+  // An agent step's completion condition state (`AgentExecuteGoalSummary` from
+  // @acorn/plugin-agents/contract/sessionExecute.ts). Host metadata: no binding reads it.
+  goalJson?: string | null
   // Which dispatch step spawned this one, when one did. The run pane draws a child under its parent.
   parentStepId?: string | null
 }

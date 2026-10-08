@@ -150,6 +150,34 @@ describe('agents:turn-follow-up', () => {
     expect(await sender.queue(note({ taskId: 'task-1', sessionId: result!.agentSessionId!, turnId: original!.id }))).toEqual({ ok: false, reason: 'operation-closed' })
   })
 
+  it('checks a goal again after a reviewer’s correction, and opens the review window once', async () => {
+    // The judge runs through the profile's one-shot mode, which the scripted profile otherwise lacks.
+    const get = agentProfileRegistry.get.bind(agentProfileRegistry)
+    vi.spyOn(agentProfileRegistry, 'get').mockImplementation((id) => id === 'scripted' ? { ...get(id)!, aiArgv: () => null } as never : get(id))
+    const judged: string[] = []
+    const judge = { currentUserId: () => 'owner', models: { generateText: vi.fn(async (request: { input: { prompt: string } }) => {
+      judged.push(request.input.prompt)
+      return { text: JSON.stringify({ satisfied: true, blocker: 'none', reason: 'Done.', evidence_summary: 'Tests pass.', relied_on_assumption: false }), providerId: 'p', backendId: 'b', modelId: 'm' }
+    }) } }
+    replies = [{ text: 'Done.\n```json\n{"ok": true}\n```' }, { text: 'Fixed add().\n```json\n{"ok": true}\n```' }]
+    const sender = await messenger('acorn-advisor')
+    let reviews = 0
+    reviewer('acorn-advisor', async (window) => {
+      reviews += 1
+      await sender.queue(note(window))
+    })
+    const result = await createSessionExecute(runtime, async () => followUps, judge as never)({
+      taskId: 'task-1', profileId: 'scripted', title: 'Workflow: review', prompt: 'Write add().', goal: 'add() adds.',
+      schema: { type: 'object', properties: { ok: { type: 'boolean' } }, required: ['ok'] },
+      runId: 'run-1', stepId: `step-${randomUUID()}`, timeoutMs: 20_000,
+    })
+    expect(result).toMatchObject({ status: 'ok', capture: { result: expect.stringContaining('Fixed add()') }, goal: { status: 'satisfied' } })
+    expect(reviews).toBe(1)
+    // Once for the step's own turn, and again for the turn set the correction changed.
+    expect(judged).toHaveLength(2)
+    expect(judged[1]).toContain('Fixed add()')
+  })
+
   it('keeps a note queued during the running turn inside the step, and refuses notes with no live operation', async () => {
     replies = [{ text: 'Working.\n```json\n{"ok": true}\n```', hold: true }, { text: 'Understood.\n```json\n{"ok": true}\n```' }]
     const sender = await messenger('acorn-permission-policy')

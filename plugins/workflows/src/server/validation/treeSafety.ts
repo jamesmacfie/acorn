@@ -134,6 +134,13 @@ function budgetViolation(budget: WorkflowBudget, usage: WorkflowUsage, admission
   return null
 }
 
+/** Reported usage as the admission ledger stores it: a missing, negative, or non-finite value is zero. */
+const cleanUsage = (usage: Partial<WorkflowUsage>): WorkflowUsage => ({
+  costUsd: Number.isFinite(usage.costUsd) && (usage.costUsd ?? 0) > 0 ? usage.costUsd! : 0,
+  inputTokens: Number.isSafeInteger(usage.inputTokens) && (usage.inputTokens ?? 0) > 0 ? usage.inputTokens! : 0,
+  outputTokens: Number.isSafeInteger(usage.outputTokens) && (usage.outputTokens ?? 0) > 0 ? usage.outputTokens! : 0,
+})
+
 export class WorkflowSafetyRailError extends Error {
   constructor(message: string) {
     super(message)
@@ -150,39 +157,7 @@ export class WorkflowTreeSafety {
 
   reserveTurn(run: WorkflowRunRow, step: WorkflowStepRow, stepBudget: WorkflowBudget): string {
     return this.db.transaction((tx) => {
-      const currentRun = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, run.id)).get()
-      const root = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, run.rootRunId ?? run.id)).get()
-      if (!currentRun || !root
-        || !['running', 'gated'].includes(currentRun.status)
-        || !['running', 'gated'].includes(root.status)) {
-        throw new WorkflowSafetyRailError('Workflow turn admission stopped because the run tree is not running.')
-      }
-      const at = Date.now()
-      if (currentRun.deadlineAt != null && currentRun.deadlineAt <= at) {
-        throw new WorkflowSafetyRailError('Workflow deadline exhausted before turn admission.')
-      }
-      const rows = tx.select().from(schema.workflowTurnAdmissions)
-        .where(eq(schema.workflowTurnAdmissions.rootRunId, root.id)).all()
-      const runs = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.rootRunId, root.id)).all()
-      const chain = ancestors(currentRun, runs)
-      if (chain.at(-1)?.id !== root.id || chain.some(owner => !['running', 'gated'].includes(owner.status))) {
-        throw new WorkflowSafetyRailError('Workflow ancestor no longer admits agent turns.')
-      }
-      const ancestorViolation = chain.map(owner => {
-        const ids = subtreeIds(owner, runs)
-        const subtree = rows.filter(row => ids.has(row.runId))
-        const budget = parseEffectiveBudget(owner)
-        return budgetViolation(budget, usageOf(subtree), true)
-          ?? (budget.maxTurns != null && subtree.length >= budget.maxTurns
-            ? `turn budget exhausted (${subtree.length} of ${budget.maxTurns} admitted)` : null)
-      }).find(Boolean)
-      const stepRows = rows.filter((row) => row.stepId === step.id)
-      const violation = ancestorViolation
-        ?? budgetViolation(stepBudget, usageOf(stepRows), true)
-        ?? (stepBudget.maxTurns != null && stepRows.length >= stepBudget.maxTurns
-          ? `step turn budget exhausted (${stepRows.length} of ${stepBudget.maxTurns} admitted)` : null)
-      if (violation) throw new WorkflowSafetyRailError(`Safety rail: ${violation}.`)
-
+      const { root, currentRun, at } = this.#admissible(tx, run, step, stepBudget, true)
       const admissionId = this.id()
       tx.insert(schema.workflowTurnAdmissions).values({
         id: admissionId,
@@ -196,20 +171,99 @@ export class WorkflowTreeSafety {
     })
   }
 
+  /**
+   * A turn the agent queued by itself inside an admitted step (a goal continuation or a result
+   * repair), or a completion check (docs/workflows/agent-steps.md § Budgets). The opening admission
+   * holds the step's usage so far, replaced rather than added, so settling it later charges each turn
+   * and check once. A turn takes an admission of its own with no usage, which is what a turn budget
+   * counts. A check takes none but must still fit the budget. Returns the reason to stop, or null.
+   */
+  admitAutomatic(
+    openingId: string,
+    run: WorkflowRunRow,
+    step: WorkflowStepRow,
+    stepBudget: WorkflowBudget,
+    kind: 'turn' | 'check',
+    usage: Partial<WorkflowUsage>,
+  ): string | null {
+    try {
+      this.db.transaction((tx) => {
+        tx.update(schema.workflowTurnAdmissions).set(cleanUsage(usage)).where(and(
+          eq(schema.workflowTurnAdmissions.id, openingId),
+          eq(schema.workflowTurnAdmissions.state, 'reserved'),
+        )).run()
+        const { root, currentRun, at } = this.#admissible(tx, run, step, stepBudget, kind === 'turn')
+        if (kind === 'check') return
+        tx.insert(schema.workflowTurnAdmissions).values({
+          id: this.id(),
+          rootRunId: root.id,
+          runId: currentRun.id,
+          stepId: step.id,
+          state: 'settled',
+          createdAt: at,
+          settledAt: at,
+        }).run()
+      })
+      return null
+    } catch (error) {
+      if (error instanceof WorkflowSafetyRailError) return error.message
+      throw error
+    }
+  }
+
+  /** Whether the run tree may spend more. Throws the reason it may not. `countTurns` is false for a
+   *  call that consumes no turn. */
+  #admissible(
+    tx: Parameters<Parameters<PluginDatabase['transaction']>[0]>[0],
+    run: WorkflowRunRow,
+    step: WorkflowStepRow,
+    stepBudget: WorkflowBudget,
+    countTurns: boolean,
+  ): { root: WorkflowRunRow; currentRun: WorkflowRunRow; at: number } {
+    const currentRun = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, run.id)).get()
+    const root = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, run.rootRunId ?? run.id)).get()
+    if (!currentRun || !root
+      || !['running', 'gated'].includes(currentRun.status)
+      || !['running', 'gated'].includes(root.status)) {
+      throw new WorkflowSafetyRailError('Workflow turn admission stopped because the run tree is not running.')
+    }
+    const at = Date.now()
+    if (currentRun.deadlineAt != null && currentRun.deadlineAt <= at) {
+      throw new WorkflowSafetyRailError('Workflow deadline exhausted before turn admission.')
+    }
+    const rows = tx.select().from(schema.workflowTurnAdmissions)
+      .where(eq(schema.workflowTurnAdmissions.rootRunId, root.id)).all()
+    const runs = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.rootRunId, root.id)).all()
+    const chain = ancestors(currentRun, runs)
+    if (chain.at(-1)?.id !== root.id || chain.some(owner => !['running', 'gated'].includes(owner.status))) {
+      throw new WorkflowSafetyRailError('Workflow ancestor no longer admits agent turns.')
+    }
+    const ancestorViolation = chain.map(owner => {
+      const ids = subtreeIds(owner, runs)
+      const subtree = rows.filter(row => ids.has(row.runId))
+      const budget = parseEffectiveBudget(owner)
+      return budgetViolation(budget, usageOf(subtree), true)
+        ?? (countTurns && budget.maxTurns != null && subtree.length >= budget.maxTurns
+          ? `turn budget exhausted (${subtree.length} of ${budget.maxTurns} admitted)` : null)
+    }).find(Boolean)
+    const stepRows = rows.filter((row) => row.stepId === step.id)
+    const violation = ancestorViolation
+      ?? budgetViolation(stepBudget, usageOf(stepRows), true)
+      ?? (countTurns && stepBudget.maxTurns != null && stepRows.length >= stepBudget.maxTurns
+        ? `step turn budget exhausted (${stepRows.length} of ${stepBudget.maxTurns} admitted)` : null)
+    if (violation) throw new WorkflowSafetyRailError(`Safety rail: ${violation}.`)
+    return { root, currentRun, at }
+  }
+
   async settleTurn(
     admissionId: string,
     usage: Partial<WorkflowUsage>,
     error?: string,
     stepBudget: WorkflowBudget = {},
   ): Promise<string | null> {
-    const clean = {
-      costUsd: Number.isFinite(usage.costUsd) && (usage.costUsd ?? 0) > 0 ? usage.costUsd! : 0,
-      inputTokens: Number.isSafeInteger(usage.inputTokens) && (usage.inputTokens ?? 0) > 0 ? usage.inputTokens! : 0,
-      outputTokens: Number.isSafeInteger(usage.outputTokens) && (usage.outputTokens ?? 0) > 0 ? usage.outputTokens! : 0,
-    }
     await this.db.update(schema.workflowTurnAdmissions).set({
       state: 'settled',
-      ...clean,
+      ...cleanUsage(usage),
       error: error ?? null,
       settledAt: Date.now(),
     }).where(and(

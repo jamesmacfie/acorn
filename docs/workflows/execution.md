@@ -114,6 +114,8 @@ retry with an edited prompt is another turn in the session the owner is already 
 
 An edited prompt patches the run's frozen definition for that step alone. The original is kept in the
 step's `inputs_json` as `originalPrompt`, so the record of what was first asked survives the re-run.
+A step's resolved `goal` is kept there too, so a retry is judged against the same condition
+([completion conditions](./agent-steps.md#completion-conditions)).
 
 Retry is a device action. A task-confined caller, meaning an agent inside the run, gets a 403,
 because it could otherwise loop a failed step past the rail that stopped it. The budget rule holds

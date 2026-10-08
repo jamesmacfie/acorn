@@ -16,6 +16,16 @@ const PROMPT_FIELD: StepField = { id: 'prompt', label: 'Prompt', type: 'prompt',
 // real definition, and the host must not refuse it.
 const OPTIONAL_PROMPT_FIELD: StepField = { ...PROMPT_FIELD, required: false, hint: 'Optional when the step appends its upstream outputs.' }
 
+// Drawn as a prompt because it takes the same references (docs/workflows/agent-steps.md § Completion conditions).
+export const GOAL_FIELD: StepField = {
+  id: 'goal',
+  label: 'Completion condition',
+  type: 'prompt',
+  required: false,
+  placeholder: 'What must be true before this step is finished.',
+  hint: 'Acorn checks this condition after turns and continues while useful work remains.',
+}
+
 export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescription>> = {
   'write-dataset': {
     label: 'Write dataset', description: 'Validate rows from an earlier step and write them to a workflow-fed dataset in this task project.', icon: 'database',
@@ -62,6 +72,7 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
     runsAgent: true,
     fields: [
       OPTIONAL_PROMPT_FIELD,
+      GOAL_FIELD,
       { id: 'schema', label: 'Result schema', type: 'textarea', hint: 'JSON Schema. The agent ends its turn with a matching JSON block.' },
       { id: 'requiresRun', label: 'Needs a run target', type: 'select', hint: "The project's run targets. Started first, and its URL is added to the prompt." },
     ],

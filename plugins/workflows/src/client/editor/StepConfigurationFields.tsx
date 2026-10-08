@@ -88,7 +88,7 @@ export default function StepConfigurationFields(props: {
                   </Show>
                 </Show>
               )}>
-                <PromptField label={field.label} hint={field.hint} required={field.required}
+                <PromptField label={field.label} hint={field.hint} placeholder={field.placeholder} required={field.required}
                   disabled={props.disabled} references={props.references}
                   value={String(readStepField(props.step as never, kind(), field.id) ?? '')}
                   onChange={(value) => props.onFieldChange(field.id, value)} />
