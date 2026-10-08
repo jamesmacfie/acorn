@@ -146,6 +146,22 @@ const drawHeader = (changes: LocalChange[], chosen: Partial<ChangeView> = {}) =>
   return host
 }
 
+it('shows dependency read failures and bounded finding details in the expanded review', () => {
+  const failed = model([change('package.json', false)])
+  failed.dependencies = Object.assign(() => undefined, { loading: false, error: new Error('read failed') }) as never
+  disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={failed} />, host))
+  expect(host.textContent).toContain('Dependency review failed')
+  disposers.pop()?.()
+  host.replaceChildren()
+  const reviewed = model([change('package.json', false)])
+  reviewed.dependencies = Object.assign(() => ({ scope: 'unstaged', revision: 'r', analyzerVersion: 2, manager: 'pnpm', managerVersion: '11.0.0', coverage: 'partial', packageCount: 0,
+    findings: [{ path: 'pnpm-lock.yaml', kind: 'integrity', name: 'pkg', before: null, after: null, detail: 'lockfile entry has no integrity metadata' }], limits: [] }), { loading: false, error: undefined }) as never
+  disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={reviewed} />, host))
+  const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes('Dependencies:'))
+  button?.click()
+  expect(host.textContent).toContain('lockfile entry has no integrity metadata')
+})
+
 /** One group's `<details>`, by the label in its summary. */
 const group = (title: string): HTMLDetailsElement => {
   const found = [...host.querySelectorAll('details')].find((fold) => fold.querySelector('.ui-section-header-label')?.textContent === title)

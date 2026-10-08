@@ -27,8 +27,12 @@ hooks, harness probes, models, or credential validation. It returns no raw argum
 environment entry, credential value, or provider output.
 
 Project policy inspection calls Changes' typed, passive static policy capability when it is
-available. It reports npm or pnpm identity, version, policy setting names, and any incomplete read.
-The capability reads bounded fixed files after the selected project's canonical root is resolved.
+available. It reports npm or pnpm identity and version, policy setting names, numeric release age,
+script suppression, build approval and ignore counts, allow-all-builds intent, release-age exception
+counts, and registry origins without
+credentials. Unknown values remain unknown. The capability reads at most 32 KiB per fixed config file
+and 128 KiB total after the selected project's canonical root is resolved. It does not parse lockfile
+contents. The capability call shares the diagnostic's timeout and cancellation fence.
 If Changes is unavailable, the diagnostic uses its smaller fixed-file summary. Neither path proves
 that every install follows those files. Pnpm policy cannot cover npm, npx, Python, or arbitrary scripts.
 Revision-specific dependency changes appear in [Changes](../diff-rendering/changes-pane.md#the-file-list).

@@ -356,9 +356,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             managedMcp: () => runtime!.mcpServers.list(),
             instructionObservation: async (projectId, taskId) => (await runtime!.observedInstructionAdmission())?.latest(projectId, taskId) ?? null,
             observedProvider: (id) => runtime!.observedProvider(id),
-            staticDependencyPolicy: async (root) => {
+            staticDependencyPolicy: async (root, signal) => {
               const policy = ctx.capabilities.get(STATIC_DEPENDENCY_POLICY)
-              return policy?.read(root)
+              return policy?.read(root, signal)
             },
           }, nodeId, userId, scope, signal)
         },

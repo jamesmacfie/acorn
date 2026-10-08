@@ -26,7 +26,7 @@ export type SecurityDiagnosticPorts = {
   managedMcp(): Promise<AgentMcpServer[]>
   instructionObservation?(projectId: string | null, taskId: string | null): Promise<InstructionAdmissionObservation | null>
   observedProvider?(id: string): AgentProviderDescriptor | null
-  staticDependencyPolicy?(root: string): Promise<StaticDependencyPolicy | undefined>
+  staticDependencyPolicy?(root: string, signal?: AbortSignal): Promise<StaticDependencyPolicy | undefined>
 }
 
 export async function securityScopeChoices(
@@ -266,12 +266,13 @@ export async function collectSecurityDiagnostics(
     try {
       const project = await bounded(() => ports.core.projects.byId(projectId))
       if (!project?.path) throw new Error('no project checkout')
-      const root = await realpath(project.path)
-      const typedPolicy = await ports.staticDependencyPolicy?.(root)
+      const projectPath = project.path
+      const root = await bounded(() => realpath(projectPath))
+      const typedPolicy = ports.staticDependencyPolicy ? await bounded(() => ports.staticDependencyPolicy!(root, signal)) : undefined
       if (typedPolicy) {
         add('project.package-policy', 'project', typedPolicy.limits.length ? 'unsupported' : 'configured_only', 'attention',
           'Changes static dependency policy capability',
-          `Package manager ${typedPolicy.manager}${typedPolicy.managerVersion ? ` ${typedPolicy.managerVersion}` : ''}; policy settings: ${typedPolicy.policyKeys.join(', ') || 'none'}.`,
+          `Package manager ${typedPolicy.manager}${typedPolicy.managerVersion ? ` ${typedPolicy.managerVersion}` : ''}; policy settings: ${typedPolicy.policyKeys.join(', ') || 'none'}; release age ${typedPolicy.releaseAgeMinutes === null ? 'unknown' : `${typedPolicy.releaseAgeMinutes} minutes`}; ignore scripts ${typedPolicy.ignoreScripts === null ? 'unknown' : typedPolicy.ignoreScripts ? 'enabled' : 'disabled'}; build approvals ${typedPolicy.buildApprovalCount ?? 'unknown'}; ignored builds ${typedPolicy.buildIgnoreCount ?? 'unknown'}; allow all builds ${typedPolicy.allowAllBuilds === null ? 'unknown' : typedPolicy.allowAllBuilds ? 'enabled' : 'disabled'}; release-age exceptions ${typedPolicy.releaseAgeExceptionCount ?? 'unknown'}; registry origins ${typedPolicy.registryOrigins.join(', ') || 'unknown'}; source policy ${typedPolicy.sourcePolicyKeys.join(', ') || 'none'}.`,
           `Static configuration only. ${typedPolicy.limits.join(' ').slice(0, 500) || 'Install commands and project code were not run.'}`,
           'Open Changes for revision-specific dependency review.')
       } else {

@@ -34,7 +34,7 @@ export const changesPlugin = (): NodePlugin => {
     const bridge = localGitBridge(ctx.core, ctx.events.worktreeStatus, ctx.hooks)
     capability = ctx.capabilities.provide(LOCAL_GIT, bridge)
     policyCapability = ctx.capabilities.provide(STATIC_DEPENDENCY_POLICY, {
-      read: async (root) => (await import('../server/dependencyReview')).staticDependencyPolicy(root),
+      read: async (root, signal) => (await import('../server/dependencyReview')).staticDependencyPolicy(root, signal),
     })
     ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
       id: 'uncommitted',

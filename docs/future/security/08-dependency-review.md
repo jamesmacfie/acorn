@@ -1,5 +1,43 @@
 # Phase 08: explain dependency and install-policy changes
 
+## Follow-up completion note: October 9, 2026
+
+Status: implemented on the Phase 08 branch after the coordinator's correctness review. Analyzer
+version 2 separates bounded canonical comparison identities from abbreviated, redacted display.
+Changing an existing lifecycle command now produces a script finding with its command withheld.
+Policy edits beyond the first 100 displayed entries remain detectable, and finding details say when
+the display cannot show the full changed value. Parsing caps nested YAML at 100,000 nodes and depth
+32, compared values at 10,000 entries and depth 32, declarations at 20,000, resolutions at 10,000,
+and findings at 1,000. Exceeding a cap yields partial coverage. The repository's own pnpm lock has
+35,709 YAML nodes and is accepted within that bound.
+
+The Node enumerates one HEAD tree and one index generation, reads their immutable blob object IDs,
+and rechecks HEAD, index, and disk before reporting. A moving input yields partial coverage and no
+comparison findings. Unborn HEAD remains supported. Npm workspace importers and pnpm importers are
+reconciled against changed manifests; absent importers and independent nested manager files are
+reported incomplete. Root alias resolutions are direct; peer variants and aliases count by meaningful
+package name. Pnpm Git commit-only edits change source identity. Non-object resolution tables are
+malformed evidence. Python and executable config changes trigger an incomplete advisory review.
+
+The `STATIC_DEPENDENCY_POLICY` contract returns numeric release age, ignore-scripts intent, build
+approval and ignore counts, allow-all-builds intent, release-age exception count, and safe registry
+origins and source-policy names. It reads configuration independently of the lockfile, at 32 KiB per
+file and 128 KiB total. Diagnostics wraps the capability in its timeout and cancellation fence; it
+does not run any configured executable. The Changes pane shows read errors and bounded finding
+details, clears old evidence across scope and status changes, and ignores a late reply from an old
+scope. Ordinary stage, diff, commit, and push behavior remains advisory and unchanged. No metadata
+network action was added.
+
+Evidence: focused dependency parser 15 tests, Changes model 11, Changes pane 32, and diagnostics 14
+passed; affected TypeScript checks, 87 architecture checks, Node production build, and desktop
+renderer build passed. The Node static graph measured 3,190,893 B against the unchanged 3,192,000 B
+ceiling; dependency parsing and YAML remain lazy. In an isolated desktop, a temporary `.npmrc` showed
+staged and unstaged review, and refresh replaced a visible policy value from 60 to 120 after a disk
+edit. That run used the earlier 30,000-node parser cap and therefore showed partial coverage for
+Acorn's valid lock; the raised bound was subsequently verified by the repository-sized lock test.
+The temporary file was removed and the fixture stopped. No full repository gate or metadata fetch
+was run. Installed package scripts, release dates, provenance, and malware status remain unknown.
+
 ## Completion note: October 9, 2026
 
 Status: implemented as an advisory Changes review. The Node compares HEAD with the index for staged

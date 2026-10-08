@@ -75,15 +75,20 @@ shows an expandable dependency summary. `plugins/changes/src/server/dependencyRe
 against the index for staged review and the index against disk for unstaged review. It includes
 relevant untracked files. The report names its scope, format, analyzer version, and digest of both
 sets of bytes. A status refresh or stage operation requests a fresh report; the pane hides a report
-while its replacement loads.
+while its replacement loads. HEAD and the index are enumerated once, and blob object IDs are read
+immutably. If HEAD, the index, or a reviewed disk file changes during acquisition, the report is
+partial with no comparison findings and asks for a retry. Read failures appear in the pane.
 
 The parser supports npm lockfile versions 2 and 3 and pnpm lockfile version 9. It compares manifest
 requests, lockfile importer resolutions, package records, sources, integrity fields, lifecycle-script
-names, package-manager versions, release-age settings, build approvals, overrides, catalogs, and
+names and command-change digests, package-manager versions, release-age settings, build approvals, overrides, catalogs, and
 registry settings. It preserves aliases, peer variants, optional flags, and workspace links in
-resolution identities. Missing, malformed, mixed, unsupported, unreadable, or oversized inputs yield
+resolution identities. Display values are redacted and abbreviated independently of complete bounded
+comparison identities. Finding details explain when the visible value was abbreviated. Missing,
+malformed, mixed, unsupported, unreadable, or oversized inputs yield
 partial or unsupported coverage and leave ordinary diff and Git actions available. Git blobs and
-disk reads have per-file and total size bounds; disk paths pass the worktree confinement check.
+disk reads have a 6 MiB per-file and 16 MiB combined read bound; disk paths pass the worktree
+confinement check. Nested independent project configuration is reported as incomplete.
 
 The review does not install packages or run project configuration. It cannot infer installed package
 scripts, publisher identity, release dates, provenance, or malware status from a lockfile. Integrity

@@ -139,9 +139,9 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
   const [dependencies] = createResource(
     () => pane.shown() && project()?.vcs === 'git' && !isArchiving(task.id)
-      && status().changes.some((change) => change.staged === (scope() === 'staged') && /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?)$/.test(change.path))
+      && status().changes.some((change) => change.staged === (scope() === 'staged') && /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.pnpmfile\.cjs|npm\.config\.js|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?|requirements\.txt|pyproject\.toml|uv\.lock|Pipfile\.lock)$/.test(change.path))
       ? { scope: scope(), revision: statusRevision() } : undefined,
-    async ({ scope }) => localGitApi.dependencies(task.id, scope).catch(() => undefined),
+    async ({ scope }) => localGitApi.dependencies(task.id, scope),
   )
 
   // The stack as a document (docs/diff-rendering/document.md § The document). The node diffs, cuts and keys

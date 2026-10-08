@@ -120,11 +120,29 @@ it('does not inspect encrypted approval bodies during a passive project check', 
 it('uses Changes static policy facts through the typed project capability', async () => {
   root = await mkdtemp(join(tmpdir(), 'acorn-diagnostics-'))
   const report = await collectSecurityDiagnostics(ports({
-    staticDependencyPolicy: async () => ({ manager: 'pnpm', managerVersion: '11.0.0', policyKeys: ['pnpm-workspace.yaml:minimumReleaseAgeExclude', 'pnpm-workspace.yaml:allowBuilds'], limits: [] }),
+    staticDependencyPolicy: async () => ({ manager: 'pnpm', managerVersion: '11.0.0', policyKeys: ['pnpm-workspace.yaml:minimumReleaseAgeExclude', 'pnpm-workspace.yaml:allowBuilds'], releaseAgeMinutes: 1440, ignoreScripts: true, buildApprovalCount: 2, buildIgnoreCount: 1, allowAllBuilds: false, releaseAgeExceptionCount: 1, registryOrigins: ['https://registry.example'], sourcePolicyKeys: ['.npmrc:registry'], limits: [] }),
   }), 'node-1', 'owner', { projectId: 'project-1' }, new AbortController().signal)
   const finding = report.findings.find((item) => item.id === 'project.package-policy')
   expect(finding?.summary).toContain('minimumReleaseAgeExclude')
   expect(finding?.source).toContain('Changes static dependency policy capability')
+  expect(finding?.summary).toContain('release age 1440 minutes')
+  expect(finding?.summary).toContain('ignore scripts enabled')
+})
+
+it('bounds a stuck static policy capability and cancels a switched node check', async () => {
+  root = await mkdtemp(join(tmpdir(), 'acorn-diagnostics-'))
+  const stuck = ports({ staticDependencyPolicy: () => new Promise(() => {}) })
+  vi.useFakeTimers()
+  try {
+    const pending = collectSecurityDiagnostics(stuck, 'node-1', 'owner', { projectId: 'project-1' }, new AbortController().signal)
+    await vi.advanceTimersByTimeAsync(4_100)
+    const report = await pending
+    expect(report.findings.find((finding) => finding.id === 'project.package-policy')?.state).toBe('failed')
+  } finally { vi.useRealTimers() }
+  const controller = new AbortController()
+  const pending = collectSecurityDiagnostics(stuck, 'node-1', 'owner', { projectId: 'project-1' }, controller.signal)
+  controller.abort()
+  await expect(pending).rejects.toThrow('cancelled')
 })
 
 it('rejects a FIFO promptly and never emits configured policy evidence', async () => {
