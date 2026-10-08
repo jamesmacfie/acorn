@@ -9,6 +9,7 @@ import { worktreesKey } from './worktreeClient'
 import { RevisionView } from './RevisionView'
 import { watchWorktreeInventory } from './worktreeInvalidation'
 import { createStashSubmission } from './stashSubmission'
+import { ExplainView } from './ExplainView'
 
 const base = (projectId: string) => `/p/${encodeURIComponent(projectId)}/x/git/stashes`
 type Action = 'create' | 'apply' | 'pop' | 'drop'
@@ -146,6 +147,7 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
         <Button onPress={() => open('apply')}>Apply to task</Button>
         <Button onPress={() => open('pop')}>Pop to task</Button>
         <Button variant="ghost" onPress={() => open('drop')}>Drop stash</Button>
+        <ExplainView projectId={props.projectId} kind="stash" id={selected().objectId} base={selected().base} />
         <Show when={selected().untrackedFiles.length}><SectionHeader>Captured untracked files</SectionHeader>
           <For each={selected().untrackedFiles}>{(path) => <Text>{path}</Text>}</For></Show>
         <Show when={selected().untrackedParent}>
@@ -153,7 +155,7 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
           <Button variant={contentView() === 'untracked' ? 'solid' : 'ghost'} onPress={() => setContentView('untracked')}>Captured untracked content</Button>
         </Show>
         <Show when={contentView() === 'tracked'} fallback={<RevisionView projectId={props.projectId} taskId={props.task?.id}
-          id={selected().untrackedParent} onCommit={props.onSelect} />}>
+          id={selected().untrackedParent} onCommit={props.onSelect} explain={false} />}>
           <RevisionView projectId={props.projectId} taskId={props.task?.id} id={selected().objectId}
             stashBase={selected().base} onCommit={props.onSelect} />
         </Show>

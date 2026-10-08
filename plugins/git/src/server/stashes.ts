@@ -6,6 +6,7 @@ import { repositoryFor } from './history'
 import { canonicalPath, parseRoster } from './worktreeRoster'
 
 type Core = Pick<CoreServices, 'git' | 'projects' | 'tasks' | 'checkoutAdmission'>
+type ReadCore = Pick<CoreServices, 'git' | 'projects'>
 const sha = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const firstLine = (text: string) => text.trim().split('\n')[0] || 'Git refused the stash operation.'
 const queue = new Map<string, Promise<void>>()
@@ -26,7 +27,7 @@ async function mutateRepository<T>(core: Core, repository: string, action: () =>
   return inRepository(await canonicalPath(common.stdout.trim()), action)
 }
 
-export async function stashRoster(core: Core, projectId: string, signal?: AbortSignal): Promise<StashRoster> {
+export async function stashRoster(core: ReadCore, projectId: string, signal?: AbortSignal): Promise<StashRoster> {
   const repository = await repositoryFor(core, projectId, signal)
   const listed = await core.git.git(['stash', 'list', '-z', '--format=%gd%x00%H%x00%gs%x00%ct'],
     { cwd: repository, maxOutputBytes: 512 << 10, signal })

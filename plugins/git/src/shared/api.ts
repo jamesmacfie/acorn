@@ -56,3 +56,9 @@ export type StashApply = { taskId: string; expectedPath: string; selection: Stas
 export type StashDrop = { selection: StashSelection; confirm: true }
 export type StashResult = { ok: boolean; error: string | null; conflicts: string[] | null; roster: StashRoster | null; changed: boolean }
 export const stashesRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/stashes`
+
+export type ExplainKind = 'commit' | 'stash'
+export type ExplainRequest = { backendId: string; modelId: string; base: string | null }
+export type ExplainResult = { text: string; backendId: string; modelId: string; omissions: string[] }
+export const explainRoute = (projectId: string, kind: ExplainKind, id: string) =>
+  `/v1/p/git/projects/${encodeURIComponent(projectId)}/explanations/${kind}/${encodeURIComponent(id)}`

@@ -10,5 +10,7 @@ export const gitPlugin = (): NodePlugin => ({
     ctx.routes.register(historyRoutes(ctx.core), { prefix: '', note: 'pinned history and read-only revision documents' })
     const { stashRoutes } = await import('../server/routes/stashes')
     ctx.routes.register(stashRoutes(ctx.core, ctx.events), { prefix: '', note: 'stash roster and guarded task checkout writes' })
+    const { explanationRoutes } = await import('../server/routes/explain')
+    ctx.routes.register(explanationRoutes(ctx.core), { prefix: '', note: 'explicit bounded Git explanations' })
   },
 })

@@ -23,7 +23,7 @@ Use a tree for UI that must work on desktop and terminal. Use a frame for browse
 The default scaffold emits a tree without a build step, and `--rectangle` emits a frame.
 
 Node plugins run on one Node. Client connections form a fleet, but a plugin's database and capability
-registry don't span that fleet. Keep client reads, caches, and subscriptions scoped to the selected Node.
+registry don't span that fleet. Keep client reads, caches, and subscriptions scoped to the selected Node. The compiled [Git plugin](./git-client/explanations.md) follows this rule on both clients.
 
 ## Startup
 

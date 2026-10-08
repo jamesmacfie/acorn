@@ -6,8 +6,9 @@ import type { DiffSource } from '@acorn/plugin-api/ui/diff'
 import type { RevisionDetail } from '../shared/api'
 import { revisionOptions } from './historyClient'
 import { revisionSource } from './revisionSource'
+import { ExplainView } from './ExplainView'
 
-export function RevisionView(props: { projectId: string; taskId?: string; id: string | null; onCommit: (id: string) => void; stashBase?: string }) {
+export function RevisionView(props: { projectId: string; taskId?: string; id: string | null; onCommit: (id: string) => void; stashBase?: string; explain?: boolean }) {
   const [base, setBase] = createSignal<string | null | undefined>(props.stashBase)
   const [file, setFile] = createSignal('')
   const scope = createMemo(() => JSON.stringify([activeNodeId(), props.projectId, props.taskId, props.id]))
@@ -57,6 +58,7 @@ export function RevisionView(props: { projectId: string; taskId?: string; id: st
             onChange={setBase} />
         </Show></Show>
         <Show when={revision().omitted}><Alert tone="warn">{revision().omitted}</Alert></Show>
+        <Show when={!props.stashBase && props.explain !== false}><ExplainView projectId={props.projectId} kind="commit" id={revision().commit.id} base={revision().base} /></Show>
         <Fold label="Changed files" count={revision().files.length} defaultOpen={revision().files.length <= 5}>
             <Rows id={`git-files:${activeNodeId()}:${props.projectId}:${props.id}:${revision().base}`} ariaLabel="Changed files"
               items={revision().files.map((entry) => ({ key: entry.path, label: entry.path }))} selected={file() || null}
