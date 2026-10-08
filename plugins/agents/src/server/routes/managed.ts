@@ -1,6 +1,7 @@
 import { sessionListQuerySchema, type SessionListFilter } from '../../shared/sessionList'
 import type { Context } from 'hono'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { createMiddleware } from 'hono/factory'
@@ -62,6 +63,7 @@ export type ManagedAgentsBridge = {
   verifyImportedResume(sessionId: string): Promise<AgentSession>
   listSessions(filter: SessionListFilter): Promise<AgentSessionList>
   snapshot(sessionId: string, afterSeq?: number, eventLimit?: number, foldTools?: boolean): Promise<AgentSessionSnapshot>
+  referenceContext(sessionId: string): Promise<AgentContextSnapshot>
   events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
   implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
@@ -104,6 +106,7 @@ const forkBodySchema = z.object({ title: z.string().trim().min(1).max(500).optio
 const cancelBodySchema = z.object({ turnId: z.string().uuid().optional() })
 const implementPlanBodySchema = z.object({ itemId: z.string().min(1).max(2_000) })
 const attachmentQuerySchema = z.object({ taskId: z.string().uuid() })
+const referenceQuerySchema = z.object({ taskId: z.string().uuid() })
 const idempotencyKey = (headers: Headers): string | null => {
   const key = headers.get('idempotency-key')?.trim()
   return key && key.length >= 8 && key.length <= 200 ? key : null
@@ -147,7 +150,7 @@ export const managedAgents = new Hono<AppEnv>()
   // Renderer execution controls require owner authority, independently of session ownership.
   // Register before the ownership resolvers so denied callers cannot reach any runtime operation.
   // Agent execution uses the guarded delegation/workflow capabilities, never these HTTP controls.
-  .on('GET', ['/providers', '/sessions/:sessionId/mcp'], requireDevice)
+  .on('GET', ['/providers', '/sessions/:sessionId/mcp', '/sessions/:sessionId/reference-context'], requireDevice)
   .on('PUT', ['/sessions/:sessionId/mcp'], requireDevice)
   .on('POST', [
     '/sessions', '/transcript-imports', '/sessions/:sessionId/turns',
@@ -298,6 +301,15 @@ export const managedAgents = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
       bridge.snapshot(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.limit, parsed.data.fold === '1'))
+  })
+  .get('/sessions/:sessionId/reference-context', async (c) => {
+    const parsed = referenceQuerySchema.safeParse(c.req.query())
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const bridge = routeCapabilityFor(c, MANAGED_AGENTS)
+    if (!bridge) return viaBridge(c, MANAGED_AGENTS, (runtime) => runtime.referenceContext(c.req.param('sessionId')))
+    const ownerTaskId = await bridge.taskIdForSession(c.req.param('sessionId'))
+    if (ownerTaskId !== parsed.data.taskId) return respondError(c, 404, 'not_found')
+    return viaBridge(c, MANAGED_AGENTS, (runtime) => runtime.referenceContext(c.req.param('sessionId')))
   })
   .get('/sessions/:sessionId/events', (c) => {
     const parsed = pageQuerySchema.safeParse(c.req.query())

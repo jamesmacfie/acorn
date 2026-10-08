@@ -154,6 +154,29 @@ it('does not reattach consumed fork context when an empty composer remounts', as
   expect(api.enqueue).toHaveBeenCalledTimes(1)
 })
 
+it('shows a session reference in the draft and restores it after a reload', async () => {
+  setActiveNode('A')
+  const first = mount(() => row('target'))
+  await tick()
+  const context: AgentContextSnapshot = {
+    type: 'context', contextId: 'reference', label: 'Session · Investigation',
+    content: '<pasted_content>Finding</pasted_content>', source: 'agents.sessions',
+    resourceId: 'source', capturedAt: 1,
+  }
+  composerDraftState('target').setContexts([context])
+  expect(first.textContent).toContain('Session · Investigation')
+  expect(readComposerPayload('A', 'target').contexts).toEqual([context])
+  disposals.splice(0).forEach(dispose => dispose())
+  clearComposerDrafts()
+  const restored = mount(() => row('target'))
+  await tick()
+  expect(restored.textContent).toContain('Session · Investigation')
+  api.enqueue.mockResolvedValue({})
+  button(restored, 'Send').click()
+  await vi.waitFor(() => expect(api.enqueue).toHaveBeenCalledOnce())
+  expect(api.enqueue.mock.calls[0][1].input).toContainEqual(context)
+})
+
 
 it('keeps a held automatic capture with its originating session and discards it after a Node switch', async () => {
   setActiveNode('A')

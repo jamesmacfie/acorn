@@ -1,6 +1,18 @@
 # Session references in the composer
 
-Status: proposed, October 6, 2026. Not started. Part of the [DeerFlow review](./README.md).
+Completion note, October 8, 2026: The agents plugin adds a task-scoped **Agent sessions** context
+picker, a device-only reference snapshot route, and pasted-content wrapping for copied conversation
+text. The composer passes its target session ID through the additive capture scope and persists each
+reference with the draft. The route requires an explicit task ID and checks the source session's
+owner before exporting its ledger. References use the fork renderer's 200-event and 100,000-character
+limits, mark omitted earlier events, and exclude tool output. A running session is captured at the
+read transaction's moment. Later phases can use the source session ID and deep link in the context
+manifest; this phase adds no transcript paging or cross-task access. Focused tests, affected
+typechecks, targeted oxlint, and documentation checks pass. The real-app check was unavailable
+because this worktree could not install missing dependencies from the npm registry. The documentation
+check used generated Tauri schemas from the main checkout, which a fresh worktree lacks.
+
+Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 
 ## Problem and outcome
 

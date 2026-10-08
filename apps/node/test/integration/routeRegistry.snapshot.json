@@ -62,6 +62,8 @@
   "GET /v1/p/agents/sessions/:sessionId/events",
   "GET /v1/p/agents/sessions/:sessionId/export",
   "GET /v1/p/agents/sessions/:sessionId/mcp",
+  "GET /v1/p/agents/sessions/:sessionId/reference-context",
+  "GET /v1/p/agents/sessions/:sessionId/reference-context",
   "GET /v1/p/agents/sessions/:sessionId/mcp",
   "GET /v1/p/agents/sessions/:sessionId/mcp",
   "GET /v1/p/agents/sessions/:sessionId/wait",

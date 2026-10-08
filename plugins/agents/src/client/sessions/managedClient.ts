@@ -1,4 +1,5 @@
 import type { SessionListFilter } from '../../shared/sessionList'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { activeNodeId, readBytes, readJson, sendForm, writeJson } from '@acorn/plugin-api/client'
 import type {
   AgentAttachment,
@@ -110,6 +111,8 @@ export const managedAgentApi = {
   // (../../shared/toolFold.ts). A node that predates it ignores the flag and sends every row.
   snapshot: (sessionId: string, afterSeq = 0, limit = 2_000, options: AgentOrigin = {}) =>
     readJson<AgentSessionSnapshot>(sessionRoute(sessionId, `?afterSeq=${afterSeq}&limit=${limit}&fold=1`), options),
+  referenceContext: (sessionId: string, taskId: string, options: AgentOrigin = {}) =>
+    readJson<AgentContextSnapshot>(sessionRoute(sessionId, `/reference-context?taskId=${encodeURIComponent(taskId)}`), options),
   events: (sessionId: string, afterSeq: number, limit = 2_000, options: AgentOrigin = {}) =>
     readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}&fold=1`), options),
   enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>, idempotencyKey?: string, options: AgentOrigin = {}) =>

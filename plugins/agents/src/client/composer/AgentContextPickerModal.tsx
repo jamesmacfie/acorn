@@ -5,14 +5,15 @@ import { Alert, Button, Checkbox, Modal, Stack, Text } from '@acorn/plugin-api/u
 export default function AgentContextPickerModal(props: {
   contribution: AgentContextContribution
   taskId: string
+  sessionId: string
   initialSelectedIds: readonly string[]
   attaching: boolean
   onAttach(optionIds: readonly string[]): void
   onClose(): void
 }) {
   const [options] = createResource(
-    () => `${props.taskId}:${props.contribution.id}`,
-    () => props.contribution.options({ taskId: props.taskId }),
+    () => `${props.taskId}:${props.sessionId}:${props.contribution.id}`,
+    () => props.contribution.options({ taskId: props.taskId, sessionId: props.sessionId }),
   )
   const [selected, setSelected] = createSignal<Set<string>>(new Set(), { equals: false })
   let initialized = false

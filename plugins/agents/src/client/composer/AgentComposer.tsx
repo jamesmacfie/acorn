@@ -579,6 +579,7 @@ export default function AgentComposer(props: {
           <AgentContextPickerModal
             contribution={contribution()}
             taskId={props.session.taskId}
+            sessionId={props.session.id}
             initialSelectedIds={selectedContextOptionIds(contribution())}
             attaching={capturingContext() === contribution().id}
             onAttach={(optionIds) => void captureSelectedContext(contribution().id, optionIds)}

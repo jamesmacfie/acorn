@@ -80,7 +80,7 @@ query is never logged. A path in either body is at most 4,096 characters.
 | `/v1/p/agents/custom-agents[/:id]` | Custom agent definitions |
 | `/v1/p/agents/mcp-servers[/:name][/test]` | The owner's MCP servers. Device-only ([MCP](../mcp.md#your-own-servers)) |
 | `/v1/p/agents/sessions`, `/sessions/search` | Session list and transcript search |
-| `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait` |
+| `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait`. `GET reference-context?taskId=...` is device-only and checks that the source session belongs to the task |
 | `/v1/p/agents/sessions/:id/turns[/:turnId]` | Queue, edit, or remove a turn |
 | `/v1/p/agents/sessions/:id/requests/:requestId/resolve` | Answer a permission or question request |
 | `/v1/p/agents/sessions/:id/{cancel,fork,compact}` | Session controls |

@@ -40,6 +40,7 @@ const METHODS = [
   'artifacts', 'artifact',
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
+  'referenceContext',
   'implementCodexPlan',
   'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
   'exportSession', 'wait', 'search', 'footprint', 'stopIdleNow', 'sessionMcp', 'setSessionMcp',
@@ -130,6 +131,26 @@ describe('managed execution requires device authority', () => {
     expect((await app.fetch(req('/api/sessions/s1/turns/t1', 'DELETE'), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/sessions/s2/cancel', 'POST', {}), {} as Env)).status).toBe(404)
     expect(cancel).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('session reference context', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+
+  it('returns only sessions owned by the requested task', async () => {
+    const referenceContext = vi.fn(async () => ({ type: 'context', content: 'snapshot' }))
+    const task1 = '00000000-0000-4000-8000-000000000001'
+    const task2 = '00000000-0000-4000-8000-000000000002'
+    setManagedAgentsBridge(fake({
+      taskIdForSession: async (id) => ({ s1: task1, s2: task2 })[id as 's1' | 's2'] ?? null,
+      referenceContext: referenceContext as never,
+    }))
+    const path = (id: string) => `/api/sessions/${id}/reference-context?taskId=${task1}`
+    expect((await authed().fetch(req(path('s1')), {} as Env)).status).toBe(200)
+    expect((await authed().fetch(req(path('s2')), {} as Env)).status).toBe(404)
+    expect((await authed().fetch(req(path('missing')), {} as Env)).status).toBe(404)
+    expect((await asTask1().fetch(req(path('s1')), {} as Env)).status).toBe(403)
+    expect(referenceContext).toHaveBeenCalledTimes(1)
   })
 })
 

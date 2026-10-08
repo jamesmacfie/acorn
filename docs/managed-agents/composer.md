@@ -47,6 +47,19 @@ The composer has two cooperative extension points
 - `agents:composer-actions` is room in the action bar beside **Attach** and the two pickers, in
   `stack` mode with a ceiling of four.
 
+## Reference another session
+
+Open **Context**, choose **Agent sessions**, and select sessions from the same task. The picker
+lists up to 50 sessions by last activity and excludes the session receiving the turn. Each selected
+session adds a snapshot to the draft. The preview shows its size, and **Send** is disabled if all
+captured contexts exceed 512 KiB. The snapshot is copied at capture time and is sent with one turn.
+
+The Node reads up to the last 200 conversation events, plans, and file changes, with a
+100,000-character text cap. A truncation marker identifies omitted earlier events. Tool output is
+excluded. The agent receives the conversation inside a pasted-content block, labeled as reference
+material. The context manifest links back to the source session. The device-only reference route
+checks the source session's task before reading it.
+
 ## Drafts and subagent views
 
 The composer's draft is held per session outside the component, as are its attachments and captured
