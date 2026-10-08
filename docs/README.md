@@ -294,9 +294,8 @@ Each feature landing page above has topic pages in a folder of the same name:
 ## Subfolders
 
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
-  delivery records kept while acceptance is open. Its README indexes every programme and single file,
-  including the [maintainability and dependency programme](./future/trim/README.md). Shipped behavior belongs
-  in an owning doc above.
+  delivery records kept while acceptance is open. Its README indexes every programme and single file.
+  Shipped behavior belongs in an owning doc above.
 - [DeerFlow review](./future/deerflow/README.md): five proposals taken from DeerFlow,
   [session references](./future/deerflow/01-session-references.md),
   [session goals](./future/deerflow/02-session-goals.md),
