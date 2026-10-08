@@ -359,6 +359,7 @@ describe('durable queue admission', () => {
       internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => 'owner' })
     await runtime.reconcile()
     await vi.waitFor(() => expect(sends).toContain(accepted.id))
+    expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('working')
     const sent = sends.length
     await oldCallback({ type: 'assistant_message', text: 'stale' })
     expect(sends).toHaveLength(sent)

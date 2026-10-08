@@ -253,7 +253,7 @@ export type AgentToolCall = {
   /** Absent means "unchanged": a provider update that only carries output must not drag a finished
    *  call back to running. The transcript projection folds a call's updates and keeps the last
    *  status that was actually reported. */
-  status?: 'pending' | 'running' | 'completed' | 'failed'
+  status?: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted' | 'unknown'
   input?: string
   output?: string
   outputAppend?: boolean

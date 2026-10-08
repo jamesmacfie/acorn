@@ -261,6 +261,7 @@ export class AgentStore extends AgentSessionRepository {
 
   private async readSnapshot(sessionId: string, afterSeq: number, limit: number | undefined, client: boolean, until?: AgentWaitCondition): Promise<AgentSessionSnapshot> {
     const projection = client ? null : await this.ensureSearchProjection()
+    const commands = client ? await import('./commandLifecycle') : null
     return this.db.transaction((tx) => {
       projection?.catchUp(tx, sessionId)
       const session = tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()
@@ -270,11 +271,13 @@ export class AgentStore extends AgentSessionRepository {
         .orderBy(asc(schema.agentEvents.seq))
       const rows = limit === undefined ? events.all() : events.limit(limit).all()
       const mappedSession = mapAgentSession(session)
+      const turns = tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
+        .orderBy(asc(schema.agentTurns.ordinal)).all().map(mapAgentTurn)
       return {
         session: mappedSession,
-        turns: tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
-          .orderBy(asc(schema.agentTurns.ordinal)).all().map(mapAgentTurn),
-        events: rows.map((row) => client ? clientEventRecord(mapAgentEvent(row)) : mapAgentEvent(row)),
+        turns,
+        events: client ? commands!.projectCommandEvents(rows.map((row) => clientEventRecord(mapAgentEvent(row))), mappedSession, turns)
+          : rows.map(mapAgentEvent),
         requests: tx.select().from(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId))
           .orderBy(asc(schema.agentRequests.createdAt)).all().map(mapAgentRequest),
         ...(until ? { wait: {
@@ -310,6 +313,7 @@ export class AgentStore extends AgentSessionRepository {
 
   private async readEventPage(sessionId: string, afterSeq: number, limit: number, client: boolean): Promise<AgentEventPage> {
     const projection = client ? null : await this.ensureSearchProjection()
+    const commands = client ? await import('./commandLifecycle') : null
     return this.db.transaction((tx) => {
       projection?.catchUp(tx, sessionId)
       const bounded = Math.min(Math.max(limit, 1), 2_000)
@@ -317,8 +321,16 @@ export class AgentStore extends AgentSessionRepository {
         .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
         .orderBy(asc(schema.agentEvents.seq)).limit(bounded + 1).all()
       const page = rows.slice(0, bounded).map((row) => client ? clientEventRecord(mapAgentEvent(row)) : mapAgentEvent(row))
-      return { events: page, nextCursor: rows.length > bounded ? page.at(-1)?.seq ?? null : null }
+      const session = client ? tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get() : null
+      const turns = session ? tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).all().map(mapAgentTurn) : []
+      return { events: session ? commands!.projectCommandEvents(page, mapAgentSession(session), turns) : page,
+        nextCursor: rows.length > bounded ? page.at(-1)?.seq ?? null : null }
     })
+  }
+
+  async unfinishedCommands(sessionId?: string): Promise<AgentEventRecord[]> {
+    const { unfinishedCommands } = await import('./commandLifecycle')
+    return this.db.transaction((tx) => unfinishedCommands(tx, sessionId))
   }
 
   /** Recompute a session's queued-turn count and store it on the row. Called after every change that

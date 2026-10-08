@@ -14,7 +14,6 @@ import type {
   AgentNormalizedEvent,
   AgentPermissionOption,
   AgentSubagentUpdate,
-  AgentToolCall,
   AgentUsage,
   AgentWebAction,
   AgentWebActivity,
@@ -415,7 +414,7 @@ const toolInput = (rawInput: unknown): string | undefined => {
 
 // Absent stays absent. ACP sends a status only when it changes, so an update that carries nothing but
 // command output would otherwise reset a finished call to running once the transcript folds the two.
-function toolStatus(status: string | null | undefined): AgentToolCall['status'] {
+function toolStatus(status: string | null | undefined): 'pending' | 'running' | 'completed' | 'failed' | undefined {
   if (status === 'completed') return 'completed'
   if (status === 'failed') return 'failed'
   if (status === 'pending') return 'pending'
@@ -603,7 +602,7 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
 function subagentFromToolCall(
   toolCallId: string,
   title: string | null | undefined,
-  status: AgentToolCall['status'],
+  status: ReturnType<typeof toolStatus>,
   meta: ClaudeToolMeta,
   background: boolean,
 ): AgentSubagentUpdate {

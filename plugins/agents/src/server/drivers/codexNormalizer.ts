@@ -331,7 +331,6 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
           id: stringValue(params.itemId) ?? 'command',
           title: 'Command output',
           kind: 'execute',
-          status: 'running',
           output: stringValue(params.delta) ?? '',
           outputAppend: true,
         },
