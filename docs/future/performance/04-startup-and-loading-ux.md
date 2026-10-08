@@ -68,6 +68,25 @@ about the person's workspace; plugin module names and stacks belong in expandabl
    boundary, and give failed imports a real loader retry rather than only resetting a cached error.
 7. Emit phase 01's milestones and bounded failed-stage attributes from this coordinator. Keep
    first-frame, restoration, shell readiness, and usable content distinct in local and Sentry reports.
+8. Decide from phase 01's numbers whether to draw the rail before startup finishes. The shell waits
+   for both the Node's first broker status and compiled plugin registration, so every rail icon
+   waits for the slower of the two. Do this step only if those numbers show the wait is long enough
+   to notice. If the Node is the slow part, an early rail makes the window look ready sooner without
+   making it usable sooner. Record that trade in the measurements before building anything.
+   - Keep a device-held record of the last drawn rail: each source's id, icon name, label, and
+     order. Update it whenever the rail changes. It holds no plugin code and grants nothing.
+   - While startup is pending, draw that record as inert icons in a loading state. An icon enables
+     when its contribution registers. Clicking one before then does nothing. Expose the pending
+     state to assistive technology, as the startup loader does.
+   - Draw a loaded plugin's icon from the same record, inert until phase 05 step 4's
+     contribution-readiness result confirms the Node still offers and trusts it. Phase 05 says not
+     to publish unverified descriptors early. An inert icon that runs no plugin code stays within
+     that rule.
+   - When registration settles, drop any recorded icon that didn't register, such as a plugin the
+     Node has since disabled. Keep the rail's geometry stable while that happens, so the remaining
+     icons don't shift under the pointer.
+   - Phase 05 step 3 makes built-in plugin icons register sooner by splitting declarations from
+     implementations. This step covers the time before even that registration finishes.
 
 The terminal host reuses state semantics and shared region placeholders where applicable. It does
 not acquire desktop-specific startup UI. Keep placement, key focus, and draft state across retries.
@@ -76,7 +95,9 @@ not acquire desktop-specific startup UI. Keep placement, key focus, and draft st
 
 Use deferred operations to test Node-ready/plugin-pending, cache-pending, registration failure and
 retry, partial registration cleanup, failed initial reads, Node switching, and restoration ordering.
-Test a ready region beside a pending region and retained content during refetch. Assert observable
+Test a ready region beside a pending region and retained content during refetch. If step 8 ships,
+test a recorded icon whose plugin registers, one whose plugin the Node disabled, a loaded plugin
+that fails its readiness check, and a click on an icon that's still pending. Assert observable
 messages and registry/persistence outcomes rather than private state-machine fields.
 
 Run `pnpm lint`, `pnpm test --filter=@acorn/client-core`, `pnpm test --filter=@acorn/tui`,

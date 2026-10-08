@@ -37,7 +37,8 @@ already load lazily. Preserve those cuts.
    Keep serial distribution commits and atomic paired frame/chrome registration. Publish a clear
    contribution-readiness result and have loaded deep links and restored panes await that result.
    Preserve immediate revocation of active authority and teardown during Node switching; import
-   deferral must not let a retired worker continue running.
+   deferral must not let a retired worker continue running. Phase 04 step 8 may draw a loaded
+   plugin's recorded rail icon, inert, until this result confirms it.
 5. Review distribution latency in `syncPluginDistribution`. Prioritize the selected Node and its
    required offers; read independent Nodes and cache bundles with bounded concurrency. Preserve
    ordered commits, provenance reporting for cached hashes, consent, owner overrides, and stale

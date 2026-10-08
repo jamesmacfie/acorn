@@ -27,6 +27,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
+| [agent-search-startup.md](./agent-search-startup.md) | Stop the full search-index check and re-index the agents plugin runs after every Node start. | Proposed October 9, 2026. Implementation not started. |
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
@@ -37,6 +38,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [multi-account.md](./multi-account.md) | Per-account harness configuration pinned to sessions. | Research and proposal. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
+| [task-deletion.md](./task-deletion.md) | Delete a task and its plugin data from the archive dialog or the Archive page, with tombstones for plugin catch-up and **Deleted task** labels. | Proposed October 9, 2026. Implementation not started. |
 | [workflow-agent-goals.md](./workflow-agent-goals.md) | Completion conditions for managed workflow agent steps and For each agents, with bounded continuations, persisted verdicts, and workflow-owned controls and budgets. | Implemented October 8, 2026. See the [reference](../workflows/agent-steps.md#completion-conditions). The standalone Agent pane doesn't yet show a workflow session's goal. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 

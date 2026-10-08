@@ -33,7 +33,7 @@ dated acceptance evidence into Testing. Do not create a branch unless the operat
 | [01: Measurements](./01-measurements-and-sentry.md) | Defined milestones, artifact inventories, and consent-controlled Sentry records. | None | Planned |
 | [02: Packaging](./02-runtime-packaging.md) | Installed Claude executable used; reviewed runtime files shipped. | 01's inventory format | Planned |
 | [03: Minification](./03-production-minification.md) | Smaller production output with a formatting-independent budget check. | 01 | Planned |
-| [04: Startup UX](./04-startup-and-loading-ux.md) | Meaningful startup messages, recovery, and local loading placeholders. | 01 | Planned |
+| [04: Startup UX](./04-startup-and-loading-ux.md) | Meaningful startup messages, recovery, local loading placeholders, and an optional early rail. | 01 | Planned |
 | [05: Renderer loading](./05-selective-renderer-loading.md) | Smaller eager graph and less mandatory work behind the first frame. | 01, 04 | Planned |
 | [06: Server loading](./06-selective-server-loading.md) | Promise-cached lazy routes and measured optional handler cuts. | 01, 03 | Planned |
 | [07: Acceptance](./07-acceptance-and-budgets.md) | Before-and-after evidence, useful budgets, installed-host checks, and live Sentry verification. | 01 to 06 | Planned |
