@@ -10,7 +10,7 @@ extension that builds these links is out of scope and has its own plan.
 
 ## Combined verification, October 8, 2026
 
-The task branch integrates main at `a630f360a`, including project-first navigation and Node shell
+The task branch integrates main at `64c4e51f3`, including project-first navigation and Node shell
 remounts. Final review preserved edits made during promotion preparation and tied preparation,
 writes, and completion callbacks to the dialog's Node and lifetime. Its 14 focused tests pass.
 
@@ -23,6 +23,11 @@ The combined terminal build passed at 722,388 bytes in 166 startup chunks under 
 guard, with all 47 external runtime imports resolving. Five overlay hosts load when opened, while
 Help and confirmation remain eager. The final affected terminal tests passed all 70 cases; scoped
 terminal and client-core lint passed after the review fixes.
+
+Main's later onboarding update is integrated. Its 30 tests, 23 shared component tests, 128 terminal
+kit tests, and client-core, onboarding, and terminal lint passed. Architecture again passed all 87
+checks, and the terminal build retained the same 722,388-byte startup closure. These integration
+logs are in `/tmp/url-after-main-*.log` on the test host.
 
 A disposable release build with identifier `com.acorn.desktop.url-acceptance` failed before
 packaging with Rust `E0463` for `zerofrom_derive`, repeating the earlier host proc-macro failure.
