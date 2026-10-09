@@ -1,62 +1,77 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { setActiveNode } from '@acorn/plugin-api/client'
-const api = vi.hoisted(() => ({ detail: vi.fn(), action: vi.fn(), remove: vi.fn(), refresh: vi.fn(), write: vi.fn(), focus: vi.fn() }))
-vi.mock('./dockerClient', () => ({ fetchContainerDetail: api.detail, containerAction: api.action, removeContainer: api.remove }))
-vi.mock('./dockerStore', () => ({ refreshDocker: api.refresh }))
+import { afterEach, expect, it, vi } from 'vitest'
+import { clientEvents, setActiveNode } from '@acorn/plugin-api/client'
+import type { DockerContainerDetail } from '../shared/model'
+
+const api = vi.hoisted(() => ({ inspect: vi.fn() }))
+vi.mock('./dockerClient', () => ({ fetchContainerDetail: api.inspect }))
+vi.mock('./dockerLogStore', () => ({ dockerLogBuffer: () => ({ text: () => 'one\ntwo\nthree', ended: () => false }) }))
+vi.mock('./wsChannel', () => ({ wsDockerAttach: () => () => {} }))
 vi.mock('./DockerExecTerminal', () => ({ default: () => null }))
-vi.mock('@acorn/plugin-api/client', async original => ({ ...await original<Record<string, unknown>>(), writeJson: api.write, requestTerminalFocusIntent: api.focus }))
+vi.mock('@acorn/plugin-api/ui/host', () => ({ Slot: () => null }))
 import ContainerDetail from './ContainerDetail'
-Element.prototype.scrollIntoView ??= () => {}
+
 const stops: (() => void)[] = []
-beforeEach(() => {
-  setActiveNode('a')
-  api.detail.mockImplementation(async (id: string) => ({ id, name: id, image: 'fixture', state: 'running', status: 'running', health: null, exitCode: null, command: '', ports: [], mounts: [], networks: [], env: [], restartCount: 0 }))
-  api.refresh.mockResolvedValue(undefined)
+afterEach(() => {
+  stops.splice(0).forEach(stop => stop())
+  clientEvents.emit('runtime:task-archived', { taskId: 'detail-navigation' })
+  setActiveNode(null)
 })
-afterEach(() => { stops.splice(0).forEach(stop => stop()); setActiveNode(null); vi.clearAllMocks() })
+const fixture = (id: string): DockerContainerDetail => ({
+  id, name: id, image: 'postgres:17', state: 'running', status: 'Up 2 hours', health: 'healthy',
+  command: 'postgres', createdAt: null, startedAt: null, finishedAt: null, exitCode: null,
+  restartCount: 0, ports: [], composeProject: null, composeService: null, composeWorkingDir: null,
+  labels: {}, env: ['PASSWORD=with=equals'], mounts: [], networks: [], imageId: 'image',
+})
 const mount = () => {
-  const [target, setTarget] = createSignal('same')
   const host = document.createElement('div'), client = new QueryClient()
   document.body.append(host)
-  const removed = vi.fn()
-  const dispose = render(() => <QueryClientProvider client={client}><ContainerDetail target={target()} taskId="task" onRemoved={removed} /></QueryClientProvider>, host)
-  stops.push(() => { dispose(); client.clear(); host.remove() })
-  return { host, setTarget, removed }
+  const [target, select] = createSignal('first')
+  const dispose = render(() => <QueryClientProvider client={client}>
+    <ContainerDetail target={target()} taskId="detail-navigation" />
+  </QueryClientProvider>, host)
+  const stop = () => { dispose(); client.clear(); host.remove() }
+  stops.push(stop)
+  return { host, select, stop }
 }
-const press = (host: HTMLElement, text: string) => {
-  const button = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === text)
-  expect(button).toBeTruthy()
-  button!.click()
+const click = (host: HTMLElement, label: string) => {
+  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === label)!
+  button.click()
 }
-const held = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { promise, resolve } }
+const panel = (host: HTMLElement, tab: string) => host.querySelector<HTMLElement>(`#docker-detail-panel-${tab}`)!
 
-it('keeps a held mutation and its refetch on the original document generation', async () => {
-  const pending = held<{ ok: true }>()
-  api.action.mockReturnValue(pending.promise)
-  const view = mount()
-  await vi.waitFor(() => expect(view.host.textContent).toContain('fixture'))
-  press(view.host, 'Stop')
-  expect(api.action).toHaveBeenCalledWith('same', 'stop', 'a')
-  view.setTarget('other'); view.setTarget('same')
-  const calls = api.detail.mock.calls.length
-  pending.resolve({ ok: true })
-  await Promise.resolve(); await Promise.resolve()
-  expect(api.detail).toHaveBeenCalledTimes(calls)
-  expect(api.refresh).not.toHaveBeenCalled()
-})
+it('restores independent container tabs, environment disclosure, and reading places after navigation', async () => {
+  setActiveNode('docker-detail-test')
+  api.inspect.mockImplementation(async (id: string) => fixture(id))
+  const first = mount()
+  await vi.waitFor(() => expect(first.host.textContent).toContain('postgres:17'))
+  await new Promise(resolve => setTimeout(resolve, 0))
+  click(first.host, 'Show variables')
+  expect(first.host.textContent).toContain('with=equals')
+  panel(first.host, 'info').scrollTop = 220
+  panel(first.host, 'info').dispatchEvent(new Event('scroll'))
+  click(first.host, 'Logs')
+  const follow = first.host.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+  follow.click()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  const log = first.host.querySelector<HTMLElement>('[role="log"]')!
+  log.scrollTop = 340
+  log.dispatchEvent(new Event('scroll'))
 
-it('does not focus a held A terminal creation on colliding Node B', async () => {
-  const pending = held<{ id: string }>()
-  api.write.mockReturnValue(pending.promise)
-  const view = mount()
-  await vi.waitFor(() => expect(view.host.textContent).toContain('fixture'))
-  press(view.host, 'Terminal')
-  expect(api.write.mock.calls[0][1]).toMatchObject({ nodeId: 'a' })
-  setActiveNode('b')
-  pending.resolve({ id: 'same-session' })
-  await Promise.resolve(); await Promise.resolve()
-  expect(api.focus).not.toHaveBeenCalled()
+  first.select('second')
+  await vi.waitFor(() => expect(panel(first.host, 'info').hidden).toBe(false))
+  expect(first.host.textContent).not.toContain('with=equals')
+  first.select('first')
+  await vi.waitFor(() => expect(panel(first.host, 'logs').hidden).toBe(false))
+  first.stop()
+
+  const returned = mount()
+  await vi.waitFor(() => expect(panel(returned.host, 'logs').hidden).toBe(false))
+  await vi.waitFor(() => expect(returned.host.querySelector<HTMLElement>('[role="log"]')!.scrollTop).toBe(340))
+  expect(returned.host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked).toBe(false)
+  click(returned.host, 'Info')
+  await vi.waitFor(() => expect(panel(returned.host, 'info').scrollTop).toBe(220))
+  expect(returned.host.textContent).toContain('with=equals')
 })

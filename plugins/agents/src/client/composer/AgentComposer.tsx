@@ -13,6 +13,7 @@ import { consumeComposerFocus } from '../sessions/managedSelection'
 import { composerDraftState, hydrateComposerDraft } from './composerState'
 import { sameAgentConfigOptions } from '../settings/agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
+import { composerExpanded, toggleComposerExpanded } from './composerPrefs'
 import { canStopAgent } from '../sessions/agentActivity'
 import { fileMentionSuggestions, formatFileMention } from './fileMentions'
 import { advertisedSuggestions, composerSegments, MAX_HIGHLIGHT_LENGTH } from './composerTokens'
@@ -90,12 +91,13 @@ export default function AgentComposer(props: {
   const sending = () => shared().sending()
   const uploading = () => shared().uploading()
   const replacing = () => shared().replacing()
-  // Picker visibility, height, and automatic-context dismissal belong to this surface. The guard
+  // Picker visibility and automatic-context dismissal belong to this surface. The guard
   // over context capture belongs to the shared draft, so another surface cannot send midway through it.
   const capturingContext = () => shared().capturing()
   const [contextPickerId, setContextPickerId] = createSignal('')
   const [dismissedAutomaticPayload, setDismissedAutomaticPayload] = createSignal<string>()
-  const [expanded, setExpanded] = createSignal(false)
+  const expanded = () => composerExpanded(props.session.taskId, props.session.id)
+  const toggleExpanded = () => toggleComposerExpanded(props.session.taskId, props.session.id)
   const composerSessionId = createMemo(() => props.session.id)
   const configOptions = createMemo<AgentConfigOption[]>(
     () => {
@@ -171,15 +173,13 @@ export default function AgentComposer(props: {
     })
   })
 
-  // Two halves, because they have two owners. This composer's view state resets on every mount that
-  // sees a new session; the session's own draft is read back once, however many composers asked, since
-  // the read fetches attachment metadata. A second mount still resets its own view state.
+  // Reset transient presentation on navigation. Draft hydration runs once per session, however
+  // many composers are mounted, since it fetches attachment metadata.
   let pickerTimer: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => clearTimeout(pickerTimer))
   createEffect(on(shared, (state) => {
     clearTimeout(pickerTimer)
     const owner = capture()
-    setExpanded(false)
     setContextPickerId('')
     setDismissedAutomaticPayload(undefined)
     hydrateComposerDraft(state.sessionId, async () => {
@@ -354,7 +354,7 @@ export default function AgentComposer(props: {
   return (
     <Stack gap="row">
       <Only hosts={['tui']}>
-        <TerminalComposerShortcut toggle={() => setExpanded((current) => !current)} />
+        <TerminalComposerShortcut toggle={toggleExpanded} />
       </Only>
       <Only hosts={['dom']}>
         <Show when={configOptions().length || props.viewControls}>
@@ -460,7 +460,7 @@ export default function AgentComposer(props: {
         onFiles={addFiles}
         onSubmit={() => void send()}
         onCancel={canStopAgent(props.session) ? () => void stop() : undefined}
-        onToggleExpand={() => setExpanded((current) => !current)}
+        onToggleExpand={toggleExpanded}
         overlay={
           <Only hosts={['dom']}>
             <IconButton
@@ -469,7 +469,7 @@ export default function AgentComposer(props: {
               pressed={expanded()}
               tip={expanded() ? 'Collapse' : 'Expand'}
               tipKey={formatChord('meta+shift+enter')}
-              onPress={() => setExpanded((current) => !current)}
+              onPress={toggleExpanded}
             />
           </Only>
         }

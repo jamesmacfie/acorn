@@ -95,6 +95,7 @@ export function TabPanel(props: {
   active: string
   children: JSX.Element
   scrollOffset?: number
+  padding?: 'pane'
   onChange?: (offset: number) => void
 }) {
   return (

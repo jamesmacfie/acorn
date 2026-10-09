@@ -13,6 +13,20 @@ export type DockerDetailViewState = {
   logScrollTop: number
   logFollow: boolean
   logQuery: string
+  panelOffsets?: Partial<Record<DockerDetailTab, number>>
+  showEnv?: boolean
+}
+
+export type DockerBrowseViewState = {
+  section: DockerScope
+  selected: string | null
+  filter: string
+  collapsed: string[]
+}
+const browseStates = new Map<string, DockerBrowseViewState>()
+export const dockerBrowseState = (): DockerBrowseViewState | undefined => browseStates.get(dockerScopeKey('browse'))
+export const rememberDockerBrowseState = (state: DockerBrowseViewState): void => {
+  browseStates.set(dockerScopeKey('browse'), state)
 }
 
 const selectedByTask = new Map<string, string>()
