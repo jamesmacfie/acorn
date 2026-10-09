@@ -8,18 +8,18 @@ import { revisionOptions } from './historyClient'
 import { revisionSource } from './revisionSource'
 import { ExplainView } from './ExplainView'
 
-export function RevisionView(props: { projectId: string; taskId?: string; id: string | null; onCommit: (id: string) => void; stashBase?: string; explain?: boolean }) {
-  const [base, setBase] = createSignal<string | null | undefined>(props.stashBase)
+export function RevisionView(props: { projectId: string; taskId?: string; id: string | null; onCommit: (id: string) => void; stashBase?: string; comparisonBase?: string; explain?: boolean }) {
+  const [base, setBase] = createSignal<string | null | undefined>(props.comparisonBase ?? props.stashBase)
   const [file, setFile] = createSignal('')
-  const scope = createMemo(() => JSON.stringify([activeNodeId(), props.projectId, props.taskId, props.id]))
-  createEffect(on(scope, () => { setBase(props.stashBase); setFile('') }, { defer: true }))
-  const detail = createQuery(() => revisionOptions(props.projectId, props.id ?? '', base()))
+  const scope = createMemo(() => JSON.stringify([activeNodeId(), props.projectId, props.taskId, props.id, props.comparisonBase, props.stashBase]))
+  createEffect(on(scope, () => { setBase(props.comparisonBase ?? props.stashBase); setFile('') }, { defer: true }))
+  const detail = createQuery(() => revisionOptions(props.projectId, props.id ?? '', base(), !!props.comparisonBase))
   const current = createMemo(() => {
     const response = detail.data
     const nodeId = activeNodeId()
     if (!nodeId || !nodeReady() || !props.id || !response || response.nodeId !== nodeId ||
       response.projectId !== props.projectId || response.id !== props.id || response.requestedBase !== base()) return null
-    return { detail: response.detail, target: { nodeId, projectId: props.projectId, taskId: props.taskId, id: props.id, base: response.detail.base } }
+    return { detail: response.detail, target: { nodeId, projectId: props.projectId, taskId: props.taskId, id: props.id, base: response.detail.base, comparison: !!props.comparisonBase } }
   })
   const [state, setState] = createSignal<{ detail: RevisionDetail; source: DiffSource } | null>(null)
   createEffect(() => {
@@ -49,7 +49,7 @@ export function RevisionView(props: { projectId: string; taskId?: string; id: st
           ]} />
           <Show when={revision().commit.refs.length}><For each={revision().commit.refs}>{(ref) => <Badge>{ref}</Badge>}</For></Show>
         </Stack></Fold>
-        <Show when={!props.stashBase}><Show when={revision().commit.parents.length} fallback={<Text emphasis="muted">Root commit · compared with the empty tree</Text>}>
+        <Show when={!props.stashBase && !props.comparisonBase}><Show when={revision().commit.parents.length} fallback={<Text emphasis="muted">Root commit · compared with the empty tree</Text>}>
           <SectionHeader>Parents</SectionHeader>
           <For each={revision().commit.parents}>{(parent, index) => <Button variant="ghost" onPress={() => props.onCommit(parent)}>
             Parent {index() + 1} · {parent.slice(0, 12)}
@@ -58,7 +58,7 @@ export function RevisionView(props: { projectId: string; taskId?: string; id: st
             onChange={setBase} />
         </Show></Show>
         <Show when={revision().omitted}><Alert tone="warn">{revision().omitted}</Alert></Show>
-        <Show when={!props.stashBase && props.explain !== false}><ExplainView projectId={props.projectId} kind="commit" id={revision().commit.id} base={revision().base} /></Show>
+        <Show when={!props.stashBase && !props.comparisonBase && props.explain !== false}><ExplainView projectId={props.projectId} kind="commit" id={revision().commit.id} base={revision().base} /></Show>
         <Fold label="Changed files" count={revision().files.length} defaultOpen={revision().files.length <= 5}>
             <Rows id={`git-files:${activeNodeId()}:${props.projectId}:${props.id}:${revision().base}`} ariaLabel="Changed files"
               items={revision().files.map((entry) => ({ key: entry.path, label: entry.path }))} selected={file() || null}

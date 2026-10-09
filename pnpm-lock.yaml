@@ -1324,6 +1324,9 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
+      '@acorn/plugin-changes':
+        specifier: workspace:*
+        version: link:../changes
       '@acorn/plugin-workflows':
         specifier: workspace:*
         version: link:../workflows

@@ -62,3 +62,35 @@ export type ExplainRequest = { backendId: string; modelId: string; base: string 
 export type ExplainResult = { text: string; backendId: string; modelId: string; omissions: string[] }
 export const explainRoute = (projectId: string, kind: ExplainKind, id: string) =>
   `/v1/p/git/projects/${encodeURIComponent(projectId)}/explanations/${kind}/${encodeURIComponent(id)}`
+
+export type GitRef = { name: string; kind: 'local' | 'remote' | 'tag'; objectId: string; commitId: string | null; upstream: string | null; checkedOut: boolean; reservedBy: WorktreeOwner[] }
+export type RefRoster = { repository: string; refs: GitRef[] }
+export type RefChange =
+  | { action: 'create-branch'; name: string; startId: string }
+  | { action: 'rename-branch'; name: string; expectedId: string; nextName: string }
+  | { action: 'delete-branch'; name: string; expectedId: string }
+  | { action: 'set-upstream'; name: string; expectedId: string; upstream: string | null }
+  | { action: 'create-tag'; name: string; startId: string; message: string | null }
+  | { action: 'delete-tag'; name: string; expectedId: string }
+export type RefChangeResult = { ok: boolean; reason: string | null; roster: RefRoster }
+export const refsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/refs`
+
+export type GitRemote = { name: string; fetchUrl: string; pushUrl: string }
+export type RemoteRoster = { repository: string; remotes: GitRemote[]; lastFetch: Record<string, { successAt: number | null; failureAt: number | null; error: string | null }> }
+export type RemoteChange =
+  | { action: 'add'; name: string; url: string }
+  | { action: 'remove'; name: string; expectedUrl: string }
+  | { action: 'set-url'; name: string; expectedUrl: string; url: string }
+  | { action: 'fetch'; name: string; expectedUrl: string }
+export type RemoteChangeResult = { ok: boolean; reason: string | null; roster: RemoteRoster }
+export const remotesRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/remotes`
+
+export type ComparisonMode = 'direct' | 'merge-base'
+export type Comparison = { source: string; destination: string; base: string; mode: ComparisonMode }
+export const comparisonRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/comparison`
+
+export type IdentityValue = { value: string | null; scope: string | null; origin: string | null; local: string | null; global: string | null }
+export type GitSettings = { repository: string; name: IdentityValue; email: IdentityValue; pullPolicy: 'ff-only' | 'rebase'; autoFetch: boolean }
+export type IdentityWrite = { scope: 'local' | 'global'; name: string; email: string }
+export type IdentityWriteResult = { name: { ok: boolean; error: string | null }; email: { ok: boolean; error: string | null }; settings: GitSettings }
+export const gitSettingsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/settings`

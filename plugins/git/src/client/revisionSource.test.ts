@@ -48,7 +48,7 @@ it('discards delayed patch, search, and gap results after the revision target ch
   expect(selected.scope).not.toEqual(old.scope)
   expect(selected.signature()).not.toBe(old.signature())
   expect(selected.draftPrefix).not.toBe(old.draftPrefix)
-  expect(reads.file).toHaveBeenCalledWith('project', 'commit', null, 'file.txt', 'blob', oldLifetime.signal)
+  expect(reads.file).toHaveBeenCalledWith('project', 'commit', null, 'file.txt', 'blob', oldLifetime.signal, undefined)
 
   const nextCommit = revisionSource({ nodeId: 'node-b', taskId: 'task-b', projectId: 'project', id: 'next-commit', base: null },
     detail, () => '', () => {}, new AbortController().signal)

@@ -85,7 +85,7 @@ describe('local-git routes over a real worktree', () => {
     const app = authed()
     const status = await statusOf(app)
     // The branch facts travel with the file list, which is the point of the one read.
-    expect(Object.keys(status).sort()).toEqual(['ahead', 'behind', 'branch', 'changes', 'operation', 'upstream'])
+    expect(Object.keys(status).sort()).toEqual(['ahead', 'behind', 'branch', 'changes', 'operation', 'pullPolicy', 'upstream', 'upstreamId'])
     expect(status.changes.find((c) => c.path === 'new.txt')?.status).toBe('untracked')
 
     const staged = await (await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { paths: ['new.txt'] }), {} as Env)).json()

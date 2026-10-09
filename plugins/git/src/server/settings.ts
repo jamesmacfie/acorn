@@ -1,0 +1,55 @@
+import { BridgeError, type CoreServices } from '@acorn/plugin-api/node'
+import { GIT_PULL_POLICY_PREF } from '@acorn/plugin-changes/contract/remote.ts'
+import type { GitSettings, IdentityValue, IdentityWrite, IdentityWriteResult } from '../shared/api'
+import { repositoryFor } from './history'
+
+type Core = Pick<CoreServices, 'git' | 'projects' | 'prefs'>
+export const PULL_POLICY_PREF = GIT_PULL_POLICY_PREF
+export const AUTO_FETCH_PREF = 'git.autoFetch'
+const first = (text: string) => text.trim().split('\n')[0] || 'Git config failed.'
+
+async function config(core: Core, repository: string, args: string[]) {
+  return core.git.git(['config', ...args], { cwd: repository, maxOutputBytes: 8192, timeoutMs: 10_000 })
+}
+
+async function identity(core: Core, repository: string, key: 'user.name' | 'user.email'): Promise<IdentityValue> {
+  const [effective, local, global] = await Promise.all([
+    config(core, repository, ['--show-origin', '--show-scope', '--null', '--get', key]),
+    config(core, repository, ['--local', '--get', key]),
+    config(core, repository, ['--global', '--get', key]),
+  ])
+  const [scope, origin, value] = effective.code === 0 ? effective.stdout.split('\0') : []
+  return { value: value ?? null, scope: scope ?? null, origin: origin ?? null,
+    local: local.code === 0 ? local.stdout.trimEnd() : null, global: global.code === 0 ? global.stdout.trimEnd() : null }
+}
+
+export async function gitSettings(core: Core, projectId: string, userId: string): Promise<GitSettings> {
+  const repository = await repositoryFor(core, projectId)
+  const [name, email, policy, fetch] = await Promise.all([
+    identity(core, repository, 'user.name'), identity(core, repository, 'user.email'),
+    core.prefs.read(userId, PULL_POLICY_PREF), core.prefs.read(userId, AUTO_FETCH_PREF),
+  ])
+  return { repository, name, email, pullPolicy: policy === 'rebase' ? 'rebase' : 'ff-only', autoFetch: fetch === 'true' }
+}
+
+export async function writeIdentity(core: Core, projectId: string, userId: string, request: IdentityWrite): Promise<IdentityWriteResult> {
+  const before = await gitSettings(core, projectId, userId)
+  const write = async (key: string, value: string) => {
+    if (await repositoryFor(core, projectId) !== before.repository) return { ok: false, error: 'Project repository changed. Reopen Git settings.' }
+    const result = await config(core, before.repository, [`--${request.scope}`, '--replace-all', key, value])
+    return { ok: result.code === 0, error: result.code === 0 ? null : first(result.stderr) }
+  }
+  const name = await write('user.name', request.name)
+  const email = await write('user.email', request.email)
+  const settings = await gitSettings(core, projectId, userId)
+  if (settings.repository !== before.repository) throw new BridgeError(409, 'repository_moved', 'Project repository changed during settings write. Inspect the result on the original repository.')
+  return { name, email, settings }
+}
+
+export async function writeGitPreference(core: Core, projectId: string, userId: string, key: typeof PULL_POLICY_PREF | typeof AUTO_FETCH_PREF, value: string): Promise<GitSettings> {
+  const before = await repositoryFor(core, projectId)
+  await core.prefs.write(userId, key, value)
+  const settings = await gitSettings(core, projectId, userId)
+  if (settings.repository !== before) throw new BridgeError(409, 'repository_moved', 'Project repository changed. Reopen Git settings.')
+  return settings
+}

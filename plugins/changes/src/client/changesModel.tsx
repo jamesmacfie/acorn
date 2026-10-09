@@ -382,9 +382,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     // `changes:before-push` runs on the node, inside the push call, as the commit chain does.
     if (action === 'fetch') return localGitApi.fetch(task.id)
     if (action === 'pull') return localGitApi.pull(task.id, {})
+    if (action === 'pull-ff') return localGitApi.pull(task.id, { rebase: false })
     if (action === 'rebase') return localGitApi.pull(task.id, { rebase: true })
     if (action === 'push') return localGitApi.push(task.id, {})
-    if (action === 'force') return localGitApi.push(task.id, { force: true })
+    if (action === 'force') return localGitApi.push(task.id, {
+      force: true, expectedBranch: status().branch ?? undefined, expectedRemoteId: status().upstreamId ?? undefined,
+    })
     return localGitApi.abort(task.id)
   }
   async function remote(action: RemoteAction): Promise<void> {

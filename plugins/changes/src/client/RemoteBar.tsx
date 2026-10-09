@@ -27,7 +27,7 @@ const LABEL: Record<RemoteVerb, string> = {
 /** The button's tooltip: what the press does to this branch, with the command underneath. */
 const TIP: Record<RemoteVerb, string> = {
   publish: 'Push this branch and set its upstream',
-  pull: 'Fast-forward onto the upstream',
+  pull: 'Pull using the configured strategy',
   push: 'Send the commits on this branch',
   fetch: 'Ask the remote what has moved',
 }
@@ -36,7 +36,8 @@ const TIP: Record<RemoteVerb, string> = {
  *  Publish and Push are the same call, and that a bare Pull will not write a merge commit. */
 const COMMAND: Record<Exclude<RemoteAction, 'abort'>, string> = {
   fetch: 'git fetch',
-  pull: 'git pull --ff-only',
+  pull: 'git pull (configured strategy)',
+  'pull-ff': 'git pull --ff-only',
   rebase: 'git pull --rebase',
   push: 'git push --set-upstream origin HEAD',
   force: 'git push --force-with-lease --set-upstream origin HEAD',
@@ -115,8 +116,8 @@ function RemoteMenu(props: { model: ChangesModel }) {
       {(menu) => (
         <>
           <Menu.Item context={menu} title={COMMAND.fetch} onSelect={() => run('fetch')}>Fetch</Menu.Item>
-          <Menu.Item context={menu} title={`${COMMAND.pull} — refused on a diverged branch`} onSelect={() => run('pull')}>
-            Pull
+          <Menu.Item context={menu} title={`${COMMAND['pull-ff']} — refused on a diverged branch`} onSelect={() => run('pull-ff')}>
+            Pull fast-forward only
           </Menu.Item>
           <Menu.Item context={menu} title={COMMAND.rebase} onSelect={() => run('rebase')}>Pull with rebase</Menu.Item>
           <Menu.Item context={menu} title={COMMAND.push} onSelect={() => run('push')}>Push</Menu.Item>
@@ -148,6 +149,7 @@ export function RemoteBar(props: { model: ChangesModel }) {
   // Disabled rather than hidden while an operation is in flight. The row keeps its shape, and the
   // tooltip is where the reason goes; a control that vanishes leaves a reader wondering what moved.
   const stalled = () => status().operation != null
+  const primaryCommand = () => verb() === 'pull' ? status().pullPolicy === 'rebase' ? COMMAND.rebase : COMMAND['pull-ff'] : COMMAND[actionFor(verb())]
   return (
     <>
       <OperationBanner model={model()} />
@@ -165,7 +167,7 @@ export function RemoteBar(props: { model: ChangesModel }) {
           busy={model().remoteBusy()}
           disabled={stalled()}
           tip={stalled() ? 'Finish or abort the operation above first' : TIP[verb()]}
-          tipSub={COMMAND[actionFor(verb())]}
+          tipSub={primaryCommand()}
           onPress={() => void model().remote(actionFor(verb()))}
         >
           {LABEL[verb()]}

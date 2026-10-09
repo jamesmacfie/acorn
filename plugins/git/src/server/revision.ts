@@ -33,13 +33,13 @@ export function parseRawFiles(output: string): RevisionFile[] {
   return files
 }
 
-async function resolveBase(core: Core, repository: string, id: string, requested: string | null | undefined, parents: string[], signal?: AbortSignal): Promise<string | null> {
+async function resolveBase(core: Core, repository: string, id: string, requested: string | null | undefined, parents: string[], signal?: AbortSignal, comparison = false): Promise<string | null> {
   if (requested === undefined) return parents[0] ?? null
   if (requested === null) {
     if (parents.length) throw new BridgeError(400, 'bad_base', 'Only a root commit can use the empty tree.')
     return null
   }
-  if (!ID.test(requested) || !parents.includes(requested)) throw new BridgeError(400, 'bad_base', 'Comparison base must be a parent of this commit.')
+  if (!ID.test(requested) || !comparison && !parents.includes(requested)) throw new BridgeError(400, 'bad_base', 'Comparison base must be a parent of this commit.')
   await commitById(core, repository, requested, signal)
   return requested
 }
@@ -52,15 +52,11 @@ async function emptyTree(core: Core, repository: string, signal?: AbortSignal): 
   return id
 }
 
-export async function revision(core: Core, projectId: string, id: string, requested?: string | null, signal?: AbortSignal, withLabels = false): Promise<RevisionDetail> {
+export async function revision(core: Core, projectId: string, id: string, requested?: string | null, signal?: AbortSignal, withLabels = false, comparison = false): Promise<RevisionDetail> {
   const repository = await repositoryFor(core, projectId, signal)
   signal?.throwIfAborted()
-  if (requested !== undefined && !withLabels) {
-    const cached = documents.get(key(repository, id, requested))
-    if (cached) return cached
-  }
   const commit = await commitById(core, repository, id, signal)
-  const base = await resolveBase(core, repository, id, requested, commit.parents, signal)
+  const base = await resolveBase(core, repository, id, requested, commit.parents, signal, comparison)
   const cacheKey = key(repository, id, base)
   const held = documents.get(cacheKey)
   if (held) { documents.delete(cacheKey); documents.set(cacheKey, held) }
@@ -119,7 +115,7 @@ export async function revision(core: Core, projectId: string, id: string, reques
   return detail
 }
 
-async function rows(core: Core, repository: string, projectId: string, detail: RevisionDetail, path: string, patchKey: string, signal?: AbortSignal) {
+async function rows(core: Core, repository: string, projectId: string, detail: RevisionDetail, path: string, patchKey: string, signal?: AbortSignal, comparison = false) {
   signal?.throwIfAborted()
   const file = detail.topology.files.find((entry) => entry.path === path && entry.patchKey === patchKey)
   if (!file) throw new BridgeError(409, 'revision_conflict', 'Diff segment is not in this revision.')
@@ -127,7 +123,7 @@ async function rows(core: Core, repository: string, projectId: string, detail: R
   if (!doc) {
     // A cache miss re-reads the bounded immutable revision, then finds its parsed file.
     documents.delete(key(repository, detail.commit.id, detail.base))
-    const refreshed = await revision(core, projectId, detail.commit.id, detail.base, signal)
+    const refreshed = await revision(core, projectId, detail.commit.id, detail.base, signal, false, comparison)
     signal?.throwIfAborted()
     doc = parsed.get(docKey(repository, refreshed.commit.id, refreshed.base, patchKey))
   }
@@ -135,17 +131,17 @@ async function rows(core: Core, repository: string, projectId: string, detail: R
   return doc.segments
 }
 
-export async function revisionFor(core: Core, projectId: string, id: string, base?: string | null, signal?: AbortSignal) {
-  return revision(core, projectId, id, base, signal, true)
+export async function revisionFor(core: Core, projectId: string, id: string, base?: string | null, signal?: AbortSignal, comparison = false) {
+  return revision(core, projectId, id, base, signal, true, comparison)
 }
 
-export async function segments(core: Core, projectId: string, id: string, base: string | null, requests: DiffSegmentRequest[], signal?: AbortSignal) {
+export async function segments(core: Core, projectId: string, id: string, base: string | null, requests: DiffSegmentRequest[], signal?: AbortSignal, comparison = false) {
   if (requests.length > MAX_SEGMENTS_PER_REQUEST) throw new BridgeError(400, 'too_many_segments', 'Too many diff segments.')
   const repository = await repositoryFor(core, projectId, signal)
-  const detail = await revision(core, projectId, id, base, signal)
+  const detail = await revision(core, projectId, id, base, signal, false, comparison)
   const result = []
   for (const request of requests) {
-    const content = await rows(core, repository, projectId, detail, request.path, request.patchKey, signal)
+    const content = await rows(core, repository, projectId, detail, request.path, request.patchKey, signal, comparison)
     const selected = content[request.ordinal]
     if (!selected) throw new BridgeError(400, 'bad_ordinal', 'Diff segment does not exist.')
     result.push({ ...request, rows: selected })
@@ -154,20 +150,20 @@ export async function segments(core: Core, projectId: string, id: string, base: 
   return result
 }
 
-export async function search(core: Core, projectId: string, id: string, base: string | null, request: DiffSearchRequest, signal?: AbortSignal) {
+export async function search(core: Core, projectId: string, id: string, base: string | null, request: DiffSearchRequest, signal?: AbortSignal, comparison = false) {
   if (request.query.length > SEARCH_MAX_QUERY) throw new BridgeError(400, 'bad_query', 'Search query is too long.')
   const repository = await repositoryFor(core, projectId, signal)
-  const detail = await revision(core, projectId, id, base, signal)
+  const detail = await revision(core, projectId, id, base, signal, false, comparison)
   const files = detail.topology.files.map(({ path, patchKey }) => ({ path, patchKey }))
-  const page = await searchDocument(files, (file) => rows(core, repository, projectId, detail, file.path, file.patchKey, signal), request)
+  const page = await searchDocument(files, (file) => rows(core, repository, projectId, detail, file.path, file.patchKey, signal, comparison), request)
   signal?.throwIfAborted()
   if (!page) throw new BridgeError(400, 'bad_cursor', 'Invalid diff search cursor.')
   return page
 }
 
-export async function fileText(core: Core, projectId: string, id: string, base: string | null, path: string, sha: string, signal?: AbortSignal) {
+export async function fileText(core: Core, projectId: string, id: string, base: string | null, path: string, sha: string, signal?: AbortSignal, comparison = false) {
   const repository = await repositoryFor(core, projectId, signal)
-  const detail = await revision(core, projectId, id, base, signal)
+  const detail = await revision(core, projectId, id, base, signal, false, comparison)
   const file = detail.topology.files.find((entry) => entry.path === path && entry.sha === sha)
   if (!file || !ID.test(sha)) throw new BridgeError(400, 'bad_blob', 'Blob is not in this revision.')
   const size = await core.git.git(['cat-file', '-s', sha], { cwd: repository, maxOutputBytes: 128, signal })

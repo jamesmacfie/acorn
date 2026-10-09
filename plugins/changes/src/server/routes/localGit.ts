@@ -89,7 +89,7 @@ const commitBody = z.object({
 // coerced would turn a fast-forward pull into a rebase, or an ordinary push into one that replaces a
 // commit on the remote.
 const pullBody = z.object({ rebase: z.boolean().optional() })
-const pushBody = z.object({ force: z.boolean().optional() })
+const pushBody = z.object({ force: z.boolean().optional(), expectedBranch: z.string().min(1).max(240).optional(), expectedRemoteId: z.string().regex(/^[0-9a-f]{40,64}$/).optional() })
 // Which backend the wand spends. `backendId` is required because a route that guessed would spend a
 // key nobody chose; `modelId` is optional because a backend that declares no model leaves the choice
 // to itself (@acorn/protocol/modelProviders.ts § defaultModelIdFor).

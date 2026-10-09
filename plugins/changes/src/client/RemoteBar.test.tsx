@@ -129,7 +129,7 @@ describe('the remote menu', () => {
   it('offers fetch, both pulls and both pushes', () => {
     draw({ upstream: 'origin/main', ahead: 0, behind: 0 })
     expect(openMenu().map((item) => item.textContent?.trim()))
-      .toEqual(['Fetch', 'Pull', 'Pull with rebase', 'Push', 'Force push'])
+      .toEqual(['Fetch', 'Pull fast-forward only', 'Pull with rebase', 'Push', 'Force push'])
   })
 
   it('is shut while a verb is already running, and so is the primary button', () => {

@@ -1,10 +1,13 @@
 import { createMemo, For, Show } from 'solid-js'
-import { activeNodeId, openActionPicker, requestTaskLaunch } from '@acorn/plugin-api/client'
+import { createQuery } from '@tanstack/solid-query'
+import { activeNodeId, openActionPicker, prefsOptions, PrefKeys, requestTaskLaunch } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, HistoryMark, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, historyLayout } from '@acorn/plugin-api/ui'
 import type { HistoryModel } from './historyModel'
 import { commitActionRequest, launchWorkflowAtCommit, sameGitActionScope } from './launchWorkflow'
 
 export function HistoryRows(props: { projectId: string; model: HistoryModel; selected: string | null; onSelect: (id: string) => void; onChanges?: () => void; onRefresh?: () => void }) {
+  const prefs = createQuery(() => prefsOptions(true))
+  const graphVisible = () => prefs.data?.[PrefKeys.gitGraphVisible] !== 'false'
   const valid = (nodeId: string | null, projectId: string) => sameGitActionScope(nodeId, projectId, props.projectId)
   const launchTask = (nodeId: string | null, projectId: string, id: string, title: string) => {
     if (valid(nodeId, projectId)) requestTaskLaunch({ nodeId, projectId, title, baseCommit: id })
@@ -48,7 +51,7 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
         const projectId = props.projectId
         const pinnedCommit = commit()
         return <Row item={itemProps} selected={selected()} onPress={() => props.onSelect(item.key)} density="compact" variant="stacked"
-          leading={<HistoryMark slot={slot()} />}
+          leading={graphVisible() ? <HistoryMark slot={slot()} /> : undefined}
           trailing={<RowActions ariaLabel={`Actions for ${pinnedCommit.id}`}>
             {(menu) => <><Menu.Item context={menu} onSelect={() => { if (valid(nodeId, projectId)) props.onSelect(pinnedCommit.id) }}>Inspect commit</Menu.Item>
               <Menu.Item context={menu} onSelect={() => launchTask(nodeId, projectId, pinnedCommit.id, pinnedCommit.subject)}>Start task here</Menu.Item>

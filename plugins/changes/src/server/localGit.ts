@@ -48,7 +48,7 @@ export const CHANGES_HOOKS = [
 // `hooks` is the owner's half of the two points above. Optional so a test can build the bridge with no
 // host around it, and absent means nobody objects, which is also what an empty chain means.
 export function localGitBridge(
-  core: Pick<CoreServices, 'tasks' | 'models'>,
+  core: Pick<CoreServices, 'tasks' | 'models'> & Partial<Pick<CoreServices, 'prefs' | 'identity'>>,
   /** `ctx.events.worktreeStatus`: a stage, a commit, a discard or a remote verb moved the dirty
    *  markers, or the counts the branch bar draws beside them. */
   worktreeChanged: (taskId: string) => void = () => {},
@@ -73,7 +73,10 @@ export function localGitBridge(
     status: async (taskId) => {
       const root = await core.tasks.root(taskId)
       if (!root) return emptyLocalStatus()
-      return localStatus(root).catch(() => emptyLocalStatus())
+      const status = await localStatus(root).catch(() => emptyLocalStatus())
+      const owner = core.identity?.active()
+      const policy = owner && core.prefs ? await (await import('./pullPolicy')).readPullPolicy(core.prefs, owner).catch(() => null) : null
+      return { ...status, pullPolicy: policy === 'rebase' ? 'rebase' : 'ff-only' }
     },
     // The diff as a document, then its segments and search pages (./localDocument.ts). git's default
     // -U3, so the pane shows hunks with expandable gaps between them rather than every line of every
@@ -113,7 +116,11 @@ export function localGitBridge(
     // The four remote verbs. Each takes 120 seconds rather than the local 30, because the clock is
     // somebody else's server (./localDiff.ts § NETWORK_TIMEOUT_MS).
     fetch: (taskId) => withRoot(taskId, fetchRemote),
-    pull: (taskId, options = {}) => withRoot(taskId, (root) => pullRemote(root, options)),
+    pull: (taskId, options = {}) => withRoot(taskId, async (root) => {
+      const owner = core.identity?.active()
+      const preference = options.rebase === undefined && owner && core.prefs ? await (await import('./pullPolicy')).readPullPolicy(core.prefs, owner) : null
+      return pullRemote(root, { rebase: options.rebase ?? (preference === 'rebase') })
+    }),
     push: (taskId, options = {}) => withRoot(taskId, async (root) => {
       const verdict = await hooks?.run('before-push', { taskId, branch: await branchOf(root), force: !!options.force })
       if (verdict && !verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }

@@ -14,6 +14,12 @@ export const gitSourceContribution: SourceContribution<never> = {
     { id: 'git.stash', path: '/p/:projectId/x/git/stashes/:stashId', order: 36 },
     { id: 'git.worktrees', path: '/p/:projectId/x/git/worktrees', order: 40 },
     { id: 'git.worktree', path: '/p/:projectId/x/git/worktrees/:worktreeId', order: 41 },
+    { id: 'git.refs', path: '/p/:projectId/x/git/refs', order: 45 },
+    { id: 'git.ref', path: '/p/:projectId/x/git/refs/:refId', order: 46 },
+    { id: 'git.remotes', path: '/p/:projectId/x/git/remotes', order: 50 },
+    { id: 'git.remote', path: '/p/:projectId/x/git/remotes/:remoteName', order: 51 },
+    { id: 'git.compare', path: '/p/:projectId/x/git/compare', order: 55 },
+    { id: 'git.comparison', path: '/p/:projectId/x/git/compare/:source/:destination/:mode/:base', order: 56 },
   ],
   regions: { list: GitSourceList, detail: GitSourceDetail, scroll: true },
 }
