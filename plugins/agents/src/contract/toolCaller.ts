@@ -7,6 +7,8 @@ export type AgentToolCaller = {
   title: string
   /** True for a session a workflow step started. Such a session may not start fresh workflow roots. */
   workflowOwned: boolean
+  /** True for a session another agent started with `agent_spawn`. */
+  delegated: boolean
   /** The run that owns the session, when the session recorded one. */
   workflowRunId: string | null
   /** The turn running now. A tool call arrives during one, so this is usually the caller's own turn. */

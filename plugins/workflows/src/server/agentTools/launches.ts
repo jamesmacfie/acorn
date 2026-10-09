@@ -108,6 +108,9 @@ export class WorkflowAgentLaunches {
     // Nested execution goes through declared child workflow steps, which keep their ancestor's
     // accounting. A step's own session never starts a fresh root.
     if (caller.workflowOwned) throw new ToolError('not_found', 'A workflow step cannot start a workflow. Use a child workflow step instead.')
+    // The allowance is per session, so a spawned child would bring fresh starts with it. Only a
+    // session the person talks to starts workflows.
+    if (caller.delegated) throw new ToolError('not_found', 'An agent another agent started cannot start a workflow. Ask the agent that started you.')
     if (!context.callId) throw new ToolError('bad_request', 'workflow_run needs a stable tool call ID.')
     const key = `${context.taskId}:${caller.sessionId}:workflow_run:${context.callId}`
     const running = this.inFlight.get(key)
@@ -272,6 +275,12 @@ export class WorkflowAgentLaunches {
   }
 
   private async dispatch(launch: LaunchRow): Promise<void> {
+    // The owner can revoke or replace the approval while the launch waits for its caller. Nothing has
+    // run yet, so the launch follows the approval as it stands now.
+    const policy = this.deps.policies.byId(launch.policyId)
+    if (policy?.state !== 'active' || policy.graphDigest !== launch.graphDigest) {
+      return this.setState(launch.id, 'failed', 'The owner withdrew or changed the approval before the run started.')
+    }
     const busy = await this.activeInCheckout(launch.taskId, launch.id)
     if (busy) return this.setState(launch.id, 'failed', `Workflow run ${busy} started in this checkout first.`)
     const effective = JSON.parse(launch.effectiveJson) as { budget: WorkflowBudget; tools: ToolCeiling }

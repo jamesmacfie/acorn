@@ -138,9 +138,9 @@ export function workflowAgentTools(load: () => Promise<WorkflowAgentServices>, c
       requiresSession: true,
       when: async (context) => {
         const signed = await managedCaller(caller, context).catch(() => null)
-        return !!signed && !signed.workflowOwned
+        return !!signed && !signed.workflowOwned && !signed.delegated
       },
-      whenDescription: 'Available to signed managed agent sessions, except sessions a workflow started.',
+      whenDescription: 'Available to signed managed agent sessions, except sessions a workflow or another agent started.',
       handler: async (input, context) => (await load()).launches.launch(runInput.parse(input), context),
     },
     {

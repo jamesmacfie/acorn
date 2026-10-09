@@ -5,7 +5,9 @@
 // set AI authoring hides too (../authoring/edit.ts): a trigger, a tool allowlist, a run target, and a
 // contributed kind's `headers` and `auth`. Provider choices are not on that list here, because a
 // harness, model, or reasoning setting is ordinary draft content the owner reviews before
-// publication. The second kind is any other string the shared secret detector flags.
+// publication. The second kind is private: a root input's default value, which list results already
+// hide, any string under a credential-like key such as `token` or `password`, and any other string the
+// shared secret detector flags. An agent may write its own private values, but not protected ones.
 //
 // Withheld values are omitted rather than replaced with a marker, so no marker can come back as an
 // executable value. A draft based on a source gets them back by stable step ID and kind.
@@ -13,7 +15,7 @@ import { scanSecretText } from '@acorn/plugin-api/node'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { SCRUBBED_WITH_KEYS } from '../authoring/edit'
 
-export type WithheldField = { path: string; reason: 'protected' | 'likely-secret' }
+export type WithheldField = { path: string; reason: 'protected' | 'input-default' | 'likely-secret' }
 
 type Json = Record<string, unknown>
 // A key within an object, or an item within a named list, found by its `id` or `name`. Positions in
@@ -24,6 +26,10 @@ type Located = { segments: Segment[]; reason: WithheldField['reason'] }
 
 const ROOT_PROTECTED = [['trigger'], ['tools', 'allow']]
 const STEP_PROTECTED = [['requiresRun'], ['tools', 'allow'], ...SCRUBBED_WITH_KEYS.map((key) => ['with', key])]
+
+// A key whose string value is a credential whether or not the detector recognises its shape. Matched at
+// the end of the key, so `maxInputTokens` and other counts stay readable.
+const CREDENTIAL_KEY = /(secret|token|passw(or)?d|api[-_]?key|private[-_]?key|authorization|cookie|credentials?)$/i
 
 const isObject = (value: unknown): value is Json => !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -103,7 +109,7 @@ function scrub(value: unknown, segments: Segment[], found: Located[]): unknown {
     const path = [...segments, { key }]
     const unnamedList = Array.isArray(item) && item.some((entry) => !itemIdentity(entry, false))
     if (typeof item === 'string' || unnamedList) {
-      if ((typeof item === 'string' ? flagged(item) : flagged(JSON.stringify(item)))) {
+      if (typeof item === 'string' ? CREDENTIAL_KEY.test(key) || flagged(item) : flagged(JSON.stringify(item))) {
         found.push({ segments: path, reason: 'likely-secret' })
         continue
       }
@@ -136,9 +142,20 @@ const withoutLoaderKeys = (def: WorkflowDef): Json => {
   return structuredClone(rest) as Json
 }
 
+/** Drops each root input's default value. The input's contract stays readable. */
+function inputDefaults(def: Json, found: Located[]): Json {
+  for (const input of Array.isArray(def.inputs) ? def.inputs : []) {
+    const identity = itemIdentity(input, false)
+    if (!identity || !isObject(input) || input.default === undefined) continue
+    delete input.default
+    found.push({ segments: [{ key: 'inputs' }, identity, { key: 'default' }], reason: 'input-default' })
+  }
+  return def
+}
+
 function located(def: WorkflowDef): { definition: Json; found: Located[] } {
   const found: Located[] = []
-  const definition = scrub(protectedFields(withoutLoaderKeys(def), found), [], found) as Json
+  const definition = scrub(inputDefaults(protectedFields(withoutLoaderKeys(def), found), found), [], found) as Json
   return { definition, found }
 }
 

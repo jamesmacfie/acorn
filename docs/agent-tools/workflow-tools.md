@@ -46,12 +46,14 @@ withheld whole and named, never cut short.
 
 `projection.ts` decides what an agent reads of a definition. It leaves out the configuration AI
 authoring hides: a trigger, a tool allowlist, a run target, and a contributed kind's `headers` and
-`auth`. It also leaves out any string the shared secret detector flags. Harness, model, and options
-stay visible, because the owner reviews them before publication. `withheld` lists each path left
-out, such as `steps[post].with.auth`.
+`auth`. It also leaves out private values: each root input's default, any string under a
+credential-like key such as `token` or `password`, and any string the shared secret detector flags.
+Harness, model, and options stay visible, because the owner reviews them before publication.
+`withheld` lists each path left out, such as `steps[post].with.auth`.
 
-An agent can't author protected fields. `workflow_draft` drops any it sends. A draft based on a
-source gets back every withheld value the agent didn't replace, matched by step ID and kind. A new
+An agent can't author protected fields. `workflow_draft` drops any it sends. It can write its own
+private values. A draft based on a source gets back every withheld value the agent didn't replace,
+matched by step ID and kind. A new
 step gets nothing, so a step that needs owner configuration stays incomplete until the owner adds it.
 No redaction marker exists, so none can come back as a value.
 
@@ -89,7 +91,8 @@ runs alone. Approve again and the same row comes back, so a session's spent star
 
 `workflow_run` checks, in order:
 
-1. The caller is a managed session that no workflow started.
+1. The caller is a managed session that neither a workflow nor another agent started. A spawned child
+   would otherwise bring a fresh start allowance with it.
 2. An active policy covers this definition in this project.
 3. `digest` matches what the agent read. Every input it sets is one the policy allows.
 4. The session has starts left. Finished and cancelled runs count; replays don't.
@@ -104,7 +107,8 @@ are the caller's signed ceiling intersected with the definition's. Nothing in th
 
 `workflow_agent_launches` stores a receipt before work starts: the caller, the call, the frozen
 graph, and the effective authority. Its ID is the run ID it reserves. A repeat returns the admitted
-snapshot, even after an edit.
+snapshot, even after an edit. Before a waiting launch starts, it checks the approval again. A
+revoked or replaced approval fails the launch, and a failed launch doesn't use a start.
 
 The calling agent is mid-turn in the same checkout, so the run waits as `awaiting-caller` until the
 caller has no turn running or queued. Agents reports each settled turn through `agents.toolCaller`.
@@ -140,6 +144,7 @@ prompt, input value, or credential goes in.
 
 - A terminal agent can read definitions but can't draft, start, read, or cancel runs.
 - A workflow step's session can't start a root. Nested work goes through child workflow steps.
+- A session another agent spawned can't start a root. The agent you talk to starts it.
 - Publication, gate answers, retries, and record reprocessing stay device actions.
 - A policy is per project. A workspace-wide row needs one approval per project.
 

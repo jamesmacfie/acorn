@@ -22,6 +22,7 @@ export function createToolCallers(store: Pick<AgentSessionRepository, 'getSessio
         title: session.title,
         // The same rule that keeps a workflow's session from delegating.
         workflowOwned: !sessionMayDelegate(session),
+        delegated: session.kind === 'delegated' || typeof session.config.delegationSpawnId === 'string',
         workflowRunId: typeof runId === 'string' ? runId : null,
         activeTurnId: (await store.activeTurn(sessionId))?.id ?? null,
       }

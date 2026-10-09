@@ -60,8 +60,8 @@ contract is `plugins/agents/src/contract/toolCaller.ts`, and the implementation 
 `plugins/agents/src/server/sessions/toolCaller.ts`. The workflows plugin uses it for its
 [workflow tools](../agent-tools/workflow-tools.md).
 
-- `resolve(taskId, sessionId)` answers the session's title, whether a workflow step started it, the
-  run that owns it, and its running turn. It answers `null` for a terminal session, an archived one,
+- `resolve(taskId, sessionId)` answers the session's title, whether a workflow step or another agent
+  started it, the run that owns it, and its running turn. It answers `null` for a terminal session, an archived one,
   and one in another task. Pass the session ID from the tool context, which the credential signs,
   never from tool input.
 - `onTurnSettled(listener)` reports each turn that reaches `completed`, `cancelled`, `failed`, or

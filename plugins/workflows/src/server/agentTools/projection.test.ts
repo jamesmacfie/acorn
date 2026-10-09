@@ -11,9 +11,11 @@ const source = (): WorkflowDef => ({
   name: 'Release',
   trigger: 'nightly',
   tools: { allow: ['git_log'], maxRisk: 'write' },
+  budget: { maxInputTokens: 1000 },
+  inputs: [{ name: 'region', schema: { type: 'string' }, default: 'ap-southeast-2' }],
   steps: [
     { id: 'plan', name: 'Plan', kind: 'agent', prompt: 'Plan it', model: 'opus', configOptions: { reasoning: 'high' }, requiresRun: 'web' },
-    { id: 'post', name: 'Post', kind: 'http', with: { url: 'https://example.com', auth: 'Bearer x', headers: { a: 'b' } } },
+    { id: 'post', name: 'Post', kind: 'http', with: { url: 'https://example.com', auth: 'Bearer x', headers: { a: 'b' }, apiToken: 'hunter2' } },
     { id: 'note', name: 'Note', kind: 'agent', prompt: `Use ${TOKEN} to push` },
   ],
 })
@@ -27,6 +29,8 @@ describe('agentDefinitionView', () => {
     expect(definition.steps[0]!.requiresRun).toBeUndefined()
     expect(definition.steps[1]!.with).toEqual({ url: 'https://example.com' })
     expect(definition.steps[2]!.prompt).toBeUndefined()
+    expect(definition.inputs).toEqual([{ name: 'region', schema: { type: 'string' } }])
+    expect(definition.budget).toEqual({ maxInputTokens: 1000 })
     expect(withheld).toEqual(expect.arrayContaining([
       { path: 'trigger', reason: 'protected' },
       { path: 'tools.allow', reason: 'protected' },
@@ -34,6 +38,8 @@ describe('agentDefinitionView', () => {
       { path: 'steps[post].with.auth', reason: 'protected' },
       { path: 'steps[post].with.headers', reason: 'protected' },
       { path: 'steps[note].prompt', reason: 'likely-secret' },
+      { path: 'steps[post].with.apiToken', reason: 'likely-secret' },
+      { path: 'inputs[region].default', reason: 'input-default' },
     ]))
     expect(JSON.stringify(definition)).not.toContain(TOKEN)
   })
@@ -44,7 +50,7 @@ describe('agentDraftDefinition', () => {
     const draft = agentDraftDefinition(source(), null)
     expect(draft.trigger).toBeUndefined()
     expect(draft.tools).toEqual({ maxRisk: 'write' })
-    expect(draft.steps[1]!.with).toEqual({ url: 'https://example.com' })
+    expect(draft.steps[1]!.with).toEqual({ url: 'https://example.com', apiToken: 'hunter2' })
   })
 
   it('restores withheld values by step ID and kind, never onto a changed kind or a new step', () => {
@@ -62,7 +68,8 @@ describe('agentDraftDefinition', () => {
     const draft = agentDraftDefinition(edited, source())
     expect(draft.trigger).toBe('nightly')
     expect(draft.tools).toEqual({ allow: ['git_log'], maxRisk: 'write' })
-    expect(draft.steps[0]!.with).toEqual({ url: 'https://example.com', auth: 'Bearer x', headers: { a: 'b' } })
+    expect(draft.steps[0]!.with).toEqual({ url: 'https://example.com', auth: 'Bearer x', headers: { a: 'b' }, apiToken: 'hunter2' })
+    expect(draft.inputs).toEqual([{ name: 'region', schema: { type: 'string' }, default: 'ap-southeast-2' }])
     expect(draft.steps[1]!.requiresRun).toBeUndefined()
     expect(draft.steps[2]!.prompt).toBe(`Use ${TOKEN} to push`)
     expect(draft.steps[3]!.with).toEqual({ url: 'https://example.org' })

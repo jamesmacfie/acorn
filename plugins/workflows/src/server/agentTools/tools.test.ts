@@ -78,7 +78,11 @@ describe('workflow discovery tools', () => {
     await expect(harness!.call('workflow_get', { ref: { source: 'database', id: row.id }, revision: 2 })).rejects.toMatchObject({ kind: 'not_found' })
 
     const file = await harness!.call('workflow_get', { ref: { source: 'repo', path: '.acorn/workflows/review.toml' } })
-    expect(file).toMatchObject({ showing: 'file', editable: false, withheld: [{ path: 'trigger', reason: 'protected' }] })
+    expect(file).toMatchObject({
+      showing: 'file', editable: false,
+      withheld: [{ path: 'trigger', reason: 'protected' }, { path: 'inputs[ticket_id].default', reason: 'input-default' }],
+    })
+    expect(JSON.stringify(file)).not.toContain('ABC-1')
     expect(file.definition.trigger).toBeUndefined()
     expect((await harness!.call('workflow_get', { ref: { source: 'repo', path: '.acorn/workflows/review.toml' }, step: 'review' })).step.name).toBe('Review')
   })

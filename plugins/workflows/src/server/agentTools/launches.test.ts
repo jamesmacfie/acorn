@@ -156,16 +156,30 @@ describe('workflow_run', () => {
     await vi.waitFor(() => expect(runStatus(first.runId)).toBe('cancelled'))
   })
 
-  it('never starts for a workflow-owned session or a terminal session', async () => {
+  it('never starts for a workflow-owned, delegated, or terminal session', async () => {
     const { ref, digest } = await approved()
     harness.sessions.set('step-session', { workflowOwned: true, workflowRunId: 'run-x' })
+    harness.sessions.set('spawned-child', { delegated: true })
     await expect(harness.call('workflow_run', { ref, digest }, managed('step-session', 'call-1'))).rejects.toMatchObject({ kind: 'not_found' })
+    // A spawned child would bring a fresh start allowance with it.
+    await expect(harness.call('workflow_run', { ref, digest, inputs: { ticket: 'A' } }, managed('spawned-child', 'call-1'))).rejects.toMatchObject({ kind: 'not_found' })
     await expect(harness.call('workflow_run', { ref, digest }, managed('terminal-session', 'call-1'))).rejects.toMatchObject({ kind: 'not_found' })
     expect(harness.store.select().from(workflowAgentLaunches).all()).toHaveLength(0)
   })
 })
 
 describe('handoff, stop, and restart', () => {
+  it('never starts a waiting launch after the owner revokes the approval', async () => {
+    const { ref, digest } = await approved()
+    harness.startTurn('session-a', 'turn-1')
+    const admitted = await harness.call('workflow_run', { ref, digest, inputs: { ticket: 'A' } }, managed('session-a', 'call-1'))
+    await harness.invocation().revoke('project', `db:${ref.id}`)
+    harness.settleTurn('session-a', 'turn-1', 'completed')
+    await vi.waitFor(async () => expect(await harness.call('workflow_read', { runId: admitted.runId }, managed('session-a', 'read')))
+      .toMatchObject({ status: 'not-started', error: expect.stringContaining('withdrew') }))
+    expect(runCount()).toBe(0)
+  })
+
   it('cancels the launch when the owner stops the turn that made it', async () => {
     const { ref, digest } = await approved()
     harness.startTurn('session-a', 'turn-1')

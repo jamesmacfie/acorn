@@ -26,7 +26,7 @@ export const workflowDef = (name: string, steps: WorkflowDef['steps'] = [{ id: '
 /** The context a signed managed session's call carries. */
 export const managed = (sessionId: string, callId: string): Partial<ToolContext> => ({ sessionId, callId })
 
-type FakeSession = { workflowOwned?: boolean; workflowRunId?: string | null }
+type FakeSession = { workflowOwned?: boolean; delegated?: boolean; workflowRunId?: string | null }
 type ExecuteResult = NonNullable<Awaited<ReturnType<AgentSessionExecute>>>
 
 export const finishedStep = (structuredOutput: unknown = null): ExecuteResult => ({
@@ -59,7 +59,7 @@ export async function bootWorkflowTools(existingRoot?: string) {
     resolve: async (taskId, sessionId) => {
       const session = taskId === 'task' ? sessions.get(sessionId) : undefined
       return session ? {
-        taskId, sessionId, title: `Chat ${sessionId}`, workflowOwned: session.workflowOwned ?? false,
+        taskId, sessionId, title: `Chat ${sessionId}`, workflowOwned: session.workflowOwned ?? false, delegated: session.delegated ?? false,
         workflowRunId: session.workflowRunId ?? null, activeTurnId: activeTurn(sessionId),
       } : null
     },
