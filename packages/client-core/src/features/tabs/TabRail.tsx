@@ -5,7 +5,8 @@ import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOpti
 import { archiveTask } from '../tasks/taskMutations'
 import { applyRailOrder, applySourceOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
-import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { activeTaskId, layoutForTask, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import { defaultLayout } from '../tasks/taskLayout'
 import { defaultSourceId } from '../../host/registries/sources/sources'
 import { schedulePanePrefetch } from '../../host/registries/panes/panes'
 import { projectPath } from '../../host/registries/commands/corePaths'
@@ -104,6 +105,10 @@ export default function TabRail() {
     prefetching = undefined
   }
   onCleanup(cancelPrefetch)
+  const warmTask = (task: Task) => {
+    cancelPrefetch()
+    prefetching = schedulePanePrefetch(task, queryClient, (layoutForTask(task.id) ?? defaultLayout()).panes)
+  }
 
   // Scope the rail to the active workspace through project IDs, so switching workspaces swaps the
   // roster.
@@ -383,12 +388,12 @@ export default function TabRail() {
               // Warm the panes this task can show, once the pointer has settled on the row
               // (registries/panes/panes.ts). The tasks themselves are already cached; what is cold is
               // each pane's own first read, and a task switch disposes the whole task scope, so
-              // nothing else is holding it.
-              onPointerEnter={() => {
-                cancelPrefetch()
-                prefetching = schedulePanePrefetch(w, queryClient)
-              }}
+              // nothing else is holding it. The code of the panes it opens with loads too. Keyboard
+              // focus resting on the row is the same intent as the pointer resting on it.
+              onPointerEnter={() => warmTask(w)}
               onPointerLeave={cancelPrefetch}
+              onFocusIn={() => warmTask(w)}
+              onFocusOut={cancelPrefetch}
               // The second door onto the row's actions. The platform also dispatches `contextmenu`
               // for Shift+F10 and the menu key, so this is the keyboard path too.
               onContextMenu={(e) => {

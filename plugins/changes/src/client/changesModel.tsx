@@ -2,10 +2,9 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, on, 
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   agentSessionsFor, clientCapability, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
-  openPane, projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
+  openPane, projectsOptions, readGeneratePick, readJson, registerCommands, registerKeybindings, saveGeneratePick,
   sendReferenceToAgent, sendToSession, taskStatusRevision, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
-import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
 import { MAX_DOCUMENT_FILES } from '@acorn/diff-document/document'
 import { documentTopology, loadDiffLineContext, type CodeRow, type DiffLineAnchor, type DiffSource } from '@acorn/plugin-api/ui/diff'

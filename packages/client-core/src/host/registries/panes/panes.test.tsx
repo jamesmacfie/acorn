@@ -2,7 +2,7 @@ import { createResource, createSignal, ErrorBoundary, lazy, onCleanup, type Comp
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
-import { paneAvailable, paneRegistry, type PaneContribution, type PaneLayoutContribution } from './panes'
+import { PANE_PREFETCH_HOVER_MS, paneAvailable, paneRegistry, schedulePanePrefetch, type PaneContribution, type PaneLayoutContribution } from './panes'
 import type { Task } from '../../../infra/queries'
 import { _resetPaneModels } from './paneModels'
 import {
@@ -227,6 +227,23 @@ describe('a region whose code is loading', () => {
     arrive({ default: () => <span data-region="detail" /> })
     await until(() => !!host.querySelector('[data-region="detail"]'))
     expect(host.querySelector('[data-loading]')).toBeNull()
+  })
+})
+
+// A settled hover on a task row loads the code of the panes that task opens with, and no other pane's
+// (docs/panes/contributions.md § Contributions).
+describe('a hover over a task row', () => {
+  it('loads the code of the panes the task opens with', async () => {
+    const loaded: string[] = []
+    const region = (id: string) => lazy(async () => {
+      loaded.push(id)
+      return { default: () => <span /> }
+    })
+    register(pane({ regions: { list: () => <span />, detail: region('notes') } }))
+    register(pane({ id: 'other', label: 'Other', regions: { list: () => <span />, detail: region('other') } }))
+    schedulePanePrefetch(task, {} as never, ['notes'])
+    await new Promise((resolve) => setTimeout(resolve, PANE_PREFETCH_HOVER_MS + 20))
+    expect(loaded).toEqual(['notes'])
   })
 })
 

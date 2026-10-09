@@ -108,10 +108,15 @@ client-core. Feature panes use them without importing another plugin's code.
 
 ## Prefetch
 
-A pane can declare `prefetch(task, queryClient)`. The task rail calls it when the pointer rests on a
-task row for 150 milliseconds (`PANE_PREFETCH_HOVER_MS`), long enough that scrolling the rail fetches
-nothing. The rail asks every pane the task could show. It's best effort: it returns nothing, and a
+A pane can declare `prefetch(task, queryClient)`. The task rail calls it when the pointer or keyboard
+focus rests on a task row for 150 milliseconds (`PANE_PREFETCH_HOVER_MS`), long enough that scrolling
+the rail fetches nothing. The rail asks every pane the task could show. It's best effort: it returns nothing, and a
 failure only means the first paint isn't instant.
+
+The same hover loads the code of the panes the task opens with, from its saved layout, and of no
+other pane. The host does this for every pane that declares a layout, through each lazy region's
+`preload`, so a pane declares nothing for it. A failed load shows on the region's own boundary when
+the pane draws.
 
 Put the pane's first read in it, and only when that read is a row and not work. The editor warms the
 task's checkout path, the request its mount makes before it can draw. The agent pane warms the task's

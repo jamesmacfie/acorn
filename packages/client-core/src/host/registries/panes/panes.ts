@@ -62,6 +62,8 @@ export type PaneContribution = PaneCommon & {
   component: Component<{ task: Task }>
   /** Set when the pane declared a layout. Read by nothing but a test; the component below draws it. */
   layout?: PaneLayoutName
+  /** Set by the host for a declared layout: start loading the layout's and regions' code without drawing. */
+  preload?: () => void
 }
 
 /**
@@ -183,6 +185,13 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
   const Draw = lazy(async () => ({ default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout] }))
   return {
     ...entry,
+    // A region that is not a `lazy()` has nothing to load. A failed load is the region boundary's to
+    // show when the pane draws, with its Try again.
+    preload: () => {
+      for (const component of [Draw, ...Object.values(entry.regions)]) {
+        void (component as { preload?: () => Promise<unknown> }).preload?.().catch(() => {})
+      }
+    },
     component: (props) => {
       const scope = paneModelScope()
       const regions: Record<string, Region> = {}
@@ -289,9 +298,16 @@ export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
 
 /**
  * The hover half: a rail row calls this on pointer enter and cancels it on leave, so scrolling the
- * rail past twenty rows fetches nothing.
+ * rail past twenty rows fetches nothing. It also starts loading the code of `shown`, the panes the task
+ * opens with, so a first opening doesn't wait on its chunks. Only those: the rest load when opened.
  */
-export const schedulePanePrefetch = (task: Task, queryClient: QueryClient): { cancel: () => void } => {
-  const timer = setTimeout(() => prefetchPanes(task, queryClient), PANE_PREFETCH_HOVER_MS)
+export const schedulePanePrefetch = (task: Task, queryClient: QueryClient, shown: readonly PaneId[] = []): { cancel: () => void } => {
+  const timer = setTimeout(() => {
+    prefetchPanes(task, queryClient)
+    for (const id of shown) {
+      const pane = paneContribution(id)
+      if (pane && paneAvailable(pane, task)) pane.preload?.()
+    }
+  }, PANE_PREFETCH_HOVER_MS)
   return { cancel: () => clearTimeout(timer) }
 }

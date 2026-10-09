@@ -1,6 +1,6 @@
 # Reduce startup work and packaged size
 
-Date: October 9, 2026. Status: approved direction; phases 01 to 04 implemented October 9, 2026.
+Date: October 9, 2026. Status: approved direction; phases 01 to 05 implemented October 9, 2026.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Use these phases to reduce Acorn's shipped bytes and startup work, explain loading progress, and
@@ -34,7 +34,7 @@ dated acceptance evidence into Testing. Do not create a branch unless the operat
 | [02: Packaging](./02-runtime-packaging.md) | Installed Claude executable used; reviewed runtime files shipped. | 01's inventory format | Implemented |
 | [03: Minification](./03-production-minification.md) | Smaller production output with a formatting-independent budget check. | 01 | Implemented |
 | [04: Startup UX](./04-startup-and-loading-ux.md) | Meaningful startup messages, recovery, local loading placeholders, and an optional early rail. | 01 | Implemented without the early rail |
-| [05: Renderer loading](./05-selective-renderer-loading.md) | Smaller eager graph and less mandatory work behind the first frame. | 01, 04 | Planned |
+| [05: Renderer loading](./05-selective-renderer-loading.md) | Smaller eager graph and less mandatory work behind the first frame. | 01, 04 | Implemented |
 | [06: Server loading](./06-selective-server-loading.md) | Promise-cached lazy routes and measured optional handler cuts. | 01, 03 | Planned |
 | [07: Acceptance](./07-acceptance-and-budgets.md) | Before-and-after evidence, useful budgets, installed-host checks, and live Sentry verification. | 01 to 06 | Planned |
 

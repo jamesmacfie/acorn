@@ -149,6 +149,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/performance-baseline-2026-10-09.md](./testing/performance-baseline-2026-10-09.md) | Dated startup timings, startup graph bytes, and installed bytes from performance phase 01. |
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by performance phase 02. |
 | [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins in performance phase 03. |
+| [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use in performance phase 05. |
 | [telemetry.md](./telemetry.md) | The map of telemetry: the record kinds, the switch, and which page owns each seam. |
 | [telemetry/model.md](./telemetry/model.md) | The switch, the five kinds, span admission, attributes, privacy, and traces. |
 | [telemetry/plugins-and-sinks.md](./telemetry/plugins-and-sinks.md) | Writing telemetry from a plugin or frame, writing a sink, and the Sentry sink. |

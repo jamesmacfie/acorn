@@ -620,7 +620,10 @@ describe('architecture boundaries', () => {
       // `features/editor/documentCustody.ts`, merged in from perf. One more on 2026-10-06 for
       // `kit/lib/ansi`, so the terminal kit's CodeBlock strips escape codes without that barrel.
       // The address parser is a pure leaf for the terminal before its renderer host connects.
-      '@acorn/client-core': 173, // Includes the no-projects surface, workspace rail, and device preference reader.
+      // Two more on 2026-10-09: `host/tree/arbitration.ts`, so `slotFills` on the plugin API's client
+      // barrel doesn't load the tree host, and `ContributionBoundary.tsx`, for the desktop's lazy
+      // promotion modal (docs/frontend/startup-budget.md).
+      '@acorn/client-core': 175, // Includes the no-projects surface, workspace rail, and device preference reader.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.

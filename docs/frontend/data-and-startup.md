@@ -99,6 +99,12 @@ blocking. `activate.ts` registers core eagerly. After the first paint, a queued 
 250 ms fallback, because macOS can suspend animation frames. Workspace restore waits for registration,
 including plugin state slices, before it reopens tasks or follows pane deep links.
 
+A distribution pass that includes the selected Node commits that Node first, as a pass of its own.
+Other Nodes' roster reads and bundle caching then run up to four at a time, so a slow remote Node
+costs one broker timeout of 30 seconds rather than one per Node ahead of it. Commits stay in request
+order, and a Node unpaired during its read is dropped at commit
+(`packages/client-core/src/host/plugins/distribution.ts`).
+
 `applyNodePlugins` waits for registration and applies the Node's disabled list when it arrives.
 Concurrent calls for one Node share a request, answers for a Node no longer selected are dropped, and
 a failed read can be retried. The host skips a pass whose plugins and disabled set match the last, so
@@ -108,7 +114,8 @@ reachable.
 
 An `acorn://` link waits for the selected Node's shell restore and a distribution reconciliation for
 that Node before checking a loaded project route. Distribution commits register loaded frame and chrome
-contributions; compiled plugin readiness alone does not cover them. This check runs again after a
+contributions, loading their hosts on the first commit; compiled plugin readiness alone doesn't cover
+them ([loaded contribution readiness](./registries.md#loaded-contribution-readiness)). This check runs again after a
 link switches to another paired Node. If the roster read fails, the dispatcher can still open core
 places and reports a missing loaded place through its normal notice.
 

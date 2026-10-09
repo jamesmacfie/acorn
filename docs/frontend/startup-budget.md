@@ -12,10 +12,17 @@ over a byte ceiling, or on a denied chunk or module name.
 ### The renderer
 
 `apps/desktop/scripts/check-renderer-budget.mjs` runs from `@acorn/desktop`'s `build`. It sums every
-script and stylesheet a cold window loads, against ceilings of 760,000 B for scripts and 200,000 B for
-styles. The script ceiling is about 5% above the measurement of 726,109 B on October 2, 2026, taken
-after compiled plugin registration moved behind the first paint. A change that needs more raises the
-ceiling in the same commit, with the reason in the commit message.
+script and stylesheet a cold window loads, against ceilings of 740,000 B for scripts and 200,000 B for
+styles. The script ceiling is about 5% above the measurement of 703,911 B on October 9, 2026, taken
+after the loaded-plugin frame, chrome, and worker hosts and the promotion modal moved behind their
+first use. A change that needs more raises the ceiling in the same commit, with the reason in the
+commit message.
+
+The same check counts the compiled roster's scripts beyond startup, against a ceiling of 230,000 B,
+about 5% above the 219,353 B measured the same day. The roster loads after the first frame, but the
+workspace restore waits for its registration. A dynamic import that only moves startup code into the
+roster saves the launch nothing, and this ceiling fails it. The roster's key, `src/client/plugins.ts`,
+lives in `apps/desktop/scripts/renderer-graph.mjs`, which the size report reads too.
 
 It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped client
 folder to `dist/renderer-manifest.json`. The startup set is the static closure of the entry chunk,
@@ -36,8 +43,9 @@ top-level dynamic import in that entry, and their full static dependencies. Impo
 including the roster loaded after the first frame, are outside the set. A dependency reached both
 statically and dynamically still counts.
 
-The ceiling is 720,000 B, about 4% above the production measurement of 692,052 B across 158 chunks on
-October 2, 2026. Production output is minified with Oxc. Zod is bundled and tree-shaken, and
+The ceiling is 700,000 B, about 4% above the production measurement of 673,918 B across 175 chunks on
+October 9, 2026. Loaded-plugin frame and chrome registration load on the first distribution pass, out
+of the startup graph. Production output is minified with Oxc. Zod is bundled and tree-shaken, and
 validation still runs before untrusted content is drawn. Other external imports are listed
 separately, and their package bytes aren't in the budget. The client imports narrow supported
 entrypoints for its model and host adapters, not broad `public.ts` barrels, which would pull DOM
@@ -81,8 +89,11 @@ slowly stops being read. So each check denies names. Both lists hold `shiki`, `w
 `prModel`, `prSections`, `viewState`, and `icon-nodes`: lazy views that once leaked into the eager
 graph. The renderer's list adds plugin code a registration needs only when it draws: `MemoryAddForm`,
 the workflow editor's `draft-` and `draftStore`, `stepFields`, `GithubImporter`, `PreviewTaskPane`, and
-`PreviewPane`. The terminal list adds `drizzle-orm`, the remote tree implementation and its kit host,
-and the post-frame roster.
+`PreviewPane`. It also names the loaded-plugin host and the promotion modal: `workerHost`,
+`chromeRegister`, `chromeData`, which frame registration imports, and `PromoteToTaskModal`. The
+renderer tests its whole list against the roster as well as startup. The terminal list adds
+`drizzle-orm`, the remote tree implementation and its kit host, `chromeRegister`, and the post-frame
+roster. The terminal client draws loaded rail rows at startup, so `chromeData` stays on its graph.
 
 Both checks test names against modules as well as chunks. The renderer's `vite.config.ts` writes
 `dist/renderer-modules.json` beside the manifest, listing each chunk's source modules, and the check
@@ -90,6 +101,12 @@ tests every folder on a startup module's path and its file name, written the way
 named (`draft.ts` as `draft-`). A module that startup code imports statically merges into a chunk
 named after some other module, so a chunk-name test alone never sees it. The terminal client's graph
 also records source modules and external imports.
+
+A registration module that imports one name from a barrel loads the whole barrel, because client-core
+modules create stores at import and the bundler keeps them. The compiled host barrel,
+`@acorn/plugin-api/ui/host`, put the frame host, worker host, and promotion modal into the roster
+through one keybinding import. Registration code imports `@acorn/plugin-api/client` and narrow
+entrypoints instead ([plugin API](../plugins/plugin-api.md)).
 
 The usual cause is a string-keyed table from a name to a value instead of to a loader, which pulls
 every value into whichever chunk holds the table. `kit/tokens/iconNodes.ts`

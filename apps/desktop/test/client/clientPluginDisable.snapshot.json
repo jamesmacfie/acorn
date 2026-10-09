@@ -70,7 +70,6 @@
       "overlay/workflows.start-from-item"
     ],
     "extensionPoints": [
-      "core:task",
       "agents:tool-card",
       "agents:attachment",
       "agents:composer-actions",
@@ -107,7 +106,6 @@
       "workflows.task-runs"
     ],
     "railMarkers": [
-      "core:task",
       "agents",
       "changes",
       "docker",

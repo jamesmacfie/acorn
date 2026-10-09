@@ -1,10 +1,45 @@
 # Phase 05: Load renderer implementations when their features open
 
-Date: October 9, 2026. Status: planned. Depends on: phases 01 and 04.
+Date: October 9, 2026. Status: implemented October 9, 2026. Depends on: phases 01 and 04.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Reduce the initial renderer graph and mandatory post-frame registration work. Use the startup and
 local loading states from phase 04 so delaying code does not create missing navigation or blank panes.
+
+## Outcome
+
+Everything a launch loads before the workspace restores dropped from 1,051,291 B to 923,264 B of
+minified scripts. Startup scripts went from 808,886 B, over their ceiling, to 703,911 B. The compiled
+roster went from 242,405 B to 219,353 B. The terminal client's startup graph went from 730,269 B,
+over its ceiling, to 673,918 B. The [evidence](../../testing/selective-renderer-loading-2026-10-09.md)
+has the method and the real-app checks. The owning references are
+[loaded contribution readiness](../../frontend/registries.md#loaded-contribution-readiness),
+[startup order](../../frontend/data-and-startup.md#startup-order), and the
+[startup budget](../../frontend/startup-budget.md).
+
+Decisions made during implementation:
+
+- The loaded-plugin frame, chrome, and worker hosts reached startup through `reload.ts`, and the
+  roster through the `@acorn/plugin-api/ui/host` barrel. Cutting only the startup edge moved about
+  146 KB of source into the roster, which the restore still waits on. `registerKeybindings` and
+  `slotFills` moved to `@acorn/plugin-api/client`, and the changes and context models import them
+  from there. The budget check counts the roster with its own ceiling and denylist, so a cut can't
+  just move bytes.
+- Frame and chrome registration load on the first distribution commit. After that a pass runs in its
+  commit's tick, so withdrawal stays synchronous. `preparePluginContributionsForNode` is the
+  readiness result that deep links await. Restored loaded panes already waited on the Node's roster
+  read, and the import adds to that wait.
+- Distribution keeps its synchronous worker teardown through `host/tree/workerTeardown.ts`, which
+  the worker host fills in as it loads.
+- Step 3 stopped at the barrel fix and the workflow run model's `stepFields` import. The rest of the
+  roster is pane models, session stores, and command declarations. A pane's `model` is a
+  synchronous factory, and deferring it would change that contract, which this phase excludes. The
+  changes model still loads the diff parser through `@acorn/plugin-api/ui/diff`, about 9 KB of
+  source.
+- Step 5 commits the selected Node first, then reads other Nodes and caches bundles up to four at a
+  time. One local Node, the usual case, sees no difference.
+- Step 6 loads the code of a task's saved panes through the existing prefetch timer, when the pointer
+  or keyboard focus rests on its rail row. The restored destination's panes load as they draw.
 
 ## Starting point and owners
 

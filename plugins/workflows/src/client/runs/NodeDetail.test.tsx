@@ -48,7 +48,7 @@ const modelFor = (row: WorkflowStepRow, form?: WorkflowGateForm): RunPaneModel =
   error: () => '',
   setError: () => undefined,
   now: () => 100_000,
-  kindLabel: (kind: string) => kind,
+  contributedKindLabel: (kind: string) => kind,
   eventsFor: () => [],
   tailFor: () => [],
   kill,

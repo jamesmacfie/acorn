@@ -25,7 +25,10 @@ const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
 const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist/client') : args[dirFlag + 1])
 
-// `scripts` is the measured startup figure plus about 5%: 726,109 B on 2026-10-02, after the compiled
+// `scripts` is the measured startup figure plus about 5%. 703,911 B on 2026-10-09, after the loaded
+// plugins' frame, chrome and worker hosts and the promotion modal moved behind their first use
+// (performance phase 05). The measurement before was 808,886 B, over the 775,000 B ceiling below.
+// Before that, 726,109 B on 2026-10-02, after the compiled
 // plugin roster moved behind the first paint. Core registration stays eager and workspace restore
 // waits for the roster. The previous measurement was 862,188 B on 2026-10-01, after the security
 // changes to frame request ownership and tree validation. Those checks run before plugin content is
@@ -39,11 +42,16 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 //
 // `floor` is a lower bound, not a target. A startup set that small means the check is reading the
 // wrong graph, which is how it went blind in September, so it fails the build rather than passes it.
+//
+// `roster` is the compiled roster's scripts beyond startup, which the workspace restore waits for. A
+// dynamic import moves code off the first frame, but restore still waits on whatever the roster
+// imports, so a cut that only moves startup code into the roster saves nothing. 219,353 B on 2026-10-09,
+// down from 242,405 B, plus about 5%.
 const limits = {
-  // 2026-10-07: 768,478 B with workspace identity in the topbar and dropdown. Their shared
-  // validation, tile, and authenticated image resource are core chrome; editing and the optional
-  // rail stay lazy. Allow 775 KB for this feature, keeping the existing denylist and style limit.
-  scripts: 775_000,
+  // 2026-10-07: 768,478 B with workspace identity in the topbar and dropdown, under a 775,000 B
+  // ceiling. Their shared validation, tile, and authenticated image resource are core chrome.
+  scripts: 740_000,
+  roster: 230_000,
   styles: 200_000,
   floor: 100_000,
 }
@@ -68,9 +76,17 @@ const limits = {
 // the workflow editor's draft modules, the GitHub importer and the
 // preview pane. Each was on the renderer's startup graph through a plugin's client entry until
 // 2026-09-25. The terminal client's graph was not checked for them, so only this list has them.
+//
+// The third group is the loaded-plugin host and the promotion modal, which load on first use since
+// 2026-10-09: the worker host, the chrome registration and its data, and the modal. Frame
+// registration imports `chromeData`, so that name stands for it too.
+//
+// The whole list applies to the roster as well as to startup, because the restore waits on both.
+// `stepFields` was in the roster through the workflow run model until 2026-10-09.
 const DENYLIST = [
   'shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes',
   'MemoryAddForm', 'draft-', 'draftStore', 'stepFields', 'GithubImporter', 'PreviewTaskPane', 'PreviewPane',
+  'workerHost', 'chromeRegister', 'chromeData', 'PromoteToTaskModal',
 ]
 
 // The denylist entries that are allowed in the startup list for now, reported loudly rather than
@@ -83,7 +99,10 @@ const DENYLIST = [
 // name that reappears fails the build outright and this list should stay empty.
 const KNOWN = []
 
-const { manifest, chunkModules, startupKeys, startupChunks, startupFiles, closure, filesOf } = await readRendererGraph(clientDir)
+const graph = await readRendererGraph(clientDir)
+const { manifest, chunkModules, startupKeys, startupChunks, startupFiles, closure, filesOf } = graph
+// A roster with no chunk of its own is imported statically, so the startup count already holds it.
+const rosterFiles = graph.rosterFiles ?? new Set()
 const scriptAssets = [...startupFiles].filter((path) => !path.endsWith('.css'))
 const styleAssets = [...startupFiles].filter((path) => path.endsWith('.css'))
 const hops = startupKeys.length
@@ -92,7 +111,8 @@ async function totalBytes(paths) {
   const sizes = await Promise.all(paths.map(async (path) => (await stat(resolve(clientDir, path))).size))
   return sizes.reduce((total, size) => total + size, 0)
 }
-const [scriptBytes, styleBytes] = await Promise.all([totalBytes(scriptAssets), totalBytes(styleAssets)])
+const rosterScripts = [...rosterFiles].filter((path) => !path.endsWith('.css'))
+const [scriptBytes, styleBytes, rosterBytes] = await Promise.all([totalBytes(scriptAssets), totalBytes(styleAssets), totalBytes(rosterScripts)])
 
 // Everything one dynamic import past the startup set. Reported rather than gated: it is the union over
 // every lazy surface the startup code can open, so a legitimately lazy pane is in it and always will
@@ -103,11 +123,14 @@ const lazyFiles = [...filesOf(closure(lazyRoots))].filter((path) => !startupFile
 const lazyBytes = await totalBytes(lazyFiles)
 
 console.log(`[renderer-budget] startup scripts=${scriptBytes}B styles=${styleBytes}B assets=${startupFiles.size} hops=${hops}`)
+console.log(graph.rosterFiles
+  ? `[renderer-budget] compiled roster before restore: scripts=${rosterBytes}B in ${rosterScripts.length} chunks`
+  : '[renderer-budget] compiled roster has no chunk of its own; startup counts it')
 console.log(`[renderer-budget] one interaction away: ${lazyFiles.length} more chunks, ${lazyBytes}B (not counted)`)
 
-// Each startup chunk's file name, then each module in it as `module (in chunk)`, so a failure says
-// both what came back and where it landed.
-const startupNames = [...startupFiles].flatMap((path) => [
+// Each startup and roster chunk's file name, then each module in it as `module (in chunk)`, so a
+// failure says both what came back and where it landed.
+const startupNames = [...startupFiles, ...rosterFiles].flatMap((path) => [
   { label: basename(path), names: [basename(path)] },
   ...(chunkModules[path] ?? []).map((module) => ({
     label: `${module} (in ${basename(path)})`,
@@ -133,7 +156,7 @@ for (const prefix of known) {
 const problems = []
 if (offenders.length) {
   problems.push(
-    `Denylisted names in the renderer's startup list: ${offenders.flatMap(hit).join(', ')}. `
+    `Denylisted names in the renderer's startup or roster list: ${offenders.flatMap(hit).join(', ')}. `
     + 'A name on that list is a lazy surface that leaked into the eager graph — the table that names it '
     + 'should hold a loader, not the value (docs/frontend/startup-budget.md § Startup budget).',
   )
@@ -148,6 +171,13 @@ if (scriptBytes > limits.scripts || styleBytes > limits.styles) {
   problems.push(
     `Renderer startup budget exceeded (scripts ${scriptBytes}/${limits.scripts}B, styles ${styleBytes}/${limits.styles}B). `
     + 'Keep optional plugin surfaces behind lazy contribution boundaries.',
+  )
+}
+if (rosterBytes > limits.roster) {
+  problems.push(
+    `Compiled roster budget exceeded (scripts ${rosterBytes}/${limits.roster}B). The workspace restore waits for `
+    + 'this registration, so keep views and handlers behind lazy contribution boundaries, and import narrow '
+    + 'entrypoints rather than barrels from registration code.',
   )
 }
 if (scriptBytes < limits.floor) {

@@ -99,11 +99,7 @@ async function rendererStartup(clientDir) {
   const scripts = [...graph.startupFiles].filter((file) => !file.endsWith('.css'))
   const styles = [...graph.startupFiles].filter((file) => file.endsWith('.css'))
   // The compiled roster, imported by ./src/client/activate.ts after the first frame.
-  const roster = 'src/client/plugins.ts'
-  const registration = graph.manifest[roster]
-    ? [...graph.filesOf(graph.closure([roster]))].filter((file) => !graph.startupFiles.has(file))
-    : null
-  return { scripts: size(scripts), styles: size(styles), registration: registration && size(registration) }
+  return { scripts: size(scripts), styles: size(styles), registration: graph.rosterFiles && size(graph.rosterFiles) }
 }
 
 const RELEASE_KINDS = ['dmg', 'macos', 'nsis', 'msi', 'appimage', 'deb', 'rpm']

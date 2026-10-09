@@ -21,7 +21,6 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId, queryOwner } from '@acorn/plugin-api/client'
 import { createWorkflowApi } from '../workflowsClient'
 import { workflowRefreshQueue } from '../refreshQueue'
-import { kindLabel } from './runDisplay'
 
 export const WORKFLOWS_PANE_ID = 'workflows'
 
@@ -298,10 +297,11 @@ export function createRunPaneModel(task: Task) {
     selectedStepId,
     selectRun,
     selectStep: (stepId: string) => setSelectedStepId(stepId),
-    /** "Run a command" for `terminal:command`: the catalog for a contributed kind, the built-in table
-     *  for the rest, the id when neither knows it. */
-    kindLabel: (kind: string): string =>
-      catalog()?.kinds.find((entry) => entry.id === kind)?.describe?.label ?? kindLabel(kind),
+    /** The catalog's label for a contributed kind: "Run a command" for `terminal:command`. A view falls
+     *  back to `kindLabel` in ./runDisplay.ts, the built-in table, which stays out of this model so
+     *  registering the pane doesn't load every step kind's fields. */
+    contributedKindLabel: (kind: string): string | undefined =>
+      catalog()?.kinds.find((entry) => entry.id === kind)?.describe?.label,
     now,
     busy,
     error,

@@ -29,7 +29,7 @@ import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins, clientPlugins, clientPluginsReady, retryClientPlugins } from './activate'
 import { createLogger, openFeature } from '@acorn/client-core/infra/telemetry'
 import { registerAddressHostWhenReady } from './addressHostRegistration'
-import { PromoteToTaskModal } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
+import { ContributionBoundary } from '@acorn/client-core/kit/components/content/ContributionBoundary.tsx'
 import { clearCache } from './clearCache'
 import { topbarBreadcrumb } from './breadcrumb'
 import TaskView from './TaskView'
@@ -73,6 +73,9 @@ import { isPanelStudioOpen } from '@acorn/client-core/features/dashboards/studio
 const SettingsView = lazy(() => import('@acorn/client-core/features/settings/SettingsView.tsx'))
 const NoProjects = lazy(() => import('@acorn/client-core/features/workspaces/NoProjects.tsx'))
 const WorkspaceRail = lazy(() => import('@acorn/client-core/features/workspaces/WorkspaceRail.tsx').then((module) => ({ default: module.WorkspaceRail })))
+// Opened by an acorn:// link that promotes an item. Its code arrives in a few milliseconds from the app
+// bundle, so it has no placeholder; a failed import draws the boundary's Try again below.
+const PromoteToTaskModal = lazy(() => import('@acorn/client-core/features/integrations/PromoteToTaskModal.tsx').then((module) => ({ default: module.PromoteToTaskModal })))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -753,17 +756,19 @@ export default function App() {
             activateTaskSignals(task)
             navigate(pathForTask(task))
           }
-          return <PromoteToTaskModal
-            providerId={promotion.sourceId}
-            item={promotion.item}
-            itemTitle={promotion.itemTitle}
-            headerLabel="Create task"
-            attachTasks={(tasks.data ?? []).filter((task) => task.status === 'active' && workspaceProjects.has(task.projectId))}
-            existingBranches={projectTasks.flatMap((task) => task.branch ? [task.branch] : [])}
-            onClose={() => setLinkPromotion(null)}
-            onCreated={ready}
-            onAttached={ready}
-          />
+          return <ContributionBoundary contributionId="core:promote-to-task">
+            <PromoteToTaskModal
+              providerId={promotion.sourceId}
+              item={promotion.item}
+              itemTitle={promotion.itemTitle}
+              headerLabel="Create task"
+              attachTasks={(tasks.data ?? []).filter((task) => task.status === 'active' && workspaceProjects.has(task.projectId))}
+              existingBranches={projectTasks.flatMap((task) => task.branch ? [task.branch] : [])}
+              onClose={() => setLinkPromotion(null)}
+              onCreated={ready}
+              onAttached={ready}
+            />
+          </ContributionBoundary>
         }}
       </Show>
       <Show when={settingsRequest()}>

@@ -5,7 +5,7 @@ import {
   Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { RunGraph } from './RunGraph'
-import { formatUsage, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
+import { formatUsage, kindLabel, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
 // The run pane's list column: this task's runs, then the selected run's steps in the same reading
@@ -122,7 +122,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                     depth={node().depth}
                     density="compact"
                     variant="tree"
-                    title={node().parents.length > 1 ? `Waits on ${node().parentLabels.join(', ')}` : model.kindLabel(node().step?.kind ?? 'agent')}
+                    title={node().parents.length > 1 ? `Waits on ${node().parentLabels.join(', ')}` : model.contributedKindLabel(node().step?.kind ?? 'agent') ?? kindLabel(node().step?.kind ?? 'agent')}
                     leading={(
                       <Icon
                         name={stepGlyph(node().step?.status)}

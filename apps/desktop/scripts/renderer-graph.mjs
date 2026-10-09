@@ -14,10 +14,15 @@ import { basename, resolve } from 'node:path'
 // is startup whatever syntax loads it.
 const STARTUP_IMPORTS = ['src/client/index.tsx']
 
+// The compiled roster. ../src/client/activate.ts imports it after the first frame, and the workspace
+// restore waits for its registration, so it isn't startup but a launch still waits on it.
+const ROSTER = 'src/client/plugins.ts'
+
 /**
  * The startup closure of a built client dir: each startup chunk, the chunks it imports, and their
- * stylesheets, plus whatever index.html names directly. Throws when the graph files are missing or
- * describe a different build than the index.html beside them.
+ * stylesheets, plus whatever index.html names directly. Also the files the compiled roster adds after
+ * it. Throws when the graph files are missing or describe a different build than the index.html
+ * beside them.
  */
 export async function readRendererGraph(clientDir) {
   const manifestPath = resolve(clientDir, '../renderer-manifest.json')
@@ -65,5 +70,7 @@ export async function readRendererGraph(clientDir) {
     ...htmlPaths(/<script[^>]+src="([^"]+)"/g),
     ...htmlPaths(/<link[^>]+rel="(?:modulepreload|stylesheet)"[^>]+href="([^"]+)"/g),
   ])
-  return { manifest, chunkModules, startupKeys, startupChunks, startupFiles, closure, filesOf }
+  // What the roster adds after startup, or null when it has no chunk of its own.
+  const rosterFiles = manifest[ROSTER] ? new Set([...filesOf(closure([ROSTER]))].filter((file) => !startupFiles.has(file))) : null
+  return { manifest, chunkModules, startupKeys, startupChunks, startupFiles, rosterFiles, closure, filesOf }
 }

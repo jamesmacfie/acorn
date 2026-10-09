@@ -34,7 +34,7 @@ vi.mock('./distribution', () => ({
   onPluginDistributionCommit: () => () => {},
   syncPluginDistribution: vi.fn(async () => {}),
 }))
-vi.mock('./syncContributions', () => ({ syncPluginContributions: vi.fn() }))
+vi.mock('./syncContributions', () => ({ syncPluginContributions: vi.fn(async () => {}), syncPluginContributionsInBackground: vi.fn() }))
 
 const { watchPluginChanges, reconcileDevicePluginChange, preparePluginContributionsForNode } = await import('./reload')
 const { syncPluginDistribution } = await import('./distribution')
@@ -91,4 +91,16 @@ it('waits for the selected node roster before registering loaded contributions',
   finish()
   await ready
   expect(syncPluginContributions).toHaveBeenCalledTimes(1)
+})
+
+it('resolves only once the contribution hosts have loaded and registered', async () => {
+  let loaded!: () => void
+  vi.mocked(syncPluginContributions).mockImplementationOnce(() => new Promise<void>((resolve) => { loaded = resolve }))
+  let settled = false
+  const ready = preparePluginContributionsForNode('linked-node').then(() => { settled = true })
+  await vi.waitFor(() => expect(loaded).toBeTypeOf('function'))
+  expect(settled).toBe(false)
+  loaded()
+  await ready
+  expect(settled).toBe(true)
 })
