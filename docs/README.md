@@ -436,3 +436,17 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [first-party-plugins.md](./first-party-plugins.md): [Plugins to
   copy](./first-party-plugins/examples.md), [First-party plugins in the
   terminal](./first-party-plugins/terminal.md).
+
+## Browser extension proposal
+
+- [Extension context](./future/extension/README.md).
+- [Native pairing](./future/extension/01-native-pairing.md).
+- [Agent conversation](./future/extension/02-agent-conversation.md).
+- [Page capture](./future/extension/03-page-capture.md).
+- [GitHub handoff](./future/extension/04-github-handoff.md).
+- [Linear handoff](./future/extension/05-linear-handoff.md).
+- [Rollbar handoff](./future/extension/06-rollbar-handoff.md).
+- [Project site settings](./future/extension/07-project-site-settings.md).
+- [Questions and approvals](./future/extension/08-questions-and-approvals.md).
+- [Site notifications](./future/extension/09-site-notifications.md).
+- [Developer release](./future/extension/10-developer-release.md).
