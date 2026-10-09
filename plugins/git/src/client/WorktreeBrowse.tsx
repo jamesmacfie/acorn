@@ -6,6 +6,7 @@ import { Alert, Badge, Button, ConfirmButton, EmptyState, Facts, IconButton, Men
 import type { Worktree } from '../shared/api'
 import { removeWorktree, worktreesKey, worktreesOptions } from './worktreeClient'
 import { watchWorktreeInventory } from './worktreeInvalidation'
+import { sameGitActionScope, worktreeActionRequest } from './launchWorkflow'
 
 const basePath = (projectId: string) => `/p/${encodeURIComponent(projectId)}/x/git/worktrees`
 const worktreePath = (projectId: string, id: string) => `${basePath(projectId)}/${id}`
@@ -43,40 +44,42 @@ export function WorktreeList() {
         onActivate={(key) => navigate(worktreePath(scope.projectId(), key))} onMenu={(key) => {
           const row = entries().find((entry) => entry.id === key)
           if (!row) return
-          openActionPicker({ title: 'Worktree actions', detail: `${row.branch ?? 'Detached HEAD'} · ${row.path}`, actions: [
-            { id: 'view', label: 'View worktree', run: () => navigate(worktreePath(scope.projectId(), row.id)) },
-            ...(row.owners[0] ? [{ id: 'open', label: 'Open task', run: () => {
-              const task = tasks.data?.find((item) => item.id === row.owners[0]?.id)
-              if (task) { activateTaskSignals(task, { pane: 'git' }); navigate(pathForTask(task)) }
-            } }] : []),
-            ...(!row.owners.length && !row.main && !row.missing && !row.locked && row.branch
-              ? [{ id: 'attach', label: 'Attach to task', run: () => requestTaskLaunch({ nodeId: activeNodeId(), projectId: scope.projectId(), title: row.branch!, worktreePath: row.path }) }] : []),
-          ] })
+          const nodeId = activeNodeId()
+          const projectId = scope.projectId()
+          openActionPicker(worktreeActionRequest(row, nodeId, projectId, scope.projectId, (taskId) => {
+            const task = tasks.data?.find((item) => item.id === taskId)
+            if (task) { activateTaskSignals(task, { pane: 'git' }); navigate(pathForTask(task)) }
+          }, () => navigate(worktreePath(projectId, row.id))))
         }}>
         {(item, itemProps, selected) => {
           const entry = () => entries().find((row) => row.id === item.key)
-          return <Show when={entry()}>{(row) =>
-            <Row item={itemProps} selected={selected()} href={worktreePath(scope.projectId(), item.key)}
+          const nodeId = activeNodeId()
+          const projectId = scope.projectId()
+          const valid = () => sameGitActionScope(nodeId, projectId, scope.projectId())
+          return <Show when={entry()}>{(row) => {
+            const pinned = row()
+            return <Row item={itemProps} selected={selected()} href={worktreePath(scope.projectId(), item.key)}
               onPress={() => navigate(worktreePath(scope.projectId(), item.key))}
               leading={<Show when={row().main || row().missing || row().locked || !row().branch || row().dirty}>
                 <Badge tone={row().missing || row().locked ? 'warn' : row().dirty ? 'danger' : 'neutral'}>
                   {row().main ? 'Main' : row().missing ? 'Missing' : row().locked ? 'Locked' : !row().branch ? 'Detached' : 'Changed'}
                 </Badge>
               </Show>}
-              trailing={<RowActions ariaLabel={`Actions for ${row().path}`}>
+              trailing={<RowActions ariaLabel={`Actions for ${pinned.path}`}>
                 {(menu) => <>
-                  <Show when={row().owners[0]}>{(owner) => <Menu.Item context={menu} onSelect={() => {
+                  <Show when={pinned.owners[0]}>{(owner) => <Menu.Item context={menu} onSelect={() => {
+                    if (!valid()) return
                     const task = tasks.data?.find((item) => item.id === owner().id)
                     if (task) { activateTaskSignals(task, { pane: 'git' }); navigate(pathForTask(task)) }
                   }}>Open task</Menu.Item>}</Show>
-                  <Show when={!row().owners.length && !row().main && !row().missing && !row().locked && row().branch}>
-                    <Menu.Item context={menu} onSelect={() => requestTaskLaunch({ nodeId: activeNodeId(), projectId: scope.projectId(), title: row().branch!, worktreePath: row().path })}>Attach to task</Menu.Item>
+                  <Show when={!pinned.owners.length && !pinned.main && !pinned.missing && !pinned.locked && pinned.branch}>
+                    <Menu.Item context={menu} onSelect={() => { if (valid()) requestTaskLaunch({ nodeId, projectId, title: pinned.branch!, worktreePath: pinned.path }) }}>Attach to task</Menu.Item>
                   </Show>
-                  <Menu.Item context={menu} onSelect={() => navigate(worktreePath(scope.projectId(), item.key))}>View worktree</Menu.Item>
+                  <Menu.Item context={menu} onSelect={() => { if (valid()) navigate(worktreePath(projectId, item.key)) }}>View worktree</Menu.Item>
                 </>}
               </RowActions>}>
               <Text>{row().branch ?? 'Detached HEAD'}</Text>
-            </Row>}
+            </Row>}}
           </Show>
         }}
       </Rows>
@@ -103,7 +106,8 @@ export function WorktreeDetail() {
   })
   const entry = () => scope.inventory.data?.worktrees.find((item) => item.id === scope.params.worktreeId)
   const task = (ownerId: string) => tasks.data?.find((candidate) => candidate.id === ownerId)
-  const openTask = (ownerId: string) => {
+  const openTask = (ownerId: string, nodeId: string | null, projectId: string) => {
+    if (!sameGitActionScope(nodeId, projectId, scope.projectId())) return
     const target = task(ownerId)
     if (!target) return
     activateTaskSignals(target, { pane: 'git' })
@@ -130,7 +134,10 @@ export function WorktreeDetail() {
   return <Stack gap="section"><Show when={entry()} fallback={<EmptyState title={scope.params.worktreeId ? 'Worktree changed' : 'Choose a worktree'}>
     {scope.params.worktreeId ? 'Refresh the list and select a current worktree.' : 'Select a row to inspect its checkout.'}
   </EmptyState>}>
-    {(row) => <>
+    {(row) => {
+      const nodeId = activeNodeId()
+      const projectId = scope.projectId()
+      return <>
       <SectionHeader actions={<Button size="sm" variant="ghost" onPress={scope.refresh}>Refresh</Button>}>Worktree</SectionHeader>
       <Show when={scope.inventory.error}><Alert tone="warn">{String(scope.inventory.error)} Showing the last available roster.</Alert></Show>
       <Facts grouping="rows" items={[
@@ -145,17 +152,17 @@ export function WorktreeDetail() {
       <Show when={row().changedFiles.length}><SectionHeader>Changed files</SectionHeader><For each={row().changedFiles}>{(path) => <Text>{path}</Text>}</For></Show>
       <Show when={row().owners.length} fallback={<Text emphasis="muted">No Acorn task owns this worktree.</Text>}>
         <SectionHeader>Tasks</SectionHeader>
-        <For each={row().owners}>{(owner) => <Button variant="ghost" onPress={() => openTask(owner.id)}>{owner.title} · Open task</Button>}</For>
+        <For each={row().owners}>{(owner) => <Button variant="ghost" onPress={() => openTask(owner.id, nodeId, projectId)}>{owner.title} · Open task</Button>}</For>
         <Text emphasis="muted">Archive the owning task through Acorn to remove its checkout.</Text>
       </Show>
       <Show when={!row().owners.length && !row().main && !row().missing && !row().locked && row().branch}>
-        <Button onPress={() => requestTaskLaunch({ nodeId: activeNodeId(), projectId: scope.projectId(), title: row().branch!, worktreePath: row().path })}>Attach to task</Button>
+        <Button onPress={() => { if (sameGitActionScope(nodeId, projectId, scope.projectId())) requestTaskLaunch({ nodeId, projectId, title: row().branch!, worktreePath: row().path }) }}>Attach to task</Button>
       </Show>
       <Show when={failure()}><Alert>{failure()}</Alert></Show>
       <Show when={!row().main && !row().locked && !row().owners.length && (row().prunable || row().dirty === false)}>
         <ConfirmButton tone="danger" confirmLabel={row().prunable ? 'Prune missing registrations?' : 'Remove this worktree?'} disabled={busy()}
           onConfirm={() => void remove(row())}>{row().prunable ? 'Prune missing registrations' : 'Remove worktree'}</ConfirmButton>
       </Show>
-    </>}
+    </>}}
   </Show></Stack>
 }

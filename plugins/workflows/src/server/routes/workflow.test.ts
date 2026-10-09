@@ -223,7 +223,17 @@ describe('workflow routes', () => {
     const response = await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId }), {} as Env)
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ runId: 'run1' })
-    expect(startById).toHaveBeenCalledExactlyOnceWith('task1', defId, undefined, true)
+    expect(startById).toHaveBeenCalledExactlyOnceWith('task1', defId, undefined, true, undefined)
+  })
+
+  it('passes a validated device launch identity to the Workflows owner', async () => {
+    const startById = vi.fn(async () => ({ runId: 'run1' }))
+    setWorkflowBridge(fake({ startById }))
+    const launchId = '7c791459-215c-45a1-819e-e3bb2783605f'
+    const response = await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship', launchId }), {} as Env)
+    expect(response.status).toBe(200)
+    expect(startById).toHaveBeenCalledExactlyOnceWith('task1', 'repo:ship', undefined, true, launchId)
+    expect((await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship', launchId: 'bad' }), {} as Env)).status).toBe(400)
   })
 
   it('hands a task-confined caller the file layers alone', async () => {

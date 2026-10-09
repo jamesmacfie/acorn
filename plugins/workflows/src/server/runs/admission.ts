@@ -13,6 +13,9 @@ import {
 import { WorkflowValidationError } from '../validation/definition'
 import type { WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import type { ResolvedWorkflowGraph } from '../../shared/workflowContracts'
+import { eq } from 'drizzle-orm'
+import * as schema from '../../node/schema'
+import { workflowContentFingerprint } from '../definitions/fingerprint'
 
 type ProjectScope = {
   id: string
@@ -122,7 +125,15 @@ export class WorkflowStartService {
     definitionId: string,
     inputs?: Record<string, DataValue>,
     allowDatabaseDefinitions = true,
+    launchId?: string,
   ): Promise<{ runId?: string; error?: string }> {
+    const fingerprint = launchId ? workflowContentFingerprint({ taskId, definitionId, inputs: inputs ?? {} }) : null
+    const callerKey = launchId ? `device:${launchId}` : null
+    if (callerKey) {
+      const [existing] = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.invocationKey, callerKey))
+      if (existing) return existing.taskId === taskId && existing.payloadFingerprint === fingerprint
+        ? { runId: existing.id } : { error: 'This workflow launch ID was used with different task, definition, or inputs.' }
+    }
     const scope = await this.deps.taskScope(taskId)
     if (!scope) return { error: 'That task no longer exists.' }
     try {
@@ -132,7 +143,8 @@ export class WorkflowStartService {
         scope,
         this.runner.validationCatalog(),
       )
-      return this.startDefinition(taskId, resolved.definition, inputs, resolved.provenance, allowDatabaseDefinitions)
+      return this.startDefinition(taskId, resolved.definition, inputs, resolved.provenance, allowDatabaseDefinitions,
+        launchId ? { intendedRunId: launchId, callerKey: callerKey!, payloadFingerprint: fingerprint!, trigger: 'manual' } : undefined)
     } catch (error) {
       return { error: error instanceof WorkflowValidationError ? error.message : 'Failed to resolve workflow.' }
     }

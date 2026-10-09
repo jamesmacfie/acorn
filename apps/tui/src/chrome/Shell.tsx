@@ -448,7 +448,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               <Match when={name() === 'task-launch'}><Show when={taskLaunchRequest()} keyed>{(request) => <TaskLaunchHost request={request} />}</Show></Match>
               <Match when={name() === 'action-picker'}><Show when={actionPickerRequest()} keyed>{(request) => <ActionPickerHost request={request} />}</Show></Match>
               <Match when={name() === 'workflow-launch'}><Show when={workflowGitLaunchRequest()} keyed>{(request) =>
-                <Dynamic component={clientCapability(WORKFLOW_GIT_LAUNCH)?.Dialog} request={request} onClose={closeWorkflowGitLaunch} />
+                <Dynamic component={clientCapability(WORKFLOW_GIT_LAUNCH)?.Dialog} request={request} onClose={() => closeWorkflowGitLaunch(request)} />
               }</Show></Match>
               <Match when={name() === 'settings'}><SettingsHost nodeId={props.nodeId} onClose={closeSettings} onSetup={() => openSetup()} /></Match>
               <Match when={name() === 'promotion'}><Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show></Match>

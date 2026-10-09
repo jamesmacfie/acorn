@@ -8,6 +8,7 @@ import { tasks } from './tasks'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
 import { clearHooks, registerHookHandler } from '../../pluginHost/hooks'
 import { getWorktreesRoot, setWorktreesRoot, unclaimedWorktrees } from '../../worktrees/taskWorktree'
+import { beginTaskArchive, finishTaskArchive } from '../../worktrees/archiveGate'
 import { projects } from './projects'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
@@ -335,6 +336,38 @@ describe('creating a task on an existing worktree', () => {
     expect(await t.db.select().from(schema.tasks)).toHaveLength(1)
   })
 
+  it('refuses locked and missing Git registrations', async () => {
+    const checkout = join(dir, 'checkout')
+    execFileSync('git', ['worktree', 'lock', worktree], { cwd: checkout })
+    expect((await create(worktree)).status).toBe(409)
+    execFileSync('git', ['worktree', 'unlock', worktree], { cwd: checkout })
+    rmSync(worktree, { recursive: true, force: true })
+    expect((await create(worktree)).status).toBe(409)
+  })
+
+  it('refuses cleanly when a registration disappears after Git lists it', async () => {
+    const read = git.gitText
+    vi.spyOn(git, 'gitText').mockImplementation(async (args, options) => {
+      const result = await read(args, options)
+      if (args[0] === 'worktree' && args[1] === 'list') rmSync(worktree, { recursive: true, force: true })
+      return result
+    })
+    expect((await create(worktree)).status).toBe(409)
+    expect(await t.db.select().from(schema.tasks)).toHaveLength(0)
+  })
+
+  it('keeps an archiving task claim even if its row has changed status', async () => {
+    const now = Date.now()
+    await t.db.insert(schema.tasks).values({ id: 'archiving-owner', title: 'Old owner', origin: 'local', projectId: 'p',
+      branch: 'feat/elsewhere', worktreePath: worktree, status: 'archived', createdAt: now, updatedAt: now })
+    expect(beginTaskArchive('archiving-owner')).toBe(true)
+    try {
+      const project = (await t.db.select().from(schema.projects))[0]!
+      expect(await unclaimedWorktrees(t.db, project)).toEqual([])
+      expect((await create(worktree)).status).toBe(409)
+    } finally { finishTaskArchive('archiving-owner') }
+  })
+
   it('rejects an attachment when the project points to a different repository after preview', async () => {
     const project = (await t.db.select().from(schema.projects))[0]!
     expect(await unclaimedWorktrees(t.db, project)).toHaveLength(1)
@@ -408,10 +441,18 @@ describe('creating a task on an existing worktree', () => {
     expect((await createBranch('feat-elsewhere')).status).toBe(200)
   })
 
-  const createSeed = (seed: Record<string, unknown>) => app.request('http://acorn.test/api/tasks', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'From base', ...seed }),
-  })
+  const createSeed = async (seed: Record<string, unknown>) => {
+    let targetIdentity = seed.targetIdentity
+    if (typeof seed.baseCommit === 'string' && /^[0-9a-f]{40,64}$/.test(seed.baseCommit) && targetIdentity === undefined) {
+      const query = new URLSearchParams({ branch: String(seed.branch ?? 'preview'), baseCommit: seed.baseCommit })
+      const preview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${query}`)
+      if (preview.ok) targetIdentity = (await preview.json() as { targetIdentity?: string }).targetIdentity
+    }
+    return app.request('http://acorn.test/api/tasks', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'From base', ...seed, targetIdentity }),
+    })
+  }
   const revision = (branch: string) => execFileSync('git', ['rev-parse', `refs/heads/${branch}`], { cwd: join(dir, 'checkout'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
 
   it('captures the chosen local base commit and leaves the worktree lazy', async () => {
@@ -433,6 +474,21 @@ describe('creating a task on an existing worktree', () => {
     expect(created.status).toBe(200)
     expect(revision('historical')).toBe(root)
     expect(await created.json()).toMatchObject({ worktreePath: null })
+  })
+
+  it('refuses a pinned commit after a project remap even when both repositories contain it', async () => {
+    const root = revision('main')
+    const query = new URLSearchParams({ branch: 'mapped-child', baseCommit: root })
+    const preview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${query}`)
+    const { targetIdentity } = await preview.json() as { targetIdentity: string }
+    const second = join(dir, 'second-repository')
+    execFileSync('git', ['clone', '-q', join(dir, 'checkout'), second])
+    expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: second, encoding: 'utf8' }).trim()).toBe(root)
+    await t.db.update(schema.projects).set({ path: second }).where(eq(schema.projects.id, 'p'))
+    const refused = await createSeed({ branch: 'mapped-child', baseCommit: root, targetIdentity })
+    expect(refused.status).toBe(409)
+    expect((await refused.json() as { error: { message: string } }).error.message).toContain('repository changed')
+    expect(() => execFileSync('git', ['rev-parse', 'refs/heads/mapped-child'], { cwd: second, stdio: 'ignore' })).toThrow()
   })
 
   it('validates full available commit objects and one starting mode before saving', async () => {

@@ -1,15 +1,32 @@
 import type { Task } from '@acorn/protocol/api.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { WorkflowGitLaunchRequest } from '../contract/gitLaunch.ts'
+import { createSignal, type Accessor } from 'solid-js'
 
-type Session = { task: Task | null; values: Record<string, DataValue>; defId: string }
+type Session = {
+  task: Accessor<Task | null>
+  setTask: (task: Task) => void
+  runId: Accessor<string | null>
+  setRunId: (runId: string) => void
+  pending: Accessor<boolean>
+  setPending: (pending: boolean) => void
+  values: Record<string, DataValue>
+  defId: string
+  launchId: string
+}
 const sessions = new Map<string, Session>()
 const key = (request: WorkflowGitLaunchRequest) => JSON.stringify([request.nodeId, request.projectId, request.commitId])
 
 export function gitLaunchSession(request: WorkflowGitLaunchRequest): Session {
   const id = key(request)
   let session = sessions.get(id)
-  if (!session) { session = { task: null, values: {}, defId: '' }; sessions.set(id, session) }
+  if (!session) {
+    const [task, setTask] = createSignal<Task | null>(null)
+    const [runId, setRunId] = createSignal<string | null>(null)
+    const [pending, setPending] = createSignal(false)
+    session = { task, setTask, runId, setRunId, pending, setPending, values: {}, defId: '', launchId: crypto.randomUUID() }
+    sessions.set(id, session)
+  }
   return session
 }
 

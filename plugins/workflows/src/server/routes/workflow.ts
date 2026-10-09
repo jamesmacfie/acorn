@@ -34,7 +34,7 @@ export type WorkflowBridge = {
   // Start a definition the node resolves itself: `repo:<fileId>` or `user:<fileId>` for a file this
   // task's project loads, anything else for a `workflow_defs` row. Resolving here rather than taking
   // the definition in the body is what lets the repo trust snapshot be checked for real.
-  startById(taskId: string, defId: string, inputs: Record<string, DataValue> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
+  startById(taskId: string, defId: string, inputs: Record<string, DataValue> | undefined, allowDatabaseDefinitions: boolean, launchId?: string): Promise<{ runId?: string; error?: string }>
   runs(taskId: string): Promise<WorkflowRunProjection[]>
   run(runId: string): Promise<WorkflowRunProjection | null>
   steps(runId: string): Promise<WorkflowStepProjection[]>
@@ -66,6 +66,7 @@ const startBody = z
     def: z.object({ name: z.string().min(1), steps: z.array(z.unknown()) }).passthrough().optional(),
     // A definition the node resolves for itself, instead of the whole thing in the body.
     defId: z.string().min(1).max(256).optional(),
+    launchId: z.uuid().optional(),
     // Values for the definition's declared inputs. Which names are allowed and which are required is
     // the runner's answer, because only the definition knows.
     inputs: z.record(z.string(), z.unknown().transform((value, ctx) => {
@@ -131,9 +132,9 @@ export const workflow = new Hono<AppEnv>()
   .post('/tasks/:id/workflows', requireDevice, async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    const { defId, inputs } = parsed.data
+    const { defId, inputs, launchId } = parsed.data
     if (defId) {
-      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs, true))
+      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs, true, launchId))
     }
     return respondError(c, 400, 'published_definition_required', ['Publish this workflow and start it by its definition ID.'])
   })

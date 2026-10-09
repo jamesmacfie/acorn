@@ -52,8 +52,8 @@ export const workflowControl = (
     catalog: (projectId) => starts.catalogForProject(projectId),
     start: (taskId, def, inputs, allowDatabaseDefinitions) =>
       starts.startDefinition(taskId, def as WorkflowDef, inputs, undefined, allowDatabaseDefinitions),
-    startById: (taskId, defId, inputs, allowDatabaseDefinitions) =>
-      starts.startById(taskId, defId, inputs, allowDatabaseDefinitions),
+    startById: (taskId, defId, inputs, allowDatabaseDefinitions, launchId) =>
+      starts.startById(taskId, defId, inputs, allowDatabaseDefinitions, launchId),
     runs: (taskId) => workflowRunsForTask(store, taskId),
     run: (runId) => workflowRunById(store, runId),
     // This plugin's contribution to the merged run list (@acorn/protocol/runs.ts). A projection,

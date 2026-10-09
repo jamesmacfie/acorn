@@ -1,5 +1,55 @@
 # Phase 05: task and workflow launches
 
+## Follow-up completion note, October 9, 2026
+
+Status: reviewed fixes implemented. A Git workflow launch now sends one UUID through the public
+device start route to Workflows' existing intended-run reservation. Workflows binds that identity to
+the task, definition, and inputs. A lost response replays the persisted run, concurrent trust
+completion and Retry admit one run, and changed payload replay fails. The Workflows launch owner
+retains created task/run IDs and typed inputs across dismissal and reopening. The Core draft records
+a late task save, but a dismissed draft cannot start its follow-on workflow. The Workflows overlay
+captures Node, project, API routing, and launch generation; delayed responses and trust completion
+cannot navigate a replaced launch. Loading, unavailable target, and read errors display actions to
+retry or close. Once a task exists, its creation fields are hidden and Retry uses that same task.
+
+Core's availability preview now returns an opaque checkout and object-store `targetIdentity` for a
+pinned commit. The draft retains its first observation and creation rechecks it under branch
+reservation. A project remap to another repository containing the same commit is refused without
+losing edits. Attachment checks a present, unlocked Git registration and active or archiving task
+claims through project aliases at reservation time; a disappearing candidate fails cleanly. Git's
+history and worktree action pickers capture Node, project, and row target before opening, and
+refuse stale actions after a scope switch, including **Open task**. Branch-tip actions still use
+the commit ID present when the menu opened; refs management remains Phase 06.
+
+Verification: focused Core route fixtures passed 45 tests, including the same-object remap,
+locked/missing/archiving attachment and removal races. Core's actual task draft tests passed 3,
+covering a save completing after dismissal and recovery on the same task. Workflows' route,
+dialog, and durable start suites passed 49, including conflicting replay, concurrent starts,
+deferred response and trust callbacks, and visible read failures. Git action tests passed 5;
+terminal router tests passed 11; protocol API tests passed 4; boundary, doc path, and published
+surface checks passed 60. Scoped TypeScript passed for protocol, Node Core, client Core, Git,
+desktop, and terminal. Workflows still has only the pre-existing null-`HeadlessArgv` fixture error
+at `workflowMapLifecycle.test.ts:222`. Touched-source oxlint reported only existing warnings in
+`workflow.test.ts`, `Shell.tsx`, and `taskWorktree.ts`. The terminal startup closure measured
+731,563/732,000 B. Desktop stage and renderer compilation passed; the renderer budget remains
+over at 802,060/775,000 B (before this follow-up: 801,647 B; before Phase 05: 798,673 B).
+The cap was not raised. Full root tests and lint remain deferred until all eight phases.
+
+Real-host reproduction: in the isolated desktop session `git-phase05`, select Git → repo →
+root commit actions → **Start workflow here**, enter the required `reason`, and submit. In the
+final staged build, new task `a2202c04-613f-46ed-a825-5eecb18d7833` opened its sole run
+`52c8216d-42a6-441f-a8fe-56866087ad65`; reopening the same commit action showed **Open task**
+and **Open run**, with the task-creation fields gone. Inspected screenshots of the run and the final recovery are
+`.acorn/agent-dev/git-phase05/screenshots/followup-workflow-run.png` and
+`.acorn/agent-dev/git-phase05/screenshots/followup-final-recovery.png`. In isolated terminal session
+`git-phase05-tui`, use Git → History, Shift+F10 on the root commit, select **Start workflow here**,
+enter `reason`, and submit. The 80×24 picker and form were inspected; the new task opened one
+completed run at both 80×24 and 120×40. Saved terminal snapshots are
+`.acorn/agent-dev/tui/git-phase05-tui/followup-run-80x24.txt` and
+`.acorn/agent-dev/tui/git-phase05-tui/followup-run-120x40.txt`. Both hosts were stopped.
+
+---
+
 ## Completion note, October 9, 2026
 
 Status: implemented. Git history offers **Start task here** and **Start workflow here** for a

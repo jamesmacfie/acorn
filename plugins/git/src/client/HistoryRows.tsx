@@ -2,23 +2,20 @@ import { createMemo, For, Show } from 'solid-js'
 import { activeNodeId, openActionPicker, requestTaskLaunch } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, HistoryMark, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, historyLayout } from '@acorn/plugin-api/ui'
 import type { HistoryModel } from './historyModel'
-import { launchWorkflowAtCommit } from './launchWorkflow'
+import { commitActionRequest, launchWorkflowAtCommit, sameGitActionScope } from './launchWorkflow'
 
 export function HistoryRows(props: { projectId: string; model: HistoryModel; selected: string | null; onSelect: (id: string) => void; onChanges?: () => void; onRefresh?: () => void }) {
-  const launchTask = (id: string, title: string) => requestTaskLaunch({ nodeId: activeNodeId(), projectId: props.projectId, title, baseCommit: id })
-  const launchWorkflow = (id: string, title: string) => launchWorkflowAtCommit(props.projectId, id, title)
+  const valid = (nodeId: string | null, projectId: string) => sameGitActionScope(nodeId, projectId, props.projectId)
+  const launchTask = (nodeId: string | null, projectId: string, id: string, title: string) => {
+    if (valid(nodeId, projectId)) requestTaskLaunch({ nodeId, projectId, title, baseCommit: id })
+  }
+  const launchWorkflow = (nodeId: string | null, projectId: string, id: string, title: string) => {
+    if (valid(nodeId, projectId)) launchWorkflowAtCommit(nodeId, projectId, id, title)
+  }
   const openActions = (id: string) => {
     const commit = commits().find((entry) => entry.id === id)
     if (!commit) return
-    openActionPicker({ title: 'Commit actions', detail: `${commit.subject} · ${commit.id.slice(0, 12)}`, actions: [
-      { id: 'inspect', label: 'Inspect commit', run: () => props.onSelect(commit.id) },
-      { id: 'task', label: 'Start task here', run: () => launchTask(commit.id, commit.subject) },
-      { id: 'workflow', label: 'Start workflow here', run: () => launchWorkflow(commit.id, commit.subject) },
-      ...commit.refs.filter((ref) => ref.startsWith('refs/heads/')).flatMap((ref) => [
-        { id: `task:${ref}`, label: `Start task at ${ref.slice(11)} tip`, run: () => launchTask(commit.id, commit.subject) },
-        { id: `workflow:${ref}`, label: `Start workflow at ${ref.slice(11)} tip`, run: () => launchWorkflow(commit.id, commit.subject) },
-      ]),
-    ] })
+    openActionPicker(commitActionRequest(commit, activeNodeId(), props.projectId, () => props.projectId, props.onSelect))
   }
   const commits = () => props.model.commits()
   const slots = createMemo(() => historyLayout(commits(), !props.model.filter().query, !!props.model.next(), props.model.dropped()))
@@ -47,17 +44,20 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
       {(item, itemProps, selected) => {
         const commit = () => commits().find((row) => row.id === item.key)!
         const slot = () => slots().find((row) => row.id === item.key)!
+        const nodeId = activeNodeId()
+        const projectId = props.projectId
+        const pinnedCommit = commit()
         return <Row item={itemProps} selected={selected()} onPress={() => props.onSelect(item.key)} density="compact" variant="stacked"
           leading={<HistoryMark slot={slot()} />}
-          trailing={<RowActions ariaLabel={`Actions for ${commit().id}`}>
-            {(menu) => <><Menu.Item context={menu} onSelect={() => props.onSelect(item.key)}>Inspect commit</Menu.Item>
-              <Menu.Item context={menu} onSelect={() => launchTask(commit().id, commit().subject)}>Start task here</Menu.Item>
-              <Menu.Item context={menu} onSelect={() => launchWorkflow(commit().id, commit().subject)}>Start workflow here</Menu.Item>
-              <For each={commit().refs.filter((ref) => ref.startsWith('refs/heads/'))}>{(ref) => <>
-                <Menu.Item context={menu} onSelect={() => launchTask(commit().id, commit().subject)}>Start task at {ref.slice(11)} tip</Menu.Item>
-                <Menu.Item context={menu} onSelect={() => launchWorkflow(commit().id, commit().subject)}>Start workflow at {ref.slice(11)} tip</Menu.Item>
+          trailing={<RowActions ariaLabel={`Actions for ${pinnedCommit.id}`}>
+            {(menu) => <><Menu.Item context={menu} onSelect={() => { if (valid(nodeId, projectId)) props.onSelect(pinnedCommit.id) }}>Inspect commit</Menu.Item>
+              <Menu.Item context={menu} onSelect={() => launchTask(nodeId, projectId, pinnedCommit.id, pinnedCommit.subject)}>Start task here</Menu.Item>
+              <Menu.Item context={menu} onSelect={() => launchWorkflow(nodeId, projectId, pinnedCommit.id, pinnedCommit.subject)}>Start workflow here</Menu.Item>
+              <For each={pinnedCommit.refs.filter((ref) => ref.startsWith('refs/heads/'))}>{(ref) => <>
+                <Menu.Item context={menu} onSelect={() => launchTask(nodeId, projectId, pinnedCommit.id, pinnedCommit.subject)}>Start task at {ref.slice(11)} tip</Menu.Item>
+                <Menu.Item context={menu} onSelect={() => launchWorkflow(nodeId, projectId, pinnedCommit.id, pinnedCommit.subject)}>Start workflow at {ref.slice(11)} tip</Menu.Item>
               </>}</For>
-              <For each={commit().parents}>{(parent, index) => <Menu.Item context={menu} onSelect={() => props.onSelect(parent)}>Open parent {index() + 1} · {parent.slice(0, 8)}</Menu.Item>}</For>
+              <For each={pinnedCommit.parents}>{(parent, index) => <Menu.Item context={menu} onSelect={() => { if (valid(nodeId, projectId)) props.onSelect(parent) }}>Open parent {index() + 1} · {parent.slice(0, 8)}</Menu.Item>}</For>
             </>}
           </RowActions>}>
           <Text>{commit().subject}</Text>

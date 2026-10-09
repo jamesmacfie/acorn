@@ -120,10 +120,9 @@ export async function unclaimedWorktrees(db: AppDatabase, project: ProjectRow): 
   const identity = (path: string): string => {
     try { return realpathSync(path) } catch { return resolve(path) }
   }
-  const claimed = await db
-    .select({ worktreePath: schema.tasks.worktreePath, projectId: schema.tasks.projectId, branch: schema.tasks.branch })
-    .from(schema.tasks)
-    .where(eq(schema.tasks.status, 'active'))
+  const claimed = (await db
+    .select({ id: schema.tasks.id, status: schema.tasks.status, worktreePath: schema.tasks.worktreePath, projectId: schema.tasks.projectId, branch: schema.tasks.branch })
+    .from(schema.tasks)).filter((row) => row.status === 'active' || isTaskArchiving(row.id))
   const taken = new Set(claimed.filter((row) => row.worktreePath).map((row) => identity(row.worktreePath!)))
   // A project-folder task has no stored worktree path. Its mapped project may itself be a linked
   // checkout, and another project alias can point at the same checkout.
@@ -142,7 +141,10 @@ export async function unclaimedWorktrees(db: AppDatabase, project: ProjectRow): 
       if (identity(resolve(owner.path, other)) === identity(resolve(project.path, repository))) reserved.add(row.branch!)
     } catch { /* An unavailable project cannot claim this Git registration. */ }
   }
-  return roster.filter((wt) => !taken.has(identity(wt.path)) && !reserved.has(wt.branch))
+  return roster.filter((wt) => {
+    try { return isDir(wt.path) && !taken.has(realpathSync(wt.path)) && !reserved.has(wt.branch) }
+    catch { return false }
+  })
 }
 
 // Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md):

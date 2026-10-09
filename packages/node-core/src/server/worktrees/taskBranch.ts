@@ -6,8 +6,24 @@ import { git, gitOrThrow, gitText } from '../core/git'
 import { branchExists } from './worktrees'
 import { worktreeAvailability, worktreeNameConflict } from './worktreeAvailability'
 import { localBranches } from './branches'
+import { createHash } from 'node:crypto'
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-export type TaskBranchSeed = { branch: string | null; branchSource?: 'derived' | 'exact'; baseBranch?: string; baseCommit?: string }
+export type TaskBranchSeed = { branch: string | null; branchSource?: 'derived' | 'exact'; baseBranch?: string; baseCommit?: string; targetIdentity?: string }
+
+// An opaque observation of both the mapped checkout and its Git object store. A draft made before
+// a project remap must not be admitted against another repository with the same commit object.
+export async function projectTargetIdentity(project: ProjectRow): Promise<string> {
+  try {
+    const common = await gitText(['rev-parse', '--git-common-dir'], { cwd: project.path!, timeoutMs: 10_000 })
+    return createHash('sha256').update(JSON.stringify([
+      realpathSync(project.path!), realpathSync(resolve(project.path!, common)),
+    ])).digest('hex')
+  } catch {
+    throw new TaskBranchError(409, 'The project repository is unavailable. Reopen the task draft.')
+  }
+}
 
 export class TaskBranchError extends Error {
   constructor(public readonly status: 400 | 409, message: string) { super(message) }
@@ -55,7 +71,8 @@ async function baseCommit(project: ProjectRow, seed: TaskBranchSeed): Promise<st
 
 export async function taskBranchAvailability(db: AppDatabase, project: ProjectRow, seed: TaskBranchSeed): Promise<WorktreeAvailability> {
   await baseCommit(project, seed)
-  return availableTaskBranch(db, project, seed)
+  const available = await availableTaskBranch(db, project, seed)
+  return seed.baseCommit ? { ...available, targetIdentity: await projectTargetIdentity(project) } : available
 }
 
 async function availableTaskBranch(db: AppDatabase, project: ProjectRow, seed: TaskBranchSeed, excluded: ReadonlySet<string> = new Set()): Promise<WorktreeAvailability> {
@@ -77,6 +94,9 @@ async function availableTaskBranch(db: AppDatabase, project: ProjectRow, seed: T
 // worktree remains lazy. Git's exclusive branch creation also catches changes made outside Acorn.
 export async function saveTaskBranch<T>(db: AppDatabase, project: ProjectRow, seed: TaskBranchSeed, save: (branch: string | null) => T): Promise<T> {
   const commit = await baseCommit(project, seed)
+  if (seed.baseCommit && (!seed.targetIdentity || await projectTargetIdentity(project) !== seed.targetIdentity)) {
+    throw new TaskBranchError(409, 'The project repository changed. Reopen the task draft.')
+  }
   if (project.vcs !== 'git' || !seed.branch) return save(null)
   const rejected = new Set<string>()
   for (;;) {

@@ -1,4 +1,4 @@
-import { createMemo, createResource, createSignal, onCleanup, type Accessor } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, onCleanup, type Accessor } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { projectBranchesRoute, projectConfigRoute, projectWorktreeAvailabilityRoute, projectWorktreesRoute, type Project, type ProjectBranches, type ProjectConfigResponse, type ProjectWorktree, type Task, type WorktreeAvailability } from '@acorn/protocol/api.ts'
 import { slugifyBranch, withBranchPrefix } from '@acorn/protocol/branch.ts'
@@ -17,7 +17,8 @@ type TaskSource = 'new' | 'folder' | 'worktree'
 
 // One owner for the dialog's edits and requests. The rail supplies a project snapshot and a live
 // task revision; changing workspace cannot silently replace the project's choices in an open form.
-export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | undefined>, close: () => void, navigate: (path: string) => void, onCreated?: (task: Task) => Promise<void>, existingTask?: Task) {
+export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | undefined>, close: () => void, navigate: (path: string) => void,
+  onCreated?: (task: Task) => Promise<void>, existingTask?: Task | Accessor<Task | null>, onPersisted?: (task: Task) => void) {
   const queryClient = useQueryClient()
   const [text, setText] = createSignal(draft.mode === 'rename' ? draft.task.title : draft.title ?? '')
   const [icon, setIcon] = createSignal<string | null>(draft.mode === 'rename' ? draft.task.icon : randomIconName())
@@ -30,7 +31,9 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
   const [skipSetup, setSkipSetup] = createSignal(false)
   const [error, setError] = createSignal('')
   const [saving, setSaving] = createSignal(false)
-  const [createdTask, setCreatedTask] = createSignal<Task | null>(existingTask ?? null)
+  const [localCreatedTask, setCreatedTask] = createSignal<Task | null>(typeof existingTask === 'function' ? null : existingTask ?? null)
+  const createdTask = createMemo(() => localCreatedTask() ?? (typeof existingTask === 'function' ? existingTask() : null))
+  const [pinnedTargetIdentity, setPinnedTargetIdentity] = createSignal<string | null>(null)
   let alive = true
   onCleanup(() => { alive = false })
 
@@ -65,8 +68,15 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
     return checked && current && checked.identity.nodeId === current.nodeId && checked.identity.projectId === current.projectId && checked.identity.branch === current.branch && checked.identity.baseBranch === current.baseBranch && checked.identity.baseCommit === current.baseCommit && checked.identity.branchSource === current.branchSource
       ? checked.result : undefined
   }
+  createEffect(() => {
+    const identity = baseCommit() ? checkedAvailability()?.targetIdentity : undefined
+    if (identity && !pinnedTargetIdentity()) setPinnedTargetIdentity(identity)
+  })
   const branchError = () => {
     const result = checkedAvailability()
+    if (baseCommit() && pinnedTargetIdentity() && result?.targetIdentity && result.targetIdentity !== pinnedTargetIdentity()) {
+      return 'The project repository changed. Reopen the task draft.'
+    }
     return !availability.loading && result && !result.available ? result.reason : ''
   }
   const canSubmit = () => {
@@ -76,6 +86,7 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
     if (source() === 'folder') return true
     if (source() === 'worktree') return !!chosenWorktree()
     return !!effectiveBranch() && !config.loading && !branches.loading && !availability.loading && checkedAvailability()?.available === true
+      && (!baseCommit() || !!pinnedTargetIdentity() && checkedAvailability()?.targetIdentity === pinnedTargetIdentity())
   }
   const submit = async () => {
     if (!canSubmit()) return
@@ -90,11 +101,14 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
         const branch = git && source() === 'new' ? effectiveBranch() : undefined
         const worktreePath = git && source() === 'worktree' ? chosenWorktree()?.path : undefined
         const task = createdTask() ?? await createTask({
-          ...(branch ? { baseBranch: baseBranch(), baseCommit: baseCommit(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const } : {}),
+          ...(branch ? { baseBranch: baseBranch(), baseCommit: baseCommit(), targetIdentity: baseCommit() ? pinnedTargetIdentity() ?? undefined : undefined,
+            branchSource: branchTouched() ? 'exact' as const : 'derived' as const } : {}),
           origin: 'local', projectId: project.id, branch, worktreePath, title: value, icon: icon() ?? undefined,
           skipSetup: !!branch && skipSetup(),
         }, draft.nodeId)
+        onPersisted?.(task)
         setCreatedTask(task)
+        if (!alive || activeNodeId() !== draft.nodeId || projectId() !== project.id) return
         if (onCreated) await onCreated(task)
         if (!alive || activeNodeId() !== draft.nodeId) return
         await queryClient.invalidateQueries({ queryKey: tasksKey })

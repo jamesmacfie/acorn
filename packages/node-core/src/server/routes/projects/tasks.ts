@@ -83,6 +83,7 @@ const taskSeedBody = z.object({
   branchSource: z.enum(['derived', 'exact']).optional(),
   baseBranch: z.string().min(1).optional(),
   baseCommit: z.string().min(1).optional(),
+  targetIdentity: z.string().regex(/^[0-9a-f]{64}$/).optional(),
   worktreePath: z.string().min(1).optional(),
   skipSetup: z.boolean().optional(),
   pullNumber: z.int().positive().optional(),
@@ -232,13 +233,17 @@ export const tasks = new Hono<AppEnv>()
           let wanted: string
           try { wanted = realpathSync(seed.worktreePath) }
           catch { throw new TaskBranchError(409, 'That worktree is no longer registered on this project.') }
-          const match = (await unclaimedWorktrees(db, currentProject)).find((wt) => realpathSync(wt.path) === wanted)
+          const match = (await unclaimedWorktrees(db, currentProject)).find((wt) => {
+            try { return realpathSync(wt.path) === wanted }
+            catch { return false }
+          })
           if (!match) throw new TaskBranchError(409, 'That worktree is not a free worktree of this project.')
           worktreePath = match.path
           attachedBranch = match.branch
           return save(attachedBranch)
         }
-        return saveTaskBranch(db, currentProject, { branch, branchSource: seed.branchSource, baseBranch: seed.baseBranch, baseCommit: seed.baseCommit }, save)
+        return saveTaskBranch(db, currentProject, { branch, branchSource: seed.branchSource, baseBranch: seed.baseBranch,
+          baseCommit: seed.baseCommit, targetIdentity: seed.targetIdentity }, save)
       })
     } catch (error) {
       if (error instanceof TaskBranchError) return respondError(c, error.status, error.status === 400 ? 'bad_request' : 'worktree-unavailable', [error.message])

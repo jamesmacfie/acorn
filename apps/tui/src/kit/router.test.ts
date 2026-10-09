@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
-import { _resetRouter, useMatch, useNavigate, useParams, useSearchParams } from './router'
+import { _resetRouter, useLocation, useMatch, useNavigate, useParams, useSearchParams } from './router'
 
 // The router shim, which is the whole of what `@solidjs/router` is on this host.
 //
@@ -26,6 +26,14 @@ describe('the router shim', () => {
     expect(useParams<{ taskId: string }>().taskId).toBe('task-9')
     // …and the project is gone with the path that carried it, rather than lingering as a stale answer.
     expect(params.projectId).toBeUndefined()
+  })
+
+  it('updates a retained location when navigation changes the visible path', () => {
+    const location = useLocation()
+    useNavigate()('/p/proj-1?tab=git')
+    expect(location.pathname).toBe('/p/proj-1')
+    useNavigate()('/p/proj-2')
+    expect(location.pathname).toBe('/p/proj-2')
   })
 
   it('decodes a segment, so a project id with a slash in it survives the round trip', () => {

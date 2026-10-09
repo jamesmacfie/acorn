@@ -45,6 +45,11 @@ the task doesn't own it yet. It refuses a worktree it can't create with `worktre
 doesn't fall back to the main checkout, because the fallback would hand the agent another branch's
 files.
 
+Attaching an existing checkout requires an unlocked, present Git worktree registration on the
+mapped repository. The task reservation repeats that check and looks for tasks still archiving,
+including tasks reached through project aliases, before claiming the path. This prevents a delayed
+archive teardown from removing a checkout just attached to a new task.
+
 Read-only panes can treat a missing worktree as an empty root. Execution surfaces, managed agents
 included, call the core task service's `requireRoot`, so a missing project mapping and a Git failure
 stay separate errors.
