@@ -15,7 +15,7 @@ export type InstructionChange = {
   afterCanonical: string | null
 }
 export type InstructionReview = {
-  id: string
+  id: string | null
   taskId: string
   projectId: string
   digest: string
@@ -24,6 +24,8 @@ export type InstructionReview = {
   baseline: boolean
   /** True only when this exact snapshot matches a readable, approved review. */
   approved?: boolean
+  /** A complete scan found no instruction or skill files, so approval is unnecessary. */
+  empty?: boolean
   findings: InstructionFinding[]
   changes: InstructionChange[]
   limits: string

@@ -63,6 +63,16 @@ export class InstructionReviewStore {
     return this.metadata(row)
   }
 
+  /** Identical discovered files can reuse approval across projects on this Node. */
+  async approvedSnapshot(digest: string): Promise<ReviewMetadata | null> {
+    const [row] = await this.db.select().from(schema.agentInstructionSnapshots)
+      .where(and(eq(schema.agentInstructionSnapshots.digest, digest), isNotNull(schema.agentInstructionSnapshots.approvedAt)))
+      .orderBy(desc(schema.agentInstructionSnapshots.approvedAt)).limit(1)
+    if (!row) return null
+    await this.secrets.reveal(row.bodyEnc, 'instruction admission')
+    return this.metadata(row)
+  }
+
   async approve(id: string, projectId: string): Promise<void> {
     this.db.transaction((tx) => {
       tx.update(schema.agentInstructionSnapshots).set({ approvedAt: Date.now() })

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SecretService, makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
@@ -11,10 +11,13 @@ let testDb: TestPluginDb
 let dir: string
 let preference = ''
 let admission: InstructionAdmission
+const shared = vi.hoisted(() => ({ skills: [] as Array<{ name: string; dir: string }> }))
+vi.mock('@acorn/plugin-api/node', () => ({ deliverableSkills: async () => shared.skills }))
 beforeEach(() => {
   testDb = makeTestPluginDb('agents')
   dir = mkdtempSync(join(tmpdir(), 'instruction-admission-'))
   preference = ''
+  shared.skills = []
   const core = {
     identity: { active: () => 'owner' },
     prefs: { read: async () => preference },
@@ -41,9 +44,9 @@ it('requires a first baseline, rejects drift, and restores an approved digest', 
   await expect(admission.admit('task')).rejects.toThrow(/review required/)
   const first = await admission.review('task')
   writeFileSync(join(dir, 'AGENTS.md'), 'Second instruction.\n')
-  await expect(admission.approve('task', first.id)).rejects.toThrow(/changed/)
+  await expect(admission.approve('task', first.id!)).rejects.toThrow(/changed/)
   const second = await admission.review('task')
-  await admission.approve('task', second.id)
+  await admission.approve('task', second.id!)
   await expect(admission.admit('task')).resolves.toBeUndefined()
   expect(admission.latest('project', null)).toMatchObject({ taskId: 'task', outcome: 'passed' })
   writeFileSync(join(dir, 'AGENTS.md'), 'Third instruction.\n')
@@ -54,7 +57,7 @@ it('recognizes an unchanged approved snapshot without creating another pending a
   preference = JSON.stringify({ reviewChangedInstructions: true })
   writeFileSync(join(dir, 'AGENTS.md'), 'Read the project documentation.\n')
   const baseline = await admission.review('task')
-  await admission.approve('task', baseline.id)
+  await admission.approve('task', baseline.id!)
   const save = vi.spyOn(admission.store, 'save')
   const unchanged = await admission.review('task')
   expect(unchanged).toMatchObject({ id: baseline.id, approved: true, baseline: false, changes: [], findings: [] })
@@ -72,18 +75,64 @@ it('still requires approval when the scan scope changes but the file text does n
   await expect(admission.admit('task')).rejects.toMatchObject({ code: 'instruction_review_required' })
 })
 
-it('does not let an approval from a different project authorize this task', async () => {
+it('requires a separate review for copied project instructions and rejects approving another project\'s review', async () => {
   preference = JSON.stringify({ reviewChangedInstructions: true })
   writeFileSync(join(dir, 'AGENTS.md'), 'Same bytes.\n')
   const approved = await admission.review('task')
-  await admission.approve('task', approved.id)
-  // The same bytes at a different project still lack that project's approved snapshot.
+  await admission.approve('task', approved.id!)
+  const otherRoot = join(dir, 'other-project')
+  mkdirSync(otherRoot)
+  writeFileSync(join(otherRoot, 'AGENTS.md'), 'Same bytes.\n')
+  // Identical text at a different canonical path is a different instruction snapshot.
   const different = new InstructionAdmission({
     identity: { active: () => 'owner' }, prefs: { read: async () => preference },
-    tasks: { load: async () => ({ id: 'other', projectId: 'other-project' }), requireRoot: async () => dir },
+    tasks: { load: async () => ({ id: 'other', projectId: 'other-project' }), requireRoot: async () => otherRoot },
   } as unknown as CoreServices, dir, admission.store)
   await expect(different.admit('other')).rejects.toThrow(/review required/)
-  await expect(different.approve('other', approved.id)).rejects.toThrow(/changed/)
+  await expect(different.approve('other', approved.id!)).rejects.toThrow(/changed/)
+})
+
+it('reuses exact shared skills across projects, but detects changed skills and additional project instructions', async () => {
+  preference = JSON.stringify({ reviewChangedInstructions: true })
+  const skillRoot = join(dir, 'shared-skill')
+  mkdirSync(skillRoot)
+  const skillFile = join(skillRoot, 'SKILL.md')
+  writeFileSync(skillFile, 'Read the architecture notes.\n')
+  shared.skills = [{ name: 'shared', dir: skillRoot }]
+  const project = (id: string) => {
+    const root = join(dir, id)
+    mkdirSync(root)
+    return { root, admission: new InstructionAdmission({
+      identity: { active: () => 'owner' }, prefs: { read: async () => preference },
+      tasks: { load: async () => ({ id, projectId: id }), requireRoot: async () => root },
+    } as unknown as CoreServices, dir, admission.store) }
+  }
+  const first = project('first'), second = project('second')
+  const review = await first.admission.review('first')
+  await expect(second.admission.admit('second')).rejects.toMatchObject({ code: 'instruction_review_required' })
+  await first.admission.approve('first', review.id!)
+  const save = vi.spyOn(admission.store, 'save')
+  await expect(second.admission.admit('second')).resolves.toBeUndefined()
+  expect(await second.admission.review('second')).toMatchObject({ approved: true, changes: [], findings: [] })
+  expect(save).not.toHaveBeenCalled()
+  writeFileSync(skillFile, 'Read the updated architecture notes.\n')
+  await expect(second.admission.admit('second')).rejects.toMatchObject({ code: 'instruction_review_required' })
+  const updated = await first.admission.review('first')
+  await first.admission.approve('first', updated.id!)
+  await expect(second.admission.admit('second')).resolves.toBeUndefined()
+  writeFileSync(join(second.root, 'AGENTS.md'), 'Project-specific instructions.\n')
+  await expect(second.admission.admit('second')).rejects.toMatchObject({ code: 'instruction_review_required' })
+  await expect(first.admission.admit('first')).resolves.toBeUndefined()
+})
+
+it('needs no approval or stored review for an empty scan, but notices instructions added later', async () => {
+  preference = JSON.stringify({ reviewChangedInstructions: true })
+  const save = vi.spyOn(admission.store, 'save')
+  await expect(admission.admit('task')).resolves.toBeUndefined()
+  expect(await admission.review('task')).toMatchObject({ id: null, empty: true, changes: [], findings: [] })
+  expect(save).not.toHaveBeenCalled()
+  writeFileSync(join(dir, 'AGENTS.md'), 'New project instructions.\n')
+  await expect(admission.admit('task')).rejects.toMatchObject({ code: 'instruction_review_required' })
 })
 
 it('shows findings for changed files without repeating an unchanged baseline finding', async () => {
@@ -91,7 +140,7 @@ it('shows findings for changed files without repeating an unchanged baseline fin
   writeFileSync(join(dir, 'CLAUDE.md'), 'Plain instruction.\n')
   const baseline = await admission.review('task')
   expect(baseline.findings.some((finding) => finding.file === 'AGENTS.md')).toBe(true)
-  await admission.approve('task', baseline.id)
+  await admission.approve('task', baseline.id!)
   writeFileSync(join(dir, 'CLAUDE.md'), 'Read https://new.example\n')
   const changed = await admission.review('task')
   expect(changed.changes.map((change) => change.path)).toEqual(['CLAUDE.md'])

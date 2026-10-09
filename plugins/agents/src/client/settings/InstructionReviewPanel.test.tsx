@@ -89,3 +89,19 @@ it('cancels a pending review when switching Nodes and ignores its late response'
   expect(host.textContent).not.toContain('Approve instructions')
   expect(mocks.writes).not.toHaveBeenCalled()
 })
+
+it('shows an empty scan without an approval action or unrelated approval links', async () => {
+  mocks.reads.mockImplementation(async (path: string) => path.endsWith('/tasks')
+    ? [{ id: 'task', title: 'Task', projectId: 'project' }]
+    : { id: null, taskId: 'task', projectId: 'project', empty: true, approved: false, changes: [], findings: [] })
+  const host = document.createElement('div'); document.body.append(host)
+  const dispose = render(() => <InstructionReviewPanel enabled />, host)
+  hosts.push(() => { dispose(); host.remove() })
+  await settle()
+  expect(host.textContent).toContain('No instruction files to review')
+  expect(host.textContent).toContain('You can start an agent')
+  expect(host.textContent).not.toContain('Approve instructions')
+  expect(host.textContent).not.toContain('Other approvals')
+  expect(host.textContent).not.toContain('Approval applies')
+  expect(mocks.writes).not.toHaveBeenCalled()
+})

@@ -64,7 +64,7 @@ export default function InstructionReviewPanel(props: { nodeId?: string | null; 
   }))
   const approve = async () => {
     const current = review()
-    if (!current || nodeId() !== reviewNodeId() || taskId() !== current.taskId) return
+    if (!current?.id || nodeId() !== reviewNodeId() || taskId() !== current.taskId) return
     const selectedNode = nodeId()
     const currentGeneration = generation
     const controller = new AbortController()
@@ -83,7 +83,7 @@ export default function InstructionReviewPanel(props: { nodeId?: string | null; 
 
   return <Stack gap="row">
     <Show when={tasks().length} fallback={<Text emphasis="muted" wrap>{loadingTasks() ? 'Loading tasks…' : 'Create a task on this Node to review its instruction files before starting an agent.'}</Text>}>
-      <Field label="Task" hint="Review the instructions in this task’s worktree. Approval applies to its project on this Node.">
+      <Field label="Task" hint="Review the instructions in this task’s worktree.">
         <Select label="Task for instruction review" value={taskId()} options={tasks().map((task) => ({ value: task.id, label: task.title }))}
           onChange={(value) => { clear(); setTaskId(value) }} />
       </Field>
@@ -92,7 +92,7 @@ export default function InstructionReviewPanel(props: { nodeId?: string | null; 
     <Show when={error()}><Alert>{error()}</Alert></Show>
     <Show when={approved()}><Alert variant="banner" tone="ok" title="Instructions approved">Acorn will ask you to review them again if the files change.</Alert></Show>
     <Show when={review()}>{(result) => <InstructionReviewResults review={result()} busy={busy()} onApprove={() => void approve()} />}</Show>
-    <Show when={review() && !review()?.approved}>
+    <Show when={review() && !review()?.approved && !review()?.empty}>
       <Inline wrap><Text emphasis="muted">Other approvals:</Text>
         <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'plugins' })}>Plugins and skills</Link>
         <Show when={selectedProject()}>{(projectId) => <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: `project/${projectId()}` })}>Project configuration</Link>}</Show>

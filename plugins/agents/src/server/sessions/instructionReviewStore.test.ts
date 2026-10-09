@@ -39,6 +39,7 @@ it('requires renewed review when the encrypted body cannot be opened', async () 
   await store.approve(first.id, 'one')
   const differentKey = new InstructionReviewStore(testDb.db, new SecretService('44'.repeat(32)))
   await expect(differentKey.approved('one')).rejects.toThrow()
+  await expect(differentKey.approvedSnapshot(first.digest)).rejects.toThrow()
 })
 
 it('recognizes either of two approved task roots in the same project', async () => {

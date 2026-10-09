@@ -13,7 +13,7 @@ stops that turn as incomplete and tells you to retry or change the setting. Opti
 
 The hidden-character check finds Unicode `Default_Ignorable_Code_Point` characters outside real
 emoji sequences and names their file and line. The review compares exact byte hashes and canonical
-path identities with an approved snapshot. First use requires a baseline review. Findings for the
+path identities with an approved snapshot. Unapproved files require a baseline review. Findings for the
 baseline or changed files identify commands, domains, sensitive paths, permission language, override
 phrases, and hidden characters. They are advisory: security documentation can mention these subjects
 without instructing misuse. File cards group highlights with their file and line, put files with
@@ -27,9 +27,13 @@ with review enabled also checks that task, so a blocked turn's **Review instruct
 directly to its review. After approval, send the blocked message again. No turn is retried automatically.
 If there are no tasks, create one on that Node before reviewing its instructions.
 
-When the exact discovered snapshot matches a readable approval, the panel shows **No changes since
-your approval**, with no approval button or scan details. This read creates no pending snapshot. A
-change to review coverage still requires approval even if file text is unchanged. Runtime refusals
+When the exact discovered snapshot matches a readable approval on the Node, the panel shows
+**Instructions already approved**, with no approval button or scan details. Projects with the same
+shared skills and no additional instructions reuse that approval. Matching includes canonical file
+paths, byte hashes, scan coverage, and analyzer version; copied files at different paths do not match.
+An empty scan needs no approval. Acorn still discovers files before each turn to detect additions or
+changes. These reads create no pending snapshot. A change to review coverage still requires approval
+for discovered files even if their text is unchanged. Runtime refusals
 use distinct instruction-review, incomplete-scan, and hidden-character error codes; saved dispatch
 failures with the older instruction messages retain their Settings link.
 
@@ -72,4 +76,3 @@ These checks have limits:
   instructions outside the discovered scope are not covered. A process with the owner's host access
   can change Acorn's on-disk approval state.
 - Text that legitimately uses a zero-width joiner or non-joiner, such as Persian, is refused too.
-

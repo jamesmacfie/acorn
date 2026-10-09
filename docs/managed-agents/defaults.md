@@ -24,7 +24,7 @@ One `prefs` row, `agents:session-defaults:v1`, holds these fields:
 | `stopIdleAfterMinutes` | 30 | **Stop idle agents after**: 15, 30, 120, or 0 for never ([idle stop](./operations.md#idle-stop)) |
 | `keepArchivedHistoryDays` | 0 | **Keep agent history for archived tasks**: 30, 90, 365, or 0 for forever ([history retention](./history-retention.md)) |
 | `checkInstructionFiles` | Off | Stops a turn containing hidden characters ([instruction checks](../security.md#instruction-file-checks-and-review)) |
-| `reviewChangedInstructions` | Off | Requires an approved per-project instruction and skill snapshot before a managed turn ([instruction review](../security.md#instruction-file-checks-and-review)) |
+| `reviewChangedInstructions` | Off | Requires approval of discovered instructions and skills before a managed turn. Identical shared files reuse approval on the Node; empty scans need none ([instruction review](../security.md#instruction-file-checks-and-review)) |
 
 Neither writer sends the other's field, and the server merges each write, so the Settings page can't
 undo a switch made while it was open.

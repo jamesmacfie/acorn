@@ -27,9 +27,9 @@ export default function InstructionReviewResults(props: { review: InstructionRev
   })
   const changes = createMemo(() => [...props.review.changes].sort((a, b) =>
     Number(findingsByFile().has(b.path)) - Number(findingsByFile().has(a.path))))
-  return <Show when={!props.review.approved} fallback={
-    <Alert variant="banner" tone="ok" title="No changes since your approval">
-      These instructions are already approved. No action is needed.
+  return <Show when={!props.review.approved && !props.review.empty} fallback={
+    <Alert variant="banner" tone="ok" title={props.review.empty ? 'No instruction files to review' : 'Instructions already approved'}>
+      {props.review.empty ? 'You can start an agent. Acorn will check for instructions added later.' : 'No changes since your approval. No action is needed.'}
     </Alert>
   }>
     <Stack gap="row">

@@ -43,9 +43,13 @@ export class InstructionAdmission {
     this.checkCancellation(signal)
     const digest = snapshotDigest(snapshot)
     const limits = 'A pre-turn scan cannot stop changes during a turn. Global instructions outside this scope are not reviewed. Host processes with owner access can change on-disk state.'
+    if (!snapshot.files.length) return {
+      id: null, taskId, projectId, digest, scope: snapshot.scope, analyzerVersion: snapshot.version,
+      baseline: false, empty: true, approved: false, findings: [], changes: [], limits,
+    }
     let prior = null
     try {
-      const matching = await this.store.approved(projectId, digest)
+      const matching = await this.store.approvedSnapshot(digest)
       this.checkCancellation(signal)
       if (matching) return {
         id: matching.id, taskId, projectId, digest, scope: snapshot.scope, analyzerVersion: snapshot.version,
@@ -110,9 +114,9 @@ export class InstructionAdmission {
           if (found.length) throw new InstructionAdmissionError('instruction_hidden_characters', hiddenCharacterReason(found))
         }
       }
-      if (settings.reviewChangedInstructions) {
+      if (settings.reviewChangedInstructions && result.snapshot.files.length) {
         let approved
-        try { approved = await this.store.approved(result.projectId, snapshotDigest(result.snapshot)) }
+        try { approved = await this.store.approvedSnapshot(snapshotDigest(result.snapshot)) }
         catch { throw new InstructionAdmissionError('instruction_review_required', 'Instruction review required: the saved approval could not be read. Review the instructions again.') }
         if (!approved || approved.digest !== snapshotDigest(result.snapshot)) {
           throw new InstructionAdmissionError('instruction_review_required', 'Instruction review required: approve the instructions for this task before the agent continues.')
