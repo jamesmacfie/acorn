@@ -24,6 +24,10 @@ A pane registers a `component`, or a `layout` plus a `regions` record. The regis
 layout into a component, and throws at registration if the regions don't match the layout
 ([pane layouts](../panes/layout.md#layout-model)).
 
+A compiled browse source can declare `viewKey(projectId)` to scope its sidebar collapse, scroll,
+and resized width. The Git source includes the active Node and project in that identity. A kit
+`ListDetail` can retain its resized width for the session through `widthKey`.
+
 A compiled session source registers Node-scoped summaries and optional refresh, send, and focus
 actions through `ctx.sessionSources`. The source keeps its full rows and fetch logic. Core reads the
 summaries for task navigation, send pickers, setup markers, and quit warnings. A selected summary

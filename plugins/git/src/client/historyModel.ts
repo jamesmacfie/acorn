@@ -3,16 +3,19 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId, clientEvents, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
 import type { Commit, HistoryFilter, HistoryPage } from '../shared/api'
 import { historyKey, historyOptions } from './historyClient'
+import { createGitViewSignal } from './viewState'
 
 export function createHistoryModel(projectId: Accessor<string>, initialRef: Accessor<string | null>, owner: Accessor<string | null> = () => null) {
   const client = useQueryClient()
-  const [ref, setRef] = createSignal<string | null>(initialRef())
-  const [field, setField] = createSignal<HistoryFilter['field']>('message')
-  const [query, setQuery] = createSignal('')
+  const state = <T,>(name: string, initial: Accessor<T>) => createGitViewSignal(projectId, () => `history:${initialRef()}:${name}`, initial, owner)
+  const [ref, setRef] = state<string | null>('ref', initialRef)
+  const [field, setField] = state<HistoryFilter['field']>('field', () => 'message')
+  const [query, setQuery] = state('query', () => '')
   const filter = createMemo<HistoryFilter>(() => ({ ref: ref(), field: field(), query: query().trim() }))
   const first = createQuery(() => historyOptions(projectId(), filter()))
-  const [extra, setExtra] = createSignal<HistoryPage[]>([])
-  const [dropped, setDropped] = createSignal(false)
+  const pageKey = () => `history:${initialRef()}:pages:${JSON.stringify(filter())}`
+  const [extra, setExtra] = createGitViewSignal<HistoryPage[]>(projectId, pageKey, () => [], owner)
+  const [dropped, setDropped] = createGitViewSignal(projectId, () => `${pageKey()}:dropped`, () => false, owner)
   const [loadingMore, setLoadingMore] = createSignal(false)
   const [moreError, setMoreError] = createSignal('')
   const pages = createMemo(() => extra().length ? extra() : first.data ? [first.data] : [])
@@ -21,13 +24,17 @@ export function createHistoryModel(projectId: Accessor<string>, initialRef: Acce
   let request: AbortController | undefined
   let generation = 0
   const ownerScope = createMemo(() => JSON.stringify([activeNodeId(), projectId(), owner(), initialRef()]))
-  createEffect(on(ownerScope, () => { setRef(initialRef()); setField('message'); setQuery('') }, { defer: true }))
   const scope = createMemo(() => `${ownerScope()}:${JSON.stringify(filter())}`)
   createEffect(on(scope, () => {
     generation++
     request?.abort()
-    setExtra([]); setDropped(false); setMoreError(''); setLoadingMore(false)
+    setMoreError(''); setLoadingMore(false)
   }))
+  createEffect(() => {
+    const firstPage = first.data
+    const retained = extra()
+    if (firstPage && retained.length && retained[0]!.observation !== firstPage.observation) { setExtra([]); setDropped(false) }
+  })
   const refresh = () => {
     generation++
     request?.abort()
@@ -53,6 +60,7 @@ export function createHistoryModel(projectId: Accessor<string>, initialRef: Acce
       if (serial === generation) setMoreError(error instanceof Error ? error.message : String(error))
     } finally { if (serial === generation) setLoadingMore(false) }
   }
-  return { ref, setRef, field, setField, query, setQuery, filter, first, pages, commits, next, dropped, loadMore, loadingMore, moreError, refresh }
+  const viewKey = () => JSON.stringify([activeNodeId(), projectId(), owner(), filter()])
+  return { viewKey, ref, setRef, field, setField, query, setQuery, filter, first, pages, commits, next, dropped, loadMore, loadingMore, moreError, refresh }
 }
 export type HistoryModel = ReturnType<typeof createHistoryModel>

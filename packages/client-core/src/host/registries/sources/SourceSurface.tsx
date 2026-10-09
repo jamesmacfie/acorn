@@ -1,5 +1,6 @@
 import { Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
+import { useParams } from '@solidjs/router'
 import { DetailColumn, ListColumn, ListDetail } from '../../../kit/components/primitives'
 import type { SourceContribution } from './sources'
 
@@ -15,6 +16,9 @@ import type { SourceContribution } from './sources'
 // difference is the one that asked for the field. The terminal reads `regions` itself and never calls
 // this, because it draws the two halves in two different panels (apps/tui/src/chrome/Shell.tsx).
 export function SourceSurface(props: { source: SourceContribution }) {
+  const params = useParams<{ projectId?: string }>()
+  const viewKey = () => props.source.viewKey?.(params.projectId)
+  const sidebarKey = () => viewKey() ?? props.source.id
   return (
     <Show when={props.source.regions} fallback={
       <Show when={props.source.component}>
@@ -25,8 +29,8 @@ export function SourceSurface(props: { source: SourceContribution }) {
         // Keyed by the source, so collapsing GitHub's list leaves Linear's alone and each comes back
         // where it was left (kit/lib/layout/collapseState.ts). Every source that hands over two halves is a
         // list beside a detail, so none of them has to ask for the control.
-        <ListDetail split collapseKey={props.source.id}>
-          <ListColumn scrollKey={props.source.id}>
+        <ListDetail split collapseKey={sidebarKey()} widthKey={viewKey()}>
+          <ListColumn scrollKey={sidebarKey()}>
             <Dynamic component={regions().list} />
           </ListColumn>
           <DetailColumn scroll={regions().scroll} measure={regions().measure}>

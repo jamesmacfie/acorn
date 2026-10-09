@@ -10,6 +10,7 @@ import { RevisionView } from './RevisionView'
 import { watchWorktreeInventory } from './worktreeInvalidation'
 import { createStashSubmission } from './stashSubmission'
 import { ExplainView } from './ExplainView'
+import { createGitViewSignal } from './viewState'
 
 const base = (projectId: string) => `/p/${encodeURIComponent(projectId)}/x/git/stashes`
 type Action = 'create' | 'apply' | 'pop' | 'drop'
@@ -56,7 +57,7 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
   const [includeUntracked, setIncludeUntracked] = createSignal(false)
   const [keepIndex, setKeepIndex] = createSignal(false)
   const [restoreIndex, setRestoreIndex] = createSignal(false)
-  const [contentView, setContentView] = createSignal<'tracked' | 'untracked'>('tracked')
+  const [contentView, setContentView] = createGitViewSignal<'tracked' | 'untracked'>(() => props.projectId, () => `stash:${props.selected}:content`, () => 'tracked', () => props.task?.id ?? null)
   const [taskId, setTaskId] = createSignal('')
   const [targetPath, setTargetPath] = createSignal('')
   const [busy, setBusy] = createSignal(false)
@@ -126,7 +127,6 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
     if (target) { activateTaskSignals(target, { pane: 'changes' }); navigate(pathForTask(target)) }
   }
   createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { close(); setFeedback(null); setError('') }, { defer: true }))
-  createEffect(on(() => props.selected, () => setContentView('tracked'), { defer: true }))
   return <Stack gap="section">
     <SectionHeader>Repository stashes</SectionHeader>
     <Button onPress={() => open('create')}>Create stash</Button>

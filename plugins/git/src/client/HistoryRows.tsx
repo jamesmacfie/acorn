@@ -57,7 +57,7 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
         {props.model.filter().query ? 'Search is limited to the newest 5,000 reachable commits.' : 'This repository may have an unborn HEAD.'}
       </EmptyState>
     </Show>
-    <Rows id={`git-history:${activeNodeId()}:${props.projectId}`} ariaLabel="Git history" items={items()} selected={props.selected}
+    <Rows id={`git-history:${props.model.viewKey()}`} ariaLabel="Git history" items={items()} selected={props.selected}
       onSelect={props.onSelect} onActivate={props.onSelect} onMenu={openActions}>
       {(item, itemProps, selected) => {
         const commit = () => commits().find((row) => row.id === item.key)!
