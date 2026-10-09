@@ -3,10 +3,11 @@ import { emitSpan, newSpanId, telemetryEnabled } from '@acorn/client-core/infra/
 import { whenOpenFeaturesSettle } from '@acorn/client-core/infra/telemetry'
 import { startupTraceId } from './boot'
 
-// The three moments a launch is judged by, beside the boot account in ./boot.ts and in its trace
+// The four moments a launch is judged by, beside the boot account in ./boot.ts and in its trace
 // (docs/telemetry/renderer.md § Startup milestones).
 //
 //   first_frame  the first frame the owner could see
+//   shell        the startup screen gave way to the shell: rail, top bar, and content region
 //   restored     the saved state is hydrated and the window has chosen where to land
 //   usable       everything visible at that landing has said it is usable, or shown an actionable
 //                empty, offline, or error state
@@ -21,7 +22,7 @@ import { startupTraceId } from './boot'
 // watched and are not comparable with a visible one. The roster's 250 ms fallback in ./index.tsx is
 // never counted as a frame.
 
-type Milestone = 'first_frame' | 'restored' | 'usable'
+type Milestone = 'first_frame' | 'shell' | 'restored' | 'usable'
 type Recorded = { at: number; attrs: TelemetryAttrs }
 
 const recorded = new Map<Milestone, Recorded>()
@@ -80,12 +81,23 @@ export function markFirstFrame(): void {
   if (!paintObserved) record('first_frame', performance.now(), { method: 'frame', proxy: true })
 }
 
+/** The first time this document drew the shell, whichever Node it was for. */
+export function markShellDrawn(): void {
+  record('shell', performance.now())
+}
+
 export type StartupAccount = {
   /** The window has hydrated its saved state and chosen where to land. */
   restored(): void
+  /**
+   * The launch stopped before restoring, on a screen the person can act on: a failure with Try again,
+   * or an offline Node with nothing cached. That screen is the launch's usable state, so it ends the
+   * usable milestone with its outcome and the step that stopped it.
+   */
+  stopped(step: string, outcome: 'offline' | 'error'): void
 }
 
-const INERT_ACCOUNT: StartupAccount = { restored: () => {} }
+const INERT_ACCOUNT: StartupAccount = { restored: () => {}, stopped: () => {} }
 
 /**
  * The restored and usable milestones belong to the first Node whose shell restores. A window can mount
@@ -101,9 +113,18 @@ export function claimStartupAccount(nodeId: string | null): StartupAccount {
     abandoned = true
     for (const name of ['restored', 'usable'] as const) if (!emitted.has(name)) recorded.delete(name)
   }
+  // Another Node's account, or one a switch abandoned, is not this mount's to record into.
+  const foreign = () => abandoned || (accountNode !== undefined && accountNode !== nodeId)
   return {
+    stopped: (step, outcome) => {
+      if (foreign() || recorded.has('restored')) return
+      accountNode = nodeId
+      record('usable', performance.now(), { features: 0, proxy: false, outcome, 'startup.step': step })
+    },
     restored: () => {
-      if (abandoned || accountNode !== undefined) return
+      // A launch that stopped and was retried still records its restore. Its usable milestone is the
+      // stopped screen, which came first.
+      if (foreign() || recorded.has('restored')) return
       accountNode = nodeId
       record('restored', performance.now())
       // After this turn, so the destination the restore just chose has mounted its features and
@@ -131,7 +152,7 @@ export function emitStartupMilestones(): void {
 function emitReady(): void {
   if (!telemetryEnabled()) return
   const origin = performance.timeOrigin
-  for (const name of ['first_frame', 'restored', 'usable'] as const) {
+  for (const name of ['first_frame', 'shell', 'restored', 'usable'] as const) {
     if (emitted.has(name)) continue
     const milestone = recorded.get(name)
     if (!milestone) continue
@@ -143,7 +164,7 @@ function emitReady(): void {
       name: `renderer.startup.${name}`,
       start: origin,
       durationMs: milestone.at,
-      status: milestone.attrs.outcome === 'timeout' ? 'error' : 'ok',
+      status: milestone.attrs.outcome === 'timeout' || milestone.attrs.outcome === 'error' ? 'error' : 'ok',
       attrs: { seam: `renderer.startup.${name}`, ...milestone.attrs },
     })
     // The usable span carries its two phases as children, so a slow launch says whether the time

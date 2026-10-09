@@ -3,7 +3,7 @@ import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.t
 import { _resetClientTelemetry, flushTelemetry, setTelemetryEnabled, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { featureUsable, openFeature } from '@acorn/client-core/infra/telemetry'
 import { startupTraceId } from './boot'
-import { _resetStartupMilestones, claimStartupAccount, emitStartupMilestones, markFirstFrame } from './startupMilestones'
+import { _resetStartupMilestones, claimStartupAccount, emitStartupMilestones, markFirstFrame, markShellDrawn } from './startupMilestones'
 
 let posted: TelemetryRecord[]
 
@@ -138,4 +138,41 @@ it('labels a milestone reached after the window was hidden', async () => {
   const all = await spans()
   expect(named(all, 'renderer.startup.restored')[0]!.attrs.visibility).toBe('visible')
   expect(named(all, 'renderer.startup.first_frame')[0]!.attrs.visibility).toBe('hidden')
+})
+
+it('records the shell once, apart from the first frame and the restore', async () => {
+  consent(true)
+  markFirstFrame()
+  markShellDrawn()
+  markShellDrawn()
+  const shell = named(await spans(), 'renderer.startup.shell')
+  expect(shell).toHaveLength(1)
+  expect(shell[0]!.traceId).toBe(startupTraceId)
+  expect(named(await spans(), 'renderer.startup.restored')).toEqual([])
+})
+
+it('ends the usable milestone on a failure the person can act on, and still records a later restore', async () => {
+  consent(true)
+  const account = claimStartupAccount('node-a')
+  account.stopped('registration', 'error')
+  account.stopped('registration', 'error')
+  const [usable] = named(await spans(), 'renderer.startup.usable')
+  expect(usable!.status).toBe('error')
+  expect(usable!.attrs).toMatchObject({ outcome: 'error', 'startup.step': 'registration', features: 0 })
+
+  // Try again worked.
+  account.restored()
+  await settle()
+  const all = await spans()
+  expect(named(all, 'renderer.startup.restored')).toHaveLength(1)
+  expect(named(all, 'renderer.startup.usable')).toHaveLength(1)
+})
+
+it('does not end the usable milestone for a stop after the restore', async () => {
+  consent(true)
+  const account = claimStartupAccount('node-a')
+  account.restored()
+  account.stopped('offline', 'offline')
+  await settle()
+  expect(named(await spans(), 'renderer.startup.usable')[0]!.attrs.outcome).toBe('usable')
 })

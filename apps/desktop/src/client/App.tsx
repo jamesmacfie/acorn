@@ -23,11 +23,10 @@ import { activeTaskId, focusedPane, isTerminalMax, isTerminalOpen, rememberWorks
 import { isTerminalTarget } from '@acorn/client-core/host/keys'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { desktopExtras } from '@acorn/client-core/infra/platform'
-import NodeGate from '@acorn/client-core/features/fleet/NodeGate.tsx'
-import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
+import { activeNodeId, activeNodeStarting, nodeGateHolds, nodeReadiness, nodeReady, selectActiveNode, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
-import { applyNodePlugins, clientPluginsReady } from './activate'
+import { applyNodePlugins, clientPlugins, clientPluginsReady, retryClientPlugins } from './activate'
 import { createLogger, openFeature } from '@acorn/client-core/infra/telemetry'
 import { registerAddressHostWhenReady } from './addressHostRegistration'
 import { PromoteToTaskModal } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
@@ -54,7 +53,9 @@ import { availableSources } from '@acorn/client-core/features/tabs'
 import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { emitBootSpans } from './boot'
-import { claimStartupAccount, emitStartupMilestones } from './startupMilestones'
+import { claimStartupAccount, emitStartupMilestones, markShellDrawn } from './startupMilestones'
+import { createStartupStage, stageHoldsShell } from './startupStage'
+import StartupScreen from './StartupScreen'
 import { telemetryOn } from '@acorn/client-core/features/settings'
 import type { TopbarProps } from '@acorn/protocol/chrome.ts'
 import Topbar from '@acorn/client-core/host/chrome/Topbar.tsx'
@@ -491,6 +492,31 @@ export default function App() {
     startupAccount.restored()
   })
 
+  // Where the launch is, for the startup screen and the content region (./startupStage.ts). The reads
+  // are the ones the restore waits on: without them it can't choose where to land.
+  const initialReads = [prefs, projects, tasks, workspaces]
+  const stage = createStartupStage(() => {
+    const missing = initialReads.filter((query) => query.data === undefined)
+    return {
+      node: nodeReadiness(),
+      nodeStarting: activeNodeStarting(),
+      nodeOffline: nodeState(activeNodeId() ?? '') === 'offline',
+      plugins: clientPlugins(),
+      cacheRestoring: isRestoring(),
+      restored: placeRestored(),
+      readsMissing: missing.length > 0,
+      readError: missing.find((query) => query.isError)?.error ?? undefined,
+    }
+  }, (step) => startupAccount.stopped(step, step === 'offline' ? 'offline' : 'error'))
+  createEffect(() => { if (!stageHoldsShell(stage())) markShellDrawn() })
+  // Each failure retries the thing that failed: the fleet selection, the roster, or the missing reads.
+  const retryStartup = () => {
+    const current = stage()
+    if (current.kind === 'failed' && current.step === 'node') void selectActiveNode()
+    else if (current.kind === 'failed' && current.step === 'registration') retryClientPlugins()
+    else for (const query of initialReads) if (query.data === undefined) void query.refetch()
+  }
+
   // A linked project chooses its own route and source. Keep that choice when the route enters a
   // workspace whose remembered view points elsewhere; ordinary workspace-picker changes still
   // restore their remembered view.
@@ -653,12 +679,13 @@ export default function App() {
   const newMatch = useMatch(() => CREATE_TASK_ROUTE)
   const isNew = () => !!newMatch()
 
-  // The gate covers the helper's fleet selection and the supervised local node's first connection
-  // (docs/frontend/data-and-startup.md § Startup readiness). That keeps pane-owned resources from issuing requests
-  // before their routes exist. The `isRestoring` gate stays too: it is an IndexedDB read, and painting
-  // in front of it would show the empty shell and then fill it.
+  // The startup screen covers the helper's fleet selection, the supervised local node's first
+  // connection, and the roster's registration (docs/frontend/data-and-startup.md § Startup readiness).
+  // That keeps pane-owned resources from issuing requests before their routes exist. The query cache's
+  // IndexedDB read holds it too, because painting in front of it would show the empty shell and then
+  // fill it. Restoring holds only the content region, so the rail and top bar draw as soon as they can.
   return (
-    <Show when={!nodeGateHolds() && !isRestoring() && clientPluginsReady()} fallback={<NodeGate />}>
+    <Show when={!stageHoldsShell(stage())} fallback={<main class="node-gate"><StartupScreen stage={stage()} onRetry={retryStartup} /></main>}>
     <div class="shell">
       {/* Install the keymap before chrome collections run their mount callbacks. A rail enabled
           at startup must register its intent layer against the same engine as a later toggle.
@@ -677,7 +704,13 @@ export default function App() {
     <div class="app">
       <Show when={showNoProjects()}><NoProjects beginAdd={beginProjectAdd} /></Show>
       <Show when={!showNoProjects()}>
-      <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
+      <Switch fallback={
+        <main class="panes panes-empty">
+          <Show when={stage().kind !== 'ready'} fallback={<Acorn />}>
+            <div class="startup-region"><StartupScreen stage={stage()} onRetry={retryStartup} /></div>
+          </Show>
+        </main>
+      }
       >
         <Match when={drawnSource()}>
           {(source) => <SourceSurface source={source()} />}

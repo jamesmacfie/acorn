@@ -49,8 +49,10 @@
 .panes-empty { grid-template-columns: 1fr; }
 .pane-empty { display: flex; }
 
-/* Node gate: no app chrome yet, so center the mark in the full viewport. */
-.node-gate { min-height: 100vh; display: grid; place-items: center; align-content: center; gap: var(--space-4); }
+/* Startup screen: no app chrome yet, so center the mark in the full viewport. Once the chrome draws,
+   the same screen holds the content region until the restore lands (apps/desktop/src/client/StartupScreen.tsx). */
+.node-gate, .startup-region { display: grid; place-items: center; align-content: center; gap: var(--space-4); }
+.node-gate { min-height: 100vh; }
 .node-gate-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); justify-content: center; }
 .node-gate-reason {
   max-width: 60ch;
@@ -69,6 +71,19 @@
   justify-content: center;
   gap: var(--space-6);
   min-height: 0;
+}
+/* A pane region or layout whose code is still loading (host/layouts/RegionLoading.tsx). It fills the
+   region, so the region keeps its place while the code arrives. */
+.region-loading {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
 }
 .acorn-art {
   margin: 0;

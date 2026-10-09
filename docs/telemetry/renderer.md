@@ -103,15 +103,16 @@ when their turn has left the list. The diff cache histograms are `.hit`, `.miss`
 
 ## Startup milestones
 
-`apps/desktop/src/client/startupMilestones.ts` records three moments of a desktop launch. Each is a
+`apps/desktop/src/client/startupMilestones.ts` records four moments of a desktop launch. Each is a
 span from the document's navigation, measured with `performance.now()`, recorded once, and in the
 same trace as `renderer.boot`:
 
 | Span | Ends when |
 | --- | --- |
 | `renderer.startup.first_frame` | The first frame the owner could see. The browser's `first-contentful-paint` entry when there is one, labelled `method: 'paint'`. Otherwise the first animation frame callback, labelled `method: 'frame'` and `proxy: true` |
+| `renderer.startup.shell` | The startup screen gave way to the shell: the rail, the top bar, and the content region. The first time in the document, whichever Node it was for |
 | `renderer.startup.restored` | The saved state has hydrated and the shell has chosen where to land |
-| `renderer.startup.usable` | Every feature open at that landing has reported usable, or the landing had none open. Two `renderer.startup.phase` children split it into `restore` and `content` |
+| `renderer.startup.usable` | Every feature open at that landing has reported usable, or the landing had none open. Two `renderer.startup.phase` children split it into `restore` and `content`. A launch that stops on a failure or offline screen before it restores ends here too, because that screen is what the person can act on |
 
 `renderer.boot` keeps its endpoint at `nodeReady`. The milestones are separate spans rather than a
 redefinition of it.
@@ -122,7 +123,14 @@ lands when the owner uncovers it. Filter on `visibility: visible` before you quo
 roster's 250 ms fallback timer in `apps/desktop/src/client/index.tsx` never counts as a frame.
 
 `usable` carries `features`, the number of features it waited for, `proxy`, true when any of them
-closed on mount, and `outcome`, the worst of `usable`, `cancelled`, and `timeout`.
+closed on mount, and `outcome`, the worst of `usable`, `cancelled`, and `timeout`. When the launch
+stopped before restoring, `outcome` is `error` or `offline`, `startup.step` names what stopped it
+(`node`, `registration`, `reads`, or `offline`), and `features` is 0. An `error` outcome sets the span's
+status to `error`. A launch that stopped and then restored after **Try again** still records
+`restored`, but keeps the stopped screen as its `usable`.
+
+Each startup failure is also an error record with `seam: 'renderer.startup'` and the same
+`startup.step`, sent once per failure by `apps/desktop/src/client/startupStage.ts`.
 
 The milestones are local numbers until the switch turns on. They're emitted then, the same retroactive
 rule `renderer.boot` follows. The restored and usable milestones belong to the first shell the window

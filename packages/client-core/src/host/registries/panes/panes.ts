@@ -2,7 +2,7 @@ import { createComponent, createMemo, createRenderEffect, lazy, onCleanup, onMou
 import type { QueryClient } from '@tanstack/solid-query'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
-import { suppliedLayout } from '../../layouts/table'
+import { suppliedLayout, suppliedRegionPlaceholder } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { markPaneDrawn, paneDrawn, paneModel, paneModelScope } from './paneModels'
@@ -157,6 +157,12 @@ function MeasuredRegion(props: { paneId: PaneId; span: SpanHandle; children: JSX
   return props.children
 }
 
+/** The host's labelled placeholder for a pane whose layout or region code is still loading. */
+function loadingPlaceholder(label: string): JSX.Element {
+  const Placeholder = suppliedRegionPlaceholder()
+  return Placeholder ? createComponent(Placeholder, { label }) : null
+}
+
 /** Turn a declared layout into the component every consumer of this registry already expects. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- as PaneRegistration above
 function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneContribution {
@@ -190,11 +196,11 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id, scope)))
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
-        // renders as an empty string, which draws the region's rectangle empty until the module
-        // lands. One boundary per region rather than one per pane, so a slow region does not blank
-        // the ones beside it. It used to be here for a harder reason, a cell host that refused a bare
-        // string outright; that rule went with the terminal rewrite
-        // (apps/tui/src/tree/renderer.ts).
+        // renders as an empty string, which drew the region's rectangle empty until the module
+        // landed. The boundary draws the host's labelled placeholder instead. One boundary per region
+        // rather than one per pane, so a slow region does not blank the ones beside it. It used to be
+        // here for a harder reason, a cell host that refused a bare string outright; that rule went
+        // with the terminal rewrite (apps/tui/src/tree/renderer.ts).
         //
         // The boundary covers the module arriving and nothing after it. Everything under a region
         // shares it, and `@tanstack/solid-query` suspends whatever boundary is above it whenever
@@ -211,7 +217,7 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
             attrs: { seam: 'pane.region', 'pane.id': entry.id, 'pane.region': name },
           })
           return createComponent(Suspense, {
-            fallback: null,
+            get fallback() { return loadingPlaceholder(entry.label) },
             get children() {
               return createComponent(MeasuredRegion, {
                 paneId: entry.id,
@@ -228,8 +234,8 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
         }
       }
       // The layout is a `lazy` too, and a pending one renders as an empty string for the same
-      // reason a region does, so it gets the same boundary.
-      return createComponent(Suspense, { fallback: null, get children() { return createComponent(Draw, {
+      // reason a region does, so it gets the same boundary and placeholder.
+      return createComponent(Suspense, { get fallback() { return loadingPlaceholder(entry.label) }, get children() { return createComponent(Draw, {
         stateKey: entry.id,
         label: entry.label,
         regions,

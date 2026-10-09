@@ -31,7 +31,7 @@ overrides:
   '@esbuild-kit/core-utils>esbuild': 0.25.12
 
 patchedDependencies:
-  solid-js@1.9.13: 65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479
+  solid-js@1.9.13: 65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169
 
 importers:
 
@@ -54,7 +54,7 @@ importers:
         version: 2.9.18
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
 
   apps/cli:
     dependencies:
@@ -103,13 +103,13 @@ importers:
         version: 1.29.0(zod@4.4.3)
       '@solidjs/router':
         specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-virtual':
         specifier: ^3.13.37
-        version: 3.13.40(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 3.13.40(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tauri-apps/api':
         specifier: ^2.9.0
         version: 2.11.1
@@ -178,7 +178,7 @@ importers:
         version: 1.7.1
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       ws:
         specifier: ^8.21.0
         version: 8.21.0
@@ -266,7 +266,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -363,7 +363,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -444,13 +444,13 @@ importers:
         version: 1.2.3
       '@opentui/keymap':
         specifier: ^0.5.9
-        version: 0.5.9(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(typescript@6.0.3)(web-tree-sitter@0.25.10)
+        version: 0.5.9(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(typescript@6.0.3)(web-tree-sitter@0.25.10)
       '@tanstack/query-persist-client-core':
         specifier: ^5.101.0
         version: 5.101.0
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@xterm/headless':
         specifier: 5.5.0
         version: 5.5.0
@@ -483,7 +483,7 @@ importers:
         version: 1.7.1
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       ws:
         specifier: ^8.21.0
         version: 8.21.0
@@ -511,7 +511,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -589,19 +589,19 @@ importers:
         version: 1.2.3
       '@opentui/keymap':
         specifier: ^0.5.9
-        version: 0.5.9(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(typescript@6.0.3)(web-tree-sitter@0.25.10)
+        version: 0.5.9(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(typescript@6.0.3)(web-tree-sitter@0.25.10)
       '@solidjs/router':
         specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/query-persist-client-core':
         specifier: ^5.101.0
         version: 5.101.0
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-virtual':
         specifier: ^3.13.37
-        version: 3.13.40(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 3.13.40(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@xterm/addon-fit':
         specifier: ^0.10.0
         version: 0.10.0(@xterm/xterm@5.5.0)
@@ -628,7 +628,7 @@ importers:
         version: 4.2.0
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     devDependencies:
       '@types/diff':
         specifier: ^8.0.0
@@ -653,7 +653,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -848,7 +848,7 @@ importers:
         version: 26.0.0
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -907,7 +907,7 @@ importers:
         version: link:../../packages/plugin-sdk
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     devDependencies:
       '@acorn/plugin-api':
         specifier: workspace:*
@@ -923,7 +923,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -950,10 +950,10 @@ importers:
         version: 1.29.0(zod@4.4.3)
       '@solidjs/router':
         specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@xterm/headless':
         specifier: 5.5.0
         version: 5.5.0
@@ -971,7 +971,7 @@ importers:
         version: 1.1.0
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -999,7 +999,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1057,7 +1057,7 @@ importers:
         version: link:../../packages/protocol
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
@@ -1069,7 +1069,7 @@ importers:
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1094,7 +1094,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1109,7 +1109,7 @@ importers:
         version: link:../../packages/protocol
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     devDependencies:
       '@acorn/client-core':
         specifier: workspace:*
@@ -1125,7 +1125,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1143,7 +1143,7 @@ importers:
         version: link:../../packages/protocol
       '@tanstack/solid-virtual':
         specifier: ^3.13.37
-        version: 3.13.40(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 3.13.40(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
@@ -1152,7 +1152,7 @@ importers:
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1177,7 +1177,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1195,7 +1195,7 @@ importers:
         version: link:../../packages/protocol
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       hono:
         specifier: 4.13.5
         version: 4.13.5
@@ -1207,7 +1207,7 @@ importers:
         version: 1.7.1
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1229,7 +1229,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1259,7 +1259,7 @@ importers:
         version: 6.43.9
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@vscode/ripgrep':
         specifier: ^1.15.9
         version: 1.18.0
@@ -1277,7 +1277,7 @@ importers:
         version: 1.1.0
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1302,7 +1302,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1326,13 +1326,13 @@ importers:
         version: link:../../packages/protocol
       '@solidjs/router':
         specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-virtual':
         specifier: ^3.13.37
-        version: 3.13.40(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 3.13.40(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
@@ -1341,7 +1341,7 @@ importers:
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1369,7 +1369,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1393,7 +1393,7 @@ importers:
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1415,7 +1415,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1433,7 +1433,7 @@ importers:
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1449,7 +1449,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1473,10 +1473,10 @@ importers:
         version: link:../../packages/protocol
       '@solidjs/router':
         specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       hono:
         specifier: 4.13.5
         version: 4.13.5
@@ -1485,7 +1485,7 @@ importers:
         version: 1.1.0
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1507,7 +1507,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1572,13 +1572,13 @@ importers:
         version: link:../../packages/protocol
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       hono:
         specifier: 4.13.5
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1600,7 +1600,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1615,13 +1615,13 @@ importers:
         version: link:../../packages/protocol
       '@solidjs/router':
         specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     devDependencies:
       '@acorn/client-core':
         specifier: workspace:*
@@ -1637,7 +1637,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1655,7 +1655,7 @@ importers:
         version: link:../../packages/protocol
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     devDependencies:
       '@acorn/client-core':
         specifier: workspace:*
@@ -1674,7 +1674,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1692,7 +1692,7 @@ importers:
         version: 4.13.5
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     devDependencies:
       '@types/node':
         specifier: ^26.0.0
@@ -1717,7 +1717,7 @@ importers:
         version: link:../../packages/protocol
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     devDependencies:
       '@types/node':
         specifier: ^26.0.0
@@ -1745,7 +1745,7 @@ importers:
         version: link:../../packages/protocol
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@xterm/addon-fit':
         specifier: ^0.10.0
         version: 0.10.0(@xterm/xterm@5.5.0)
@@ -1775,7 +1775,7 @@ importers:
         version: 4.2.0
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1800,7 +1800,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -1830,10 +1830,10 @@ importers:
         version: link:../../packages/protocol
       '@solidjs/router':
         specifier: ^0.16.1
-        version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       '@tanstack/solid-query':
         specifier: ^5.101.0
-        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
@@ -1845,7 +1845,7 @@ importers:
         version: 1.7.1
       solid-js:
         specifier: 'catalog:'
-        version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+        version: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -1873,7 +1873,7 @@ importers:
         version: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vite-plugin-solid:
         specifier: ^2.11.12
-        version: 2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+        version: 2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
       vitest:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
@@ -6050,11 +6050,11 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@opentui/keymap@0.5.9(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(typescript@6.0.3)(web-tree-sitter@0.25.10)':
+  '@opentui/keymap@0.5.9(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(typescript@6.0.3)(web-tree-sitter@0.25.10)':
     dependencies:
       '@opentui/core': 0.5.9(typescript@6.0.3)(web-tree-sitter@0.25.10)
     optionalDependencies:
-      solid-js: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+      solid-js: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     transitivePeerDependencies:
       - typescript
       - web-tree-sitter
@@ -6209,9 +6209,9 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.0.2': {}
 
-  '@solidjs/router@0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))':
+  '@solidjs/router@0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))':
     dependencies:
-      solid-js: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+      solid-js: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
 
   '@stablelib/base64@1.0.1': {}
 
@@ -6223,15 +6223,15 @@ snapshots:
     dependencies:
       '@tanstack/query-core': 5.101.0
 
-  '@tanstack/solid-query@5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))':
+  '@tanstack/solid-query@5.101.0(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))':
     dependencies:
       '@tanstack/query-core': 5.101.0
-      solid-js: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+      solid-js: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
 
-  '@tanstack/solid-virtual@3.13.40(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))':
+  '@tanstack/solid-virtual@3.13.40(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))':
     dependencies:
       '@tanstack/virtual-core': 3.17.11
-      solid-js: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+      solid-js: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
 
   '@tanstack/virtual-core@3.17.11': {}
 
@@ -6659,12 +6659,12 @@ snapshots:
       html-entities: 2.3.3
       parse5: 7.3.0
 
-  babel-preset-solid@1.9.12(@babel/core@7.29.7)(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)):
+  babel-preset-solid@1.9.12(@babel/core@7.29.7)(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)):
     dependencies:
       '@babel/core': 7.29.7
       babel-plugin-jsx-dom-expressions: 0.40.7(@babel/core@7.29.7)
     optionalDependencies:
-      solid-js: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+      solid-js: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
 
   baseline-browser-mapping@2.11.0: {}
 
@@ -7887,18 +7887,18 @@ snapshots:
 
   smol-toml@1.7.1: {}
 
-  solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479):
+  solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169):
     dependencies:
       csstype: 3.2.3
       seroval: 1.5.4
       seroval-plugins: 1.5.4(seroval@1.5.4)
 
-  solid-refresh@0.6.3(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)):
+  solid-refresh@0.6.3(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)):
     dependencies:
       '@babel/generator': 7.29.7
       '@babel/helper-module-imports': 7.29.7
       '@babel/types': 7.29.7
-      solid-js: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
+      solid-js: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
     transitivePeerDependencies:
       - supports-color
 
@@ -8069,14 +8069,14 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite-plugin-solid@2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)):
+  vite-plugin-solid@2.11.12(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)):
     dependencies:
       '@babel/core': 7.29.7
       '@types/babel__core': 7.20.5
-      babel-preset-solid: 1.9.12(@babel/core@7.29.7)(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+      babel-preset-solid: 1.9.12(@babel/core@7.29.7)(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       merge-anything: 5.1.7
-      solid-js: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)
-      solid-refresh: 0.6.3(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+      solid-js: 1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169)
+      solid-refresh: 0.6.3(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
       vite: 8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)
       vitefu: 1.1.3(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
     transitivePeerDependencies:

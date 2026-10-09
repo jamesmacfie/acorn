@@ -92,7 +92,7 @@ The accounts meet at `[helper:boot] service.start`, where the Node reports that 
 span from `ready line` to `service.start` is the Node's share of the launch. `node selected` is the
 fleet selection, which happens before the Node is up. `nodeReady` is the local Node's first status
 reaching the renderer, which is when the shell mounts and sends its first reads.
-[Frontend](../frontend/data-and-startup.md) § Startup readiness describes the loader.
+[Frontend](../frontend/data-and-startup.md) § Startup readiness describes the startup screen.
 
 `[renderer:boot] first paint` doesn't print from a background window. It's a `requestAnimationFrame`
 callback, and macOS pauses those while the window is hidden. Bring the window to the front before you
@@ -101,8 +101,11 @@ and it marks the end of the renderer's own work.
 
 ### Read the startup milestones
 
-The renderer also marks three milestones on the performance timeline, whatever the switches say:
-`acorn:startup:first_frame`, `acorn:startup:restored`, and `acorn:startup:usable`.
+The renderer also marks four milestones on the performance timeline, whatever the switches say:
+`acorn:startup:first_frame`, `acorn:startup:shell`, `acorn:startup:restored`, and
+`acorn:startup:usable`. The gap from `first_frame` to `shell` is the time the startup screen was up.
+Its messages follow the stages in [data and startup](../frontend/data-and-startup.md#startup-stages),
+so a slow stage shows on screen as well as in the gap.
 [Renderer telemetry](../telemetry/renderer.md#startup-milestones) defines them. Read them with
 `performance.getEntriesByType('mark')` in devtools, or through the WebDriver client of a
 `pnpm dev:agent` session, as `apps/desktop/scripts/agent/webdriver.mjs` does for measures.
@@ -171,7 +174,10 @@ start before you claim a byte cut made one faster.
 The milestones are transactions named after the span. In **Explore → Traces**, filter on
 `span.op:renderer.startup.usable visibility:visible` and chart `p50(span.duration)`,
 `p75(span.duration)`, and `p95(span.duration)`, grouped by `release`. Add `proxy:false` to leave out
-launches that landed on a mount-proxy feature. Use `span.op:ui.feature.open first:true` grouped by
+launches that landed on a mount-proxy feature, and `outcome:usable` to leave out launches that
+stopped on a failure or offline screen. Chart `span.op:renderer.startup.shell` the same way for the
+time the startup screen held the window. In **Issues**, search `seam:renderer.startup` grouped by
+`startup.step` for the launches that failed. Use `span.op:ui.feature.open first:true` grouped by
 `feature.id` for first openings, and `first:false` for repeated ones.
 
 Byte gauges are trace metrics. In **Explore → Metrics**, chart `max(app.bundle.bytes)` filtered on

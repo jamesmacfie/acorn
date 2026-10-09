@@ -19,6 +19,7 @@ import {
   workspaceSettingsTarget, type SettingsContribution, type SettingsNavigate, type SettingsPageContext,
 } from '../../host/registries/shell/settings'
 import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
+import { RegionLoading } from '../../host/layouts/RegionLoading'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { createDomCollection } from '../../kit/keys/collection'
 import { restoreFocusOnCleanup } from '../../kit/keys/trap'
@@ -704,24 +705,27 @@ export default function SettingsView(props: {
                 <div ref={pageElement} class="settings-page">
                   {/* A plain wrapper carries the live region, so the line is announced when it appears. */}
                   <Show when={status()}><div role="status"><Text emphasis="muted" wrap>{status()}</Text></div></Show>
-                  {/* Its own boundary, so a page's lazy chunk holds only the page and not the rail. */}
-                  <Suspense>
-                    <Show when={pageKey()} keyed>
-                      {(_key) => {
-                        const page = untrack(() => resolved().page)
-                        return (
-                          <ContributionBoundary contributionId={`settings:${page.id}`} owner={settingsRegistry.ownerOf(page.id)}>
+                  {/* Its own boundary, so a page's lazy chunk holds only the page and not the rail. One
+                      per page, inside the keyed Show: a boundary that has drawn never shows its
+                      placeholder again (patches/README.md), so a shared one left the next page blank
+                      while its code loaded. Inside the error boundary, so Try again starts a fresh one. */}
+                  <Show when={pageKey()} keyed>
+                    {(_key) => {
+                      const page = untrack(() => resolved().page)
+                      return (
+                        <ContributionBoundary contributionId={`settings:${page.id}`} owner={settingsRegistry.ownerOf(page.id)}>
+                          <Suspense fallback={<RegionLoading label={page.label} />}>
                             <UnsavedChangesContext.Provider value={unsaved}>
                               <SettingsDetailContext.Provider value={details}>
                                 <Dynamic component={page.component} context={context} />
                                 <SettingsUsable />
                               </SettingsDetailContext.Provider>
                             </UnsavedChangesContext.Provider>
-                          </ContributionBoundary>
-                        )
-                      }}
-                    </Show>
-                  </Suspense>
+                          </Suspense>
+                        </ContributionBoundary>
+                      )
+                    }}
+                  </Show>
                 </div>
               </div>
             </>

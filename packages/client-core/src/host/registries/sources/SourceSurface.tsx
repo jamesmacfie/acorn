@@ -1,6 +1,7 @@
-import { createEffect, createRenderEffect, on, onCleanup, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import { createEffect, createRenderEffect, on, onCleanup, Show, Suspense, type Component } from 'solid-js'
 import { DetailColumn, ListColumn, ListDetail } from '../../../kit/components/primitives'
+import { ContributionBoundary } from '../../../kit/components/content/ContributionBoundary'
+import { RegionLoading } from '../../layouts/RegionLoading'
 import { featureMounted, openFeature } from '../../../infra/telemetry/featureOpening'
 import { sourceRegistry, type SourceContribution } from './sources'
 
@@ -26,7 +27,7 @@ export function SourceSurface(props: { source: SourceContribution }) {
   return (
     <Show when={props.source.regions} fallback={
       <Show when={props.source.component}>
-        {(component) => <Dynamic component={component()} />}
+        {(component) => <SourceRegion source={props.source} component={component()} />}
       </Show>
     }>
       {(regions) => (
@@ -35,12 +36,31 @@ export function SourceSurface(props: { source: SourceContribution }) {
         // list beside a detail, so none of them has to ask for the control.
         <ListDetail split collapseKey={props.source.id}>
           <ListColumn>
-            <Dynamic component={regions().list} />
+            <SourceRegion source={props.source} component={regions().list} />
           </ListColumn>
           <DetailColumn scroll={regions().scroll} measure={regions().measure}>
-            <Dynamic component={regions().detail} />
+            <SourceRegion source={props.source} component={regions().detail} />
           </DetailColumn>
         </ListDetail>
+      )}
+    </Show>
+  )
+}
+
+/**
+ * One part of a source under boundaries of its own, so a list that fails or is still loading leaves
+ * the detail beside it alone. Keyed on the component: a boundary that has drawn never shows its
+ * placeholder again (patches/README.md), and a source switch hands this the next source's component.
+ */
+function SourceRegion(props: { source: SourceContribution; component: Component }) {
+  return (
+    <Show when={props.component} keyed>
+      {(Region) => (
+        <ContributionBoundary contributionId={props.source.id} owner={sourceRegistry.ownerOf(props.source.id)}>
+          <Suspense fallback={<RegionLoading label={props.source.label} />}>
+            <Region />
+          </Suspense>
+        </ContributionBoundary>
       )}
     </Show>
   )

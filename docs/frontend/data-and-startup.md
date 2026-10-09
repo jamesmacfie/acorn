@@ -47,10 +47,51 @@ projector.
 
 ## Startup readiness
 
-The desktop opens its window as soon as the helper is listening, and shows the startup loader while the
+The desktop opens its window as soon as the helper is listening, and shows the startup screen while the
 helper picks a Node and the supervised local Node boots. The renderer doesn't mount the shell or plugin
 panes until that Node reports its first broker status and compiled plugin registration finishes, so
 pane resources never request routes that don't exist yet.
+
+### Startup stages
+
+`apps/desktop/src/client/startupStage.ts` owns what the screen says. It reads the Node's readiness,
+the roster's registration state, the query cache's restore, the restore pass, and the initial reads,
+and names the first one still holding progress. The work overlaps, and the module doesn't reorder it.
+The same inputs always give the same message. A failure wins over anything pending.
+
+| Stage | Message | Where it shows | Ends when |
+| --- | --- | --- | --- |
+| `connecting` | Connecting to your computer… | Whole window | Fleet selection settles. |
+| `starting` | Starting Acorn's services… | Whole window | The local Node's first broker status arrives. |
+| `unpaired` | Not connected yet | Whole window | A Node is paired. |
+| `preparing` | Preparing your workspace… | Whole window | The compiled roster registers. |
+| `reading-cache` | Restoring your workspace… | Whole window | The query cache loads from IndexedDB. |
+| `restoring` | Restoring your workspace… | Content region | Hydration and destination selection settle. |
+| `offline` | Your computer is offline | Content region | The Node reconnects, or Try again reads cached data. |
+| `failed` | Acorn couldn't finish loading | Whole window, or the content region for reads | Try again succeeds. |
+
+The rail and top bar draw once the whole-window stages finish, so the restore holds only the content
+region. A restored window never goes back to a startup stage. A later disconnect keeps what's drawn
+and shows the ordinary connection state.
+
+Each failure retries what failed. A Node failure runs the fleet selection again. A roster failure
+discards the failed import and registration, then imports and registers again
+(`apps/desktop/src/client/pluginStartup.ts`). The plugin host takes back each plugin's earlier
+contributions before it registers again, so a retry after a partial registration leaves one of each.
+A read failure refetches the prefs, project, task, and workspace lists that are missing. Without
+those lists the restore can't choose where to land, so a failed read with nothing cached shows the
+failure instead of waiting forever. An offline Node with nothing cached shows the offline stage
+straight away. The startup screen keeps the Node's own recovery actions, **Open data folder** and
+**Quit**, and puts the error text under **Show details**.
+
+The coordinator reports each failure once through the error records, with `startup.step` set to
+`node`, `registration`, or `reads`. It also feeds the startup milestones
+([renderer telemetry](../telemetry/renderer.md#startup-milestones)).
+
+The terminal client has no startup screen. It reports a starting Node in its footer and shares the
+pane placeholders ([states](../ui-design/states.md#loading)).
+
+### Startup order
 
 `apps/desktop/src/client/index.tsx` starts `selectActiveNode()` and `applyNodePlugins()` without
 blocking. `activate.ts` registers core eagerly. After the first paint, a queued task imports the

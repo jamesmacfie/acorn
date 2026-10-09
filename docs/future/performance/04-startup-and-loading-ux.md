@@ -1,17 +1,46 @@
 # Phase 04: Explain startup progress and recover loading failures
 
-Date: October 9, 2026. Status: planned. Depends on: phase 01.
+Date: October 9, 2026. Status: implemented October 9, 2026, without step 8. Depends on: phase 01.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Show changing loading messages for the actual startup stage, and keep a pending feature visible as
 a labelled placeholder. Preserve saved destinations and layouts while adding retryable failure states.
 
+## Outcome
+
+Steps 1 to 7 shipped. The owning references are [startup stages](../../frontend/data-and-startup.md#startup-stages),
+[loading states](../../ui-design/states.md#loading), the startup milestones in
+[renderer telemetry](../../telemetry/renderer.md#startup-milestones), [profiling](../../local-development/profiling.md#read-the-startup-milestones),
+and the `lazy()` retry in `patches/README.md`.
+
+Decisions made during implementation:
+
+- `apps/desktop/src/client/startupStage.ts` is the coordinator. It's a pure projection of Node
+  readiness, roster state, cache restore, restore, and initial reads, plus one effect that reports
+  failures and ends the usable milestone on a stopped screen. `StartupScreen.tsx` replaced
+  client-core's `NodeGate`, which only the desktop used.
+- The "Opening your last view" stage isn't a separate message. Once the destination is chosen, each
+  pane region draws its own labelled placeholder, which says the same thing more precisely.
+- A new `renderer.startup.shell` milestone records when the startup screen gives way to the shell, so
+  shell readiness stays apart from the first frame and the restore.
+- Region placeholders go through a host seam beside the layout table, because pane regions draw on
+  both hosts and `panes.ts` can't import markup.
+- Failed imports retry through a third solid-js patch, so all 54 `lazy()` call sites retry without a
+  wrapper.
+
+Step 8 didn't ship. The [baseline](../../testing/performance-baseline-2026-10-09.md) has the first
+frame at 141 to 180 ms and `nodeReady` at 312 to 613 ms. The Node is the slow part: its own
+`listener-up` lands 349 to 499 ms after its process starts. A remembered rail would make the window
+look ready about 150 to 450 ms sooner without making any of it usable sooner. Every baseline launch
+was hidden, so revisit with visible launches in phase 07, reading the gap from `first_frame` to `shell`.
+
 ## Starting point and owners
 
 `apps/desktop/src/client/App.tsx` gates the shell with Node readiness, query-cache restoration, and
 compiled plugin readiness, using `NodeGate` as the fallback for all three.
-`packages/client-core/src/features/fleet/NodeGate.tsx` handles starting, unpaired, and failed Node
-states. It has no content for a ready Node whose plugin or restoration gate still holds.
+`packages/client-core/src/features/fleet/NodeGate.tsx`, deleted by this phase, handles starting,
+unpaired, and failed Node states. It has no content for a ready Node whose plugin or restoration gate
+still holds.
 
 `apps/desktop/src/client/pluginStartup.ts` caches the roster promise and marks ready after
 registration. A rejected import or registration retains the rejection with no dedicated retry state.

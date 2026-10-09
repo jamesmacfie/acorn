@@ -26,6 +26,8 @@ import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
 import { bootMark, emitBootSpans } from './boot'
 import { markFirstFrame } from './startupMilestones'
 import { startDesktopLinks } from './links'
+import { setRegionPlaceholder } from '@acorn/client-core/host/layouts'
+import { RegionLoading } from '@acorn/client-core/host/layouts/RegionLoading.tsx'
 
 const noop = () => null
 
@@ -75,6 +77,9 @@ window.addEventListener('pagehide', () => void flushTelemetry())
 
 // The first mark of the cold-start account (./boot.ts).
 bootMark('script start')
+// What a pane draws while its code loads. The DOM's layouts are the pane registry's default, but its
+// placeholder is the host's to supply (client-core/host/layouts/table.ts).
+setRegionPlaceholder(RegionLoading)
 void startDesktopLinks()
 
 // A WS drop means the client missed events, and there is no cursor into history to replay from, so
@@ -198,7 +203,8 @@ const fillIn = () => {
   if (pluginsStarted) return
   pluginsStarted = true
   clearTimeout(pluginFallback)
-  void startClientPlugins().then(() => {
+  void startClientPlugins().then((registered) => {
+    if (!registered) return
     bootMark('roster registered')
     return applyNodePlugins(activeNodeId() ?? undefined)
   })

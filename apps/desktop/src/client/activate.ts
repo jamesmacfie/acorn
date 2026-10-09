@@ -59,8 +59,10 @@ registerNoticeTargetHandler('settings', (_taskId, target) => {
 activateScopedStateEviction()
 // Core registration stays eager; the compiled roster and its implementation closure load after the
 // shell paints. Restore waits for this signal so pane defaults cannot replace persisted layouts.
-const [clientPluginsReady, setClientPluginsReady] = createSignal(false)
-export { clientPluginsReady }
+export type ClientPluginsState = { kind: 'pending' } | { kind: 'ready' } | { kind: 'failed'; error: unknown }
+const [clientPlugins, setClientPlugins] = createSignal<ClientPluginsState>({ kind: 'pending' })
+export { clientPlugins }
+export const clientPluginsReady = (): boolean => clientPlugins().kind === 'ready'
 
 const startup = createPluginStartup({
   load: async () => (await import('./plugins')).clientPlugins,
@@ -74,10 +76,20 @@ const startup = createPluginStartup({
   },
   activeNode: activeNodeId,
   disabled: disabledNodePlugins,
-  onReady: () => setClientPluginsReady(true),
+  onReady: () => setClientPlugins({ kind: 'ready' }),
+  onFailed: (error) => setClientPlugins({ kind: 'failed', error }),
 })
 
-export const startClientPlugins = async (): Promise<void> => { await startup.initialize() }
+/** Resolves false when the roster failed. The startup screen shows and reports that failure
+ *  (./startupStage.ts), so it is not also an unhandled rejection. */
+export const startClientPlugins = (): Promise<boolean> => startup.initialize().then(() => true, () => false)
+
+/** The startup screen's Try again. Imports and registers the roster afresh, then applies the node. */
+export function retryClientPlugins(): void {
+  if (clientPlugins().kind !== 'failed') return
+  setClientPlugins({ kind: 'pending' })
+  void startup.retry().then(() => applyNodePlugins(), () => {})
+}
 
 export async function applyNodePlugins(nodeId?: string): Promise<void> {
   const target = nodeId ?? activeNodeId()

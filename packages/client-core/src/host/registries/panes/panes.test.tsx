@@ -1,4 +1,4 @@
-import { createResource, createSignal, onCleanup } from 'solid-js'
+import { createResource, createSignal, ErrorBoundary, lazy, onCleanup, type Component } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { TelemetryRecord, TelemetrySpan } from '@acorn/protocol/telemetry.ts'
@@ -13,6 +13,7 @@ import {
 } from '../../../infra/telemetry/emitter'
 import { evictScope } from '../shell/scopeEviction'
 import { _resetLayoutState } from '../../layouts/state'
+import { _resetLayouts, setRegionPlaceholder } from '../../layouts/table'
 
 // The one thing the pane registry does beyond holding entries: it turns a declared layout into the
 // component every consumer already expects (docs/panes/contributions.md § Contributions).
@@ -50,7 +51,12 @@ afterEach(() => {
   for (const entry of registered) entry.dispose()
   registered = []
   _resetClientTelemetry()
+  _resetLayouts()
 })
+
+const until = async (done: () => boolean) => {
+  for (let tries = 0; tries < 400 && !done(); tries++) await new Promise((resolve) => setTimeout(resolve, 5))
+}
 
 describe('a pane that declares a layout', () => {
   it('draws the layout and fills its regions', async () => {
@@ -200,6 +206,52 @@ describe('a region that has already drawn', () => {
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
     expect(host.querySelector('[data-region]')?.textContent).toBe('diffconflicts')
+  })
+})
+
+// A region whose code is still loading draws the host's labelled placeholder, under its own boundary,
+// so a region that is ready draws beside it (docs/ui-design/states.md § Loading).
+describe('a region whose code is loading', () => {
+  it('draws the host placeholder with the pane label while its neighbour draws', async () => {
+    setRegionPlaceholder((props) => <span data-loading>{props.label}</span>)
+    let arrive: (module: { default: Component }) => void = () => {}
+    const Detail = lazy(() => new Promise<{ default: Component }>((resolve) => { arrive = resolve }))
+    register(pane({ regions: { list: () => <span data-region="list" />, detail: Detail } }))
+    const Pane = paneRegistry.get('notes')!.component
+    dispose = render(() => <Pane task={task} />, host)
+
+    await until(() => !!host.querySelector('[data-region]'))
+    expect(host.querySelector('[data-region="list"]')).not.toBeNull()
+    expect(host.querySelector('[data-loading]')?.textContent).toBe('Notes')
+
+    arrive({ default: () => <span data-region="detail" /> })
+    await until(() => !!host.querySelector('[data-region="detail"]'))
+    expect(host.querySelector('[data-loading]')).toBeNull()
+  })
+})
+
+// Upstream `lazy()` keeps a rejected import, so a boundary's Try again threw the same error without
+// loading anything. The solid-js patch forgets a failed import (patches/README.md). This is the test
+// for it.
+describe('a lazy import that failed', () => {
+  it('loads again when its error boundary resets', async () => {
+    let attempts = 0
+    const Flaky = lazy(async () => {
+      attempts++
+      if (attempts === 1) throw new Error('Importing a module script failed')
+      return { default: () => <span data-loaded /> }
+    })
+    let retry: () => void = () => {}
+    dispose = render(() => (
+      <ErrorBoundary fallback={(_error, reset) => { retry = reset; return <span data-failed /> }}>
+        <Flaky />
+      </ErrorBoundary>
+    ), host)
+    await until(() => !!host.querySelector('[data-failed]'))
+    retry()
+    await until(() => !!host.querySelector('[data-loaded]'))
+    expect(attempts).toBe(2)
+    expect(host.querySelector('[data-loaded]')).not.toBeNull()
   })
 })
 
