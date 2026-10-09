@@ -353,6 +353,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
               regions,
               collapsible: surface.collapsible === true,
               collapseContent: 'empty',
+              get scrollScope() { return scope().taskId ?? scope().projectId },
             })
           }
         })()

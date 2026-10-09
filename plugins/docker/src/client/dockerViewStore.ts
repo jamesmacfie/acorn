@@ -32,6 +32,16 @@ export const rememberDockerDetailState = (taskId: string | undefined, target: st
 export const dockerDetailState = (taskId: string | undefined, target: string): DockerDetailViewState | undefined =>
   detailStates.get(detailKey(taskId, target))
 
+// Where each browse section's list was scrolled to. Keyed by node, not task, because the lists are
+// the daemon's.
+const browseOffsets = new Map<string, number>()
+
+export const rememberDockerBrowseOffset = (section: string, offset: number): void => {
+  browseOffsets.set(dockerScopeKey('browse', section), offset)
+}
+
+export const dockerBrowseOffset = (section: string): number => browseOffsets.get(dockerScopeKey('browse', section)) ?? 0
+
 // ── "Show me this one" ────────────────────────────────────────────────────────────────────────────
 //
 // A resource somebody named somewhere else — the palette's `docker.find` (./commands.ts) — and where

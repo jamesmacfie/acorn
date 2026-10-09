@@ -32,6 +32,9 @@ export type LayoutProps = {
   /** `list-detail` only. An empty collapse keeps only the header-height expand control instead of
    *  asking the list region to provide one-mark row variants. */
   collapseContent?: 'rows' | 'empty'
+  /** `list-detail` only. What the list is showing, usually the task, so that each one keeps its own
+   *  scroll position in the list column rather than every task sharing the pane's. */
+  scrollScope?: string
   /** `tabs` only. The bar, in order; each entry has a `panel:<id>` region. */
   tabs?: readonly { id: string; label: string }[]
   /** `wizard` only. The host draws the indicator from these and the back and next controls. */
