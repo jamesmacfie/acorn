@@ -64,6 +64,8 @@ it('uses the live permission profile and narrower ceiling while describing defau
   expect(report.findings.find((finding) => finding.id === 'harness.next-default')?.summary).toContain('danger-full-access')
   expect(report.findings.find((finding) => finding.id === 'agent-tools.grants')?.summary).toContain('run_start denied')
   expect(report.findings.find((finding) => finding.id === 'agent-tools.ceiling')?.summary).toContain('read')
+  expect(report.findings.find((finding) => finding.id === 'agent-tools.grants')?.facts).toContainEqual({ label: 'Default: run commands', value: 'Blocked' })
+  expect(report.findings.find((finding) => finding.id === 'agent-tools.grants')?.description).toContain('1 are allowed and 1 are blocked')
 })
 
 it('statically flags an unpinned runner and never returns credential-shaped inputs', async () => {
@@ -132,6 +134,8 @@ it('reports bounded plugin counts and observed admission without external text',
     instructionObservation: async () => ({ taskId: secret, projectId: 'project-1', checkedAt: 1234, outcome: 'blocked' }),
   }), 'node-1', 'owner', { projectId: 'project-1' }, new AbortController().signal)
   expect(report.findings.find((finding) => finding.id === 'plugins.grants')?.summary).toContain('1 active executable grants')
+  expect(report.findings.filter((finding) => finding.id === 'plugins.grants')).toHaveLength(1)
+  expect(report.findings.find((finding) => finding.id === 'plugins.grants')?.description).toContain('waiting for your review')
   expect(report.findings.find((finding) => finding.id === 'instructions.latest')).toMatchObject({ state: 'observed', severity: 'warning' })
   expect(JSON.stringify(report)).not.toContain(secret)
 })
@@ -151,6 +155,7 @@ it('uses Changes static policy facts through the typed project capability', asyn
   expect(finding?.source).toContain('Changes static dependency policy capability')
   expect(finding?.summary).toContain('release age 1440 minutes')
   expect(finding?.summary).toContain('ignore scripts enabled')
+  expect(finding?.facts).toContainEqual({ label: 'Wait before accepting a release', value: '1 day' })
 })
 
 it('bounds a stuck static policy capability and cancels a switched node check', async () => {

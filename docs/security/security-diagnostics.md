@@ -11,13 +11,23 @@ service tokens cannot read either route.
 The report stays in the open page, expires after five minutes, and clears on Node or scope change.
 Acorn stores no report history. The terminal client lists the core settings page with its established
 desktop fallback, so this action is available in the desktop app on a device paired with the Node.
-Findings show a plain-language evidence label and suggested action. Expand **Check details** to read
-the evidence limits, source, and check identifier.
+The report puts **Needs attention** first, followed by **Your settings**. Each card has a readable
+explanation, labeled settings, and a named action such as **Review tool permissions**. Tool access
+shows allowed and blocked counts rather than a list of internal tool names. Managed MCP cards use
+redacted server names. Checks that need an unselected project or running agent are omitted.
+
+Unavailable checks are counted above the results and grouped under **Not verified**. A missing
+observation does not establish that a setting is unsafe. Read failures remain visible under
+**Needs attention**. The summary describes only completed checks; it never declares the Node safe.
+Expand a card's **Technical details** to read the full bounded summary, evidence limits, source, and
+check identifier. General coverage limits are under **What this check cannot tell you**.
 
 ## Evidence and limits
 
 Each finding contains a stable check ID, owner, Node and scope IDs, checked time, evidence state,
-severity, source, bounded explanation, limit, and repair action. Observed, configured only, unknown,
+severity, source, bounded explanation, limit, and repair action. Optional display fields provide a
+human-readable title, description, and labeled facts; older reports use client-owned fallback copy.
+Observed, configured only, unknown,
 unsupported, and failed are evidence states, separate from severity. A failed read does not establish
 that a control is off. The selected session's observed settings take precedence over defaults for the
 next session.

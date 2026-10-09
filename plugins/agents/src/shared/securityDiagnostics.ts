@@ -14,6 +14,10 @@ export type SecurityFinding = {
   severity: SecuritySeverity
   source: string
   summary: string
+  /** Human-readable result; the full evidence remains in summary and limits. Optional for older Nodes. */
+  description?: string
+  title?: string
+  facts?: Array<{ label: string; value: string }>
   limits: string
   repair: string
 }

@@ -1,39 +1,10 @@
-import { createEffect, createSignal, For, on, onCleanup, Show } from 'solid-js'
-import { clientEvents, readJson } from '@acorn/plugin-api/client'
-import { Alert, Button, Field, Fold, Link, Select, Stack, Text } from '@acorn/plugin-api/ui'
-import { agentSecurityDiagnosticsRoute, type SecurityDiagnostics, type SecurityFinding, type SecurityScopeChoices } from '../../shared/securityDiagnostics'
+import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
+import { readJson } from '@acorn/plugin-api/client'
+import { Alert, Button, Field, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { agentSecurityDiagnosticsRoute, type SecurityDiagnostics, type SecurityScopeChoices } from '../../shared/securityDiagnostics'
+import SecurityDiagnosticsResults from './SecurityDiagnosticsResults'
 
 const emptyChoices: SecurityScopeChoices = { projects: [], sessions: [] }
-const evidenceLabels = {
-  observed: 'Observed on this Node', configured_only: 'Saved setting', unknown: 'Could not verify',
-  unsupported: 'Not supported', failed: 'Check failed',
-} satisfies Record<SecurityFinding['state'], string>
-
-const settingsFor = (finding: SecurityFinding): string | null => {
-  if (finding.id.startsWith('mcp.')) return 'agent-mcp-servers'
-  if (finding.id.startsWith('agent-tools.')) return 'agent-tools'
-  if (finding.id.startsWith('plugins.')) return 'plugins'
-  if (finding.id.startsWith('harness.')) return 'agent-defaults'
-  if (finding.id.startsWith('instructions.')) return 'security'
-  if (finding.id.startsWith('project.') && finding.projectId) return `project/${finding.projectId}`
-  return null
-}
-
-/** The route has already reduced external data to safe, bounded evidence. */
-function Finding(props: { finding: SecurityFinding }) {
-  const finding = () => props.finding
-  const settings = () => settingsFor(finding())
-  return <Stack gap="row">
-    <Text wrap>{finding().severity === 'warning' ? '⚠ ' : ''}{finding().summary}</Text>
-    <Text emphasis="muted">{evidenceLabels[finding().state]}</Text>
-    <Text emphasis="muted" wrap>{finding().repair}</Text>
-    <Show when={settings()}>{(tab) => <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: tab() })}>Open setting</Link>}</Show>
-    <Fold label="Check details" defaultOpen={false}>
-      <Text emphasis="muted" wrap>{finding().limits}</Text>
-      <Text emphasis="muted" wrap>Source: {finding().source}. Check: {finding().id}. Owner: {finding().owner}.</Text>
-    </Fold>
-  </Stack>
-}
 
 export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null }) {
   const [choices, setChoices] = createSignal(emptyChoices)
@@ -107,9 +78,6 @@ export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null
     <Button size="sm" busy={busy()} onPress={() => void check()}>Check this node</Button>
     <Show when={error()}><Alert>{error()}</Alert></Show>
     <Show when={report() && !visible()}><Text emphasis="muted">Evidence expired. Check this node again.</Text></Show>
-    <Show when={visible()}>{(current) => <Stack gap="row">
-      <Text emphasis="muted">Checked {new Date(current().checkedAt).toLocaleString()}. Evidence expires in five minutes.</Text>
-      <For each={current().findings}>{(finding) => <Finding finding={finding} />}</For>
-    </Stack>}</Show>
+    <Show when={visible()}>{(current) => <SecurityDiagnosticsResults report={current()} />}</Show>
   </Stack>
 }

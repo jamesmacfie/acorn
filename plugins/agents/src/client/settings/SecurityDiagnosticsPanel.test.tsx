@@ -16,8 +16,9 @@ const { default: SecurityDiagnosticsPanel } = await import('./SecurityDiagnostic
 const choices: SecurityScopeChoices = { projects: [{ id: 'project-1', name: 'Project one' }, { id: 'project-2', name: 'Project two' }], sessions: [] }
 const report = (nodeId: string, projectId: string | null = null): SecurityDiagnostics => ({
   nodeId, projectId, sessionId: null, checkedAt: Date.now(), expiresAt: Date.now() + 300_000,
-  findings: [{ id: 'host.limit', owner: 'core', nodeId, projectId, sessionId: null, checkedAt: Date.now(),
+  findings: [{ id: 'instructions.checks', owner: 'agents', nodeId, projectId, sessionId: null, checkedAt: Date.now(),
     state: 'observed', severity: 'info', source: 'fixture', summary: `Evidence for ${nodeId}/${projectId ?? 'node'}`,
+    description: `Evidence for ${nodeId}/${projectId ?? 'node'}`,
     limits: 'Limited evidence.', repair: 'Review settings.' }],
 })
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
