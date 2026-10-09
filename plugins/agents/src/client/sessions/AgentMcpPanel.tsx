@@ -116,7 +116,7 @@ export default function AgentMcpPanel(props: { sessionId: string; onClose: () =>
           fallback={
             <Text emphasis="muted" wrap>
               This agent does not tell acorn which servers it has connected, so servers from its own config
-              are not listed here. The Config files tab of Settings → MCP shows them.
+              are not listed here. The Config files section of Settings → MCP shows them.
             </Text>
           }
         >

@@ -12,13 +12,13 @@ import { formatPath } from '../../kit/lib/rendering/formatPath'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 
-// Settings → Agents → MCP, Config files tab (docs/mcp.md § Configuration): a read-only inspector over the
+// Settings → Agents → MCP, Config files section (docs/mcp.md § Configuration): a read-only inspector over the
 // MCP config files the agents in one project load, from its folder's .mcp.json and .cursor/mcp.json and
 // from ~/.claude.json. Secrets arrive already masked from the node.
 //
 // Keyed by a project picker rather than by the open task, so the page shows the same servers for a
 // project whether or not a task is open. It starts on the open task's project when there is one. The
-// agents plugin owns the MCP page and draws this as the tab beside the servers acorn itself adds,
+// agents plugin owns the MCP page and draws this below the servers acorn itself adds,
 // because acorn can add a server but cannot remove one a CLI loads by itself.
 const STATUS = {
   enabled: { word: 'On', tone: 'ok' },

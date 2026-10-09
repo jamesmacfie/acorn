@@ -113,11 +113,11 @@ in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx
 124. On Custom agents, create an agent, then edit it. Confirm that the editor opens in the pane, that
      the header names it with a back link, and that ⌘[ with an unsaved change asks before going back.
      Delete it from the danger zone and confirm that it leaves New and the palette.
-125. On MCP's Servers tab, add a server, edit it, and remove it from its danger zone. Confirm that each
+125. In MCP's Servers section, add a server, edit it, and remove it from its danger zone. Confirm that each
      step happens in the pane and that the list names `/mcp`.
-126. With no task open, open MCP's Config files tab, pick a project with a committed `.mcp.json`, and
-     note its servers. Open a task in that project, open the tab again, and confirm that it starts on
-     that project and lists the same servers.
+126. With no task open, open MCP and confirm that Config files follows Servers without tabs. Pick a
+     project with a committed `.mcp.json`, and note its servers. Open a task in that project, open MCP
+     again, and confirm that Config files starts on that project and lists the same servers.
 127. On Tools and permissions, switch between **By owner** and **By tier**. Confirm that a loaded
      plugin's tools sit under its id, and that turning the Execute tier on and off moves every execute
      tool's switch.
