@@ -1,19 +1,22 @@
-import { createEffect, createSignal, on } from 'solid-js'
+import { createEffect, on } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, type Task } from '@acorn/plugin-api/client'
+import { type Task } from '@acorn/plugin-api/client'
 import { worktreesKey, worktreesOptions } from './worktreeClient'
 import { watchWorktreeInventory } from './worktreeInvalidation'
 import { createHistoryModel } from './historyModel'
+import { createGitViewSignal } from './viewState'
 
 export function createGitPaneModel(task: Task) {
   const queryClient = useQueryClient()
   const inventory = createQuery(() => worktreesOptions(task.projectId))
-  const [selected, setSelected] = createSignal<string | null>(null)
-  const [section, setSection] = createSignal<'history' | 'stashes' | 'worktrees'>('history')
-  const [stashId, setStashId] = createSignal<string | null>(null)
-  const [commitId, setCommitId] = createSignal<string | null>(null)
-  const [missingBranch, setMissingBranch] = createSignal(false)
+  const state = <T,>(name: string, initial: () => T) => createGitViewSignal(() => task.projectId, () => `pane:${name}`, initial, () => task.id)
+  const [selected, setSelected] = state<string | null>('worktree', () => null)
+  const [section, setSection] = state<'history' | 'stashes' | 'worktrees'>('section', () => 'history')
+  const [stashId, setStashId] = state<string | null>('stash', () => null)
+  const [commitId, setCommitId] = state<string | null>('commit', () => null)
   const branchRef = () => task.branch ? `refs/heads/${task.branch}` : null
+  const [missingBranch, setMissingBranch] = createGitViewSignal(() => task.projectId,
+    () => `pane:missing-branch:${branchRef()}`, () => false, () => task.id)
   const history = createHistoryModel(() => task.projectId, branchRef, () => task.id)
   const refreshHistory = () => {
     if (missingBranch()) { setMissingBranch(false); history.setRef(branchRef()) }
@@ -23,11 +26,6 @@ export function createGitPaneModel(task: Task) {
     void queryClient.invalidateQueries({ queryKey: worktreesKey(task.projectId) })
     if (missingBranch()) refreshHistory()
   })
-  createEffect(on(activeNodeId, () => { setSelected(null); setCommitId(null) }, { defer: true }))
-  createEffect(on(() => JSON.stringify([activeNodeId(), task.id, task.projectId, task.branch]), () => {
-    setMissingBranch(false)
-    history.setRef(branchRef())
-  }, { defer: true }))
   createEffect(on(() => JSON.stringify(history.filter()), () => setCommitId(null), { defer: true }))
   createEffect(() => {
     if (task.branch && history.ref() && (history.first.error as { code?: string } | null)?.code === 'bad_ref' && !history.first.isFetching) {

@@ -54,21 +54,10 @@ export type CoreProcService = {
 export type CoreServices = {
   /** Verify provenance that the authenticated tool route minted for one signed invocation. */
   agentToolProvenance?: { verify(input: import('../agentTools/provenance').AgentToolProvenance): boolean | Promise<boolean> }
-  /** Registered names and risk tiers only. Diagnostics combines this catalog with owner preferences
-   *  and a session ceiling; a loaded plugin receives no grant for this facet. */
-  agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
-  /** Bounded passive plugin facts; supplied by the composition root after the host starts. */
-  pluginSecurity?: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
-  /** The optional secret publication gate (docs/security/secret-publication.md). Built-ins only; a
-   *  loaded plugin receives no grant for it, and nothing here can allow an exception. */
-  secretPublication?: SecretPublicationGate
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
   git: CoreGitService
-  checkoutAdmission: CheckoutAdmission
-  /** Serializes repository metadata writes with task branch reservations for the same Git object store. */
-  repositoryMetadata: { write<T>(projectId: string, action: (repository: string, commonDirectory: string) => Promise<T>): Promise<T> }
   // Every child process: env allowlist, process-group kill, bounded capture.
   proc: CoreProcService
   // Use-scoped credential access; scrubs the plaintext out of anything thrown from its scope.
@@ -102,6 +91,15 @@ export type CoreServices = {
 
 /** First-party orchestration seams that never cross the loaded-plugin boundary. */
 export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects' | 'models'> & {
+  /** Registered names and risk tiers for diagnostics, bounded by owner preferences and session policy. */
+  agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
+  /** Bounded passive plugin facts; supplied by the composition root after the host starts. */
+  pluginSecurity?: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
+  /** The optional secret publication gate. Loaded plugins receive no grant for it. */
+  secretPublication?: SecretPublicationGate
+  checkoutAdmission: CheckoutAdmission
+  /** Serializes repository metadata writes with task branch reservations for the same Git object store. */
+  repositoryMetadata: { write<T>(projectId: string, action: (repository: string, commonDirectory: string) => Promise<T>): Promise<T> }
   taskScripts: TaskScriptEvidenceService
   tasks: CompiledTaskService
   projects: CompiledProjectService

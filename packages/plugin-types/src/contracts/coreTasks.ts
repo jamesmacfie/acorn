@@ -55,6 +55,8 @@ export type CoreTaskService = {
   ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
   runConfig(taskId: string): Promise<TaskRunConfig>
   active(): Promise<TaskRef[]>
+  /** Branch claims that still block metadata changes, including archive teardown in progress. */
+  branchClaims(): Promise<TaskRef[]>
   /** Throws when the task or its workspace membership is missing. */
   workspaceId(taskId: string): Promise<string>
   /** The same lookup with "no workspace" as a value. A real database failure still throws. */

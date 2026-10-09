@@ -20,18 +20,34 @@ commit's immutable ID, every parent, author and committer name, email, date, ful
 and current ref labels. A detached HEAD is included; an unborn HEAD with no refs yields a named
 empty state. The Node uses topological ordering, so ancestors follow their descendants.
 
-The ref filter accepts a named local branch, remote-tracking branch, or tag from the returned ref
-list. Search is a case-insensitive substring of the full message, author name plus email, or full
+The compact ref selector accepts a named local branch, remote-tracking branch, or tag from the returned ref
+list. Use the menu beside the search field to choose message, author, or commit hash. Commit rows
+show the subject, short hash, and ref labels. Parent actions are available in the commit menu.
+Search is a case-insensitive substring of the full message, author name plus email, or full
 object ID. It examines at most the newest 5,000 reachable commits and says when that bound cuts
 the search short. Unfiltered history can page beyond that search window. Queries have a
 128-character limit. The client retains a window of 10 pages
-(1,000 rows) and replaces older rows as browsing continues. Filtering names parent IDs but draws
+(1,000 rows) and replaces older rows as browsing continues. Filtering draws
 no connection through omitted commits. The kit's `HistoryMark` owns the desktop lanes and terminal
 relationship mark; the collection owns selection and keyboard actions. Desktop lanes join at row
 boundaries, terminate at roots, and show a dashed continuation at a retained-window boundary. They
 show a count when more than eight lanes are active. A task
 pane retries its recorded branch on refresh and on Node or task changes after a missing-branch
 fallback.
+
+## Return to a Git view
+
+Each Node and project keeps its Git section, selected item, filters, comparison inputs, loaded history
+window, and scroll positions for the client session. Switching sections also returns to that section's
+selected item. A direct Git link opens its named item instead of the remembered one.
+
+Revision views retain the comparison parent, selected file, disclosure sections, sidebar width, and
+diff reading place. The repository sidebar keeps its width and collapsed state per Node and project.
+Task Git panes keep separate selections and filters, and archiving a task evicts its view state.
+Write dialogs close when their scope changes; returning to a view does not resume an action.
+
+`plugins/git/src/client/viewState.ts` owns the plugin's session state. History windows are discarded
+when a refreshed first page reports different ref tips. A relaunch resets session state.
 
 ## Inspect a revision
 

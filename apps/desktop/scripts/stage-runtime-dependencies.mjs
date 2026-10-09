@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writ
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { requiredRuntimePackages } from '../../../scripts/nodeRuntimePackages.ts'
+import { isOmittedPackage, pruneRuntimeDependencies } from '../../../scripts/prune-runtime.mjs'
 import { nativePackageFilter } from './native-package-files.mjs'
 import { runtimeTarget } from './node-runtime.mjs'
 
@@ -57,6 +58,7 @@ export function stageRuntimeDependencies(pkg, helper, stageTarget, names = requi
       ...manifest.optionalDependencies,
     }
     for (const dependency of Object.keys(dependencies)) {
+      if (isOmittedPackage(dependency)) continue
       const optional = Object.hasOwn(manifest.optionalDependencies ?? {}, dependency)
         || manifest.peerDependenciesMeta?.[dependency]?.optional === true
       const installed = installedPackage(dependency, localRequire, optional)
@@ -79,6 +81,8 @@ export function stageRuntimeDependencies(pkg, helper, stageTarget, names = requi
   }
 
   for (const [name, source] of roots) copyPackage(name, source, modules, new Map())
+  const pruned = pruneRuntimeDependencies(modules)
   writeFileSync(resolve(helper, 'package.json'), '{"type":"module"}\n')
   console.log(`[stage] ${names.length} runtime entries, ${roots.size} hoisted packages -> dist/helper/node_modules`)
+  console.log(`[stage] pruned ${pruned.removed.length} unused paths, ${pruned.bytes} bytes`)
 }

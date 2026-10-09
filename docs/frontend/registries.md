@@ -24,6 +24,10 @@ A pane registers a `component`, or a `layout` plus a `regions` record. The regis
 layout into a component, and throws at registration if the regions don't match the layout
 ([pane layouts](../panes/layout.md#layout-model)).
 
+A compiled browse source can declare `viewKey(projectId)` to scope its sidebar collapse, scroll,
+and resized width. The Git source includes the active Node and project in that identity. A kit
+`ListDetail` can retain its resized width for the session through `widthKey`.
+
 A compiled session source registers Node-scoped summaries and optional refresh, send, and focus
 actions through `ctx.sessionSources`. The source keeps its full rows and fetch logic. Core reads the
 summaries for task navigation, send pickers, setup markers, and quit warnings. A selected summary
@@ -87,6 +91,25 @@ JSX. The `logic` half of client-core's test suite runs in plain Node with no Sol
 module that imports a `.tsx` file can't load there. Each keeps its rules, ordering, gates, and
 resolution in a plain module, beside a thin `.tsx` host that draws what the registry decided. A second
 test project, `hosts`, renders those hosts under jsdom ([test layers](../testing/layers.md#client-core)).
+
+### Loaded contribution readiness
+
+A loaded plugin's frames, chrome, and worker host load on first use, not at startup. Each
+distribution commit calls `syncPluginContributions` in
+`packages/client-core/src/host/plugins/syncContributions.ts`. The first call imports frame and chrome
+registration, then runs both passes as a pair. After that, a pass runs in the same tick as its
+commit, so a withdrawn plugin loses its surfaces at once. A failed import is logged and the next
+commit or Node change imports again. Both passes read the current distribution when they run, so a
+pass that waited on the import can't register a plugin that a later commit withdrew.
+
+`preparePluginContributionsForNode` in `reload.ts` is the readiness result. It finishes the selected
+Node's distribution pass, loads the hosts, registers the contributions, and rejects if any step
+fails. A deep link to a loaded route waits for it. A restored pane of a loaded plugin draws once its
+registration lands, the same as it did when registration waited only on the Node's roster read.
+
+Distribution stops a withdrawn plugin's workers synchronously, without importing the worker host.
+`host/tree/workerHost.ts` installs its teardown into `host/tree/workerTeardown.ts` when it loads.
+The worker host keeps every worker in its own table, so before it loads there's nothing to stop.
 
 ## The platform seam
 

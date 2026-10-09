@@ -34,14 +34,14 @@ export function CodeBlock(props: {
 
 /** Monospace lines with the find bar as the bottom line. `follow` is what the region's scroll does;
  *  the tail is at the bottom because a column of cells grows downward. */
-export function Log(props: { lines: readonly string[]; follow?: boolean; find?: JSX.Element; ariaLabel: string }) {
+export function Log(props: { lines: readonly string[]; follow?: boolean; find?: JSX.Element; ariaLabel: string; scrollOffset?: number; onChange?: (offset: number) => void }) {
   return (
     <box flexDirection="column" flexGrow={1}>
       {/* A viewport, where this was a yoga clip. A clip owns no offset, so a log longer than its
           frame drew its first screenful and nothing could reach the tail (../scrolling.tsx,
           docs/tui/scrolling.md § Scrolling viewports). The find bar stays outside it, so it is on the bottom
           line wherever the lines above it have been scrolled to. */}
-      <ScrollViewport>
+      <ScrollViewport scrollOffset={props.scrollOffset} onChange={props.onChange}>
         <For each={props.lines}>{(line) => <Line role="mono">{line}</Line>}</For>
       </ScrollViewport>
       {slot(props.find)}
@@ -91,4 +91,3 @@ export function Markdown(props: {
   const lines = createMemo(() => markdownLines(props.text))
   return <Lines lines={lines()} />
 }
-

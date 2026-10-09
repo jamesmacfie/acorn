@@ -1,7 +1,8 @@
 # Local development
 
 This page covers getting acorn running from a checkout: the environment, the dev loops, the native
-module, and the database commands. The agent drivers and profiling have their own pages.
+module, and the database commands. The agent drivers, profiling, and packaged stacks have their own
+pages.
 
 acorn is a pnpm workspace built with Turborepo. First-party packages are consumed as TypeScript
 source. `apps/node` and `apps/desktop` are the build roots. The Node's build entries are in
@@ -12,6 +13,7 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 | --- | --- |
 | [Agent drivers](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client from the command line, native control, and the large-surface flow. |
 | [Profiling](./local-development/profiling.md) | Timing a cold start and a task switch. |
+| [Packaged stacks](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 
 <a id="agent-driven-desktop-development"></a>
 <a id="native-control-of-a-session"></a>

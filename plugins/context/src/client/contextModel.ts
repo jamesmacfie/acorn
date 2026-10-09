@@ -1,6 +1,5 @@
 import { createMemo, createResource, createSignal } from 'solid-js'
-import { agentSessionsFor, bytesOf, openPane, readJson, revealCollectionItem, sendToSession, toast, type Task, type SessionSummary } from '@acorn/plugin-api/client'
-import { slotFills } from '@acorn/plugin-api/ui/host'
+import { agentSessionsFor, bytesOf, openPane, readJson, revealCollectionItem, sendToSession, slotFills, toast, type Task, type SessionSummary } from '@acorn/plugin-api/client'
 import { CONTEXT_SECTION_POINT } from './sectionPoint'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
 import { recordSync, rememberTarget, syncStatus, targetSessionFor, type SyncStatus } from './syncState'

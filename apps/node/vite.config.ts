@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
+import { describeChunks } from '../../scripts/chunkGraph.mts'
 import { isRuntimeResolved } from './externals'
 import { thirdPartyNotices } from './thirdPartyNotices'
 
@@ -12,6 +13,20 @@ export default defineConfig({
       if (!id.endsWith('/plugins/memory/src/server/standingContext.ts')) return
       const contract = readFileSync(resolve(__dirname, '../../plugins/memory/src/server/memoryContract.md'), 'utf8')
       return code.replace("readFileSync(new URL('./memoryContract.md', import.meta.url), 'utf8')", JSON.stringify(contract))
+    },
+  }, {
+    // Every chunk's edges, external packages, source modules, and emitted size (scripts/chunkGraph.mts),
+    // which the service budget, the size report, and the standalone manifest check all read. The
+    // startup closure is service.js and everything it imports statically; a dynamic import is
+    // post-startup. Staging and the standalone tarball leave this file out.
+    name: 'acorn:service-startup-graph',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      // A loaded-plugin package build reuses this config (scripts/build-plugin.mjs). It has no service
+      // entry, and its package ships whatever lands in its dist.
+      if (!bundle['service.js']) return
+      const chunks = describeChunks(this, bundle, resolve(__dirname, '../..'))
+      this.emitFile({ type: 'asset', fileName: 'startup-graph.json', source: JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }) })
     },
   }],
   // Node resolution, not browser: prefer the `node` condition and never the `browser` field.
@@ -41,7 +56,12 @@ export default defineConfig({
     modulePreload: false,
     copyPublicDir: false,
     reportCompressedSize: false,
-    minify: false,
+    // Oxc halves the startup graph's bytes. `keepNames` below keeps function and class names, so a
+    // packaged stack still reads `at createSession`, and the hidden source maps stay in dist for the
+    // matching-build lookup (docs/local-development/packaged-stacks.md § Find the source line). Staging
+    // and the standalone tarball leave the maps out.
+    minify: 'oxc',
+    sourcemap: 'hidden',
     emptyOutDir: true,
     rollupOptions: {
       input: {
@@ -57,6 +77,7 @@ export default defineConfig({
       external: isRuntimeResolved,
       output: {
         format: 'es',
+        keepNames: true,
         entryFileNames: '[name].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: 'chunks/[name]-[hash].[ext]',

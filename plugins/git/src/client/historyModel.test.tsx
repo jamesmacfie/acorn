@@ -12,7 +12,7 @@ vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: firstPage }),
   useQueryClient: () => ({ invalidateQueries }),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({
+vi.mock('@acorn/plugin-api/client', () => ({ onScopeEvicted: () => () => {},
   activeNodeId: nodeId,
   wsOnNodeEvent: () => () => {},
   wsOnReconnect: () => () => {},
@@ -75,4 +75,29 @@ it('refresh clears a pending continuation and its error, then permits another lo
   await model.loadMore()
   expect(model.commits().map((commit) => commit.id)).toEqual(['first', 'fresh'])
   expect(model.loadingMore()).toBe(false)
+})
+
+it('restores filters and loaded pages after leaving, with separate project and Node views', async () => {
+  const [project, setProject] = createSignal('retained-project')
+  const draw = () => createRoot((stop) => { dispose = stop; return createHistoryModel(project, () => null) })
+  let model = draw()
+  model.setField('author'); model.setQuery('Ada'); model.setRef('refs/heads/topic')
+  nextRead = () => Promise.resolve({ commits: [{ id: 'second-page' }], nextCursor: 'third' } as unknown as HistoryPage)
+  await model.loadMore()
+  dispose()
+  model = draw()
+  expect(model.filter()).toEqual({ ref: 'refs/heads/topic', field: 'author', query: 'Ada' })
+  expect(model.commits().map((commit) => commit.id)).toEqual(['first', 'second-page'])
+  expect(model.next()).toBe('third')
+  setProject('other-project')
+  expect(model.query()).toBe('')
+  expect(model.commits().map((commit) => commit.id)).toEqual(['first'])
+  model.setQuery('Grace')
+  setProject('retained-project')
+  expect(model.query()).toBe('Ada')
+  setNodeId('node-b')
+  expect(model.query()).toBe('')
+  setNodeId('node-a')
+  expect(model.query()).toBe('Ada')
+  expect(model.commits().map((commit) => commit.id)).toEqual(['first', 'second-page'])
 })

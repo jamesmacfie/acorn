@@ -6,6 +6,7 @@ import { Alert, Button, EmptyState, Facts, Input, Select, Stack, Text } from '@a
 import { comparisonRoute, type Comparison, type ComparisonMode } from '../shared/api'
 import { refsOptions } from './refsClient'
 import { RevisionView } from './RevisionView'
+import { createGitViewSignal } from './viewState'
 
 const base = (projectId: string) => `/p/${encodeURIComponent(projectId)}/x/git/compare`
 const path = (projectId: string, pinned: Comparison) => `${base(projectId)}/${pinned.source}/${pinned.destination}/${pinned.mode}/${pinned.base}`
@@ -15,11 +16,11 @@ export function CompareSourceList() {
   const pinned = useMatch(() => '/p/:projectId/x/git/compare/:source/:destination/:mode/:base')
   const navigate = useNavigate()
   const refs = createQuery(() => refsOptions(params.projectId))
-  const [source, setSource] = createSignal('')
-  const [destination, setDestination] = createSignal('')
-  const [sourceId, setSourceId] = createSignal('')
-  const [destinationId, setDestinationId] = createSignal('')
-  const [mode, setMode] = createSignal<ComparisonMode>('direct')
+  const [source, setSource] = createGitViewSignal(() => params.projectId, () => 'compare:source', () => '')
+  const [destination, setDestination] = createGitViewSignal(() => params.projectId, () => 'compare:destination', () => '')
+  const [sourceId, setSourceId] = createGitViewSignal(() => params.projectId, () => 'compare:sourceId', () => '')
+  const [destinationId, setDestinationId] = createGitViewSignal(() => params.projectId, () => 'compare:destinationId', () => '')
+  const [mode, setMode] = createGitViewSignal<ComparisonMode>(() => params.projectId, () => 'compare:mode', () => 'direct')
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   let generation = 0
@@ -38,7 +39,7 @@ export function CompareSourceList() {
     finally { if (current()) setBusy(false) }
   }
   createEffect(on(scope, (current, previous) => {
-    generation++; setSource(''); setDestination(''); setSourceId(''); setDestinationId(''); setMode('direct'); setError(''); setBusy(false)
+    generation++; setError(''); setBusy(false)
     const [, oldProject] = previous ? JSON.parse(previous) as [string | null, string | null] : [null, null]
     const [, nextProject] = JSON.parse(current) as [string | null, string | null]
     if (oldProject && nextProject && current !== previous && pinned()) navigate(base(nextProject))

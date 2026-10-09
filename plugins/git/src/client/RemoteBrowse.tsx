@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'sol
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId } from '@acorn/plugin-api/client'
-import { Alert, Button, ConfirmButton, EmptyState, Facts, Input, Modal, Row, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, ConfirmButton, EmptyState, Facts, IconButton, Input, Modal, Row, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
 import type { GitRemote, RemoteChange } from '../shared/api'
 import { sameGitActionScope } from './launchWorkflow'
 import { changeRemote, remotesKey, remotesOptions } from './remotesClient'
@@ -15,8 +15,8 @@ function RemoteList(props: { projectId: string; selected: string | null; onSelec
   const query = createQuery(() => remotesOptions(props.projectId))
   const cache = useQueryClient()
   const rows = () => query.data?.remotes ?? []
-  return <Stack gap="section">
-    <SectionHeader count={rows().length} actions={<Button size="sm" variant="ghost" onPress={() => void cache.invalidateQueries({ queryKey: remotesKey(props.projectId) })}>Refresh</Button>}>Remotes</SectionHeader>
+  return <Stack gap="none">
+    <SectionHeader count={rows().length} actions={<IconButton icon="refresh-cw" label="Refresh remotes" spin={query.isFetching} onPress={() => void cache.invalidateQueries({ queryKey: remotesKey(props.projectId) })} />}>Remotes</SectionHeader>
     <Show when={query.isLoading}><EmptyState title="Loading remotes" /></Show>
     <Show when={query.error}><Alert tone="warn">{String(query.error)}</Alert></Show>
     <Show when={!query.isLoading && !rows().length}><EmptyState title="No remotes">Add a remote to fetch repository refs.</EmptyState></Show>

@@ -1,7 +1,9 @@
 import { connect, type Socket } from 'node:net'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
-import { WebSocketServer, type WebSocket } from 'ws'
+// Type-only. `ws` loads on the first tunnel upgrade, as it does for wsHub, so the node's boot graph
+// doesn't carry it (docs/plugin-authoring/the-node-half.md § Load a route on first use).
+import type { WebSocket, WebSocketServer } from 'ws'
 import { claimUpgrade } from './upgradeClaim'
 import { authorizeWsUpgrade, type WsAuthDeps } from './wsHub'
 import { MAX_TUNNEL_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
@@ -105,7 +107,9 @@ type Pipe = { ws: WebSocket; tcp: Socket; deviceId: string | null }
 
 export function attachTunnel(server: Server, deps: TunnelDeps): void {
   const maxBytes = Math.min(deps.maxTunnelMessageBytes ?? MAX_TUNNEL_MESSAGE_BYTES, MAX_TUNNEL_MESSAGE_BYTES)
-  const wss = new WebSocketServer({ noServer: true, maxPayload: maxBytes })
+  // Created on the first upgrade that passes its checks. Concurrent first upgrades share one server.
+  let wss: WebSocketServer | null = null
+  let loading: Promise<WebSocketServer> | null = null
   const pipes = new Set<Pipe>()
   const pending = new Map<Duplex, Socket | null>()
   let disposed = false
@@ -154,6 +158,12 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
       const ports: readonly number[] = await deps.declaredPorts(target.taskId).catch(() => [] as number[])
       if (!ready(socket)) { socket.destroy(); return }
       if (!ports.includes(target.port)) return refuse(socket, 403, 'Forbidden')
+      loading ??= import('ws').then(({ WebSocketServer }) => {
+        if (disposed) throw new Error('Tunnel disposed')
+        return (wss = new WebSocketServer({ noServer: true, maxPayload: maxBytes }))
+      })
+      const upgrader = await loading
+      if (!ready(socket)) { socket.destroy(); return }
 
       const tcp = connect({ host: LOOPBACK, port: target.port })
       pending.set(socket, tcp)
@@ -169,7 +179,7 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
       tcp.once('connect', () => {
         if (!ready(socket)) { tcp.destroy(); socket.destroy(); return }
         try {
-          wss.handleUpgrade(req, socket, head, (ws) => {
+          upgrader.handleUpgrade(req, socket, head, (ws) => {
             if (disposed || tcp.destroyed) { ws.on('error', () => {}); ws.terminate(); tcp.destroy(); return }
             handedOver = true
             pending.delete(socket)
@@ -196,7 +206,7 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
     for (const [socket, tcp] of pending) { tcp?.destroy(); socket.destroy() }
     pending.clear()
     for (const pipe of [...pipes]) closePipe(pipe)
-    wss.close()
+    wss?.close()
   })
 }
 

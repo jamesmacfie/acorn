@@ -17,7 +17,7 @@ import {
   type DevicePluginEntry, type NodePluginObservation, type PluginDistributionSnapshot, type PluginTrustRequest,
 } from './distributionModel'
 import { contributionAvailability, nodePluginRuntime, nodePluginServiceAvailable } from './availabilityModel'
-import { stopTreeWorker } from '../tree/workerHost'
+import { stopTreeWorkers } from '../tree/workerTeardown'
 
 const log = createLogger('plugins')
 const emptyHost = (): PluginHostState => ({ cached: {}, acks: [], devGrants: [] })
@@ -161,7 +161,7 @@ function publish(next: PluginDistributionSnapshot): void {
   const retained = selectedKeys(next)
   for (const key of selectedKeys(previous)) if (!retained.has(key)) {
     const [pluginId, hash] = JSON.parse(key) as [string, string]
-    stopTreeWorker({ pluginId, hash }, 'plugin selection withdrawn')
+    stopTreeWorkers({ pluginId, hash }, 'plugin selection withdrawn')
   }
   initialized = true
   setDistribution(next)
@@ -194,11 +194,34 @@ async function rosterFor(nodeId: string): Promise<readonly NodePluginRow[]> {
   return (await readJson<NodePluginState>(corePluginsRoute, { nodeId })).plugins
 }
 
+// Node reads and bundle caching are independent requests, so a pass runs a few at once. A slow remote
+// node then costs one broker timeout rather than one per node ahead of it.
+const PASS_CONCURRENCY = 4
+async function eachBounded<T>(items: readonly T[], work: (item: T) => Promise<void>): Promise<void> {
+  const queue = [...items]
+  await Promise.all(Array.from({ length: Math.min(PASS_CONCURRENCY, queue.length) }, async () => {
+    for (let item = queue.shift(); item !== undefined; item = queue.shift()) await work(item)
+  }))
+}
+
 export type DistributionSyncOptions = { nodeIds?: readonly string[]; trustOnly?: boolean; deviceOnly?: boolean }
 
 /** Every input enters one serial queue. Reads publish in request order, so an older result cannot
- * overwrite a newer one. Unpaired nodes are checked again at commit. */
+ * overwrite a newer one. Unpaired nodes are checked again at commit.
+ *
+ * A fleet pass that includes the selected node commits that node first, as a pass of its own, so the
+ * window's own plugins don't wait on remote nodes. The returned promise settles with the second pass. */
 export function syncPluginDistribution(options: DistributionSyncOptions = {}): Promise<void> {
+  const selected = activeNodeId()
+  const wanted = options.nodeIds ?? nodes().map((node) => node.nodeId)
+  if (!options.trustOnly && !options.deviceOnly && selected && wanted.length > 1 && wanted.includes(selected)) {
+    enqueuePass({ nodeIds: [selected] }).catch(() => { /* logged by the queue */ })
+    return enqueuePass({ nodeIds: wanted.filter((id) => id !== selected) })
+  }
+  return enqueuePass(options)
+}
+
+function enqueuePass(options: DistributionSyncOptions): Promise<void> {
   const generation = ++requestedGeneration
   const pass = async (): Promise<void> => {
     if (!pluginHostAvailable()) return
@@ -209,6 +232,7 @@ export function syncPluginDistribution(options: DistributionSyncOptions = {}): P
     if (options.trustOnly || options.deviceOnly) for (const id of previous.byNode.keys()) paired.add(id)
     const byNode = new Map([...previous.byNode].filter(([id]) => paired.has(id)))
     const wanted = options.trustOnly || options.deviceOnly ? new Set<string>() : new Set(options.nodeIds ?? paired)
+    const reads: string[] = []
     for (const nodeId of paired) {
       if (options.trustOnly || options.deviceOnly) continue
       if (nodeState(nodeId) === 'offline') {
@@ -216,7 +240,9 @@ export function syncPluginDistribution(options: DistributionSyncOptions = {}): P
         if (old) byNode.set(nodeId, { ...old, reachable: false, stale: true })
         continue
       }
-      if (!wanted.has(nodeId)) continue
+      if (wanted.has(nodeId)) reads.push(nodeId)
+    }
+    await eachBounded(reads, async (nodeId) => {
       try {
         const rows = await rosterFor(nodeId)
         for (const row of rows) if (legacyRuntimeIdentityWithheld(row)) {
@@ -228,9 +254,10 @@ export function syncPluginDistribution(options: DistributionSyncOptions = {}): P
         const old = byNode.get(nodeId)
         if (old) byNode.set(nodeId, { ...old, stale: true })
       }
-    }
+    })
     // Cache active and installed offers; caching an update never selects it.
     const seen = new Set<string>()
+    const puts: { nodeId: string; pluginId: string; hash: string; version: string }[] = []
     for (const observation of options.deviceOnly ? [] : byNode.values()) {
       if (!observation.reachable || observation.stale) continue
       for (const row of observation.rows) {
@@ -241,12 +268,15 @@ export function syncPluginDistribution(options: DistributionSyncOptions = {}): P
           const sourceKey = decisionKey(observation.nodeId, hash)
           if (seen.has(sourceKey)) continue
           seen.add(sourceKey)
-          // Even a cached hash must be reported by this node to update provenance in custody.
-          const result = await cachePluginBundle({ nodeId: observation.nodeId, pluginId: row.name, hash, version: offer!.version })
-          if ('error' in result) log.warn(`${row.name} from ${observation.nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': row.name })
+          puts.push({ nodeId: observation.nodeId, pluginId: row.name, hash, version: offer!.version })
         }
       }
     }
+    // Even a cached hash must be reported by this node to update provenance in custody.
+    await eachBounded(puts, async (put) => {
+      const result = await cachePluginBundle(put)
+      if ('error' in result) log.warn(`${put.pluginId} from ${put.nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': put.pluginId })
+    })
     const host = await readPluginHostState()
     lastHostState = host
     const offers = [...byNode.values()].flatMap((observation) => observation.rows.flatMap((row) =>

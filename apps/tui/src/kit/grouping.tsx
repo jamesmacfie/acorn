@@ -1,5 +1,5 @@
 // Stable TUI kit entrypoint. Components live beside the behavior they own.
-export { Card, Fold, Inline, Section, Stack, Toolbar, ToolbarSpacer } from './grouping/blocks'
+export { Card, FilterBar, Fold, Inline, Section, Stack, Toolbar, ToolbarSpacer } from './grouping/blocks'
 export { Timeline } from './grouping/timeline'
 export { panelsFor, registerPanel } from './grouping/panelRegistry'
 export { DocumentTabs, TabPanel, Tabs } from './grouping/tabs'

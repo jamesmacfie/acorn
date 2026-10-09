@@ -24,6 +24,7 @@ import { agentCommandsSlotContribution } from './AgentCommands'
 import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
 import { sessionOrderSlice } from './sessions/sessionOrder'
+import { composerExpansionSlice } from './composer/composerPrefs'
 import { sessionContextContribution } from './sessionContextContribution'
 
 // The conversation, for whoever else has a session to draw (../contract/conversation.ts). Lazy like
@@ -118,6 +119,7 @@ export const agentsClientPlugin: ClientPlugin = {
     // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
     ctx.persistedStateSlices.register(agentToolFoldSlice)
     ctx.persistedStateSlices.register(sessionOrderSlice)
+    ctx.persistedStateSlices.register(composerExpansionSlice)
     // The Agents group's pages, each with the sections and rows it draws for search (each page's file
     // draws the same ones). Core's Tools and permissions (order 30) sits between them.
     ctx.settingsPages.register({
@@ -149,8 +151,8 @@ export const agentsClientPlugin: ClientPlugin = {
       sections: [{ id: 'agents', label: 'Your agents' }],
       component: CustomAgentsSettings,
     })
-    // Two tabs: the servers acorn adds to every session, and the ones each CLI loads by itself, which
-    // was core's MCP config files page. Its old id is an alias, so a link to it lands on its tab.
+    // Two sections: the servers acorn adds to every session, and the ones each CLI loads by itself,
+    // which was core's MCP config files page. Its old id is an alias for the config files section.
     ctx.settingsPages.register({
       id: 'agent-mcp-servers', label: 'MCP', category: 'agents', scope: 'node', icon: 'server-cog', order: 40, requires: { plugin: 'agents' },
       aliases: ['mcp#files'],

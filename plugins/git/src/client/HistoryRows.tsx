@@ -1,9 +1,15 @@
 import { createMemo, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeNodeId, openActionPicker, prefsOptions, PrefKeys, requestTaskLaunch } from '@acorn/plugin-api/client'
-import { Alert, Button, EmptyState, HistoryMark, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, historyLayout } from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, HistoryMark, IconButton, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, FilterBar, historyLayout } from '@acorn/plugin-api/ui'
 import type { HistoryModel } from './historyModel'
 import { commitActionRequest, launchWorkflowAtCommit, sameGitActionScope } from './launchWorkflow'
+
+const searchFields = [
+  { value: 'message', label: 'Message', placeholder: 'Search messages…' },
+  { value: 'author', label: 'Author name or email', placeholder: 'Search authors…' },
+  { value: 'hash', label: 'Full object ID', placeholder: 'Search commit hashes…' },
+] as const
 
 export function HistoryRows(props: { projectId: string; model: HistoryModel; selected: string | null; onSelect: (id: string) => void; onChanges?: () => void; onRefresh?: () => void }) {
   const prefs = createQuery(() => prefsOptions(true))
@@ -23,14 +29,23 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
   const commits = () => props.model.commits()
   const slots = createMemo(() => historyLayout(commits(), !props.model.filter().query, !!props.model.next(), props.model.dropped()))
   const items = createMemo(() => commits().map((commit) => ({ key: commit.id, label: `${commit.subject} ${commit.id}` })))
-  return <Stack gap="section">
-    <SectionHeader count={commits().length} actions={<Button size="sm" variant="ghost" onPress={props.onRefresh ?? props.model.refresh}>Refresh</Button>}>History</SectionHeader>
-    <Select label="Ref" value={props.model.ref() ?? ''} options={[{ value: '', label: 'All refs and HEAD' }, ...(props.model.first.data?.refs ?? []).map((ref) => ({ value: ref, label: ref }))]}
-      onChange={(value) => props.model.setRef(value || null)} />
-    <Select label="Search in" value={props.model.field()} options={[
-      { value: 'message', label: 'Message' }, { value: 'author', label: 'Author name or email' }, { value: 'hash', label: 'Full object ID' },
-    ]} onChange={(value) => props.model.setField(value as 'message' | 'author' | 'hash')} />
-    <Input label="Search history" type="search" value={props.model.query()} maxLength={128} onInput={props.model.setQuery} placeholder="Case insensitive substring" />
+  return <Stack gap="none">
+    <SectionHeader count={commits().length} actions={<IconButton icon="refresh-cw" label="Refresh history" spin={props.model.first.isFetching} onPress={props.onRefresh ?? props.model.refresh} />}>History</SectionHeader>
+    <FilterBar ariaLabel="History ref">
+      <Select size="sm" label="Ref" value={props.model.ref() ?? ''} options={[{ value: '', label: 'All refs and HEAD' }, ...(props.model.first.data?.refs ?? []).map((ref) => ({ value: ref, label: ref }))]}
+        onChange={(value) => props.model.setRef(value || null)} />
+    </FilterBar>
+    <FilterBar ariaLabel="Search history">
+      <Input kind="filter" label="Search history" type="search" value={props.model.query()} maxLength={128} onInput={props.model.setQuery}
+        placeholder={searchFields.find((field) => field.value === props.model.field())!.placeholder} />
+      <Menu ariaLabel="Search in" placement="bottom-end" trigger={({ open, toggle }) =>
+        <IconButton icon="list-filter" label={`Search in: ${searchFields.find((field) => field.value === props.model.field())!.label}`}
+          opens="menu" expanded={open()} onPress={toggle} />}>
+        {(menu) => <><Menu.Label>Search in</Menu.Label><For each={searchFields}>{(field) =>
+          <Menu.Item context={menu} kind="radio" checked={props.model.field() === field.value} onSelect={() => props.model.setField(field.value)}>{field.label}</Menu.Item>
+        }</For></>}
+      </Menu>
+    </FilterBar>
     <Show when={props.onChanges}><Button variant="ghost" onPress={props.onChanges}>Working changes in Changes</Button></Show>
     <Show when={props.model.first.isLoading}><EmptyState title="Loading history" /></Show>
     <Show when={props.model.first.error}><Alert tone="warn">{String(props.model.first.error)}{props.model.first.data ? ' Showing the last available page.' : ''}</Alert></Show>
@@ -42,7 +57,7 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
         {props.model.filter().query ? 'Search is limited to the newest 5,000 reachable commits.' : 'This repository may have an unborn HEAD.'}
       </EmptyState>
     </Show>
-    <Rows id={`git-history:${activeNodeId()}:${props.projectId}`} ariaLabel="Git history" items={items()} selected={props.selected}
+    <Rows id={`git-history:${props.model.viewKey()}`} ariaLabel="Git history" items={items()} selected={props.selected}
       onSelect={props.onSelect} onActivate={props.onSelect} onMenu={openActions}>
       {(item, itemProps, selected) => {
         const commit = () => commits().find((row) => row.id === item.key)!
@@ -64,7 +79,7 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
             </>}
           </RowActions>}>
           <Text>{commit().subject}</Text>
-          <Text emphasis="muted">{commit().id.slice(0, 8)} · {commit().parents.length ? `Parents ${commit().parents.map((id) => id.slice(0, 8)).join(', ')}` : 'Root commit'}</Text>
+          <Text emphasis="muted">{commit().id.slice(0, 8)}</Text>
           <Show when={commit().refs.length}><Text emphasis="muted">Refs {commit().refs.join(', ')}</Text></Show>
         </Row>
       }}

@@ -6,7 +6,7 @@
 // the build here rather than in review.
 import type { Component } from 'solid-js'
 import type {
-  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, DescriptionList, EmptyState, Field, Input,
+  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, DescriptionList, EmptyState, Field, FilterBar, Input,
   Kbd, ListDetail, Meter, Row, SectionHeader, SegmentedControl, Select, Spinner, StatusDot, Table,
   Textarea, ToggleButton, Toolbar, TreeRow,
 } from '../components/primitives'
@@ -56,6 +56,7 @@ type _CodeBlock = NoStyling<Styling<typeof CodeBlock>>
 type _DescriptionList = NoStyling<Styling<typeof DescriptionList>>
 type _EmptyState = NoStyling<Styling<typeof EmptyState>>
 type _Facts = NoStyling<Styling<typeof Facts>>
+type _FilterBar = NoStyling<Styling<typeof FilterBar>>
 type _Field = NoStyling<Styling<typeof Field>>
 type _Fold = NoStyling<Styling<typeof Fold>>
 type _Grid = NoStyling<Styling<typeof Grid>>

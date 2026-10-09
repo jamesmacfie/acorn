@@ -34,6 +34,7 @@ export const NODE_FOCUS = {
   Timeline: 'collection',
   Tabs: 'collection',
   Toolbar: 'none',
+  FilterBar: 'none',
   Modal: 'trap',
   ModalBody: 'none',
   ModalActions: 'none',

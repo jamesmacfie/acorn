@@ -30,6 +30,24 @@ No view shows a spinner without a deadline. Past the deadline it resolves to `st
 cache uses `stale` or `offline`, because it has data. The age beside `stale` or `offline` reads
 "never" when the Node hasn't answered once this session.
 
+### Loading
+
+A view that waits for its code draws a labelled placeholder, not a blank rectangle. Pane layouts and
+regions, source lists and details, and settings pages each draw one under their own boundary, so a
+region that's still loading never blanks the one beside it. Each host supplies its placeholder through
+`setRegionPlaceholder` in `packages/client-core/src/host/layouts/table.ts`. The desktop draws the kit
+spinner with "Loading" and the pane's name. The terminal draws a muted line with the same words.
+
+A boundary shows its placeholder only before its first draw. After that, a refetch keeps the drawn
+content in place (`patches/README.md`). A failed import draws the contribution's "This view stopped
+working" state, and its **Try again** loads the code again rather than repeating the cached error.
+
+A launch has its own messages, one per stage, in place of a generic spinner
+([data and startup](../frontend/data-and-startup.md#startup-stages)). Each message is about the
+person's workspace. Plugin names and stacks go under **Show details**. The screen's status line is a
+live region, so a screen reader announces each change of stage. There's no progress percentage and no
+minimum display time.
+
 ### Empty states
 
 An empty page, pane, or detail column, such as a detail with nothing selected, draws the centered

@@ -106,6 +106,8 @@ export const TabPanel = (props: {
   idPrefix: string; id: string; active: string; children: JSX.Element
   /** The panel viewport's reading place, owned by the feature showing it. */
   scrollOffset?: number
+  /** Inset document content while keeping the strip and footer at the pane edges. */
+  padding?: 'pane'
   onChange?: (offset: number) => void
 }) => {
   let panel: HTMLElement | undefined
@@ -151,6 +153,7 @@ export const TabPanel = (props: {
     ref={panel}
     id={`${props.idPrefix}-panel-${props.id}`}
     class="ui-tab-panel"
+    data-padding={props.padding}
     role="tabpanel"
     aria-labelledby={`${props.idPrefix}-tab-${props.id}`}
     hidden={props.active !== props.id}

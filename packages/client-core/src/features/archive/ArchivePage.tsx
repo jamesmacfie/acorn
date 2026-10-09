@@ -9,7 +9,7 @@ import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { restoreTask } from '../tasks/restoreTask'
 import TaskPaneHost from '../tasks/TaskPaneHost'
 import { openTarget } from '../notifications/notifications'
-import { Alert, Button, DetailColumn, EmptyState, Input, ListColumn, ListDetail, Row, SectionHeader, Toolbar } from '../../kit/components/primitives'
+import { Alert, Button, DetailColumn, EmptyState, Input, ListColumn, ListDetail, Row, SectionHeader, FilterBar } from '../../kit/components/primitives'
 import { Rows } from '../../kit/components/layout/Rows'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Inline } from '../../kit/components/layout/Inline'
@@ -123,7 +123,7 @@ export default function ArchivePage() {
       <ListColumn label="Archived tasks">
         <Show when={!collapsed()}>
           <SectionHeader>Archive</SectionHeader>
-          <Toolbar size="sm" ariaLabel="Search archived tasks">
+          <FilterBar ariaLabel="Search archived tasks">
             <Input
               kind="filter"
               type="search"
@@ -133,7 +133,7 @@ export default function ArchivePage() {
               title="Searches titles, branches, and agent conversations."
               onInput={setText}
             />
-          </Toolbar>
+          </FilterBar>
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
         </Show>
         <div class="scroll" ref={(element) => retainScroll(element, {

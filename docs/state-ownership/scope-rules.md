@@ -46,6 +46,7 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Which backend and model every Generate control spends (`models.generatePick`) | Device |
 | The query cache | Node |
 | Task layout, open files, PR filters, and context selection | Owning Node's preferences, keyed by Node and task or repository |
+| Agent input expansion | Owning Node's preferences, keyed by Node, task, and agent session |
 | Dashboard panel definitions and their placements | Owning Node's preferences, one app-scoped slice |
 | Last view per workspace | Owning Node's preferences, keyed by Node and workspace |
 | Last workspace and the two-workspace shortcut pair | Active Node's app-scoped preferences |
@@ -58,6 +59,7 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Editor word wrap default | Device preference `editor_word_wrap`; off when absent |
 | Editor indentation fallback | Device preference `editor_indentation`; two spaces when absent or invalid |
 | Editor per-tab wrap and indentation choices | Session memory keyed by Node, task, and path; rename moves them, close, trash, archive, and Node removal prune them |
+| Git section, selections, filters, comparison inputs, loaded history window, and reading places | Session memory keyed by Node and project, with separate task views |
 | Provider data and task mutations | Owning Node |
 | Computer Use app-access grants ([app-access approval](../managed-agents/app-access.md#app-access-approval)) | The Computer Use integration on the Node's computer. The Node keeps only the decision |
 

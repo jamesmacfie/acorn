@@ -1,5 +1,5 @@
 diff --git a/dist/dev.cjs b/dist/dev.cjs
-index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..e1705df7ed523edbe07312d2f2667b07da9feca8 100644
+index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..2f6c99b756424183641b5baa41d1919dac06fdb3 100644
 --- a/dist/dev.cjs
 +++ b/dist/dev.cjs
 @@ -829,7 +829,9 @@ function runTop(node) {
@@ -13,7 +13,17 @@ index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..e1705df7ed523edbe07312d2f2667b07
    const ancestors = [node];
    while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
      if (runningTransition && Transition.disposed.has(node)) return;
-@@ -1549,10 +1551,9 @@ function Show(props) {
+@@ -1492,7 +1494,8 @@ function lazy(fn) {
+         setHydrateContext();
+       });
+       comp = s;
+-    } else if (!comp) {
++    } else if (!comp || comp.error) {
++      if (comp) p = undefined;
+       const [s] = createResource(() => (p || (p = fn())).then(mod => mod.default));
+       comp = s;
+     }
+@@ -1549,10 +1552,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -27,7 +37,7 @@ index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..e1705df7ed523edbe07312d2f2667b07
      }
      return props.fallback;
    }, undefined, {
-@@ -1765,7 +1766,9 @@ function Suspense(props) {
+@@ -1765,7 +1767,9 @@ function Suspense(props) {
                showContent = true,
                showFallback = true
              } = show ? show() : {};
@@ -39,7 +49,7 @@ index f20c60d9cffc7d2527ec4092d557a720ae7b7d19..e1705df7ed523edbe07312d2f2667b07
              dispose && dispose();
              dispose = ctx = p = undefined;
 diff --git a/dist/dev.js b/dist/dev.js
-index 2803ce7f070926657d1b4352741a5fcec67af2f9..bf197ecbdd8c144f3bcacb030d4c0aab714bb338 100644
+index 2803ce7f070926657d1b4352741a5fcec67af2f9..4a3ccf5f9c58612159529aff95a57fb7eef8fab5 100644
 --- a/dist/dev.js
 +++ b/dist/dev.js
 @@ -827,7 +827,9 @@ function runTop(node) {
@@ -53,7 +63,17 @@ index 2803ce7f070926657d1b4352741a5fcec67af2f9..bf197ecbdd8c144f3bcacb030d4c0aab
    const ancestors = [node];
    while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
      if (runningTransition && Transition.disposed.has(node)) return;
-@@ -1547,10 +1549,9 @@ function Show(props) {
+@@ -1490,7 +1492,8 @@ function lazy(fn) {
+         setHydrateContext();
+       });
+       comp = s;
+-    } else if (!comp) {
++    } else if (!comp || comp.error) {
++      if (comp) p = undefined;
+       const [s] = createResource(() => (p || (p = fn())).then(mod => mod.default));
+       comp = s;
+     }
+@@ -1547,10 +1550,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -67,7 +87,7 @@ index 2803ce7f070926657d1b4352741a5fcec67af2f9..bf197ecbdd8c144f3bcacb030d4c0aab
      }
      return props.fallback;
    }, undefined, {
-@@ -1763,7 +1764,9 @@ function Suspense(props) {
+@@ -1763,7 +1765,9 @@ function Suspense(props) {
                showContent = true,
                showFallback = true
              } = show ? show() : {};
@@ -79,7 +99,7 @@ index 2803ce7f070926657d1b4352741a5fcec67af2f9..bf197ecbdd8c144f3bcacb030d4c0aab
              dispose && dispose();
              dispose = ctx = p = undefined;
 diff --git a/dist/solid.cjs b/dist/solid.cjs
-index 08b339b27b6c149d73a81dd759b483dcde99531b..e4b8bf77ba9cfe3f02c0f9d3aa604afe0fcdcfe1 100644
+index 08b339b27b6c149d73a81dd759b483dcde99531b..3648ae7268fb212774f48057b18f1d920d85d176 100644
 --- a/dist/solid.cjs
 +++ b/dist/solid.cjs
 @@ -784,7 +784,9 @@ function runTop(node) {
@@ -93,7 +113,17 @@ index 08b339b27b6c149d73a81dd759b483dcde99531b..e4b8bf77ba9cfe3f02c0f9d3aa604afe
    const ancestors = [node];
    while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
      if (runningTransition && Transition.disposed.has(node)) return;
-@@ -1490,10 +1492,9 @@ function Show(props) {
+@@ -1442,7 +1444,8 @@ function lazy(fn) {
+         setHydrateContext();
+       });
+       comp = s;
+-    } else if (!comp) {
++    } else if (!comp || comp.error) {
++      if (comp) p = undefined;
+       const [s] = createResource(() => (p || (p = fn())).then(mod => mod.default));
+       comp = s;
+     }
+@@ -1490,10 +1493,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -107,7 +137,7 @@ index 08b339b27b6c149d73a81dd759b483dcde99531b..e4b8bf77ba9cfe3f02c0f9d3aa604afe
      }
      return props.fallback;
    }, undefined, undefined);
-@@ -1694,7 +1695,9 @@ function Suspense(props) {
+@@ -1694,7 +1696,9 @@ function Suspense(props) {
                showContent = true,
                showFallback = true
              } = show ? show() : {};
@@ -119,7 +149,7 @@ index 08b339b27b6c149d73a81dd759b483dcde99531b..e4b8bf77ba9cfe3f02c0f9d3aa604afe
              dispose && dispose();
              dispose = ctx = p = undefined;
 diff --git a/dist/solid.js b/dist/solid.js
-index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..1011f2f27ab24eb6637d02b89c62ed0527b8a820 100644
+index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..4c1ecd4416ab7689f2d5bdc759b8ab7c30fa5b10 100644
 --- a/dist/solid.js
 +++ b/dist/solid.js
 @@ -782,7 +782,9 @@ function runTop(node) {
@@ -133,7 +163,17 @@ index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..1011f2f27ab24eb6637d02b89c62ed05
    const ancestors = [node];
    while ((node = node.owner) && (!node.updatedAt || node.updatedAt < ExecCount)) {
      if (runningTransition && Transition.disposed.has(node)) return;
-@@ -1488,10 +1490,9 @@ function Show(props) {
+@@ -1440,7 +1442,8 @@ function lazy(fn) {
+         setHydrateContext();
+       });
+       comp = s;
+-    } else if (!comp) {
++    } else if (!comp || comp.error) {
++      if (comp) p = undefined;
+       const [s] = createResource(() => (p || (p = fn())).then(mod => mod.default));
+       comp = s;
+     }
+@@ -1488,10 +1491,9 @@ function Show(props) {
      if (c) {
        const child = props.children;
        const fn = typeof child === "function" && child.length > 0;
@@ -147,7 +187,7 @@ index ad7d8dbfab300ee0fc2f912eb628cd33472603b7..1011f2f27ab24eb6637d02b89c62ed05
      }
      return props.fallback;
    }, undefined, undefined);
-@@ -1692,7 +1693,9 @@ function Suspense(props) {
+@@ -1692,7 +1694,9 @@ function Suspense(props) {
                showContent = true,
                showFallback = true
              } = show ? show() : {};

@@ -94,6 +94,7 @@ acorn-plugin-sdk/remote: value Facts
 acorn-plugin-sdk/remote: value Fallback
 acorn-plugin-sdk/remote: value Field
 acorn-plugin-sdk/remote: value FileHead
+acorn-plugin-sdk/remote: value FilterBar
 acorn-plugin-sdk/remote: value FindBar
 acorn-plugin-sdk/remote: value Fold
 acorn-plugin-sdk/remote: value Grid
@@ -474,6 +475,8 @@ acorn-plugin-types: member CoreProjectService.update
 acorn-plugin-types: member CoreSecretService.seal
 acorn-plugin-types: member CoreSecretService.use
 acorn-plugin-types: member CoreSecretService.useOptional
+acorn-plugin-types: member CoreServices.agentToolProvenance
+acorn-plugin-types: member CoreServices.agentToolProvenance.verify
 acorn-plugin-types: member CoreServices.context
 acorn-plugin-types: member CoreServices.data
 acorn-plugin-types: member CoreServices.fs
@@ -489,6 +492,7 @@ acorn-plugin-types: member CoreServices.telemetry
 acorn-plugin-types: member CoreTaskService.active
 acorn-plugin-types: member CoreTaskService.adoptPullNumbers
 acorn-plugin-types: member CoreTaskService.attachPull
+acorn-plugin-types: member CoreTaskService.branchClaims
 acorn-plugin-types: member CoreTaskService.cancel
 acorn-plugin-types: member CoreTaskService.createChild
 acorn-plugin-types: member CoreTaskService.idsForWorkspace
@@ -920,6 +924,9 @@ acorn-plugin-types: member Principal.kind
 acorn-plugin-types: member Principal.scope
 acorn-plugin-types: member Principal.sessionId
 acorn-plugin-types: member Principal.taskId
+acorn-plugin-types: member Principal.toolCeiling
+acorn-plugin-types: member Principal.toolCeiling.allow
+acorn-plugin-types: member Principal.toolCeiling.maxRisk
 acorn-plugin-types: member Principal.userId
 acorn-plugin-types: member ProcResult.aborted
 acorn-plugin-types: member ProcResult.code

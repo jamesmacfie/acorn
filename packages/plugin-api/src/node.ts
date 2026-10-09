@@ -66,6 +66,9 @@ export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 // The portable carrier a loaded plugin uses to run its own Hono router through
 // `ctx.routes.fetch` (docs/plugins/loaded-plugins.md § Loaded plugins).
 export { portableCarrier } from '@acorn/node-core/server/pluginHost'
+// Routes whose module loads on the first request rather than at boot
+// (docs/plugin-authoring/the-node-half.md § Load a route on first use).
+export { LazyRouteLoadError, lazyFetch, lazyRouter } from '@acorn/node-core/server/pluginHost'
 export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 export { ScheduleSkipped } from '@acorn/node-core/server/schedules/scheduler.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'

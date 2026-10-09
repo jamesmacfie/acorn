@@ -18,7 +18,7 @@ import type { WorkflowStepProjection } from '../../shared/api'
 import { gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
 import type { WorkflowGateForm } from '../../shared/workflowContracts'
 import TypedValueField from '../editor/TypedValueField'
-import { formatCost, formatDuration, kindRunsAgent, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
+import { formatCost, formatDuration, kindLabel, kindRunsAgent, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 import GoalDetails from './GoalDetails'
 import { ChildRuns, RunLineage } from './RunRelationships'
@@ -173,7 +173,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   // would stop the toolbar moving as the step's status does.
   const meta = (current: () => WorkflowStepRow) => (
     <Text emphasis="muted">
-      {[model.kindLabel(current().kind), statusLabel(current().status), formatCost(current().costUsd ?? 0), stepElapsed(current(), model.now())]
+      {[model.contributedKindLabel(current().kind) ?? kindLabel(current().kind), statusLabel(current().status), formatCost(current().costUsd ?? 0), stepElapsed(current(), model.now())]
         .filter(Boolean).join(' · ')}
     </Text>
   )

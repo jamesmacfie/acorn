@@ -1,5 +1,6 @@
 import { lazy } from 'solid-js'
 import type { SourceContribution } from '@acorn/plugin-api/client'
+import { activeNodeId } from '@acorn/plugin-api/client'
 
 const GitSourceList = lazy(() => import('./HistoryBrowse').then((module) => ({ default: module.GitSourceList })))
 const GitSourceDetail = lazy(() => import('./HistoryBrowse').then((module) => ({ default: module.GitSourceDetail })))
@@ -7,6 +8,7 @@ const GitSourceDetail = lazy(() => import('./HistoryBrowse').then((module) => ({
 export const gitSourceContribution: SourceContribution<never> = {
   id: 'git', order: 45, glyph: 'git-branch', label: 'Git',
   projectScoped: true, requiresGitProject: true,
+  viewKey: (projectId) => JSON.stringify(['git', activeNodeId(), projectId]),
   routes: [
     { id: 'git.history', path: '/p/:projectId/x/git/history', order: 30 },
     { id: 'git.revision', path: '/p/:projectId/x/git/history/:commitId', order: 31 },
@@ -21,5 +23,5 @@ export const gitSourceContribution: SourceContribution<never> = {
     { id: 'git.compare', path: '/p/:projectId/x/git/compare', order: 55 },
     { id: 'git.comparison', path: '/p/:projectId/x/git/compare/:source/:destination/:mode/:base', order: 56 },
   ],
-  regions: { list: GitSourceList, detail: GitSourceDetail, scroll: true },
+  regions: { list: GitSourceList, detail: GitSourceDetail },
 }

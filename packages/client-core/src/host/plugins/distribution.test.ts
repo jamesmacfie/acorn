@@ -33,9 +33,9 @@ vi.mock('./host', () => ({
   cachePluginBundle: async () => ({ hash: 'cached' }),
   readPluginHostState: async () => hostState(),
 }))
-vi.mock('../tree/workerHost', () => ({ stopTreeWorker: vi.fn() }))
 
 const { distribution, forgetPluginNode, _resetPluginDistribution, syncPluginDistribution } = await import('./distribution')
+const { installTreeWorkerTeardown } = await import('../tree/workerTeardown')
 
 const runtime = (hash: string): PluginRuntimeIdentity => ({
   version: hash,
@@ -122,5 +122,49 @@ describe('plugin distribution reconciliation', () => {
     await Promise.all([earlier, later])
     expect(selected('b')).toBe('two')
     expect(distribution().byNode.get('b')?.generation).toBeGreaterThan(1)
+  })
+
+  it('stops a withdrawn identity\'s workers in the commit that withdraws it', async () => {
+    const stopped: string[] = []
+    installTreeWorkerTeardown((key, reason) => stopped.push(`${key.pluginId} ${key.hash}: ${reason}`))
+    await syncPluginDistribution()
+    expect(stopped).toEqual([])
+    rosters.set('a', [row('two')])
+    rosters.set('b', [row('two')])
+    await syncPluginDistribution()
+    expect(stopped).toEqual(['reports one: plugin selection withdrawn'])
+  })
+
+  it('commits the selected node before a slow remote read finishes', async () => {
+    let release: ((rows: NodePluginRow[]) => void) | undefined
+    readRoster = async (nodeId) => nodeId === 'b'
+      ? new Promise<NodePluginRow[]>((resolve) => { release = resolve })
+      : rosters.get(nodeId) ?? []
+    const pending = syncPluginDistribution()
+    await vi.waitFor(() => expect(selected('a')).toBe('one'))
+    expect(release).toBeTypeOf('function')
+    expect(selected('b')).toBeUndefined()
+    release!([row('two')])
+    await pending
+    expect(selected('b')).toBe('two')
+  })
+
+  it('reads independent nodes at once', async () => {
+    paired = ['a', 'b', 'c']
+    rosters.set('c', [row('one')])
+    const waiting: string[] = []
+    const releases: (() => void)[] = []
+    readRoster = async (nodeId) => {
+      if (nodeId !== 'a') {
+        waiting.push(nodeId)
+        await new Promise<void>((resolve) => releases.push(resolve))
+      }
+      return rosters.get(nodeId) ?? []
+    }
+    const pending = syncPluginDistribution()
+    await vi.waitFor(() => expect(waiting.sort()).toEqual(['b', 'c']))
+    for (const release of releases) release()
+    await pending
+    expect(selected('c')).toBe('one')
   })
 })

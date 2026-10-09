@@ -116,3 +116,59 @@ For a compiled channel handler, `onFrame`'s opaque connection token identifies o
 resource lifetime. Key subscriptions and interactive resources by that token, and release them in
 `onDisconnect`, because one socket can carry several viewers. The token carries no credentials. Core
 applies the socket's authorization before dispatch, and the channel owner validates its own payloads.
+
+## Load a route on first use
+
+A route registered in `init` normally imports its code at Node boot. The Node build counts that code
+against its startup budget (`apps/node/scripts/check-service-budget.mjs`). Two helpers on
+`@acorn/plugin-api/node` keep the registration in `init` and load the module behind it on its first
+request:
+
+- `lazyFetch(load)` wraps a handler for `ctx.routes.fetch`. `load` resolves to a
+  `(Request, PluginRequestContext) => Response` function.
+- `lazyRouter(load)` wraps a compiled plugin's Hono router for `ctx.routes.register`. The loaded
+  router runs with the host's request context, so `ownerId(c)`, `c.env`, route parameters, mount order,
+  and the app's error handler behave as they do for a router built at boot. A path the router doesn't
+  serve falls through to the next handler.
+
+```ts
+ctx.routes.fetch(lazyFetch(async () =>
+  (await import('../server/data/pullSourceHandler')).createPullSourceHandler()), { prefix: '/data/pulls' })
+ctx.routes.register(lazyRouter(async () =>
+  (await import('../server/routes/mirrorRoutes')).mirrorRoutes(store, ctx.core, emit)), { prefix: '/repos' })
+```
+
+Both helpers cache the load promise, so concurrent first requests share one load. A rejected load
+clears the cache, and the next request retries it. Call each helper inside `init`, so a reload builds
+a fresh handler with the reloaded plugin's handles. If the loaded module opens a connection, starts a
+timer, or subscribes to anything, give that resource an owner that `dispose` closes. A cached promise
+doesn't close anything.
+
+Use one when both of these hold:
+
+- `pnpm --filter @acorn/node measure:service-graph` shows that the module adds about 10 KB or more,
+  and `--why <path fragment>` shows that nothing else on the boot path imports it.
+- A normal boot doesn't need the route before the first request reaches it.
+
+Keep these at boot:
+
+- Work `init` or `ready` has to finish: opening stores, migrations, recovery of interrupted work, and
+  schedule registration.
+- Declarations that tell the Node something exists: route mounts, tool names and schemas, data source
+  descriptors, context sections, hooks, and schedule keys. Their implementations can load lazily.
+- A module that registers something as a side effect of being imported. Loading it lazily drops the
+  registration.
+
+Several routers that share a prefix match in registration order. Build them in one module, in that
+order, and wrap the module in a single `lazyRouter`, as the GitHub plugin does in
+`plugins/github/src/server/routes/mirrorRoutes.ts`. Pin the order with a test, because the Node's route
+golden sees only the one lazy mount.
+
+### Diagnose a first-use failure
+
+A load that throws answers the request with the usual 500 error envelope. The Node logs
+`unhandled error name=LazyRouteLoadError` with the request path, and the original error is the
+`cause`. A handler that throws after a successful load logs its own error name. The error moves from
+boot to the first request, so boot tests don't catch it. Request the route once in `pnpm dev:agent`,
+or through `createApp()` in a test, as `apps/node/test/integration/routeRegistry.test.ts` does for the
+GitHub mirror.

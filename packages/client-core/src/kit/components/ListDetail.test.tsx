@@ -1,4 +1,5 @@
 import { render } from 'solid-js/web'
+import { createSignal } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ListDetail } from './primitives'
 
@@ -72,5 +73,23 @@ describe('ListDetail', () => {
 
     handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
     expect(root.style.gridTemplateColumns).toBe('120px 1px minmax(0, 1fr)')
+  })
+
+  it('restores a resized sidebar after remount and scopes widths to the supplied identity', () => {
+    const [key, setKey] = createSignal('retained-git-project')
+    const draw = () => render(() => <ListDetail widthKey={key()} list={<span>list</span>}>detail</ListDetail>, host)
+    let dispose = draw()
+    const root = () => host.querySelector<HTMLElement>('.ui-listdetail')!
+    Object.defineProperty(root(), 'offsetWidth', { configurable: true, value: 800 })
+    Object.defineProperty(host.querySelector('.ui-listdetail-list')!, 'offsetWidth', { configurable: true, value: 200 })
+    host.querySelector('[role="separator"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    dispose()
+    dispose = draw()
+    expect(root().style.gridTemplateColumns).toBe('216px 1px minmax(0, 1fr)')
+    setKey('other-git-project')
+    expect(root().style.gridTemplateColumns).toBe('')
+    setKey('retained-git-project')
+    expect(root().style.gridTemplateColumns).toBe('216px 1px minmax(0, 1fr)')
+    dispose()
   })
 })

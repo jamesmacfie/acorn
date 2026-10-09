@@ -1,7 +1,10 @@
-import { Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import { createEffect, createRenderEffect, on, onCleanup, Show, Suspense, type Component } from 'solid-js'
+import { useParams } from '@solidjs/router'
 import { DetailColumn, ListColumn, ListDetail } from '../../../kit/components/primitives'
-import type { SourceContribution } from './sources'
+import { ContributionBoundary } from '../../../kit/components/content/ContributionBoundary'
+import { RegionLoading } from '../../layouts/RegionLoading'
+import { featureMounted, openFeature } from '../../../infra/telemetry/featureOpening'
+import { sourceRegistry, type SourceContribution } from './sources'
 
 // A browse source on screen, whichever way it declared itself.
 //
@@ -15,24 +18,53 @@ import type { SourceContribution } from './sources'
 // difference is the one that asked for the field. The terminal reads `regions` itself and never calls
 // this, because it draws the two halves in two different panels (apps/tui/src/chrome/Shell.tsx).
 export function SourceSurface(props: { source: SourceContribution }) {
+  const params = useParams<{ projectId?: string }>()
+  const viewKey = () => props.source.viewKey?.(params.projectId)
+  const sidebarKey = () => viewKey() ?? props.source.id
+  // No source reports usable content, so its opening is a mount proxy
+  // (docs/telemetry/renderer.md § Feature openings). Keyed on the id rather than on this component,
+  // because switching sources hands this same component a new source. The render effect opens the
+  // record before the surface draws, and the effect closes it once the surface has mounted.
+  const sourceId = () => props.source.id
+  createRenderEffect(on(sourceId, (id) => onCleanup(openFeature(id, sourceRegistry.ownerOf(id) ?? 'core', { kind: 'source', reportsUsable: false }))))
+  createEffect(on(sourceId, featureMounted))
   return (
     <Show when={props.source.regions} fallback={
       <Show when={props.source.component}>
-        {(component) => <Dynamic component={component()} />}
+        {(component) => <SourceRegion source={props.source} component={component()} />}
       </Show>
     }>
       {(regions) => (
         // Keyed by the source, so collapsing GitHub's list leaves Linear's alone and each comes back
         // where it was left (kit/lib/layout/collapseState.ts). Every source that hands over two halves is a
         // list beside a detail, so none of them has to ask for the control.
-        <ListDetail split collapseKey={props.source.id}>
-          <ListColumn scrollKey={props.source.id}>
-            <Dynamic component={regions().list} />
+        <ListDetail split collapseKey={sidebarKey()} widthKey={viewKey()}>
+          <ListColumn scrollKey={sidebarKey()}>
+            <SourceRegion source={props.source} component={regions().list} />
           </ListColumn>
           <DetailColumn scroll={regions().scroll} measure={regions().measure}>
-            <Dynamic component={regions().detail} />
+            <SourceRegion source={props.source} component={regions().detail} />
           </DetailColumn>
         </ListDetail>
+      )}
+    </Show>
+  )
+}
+
+/**
+ * One part of a source under boundaries of its own, so a list that fails or is still loading leaves
+ * the detail beside it alone. Keyed on the component: a boundary that has drawn never shows its
+ * placeholder again (patches/README.md), and a source switch hands this the next source's component.
+ */
+function SourceRegion(props: { source: SourceContribution; component: Component }) {
+  return (
+    <Show when={props.component} keyed>
+      {(Region) => (
+        <ContributionBoundary contributionId={props.source.id} owner={sourceRegistry.ownerOf(props.source.id)}>
+          <Suspense fallback={<RegionLoading label={props.source.label} />}>
+            <Region />
+          </Suspense>
+        </ContributionBoundary>
       )}
     </Show>
   )

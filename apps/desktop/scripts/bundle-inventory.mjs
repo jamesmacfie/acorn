@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { pruneRuntimeDependencies } from '../../../scripts/prune-runtime.mjs'
 import { sha256 } from './node-runtime.mjs'
 
 const trees = [
@@ -35,6 +36,13 @@ export function verifyResources(pkg, resources, fail) {
   }
   for (const file of required) {
     if (!existsSync(join(resources, file))) fail(`the bundle is missing ${file}.`)
+  }
+  // The digest check above only proves staged files arrived. This proves nothing omitted came back.
+  const runtimeModules = join(resources, 'helper/node_modules')
+  if (existsSync(runtimeModules)) {
+    for (const { path } of pruneRuntimeDependencies(runtimeModules, { dryRun: true }).removed) {
+      fail(`the bundle ships helper/node_modules/${path}, which the runtime file policy omits.`)
+    }
   }
   const pluginRoot = join(resources, 'plugins')
   const plugins = existsSync(pluginRoot) ? readdirSync(pluginRoot) : []

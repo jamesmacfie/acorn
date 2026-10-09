@@ -87,6 +87,8 @@ Paths are under `packages/client-core/src` unless they start with `apps/`.
 | A diff pane's first plain rows | `features/diff/DiffPane.tsx` | Histogram `diff.first_plain`, labelled only by `cache` |
 | Every delivered notice | `features/notifications/deliver.ts` | Event `notice.delivered` with the kind and whether it landed read |
 | The boot account | `apps/desktop/src/client/boot.ts` | Span `renderer.boot` with a `renderer.boot.mark` child per mark, built once the switch is on and the Node is ready |
+| The startup milestones | `apps/desktop/src/client/startupMilestones.ts` | Spans `renderer.startup.first_frame`, `.restored`, and `.usable` ([startup milestones](#startup-milestones)) |
+| Every pane, source, and Settings opening | `infra/telemetry/featureOpening.ts` | Span `ui.feature.open` ([feature openings](#feature-openings)) |
 | Uncaught error or rejection | `apps/desktop/src/client/index.tsx` | A fatal error with its stack |
 | Console lines | Everywhere under client-core and the desktop client and shell | Log records through `createLogger(tag)` |
 
@@ -98,3 +100,69 @@ reader nor the timeline made, and `took`, the reader's place changing without th
 when their turn has left the list. The diff cache histograms are `.hit`, `.miss`, `.insert`, `.evict`,
 `.evicted_rows`, `.evicted_bytes`, `.oversize`, and the resident `.documents`, `.segments`, `.rows`,
 `.plain_bytes`, and `.enrichment_bytes` ([resident segments](../diff-rendering/loading.md#resident-segments)).
+
+## Startup milestones
+
+`apps/desktop/src/client/startupMilestones.ts` records four moments of a desktop launch. Each is a
+span from the document's navigation, measured with `performance.now()`, recorded once, and in the
+same trace as `renderer.boot`:
+
+| Span | Ends when |
+| --- | --- |
+| `renderer.startup.first_frame` | The first frame the owner could see. The browser's `first-contentful-paint` entry when there is one, labelled `method: 'paint'`. Otherwise the first animation frame callback, labelled `method: 'frame'` and `proxy: true` |
+| `renderer.startup.shell` | The startup screen gave way to the shell: the rail, the top bar, and the content region. The first time in the document, whichever Node it was for |
+| `renderer.startup.restored` | The saved state has hydrated and the shell has chosen where to land |
+| `renderer.startup.usable` | Every feature open at that landing has reported usable, or the landing had none open. Two `renderer.startup.phase` children split it into `restore` and `content`. A launch that stops on a failure or offline screen before it restores ends here too, because that screen is what the person can act on |
+
+`renderer.boot` keeps its endpoint at `nodeReady`. The milestones are separate spans rather than a
+redefinition of it.
+
+Every milestone carries `visibility`. It reads `hidden` when the window was hidden at any point before
+the milestone. macOS runs no animation frames for an occluded window, so a hidden launch's first frame
+lands when the owner uncovers it. Filter on `visibility: visible` before you quote a launch time. The
+roster's 250 ms fallback timer in `apps/desktop/src/client/index.tsx` never counts as a frame.
+
+`usable` carries `features`, the number of features it waited for, `proxy`, true when any of them
+closed on mount, and `outcome`, the worst of `usable`, `cancelled`, and `timeout`. When the launch
+stopped before restoring, `outcome` is `error` or `offline`, `startup.step` names what stopped it
+(`node`, `registration`, `reads`, or `offline`), and `features` is 0. An `error` outcome sets the span's
+status to `error`. A launch that stopped and then restored after **Try again** still records
+`restored`, but keeps the stopped screen as its `usable`.
+
+Each startup failure is also an error record with `seam: 'renderer.startup'` and the same
+`startup.step`, sent once per failure by `apps/desktop/src/client/startupStage.ts`.
+
+The milestones are local numbers until the switch turns on. They're emitted then, the same retroactive
+rule `renderer.boot` follows. The restored and usable milestones belong to the first shell the window
+mounts. A Node switch remounts the shell, which drops any that weren't emitted and records nothing for
+the second Node.
+
+## Feature openings
+
+`packages/client-core/src/infra/telemetry/featureOpening.ts` times how long a feature takes to become
+usable after the host opens it. The host opens a record where it mounts the feature, and the feature
+closes it. The span is `ui.feature.open`, with these attributes:
+
+- `feature.id` and `feature.kind`: a pane ID, a rail source ID, or `settings`.
+- `first`: whether this document has opened that feature before. A first opening also loads the
+  feature's code. Query-cache warmth is a separate fact, reported as `cached` when the feature knows it.
+- `state`: `content`, `empty`, `offline`, or `error`. Each is a usable state. A spinner isn't.
+- `proxy: 'mount'`: the feature doesn't report for itself, so the host closed the record when the
+  feature's first content mounted. Don't read a proxy as usable time.
+- `outcome: 'timeout'`, with status `error`, when nothing closed the record within 30 seconds.
+
+An opening that's closed before it reports, by a task switch or a closed pane, emits nothing. The
+module holds one pending record per feature ID and at most 16 in all, never one per task.
+
+These features report for themselves:
+
+| Feature | Owner | Usable when |
+| --- | --- | --- |
+| Agent pane | `plugins/agents/src/client/sessions/AgentPane.tsx` | The session list answered, and the open session's transcript, the start cards, or an error is on screen |
+| Editor pane | `plugins/editor/src/client/EditorPane.tsx` | The checkout answered and the remembered document is editable, or there's no document or no checkout |
+| Changes pane | `plugins/changes/src/client/ChangesPane.tsx` | The first status read answered, with changes or a clean tree, or the project isn't Git |
+| Settings | `packages/client-core/src/features/settings/SettingsView.tsx` | The page's code and the data it read have arrived. The record starts at the request in `apps/desktop/src/client/App.tsx` |
+
+Every other pane and every rail source is a mount proxy. A pane declares `reportsUsable` and calls
+`featureUsable` to join the table ([pane contributions](../panes/contributions.md#contributions)).
+

@@ -14,8 +14,9 @@ const setup = () => {
   const register = vi.fn()
   const refresh = vi.fn(async (_nodeId: string): Promise<readonly string[] | null> => [])
   const onReady = vi.fn()
-  const startup = createPluginStartup({ load, register, refresh, onReady, activeNode: () => active, disabled: () => [] })
-  return { ...startup, plugins, load, register, refresh, onReady, select: (id: string) => { active = id } }
+  const onFailed = vi.fn()
+  const startup = createPluginStartup({ load, register, refresh, onReady, onFailed, activeNode: () => active, disabled: () => [] })
+  return { ...startup, plugins, load, register, refresh, onReady, onFailed, select: (id: string) => { active = id } }
 }
 
 describe('post-paint compiled plugin startup', () => {
@@ -74,13 +75,42 @@ describe('post-paint compiled plugin startup', () => {
     expect(host.register).toHaveBeenLastCalledWith(host.plugins, ['docker'])
   })
 
-  it('does not release restoration when registration fails', async () => {
+  it('does not release restoration when registration fails, and leaves the node unapplied', async () => {
     const host = setup()
     host.register.mockImplementation(() => { throw new Error('duplicate pane') })
     const apply = host.apply('A')
     await expect(host.initialize()).rejects.toThrow('duplicate pane')
-    await expect(apply).rejects.toThrow('duplicate pane')
+    await apply
     expect(host.onReady).not.toHaveBeenCalled()
+    expect(host.onFailed).toHaveBeenCalledWith(expect.objectContaining({ message: 'duplicate pane' }))
     expect(host.refresh).not.toHaveBeenCalled()
+  })
+
+  it('retries a failed roster import with a fresh attempt, then applies the node', async () => {
+    const host = setup()
+    host.load.mockRejectedValueOnce(new Error('Importing a module script failed'))
+    await expect(host.initialize()).rejects.toThrow('Importing')
+    // A second initialize keeps the failure; only retry discards it.
+    await expect(host.initialize()).rejects.toThrow('Importing')
+    expect(host.load).toHaveBeenCalledTimes(1)
+
+    await host.retry()
+    await host.apply('A')
+    expect(host.load).toHaveBeenCalledTimes(2)
+    expect(host.onReady).toHaveBeenCalledTimes(1)
+    expect(host.register).toHaveBeenLastCalledWith(host.plugins, [])
+  })
+
+  it('does not start a second attempt while one is pending or after one succeeded', async () => {
+    const host = setup()
+    const roster = deferred<typeof host.plugins>()
+    host.load.mockReturnValueOnce(roster.promise)
+    const first = host.initialize()
+    expect(host.retry()).toBe(first)
+    roster.resolve(host.plugins)
+    await first
+    expect(host.retry()).toBe(first)
+    expect(host.load).toHaveBeenCalledTimes(1)
+    expect(host.register).toHaveBeenCalledTimes(1)
   })
 })

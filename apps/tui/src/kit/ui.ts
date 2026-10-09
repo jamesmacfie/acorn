@@ -11,7 +11,7 @@
 export {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
   ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
-  Toolbar, ToolbarSpacer,
+  Toolbar, FilterBar, ToolbarSpacer,
 } from './grouping'
 export {
   Alert, Badge, ChipRow, Chip, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,

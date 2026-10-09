@@ -7,7 +7,7 @@ import {
   distribution, forgetPluginNode, markPluginNodeStale, notifyActivePluginNodeChanged,
   onPluginDistributionCommit, syncPluginDistribution,
 } from './distribution'
-import { syncPluginContributions } from './syncContributions'
+import { syncPluginContributions, syncPluginContributionsInBackground } from './syncContributions'
 import { createLogger } from '../../infra/telemetry/logger'
 import { invalidateDataSources } from '../../features/dataSources/queries'
 import { invalidatePublishedPanels } from '../../features/dashboards/dashboardClient'
@@ -29,20 +29,21 @@ export async function reconcilePluginChange(nodeId: string = activeNodeId() ?? '
 /** A device install, update, toggle, or removal needs no node roster request. */
 export async function reconcileDevicePluginChange(): Promise<void> {
   await syncPluginDistribution({ deviceOnly: true })
-  syncPluginContributions()
+  await syncPluginContributions()
 }
 
-/** A linked place may name a loaded route. The distribution queue includes the device pass and
- * earlier fleet reads; finish the selected node's pass and register its contributions before routing. */
+/** The contribution-readiness result. A linked place may name a loaded route. The distribution queue
+ * includes the device pass and earlier fleet reads; finish the selected node's pass, load the frame and
+ * chrome hosts, and register its contributions before routing. Rejects when either step fails. */
 export async function preparePluginContributionsForNode(nodeId: string): Promise<void> {
   await syncPluginDistribution({ nodeIds: [nodeId] })
-  syncPluginContributions()
+  await syncPluginContributions()
 }
 
 /** Plugin lifecycle events are fleet control events. Ordinary task streams still obey the active
  * node WebSocket filter. The status effect tracks transitions, so reconnects read again. */
 export function watchPluginChanges(): () => void {
-  const unsubscribeCommit = onPluginDistributionCommit(syncPluginContributions)
+  const unsubscribeCommit = onPluginDistributionCommit(syncPluginContributionsInBackground)
   // Device bundles can register before any node has connected. Reconciliation is serialized with
   // subsequent fleet reads in distribution.ts, so an arriving node cannot overtake this pass.
   void reconcileDevicePluginChange().catch((error: unknown) => log.warn('could not read device plugins', error))

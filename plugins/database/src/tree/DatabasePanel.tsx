@@ -1,7 +1,7 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import {
   Alert, Badge, Button, DetailColumn, EmptyState, formatChord, Grid, Heading,
-  IconButton, Input, ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, Toolbar, ToolbarSpacer,
+  IconButton, Input, ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, FilterBar, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbSavedQuery, DbTable } from '../shared/database'
@@ -350,9 +350,9 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
           <SectionHeader count={connected() ? tables().length : undefined}>Tables</SectionHeader>
           {/* Last-known tables remain visible while the connection check runs. */}
           <Show when={connected() || tables().length > 0}>
-            <Toolbar size="sm" ariaLabel="Filter tables">
+            <FilterBar ariaLabel="Filter tables">
               <Input kind="filter" label="Filter tables" placeholder="Filter tables…" value={filter()} onChange={(value: string) => { userChanged = true; setFilter(value) }} />
-            </Toolbar>
+            </FilterBar>
             <For each={filtered()} fallback={<EmptyState align="start" size="sm">No tables</EmptyState>}>
               {(t) => (
                 <Row

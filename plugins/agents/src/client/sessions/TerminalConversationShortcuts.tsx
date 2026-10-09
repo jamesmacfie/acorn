@@ -1,6 +1,5 @@
 import { onCleanup } from 'solid-js'
-import { registerCommands } from '@acorn/plugin-api/client'
-import { registerKeybindings } from '@acorn/plugin-api/ui/host'
+import { registerCommands, registerKeybindings } from '@acorn/plugin-api/client'
 
 /** The transcript actions whose desktop buttons take too many terminal rows. */
 export default function TerminalConversationShortcuts(props: {

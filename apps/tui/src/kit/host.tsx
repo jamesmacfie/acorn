@@ -32,14 +32,12 @@ import { Modal, ModalBody, SectionHeader } from './grouping'
 
 // ── Host machinery, unchanged ─────────────────────────────────────────────────────────────────────
 // Registries and pure rules. None of these draw, so both hosts spend the same module.
-export { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 // From the model rather than from `willPhase.tsx`, which is the DOM's confirmation dialog and would
 // bring a `<div>` with it. The registration and the concern type are the model's own.
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
 export type { Concern } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
 // The shell's one confirmation, drawn by the shell over whatever has the screen (../chrome/Confirmation.tsx).
 export { confirmAction } from '../chrome/confirmStore'
-export { slotFills } from '@acorn/client-core/host/tree'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
 export { RemoteTree } from '../plugins/remoteTreeLoader'
@@ -165,12 +163,12 @@ export function PromoteToTaskModal(_props: {
 // Type-only, so the DOM component this names is erased rather than imported.
 export type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
 
-/** The Config files tab of the agents plugin's MCP page.
+/** The Config files section of the agents plugin's MCP page.
  *
  *  Absent, and it says so. Core draws the list with the desktop's own controls, and it had no terminal
  *  form when it was a page of its own either. */
 export function McpConfigFiles() {
-  return <Line role="muted">The servers each CLI loads from its own config files are listed on this tab in the desktop app.</Line>
+  return <Line role="muted">The servers each CLI loads from its own config files are listed in the Config files section in the desktop app.</Line>
 }
 
 /** "Is there a task for this thing, and if not, start one".

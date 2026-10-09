@@ -1,6 +1,6 @@
 import { HISTORY_VISIBLE_LANES, type HistorySlot } from '../../lib/layout/historyLayout'
 
-/** One compact row of the history drawing. Text outside this aria-hidden mark names the parents. */
+/** One compact row of the history drawing. Parent actions remain available in the commit menu. */
 export function HistoryMark(props: { slot: HistorySlot }) {
   const shown = () => Math.min(props.slot.lanes, HISTORY_VISIBLE_LANES)
   const hidden = () => Math.max(0, props.slot.lanes - HISTORY_VISIBLE_LANES)
@@ -12,8 +12,10 @@ export function HistoryMark(props: { slot: HistorySlot }) {
         .map((edge) => <line x1={x(edge.from)} y1={edge.start === 'top' ? 0 : 50} x2={x(edge.to)}
           y2={edge.end === 'center' ? 50 : 100} stroke="currentColor" stroke-dasharray={edge.continuation ? '3 3' : undefined}
           vector-effect="non-scaling-stroke" />)}
-      {props.slot.lane < HISTORY_VISIBLE_LANES && <circle cx={x(props.slot.lane)} cy="50" r="4" fill="currentColor" />}
       {hidden() > 0 && <text x={HISTORY_VISIBLE_LANES * 12 + 2} y="53" fill="currentColor" font-size="10">+{hidden()}</text>}
     </svg>
+    {props.slot.lane < HISTORY_VISIBLE_LANES && <svg class="ui-history-node" viewBox="0 0 8 8" style={{ left: `${x(props.slot.lane)}px` }}>
+      <circle cx="4" cy="4" r="4" fill="currentColor" />
+    </svg>}
   </span>
 }

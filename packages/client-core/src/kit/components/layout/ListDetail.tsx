@@ -1,8 +1,9 @@
-import { children, createSignal, Show, type JSX } from 'solid-js'
+import { children, createMemo, createSignal, Show, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { sidebarCollapse } from '../../lib/layout/collapseState'
 import { keyedScrollStore, retainScroll } from '../../lib/layout/retainScroll'
 import { createSplitDrag, type SplitDrag } from '../../lib/layout/split'
+import { listWidthState } from '../../lib/layout/listWidthState'
 import Icon from '../content/Icon'
 import { Button } from '../inputs/Button'
 
@@ -66,6 +67,8 @@ export function ListDetail(props: {
   /** `narrow` is the compact identifier switcher, `default` is the browse list, and `wide` is a
    *  column that holds a document rather than a picker. */
   listWidth?: 'narrow' | 'default' | 'wide'
+  /** Session identity for a resized list column. */
+  widthKey?: string
   /** Detail column scrolls as one region. Otherwise its children own their scrolling. */
   scrollDetail?: boolean
   /** `main` when this split is the document itself, such as a plugin frame where nothing else
@@ -97,7 +100,14 @@ export function ListDetail(props: {
   // resolves the prop once and hands the same nodes to all three readers.
   const list = children(() => props.list)
   const columns = children(() => props.children)
-  const [width, setWidth] = createSignal(0)
+  const localWidth = createSignal(0)
+  const widthState = createMemo(() => {
+    const key = props.widthKey
+    if (key === undefined) return localWidth
+    return listWidthState(key)
+  })
+  const width = () => widthState()[0]()
+  const setWidth = (value: number) => widthState()[1](value)
   const collapse = () => props.collapseKey === undefined ? undefined : sidebarCollapse(props.collapseKey)
   const collapsed = () => collapse()?.[0]() === true
   let root: HTMLDivElement | undefined

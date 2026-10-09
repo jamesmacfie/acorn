@@ -1,11 +1,10 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, queryOwner, clientEvents, consumeTerminalFocusIntent, formatChord, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, clientEvents, consumeTerminalFocusIntent, formatChord, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, registerKeybindings, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
 import { activeTerminal, addSession, refreshSessions, rememberActiveTerminal, sessions } from './sessionStore'
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import {
   Alert, Button, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
 } from '@acorn/plugin-api/ui'

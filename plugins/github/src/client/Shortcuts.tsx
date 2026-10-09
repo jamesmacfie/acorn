@@ -1,8 +1,7 @@
 import { createMemo, onCleanup, onMount } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
-import { projectsOptions, registerCommands } from '@acorn/plugin-api/client'
-import { registerKeybindings } from '@acorn/plugin-api/ui/host'
+import { projectsOptions, registerCommands, registerKeybindings } from '@acorn/plugin-api/client'
 import { useChangedFiles } from './changedFiles'
 import { githubCommands } from './commands'
 

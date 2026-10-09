@@ -34,6 +34,7 @@ export declare const Card: (props: KitNodeProps) => JSX.Element
 export declare const Timeline: (props: KitNodeProps) => JSX.Element
 export declare const Tabs: (props: KitNodeProps) => JSX.Element
 export declare const Toolbar: (props: KitNodeProps) => JSX.Element
+export declare const FilterBar: (props: KitNodeProps) => JSX.Element
 export declare const Modal: (props: KitNodeProps) => JSX.Element
 export declare const ModalBody: (props: KitNodeProps) => JSX.Element
 export declare const ModalActions: (props: KitNodeProps) => JSX.Element

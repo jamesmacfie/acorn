@@ -410,8 +410,12 @@ type MetricEntry = { at: number; name: string; type: 'counter' | 'gauge' | 'dist
  * mean inventing samples it no longer has. Its four useful numbers go as three gauges and a counter
  * instead, so `sql.select.p95` is a series somebody can chart and `sql.select.count` still adds up.
  */
+// Acorn's emitters write durations as `ms`. Sentry only recognises its own unit names, so a duration
+// would otherwise chart as a bare number. Every other unit, such as `byte`, is already Sentry's name.
+const sentryUnit = (unit: string): string => (unit === 'ms' ? 'millisecond' : unit)
+
 function metricEntries(metric: Metric): MetricEntry[] {
-  const base = { at: metric.at, attrs: metric.attrs, ...(metric.unit ? { unit: metric.unit } : {}) }
+  const base = { at: metric.at, attrs: metric.attrs, ...(metric.unit ? { unit: sentryUnit(metric.unit) } : {}) }
   if (typeof metric.value === 'number') {
     return [{ ...base, name: metric.name, type: metric.type === 'count' ? 'counter' : 'gauge', value: metric.value }]
   }

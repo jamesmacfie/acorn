@@ -34,6 +34,7 @@ export const NODE_SUPPORT = {
     loss: 'the reader is not put back on the turn they left; a redrawn list opens at the newest turn' },
   Tabs: { dom: 'full', tui: 'full' },
   Toolbar: { dom: 'full', tui: 'full' },
+  FilterBar: { dom: 'full', tui: 'full' },
   Modal: { dom: 'full', tui: 'full' },
   // The two halves of a Modal as nodes rather than as `Modal.Body` and `Modal.Actions`: a remote tree
   // names one type per node and has nowhere to put the dot.

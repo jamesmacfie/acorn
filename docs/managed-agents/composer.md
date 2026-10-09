@@ -33,8 +33,10 @@ spans take the pointer and hand the caret back to the textarea on mousedown.
 between three rows and 18. The textarea handles the keymap's `maximize` intent while focused, before
 the shell's pane-maximize binding. Outside the field, the chord maximizes the pane. The terminal also
 registers `agents.composer.expand` on Alt+E for terminals that can't distinguish modified Enter.
-The transcript yields the height and keeps its place. The state is per composer and lasts the app
-session, because two panes on one session are two readers.
+The transcript yields the height and keeps its place. The owning Node's preferences remember the
+expanded or collapsed choice per session, through the task-scoped `agents.composer-expansion` slice.
+Returning to a session or relaunching restores its field height. Two panes showing the same session
+share the choice. Sessions without a saved choice start collapsed.
 
 ## Composer slots
 
@@ -82,8 +84,8 @@ tiles alone.
 `composerState.ts` owns one mutable draft for each Node and session. It holds text, attachment IDs,
 context, hydration, and the send, upload, replacement, and capture guards. A rendered composer holds
 that draft while it is visible and reads it again when navigation changes the session or Node.
-Presentation choices, including field height, context dismissal, and the open picker, stay in
-`AgentComposer.tsx`.
+`composerPrefs.ts` owns the saved field height per session and removes it when a session is deleted
+or its task is evicted. Context dismissal and the open picker stay in `AgentComposer.tsx`.
 
 `submitOperation.ts` assembles the captured text, file mentions, attachments, context, policy, and
 source before it enqueues a turn. The shared draft acknowledges the submitted revisions after the

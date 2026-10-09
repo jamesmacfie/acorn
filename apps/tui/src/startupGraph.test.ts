@@ -51,7 +51,7 @@ describe('complete terminal startup budget', () => {
   it('keeps a static edge even when the same chunk also has a dynamic edge', () => {
     chunk('main.js', 100, ['chunks/big.js'], [], ['chunks/big.js'])
     chunk('chunks/big.js', 800_000)
-    expect(check().output).toContain('over its 732000B ceiling')
+    expect(check().output).toContain('over its 700000B ceiling')
   })
 
   it('counts launcher-only bytes that an App-only walk would miss', () => {

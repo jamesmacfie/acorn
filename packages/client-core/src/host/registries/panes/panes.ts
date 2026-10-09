@@ -2,11 +2,12 @@ import { createComponent, createMemo, createRenderEffect, lazy, onCleanup, onMou
 import type { QueryClient } from '@tanstack/solid-query'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
-import { suppliedLayout } from '../../layouts/table'
+import { suppliedLayout, suppliedRegionPlaceholder } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { markPaneDrawn, paneDrawn, paneModel, paneModelScope } from './paneModels'
 import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
+import { featureMounted } from '../../../infra/telemetry/featureOpening'
 import { Registry, type Disposable } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 
@@ -49,12 +50,20 @@ type PaneCommon = {
    * would find no worktree, and a pane that can start work would start it on a task that is archived.
    */
   readsArchived?: boolean
+  /**
+   * This pane calls `featureUsable(id)` once its content can be used
+   * (docs/telemetry/renderer.md § Feature openings). Without it the host closes the pane's opening
+   * record when the pane mounts, and labels that measurement a proxy.
+   */
+  reportsUsable?: boolean
 }
 
 export type PaneContribution = PaneCommon & {
   component: Component<{ task: Task }>
   /** Set when the pane declared a layout. Read by nothing but a test; the component below draws it. */
   layout?: PaneLayoutName
+  /** Set by the host for a declared layout: start loading the layout's and regions' code without drawing. */
+  preload?: () => void
 }
 
 /**
@@ -140,12 +149,20 @@ export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
  * waiting on a `lazy()` import or a resource ends its span when the reader can see it, not when the
  * host asked for it.
  */
-function MeasuredRegion(props: { span: SpanHandle; children: JSX.Element }): JSX.Element {
+function MeasuredRegion(props: { paneId: PaneId; span: SpanHandle; children: JSX.Element }): JSX.Element {
   onMount(() => {
     recordSample('core', 'pane.region.mount', 1)
     props.span.end()
+    // The first region with content is the proxy for a pane that does not report usable for itself.
+    featureMounted(props.paneId)
   })
   return props.children
+}
+
+/** The host's labelled placeholder for a pane whose layout or region code is still loading. */
+function loadingPlaceholder(label: string): JSX.Element {
+  const Placeholder = suppliedRegionPlaceholder()
+  return Placeholder ? createComponent(Placeholder, { label }) : null
 }
 
 /** Turn a declared layout into the component every consumer of this registry already expects. */
@@ -168,6 +185,13 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
   const Draw = lazy(async () => ({ default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout] }))
   return {
     ...entry,
+    // A region that is not a `lazy()` has nothing to load. A failed load is the region boundary's to
+    // show when the pane draws, with its Try again.
+    preload: () => {
+      for (const component of [Draw, ...Object.values(entry.regions)]) {
+        void (component as { preload?: () => Promise<unknown> }).preload?.().catch(() => {})
+      }
+    },
     component: (props) => {
       const scope = paneModelScope()
       const regions: Record<string, Region> = {}
@@ -181,11 +205,11 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id, scope)))
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
-        // renders as an empty string, which draws the region's rectangle empty until the module
-        // lands. One boundary per region rather than one per pane, so a slow region does not blank
-        // the ones beside it. It used to be here for a harder reason, a cell host that refused a bare
-        // string outright; that rule went with the terminal rewrite
-        // (apps/tui/src/tree/renderer.ts).
+        // renders as an empty string, which drew the region's rectangle empty until the module
+        // landed. The boundary draws the host's labelled placeholder instead. One boundary per region
+        // rather than one per pane, so a slow region does not blank the ones beside it. It used to be
+        // here for a harder reason, a cell host that refused a bare string outright; that rule went
+        // with the terminal rewrite (apps/tui/src/tree/renderer.ts).
         //
         // The boundary covers the module arriving and nothing after it. Everything under a region
         // shares it, and `@tanstack/solid-query` suspends whatever boundary is above it whenever
@@ -202,9 +226,10 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
             attrs: { seam: 'pane.region', 'pane.id': entry.id, 'pane.region': name },
           })
           return createComponent(Suspense, {
-            fallback: null,
+            get fallback() { return loadingPlaceholder(entry.label) },
             get children() {
               return createComponent(MeasuredRegion, {
+                paneId: entry.id,
                 span,
                 get children() {
                   return createComponent(Region, {
@@ -218,8 +243,8 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
         }
       }
       // The layout is a `lazy` too, and a pending one renders as an empty string for the same
-      // reason a region does, so it gets the same boundary.
-      return createComponent(Suspense, { fallback: null, get children() { return createComponent(Draw, {
+      // reason a region does, so it gets the same boundary and placeholder.
+      return createComponent(Suspense, { get fallback() { return loadingPlaceholder(entry.label) }, get children() { return createComponent(Draw, {
         stateKey: entry.id,
         label: entry.label,
         regions,
@@ -274,9 +299,16 @@ export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
 
 /**
  * The hover half: a rail row calls this on pointer enter and cancels it on leave, so scrolling the
- * rail past twenty rows fetches nothing.
+ * rail past twenty rows fetches nothing. It also starts loading the code of `shown`, the panes the task
+ * opens with, so a first opening doesn't wait on its chunks. Only those: the rest load when opened.
  */
-export const schedulePanePrefetch = (task: Task, queryClient: QueryClient): { cancel: () => void } => {
-  const timer = setTimeout(() => prefetchPanes(task, queryClient), PANE_PREFETCH_HOVER_MS)
+export const schedulePanePrefetch = (task: Task, queryClient: QueryClient, shown: readonly PaneId[] = []): { cancel: () => void } => {
+  const timer = setTimeout(() => {
+    prefetchPanes(task, queryClient)
+    for (const id of shown) {
+      const pane = paneContribution(id)
+      if (pane && paneAvailable(pane, task)) pane.preload?.()
+    }
+  }, PANE_PREFETCH_HOVER_MS)
   return { cancel: () => clearTimeout(timer) }
 }

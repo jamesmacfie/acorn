@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { createSignal } from 'solid-js'
 import { afterEach, expect, it, vi } from 'vitest'
-import { setActiveNode } from '@acorn/plugin-api/testkit/client'
+import { evictScope, setActiveNode } from '@acorn/plugin-api/testkit/client'
 import type { AgentContextContribution, AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import type { AgentAttachment, AgentSession } from '../../contract/wire.ts'
 import { composerDraftState, clearComposerDrafts } from './composerState'
@@ -32,7 +32,33 @@ const mount = (session: () => AgentSession) => {
   return host
 }
 const button = (host: HTMLElement, label: string) => [...host.querySelectorAll('button')].find(item => item.textContent?.includes(label))!
-afterEach(() => { disposals.splice(0).forEach(dispose => dispose()); clearComposerDrafts(); localStorage.clear(); setActiveNode(null); vi.clearAllMocks(); contextFixture.contributions = []; delete window.acorn })
+afterEach(() => { disposals.splice(0).forEach(dispose => dispose()); clearComposerDrafts(); evictScope({ scope: 'node-switched' }); localStorage.clear(); setActiveNode(null); vi.clearAllMocks(); contextFixture.contributions = []; delete window.acorn })
+
+it('remembers expanded and collapsed input per session across navigation and composer mounts', async () => {
+  setActiveNode('A')
+  const [current, setCurrent] = createSignal(row('same'))
+  const first = mount(current)
+  const second = mount(() => row('same'))
+  await tick()
+  const field = (host: HTMLElement) => host.querySelector('textarea')!
+  const toggle = (host: HTMLElement, label: string) =>
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${label} the message box"]`)!.click()
+  expect(field(first).rows).toBe(3)
+  toggle(first, 'Expand')
+  expect(field(first).rows).toBe(18)
+  expect(field(second).rows).toBe(18)
+  setCurrent(row('other'))
+  expect(field(first).rows).toBe(3)
+  setCurrent(row('same'))
+  expect(field(first).rows).toBe(18)
+  const remounted = mount(() => row('same'))
+  expect(field(remounted).rows).toBe(18)
+  toggle(second, 'Collapse')
+  expect(field(first).rows).toBe(3)
+  setCurrent(row('other'))
+  setCurrent(row('same'))
+  expect(field(first).rows).toBe(3)
+})
 
 it('acknowledges the submitted draft while retaining edits and releasing only its shared send guard', async () => {
   setActiveNode('A')

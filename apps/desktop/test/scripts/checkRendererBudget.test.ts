@@ -162,6 +162,35 @@ describe('check-renderer-budget', () => {
     expect(output).toContain('Renderer startup budget exceeded')
   })
 
+  // The compiled roster loads after the first frame, but the restore waits for it, so it has its own
+  // ceiling and the same denylist.
+  const withRoster = (rosterFile: string, modules: Record<string, string[]> = {}, bytes: Record<string, number> = {}) => build({
+    'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'], dynamicImports: ['src/client/plugins.ts'] },
+    _x: { file: 'assets/store-bbbb.js' },
+    'src/client/plugins.ts': { file: `assets/${rosterFile}`, imports: ['_x'] },
+  }, bytes, modules)
+
+  it('counts the roster beyond startup and passes it under its ceiling', () => {
+    withRoster('plugins-cccc.js')
+    const { code, output } = run(dir)
+    expect(code).toBe(0)
+    expect(output).toContain('compiled roster before restore: scripts=60000B in 1 chunks')
+  })
+
+  it('fails over the roster ceiling', () => {
+    withRoster('plugins-cccc.js', {}, { 'assets/plugins-cccc.js': 300_000 })
+    const { code, output } = run(dir)
+    expect(code).toBe(1)
+    expect(output).toContain('Compiled roster budget exceeded')
+  })
+
+  it('fails on a denylisted module in the roster', () => {
+    withRoster('plugins-cccc.js', { 'assets/plugins-cccc.js': ['packages/client-core/src/host/tree/workerHost.ts'] })
+    const { code, output } = run(dir)
+    expect(code).toBe(1)
+    expect(output).toContain('workerHost.ts (in plugins-cccc.js)')
+  })
+
   it('fails under the floor, because a startup set that small is the wrong graph', () => {
     // A guard whose app import the check does not know about: only the guard is counted.
     build({

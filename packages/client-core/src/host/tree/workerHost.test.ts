@@ -5,6 +5,7 @@ import type { TreeSlotBridge } from './workerHost'
 import { allowApi } from '../frames/scopes'
 import { pluginTreeRelayOrigin, pluginTreeRelayUrl } from './isolatedWorker'
 import { _setWorkerFactory, _stopAllTreeWorkers, acquireTreeWorker, stopTreeWorker } from './workerHost'
+import { stopTreeWorkers } from './workerTeardown'
 
 // The lifecycle around a plugin's worker: one per bundle, shared by every tree it serves, stopped when
 // the last one goes and when it stops answering.
@@ -115,7 +116,8 @@ describe('one worker per bundle', () => {
     expect(connected).toEqual(['alpha', 'beta'])
     expect(alpha.bridgePort()).not.toBe(beta.bridgePort())
 
-    stopTreeWorker({ pluginId: 'alpha', hash: HASH }, 'trust withdrawn')
+    // Through the seam distribution calls, which this module installed as it loaded.
+    stopTreeWorkers({ pluginId: 'alpha', hash: HASH }, 'trust withdrawn')
     expect(sandboxes[0]!.terminated).toBe(true)
     expect(sandboxes[1]!.terminated).toBe(false)
     expect(alpha.bridgePort()).toBeNull()

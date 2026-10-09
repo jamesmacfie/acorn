@@ -179,6 +179,29 @@ describe('the client plugin host', () => {
     clear('again')
   })
 
+  // The startup screen's Try again runs the same roster after a pass threw part-way
+  // (apps/desktop/src/client/pluginStartup.ts). Whatever registered or activated before the throw is
+  // taken back first, so the retry leaves one of each and stops the first activation.
+  it('cleans up a pass that threw part-way when the roster runs again', () => {
+    let broken = true
+    const stopped: string[] = []
+    const plugins: ClientPlugin[] = [
+      { name: 'first', init: (ctx) => { ctx.panes.register(pane('host.first')) }, activate: () => () => { stopped.push('first') } },
+      { name: 'second', init: (ctx) => {
+        ctx.panes.register(pane('host.second'))
+        if (broken) throw new Error('second failed to register')
+      } },
+    ]
+    expect(() => initClientPlugins(plugins)).toThrow('second failed to register')
+    broken = false
+    expect(() => initClientPlugins(plugins)).not.toThrow()
+    expect(paneRegistry.entries().filter((entry) => entry.id.startsWith('host.')).map((entry) => entry.id).sort()).toEqual(['host.first', 'host.second'])
+    // The thrown pass never reached activate, so there was nothing to stop.
+    expect(stopped).toEqual([])
+    clear('first', 'second')
+    expect(stopped).toEqual(['first'])
+  })
+
   // The shell runs the host at boot and again when the node answers, and the answer is usually the
   // same. A second pass over the same inputs used to take everything back, register it again and run
   // every `activate` twice, which is two roster reads per launch from the agents plugin alone.

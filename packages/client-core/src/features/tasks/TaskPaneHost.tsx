@@ -1,4 +1,4 @@
-import { createEffect, createSignal, createUniqueId, For, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
 import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import type { Task } from '../../infra/queries'
 import { paneAvailable, paneContribution, paneContributions, paneRegistry, type PaneContribution, type PaneId } from '../../host/registries/panes/panes'
@@ -24,6 +24,7 @@ import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
 import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints/exclusiveSlots'
 import { registerContextMenuItems, type RailPaneTarget } from '../../host/registries/panes/contextMenus'
 import { ContextMenuHost, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
+import { featureMounted, openFeature } from '../../infra/telemetry/featureOpening'
 
 registerCoreExclusiveSlot('pane.switcher', (props) => <PaneSwitcher {...(props.value as PaneSwitcherProps)} />)
 
@@ -185,7 +186,13 @@ export default function TaskPaneHost(props: {
             </section>
           }
         >
-          {(pane, index) => (
+          {(pane, index) => {
+            // One opening per pane per mount. The host remounts this list for each task, so opening
+            // a task opens its panes again. A pane drawn from a layout closes its proxy record when
+            // its first region mounts (registries/panes/panes.ts); any other pane closes it here.
+            onCleanup(openFeature(pane.id, paneRegistry.ownerOf(pane.id) ?? 'core', { kind: 'pane', reportsUsable: pane.reportsUsable === true }))
+            onMount(() => { if (!pane.layout) featureMounted(pane.id) })
+            return (
             <>
               <div
                 ref={(element) => slotRefs.set(pane.id, element)}
@@ -241,7 +248,8 @@ export default function TaskPaneHost(props: {
                 })()}
               </Show>
             </>
-          )}
+            )
+          }}
         </For>
       </div>
 

@@ -12,7 +12,7 @@ import { evictScope } from '@acorn/client-core/host/registries/shell'
 import { emitBootSpans } from './boot'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { setActiveTaskId, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
+import { setLayouts, setRegionPlaceholder } from '@acorn/client-core/host/layouts/table.ts'
 import { setSourcePanel } from '@acorn/client-core/host/chrome'
 import { sourcePanel } from './plugins/SourcePanel'
 import { setExtendedPane } from '@acorn/client-core/host/chrome'
@@ -20,6 +20,7 @@ import { ExtendedPane } from './plugins/ExtendedPane'
 import { setRemoteTree } from '@acorn/client-core/host/tree'
 import { setDocumentSurface } from '@acorn/client-core/host/frames/documentSurface.ts'
 import { LAYOUTS } from './layouts'
+import { Line } from './kit/cells'
 import { RemoteTree } from './plugins/remoteTreeLoader'
 import { Shell } from './chrome/Shell'
 import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
@@ -45,6 +46,8 @@ import { resetFilePrompts } from './chrome/filePrompt'
 // not use. Phase 2 made the table a seam, so a pane's own component is now the thing that draws
 // (client-core/host/layouts/table.ts, docs/tui.md).
 setLayouts(LAYOUTS)
+// And what a pane draws while its code loads: the panel's own loading line, with the pane's name.
+setRegionPlaceholder((props) => <Line role="muted">Loading {props.label}…</Line>)
 
 // The loaded-plugin tree seam. Its worker factory is installed beside the loaded-plugin watcher
 // after the first frame: no bundle can reach this renderer until that watcher starts.

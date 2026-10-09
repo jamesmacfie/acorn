@@ -12,7 +12,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
-| [performance/](./performance/README.md) | Seven phases for Sentry measurements, installed Claude, packaging, minification, startup messages, selective loading, and acceptance. | Approved direction October 9, 2026. Implementation not started. |
 | [editor/](./editor/README.md) | Review the implemented editor and finish repository and supported-platform acceptance. | Six phases implemented. Final review and full test gate remain open. Completion notes moved to Testing. |
 | [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Implementation not started. |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
@@ -33,13 +32,14 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [editor-files.md](./editor-files.md) | Plugin file viewers through an Editor replacement point and a confined read-only file capability. | Proposed. Implementation not started. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
-| [lazy-plugin-code.md](./lazy-plugin-code.md) | A shared promise-caching `lazyFetch` helper and selective route conversion. | Proposed; assigned to [Performance phase 06](./performance/06-selective-server-loading.md). Handwritten lazy routes exist; the shared helper is unbuilt. |
+| [lazy-plugin-code.md](./lazy-plugin-code.md) | A shared promise-caching `lazyFetch` helper and selective route conversion. | Implemented October 9, 2026. The page keeps the original design. |
 | [multi-account.md](./multi-account.md) | Per-account harness configuration pinned to sessions. | Research and proposal. Implementation not started. |
 | [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
 | [task-deletion.md](./task-deletion.md) | Delete a task and its plugin data from the archive dialog or the Archive page, with tombstones for plugin catch-up and **Deleted task** labels. | Proposed October 9, 2026. Implementation not started. |
 | [workflow-agent-goals.md](./workflow-agent-goals.md) | Completion conditions for managed workflow agent steps and For each agents, with bounded continuations, persisted verdicts, and workflow-owned controls and budgets. | Implemented October 8, 2026. See the [reference](../workflows/agent-steps.md#completion-conditions). The standalone Agent pane doesn't yet show a workflow session's goal. |
+| [workflow-agent-tools.md](./workflow-agent-tools.md) | PRD for scoped workflow discovery, agent drafts, approved invocation, bounded run reads, and cancellation. | Proposed October 9, 2026. Implementation not started. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
 ## Choose the owning plan
@@ -311,6 +311,13 @@ the owning docs, and its decisions, refusals and numbers became a dated record. 
 `legacy/performance/`, which covered desktop startup, task switching, streaming work and memory. What
 that plan built is in the owning docs, and each change's before-and-after numbers are in its commit
 message. All three are in git history.
+
+The third `performance/` folder was deleted on 2026-10-09. Its phases 01 to 06 shipped that day:
+startup and feature measurements with Sentry export, the installed Claude Code, production
+minification, startup messages, and loading renderer and server code on first use. The owning docs
+describe the result, and each phase's dated evidence is under `docs/testing/` with a 2026-10-09 date.
+Phase 07, combined acceptance with packaged-host checks and live Sentry evidence, didn't ship. Its
+plan is in git history.
 
 `legacy/` was the architecture review and version-1 reset: thirteen tickets that gave each contract
 one owner and one representation, removed compatibility adoption, and reset every database to one

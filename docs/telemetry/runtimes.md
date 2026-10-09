@@ -70,6 +70,7 @@ nanoseconds, measured on September 11, 2026.
 | Every audit row | `server/audit.ts` | Event `audit.<action>` with the actor and none of the row's details |
 | Uncaught exception or rejection | `apps/node/src/composition/crash.ts` | A fatal error with its stack, then exit 1 |
 | Runtime pressure | `server/telemetry/runtimePressure.ts` | Event loop, CPU, and memory gauges every five seconds ([diagnosis](./diagnosis.md)) |
+| The app's shipped bytes, once per launch | `server/telemetry/installedBytes.ts` | Gauges `app.startup.bytes` and `app.bundle.bytes` ([shipped bytes](#shipped-bytes)) |
 | Console lines | Everywhere under `packages/node-core/src` and `apps/node/src` | Log records ([logging](./logging.md)) |
 
 Git and SQL histograms take their owner from the ambient store. A loaded plugin's HTTP routes need
@@ -98,6 +99,29 @@ Node stops printing the stack and stops exiting, so `installCrashHandlers` does 
 flush in between and a one-second window for asynchronous sinks. A crash must not become a hang
 because an exporter waits on a socket. It's installed from the two process entries, not from
 `startServiceRuntime`, which a test boots three times in one process.
+
+## Shipped bytes
+
+The desktop build writes `helper/size-report.json` with `apps/desktop/scripts/size-report.mjs`
+([profiling](../local-development/profiling.md#measuring-shipped-bytes)). A minute after the Node
+boots, `server/telemetry/installedBytes.ts` reads that report and emits byte gauges with unit `byte`:
+
+| Gauge | `method` | One per |
+| --- | --- | --- |
+| `app.startup.bytes` | `build` | Runtime and phase from the report: `startup.runtime` is `renderer`, `node`, or `tui`, and `phase` is `startup` or `registration` |
+| `app.bundle.bytes` | `build` | Component as the build counted it, with `artifact: 'build'` |
+| `app.bundle.bytes` | `walk` | Component as installed on this machine, with `artifact: 'installed'` |
+| `app.bundle.bytes` | `stat` | The bundled Node executable, as `component: 'native-runtime'`, in a packaged app only |
+
+Every gauge carries `release`, `platform`, `arch`, and `installation`, which is `packaged` or
+`development`. `complete: false` marks a build that missed a component, or a walk that hit its limit
+of 200,000 files or 32 levels. The walk stays under the resource root, follows no symlink, and skips
+the data root, `.git` folders, source maps, and the report itself.
+
+Only the desktop app reports, because only it hands the Node a resource directory, as the parent of
+`bundledPluginsDir`. With telemetry off, the Node checks again every ten minutes until it has reported
+once. Compressed installer sizes aren't here. CI's packaging run writes them to
+`dist/release-size-report.json`, which you join to these gauges by `release`.
 
 ## Other runtimes
 

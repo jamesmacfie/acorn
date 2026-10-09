@@ -18,7 +18,7 @@ vi.mock('@tanstack/solid-query', () => ({
   }),
   useQueryClient: () => ({ invalidateQueries }),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({
+vi.mock('@acorn/plugin-api/client', () => ({ onScopeEvicted: () => () => {},
   activeNodeId: nodeId,
   nodeReady: () => true,
   wsOnNodeEvent: (_channel: string, cb: () => void) => { subscriptions.worktree.add(cb); return () => subscriptions.worktree.delete(cb) },

@@ -1,6 +1,6 @@
 // Shared container detail panel (docs/docker.md): Info + live Logs + live Stats tabs, used by the
 // browse right pane and the task pane. One component, two hosts, the same split as RollbarItemPanel.
-import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, on, onCleanup, Show, type JSX } from 'solid-js'
 import { queryOwner, requestTerminalFocusIntent, toast, writeJson } from '@acorn/plugin-api/client'
 import { useQueryClient } from '@tanstack/solid-query'
 import { captureDockerScope } from './dockerScope'
@@ -13,9 +13,10 @@ import { refreshDocker } from './dockerStore'
 import { dockerLogBuffer, type DockerLogBuffer } from './dockerLogStore'
 import { containerTone, dockerDetailState, rememberDockerDetailState, type DockerDetailTab as Tab } from './dockerViewStore'
 import DockerExecTerminal from './DockerExecTerminal'
+import ContainerInfo from './ContainerInfo'
 import { STATS_BESIDE_POINT } from './extensionPoints'
 import {
-  Alert, Button, Checkbox, Chip, ChipRow, ConfirmButton, EmptyState, Facts, FindBar, Heading, Inline,
+  Alert, Button, Checkbox, ConfirmButton, EmptyState, Facts, FindBar, Icon, IconButton, Inline,
   Log, Meter, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
@@ -23,10 +24,16 @@ import { Slot } from '@acorn/plugin-api/ui/host'
 // Try bash, fall back to sh. Works across alpine/debian-ish images.
 const execCommand = (ref: string): string => `docker exec -it ${ref} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`
 
-const portLabel = (p: DockerPort): string =>
-  p.hostPort ? `${p.hostPort} → ${p.containerPort}/${p.protocol}` : `${p.containerPort}/${p.protocol}`
+type ContainerDetailProps = { target: string; taskId?: string; onRemoved?: () => void; actions?: JSX.Element }
 
-export default function ContainerDetail(props: { target: string; taskId?: string; onRemoved?: () => void; actions?: JSX.Element }) {
+export default function ContainerDetail(props: ContainerDetailProps) {
+  const view = createMemo(() => ({ target: props.target, taskId: props.taskId }))
+  return <Show when={view()} keyed>{(document) => (
+    <ContainerDetailView target={document.target} taskId={document.taskId} onRemoved={props.onRemoved} actions={props.actions} />
+  )}</Show>
+}
+
+function ContainerDetailView(props: ContainerDetailProps) {
   const owner = captureDockerScope(queryOwner(useQueryClient()))
   let mounted = true
   onCleanup(() => { mounted = false })
@@ -39,14 +46,14 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   const [tab, setTab] = createSignal<Tab>(initialView?.tab ?? 'info')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const [showEnv, setShowEnv] = createSignal(false)
+  const [showEnv, setShowEnv] = createSignal(initialView?.showEnv ?? false)
 
   const [detail, { refetch }] = createResource(() => props.target, target => fetchContainerDetail(target, owner.nodeId))
 
   // Live logs: a session-scoped buffer (dockerLogStore) that outlives this component, so
   // navigating away and back lands on the same content; view state (tab/follow/find) is restored per
-  // container via dockerViewState. The scroll position is `Log`'s to keep now — the kit owns the
-  // follow behaviour, so the pane no longer holds a `<pre>` ref to read one off.
+  // container via dockerViewStore. The pane owns the reading place; Log restores it and owns
+  // the scroller and follow behaviour.
   const [logBuf, setLogBuf] = createSignal<DockerLogBuffer | null>(null)
   const [follow, setFollow] = createSignal(initialView?.logFollow ?? true)
   const [logQuery, setLogQuery] = createSignal(initialView?.logQuery ?? '')
@@ -59,25 +66,21 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   const rememberView = () => {
     if (!owner.current()) return
     rememberDockerDetailState(props.taskId, props.target, {
-      tab: tab(), logScrollTop: 0, logFollow: follow(), logQuery: logQuery(),
+      ...dockerDetailState(props.taskId, props.target),
+      tab: tab(), logScrollTop: dockerDetailState(props.taskId, props.target)?.logScrollTop ?? 0,
+      logFollow: follow(), logQuery: logQuery(), showEnv: showEnv(),
     })
   }
+  const rememberPanel = (panel: Tab, offset: number) => {
+    if (!owner.current()) return
+    const saved = dockerDetailState(props.taskId, props.target)!
+    rememberDockerDetailState(props.taskId, props.target, { ...saved, panelOffsets: { ...saved.panelOffsets, [panel]: offset } })
+  }
+  createEffect(rememberView)
   const switchTab = (t: Tab) => {
     setTab(t)
     rememberView()
   }
-
-  // Chip switches change props.target without remounting. Restore the new container's view state.
-  createEffect(on(() => props.target, (target) => {
-    const saved = dockerDetailState(props.taskId, target)
-    setTab(saved?.tab ?? 'info')
-    setFollow(saved?.logFollow ?? true)
-    setLogQuery(saved?.logQuery ?? '')
-    setMatchIdx(0)
-    setBusy(false)
-    setError('')
-    setShowEnv(false)
-  }, { defer: true }))
 
   createEffect(on(() => (tab() === 'logs' ? props.target : null), (ref) => {
     setLogBuf(owner.current() && ref ? dockerLogBuffer(ref) : null)
@@ -101,6 +104,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
     if (!n) return
     setFollow(false)
     setMatchIdx(((currentMatch() + dir) % n + n) % n)
+    rememberView()
   }
 
   // Live stats: one sample per docker tick; keep a short history for the text readout.
@@ -183,36 +187,17 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   }
 
   const running = () => detail()?.state === 'running'
+  createEffect(() => {
+    if (detail() && !running() && tab() === 'terminal') switchTab('info')
+  })
 
   // `grow`, so the region gives the log its height and the log scrolls inside it. Without it the
   // column clipped the newest lines, and Follow had no scroller to follow.
   return (
-    <Stack gap="row" grow>
+    <Stack gap="none" grow>
       <Show when={detail()} fallback={<EmptyState align="start" busy={!detail.error}>{detail.error ? 'Container not found.' : 'Loading…'}</EmptyState>}>
         {(d) => (
           <>
-            <Toolbar ariaLabel="Container">
-              <StatusDot tone={containerTone(d().state)} />
-              <Heading level={2}>{d().name}</Heading>
-              <Toolbar.Spacer />
-              <Show when={!running()}>
-                <Button size="sm" disabled={busy()} onPress={() => void act('start')}>Start</Button>
-              </Show>
-              <Show when={running()}>
-                <Button size="sm" disabled={busy()} onPress={() => void act('stop')}>Stop</Button>
-                <Button size="sm" disabled={busy()} onPress={() => void act('restart')}>Restart</Button>
-                <Button
-                  size="sm"
-                  tip={props.taskId ? 'Open shell' : 'Copy shell command'}
-                  onPress={() => void openExec(d().name)}
-                >
-                  {props.taskId ? 'Terminal' : 'Copy exec'}
-                </Button>
-              </Show>
-              <ConfirmButton size="sm" tone="danger" label="Remove" confirmLabel="Remove container?" disabled={busy()} onConfirm={() => void remove()}>Remove</ConfirmButton>
-              {props.actions}
-            </Toolbar>
-            <Text emphasis="muted">{d().image} · {d().status}{d().health ? ` · ${d().health}` : ''}</Text>
             <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
 
             {/* Terminal is conditional, so the tab list is derived rather than a module constant. */}
@@ -227,71 +212,22 @@ export default function ContainerDetail(props: { target: string; taskId?: string
               onChange={(id) => switchTab(id as Tab)}
               idPrefix="docker-detail"
               ariaLabel="Container detail"
+              actions={
+                <>
+                  <IconButton icon={running() ? 'square' : 'play'} label={running() ? 'Stop' : 'Start'} title={running() ? 'Stop container' : 'Start container'} disabled={busy()} onPress={() => void act(running() ? 'stop' : 'start')} />
+                  <Show when={running()}>
+                    <IconButton icon="rotate-cw" label="Restart" title="Restart container" disabled={busy()} onPress={() => void act('restart')} />
+                    <IconButton icon="terminal" label={props.taskId ? 'Open shell' : 'Copy shell command'} title={props.taskId ? 'Open shell' : 'Copy shell command'} onPress={() => void openExec(d().name)} />
+                  </Show>
+                  <ConfirmButton variant="bare" size="sm" iconOnly tone="danger" label="Remove container" confirmLabel="Remove container?" disabled={busy()} onConfirm={() => void remove()}><Icon name="trash-2" /></ConfirmButton>
+                  {props.actions}
+                </>
+              }
             />
 
-            <TabPanel id="info" active={tab()} idPrefix="docker-detail">
-              {/* Rows, not tiles: half of these are a long mono string — an id, a command, a working
-                  directory — and this pane is often one narrow column of a task row, where a tile grid
-                  gives each of them 150px and wraps it to four lines. */}
-              <Facts
-                size="sm"
-                grouping="rows"
-                items={[
-                  { label: 'ID', value: d().id, mono: true },
-                  { label: 'Command', value: d().command, mono: true },
-                  { label: 'State', value: `${d().state}${d().exitCode !== null && d().state === 'exited' ? ` (exit ${d().exitCode})` : ''}` },
-                  ...(d().startedAt ? [{ label: 'Started', value: new Date(d().startedAt!).toLocaleString() }] : []),
-                  ...(d().restartCount > 0 ? [{ label: 'Restarts', value: String(d().restartCount) }] : []),
-                  ...(d().composeProject
-                    ? [{ label: 'Compose', value: `${d().composeProject}${d().composeService ? ` / ${d().composeService}` : ''}`, mono: true }]
-                    : []),
-                  ...(d().composeWorkingDir ? [{ label: 'Working dir', value: d().composeWorkingDir!, mono: true }] : []),
-                  ...(d().ports.length
-                    ? [{
-                      label: 'Ports',
-                      value: (
-                        <ChipRow ariaLabel="Published ports">
-                          <For each={d().ports}>
-                            {(p) => (
-                              <Chip
-                                title={p.hostPort ? `Copy http://localhost:${p.hostPort}` : 'Not published'}
-                                {...(p.hostPort ? { onPress: () => copyPort(p) } : {})}
-                              >
-                                {portLabel(p)}
-                              </Chip>
-                            )}
-                          </For>
-                        </ChipRow>
-                      ),
-                    }]
-                    : []),
-                  ...(d().mounts.length
-                    ? [{
-                      label: 'Mounts',
-                      value: (
-                        <Stack gap="none">
-                          <For each={d().mounts}>
-                            {(m) => <Text emphasis="mono">{m.type}: {m.destination}{m.rw ? '' : ' (ro)'}</Text>}
-                          </For>
-                        </Stack>
-                      ),
-                    }]
-                    : []),
-                  ...(d().networks.length ? [{ label: 'Networks', value: d().networks.join(', '), mono: true }] : []),
-                  ...(d().env.length
-                    ? [{
-                      label: 'Env',
-                      value: (
-                        <Show when={showEnv()} fallback={<Button size="sm" onPress={() => setShowEnv(true)}>Show {d().env.length} variables</Button>}>
-                          <Stack gap="none">
-                            <For each={d().env}>{(line) => <Text emphasis="mono">{line}</Text>}</For>
-                          </Stack>
-                        </Show>
-                      ),
-                    }]
-                    : []),
-                ]}
-              />
+            <TabPanel id="info" active={tab()} idPrefix="docker-detail" padding="pane"
+              scrollOffset={initialView?.panelOffsets?.info ?? 0} onChange={(offset) => rememberPanel('info', offset)}>
+              <ContainerInfo detail={d()} showEnv={showEnv()} onToggleEnv={() => { setShowEnv(!showEnv()); rememberView() }} onCopyPort={copyPort} />
             </TabPanel>
 
             <TabPanel id="logs" active={tab()} idPrefix="docker-detail">
@@ -301,6 +237,12 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 ariaLabel={`${d().name} logs`}
                 lines={logLines()}
                 follow={follow()}
+                scrollOffset={initialView?.logScrollTop ?? 0}
+                onChange={(offset) => {
+                  if (owner.current() && tab() === 'logs') rememberDockerDetailState(props.taskId, props.target, {
+                    ...dockerDetailState(props.taskId, props.target)!, logScrollTop: offset,
+                  })
+                }}
                 find={
                   <FindBar
                     placeholder="Find in logs"
@@ -313,7 +255,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                     count={logQuery() ? { current: currentMatch() + 1, total: logMatches().length } : undefined}
                     onNext={() => navMatch(1)}
                     onPrev={() => navMatch(-1)}
-                    onClose={() => setLogQuery('')}
+                    onClose={() => { setLogQuery(''); rememberView() }}
                     status={logEnded() ? 'Log stream ended' : 'Live'}
                     toggles={
                       <>
@@ -346,8 +288,9 @@ export default function ContainerDetail(props: { target: string; taskId?: string
               <Show when={d().id} keyed>{(id) => <DockerExecTerminal containerRef={id} label={`${d().name} shell`} />}</Show>
             </TabPanel>
 
-            <TabPanel id="stats" active={tab()} idPrefix="docker-detail">
-              <Show when={stats()} fallback={<EmptyState align="start" busy={!statsEnded() && running()}>{statsEnded() ? 'Stats stopped. The container may have stopped.' : running() ? 'Reading stats…' : "The container isn't running."}</EmptyState>}>
+            <TabPanel id="stats" active={tab()} idPrefix="docker-detail" padding="pane"
+              scrollOffset={initialView?.panelOffsets?.stats ?? 0} onChange={(offset) => rememberPanel('stats', offset)}>
+              <Show when={stats()} fallback={<EmptyState busy={!statsEnded() && running()}>{statsEnded() ? 'Stats stopped. The container may have stopped.' : running() ? 'Reading stats…' : "The container isn't running."}</EmptyState>}>
                 {(s) => (
                   <Inline gap="section" wrap>
                     <Facts
@@ -373,6 +316,11 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 )}
               </Show>
             </TabPanel>
+            <Toolbar variant="status" size="sm" ariaLabel="Container status"
+              primary={<Text tip={d().name}>{d().name}</Text>}
+              secondary={<Text emphasis="muted" tip={d().image}>{d().image}</Text>}
+              essential={<Inline gap="inline"><StatusDot tone={containerTone(d().state)} /><Text>{d().state}{d().health ? ` · ${d().health}` : ''}</Text></Inline>}
+            />
           </>
         )}
       </Show>
