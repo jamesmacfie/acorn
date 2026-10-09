@@ -72,3 +72,7 @@ export { InlineSlot } from '@acorn/client-core/host/frames'
 // The compiled composer control around its owner's model choices. Its `above` and `children` props
 // carry JSX, so it composes kit nodes in the host rather than adding a remote-tree node.
 export { default as ModelPickerPopover } from '@acorn/client-core/features/settings/models/ModelPickerPopover.tsx'
+
+// The read-only list of MCP servers each CLI loads from its own config files, which the agents plugin
+// draws as a tab of its MCP page. Core's, because the node route it reads is core's.
+export { default as McpConfigFiles } from '@acorn/client-core/features/settings/McpSettings.tsx'

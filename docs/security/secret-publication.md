@@ -99,8 +99,9 @@ The Git checks have these bounds:
 
 - A text blob may hold 8 MiB. A larger one is unscanned.
 - One check reads at most 20,000 blobs and 64 MiB.
-- Blobs with a NUL byte in their first 8,000 bytes are binary. The report counts them in its limits,
-  and they don't make the check incomplete.
+- Binary blobs are scanned too, so a NUL byte can't hide an ASCII token beside it.
+- Objects are read from `git cat-file --batch` byte for byte and cut at the size in each header, so a
+  line in a file that imitates a header can't hide text from the scan.
 - Results are cached by blob ID and detector version, with positions and rule IDs only. The cache
   holds up to 20,000 blobs.
 
@@ -114,7 +115,8 @@ command. Git has no transaction that covers both, so Acorn narrows the window an
 An export checks the exact serialized string the route returns, up to 64 MiB. A larger export is
 unscanned. The digest leaves out `exportedAt`, so an allowance survives the re-export that follows
 it. **Export Markdown without secrets** and **Export JSON without secrets** in the session menu return
-a separate redacted copy. JSON is redacted string by string, so the copy stays valid JSON. The stored
+a separate redacted copy. JSON is redacted string by string, keys included, so the copy stays valid
+JSON. The node scans the redacted copy again and refuses to return one that still matches. The stored
 session never changes. The route's `variant` field names which copy it returned.
 
 An agent message with attachments is checked at the shared dispatch point, after the instruction

@@ -124,6 +124,22 @@ describe('commit admission', () => {
   })
 })
 
+describe('blob reading', () => {
+  it('finds a token in binary content and on a line that imitates a batch header', async () => {
+    // A NUL byte first, then a token: binary content is still scanned.
+    writeFileSync(join(dir, 'blob.bin'), Buffer.concat([Buffer.from([0, 1, 2]), Buffer.from(` ${TOKEN} `)]))
+    write('b.ts', CLEAN + 'more\n')
+    git('add', 'blob.bin', 'b.ts')
+    const ids = git('ls-files', '-s', 'b.ts').split(' ')[1]!
+    // A line in a.ts shaped like the next object's header, with the token after it.
+    write('a.ts', `${CLEAN}\n${ids} blob 99 ${TOKEN}\n`)
+    git('add', 'a.ts')
+    const report = (await bridge().secretCheck('t', 'commit')).report
+    expect(report.findings.map((finding) => finding.location).sort()).toEqual(['a.ts', 'blob.bin'])
+    expect(report.complete).toBe(true)
+  })
+})
+
 describe('push admission', () => {
   it('finds a secret a later commit removed, and leaves the remote alone', async () => {
     git('switch', '-q', '-c', 'feature')

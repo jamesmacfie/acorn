@@ -526,6 +526,12 @@ describe('managed agent runtime conformance', () => {
     const redacted = await runtime.exportSession(session.id, 'json', 'redacted')
     expect(redacted.content).not.toContain(token)
     expect(JSON.stringify(JSON.parse(redacted.content).turns)).toContain('[redacted secret] for the \\"deploy\\"')
+    // Keys are redacted too: tool inputs and provider payloads carry caller-chosen key names.
+    const store = runtime.store as unknown as { exportSnapshot: (id: string) => Promise<unknown> }
+    const original = store.exportSnapshot.bind(runtime.store)
+    store.exportSnapshot = async (id) => ({ ...(await original(id) as object), extra: { [token]: 'value' } })
+    expect((await runtime.exportSession(session.id, 'json', 'redacted')).content).not.toContain(token)
+    store.exportSnapshot = original
     // Same bytes apart from the export time, same digest: an allowance survives the re-export.
     expect((await runtime.exportSession(session.id, 'json', 'redacted')).digest).toBe(redacted.digest)
     blocking = false

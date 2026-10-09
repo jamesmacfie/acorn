@@ -2,7 +2,6 @@ import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { McpServerSummary } from '@acorn/protocol/mcp.ts'
 import { projectsOptions, tasksOptions } from '../../infra/queries'
-import type { SettingsPageContext } from '../../host/registries/shell/settings'
 import { activeTaskId } from '../tasks/tasks'
 import { mcpApi } from './mcpClient'
 import { Badge, Button, EmptyState, Select } from '../../kit/components/primitives'
@@ -13,13 +12,13 @@ import { formatPath } from '../../kit/lib/rendering/formatPath'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 
-// Settings → Agents → MCP config files (docs/mcp.md § Configuration): a read-only inspector over the
+// Settings → Agents → MCP, Config files tab (docs/mcp.md § Configuration): a read-only inspector over the
 // MCP config files the agents in one project load, from its folder's .mcp.json and .cursor/mcp.json and
 // from ~/.claude.json. Secrets arrive already masked from the node.
 //
 // Keyed by a project picker rather than by the open task, so the page shows the same servers for a
 // project whether or not a task is open. It starts on the open task's project when there is one. The
-// servers acorn itself adds are on the agents plugin's MCP servers page, which this page links to,
+// agents plugin owns the MCP page and draws this as the tab beside the servers acorn itself adds,
 // because acorn can add a server but cannot remove one a CLI loads by itself.
 const STATUS = {
   enabled: { word: 'On', tone: 'ok' },
@@ -38,7 +37,7 @@ const serverHelp = (s: McpServerSummary): string | undefined => {
   return lines.length ? lines.join('. ') : undefined
 }
 
-export default function McpSettings(props: { context?: SettingsPageContext }) {
+export default function McpSettings() {
   const projects = createQuery(() => projectsOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
   // What the last Create did: the file it wrote, or why it wrote nothing.
@@ -93,12 +92,7 @@ export default function McpSettings(props: { context?: SettingsPageContext }) {
         description="Servers your agents load from their own config files. acorn can't turn these off."
         help="acorn reads .mcp.json and .cursor/mcp.json in the project folder, and ~/.claude.json. Secret values are hidden."
         actions={
-          <>
-            <Show when={props.context}>
-              {(context) => <Button size="sm" variant="ghost" onPress={() => context().navigate('agent-mcp-servers')}>MCP servers</Button>}
-            </Show>
-            <Button size="sm" onPress={() => void refetch()}>Rescan</Button>
-          </>
+          <Button size="sm" onPress={() => void refetch()}>Rescan</Button>
         }
       >
         <SettingRow label="Project" help="Tasks on this project load the same files from their worktree.">

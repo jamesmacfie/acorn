@@ -30,7 +30,7 @@ export type GitSecretCheck = { destination: string; report: SecretCheckReport }
 // Per blob id and detector version: positions and rule ids only, never a value or a line. A blob is
 // immutable, so a result never goes stale; the bound keeps the map from growing with history.
 const CACHE_LIMIT = 20_000
-type CachedBlob = { findings: Omit<SecretFinding, 'location'>[] } | { binary: true }
+type CachedBlob = { findings: Omit<SecretFinding, 'location'>[] }
 const blobCache = new Map<string, CachedBlob>()
 const remember = (id: string, result: CachedBlob) => {
   blobCache.set(`${SECRET_DETECTOR_VERSION}:${id}`, result)
@@ -38,7 +38,7 @@ const remember = (id: string, result: CachedBlob) => {
 }
 
 const sha256 = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
-const text = async (root: string, args: string[], options: { stdin?: string; env?: Record<string, string>; timeoutMs?: number } = {}) =>
+const text = async (root: string, args: string[], options: { stdin?: string; env?: Record<string, string>; timeoutMs?: number; stdoutEncoding?: 'utf8' | 'latin1' } = {}) =>
   (await gitOrThrow(args, { cwd: root, timeoutMs: options.timeoutMs ?? 30_000, maxOutputBytes: 64 << 20, ...options })).stdout
 const optional = async (root: string, args: string[]) => {
   const result = await git(args, { cwd: root, timeoutMs: 15_000 })
@@ -47,26 +47,24 @@ const optional = async (root: string, args: string[]) => {
 
 type Blob = { id: string; path: string }
 
-/** Scan blobs by id, reading each once through `git cat-file --batch`. Binary blobs are listed in
- *  the limits: the detector reads text, and a Git check that refused every image would be unusable. */
-export async function scanBlobs(root: string, blobs: readonly Blob[], signal?: AbortSignal): Promise<{ findings: SecretFinding[]; unscanned: SecretUnscanned[]; binary: number; stopped: boolean }> {
+/** Scan blobs by id, reading each once through `git cat-file --batch`. Every blob is scanned,
+ *  binary included: a NUL byte must not hide an ASCII token next to it, and the size bounds still apply. */
+export async function scanBlobs(root: string, blobs: readonly Blob[], signal?: AbortSignal): Promise<{ findings: SecretFinding[]; unscanned: SecretUnscanned[]; stopped: boolean }> {
   const findings: SecretFinding[] = []
   const unscanned: SecretUnscanned[] = []
-  let binary = 0
   const unique = [...new Map(blobs.map((blob) => [blob.id, blob])).values()]
   if (unique.length > SECRET_MAX_BLOBS) {
-    return { findings, unscanned: [{ location: `${unique.length} blobs`, reason: `More than ${SECRET_MAX_BLOBS} blobs to check.` }], binary, stopped: true }
+    return { findings, unscanned: [{ location: `${unique.length} blobs`, reason: `More than ${SECRET_MAX_BLOBS} blobs to check.` }], stopped: true }
   }
   const record = (blob: Blob, result: CachedBlob) => {
-    if ('binary' in result) binary += 1
-    else for (const finding of result.findings) findings.push({ ...finding, location: blob.path })
+    for (const finding of result.findings) findings.push({ ...finding, location: blob.path })
   }
   const pending = unique.filter((blob) => {
     const cached = blobCache.get(`${SECRET_DETECTOR_VERSION}:${blob.id}`)
     if (cached) record(blob, cached)
     return !cached
   })
-  if (!pending.length) return { findings, unscanned, binary, stopped: false }
+  if (!pending.length) return { findings, unscanned, stopped: false }
 
   const sizes = await text(root, ['cat-file', '--batch-check=%(objectname) %(objecttype) %(objectsize)'], { stdin: pending.map((blob) => blob.id).join('\n') + '\n' })
   const sized = new Map(sizes.split('\n').filter(Boolean).map((line) => {
@@ -79,28 +77,26 @@ export async function scanBlobs(root: string, blobs: readonly Blob[], signal?: A
   const flush = async () => {
     if (!batch.length) return
     signal?.throwIfAborted()
-    // Headers are found by the ids we asked for, in order. Output arrives as decoded text, so byte
-    // sizes cannot be used to slice it; secrets are ASCII and survive the decoding.
-    const output = await text(root, ['cat-file', '--batch'], { stdin: batch.map((blob) => blob.id).join('\n') + '\n' })
+    // Latin-1 keeps one character per byte, so each object is sliced by the size in its own header
+    // rather than found by searching for the next header, which a blob's content could imitate.
+    const output = await text(root, ['cat-file', '--batch'], { stdin: batch.map((blob) => blob.id).join('\n') + '\n', stdoutEncoding: 'latin1' })
     let at = 0
-    batch.forEach((blob, index) => {
-      // `<id> blob <size>\n<content>\n` per object, so the LF before the next header ends this one.
-      const start = output.indexOf(`${blob.id} blob `, at)
-      const header = start < 0 ? -1 : output.indexOf('\n', start)
-      const following = batch[index + 1]
-      const end = header < 0 ? -1 : following ? output.indexOf(`\n${following.id} blob `, header) : output.length - 1
-      if (end < 0) {
-        unscanned.push({ location: blob.path, reason: 'Git could not read this object.' })
-        return
+    for (const [index, blob] of batch.entries()) {
+      const header = output.indexOf('\n', at)
+      const [id, type, size] = output.slice(at, header).split(' ')
+      const end = header + 1 + Number(size)
+      if (header < 0 || id !== blob.id || type !== 'blob' || !Number.isSafeInteger(Number(size)) || output[end] !== '\n') {
+        // Every later object in this batch is unreadable too: the stream lost its framing here.
+        for (const lost of batch.slice(index)) unscanned.push({ location: lost.path, reason: 'Git could not read this object.' })
+        break
       }
-      at = end
-      const body = output.slice(header + 1, end)
-      const result: CachedBlob = body.slice(0, 8000).includes('\0')
-        ? { binary: true }
-        : { findings: scanSecretText(body, blob.path).map(({ location: _location, ...finding }) => finding) }
+      at = end + 1
+      // Lossy UTF-8: tokens are ASCII and survive it, in text and binary content alike.
+      const body = new TextDecoder().decode(Buffer.from(output.slice(header + 1, end), 'latin1'))
+      const result: CachedBlob = { findings: scanSecretText(body, blob.path).map(({ location: _location, ...finding }) => finding) }
       remember(blob.id, result)
       record(blob, result)
-    })
+    }
     batch = []
     batchBytes = 0
   }
@@ -119,14 +115,14 @@ export async function scanBlobs(root: string, blobs: readonly Blob[], signal?: A
     total += info.size
     if (total > SECRET_TOTAL_MAX_BYTES) {
       unscanned.push({ location: blob.path, reason: `The check stopped after ${SECRET_TOTAL_MAX_BYTES >> 20} MiB.` })
-      return { findings, unscanned, binary, stopped: true }
+      return { findings, unscanned, stopped: true }
     }
     if (batchBytes + info.size > BATCH_BYTES) await flush()
     batch.push(blob)
     batchBytes += info.size
   }
   await flush()
-  return { findings, unscanned, binary, stopped: false }
+  return { findings, unscanned, stopped: false }
 }
 
 // `git diff-tree -r -z` records: `:<mode> <mode> <old> <new> <status>\0<path>\0`. Added, modified,
@@ -145,7 +141,6 @@ const failure = (digest: string, location: string, error: unknown, limits: strin
   secretReport({ digest, findings: [], unscanned: [{ location, reason: error instanceof Error ? error.message.split('\n')[0]!.slice(0, 200) : 'The check failed.' }], limits })
 
 function finish(digest: string, scan: Awaited<ReturnType<typeof scanBlobs>>, limits: string[]): SecretCheckReport {
-  if (scan.binary) limits.push(`${scan.binary} binary file${scan.binary === 1 ? ' was' : 's were'} not scanned.`)
   return secretReport({ digest, findings: scan.findings, unscanned: scan.unscanned, stopped: scan.stopped, limits })
 }
 

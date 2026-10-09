@@ -26,6 +26,8 @@ export type GitOptions = {
   signal?: AbortSignal
   env?: Record<string, string>
   stdin?: string
+  /** `latin1` keeps one character per byte, for output sliced by byte counts (./proc.ts). */
+  stdoutEncoding?: 'utf8' | 'latin1'
   // For commands such as diff --no-index, where 1 means a complete answer with differences.
   // Output, deadline, cancellation, and spawn failures still throw.
   allowedExitCodes?: readonly number[]
@@ -57,6 +59,7 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
   maxOutputBytes: opts.maxOutputBytes ?? GIT_MAX_OUTPUT_BYTES,
   signal: opts.signal,
   stdin: opts.stdin,
+  stdoutEncoding: opts.stdoutEncoding,
 })
 
 // Apple's /usr/bin/git is an Xcode selector. After an Xcode update it can refuse every command

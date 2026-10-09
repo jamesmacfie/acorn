@@ -136,7 +136,7 @@ object or array.
 
 A contributed harness reaches acorn's own tools through the protocol: the driver names acorn's MCP
 server on `session/new` and on resume, for any harness with no `mcp add` command. Claude Code and Codex
-keep their config-file registration. Your servers from Settings → MCP servers reach every harness
+keep their config-file registration. Your servers from Settings → MCP reach every harness
 through the protocol ([MCP configuration](../mcp.md#configuration)).
 
 The driver declines `fs`, `terminal`, and the `mcpServers` client capability at `initialize`. Each

@@ -7,7 +7,7 @@ how a harness receives servers.
 acorn ships a stdio MCP server, a thin child-process client. It receives a task-scoped environment,
 resolves the Node endpoint from the data root, and calls `/v1` over loopback. It never opens SQLite or
 owns a second domain implementation. acorn also hands every agent session the servers you add in
-Settings → MCP servers, whichever harness runs it ([your own servers](#your-own-servers)).
+Settings → MCP, whichever harness runs it ([your own servers](#your-own-servers)).
 
 ## Launch environment
 
@@ -114,7 +114,7 @@ development build goes stale after a reinstall, and a restored tmux session neve
 isolated `dev:agent` or `dev:tui:agent` session sets `ACORN_SKIP_MCP_REGISTRATION=1` and skips both, so
 a throwaway checkout never takes over the person's `acorn-dev` entry.
 
-**Settings → MCP config files** lists the servers each CLI loads from its own config files, with secret
+The **Config files** tab of **Settings → MCP** lists the servers each CLI loads from its own config files, with secret
 values masked, and never starts one. It reads one project, picked on the page, starting on the open
 task's project: `.mcp.json` and `.cursor/mcp.json` in the project's folder, and `~/.claude.json`
 (`GET /v1/core/projects/:id/mcp`). **Create .mcp.json** writes an empty file into the project's folder
@@ -133,9 +133,10 @@ contract for global or harness-owned servers. The diagnostic calls those unknown
 the managed list as complete. This check does not replace the explicit **Test** action below. It also
 reads stored package, consent, and review facts without installing, probing, or opening credentials.
 
-Settings → MCP servers holds the servers acorn declares to agent sessions: a list, then one server's
-editor with **Save**, **Cancel**, and **Remove server**. It links to MCP config files, and that page
-links back, because the two have different owners. The agents plugin owns these, one row per server in
+The **Servers** tab of Settings → MCP holds the servers acorn declares to agent sessions: a list, then
+one server's editor with **Save**, **Cancel**, and **Remove server**. The agents plugin owns the page
+and draws core's config file list as its second tab. The old `mcp` page id is an alias for that tab.
+The agents plugin owns these servers, one row per server in
 its database (`plugins/agents/src/server/mcpServerStore.ts`). A server is a command with arguments and
 an environment, or a URL with headers. A value marked secret is sealed by the Node's secret service,
 read back as a name with no value, and kept when an edit leaves it empty. The routes accept only an

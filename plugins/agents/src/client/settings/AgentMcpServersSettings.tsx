@@ -47,17 +47,13 @@ export function consentSource(server: AgentMcpServer): string {
   } catch { return 'HTTP endpoint (address hidden)' }
 }
 
-// The one piece of the settings page context this page uses. Optional, so the page draws on its own
-// in a test.
-type PageContext = { navigate: (target: string) => void }
-
-// Settings → Agents → MCP servers (docs/mcp.md § Your own servers): the servers acorn hands every agent
+// Settings → Agents → MCP, Servers tab (docs/mcp.md § Your own servers): the servers acorn hands every agent
 // session, whichever harness runs it. A list, then one server's editor in the same pane, which the
 // settings header names and offers the way back from (useSettingsDetail). A server's switch saves when
 // it changes. Adding or editing one is a form with Save and Cancel, because a command, its arguments
 // and its secrets only work together. Remove sits in the editor's danger zone. The section matches the
-// one `../index.ts` declares for search.
-export default function AgentMcpServersSettings(props: { context?: PageContext }) {
+// one `../index.ts` declares for search. ./McpSettingsPage.tsx draws it as a tab.
+export default function AgentMcpServersSettings() {
   const queryClient = useQueryClient()
   const servers = createQuery(() => agentMcpServersOptions())
   const [draft, setDraft] = createSignal<AgentMcpServerDraft | null>(null)
@@ -196,9 +192,6 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
               help="They go to Claude Code, Codex, and any other harness, including a session you continue in a terminal. Test executes a command or contacts the URL. A change applies to new sessions. To change an open session, type /mcp in its message box."
               actions={
                 <>
-                  <Show when={props.context}>
-                    {(context) => <Button variant="ghost" onPress={() => context().navigate('mcp')}>MCP config files</Button>}
-                  </Show>
                   <Button onPress={() => openForm(blankAgentMcpServerDraft())}><Icon name="plus" /> Add server</Button>
                   <Button onPress={() => { setPackageUpdate(null); setPackageOpen(true) }}>Install an MCP package</Button>
                   <Button variant="ghost" onPress={() => void refreshReviews()}>Refresh tool reviews</Button>
