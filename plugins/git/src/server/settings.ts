@@ -52,10 +52,17 @@ export async function writeIdentity(core: Core, projectId: string, userId: strin
   }
 }
 
-export async function writeGitPreference(core: Core, projectId: string, userId: string, key: typeof PULL_POLICY_PREF | typeof AUTO_FETCH_PREF, value: string): Promise<GitSettings> {
+export async function writeGitPreference(core: Core, projectId: string, userId: string, key: typeof PULL_POLICY_PREF | typeof AUTO_FETCH_PREF,
+  value: string, onWritten: () => void = () => {}): Promise<GitSettings> {
   const before = await repositoryFor(core, projectId)
   await core.prefs.write(userId, key, value)
-  const settings = await gitSettings(core, projectId, userId)
-  if (settings.repository !== before) throw new BridgeError(409, 'repository_moved', 'Project repository changed. Reopen Git settings.')
-  return settings
+  onWritten()
+  try {
+    const settings = await gitSettings(core, projectId, userId)
+    if (settings.repository !== before) throw new BridgeError(409, 'repository_moved', 'Preference saved, but project repository changed during readback. Reopen Git settings.')
+    return settings
+  } catch (error) {
+    if (error instanceof BridgeError && error.code === 'repository_moved') throw error
+    throw new BridgeError(503, 'preference_readback_failed', `Preference saved, but Git settings readback failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }

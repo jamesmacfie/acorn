@@ -3,8 +3,11 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import type { CoreServices } from '@acorn/plugin-api/node'
+import { Hono } from 'hono'
+import type { AppEnv, CoreServices } from '@acorn/plugin-api/node'
+import { AutoFetcher } from './autoFetch'
 import { gitSettings, writeIdentity, writeGitPreference, PULL_POLICY_PREF } from './settings'
+import { settingsRoutes } from './routes/settings'
 
 let directory = ''
 afterEach(() => { if (directory) rmSync(directory, { recursive: true, force: true }); directory = '' })
@@ -72,4 +75,50 @@ it('returns first-field success when the second subprocess throws, and keeps ori
   expect(unread.readbackError).toContain('readback unavailable')
   expect(unread.settings.repository).toBe(realpathSync(root))
   await expect(gitSettings(core(root, home), 'project', 'owner')).resolves.toMatchObject({ name: { local: 'Next' } })
+})
+
+it('aborts pending discovery after preference persistence even when readback fails, then permits opt-in', async () => {
+  const { root, home } = fixture(), base = core(root, home)
+  let failReadback = false, discoveries = 0, remoteReads = 0
+  let entered!: () => void, release!: () => void
+  const atDiscovery = new Promise<void>((done) => { entered = done })
+  const pending = new Promise<void>((done) => { release = done })
+  let discoverySignal: AbortSignal | undefined
+  const service = { ...base,
+    identity: { active: () => 'owner' },
+    projects: { ...base.projects, checkouts: async () => [{ id: 'project', path: root }] },
+    git: { git: async (args: readonly string[], options: Parameters<typeof base.git.git>[1] & { signal?: AbortSignal }) => {
+      if (failReadback && args.includes('--show-origin')) throw new Error('readback unavailable')
+      if (args.includes('--git-common-dir')) {
+        discoveries++
+        if (discoveries === 1) { discoverySignal = options.signal; entered(); await pending; options.signal?.throwIfAborted() }
+      }
+      return base.git.git(args, options)
+    } },
+  } as unknown as CoreServices
+  const fetcher = new AutoFetcher(service, { roster: async () => { remoteReads++; return { remotes: [] } }, change: async () => ({ ok: true }) } as never)
+  const app = new Hono<AppEnv>()
+  app.use('*', async (c, next) => { c.set('principal', { kind: 'device', userId: 'owner' }); await next() })
+  app.route('/', settingsRoutes(service, (enabled) => fetcher.setEnabled(enabled)))
+  app.onError((error, c) => c.json({ error: error.message }, 503))
+  const preference = (value: boolean) => app.request('/projects/project/settings/preference', {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'auto-fetch', value }),
+  })
+  expect((await preference(true)).status).toBe(200)
+  const tick = fetcher.tick()
+  await atDiscovery
+  failReadback = true
+  const disabled = await preference(false)
+  expect(disabled.status).toBe(503)
+  expect((await disabled.json()).error).toContain('Preference saved, but Git settings readback failed')
+  expect(await service.prefs.read('owner', 'git.autoFetch')).toBe('false')
+  expect(discoverySignal?.aborted).toBe(true)
+  release()
+  await tick
+  expect(remoteReads).toBe(0)
+  failReadback = false
+  expect((await preference(true)).status).toBe(200)
+  expect(await fetcher.tick()).toContain('0 remotes fetched')
+  expect(discoveries).toBe(2)
+  fetcher.dispose()
 })

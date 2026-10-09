@@ -22,8 +22,8 @@ export function settingsRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'pr
       const parsed = preference.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) throw new BridgeError(400, 'bad_request', 'Invalid Git preference.')
       const settings = await writeGitPreference(core, c.req.param('projectId'), ownerId(c), parsed.data.kind === 'pull-policy' ? PULL_POLICY_PREF : AUTO_FETCH_PREF,
-        parsed.data.kind === 'pull-policy' ? parsed.data.value : String(parsed.data.value))
-      if (parsed.data.kind === 'auto-fetch') onAutoFetchChange?.(parsed.data.value)
+        parsed.data.kind === 'pull-policy' ? parsed.data.value : String(parsed.data.value),
+        () => { if (parsed.data.kind === 'auto-fetch') onAutoFetchChange?.(parsed.data.value) })
       return c.json(settings)
     })
 }

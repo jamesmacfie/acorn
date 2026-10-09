@@ -78,8 +78,9 @@ export function RefDetail(props: { projectId: string; selected: string | null })
     setBusy(true); setError('')
     try {
       const response = await changeRef(target.projectId, request)
-      cache.setQueryData(queryKey, response.roster)
-      if (current()) { if (response.ok) close(); else setError(response.reason ?? 'Git refused the ref change.') }
+      if (response.postState === 'fresh') cache.setQueryData(queryKey, response.roster)
+      else void cache.invalidateQueries({ queryKey })
+      if (current()) { if (response.ok && response.postState === 'fresh') close(); else setError(response.reason ?? 'Git refused the ref change.') }
     } catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : String(cause)) }
     finally { if (current()) setBusy(false) }
   }

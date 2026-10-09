@@ -72,7 +72,8 @@ export type RefChange =
   | { action: 'set-upstream'; name: string; expectedId: string; upstream: string | null }
   | { action: 'create-tag'; name: string; startId: string; message: string | null }
   | { action: 'delete-tag'; name: string; expectedId: string }
-export type RefChangeResult = { ok: boolean; reason: string | null; roster: RefRoster }
+/** An unavailable post-state carries the last observation from this repository, not a cache update. */
+export type RefChangeResult = { ok: boolean; reason: string | null; roster: RefRoster; postState: 'fresh' | 'unavailable'; command: { code: number | null; error: string | null } | null }
 export const refsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/refs`
 
 export type GitRemote = { name: string; fetchUrl: string; pushUrl: string; fetchUrlCount: number; pushUrlCount: number }
@@ -82,7 +83,7 @@ export type RemoteChange =
   | { action: 'remove'; name: string; expectedUrl: string }
   | { action: 'set-url'; name: string; expectedUrl: string; url: string }
   | { action: 'fetch'; name: string; expectedUrl: string }
-export type RemoteChangeResult = { ok: boolean; reason: string | null; roster: RemoteRoster }
+export type RemoteChangeResult = { ok: boolean; reason: string | null; roster: RemoteRoster; postState: 'fresh' | 'unavailable'; command: { code: number | null; error: string | null } | null }
 export const remotesRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/remotes`
 
 export type ComparisonMode = 'direct' | 'merge-base'

@@ -8,6 +8,8 @@ The ref roster distinguishes local branches, remote-tracking branches, and tags.
 
 The remote roster includes fetch and push URLs and the last fetch success or failure per remote. Add, remove, fetch URL edit, and fetch use an explicit remote name and recheck the observed URL. The editor changes the single configured fetch URL and preserves a separate push URL; it refuses an edit when multiple fetch URLs are configured. The Node accepts HTTPS, SSH, Git, file, and absolute local URLs. Git receives argument arrays and an explicit protocol allowlist, so an executable remote helper cannot run. Manual fetch and scheduled fetch report failures with the refreshed remote roster.
 
+Mutation responses include the Git command result and whether their post-state roster is fresh. If Git changes a ref or remote but the final inspection fails, the response retains the last observation from the original repository, marks it unavailable as post-state, and asks the client to refresh. The client does not cache that earlier observation as a fresh roster. Ref and remote commands invalidate mounted Git and Changes reads even when a fetch reports failure or is aborted, since some tracking refs may already have moved.
+
 Task pull and push remain Changes operations. Git uses Changes' public remote contract and selects a task explicitly. Changes retains its before-push hooks, fast-forward or rebase pull behavior, and force-with-lease checks. A force push carries the remote object ID observed by the person as an explicit lease; a later fetch cannot silently broaden that lease.
 
 ## Pinned comparisons
@@ -17,6 +19,8 @@ Task pull and push remain Changes operations. Git uses Changes' public remote co
 ## Settings and scheduled fetch
 
 The Node settings page reads effective `user.name` and `user.email` with their Git scope and origin, plus local and Node-user-global values. The form selects one write scope explicitly. A repository-local value can override a global write; readback shows that override. Name and email writes report success separately so a partial failure leaves the unsuccessful input in the form. The Node user global config is used; Acorn does not write the client's home directory.
+
+An auto-fetch preference write updates the Node scheduler immediately after the preference is saved. If the following settings readback fails, the request reports that the preference was saved and readback failed; disabling still aborts work already in progress.
 
 Pull policy is fast-forward only by default or rebase when selected. Device settings control graph visibility and the shared diff presentation. Automatic fetch is off by default. When enabled, a Node timer checks every five minutes, groups project aliases by Git common directory, and fetches at most two repositories concurrently. A disabled or disposed scheduler cancels its work. Client reads, mounts, and refreshes do not start a fetch. The remote roster exposes the most recent success and failure.
 

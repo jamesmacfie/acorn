@@ -2,6 +2,37 @@
 
 Date: October 7, 2026. Status: complete October 9, 2026.
 
+## Final Phase 06 follow-up — October 9, 2026
+
+Ref and remote mutations now retain the executed command's exit/error and the original repository
+observation if the final roster cannot be read. Responses mark that roster as unavailable post-state;
+the client invalidates its captured query key and does not cache the old observation as current.
+The owning command path emits the shared Git/Changes invalidation after every attempted mutation,
+including nonzero or aborted fetches that may already have moved some tracking refs. Ordinary
+pre-command refusals return a fresh observation without a command; repository remaps retain the
+original scope and mark its observation unavailable as current state. Remote reads compose request and
+service-lifetime signals from project resolution through URL and identity inspection, and stop
+before a later subprocess after cancellation. The metadata guard remains held through readback and
+releases after a partial result. Ref and remote guard callback indentation was corrected.
+
+Saving the auto-fetch preference now notifies the scheduler immediately after the authoritative
+preference write. A later Git settings readback failure reports that the preference was saved;
+disabling still aborts an in-flight discovery/fetch and a later opt-in works. No client read or
+mount starts network work. The shipped feature documentation records the post-state and preference
+failure contracts. No UI layout changed, so the inspected desktop and 80×24/120×40 terminal host
+evidence below remains applicable; their session records remain stopped.
+
+Narrow verification: 5 Git test files, 30 tests passed. Real disposable repositories cover ref
+creation and remote edit with failed final inspection, and a local bare remote whose fetch updates
+tracking refs before a controlled failure result. Controlled promises prove aborted fetch
+invalidation, cancellation during repository discovery and guarded manual readback, no later
+subprocess, metadata admission release, and disabling despite failed settings readback followed
+by renewed opt-in. Git type check and changed-file oxlint passed; oxlint retains the existing
+control-character-regex warning in the remote URL validator. Focused documentation architecture
+checks passed 5/6; the sole failure is the unchanged 211/201-line route-document limit recorded
+below. Payload caps were unchanged and no
+host was rebuilt because no rendered behavior changed.
+
 ## Follow-up completion note — October 9, 2026
 
 The review found late-response scope leaks, metadata races, an unguarded Changes pull,

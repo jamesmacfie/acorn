@@ -63,8 +63,9 @@ export function RemoteDetail(props: { projectId: string; selected: string | null
     setBusy(true); setError('')
     try {
       const result = await changeRemote(target.projectId, request)
-      cache.setQueryData(queryKey, result.roster)
-      if (current()) { if (result.ok) { close(); setFeedback(`${kind === 'fetch' ? 'Fetched' : 'Updated'} ${request.name}.`) }
+      if (result.postState === 'fresh') cache.setQueryData(queryKey, result.roster)
+      else void cache.invalidateQueries({ queryKey })
+      if (current()) { if (result.ok && result.postState === 'fresh') { close(); setFeedback(`${kind === 'fetch' ? 'Fetched' : 'Updated'} ${request.name}.`) }
         else setError(result.reason ?? 'Git refused the remote operation.') }
     } catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : String(cause)) }
     finally { if (current()) setBusy(false) }

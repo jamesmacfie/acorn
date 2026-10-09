@@ -137,3 +137,30 @@ it('refuses an archived alias task branch while archive teardown still owns it',
     } finally { finishTaskArchive('archived-task') }
   } finally { db.cleanup() }
 })
+
+it('retains a successful ref command when final inspection fails and releases metadata admission', async () => {
+  const root = fixture(), id = git(root, 'rev-parse', 'HEAD')
+  const base = core(root)
+  let mutated = false, failReadback = true, held = false, events = 0
+  const service = { ...base,
+    repositoryMetadata: { write: async (_: string, action: (repository: string, common: string) => Promise<unknown>) => {
+      expect(held).toBe(false)
+      held = true
+      try { return await base.repositoryMetadata.write('a', action) } finally { held = false }
+    } },
+    git: { git: async (args: readonly string[], options: Parameters<typeof base.git.git>[1]) => {
+      if (mutated && failReadback && args[0] === 'for-each-ref') { failReadback = false; throw new Error('readback unavailable') }
+      const result = await base.git.git(args, options)
+      if (args[0] === 'branch' && args[1] === '--') mutated = true
+      return result
+    } },
+  } as typeof base
+  const result = await changeRef(service, 'a', { action: 'create-branch', name: 'new-ref', startId: id }, () => { events++ })
+  expect(result).toMatchObject({ ok: true, postState: 'unavailable', command: { code: 0, error: null } })
+  expect(result.reason).toContain('readback unavailable')
+  expect(result.roster.refs.some((ref) => ref.name === 'new-ref')).toBe(false)
+  expect(git(root, 'branch', '--list', 'new-ref')).toBe('new-ref')
+  expect(events).toBe(1)
+  expect(held).toBe(false)
+  expect((await changeRef(service, 'a', { action: 'create-branch', name: 'another', startId: id })).postState).toBe('fresh')
+})
