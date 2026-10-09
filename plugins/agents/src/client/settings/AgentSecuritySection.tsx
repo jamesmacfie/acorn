@@ -45,38 +45,42 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
   }
 
   return (
-    <SettingsSection
-      id="agent-instructions"
-      label="Agent instruction files"
-      help="Acorn checks discovered repository instructions and skills before a managed agent turn."
-    >
-      <SettingRow
-        label={LABEL}
-        description="If one holds hidden characters, the turn stops and says where they are."
-        savedAt={save.savedAt()}
-        // Until the node answers, the switch would show Off as a guess and a click would write it.
-        error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
+    <>
+      <SettingsSection
+        id="agent-instructions"
+        label="Agent instruction files"
+        help="Files such as AGENTS.md, CLAUDE.md, and skills tell agents how to work in a project."
       >
-        <Checkbox
-          switch
-          ariaLabel={LABEL}
-          checked={stored.data?.checkInstructionFiles ?? false}
-          disabled={!stored.isSuccess}
-          onChange={(next) => save.run(() => write('checkInstructionFiles', next))}
-        />
-      </SettingRow>
-      <SettingRow
-        label="Review changed instruction files"
-        description="Stop managed turns until you approve the current instruction and skill snapshot. Off by default."
-        error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
-      >
-        <Checkbox switch ariaLabel="Review changed instruction files"
-          checked={stored.data?.reviewChangedInstructions ?? false}
-          disabled={!stored.isSuccess}
-          onChange={(next) => save.run(() => write('reviewChangedInstructions', next))} />
-      </SettingRow>
-      <InstructionReviewPanel nodeId={props.nodeId} />
-      <SecurityDiagnosticsPanel nodeId={props.nodeId} />
-    </SettingsSection>
+        <SettingRow
+          label={LABEL}
+          description="Stop an agent if an instruction file contains hidden characters, and show you where they are."
+          savedAt={save.savedAt()}
+          // Until the node answers, the switch would show Off as a guess and a click would write it.
+          error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
+        >
+          <Checkbox
+            switch
+            ariaLabel={LABEL}
+            checked={stored.data?.checkInstructionFiles ?? false}
+            disabled={!stored.isSuccess}
+            onChange={(next) => save.run(() => write('checkInstructionFiles', next))}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Review changed instruction files"
+          description="Ask you to approve instructions and skills before agents use them, and again whenever those files change."
+          error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
+        >
+          <Checkbox switch ariaLabel="Review changed instruction files"
+            checked={stored.data?.reviewChangedInstructions ?? false}
+            disabled={!stored.isSuccess}
+            onChange={(next) => save.run(() => write('reviewChangedInstructions', next))} />
+        </SettingRow>
+        <InstructionReviewPanel nodeId={props.nodeId} />
+      </SettingsSection>
+      <SettingsSection id="agent-security-check" label="Security check">
+        <SecurityDiagnosticsPanel nodeId={props.nodeId} />
+      </SettingsSection>
+    </>
   )
 }

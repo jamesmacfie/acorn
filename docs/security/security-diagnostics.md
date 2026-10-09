@@ -1,13 +1,18 @@
 # Security diagnostics
 
-Settings > Security and backup has **Check this node** in the agents section. Use it to read evidence
-on the selected Node. A project and running managed session are optional. The agents plugin owns the
+Settings > Security and backup has **Check this node** under **Security check**. Use it to read evidence
+on the selected Node. The project list uses saved project names. Choose **Node settings only** to
+leave out project checks. A running agent is optional: choose one to include its active settings,
+which can differ from the defaults for new agents. This choice appears only when a running agent is
+available for the selected project. The agents plugin owns the
 device-only `GET /v1/p/agents/security-diagnostics` report and `/scopes` choice routes. Task and
 service tokens cannot read either route.
 
 The report stays in the open page, expires after five minutes, and clears on Node or scope change.
 Acorn stores no report history. The terminal client lists the core settings page with its established
 desktop fallback, so this action is available in the desktop app on a device paired with the Node.
+Findings show a plain-language evidence label and suggested action. Expand **Check details** to read
+the evidence limits, source, and check identifier.
 
 ## Evidence and limits
 

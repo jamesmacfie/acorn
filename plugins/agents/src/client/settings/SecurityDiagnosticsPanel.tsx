@@ -1,9 +1,13 @@
 import { createEffect, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { clientEvents, readJson } from '@acorn/plugin-api/client'
-import { Alert, Button, Link, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, Field, Fold, Link, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { agentSecurityDiagnosticsRoute, type SecurityDiagnostics, type SecurityFinding, type SecurityScopeChoices } from '../../shared/securityDiagnostics'
 
 const emptyChoices: SecurityScopeChoices = { projects: [], sessions: [] }
+const evidenceLabels = {
+  observed: 'Observed on this Node', configured_only: 'Saved setting', unknown: 'Could not verify',
+  unsupported: 'Not supported', failed: 'Check failed',
+} satisfies Record<SecurityFinding['state'], string>
 
 const settingsFor = (finding: SecurityFinding): string | null => {
   if (finding.id.startsWith('mcp.')) return 'agent-mcp-servers'
@@ -21,10 +25,13 @@ function Finding(props: { finding: SecurityFinding }) {
   const settings = () => settingsFor(finding())
   return <Stack gap="row">
     <Text wrap>{finding().severity === 'warning' ? '⚠ ' : ''}{finding().summary}</Text>
-    <Text emphasis="muted" wrap>{finding().state.replace('_', ' ')} · {finding().source} · {finding().owner} · {finding().id}</Text>
-    <Text emphasis="muted" wrap>Limit: {finding().limits}</Text>
-    <Text emphasis="muted" wrap>Action: {finding().repair}</Text>
+    <Text emphasis="muted">{evidenceLabels[finding().state]}</Text>
+    <Text emphasis="muted" wrap>{finding().repair}</Text>
     <Show when={settings()}>{(tab) => <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: tab() })}>Open setting</Link>}</Show>
+    <Fold label="Check details" defaultOpen={false}>
+      <Text emphasis="muted" wrap>{finding().limits}</Text>
+      <Text emphasis="muted" wrap>Source: {finding().source}. Check: {finding().id}. Owner: {finding().owner}.</Text>
+    </Fold>
   </Stack>
 }
 
@@ -52,7 +59,7 @@ export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null
     request = controller
     void readJson<SecurityScopeChoices>(`${agentSecurityDiagnosticsRoute}/scopes`, { nodeId: selectedNode, signal: controller.signal })
       .then((found) => { if (generation === current) setChoices(found) })
-      .catch(() => { if (generation === current) setError('Scope choices could not be loaded. You can still check this Node.') })
+      .catch(() => { if (generation === current) setError('Could not load projects and running agents. You can still check this Node.') })
   }))
   onCleanup(() => { clearReport(); if (timer) clearInterval(timer) })
 
@@ -78,19 +85,25 @@ export default function SecurityDiagnosticsPanel(props: { nodeId?: string | null
         timer = setInterval(() => setClock(Date.now()), 15_000)
       }
     } catch {
-      if (generation === current) setError('Diagnostics could not finish. Retry Check this node.')
+      if (generation === current) setError('The security check could not finish. Try again.')
     } finally { if (generation === current) setBusy(false) }
   }
 
   const visible = () => { const current = report(); return current && current.expiresAt > clock() ? current : null }
   return <Stack gap="row">
-    <Text emphasis="muted" wrap>Read current evidence on this Node. The check runs no configured commands, servers, package manager, or model. The owner still has host access, and global harness settings may be invisible.</Text>
-    <Select label="Project" value={projectId()} options={[{ value: '', label: 'No project' }, ...choices().projects.map((project) => ({ value: project.id, label: project.name }))]}
-      onChange={(value) => { clearReport(); setProjectId(value); setSessionId('') }} />
-    <Select label="Running session" value={sessionId()} options={[{ value: '', label: 'No session' }, ...choices().sessions
-      .filter((session) => !projectId() || session.projectId === projectId())
-      .map((session) => ({ value: session.id, label: session.label }))]}
-      onChange={(value) => { clearReport(); setSessionId(value) }} />
+    <Text emphasis="muted" wrap>Check the security settings on this Node. This reads saved settings without starting agents or running commands.</Text>
+    <Field label="Project (optional)" hint="Include this project's instruction checks and package policies.">
+      <Select label="Project" value={projectId()} options={[{ value: '', label: 'Node settings only' }, ...choices().projects.map((project) => ({ value: project.id, label: project.name }))]}
+        onChange={(value) => { clearReport(); setProjectId(value); setSessionId('') }} />
+    </Field>
+    <Show when={choices().sessions.some((session) => !projectId() || session.projectId === projectId())}>
+      <Field label="Running agent (optional)" hint="Include the settings an agent is using. These can differ from the defaults for new agents.">
+        <Select label="Running agent" value={sessionId()} options={[{ value: '', label: 'Defaults for new agents' }, ...choices().sessions
+          .filter((session) => !projectId() || session.projectId === projectId())
+          .map((session) => ({ value: session.id, label: session.label }))]}
+          onChange={(value) => { clearReport(); setSessionId(value) }} />
+      </Field>
+    </Show>
     <Button size="sm" busy={busy()} onPress={() => void check()}>Check this node</Button>
     <Show when={error()}><Alert>{error()}</Alert></Show>
     <Show when={report() && !visible()}><Text emphasis="muted">Evidence expired. Check this node again.</Text></Show>

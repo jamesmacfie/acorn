@@ -32,9 +32,13 @@ it('cancels a Node request and ignores a late response from the previous Node', 
   const dispose = render(() => <SecurityDiagnosticsPanel nodeId={nodeId()} />, host)
   mock.requests.shift()!.resolve(choices)
   await settle()
+  expect(host.textContent).toContain('Project (optional)')
+  expect(host.textContent).not.toContain('Running agent (optional)')
+  expect([...host.querySelectorAll('option')].map((option) => option.textContent)).toContain('Project one')
   checkButton(host).click()
   const old = mock.requests.shift()!
   expect(old.nodeId).toBe('node-1')
+  expect(old.route).toBe('/v1/p/agents/security-diagnostics')
   setNodeId('node-2')
   expect(old.signal?.aborted).toBe(true)
   mock.requests.shift()!.resolve(choices)
@@ -46,6 +50,29 @@ it('cancels a Node request and ignores a late response from the previous Node', 
   mock.requests.shift()!.resolve(report('node-2'))
   await settle()
   expect(host.textContent).toContain('Evidence for node-2')
+  dispose(); host.remove()
+})
+
+it('offers running agents for the project and clears the agent when switching projects', async () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const dispose = render(() => <SecurityDiagnosticsPanel nodeId="node-1" />, host)
+  mock.requests.shift()!.resolve({ ...choices, sessions: [{ id: 'session-1', projectId: 'project-1', label: 'Review permissions' }] })
+  await settle()
+  const project = host.querySelector('select')!
+  project.value = 'project-1'; project.dispatchEvent(new Event('change', { bubbles: true }))
+  expect(host.textContent).toContain('Running agent (optional)')
+  const agent = host.querySelectorAll('select')[1]!
+  expect([...agent.options].map((option) => option.textContent)).toContain('Review permissions')
+  agent.value = 'session-1'; agent.dispatchEvent(new Event('change', { bubbles: true }))
+  checkButton(host).click()
+  const request = mock.requests.shift()!
+  expect(request.route).toBe('/v1/p/agents/security-diagnostics?projectId=project-1&sessionId=session-1')
+  project.value = 'project-2'; project.dispatchEvent(new Event('change', { bubbles: true }))
+  expect(request.signal?.aborted).toBe(true)
+  expect(host.textContent).not.toContain('Running agent (optional)')
+  checkButton(host).click()
+  expect(mock.requests.shift()!.route).toBe('/v1/p/agents/security-diagnostics?projectId=project-2')
   dispose(); host.remove()
 })
 

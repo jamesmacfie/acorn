@@ -34,14 +34,15 @@ export async function securityScopeChoices(
   listSessions: () => Promise<AgentSession[]>,
 ): Promise<SecurityScopeChoices> {
   const projects = (await core.projects.checkouts()).slice(0, 100)
-  const names = projects.map((project, index) => ({ id: project.id, name: `Project ${index + 1} (${project.id.slice(0, 8)})` }))
+  const names = (await Promise.all(projects.map((project) => core.projects.byId(project.id))))
+    .flatMap((project) => project ? [{ id: project.id, name: project.name }] : [])
   const tasks = await core.tasks.active()
-  const projectByTask = new Map(tasks.map((task) => [task.id, task.projectId]))
+  const taskById = new Map(tasks.map((task) => [task.id, task]))
   const sessions = (await listSessions())
     .filter((session) => !['stopped', 'failed', 'archived'].includes(session.runtimeState))
     .flatMap((session) => {
-      const projectId = projectByTask.get(session.taskId)
-      return projectId ? [{ id: session.id, projectId, label: `Running session ${session.id.slice(0, 8)}` }] : []
+      const task = taskById.get(session.taskId)
+      return task ? [{ id: session.id, projectId: task.projectId, label: session.title || task.title }] : []
     })
   return { projects: names, sessions }
 }

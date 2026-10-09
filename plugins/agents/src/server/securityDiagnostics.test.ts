@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { AgentSession } from '../contract/wire.ts'
 import type { AgentMcpServer } from '../shared/mcpServers'
 import { defaultAgentSessionDefaults } from '../shared/sessionDefaults'
-import { collectSecurityDiagnostics, readBoundedFile, type SecurityDiagnosticPorts } from './securityDiagnostics'
+import { collectSecurityDiagnostics, readBoundedFile, securityScopeChoices, type SecurityDiagnosticPorts } from './securityDiagnostics'
 
 let root = ''
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ''; vi.useRealTimers() })
@@ -27,6 +27,30 @@ const ports = (overrides: Partial<SecurityDiagnosticPorts> = {}): SecurityDiagno
   session: async () => null,
   managedMcp: async () => [],
   ...overrides,
+})
+
+it('names projects and running agents from their saved records', async () => {
+  const projects = [
+    { id: 'project-1', name: 'Acorn', path: '/projects/acorn' },
+    { id: 'project-2', name: 'Runn', path: '/projects/runn' },
+  ]
+  const core = {
+    projects: {
+      checkouts: async () => [...projects, { id: 'removed', path: '/projects/removed' }],
+      byId: async (id: string) => projects.find((project) => project.id === id) ?? null,
+    },
+    tasks: { active: async () => [{ id: 'task-1', title: 'Security review', projectId: 'project-1' }] },
+  } as unknown as SecurityDiagnosticPorts['core']
+  const choices = await securityScopeChoices(core, async () => [
+    { ...session({}), title: 'Review permissions' },
+    { ...session({}), id: 'untitled', title: '' },
+    { ...session({}), id: 'stopped', title: 'Stopped agent', runtimeState: 'stopped' },
+  ])
+  expect(choices.projects).toEqual([{ id: 'project-1', name: 'Acorn' }, { id: 'project-2', name: 'Runn' }])
+  expect(choices.sessions).toEqual([
+    { id: 'session-1', projectId: 'project-1', label: 'Review permissions' },
+    { id: 'untitled', projectId: 'project-1', label: 'Security review' },
+  ])
 })
 
 it('uses the live permission profile and narrower ceiling while describing defaults separately', async () => {

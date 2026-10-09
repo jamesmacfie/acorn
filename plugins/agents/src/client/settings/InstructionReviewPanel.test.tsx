@@ -27,6 +27,6 @@ it('shows findings before collapsed diffs and does not approve a review after sw
   expect(host.querySelector('details')?.open).toBe(false)
   setNode('node-b'); await settle()
   expect(host.textContent).not.toContain('External domain')
-  expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('Approve this snapshot'))).toBe(false)
+  expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('Approve these instructions'))).toBe(false)
   expect(mocks.writes).not.toHaveBeenCalled()
 })

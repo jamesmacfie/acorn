@@ -66,19 +66,20 @@ export default function InstructionReviewPanel(props: { nodeId?: string | null }
   }
 
   return <Stack gap="row">
-    <Text emphasis="muted" wrap>Review is per project and Node. Findings are advisory; read the changed files before approving if you need more context. Plugin skills and executable project configuration have separate approvals.</Text>
-    <Text emphasis="muted" wrap>Other controls: <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'plugins' })}>Installed plugins and skills</Link>
+    <Text emphasis="muted" wrap>Choose a task to review the instructions and skills its agents read. Your approval applies to that project on this Node.</Text>
+    <Text emphasis="muted" wrap>Manage <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'plugins' })}>plugins and skills</Link>
       <Show when={selectedProject()}>{(projectId) => <> and <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: `project/${projectId()}` })}>Project configuration</Link></>}</Show>
     </Text>
-    <Show when={tasks().length} fallback={<Text emphasis="muted">No active project tasks are available for review.</Text>}>
+    <Show when={tasks().length} fallback={<Text emphasis="muted">Create a task in a project on this Node to review its instruction files.</Text>}>
       <Select label="Project task" value={taskId()} options={tasks().map((task) => ({ value: task.id, label: task.title }))}
         onChange={(value) => { setTaskId(value); setReview(null); setApproved(false) }} />
       <Button size="sm" busy={busy()} onPress={() => void load()}>Review instruction files</Button>
     </Show>
     <Show when={error()}><Alert>{error()}</Alert></Show>
-    <Show when={approved()}><Text>Instruction snapshot approved. A later change requires another review.</Text></Show>
+    <Show when={approved()}><Text>Instructions approved. Acorn asks you to review them again if the files change.</Text></Show>
     <Show when={review()}>{(result) => <Stack gap="row">
-      <Text wrap>{result().baseline ? 'First use: review this baseline.' : 'Changes since the last approved snapshot.'} {result().changes.length} {result().changes.length === 1 ? 'file' : 'files'} and {result().findings.length} {result().findings.length === 1 ? 'finding' : 'findings'}.</Text>
+      <Text wrap>{result().baseline ? 'Review these files before the first agent starts.' : 'Changes since your last approval.'} {result().changes.length} {result().changes.length === 1 ? 'file' : 'files'} and {result().findings.length} {result().findings.length === 1 ? 'finding' : 'findings'}.</Text>
+      <Text emphasis="muted" wrap>Findings highlight text to read carefully. They do not necessarily mean a file is unsafe. Plugin and project configuration approvals are separate.</Text>
       <Text emphasis="muted" wrap>Scope: {result().scope}</Text>
       <Text emphasis="muted" wrap>{result().limits}</Text>
       <For each={result().findings}>{(finding) =>
@@ -92,7 +93,7 @@ export default function InstructionReviewPanel(props: { nodeId?: string | null }
           </Show>
         </Fold>}
       </For>
-      <Button busy={busy()} onPress={() => void approve()}>Approve this snapshot</Button>
+      <Button busy={busy()} onPress={() => void approve()}>Approve these instructions</Button>
     </Stack>}</Show>
   </Stack>
 }
