@@ -149,8 +149,8 @@ export const agentsClientPlugin: ClientPlugin = {
       sections: [{ id: 'agents', label: 'Your agents' }],
       component: CustomAgentsSettings,
     })
-    // Two tabs: the servers acorn adds to every session, and the ones each CLI loads by itself, which
-    // was core's MCP config files page. Its old id is an alias, so a link to it lands on its tab.
+    // Two sections: the servers acorn adds to every session, and the ones each CLI loads by itself,
+    // which was core's MCP config files page. Its old id is an alias for the config files section.
     ctx.settingsPages.register({
       id: 'agent-mcp-servers', label: 'MCP', category: 'agents', scope: 'node', icon: 'server-cog', order: 40, requires: { plugin: 'agents' },
       aliases: ['mcp#files'],
