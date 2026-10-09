@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId } from '@acorn/plugin-api/client'
@@ -29,7 +29,7 @@ function RemoteList(props: { projectId: string; selected: string | null; onSelec
   </Stack>
 }
 
-function RemoteDetail(props: { projectId: string; selected: string | null }) {
+export function RemoteDetail(props: { projectId: string; selected: string | null }) {
   const query = createQuery(() => remotesOptions(props.projectId))
   const cache = useQueryClient()
   const remote = createMemo(() => query.data?.remotes.find((entry) => entry.name === props.selected) ?? null)
@@ -40,11 +40,14 @@ function RemoteDetail(props: { projectId: string; selected: string | null }) {
   const [error, setError] = createSignal('')
   const [feedback, setFeedback] = createSignal('')
   const [captured, setCaptured] = createSignal<{ nodeId: string | null; projectId: string; remote: GitRemote | null } | null>(null)
+  let generation = 0
   const open = (next: Action) => {
+    generation++
+    setBusy(false)
     setCaptured({ nodeId: activeNodeId(), projectId: props.projectId, remote: remote() })
     setAction(next); setName(remote()?.name ?? ''); setUrl(remote()?.fetchUrl ?? ''); setError(''); setFeedback('')
   }
-  const close = () => { if (!busy()) setAction(null) }
+  const close = () => { generation++; setAction(null); setBusy(false) }
   const submit = async () => {
     const target = captured(), kind = action()
     if (!target || !kind) return
@@ -54,16 +57,20 @@ function RemoteDetail(props: { projectId: string; selected: string | null }) {
       : kind === 'set-url' && target.remote ? { action: kind, name: target.remote.name, expectedUrl: target.remote.fetchUrl, url: url() }
       : kind === 'fetch' && target.remote ? { action: kind, name: target.remote.name, expectedUrl: target.remote.fetchUrl } : null
     if (!request) return
+    const queryKey = remotesKey(target.projectId)
+    const own = ++generation
+    const current = () => own === generation && target.nodeId === activeNodeId() && target.projectId === props.projectId && action() === kind
     setBusy(true); setError('')
     try {
       const result = await changeRemote(target.projectId, request)
-      cache.setQueryData(remotesKey(target.projectId), result.roster)
-      if (result.ok) { setAction(null); setFeedback(`${kind === 'fetch' ? 'Fetched' : 'Updated'} ${request.name}.`) }
-      else setError(result.reason ?? 'Git refused the remote operation.')
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
-    finally { setBusy(false) }
+      cache.setQueryData(queryKey, result.roster)
+      if (current()) { if (result.ok) { close(); setFeedback(`${kind === 'fetch' ? 'Fetched' : 'Updated'} ${request.name}.`) }
+        else setError(result.reason ?? 'Git refused the remote operation.') }
+    } catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : String(cause)) }
+    finally { if (current()) setBusy(false) }
   }
-  createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { setAction(null); setFeedback('') }, { defer: true }))
+  createEffect(on(() => `${activeNodeId()}:${props.projectId}:${props.selected}`, () => { close(); setFeedback('') }, { defer: true }))
+  onCleanup(() => { generation++ })
   return <Stack gap="section">
     <SectionHeader>Repository remotes</SectionHeader>
     <Button onPress={() => open('add')}>Add remote</Button>
@@ -71,8 +78,8 @@ function RemoteDetail(props: { projectId: string; selected: string | null }) {
     <Show when={feedback()}><Alert tone="ok">{feedback()}</Alert></Show>
     <Show when={remote()} fallback={<EmptyState title="Select a remote">Select a remote to inspect or fetch it.</EmptyState>}>
       {(selected) => <>
-        <Facts grouping="rows" items={[{ label: 'Name', value: selected().name }, { label: 'Fetch URL', value: selected().fetchUrl },
-          { label: 'Push URL', value: selected().pushUrl },
+        <Facts grouping="rows" items={[{ label: 'Name', value: selected().name }, { label: 'Fetch URL', value: `${selected().fetchUrl}${selected().fetchUrlCount > 1 ? ` (${selected().fetchUrlCount} configured)` : ''}` },
+          { label: 'Push URL', value: `${selected().pushUrl}${selected().pushUrlCount > 1 ? ` (${selected().pushUrlCount} configured)` : ''}` },
           { label: 'Last successful fetch', value: query.data?.lastFetch[selected().name]?.successAt ? new Date(query.data!.lastFetch[selected().name]!.successAt!).toLocaleString() : 'Never' },
           { label: 'Last failure', value: query.data?.lastFetch[selected().name]?.error ?? 'None' }]} />
         <Button onPress={() => open('fetch')}>Fetch this remote</Button>

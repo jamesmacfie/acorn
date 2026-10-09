@@ -15,10 +15,10 @@ const request = z.discriminatedUnion('action', [
 export function remoteRoutes(service: RemoteService) {
   return new Hono<AppEnv>()
     .use('/projects/:projectId/remotes', requireDevice)
-    .get('/projects/:projectId/remotes', async (c) => c.json(await service.roster(c.req.param('projectId'))))
+    .get('/projects/:projectId/remotes', async (c) => c.json(await service.roster(c.req.param('projectId'), c.req.raw.signal)))
     .post('/projects/:projectId/remotes', async (c) => {
       const parsed = request.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) throw new BridgeError(400, 'bad_request', 'Invalid remote action.')
-      return c.json(await service.change(c.req.param('projectId'), parsed.data))
+      return c.json(await service.change(c.req.param('projectId'), parsed.data, c.req.raw.signal))
     })
 }

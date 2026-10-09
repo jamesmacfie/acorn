@@ -23,7 +23,7 @@ function fixture(objectFormat?: 'sha256') {
   const task: TaskRef = { id: 'task', title: 'Task', projectId: 'project', branch: null, worktreePath: null, skipSetup: false, pullNumber: null }
   const core = {
     projects: { byId: async (id: string) => id === 'project' ? { id, path: root } : null },
-    tasks: { load: async (id: string) => id === task.id ? task : undefined, active: async () => [task] },
+    tasks: { load: async (id: string) => id === task.id ? task : undefined, active: async () => [task], branchClaims: async () => [task] },
     checkoutAdmission: { write: async (_: string, action: (path: string) => Promise<unknown>) => action(task.worktreePath ?? root) },
     git: { git: async (args: readonly string[], opts: { cwd: string }) => new Promise<{ code: number; stdout: string; stderr: string }>((done) => {
       const child = spawn('git', [...args], { cwd: opts.cwd })

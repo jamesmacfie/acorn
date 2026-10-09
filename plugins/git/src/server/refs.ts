@@ -10,17 +10,22 @@ const first = (stderr: string, fallback: string) => stderr.trim().split('\n')[0]
 
 async function commonDirectory(core: Core, path: string): Promise<string | null> {
   const result = await core.git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: path, maxOutputBytes: 8192 })
-  return result.code === 0 ? canonicalPath(resolve(path, result.stdout.trim())) : null
+  return result.code === 0 && !result.truncated && !!result.stdout.trim() ? canonicalPath(resolve(path, result.stdout.trim())) : null
 }
 
 async function branchOwners(core: Core, repository: string): Promise<Map<string, WorktreeOwner[]>> {
   const identity = await commonDirectory(core, repository)
   const owners = new Map<string, WorktreeOwner[]>()
-  for (const task of await core.tasks.active()) {
+  if (!identity) throw new BridgeError(409, 'repository_unavailable', 'Could not verify repository identity.')
+  for (const task of await core.tasks.branchClaims()) {
     if (!task.branch) continue
     const project = await core.projects.byId(task.projectId)
+    if (!project?.path) throw new BridgeError(409, 'ownership_unavailable', 'Cannot verify task branch ownership. Refresh and try again.')
     const path = task.worktreePath ?? project?.path
-    if (!path || (await commonDirectory(core, path) ?? (project?.path ? await commonDirectory(core, project.path) : null)) !== identity) continue
+    const mapped = path ? await commonDirectory(core, path) : null
+    const projectIdentity = await commonDirectory(core, project.path)
+    if (!projectIdentity || (!mapped && task.worktreePath)) throw new BridgeError(409, 'ownership_unavailable', 'Cannot verify task branch ownership. Refresh and try again.')
+    if ((mapped ?? projectIdentity) !== identity && projectIdentity !== identity) continue
     owners.set(task.branch, [...owners.get(task.branch) ?? [], { id: task.id, title: task.title, projectId: task.projectId }])
   }
   return owners
@@ -29,20 +34,20 @@ async function branchOwners(core: Core, repository: string): Promise<Map<string,
 export async function refRoster(core: Core, projectId: string): Promise<RefRoster> {
   const repository = await repositoryFor(core, projectId)
   const [listed, worktrees, owners] = await Promise.all([
-    core.git.git(['for-each-ref', '--format=%(refname)%00%(objectname)%00%(*objectname)%00%(upstream)', 'refs/heads', 'refs/remotes', 'refs/tags'], { cwd: repository, maxOutputBytes: 256 * 1024 }),
+    core.git.git(['for-each-ref', '--format=%(refname)%00%(objectname)%00%(objecttype)%00%(*objectname)%00%(*objecttype)%00%(upstream)', 'refs/heads', 'refs/remotes', 'refs/tags'], { cwd: repository, maxOutputBytes: 256 * 1024 }),
     core.git.git(['worktree', 'list', '--porcelain', '-z'], { cwd: repository, maxOutputBytes: 1 << 20 }),
     branchOwners(core, repository),
   ])
-  if (listed.code !== 0 || worktrees.code !== 0) throw new BridgeError(422, 'git_failed', first(listed.stderr || worktrees.stderr, 'Could not inspect refs.'))
+  if (listed.code !== 0 || worktrees.code !== 0 || listed.truncated || worktrees.truncated || !worktrees.stdout.endsWith('\0\0')) throw new BridgeError(422, 'git_failed', first(listed.stderr || worktrees.stderr, 'Could not inspect complete refs and worktrees.'))
   const checkedOut = new Set(parseRoster(worktrees.stdout).map((entry) => entry.branch).filter((name): name is string => !!name))
   const refs: GitRef[] = []
   for (const line of listed.stdout.trimEnd().split('\n')) {
     if (!line) continue
-    const [full, objectId, peeled, upstream] = line.split('\0')
-    if (!full || !objectId || !ID.test(objectId)) continue
+    const [full, objectId, objectType, peeled, peeledType, upstream] = line.split('\0')
+    if (!full || !objectId || !ID.test(objectId)) throw new BridgeError(422, 'git_failed', 'Git returned an incomplete ref roster.')
     const kind = full.startsWith('refs/heads/') ? 'local' : full.startsWith('refs/remotes/') ? 'remote' : 'tag'
     const name = full.slice(kind === 'local' ? 11 : kind === 'remote' ? 13 : 10)
-    refs.push({ name, kind, objectId, commitId: kind === 'tag' && peeled ? peeled : objectId,
+    refs.push({ name, kind, objectId, commitId: objectType === 'commit' ? objectId : peeledType === 'commit' && ID.test(peeled ?? '') ? peeled : null,
       upstream: kind === 'local' ? upstream || null : null, checkedOut: kind === 'local' && checkedOut.has(name),
       reservedBy: kind === 'local' ? owners.get(name) ?? [] : [] })
   }
@@ -61,10 +66,12 @@ async function commitExists(core: Core, repository: string, id: string): Promise
   return type.code === 0 && type.stdout.trim() === 'commit'
 }
 
-export async function changeRef(core: Core, projectId: string, change: RefChange): Promise<RefChangeResult> {
+export async function changeRef(core: Core & Pick<CoreServices, 'repositoryMetadata'>, projectId: string, change: RefChange, changed: () => void = () => {}): Promise<RefChangeResult> {
+  return core.repositoryMetadata.write(projectId, async (observedRepository, observedCommon) => {
   let roster = await refRoster(core, projectId)
   const refuse = (reason: string): RefChangeResult => ({ ok: false, reason, roster })
   const repository = roster.repository
+  if (repository !== observedRepository || await commonDirectory(core, repository) !== observedCommon) return refuse('Project repository changed. Reopen the action.')
   const kind = change.action.endsWith('tag') ? 'tag' : 'branch'
   if (!await validName(core, repository, change.name, kind)) return refuse(`Invalid ${kind} name.`)
   if (change.action === 'rename-branch' && !await validName(core, repository, change.nextName, 'branch')) return refuse('Invalid new branch name.')
@@ -91,10 +98,12 @@ export async function changeRef(core: Core, projectId: string, change: RefChange
   }
   // The second observation narrows the window between the menu selection and the Git write.
   roster = await refRoster(core, projectId)
-  if (roster.repository !== repository) return refuse('Project repository changed. Reopen the action.')
+  if (roster.repository !== repository || await commonDirectory(core, repository) !== observedCommon) return refuse('Project repository changed. Reopen the action.')
   const fresh = roster.refs.find((ref) => ref.kind === (kind === 'tag' ? 'tag' : 'local') && ref.name === change.name)
   if ('startId' in change ? !!fresh : !fresh || fresh.objectId !== change.expectedId || fresh.checkedOut || fresh.reservedBy.length) return refuse('Ref or task ownership changed. Refresh and try again.')
   const result = await core.git.git(args, { cwd: repository, maxOutputBytes: 8192, timeoutMs: 30_000 })
+  if (result.code === 0) changed()
   roster = await refRoster(core, projectId)
   return { ok: result.code === 0, reason: result.code === 0 ? null : first(result.stderr, 'Git refused the ref change.'), roster }
+  })
 }

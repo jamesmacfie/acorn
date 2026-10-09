@@ -28,13 +28,14 @@ export class AutoFetcher {
     return !!owner && await this.core.prefs.read(owner, AUTO_FETCH_PREF) === 'true'
   }
 
-  private async projectsByRepository(): Promise<Map<string, string>> {
+  private async projectsByRepository(signal: AbortSignal): Promise<Map<string, string>> {
     const result = new Map<string, string>()
     for (const project of (await this.core.projects.checkouts()).slice(0, 128)) {
-      if (this.disposed) break
+      if (signal.aborted) break
       try {
-        const common = await this.core.git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: project.path, maxOutputBytes: 8192, signal: this.lifetime.signal })
-        if (common.code === 0) {
+        const common = await this.core.git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: project.path, maxOutputBytes: 8192, signal })
+        if (signal.aborted) break
+        if (common.code === 0 && !common.truncated) {
           const key = await canonicalPath(resolve(project.path, common.stdout.trim()))
           if (!result.has(key)) result.set(key, project.id)
         }
@@ -44,18 +45,19 @@ export class AutoFetcher {
   }
 
   async tick(signal?: AbortSignal): Promise<string> {
-    if (this.running || this.disposed || !await this.enabled()) return 'auto-fetch disabled or already running'
+    if (this.running || this.disposed) return 'auto-fetch disabled or already running'
     this.running = true
     const combined = AbortSignal.any([...(signal ? [signal] : []), this.lifetime.signal, this.enabledLifetime.signal])
     let fetched = 0, failures = 0
     try {
-      const repositories = [...(await this.projectsByRepository()).entries()].filter(([key]) => this.now() - (this.lastAttempt.get(key) ?? -Infinity) >= AUTO_FETCH_CADENCE_MS)
+      if (!await this.enabled() || combined.aborted) return 'auto-fetch disabled or already running'
+      const repositories = [...(await this.projectsByRepository(combined)).entries()].filter(([key]) => this.now() - (this.lastAttempt.get(key) ?? -Infinity) >= AUTO_FETCH_CADENCE_MS)
       for (let at = 0; at < repositories.length && !combined.aborted && !this.disposed; at += 2) {
         await Promise.all(repositories.slice(at, at + 2).map(async ([key, projectId]) => {
           this.lastAttempt.set(key, this.now())
           try {
             if (!await this.enabled() || combined.aborted || this.disposed) return
-            const roster = await this.remotes.roster(projectId)
+            const roster = await this.remotes.roster(projectId, combined)
             for (const remote of roster.remotes) {
               if (!await this.enabled() || combined.aborted || this.disposed) return
               const result = await this.remotes.change(projectId, { action: 'fetch', name: remote.name, expectedUrl: remote.fetchUrl }, combined)

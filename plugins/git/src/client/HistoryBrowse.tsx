@@ -1,6 +1,7 @@
-import { createEffect, createMemo, on, Show } from 'solid-js'
+import { createEffect, createMemo, on, onCleanup, Show } from 'solid-js'
+import { useQueryClient } from '@tanstack/solid-query'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
-import { activeNodeId, setSelectedSource } from '@acorn/plugin-api/client'
+import { activeNodeId, setSelectedSource, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Stack, TabPanel, Tabs } from '@acorn/plugin-api/ui'
 import { createHistoryModel } from './historyModel'
 import { HistoryRows } from './HistoryRows'
@@ -26,6 +27,13 @@ function HistoryList() {
 
 export function GitSourceList() {
   const params = useParams<{ projectId: string; commitId?: string; worktreeId?: string }>()
+  const cache = useQueryClient()
+  const refresh = () => {
+    const node = activeNodeId(), project = params.projectId
+    for (const prefix of ['git-history', 'git-refs', 'git-remotes']) void cache.invalidateQueries({ queryKey: [prefix, node, project] })
+  }
+  const off = [wsOnNodeEvent('worktree:status-changed', refresh), wsOnReconnect(refresh)]
+  onCleanup(() => off.forEach((dispose) => dispose()))
   const navigate = useNavigate()
   const base = useMatch(() => '/p/:projectId/x/git/worktrees')
   const entry = useMatch(() => '/p/:projectId/x/git/worktrees/:worktreeId')

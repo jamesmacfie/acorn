@@ -16,6 +16,8 @@ import { createProjectService, type CompiledProjectService, type ProjectService 
 import { createTelemetryService, type TelemetryService } from './telemetry'
 import { verifyAgentToolProvenance } from '../agentTools/provenance'
 import { createCheckoutAdmission, registerCheckoutAdmission, type CheckoutAdmission } from './checkoutAdmission'
+import { getProject } from '../projects'
+import { realpathSync } from 'node:fs'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
 //
@@ -56,6 +58,8 @@ export type CoreServices = {
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
   git: CoreGitService
   checkoutAdmission: CheckoutAdmission
+  /** Serializes repository metadata writes with task branch reservations for the same Git object store. */
+  repositoryMetadata: { write<T>(projectId: string, action: (repository: string, commonDirectory: string) => Promise<T>): Promise<T> }
   // Every child process: env allowlist, process-group kill, bounded capture.
   proc: CoreProcService
   // Use-scoped credential access; scrubs the plaintext out of anything thrown from its scope.
@@ -127,6 +131,17 @@ export function createCoreServices(options: {
     fs: fs satisfies CoreFsService,
     git: git satisfies CoreGitService,
     checkoutAdmission,
+    repositoryMetadata: {
+      write: async (projectId, action) => {
+        const { repositoryMetadataKey, withBranchReservation } = await import('../worktrees/taskBranch')
+        const project = await getProject(options.db, projectId)
+        if (!project?.path || project.vcs !== 'git') throw new Error('Git project is unavailable on this Node.')
+        return withBranchReservation(options.db, project, async () => action(
+          realpathSync(await git.gitText(['rev-parse', '--show-toplevel'], { cwd: project.path!, timeoutMs: 10_000 })),
+          await repositoryMetadataKey(project),
+        ))
+      },
+    },
     proc: proc satisfies CoreProcService,
     secrets: options.secrets,
     tasks,

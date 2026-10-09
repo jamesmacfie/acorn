@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId, requestTaskLaunch } from '@acorn/plugin-api/client'
@@ -34,7 +34,7 @@ function RefList(props: { projectId: string; selected: string | null; onSelect: 
   </Stack>
 }
 
-function RefDetail(props: { projectId: string; selected: string | null }) {
+export function RefDetail(props: { projectId: string; selected: string | null }) {
   const query = createQuery(() => refsOptions(props.projectId))
   const cache = useQueryClient()
   const [action, setAction] = createSignal<Action | null>(null)
@@ -45,8 +45,11 @@ function RefDetail(props: { projectId: string; selected: string | null }) {
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [captured, setCaptured] = createSignal<{ nodeId: string | null; projectId: string; ref: GitRef | null } | null>(null)
+  let generation = 0
   const ref = createMemo(() => query.data?.refs.find((item) => refKey(item) === props.selected) ?? null)
   const open = (next: Action) => {
+    generation++
+    setBusy(false)
     setCaptured({ nodeId: activeNodeId(), projectId: props.projectId, ref: ref() })
     setName(ref()?.name ?? '')
     setStartId(ref()?.commitId ?? query.data?.refs.find((item) => item.checkedOut)?.commitId ?? '')
@@ -55,7 +58,7 @@ function RefDetail(props: { projectId: string; selected: string | null }) {
     setError('')
     setAction(next)
   }
-  const close = () => { if (!busy()) setAction(null) }
+  const close = () => { generation++; setAction(null); setBusy(false) }
   const submit = async () => {
     const target = captured(), kind = action()
     if (!target || !kind) return
@@ -69,14 +72,16 @@ function RefDetail(props: { projectId: string; selected: string | null }) {
       : kind === 'set-upstream' && selected ? { action: kind, name: selected.name, expectedId: selected.objectId, upstream: upstream() || null }
       : null
     if (!request) return
+    const queryKey = refsKey(target.projectId)
+    const own = ++generation
+    const current = () => own === generation && target.nodeId === activeNodeId() && target.projectId === props.projectId && action() === kind
     setBusy(true); setError('')
     try {
       const response = await changeRef(target.projectId, request)
-      cache.setQueryData(refsKey(target.projectId), response.roster)
-      if (response.ok) setAction(null)
-      else setError(response.reason ?? 'Git refused the ref change.')
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
-    finally { setBusy(false) }
+      cache.setQueryData(queryKey, response.roster)
+      if (current()) { if (response.ok) close(); else setError(response.reason ?? 'Git refused the ref change.') }
+    } catch (cause) { if (current()) setError(cause instanceof Error ? cause.message : String(cause)) }
+    finally { if (current()) setBusy(false) }
   }
   const launch = (workflow: boolean) => {
     const selected = ref(), nodeId = activeNodeId(), projectId = props.projectId
@@ -84,7 +89,8 @@ function RefDetail(props: { projectId: string; selected: string | null }) {
     if (workflow) launchWorkflowAtCommit(nodeId, projectId, selected.commitId, selected.name)
     else requestTaskLaunch({ nodeId, projectId, title: selected.name, baseCommit: selected.commitId })
   }
-  createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { setAction(null); setError('') }, { defer: true }))
+  createEffect(on(() => `${activeNodeId()}:${props.projectId}:${props.selected}`, () => { close(); setError('') }, { defer: true }))
+  onCleanup(() => { generation++ })
   return <Stack gap="section">
     <SectionHeader>Refs</SectionHeader>
     <Button onPress={() => open('create-branch')}>Create branch</Button>

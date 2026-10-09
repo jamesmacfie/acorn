@@ -6,7 +6,7 @@ The Git plugin reads and changes repository refs through the selected Node. **Gi
 
 The ref roster distinguishes local branches, remote-tracking branches, and tags. It includes immutable object and commit IDs, upstreams, checked-out worktrees, and task reservations. Branch creation takes a pinned start ID. Rename, delete, and upstream edits include the observed branch ID and recheck it at write time. The Node refuses mutations of branches checked out in any worktree or reserved by a task across aliases of the same object store, including pending and archiving tasks. Tags can be lightweight or annotated; deletion rechecks the tag object ID.
 
-The remote roster includes fetch and push URLs and the last fetch success or failure per remote. Add, remove, URL edit, and fetch use an explicit remote name and recheck the observed URL. The Node accepts HTTPS, SSH, Git, file, and absolute local URLs. Git receives argument arrays and an explicit protocol allowlist, so an executable remote helper cannot run. Manual fetch and scheduled fetch report failures with the refreshed remote roster.
+The remote roster includes fetch and push URLs and the last fetch success or failure per remote. Add, remove, fetch URL edit, and fetch use an explicit remote name and recheck the observed URL. The editor changes the single configured fetch URL and preserves a separate push URL; it refuses an edit when multiple fetch URLs are configured. The Node accepts HTTPS, SSH, Git, file, and absolute local URLs. Git receives argument arrays and an explicit protocol allowlist, so an executable remote helper cannot run. Manual fetch and scheduled fetch report failures with the refreshed remote roster.
 
 Task pull and push remain Changes operations. Git uses Changes' public remote contract and selects a task explicitly. Changes retains its before-push hooks, fast-forward or rebase pull behavior, and force-with-lease checks. A force push carries the remote object ID observed by the person as an explicit lease; a later fetch cannot silently broaden that lease.
 
@@ -29,6 +29,8 @@ All routes require a paired device and resolve `:projectId` through the Node pro
 | `GET, POST /v1/p/git/projects/:projectId/refs` | Ref roster or guarded ref mutation with post-state |
 | `GET, POST /v1/p/git/projects/:projectId/remotes` | Remote roster or guarded remote operation with post-state |
 | `POST /v1/p/git/projects/:projectId/comparison` | Pinned source, destination, mode, and base IDs |
-| `GET, POST /v1/p/git/projects/:projectId/settings` | Scoped identity and Node preferences, or identity write and readback |
+| `GET /v1/p/git/projects/:projectId/settings` | Scoped identity and Node preferences |
+| `PUT /v1/p/git/projects/:projectId/settings/identity` | Explicit local or Node-global identity write and readback |
+| `PUT /v1/p/git/projects/:projectId/settings/preference` | Pull policy or automatic fetch preference |
 
 See [Git history and revision diffs](./history.md) for revision and segmented diff routes.

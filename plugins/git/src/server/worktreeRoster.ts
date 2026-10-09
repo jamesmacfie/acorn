@@ -87,13 +87,10 @@ async function taskOwners(core: Core, tasks: readonly TaskRef[]): Promise<Map<st
     if (task.branch !== null || task.worktreePath) continue
     if (!projectRoots.has(task.projectId)) {
       const project = await core.projects.byId(task.projectId)
-      let path: string | null = null
-      if (project?.path) {
-        try {
-          const root = await core.git.git(['rev-parse', '--show-toplevel'], { cwd: project.path, maxOutputBytes: 8192 })
-          if (root.code === 0) path = await canonicalPath(root.stdout.trim())
-        } catch { /* A missing mapping cannot own a registered checkout. */ }
-      }
+      if (!project?.path) throw new Error('Cannot verify task checkout ownership.')
+      const root = await core.git.git(['rev-parse', '--show-toplevel'], { cwd: project.path, maxOutputBytes: 8192 })
+      if (root.code !== 0 || root.truncated) throw new Error('Cannot verify task checkout ownership.')
+      const path = await canonicalPath(root.stdout.trim())
       projectRoots.set(task.projectId, path)
     }
     const path = projectRoots.get(task.projectId)
@@ -108,16 +105,17 @@ export async function inventory(core: Core, projectId: string): Promise<Worktree
   if (!project) return empty('Project not found on this Node.')
   if (!project.path) return empty('This project has no mapped checkout on this Node.')
   const root = await core.git.git(['rev-parse', '--show-toplevel'], { cwd: project.path, maxOutputBytes: 8192 })
-  if (root.code !== 0) return empty(message(root.stderr, 'This project is not a Git repository.'))
+  if (root.code !== 0 || root.truncated) return empty(message(root.stderr, 'This project is not a complete Git repository.'))
   const checkoutRoot = await canonicalPath(root.stdout.trim())
   const roster = await core.git.git(['worktree', 'list', '--porcelain', '-z'], { cwd: checkoutRoot, maxOutputBytes: MAX_ROSTER_BYTES })
-  if (roster.code !== 0) return { ...empty(message(roster.stderr, 'Could not read worktrees.')), repository: checkoutRoot }
+  if (roster.code !== 0 || roster.truncated || !roster.stdout.endsWith('\0\0')) return { ...empty(message(roster.stderr, 'Could not read complete worktrees.')), repository: checkoutRoot }
   const entries = parseRoster(roster.stdout)
   // Git lists the main worktree first. Use that path as the repository identity so two project
   // mappings into different linked worktrees still share observations and the cleanup guard.
   const repository = await canonicalPath(entries[0]?.path ?? checkoutRoot)
-  const tasks = await core.tasks.active()
-  const owners = await taskOwners(core, tasks)
+  let owners: Map<string, TaskRef[]>
+  try { owners = await taskOwners(core, await core.tasks.branchClaims()) }
+  catch { return { ...empty('Cannot verify task checkout ownership.'), repository } }
   const worktrees: Worktree[] = []
   for (let index = 0; index < entries.length; index += 8) {
     worktrees.push(...await Promise.all(entries.slice(index, index + 8).map((entry) => describe(core, repository, entry, owners))))

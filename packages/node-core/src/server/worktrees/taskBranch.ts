@@ -1,7 +1,7 @@
 import { dedupeBranch, isValidBranch } from '@acorn/protocol/branch.ts'
 import type { WorktreeAvailability } from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
-import type { ProjectRow } from '../projects'
+import { getProject, type ProjectRow } from '../projects'
 import { git, gitOrThrow, gitText } from '../core/git'
 import { branchExists } from './worktrees'
 import { worktreeAvailability, worktreeNameConflict } from './worktreeAvailability'
@@ -30,20 +30,37 @@ export class TaskBranchError extends Error {
 }
 
 const occupied = 'This branch name already exists in another worktree'
-const queues = new WeakMap<AppDatabase, Promise<void>>()
+const queues = new WeakMap<AppDatabase, Map<string, Promise<void>>>()
 
-// Serialize Git checks and row reservation across projects on this Node: different projects can
-// map to the same worktree directory. The callback must save synchronously before releasing it.
-export async function withBranchReservation<T>(db: AppDatabase, action: () => Promise<T>): Promise<T> {
-  const previous = queues.get(db) ?? Promise.resolve()
+export async function repositoryMetadataKey(project: ProjectRow): Promise<string> {
+  if (project.vcs !== 'git' || !project.path) return `project:${project.id}`
+  try {
+    const common = await gitText(['rev-parse', '--git-common-dir'], { cwd: project.path, timeoutMs: 10_000 })
+    return realpathSync(resolve(project.path, common))
+  } catch {
+    throw new TaskBranchError(409, 'The project repository is unavailable. Reopen the action.')
+  }
+}
+
+// Serialize task reservations and metadata writes across project aliases sharing an object store.
+// The callback completes its write before releasing the queue.
+export async function withBranchReservation<T>(db: AppDatabase, project: ProjectRow, action: () => Promise<T>): Promise<T> {
+  const key = await repositoryMetadataKey(project)
+  const entries = queues.get(db) ?? new Map<string, Promise<void>>()
+  queues.set(db, entries)
+  const previous = entries.get(key) ?? Promise.resolve()
   let release!: () => void
   const next = new Promise<void>((resolve) => { release = resolve })
-  queues.set(db, next)
+  entries.set(key, next)
   await previous
-  try { return await action() }
+  try {
+    const current = await getProject(db, project.id)
+    if (!current || await repositoryMetadataKey(current) !== key) throw new TaskBranchError(409, 'The project repository changed. Reopen the action.')
+    return await action()
+  }
   finally {
     release()
-    if (queues.get(db) === next) queues.delete(db)
+    if (entries.get(key) === next) entries.delete(key)
   }
 }
 

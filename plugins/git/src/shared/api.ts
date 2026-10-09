@@ -75,7 +75,7 @@ export type RefChange =
 export type RefChangeResult = { ok: boolean; reason: string | null; roster: RefRoster }
 export const refsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/refs`
 
-export type GitRemote = { name: string; fetchUrl: string; pushUrl: string }
+export type GitRemote = { name: string; fetchUrl: string; pushUrl: string; fetchUrlCount: number; pushUrlCount: number }
 export type RemoteRoster = { repository: string; remotes: GitRemote[]; lastFetch: Record<string, { successAt: number | null; failureAt: number | null; error: string | null }> }
 export type RemoteChange =
   | { action: 'add'; name: string; url: string }
@@ -92,5 +92,5 @@ export const comparisonRoute = (projectId: string) => `/v1/p/git/projects/${enco
 export type IdentityValue = { value: string | null; scope: string | null; origin: string | null; local: string | null; global: string | null }
 export type GitSettings = { repository: string; name: IdentityValue; email: IdentityValue; pullPolicy: 'ff-only' | 'rebase'; autoFetch: boolean }
 export type IdentityWrite = { scope: 'local' | 'global'; name: string; email: string }
-export type IdentityWriteResult = { name: { ok: boolean; error: string | null }; email: { ok: boolean; error: string | null }; settings: GitSettings }
+export type IdentityWriteResult = { name: { ok: boolean; error: string | null }; email: { ok: boolean; error: string | null }; settings: GitSettings; readbackError: string | null }
 export const gitSettingsRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/settings`

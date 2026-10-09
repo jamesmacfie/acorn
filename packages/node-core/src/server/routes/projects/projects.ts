@@ -14,7 +14,6 @@ import { respondError } from '../../respond'
 import { isTaskConfined } from '../../middleware/requireUser'
 import { ownerId } from '../../middleware/requireUser'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
-import { taskBranchAvailability, TaskBranchError } from '../../worktrees/taskBranch'
 import { projectBranches } from '../../worktrees/branches'
 
 // /v1/core/projects, the first-class folder-project surface (docs/workspaces-and-tasks.md).
@@ -147,6 +146,7 @@ export const projects = new Hono<AppEnv>()
     if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
     const branchSource = c.req.query('branchSource')
     if (branchSource !== undefined && branchSource !== 'derived' && branchSource !== 'exact') return respondError(c, 400, 'bad_request')
+    const { taskBranchAvailability, TaskBranchError } = await import('../../worktrees/taskBranch')
     try {
       const result = await taskBranchAvailability(db, project, { branch, branchSource, baseBranch: c.req.query('baseBranch'), baseCommit: c.req.query('baseCommit') })
       // Preserve the response for callers that do not request a preview.

@@ -14,13 +14,13 @@ const request = z.discriminatedUnion('action', [
   z.object({ action: z.literal('delete-tag'), name, expectedId: id }).strict(),
 ])
 
-export function refRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'tasks'>) {
+export function refRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'tasks' | 'repositoryMetadata'>, changed: () => void = () => {}) {
   return new Hono<AppEnv>()
     .use('/projects/:projectId/refs', requireDevice)
     .get('/projects/:projectId/refs', async (c) => c.json(await refRoster(core, c.req.param('projectId'))))
     .post('/projects/:projectId/refs', async (c) => {
       const parsed = request.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) throw new BridgeError(400, 'bad_request', 'Invalid ref action.')
-      return c.json(await changeRef(core, c.req.param('projectId'), parsed.data))
+      return c.json(await changeRef(core, c.req.param('projectId'), parsed.data, changed))
     })
 }

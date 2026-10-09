@@ -38,7 +38,7 @@ function core(root: string, tasks: TaskRef[] = [], aliasPath = root) {
   ]
   return {
     projects: { byId: async (id: string) => projects.find((project) => project.id === id) ?? null },
-    tasks: { active: async () => tasks },
+    tasks: { branchClaims: async () => tasks },
     git: { git: async (args: readonly string[], opts: { cwd: string }) => {
       const result = await new Promise<{ code: number; stdout: string; stderr: string }>((done) => {
         const child = spawn('git', [...args], { cwd: opts.cwd })

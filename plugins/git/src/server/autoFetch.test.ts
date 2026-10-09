@@ -46,3 +46,47 @@ it('starts no network work while off, deduplicates aliases, bounds parallel work
   await state.fetcher.tick()
   expect(state.calls).toHaveLength(4)
 })
+
+it('claims the first tick before preference read and stops discovery when disabled or disposed', async () => {
+  const preference = deferred<string>()
+  const discovery = deferred<{ code: number; stdout: string; stderr: string }>()
+  const entered = deferred<void>()
+  const calls: string[] = []
+  const core = { identity: { active: () => 'owner' }, prefs: { read: () => preference.promise },
+    projects: { checkouts: async () => [{ id: 'a', path: '/tmp/a' }, { id: 'b', path: '/tmp/b' }] },
+    git: { git: async (_: unknown, options: { cwd: string }) => { calls.push(options.cwd); entered.resolve(); return discovery.promise } },
+  } as unknown as Pick<CoreServices, 'git' | 'projects' | 'prefs' | 'identity'>
+  const remoteCalls: string[] = []
+  const remote = { roster: async (id: string) => { remoteCalls.push(id); return { remotes: [{ name: 'origin', fetchUrl: '/tmp/remote' }] } }, change: async () => ({ ok: true }) } as unknown as Pick<RemoteService, 'roster' | 'change'>
+  const fetcher = new AutoFetcher(core, remote)
+  const first = fetcher.tick()
+  expect(await fetcher.tick()).toContain('already running')
+  preference.resolve('true')
+  await entered.promise
+  fetcher.setEnabled(false)
+  discovery.resolve({ code: 0, stdout: '/tmp/common\n', stderr: '' })
+  await first
+  expect(calls).toEqual(['/tmp/a'])
+  expect(remoteCalls).toEqual([])
+  fetcher.dispose()
+})
+
+it('does not start another remote after disposal during an in-flight fetch', async () => {
+  const gate = deferred<{ ok: boolean }>()
+  const entered = deferred<void>()
+  const calls: string[] = []
+  const core = { identity: { active: () => 'owner' }, prefs: { read: async () => 'true' },
+    projects: { checkouts: async () => [{ id: 'a', path: '/tmp/a' }] },
+    git: { git: async () => ({ code: 0, stdout: '/tmp/common\n', stderr: '' }) },
+  } as unknown as Pick<CoreServices, 'git' | 'projects' | 'prefs' | 'identity'>
+  const remote = { roster: async () => ({ remotes: [{ name: 'one', fetchUrl: '/tmp/one' }, { name: 'two', fetchUrl: '/tmp/two' }] }),
+    change: async (_: string, change: { name: string }) => { calls.push(change.name); entered.resolve(); return gate.promise },
+  } as unknown as Pick<RemoteService, 'roster' | 'change'>
+  const fetcher = new AutoFetcher(core, remote)
+  const tick = fetcher.tick()
+  await entered.promise
+  fetcher.dispose()
+  gate.resolve({ ok: false })
+  await tick
+  expect(calls).toEqual(['one'])
+})

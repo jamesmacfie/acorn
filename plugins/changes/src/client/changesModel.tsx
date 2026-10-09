@@ -1,7 +1,7 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  agentSessionsFor, clientCapability, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
+  activeNodeId, agentSessionsFor, clientCapability, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
   openPane, projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
   sendReferenceToAgent, sendToSession, taskStatusRevision, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
@@ -378,7 +378,8 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // Every reason goes to the alert rather than into the header, because git's refusals are multi-line
   // and because `remoteReason` turns the ones it recognises into a next step to press (./model.ts).
   const [remoteBusy, setRemoteBusy] = createSignal(false)
-  const runRemote = (action: RemoteAction) => {
+  const forceObservation = () => ({ nodeId: activeNodeId(), branch: status().branch, upstreamId: status().upstreamId })
+  const runRemote = (action: RemoteAction, observed = forceObservation()) => {
     // `changes:before-push` runs on the node, inside the push call, as the commit chain does.
     if (action === 'fetch') return localGitApi.fetch(task.id)
     if (action === 'pull') return localGitApi.pull(task.id, {})
@@ -386,18 +387,21 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     if (action === 'rebase') return localGitApi.pull(task.id, { rebase: true })
     if (action === 'push') return localGitApi.push(task.id, {})
     if (action === 'force') return localGitApi.push(task.id, {
-      force: true, expectedBranch: status().branch ?? undefined, expectedRemoteId: status().upstreamId ?? undefined,
+      force: true, expectedBranch: observed.branch ?? undefined, expectedRemoteId: observed.upstreamId ?? undefined,
     })
     return localGitApi.abort(task.id)
   }
-  async function remote(action: RemoteAction): Promise<void> {
+  async function remote(action: RemoteAction, observed = forceObservation()): Promise<void> {
     if (remoteBusy()) return
+    if (action === 'force' && (observed.nodeId !== activeNodeId() || observed.branch !== status().branch)) {
+      setActionError('Node or branch changed. Reopen Force push.'); return
+    }
     setRemoteBusy(true)
     setActionError('')
     // Caught rather than left to reject: git's own refusals arrive as `{ ok: false, reason }`, but the
     // route itself can fail — a node that went away mid-fetch, a 120-second call the transport gave up
     // on — and the reader would otherwise press a button and watch nothing happen.
-    const res = await runRemote(action)
+    const res = await runRemote(action, observed)
       .catch((error: unknown) => ({ ok: false, reason: error instanceof Error ? error.message : 'The node did not answer.' }))
       .finally(() => setRemoteBusy(false))
     setActionError(res.ok ? '' : remoteReason(action, res.reason ?? 'The remote refused.'))
@@ -470,6 +474,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     /** Run one remote verb: the bar's primary button, its menu, and the banner's Abort all come
      *  through here (./RemoteBar.tsx). */
     remote,
+    forceObservation,
     /** The backends the wand may offer. Empty hides it: there is nothing to press. */
     modelBackends,
     /** Which backend and model a press will spend, or null when there is nothing to spend. */

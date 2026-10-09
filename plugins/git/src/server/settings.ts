@@ -35,15 +35,21 @@ export async function gitSettings(core: Core, projectId: string, userId: string)
 export async function writeIdentity(core: Core, projectId: string, userId: string, request: IdentityWrite): Promise<IdentityWriteResult> {
   const before = await gitSettings(core, projectId, userId)
   const write = async (key: string, value: string) => {
-    if (await repositoryFor(core, projectId) !== before.repository) return { ok: false, error: 'Project repository changed. Reopen Git settings.' }
-    const result = await config(core, before.repository, [`--${request.scope}`, '--replace-all', key, value])
-    return { ok: result.code === 0, error: result.code === 0 ? null : first(result.stderr) }
+    try {
+      if (await repositoryFor(core, projectId) !== before.repository) return { ok: false, error: 'Project repository changed. Reopen Git settings.' }
+      const result = await config(core, before.repository, [`--${request.scope}`, '--replace-all', key, value])
+      return { ok: result.code === 0, error: result.code === 0 ? null : first(result.stderr) }
+    } catch (error) { return { ok: false, error: error instanceof Error ? error.message : String(error) } }
   }
   const name = await write('user.name', request.name)
   const email = await write('user.email', request.email)
-  const settings = await gitSettings(core, projectId, userId)
-  if (settings.repository !== before.repository) throw new BridgeError(409, 'repository_moved', 'Project repository changed during settings write. Inspect the result on the original repository.')
-  return { name, email, settings }
+  try {
+    const settings = await gitSettings(core, projectId, userId)
+    if (settings.repository === before.repository) return { name, email, settings, readbackError: null }
+    return { name, email, settings: before, readbackError: 'Project repository changed during readback. Inspect identity on the original repository.' }
+  } catch (error) {
+    return { name, email, settings: before, readbackError: `Identity readback failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
 }
 
 export async function writeGitPreference(core: Core, projectId: string, userId: string, key: typeof PULL_POLICY_PREF | typeof AUTO_FETCH_PREF, value: string): Promise<GitSettings> {

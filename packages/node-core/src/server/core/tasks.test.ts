@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema, type AppDatabase } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { createTaskService } from './tasks'
+import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 
 const { broadcasts } = vi.hoisted(() => ({ broadcasts: [] as Record<string, unknown>[] }))
 vi.mock('../transport/wsHub', async (importOriginal) => ({
@@ -45,6 +46,15 @@ describe('the task service workspace lookups', () => {
     expect(await tasks.workspaceIdOrNull('in-workspace')).toBe('ws1')
   })
 
+  it('keeps an archived task branch claimed while archive teardown is unsettled', async () => {
+    t.db.update(schema.tasks).set({ status: 'archived', archivedAt: now }).where(eq(schema.tasks.id, 'in-workspace')).run()
+    expect((await tasks.active()).map((task) => task.id)).not.toContain('in-workspace')
+    expect((await tasks.branchClaims()).map((task) => task.id)).not.toContain('in-workspace')
+    expect(beginTaskArchive('in-workspace')).toBe(true)
+    try { expect((await tasks.branchClaims()).map((task) => task.id)).toContain('in-workspace') }
+    finally { finishTaskArchive('in-workspace') }
+  })
+
   it('answers null where the throwing form throws — unknown task, and a repo in no workspace', async () => {
     await expect(tasks.workspaceId('nope')).rejects.toThrow(/Task not found/)
     await expect(tasks.workspaceId('no-workspace')).rejects.toThrow(/no project scope/)
@@ -66,13 +76,16 @@ describe('the task service workspace lookups', () => {
 
 describe('createChild project inheritance', () => {
   let t: TestDb
+  let gitProject: string
 
   beforeEach(() => {
     t = makeTestDb()
+    gitProject = mkdtempSync(join(tmpdir(), 'acorn-child-project-'))
+    execFileSync('git', ['init', '-q', gitProject])
     broadcasts.length = 0
   })
 
-  afterEach(() => t.cleanup())
+  afterEach(() => { t.cleanup(); rmSync(gitProject, { recursive: true, force: true }) })
 
   it('creates a branchless child for a non-Git project', async () => {
     const now = Date.now()
@@ -99,7 +112,7 @@ describe('createChild project inheritance', () => {
     const at = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-git', name: 'Git', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
     await t.db.insert(schema.projects).values({
-      id: 'project-git', name: 'app', path: '/tmp/acorn-app', workspaceId: 'workspace-git', sort: 0, hidden: false,
+      id: 'project-git', name: 'app', path: gitProject, workspaceId: 'workspace-git', sort: 0, hidden: false,
       vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
       createdAt: at, updatedAt: at,
     })
@@ -137,7 +150,7 @@ describe('createChild project inheritance', () => {
     const at = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-conflict', name: 'Conflict', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
     await t.db.insert(schema.projects).values({
-      id: 'project-conflict', name: 'app', path: '/tmp/acorn-conflict', workspaceId: 'workspace-conflict', sort: 0, hidden: false,
+      id: 'project-conflict', name: 'app', path: gitProject, workspaceId: 'workspace-conflict', sort: 0, hidden: false,
       vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
       createdAt: at, updatedAt: at,
     })
@@ -159,19 +172,22 @@ describe('createChild project inheritance', () => {
 
 describe('createRoot replay identity', () => {
   let t: TestDb
+  let gitProject: string
 
   beforeEach(async () => {
     t = makeTestDb()
+    gitProject = mkdtempSync(join(tmpdir(), 'acorn-root-project-'))
+    execFileSync('git', ['init', '-q', gitProject])
     broadcasts.length = 0
     await t.db.insert(schema.workspaces).values({ id: 'workspace-root', name: 'Root', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-root', name: 'app', path: '/tmp/root-app', workspaceId: 'workspace-root', sort: 0, hidden: false,
+      id: 'project-root', name: 'app', path: gitProject, workspaceId: 'workspace-root', sort: 0, hidden: false,
       vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
       createdAt: now, updatedAt: now,
     })
   })
 
-  afterEach(() => t.cleanup())
+  afterEach(() => { t.cleanup(); rmSync(gitProject, { recursive: true, force: true }) })
 
   it('replays the intended root once and rejects conflicting reuse', async () => {
     const tasks = createTaskService(t.db)

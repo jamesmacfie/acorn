@@ -107,6 +107,7 @@ Menu.Item = (props: {
   kind?: 'radio' | 'checkbox'
   checked?: boolean
   confirm?: string
+  onArm?: () => void
   tone?: 'neutral' | 'danger'
   leading?: JSX.Element
   trailing?: JSX.Element
@@ -118,6 +119,7 @@ Menu.Item = (props: {
   const control = stop({
     onPress: () => {
       // Arming leaves the list open, or the prompt would close under the press that raised it.
+      if (props.confirm && !armed.armed()) props.onArm?.()
       if (props.confirm && !armed.request('confirm')) return
       props.onSelect()
       if (props.closeOnSelect ?? props.kind !== 'checkbox') props.context.close()

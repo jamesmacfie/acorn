@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -15,13 +15,17 @@ function fixture() {
   execFileSync('git', ['init', '-q', root])
   return { root, home }
 }
-function core(root: string, home: string, failEmail = false) {
+function core(root: string, home: string, failEmail: boolean | 'throw-email' | 'readback' = false) {
   const prefs = new Map<string, string>()
+  let writes = 0
   const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(home, 'xdg'), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: join(home, '.gitconfig') }
   return { projects: { byId: async () => ({ path: root }) }, prefs: { read: async (_: string, key: string) => prefs.get(key) ?? null,
     write: async (_: string, key: string, value: string) => { prefs.set(key, value) } },
   git: { git: async (args: readonly string[], opts: { cwd: string; stdin?: string }) => new Promise<{ code: number; stdout: string; stderr: string }>((done, fail) => {
-    if (failEmail && args.includes('user.email') && args.includes('--replace-all')) return done({ code: 1, stdout: '', stderr: 'email write blocked' })
+    if (args.includes('--replace-all')) writes++
+    if (failEmail === 'readback' && writes > 0 && args.includes('--show-origin')) return fail(new Error('readback unavailable'))
+    if (failEmail === 'throw-email' && args.includes('user.email') && args.includes('--replace-all')) return fail(new Error('email subprocess failed'))
+    if (failEmail === true && args.includes('user.email') && args.includes('--replace-all')) return done({ code: 1, stdout: '', stderr: 'email write blocked' })
     const child = spawn('git', [...args], { cwd: opts.cwd, env })
     child.stdin.on('error', () => {})
     const stdout: Buffer[] = [], stderr: Buffer[] = []
@@ -55,4 +59,17 @@ it('reads back a partial identity write and leaves the failed field in the calle
   expect(result.email).toEqual({ ok: false, error: 'email write blocked' })
   expect(result.settings.name.local).toBe('Written')
   expect(result.settings.email.value).toBeNull()
+})
+
+it('returns first-field success when the second subprocess throws, and keeps original-scope evidence when readback fails', async () => {
+  const { root, home } = fixture()
+  const failed = await writeIdentity(core(root, home, 'throw-email'), 'project', 'owner', { scope: 'local', name: 'Written', email: 'blocked@example.test' })
+  expect(failed.name.ok).toBe(true)
+  expect(failed.email).toEqual({ ok: false, error: 'email subprocess failed' })
+  expect(failed.settings.name.local).toBe('Written')
+  const unread = await writeIdentity(core(root, home, 'readback'), 'project', 'owner', { scope: 'local', name: 'Next', email: 'next@example.test' })
+  expect(unread.name.ok && unread.email.ok).toBe(true)
+  expect(unread.readbackError).toContain('readback unavailable')
+  expect(unread.settings.repository).toBe(realpathSync(root))
+  await expect(gitSettings(core(root, home), 'project', 'owner')).resolves.toMatchObject({ name: { local: 'Next' } })
 })

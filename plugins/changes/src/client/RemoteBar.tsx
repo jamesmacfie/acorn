@@ -97,6 +97,7 @@ function OperationBanner(props: { model: ChangesModel }) {
 function RemoteMenu(props: { model: ChangesModel }) {
   const model = () => props.model
   const run = (action: RemoteAction) => void model().remote(action)
+  let armedForce: ReturnType<ChangesModel['forceObservation']> | undefined
   return (
     <Menu
       ariaLabel="Remote actions"
@@ -126,8 +127,9 @@ function RemoteMenu(props: { model: ChangesModel }) {
             context={menu}
             tone="danger"
             confirm="Force push?"
+            onArm={() => { armedForce = model().forceObservation() }}
             title={`${COMMAND.force} — replaces the upstream with this branch`}
-            onSelect={() => run('force')}
+            onSelect={() => { void model().remote('force', armedForce); armedForce = undefined }}
           >
             Force push
           </Menu.Item>

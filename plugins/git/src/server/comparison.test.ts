@@ -29,7 +29,7 @@ function fixture() {
   return { ancestor, side, main }
 }
 function core() {
-  return { projects: { byId: async () => ({ path: root }) }, tasks: { active: async () => [] },
+  return { projects: { byId: async () => ({ path: root }) }, tasks: { branchClaims: async () => [] },
     git: { git: async (args: readonly string[], opts: { cwd: string; stdin?: string }) => new Promise<{ code: number; stdout: string; stderr: string }>((done, fail) => {
       const child = spawn('git', [...args], { cwd: opts.cwd })
       child.stdin.on('error', () => {})

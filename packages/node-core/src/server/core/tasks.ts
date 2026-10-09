@@ -11,7 +11,6 @@ import { schema } from '../db'
 import { broadcastTasksChanged, broadcastWorktreeStatusChanged } from '../notify'
 import { loadTask, projectForTask, requireTaskRoot, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../worktrees/taskWorktree'
 import { getProject, normalizeGithubPart } from '../projects'
-import { saveTaskBranch, withBranchReservation } from '../worktrees/taskBranch'
 import { isTaskArchiving } from '../worktrees/archiveGate'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
@@ -74,6 +73,8 @@ export type TaskService = {
   // reconciles its file index from every active worktree. What those two read is a subset of
   // TaskRef, so they get refs like every other reader.
   active(): Promise<TaskRef[]>
+  /** Branch claims that still block metadata changes, including archive teardown in progress. */
+  branchClaims(): Promise<TaskRef[]>
   // The workspace a task belongs to, resolved task to project to workspace membership. Throws when
   // the task or its membership is missing, because the caller, plugins/notes' `notes_*` tools with
   // `scope: 'workspace'`, has no degraded answer. A workspace-scoped note has to land in a directory
@@ -135,7 +136,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       if (!project) throw new Error('Project not found.')
       const title = seed.title.trim()
       if (!title || !seed.origin.trim() || !intendedTaskId.trim()) throw new Error('Root task identity, title, and origin are required.')
-      const created = db.transaction((tx) => {
+      const reserve = async () => db.transaction((tx) => {
         const existing = tx.select().from(schema.tasks).where(eq(schema.tasks.id, intendedTaskId)).get()
         const branches = tx.select({ id: schema.tasks.id, branch: schema.tasks.branch }).from(schema.tasks).all()
           .flatMap(row => row.id !== intendedTaskId && row.branch ? [row.branch] : [])
@@ -158,6 +159,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         }).run()
         return true
       })
+      const created = project.vcs === 'git' ? await (await import('../worktrees/taskBranch')).withBranchReservation(db, project, reserve) : await reserve()
       if (created) {
         await recordSetupDecision(db, intendedTaskId, false)
         broadcastWorktreeStatusChanged({ taskId: intendedTaskId })
@@ -218,6 +220,8 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
     resolveCwd: (task, baseCheckout) => resolveTaskCwd(db, task, baseCheckout),
     runConfig: (taskId) => taskRunConfig(db, taskId),
     active: () => db.select(TASK_REF_COLUMNS).from(schema.tasks).where(eq(schema.tasks.status, 'active')),
+    branchClaims: async () => db.select({ ...TASK_REF_COLUMNS, status: schema.tasks.status }).from(schema.tasks).all()
+      .filter((task) => task.status === 'active' || isTaskArchiving(task.id)),
     workspaceId: (taskId) => workspaceIdFor(db, taskId),
     // Built from the same two queries as `workspaceIdFor` rather than by catching its throw, because
     // catching cannot tell "no membership" from "the database is broken".
@@ -332,13 +336,14 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       return result.relation
     },
     createChild: async (parentTaskId, seed, intendedChildId) => {
+      const { saveTaskBranch, withBranchReservation } = await import('../worktrees/taskBranch')
       const parent = await loadTask(db, parentTaskId)
       if (!parent) throw new Error('Parent task not found.')
       const project = await projectForTask(db, parent)
       if (!project) throw new Error('Parent task has no project.')
       const id = intendedChildId ?? randomUUID()
       const stem = slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`
-      const created = await withBranchReservation(db, async () => {
+      const created = await withBranchReservation(db, project, async () => {
         const existingTask = db.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()
         // Replay keeps the first allocation even when Git or other task reservations have changed.
         if (existingTask) {

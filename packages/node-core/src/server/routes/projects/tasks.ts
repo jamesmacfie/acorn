@@ -22,7 +22,6 @@ import { integrationProviderRegistry } from '../../integrations/registry'
 import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, type ProjectRow } from '../../projects'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
-import { saveTaskBranch, TaskBranchError, withBranchReservation } from '../../worktrees/taskBranch'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
 // and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
@@ -223,8 +222,9 @@ export const tasks = new Hono<AppEnv>()
       }).run()
       return allocatedBranch
     }
+    const { saveTaskBranch, TaskBranchError, withBranchReservation } = await import('../../worktrees/taskBranch')
     try {
-      branch = await withBranchReservation(db, async () => {
+      branch = await withBranchReservation(db, project, async () => {
         const currentProject = await getProject(db, seed.projectId)
         if (!currentProject || currentProject.path !== project.path || currentProject.vcs !== project.vcs) {
           throw new TaskBranchError(409, 'The project mapping changed. Reopen the task draft.')

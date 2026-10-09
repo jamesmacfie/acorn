@@ -2,6 +2,66 @@
 
 Date: October 7, 2026. Status: complete October 9, 2026.
 
+## Follow-up completion note — October 9, 2026
+
+The review found late-response scope leaks, metadata races, an unguarded Changes pull,
+auto-fetch cancellation gaps, and misleading forms. These are corrected in the owning layers.
+Git client submissions now capture Node/project/cache keys and dialog generations before work;
+late replies cannot replace a new dialog, settings draft, or task selector. Comparison resets on
+a real scope change while retaining a pinned route during initial project hydration. The shared
+Core repository metadata admission serializes branch reservations and Git ref/remote mutations by
+canonical common directory. Branch ownership includes archived tasks whose archive is still in
+progress, and incomplete Git roster/ownership reads refuse mutations. Changes now admits pull
+through the checkout write guard and rechecks task, mapping, branch, operation, and clean state
+inside it, for both its own UI and Git's public caller. Force push carries the upstream ID from
+the armed action through confirmation even when a background fetch updates tracking status.
+
+Auto-fetch claims a pass before its first await and propagates cancellation through discovery,
+roster, and fetch. Disable and disposal stop new work. Git mutations and fetches emit the shared
+status event to invalidate mounted Git and Changes views. Identity writes preserve per-field and
+original-scope evidence after a subprocess or readback failure. Remote fetch URL edits use literal
+Git config replacement, refuse multiple fetch URLs, and preserve push URLs. Non-commit tags show
+their object type and cannot launch tasks/workflows. The comparison form visibly identifies
+Source, Destination, Base, and optional commit IDs in both clients. The shipped route table now
+lists settings GET and identity/preference PUT at their actual paths.
+
+Focused follow-up verification: 10 Git test files, 35 tests; 3 Changes files, 47 tests; 2 Core
+files, 18 tests. These include deferred Node/project/dialog/disposal responses, dirty settings
+edits and partial retry, real Core branch reservation and archiving across aliases, local bare
+remotes for guarded pull (fast-forward and rebase), force lease after tracking refresh, and
+controlled simultaneous/aborted auto-fetch passes. Node Core, plugin API, Git, Changes,
+client Core, and TUI type checks passed. Narrow oxlint found one newly unused import and it was
+removed; its remaining warning is the existing remote URL control-character regex. Four focused
+architecture files passed 62/63 tests; the sole failure is the unchanged route-document length
+rule for `core-routes.md` (211 lines) and `plugin-routes.md` (201 lines). `git diff --check` passed.
+
+Real host reproduction: the isolated desktop `git-phase06-review2` used the disposable
+`/private/tmp/acorn-phase06-hosts-0God4B/desktop/repo` and bare remote. Its fresh post-fix
+snapshots showed refs/remotes/settings, direct comparison of 2 files (`41852dc6` → `5c674821`),
+and merge-base comparison of 1 file with base `b4046913`; inspected artifacts are
+`.acorn/agent-dev/git-phase06-review2/screenshots/compare-review.png` and `settings-review.png`.
+After the final comparison layout change, rebuilt desktop `git-phase06-followup-final` showed
+the Source/Destination/Base selectors and both optional ID placeholders in a fresh snapshot and
+inspected `screenshots/compare-final.png`. That final host used the worktree project, so the
+comparison content proof is from the earlier post-fix fixture host, not the final layout rebuild.
+
+The rebuilt terminal host `git-phase06-review-tui` used the sibling disposable `tui/repo` fixture.
+At 80×24: Enter Git, Tab twice to tabs, `l` five times to Compare, `j` to Source, Enter and
+`j` twice then Enter for local main; `j`, Enter, `j`, Enter selected local feature as Destination;
+the same sequence chose shared merge base; `j` reached optional Source ID, Tab skipped each ID
+to Pin, and Enter pinned. The snapshot showed direction `5c674821` → `41852dc6`, mode Shared
+merge base → destination, base `b40469138b06d9`, and one changed `feature.txt`. Resizing to
+120×40 preserved the pin and displayed the labeled controls and detail. Session input and ANSI
+snapshots are under `.acorn/agent-dev/tui/git-phase06-review-tui/logs/`. Both terminal and final
+desktop hosts were stopped. Earlier post-fix host snapshots covered refs, remotes, and settings;
+the final host rerun targeted the comparison layout affected by the last edit.
+
+Final measured startup payloads: Node 3,194,797/3,200,000 B; TUI 731,655/732,000 B; desktop
+renderer 802,712/775,000 B (38 B above the first Phase 06 build and 121 B above Phase 05).
+The desktop cap remains unchanged and its existing overage is a final branch integration concern.
+Known unrelated failures remain the unchanged docs route-length rule, Agents fixtures lacking
+`turnId`, and Workflows' null `HeadlessArgv` fixture. No Phase 07 or 08 work is included.
+
 ## Completion note — October 9, 2026
 
 Refs, remotes, pinned comparison, scoped settings, and Node auto-fetch landed in that order. Git
