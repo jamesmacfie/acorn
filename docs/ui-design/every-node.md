@@ -96,6 +96,7 @@ paint containment would clip a card's focus ring.
 | `DocumentTabs` | collection | One line of tab labels with a `×` on the current one |
 | `SectionHeader` | none | A bold heading with actions on the next line, so a long action label cannot erase the heading. `help` is a grey line between them, because this host has no hover |
 | `TabPanel` | none | The rows under the tab strip |
+| `FilterBar` | none | An inset row containing an input or dropdown and optional filter actions; controls wrap onto the next line when they do not fit |
 | `ToolbarSpacer` | none | The padding that pushes what follows to the right edge |
 | `SettingsSection` | none | The label in bold, the description in grey under it, then `help` as a grey line, because this host has no hover, then its rows. The danger zone's label is in the danger colour instead of a frame. `actions` draw on the line under the label |
 | `SettingRow` | none | Reduced: one line, the label then the control, and `stacked` puts the control on the next line. The description in grey under it, then `help` as a grey line, because this host has no hover, **Saved** in green or the error in red. `onReset` adds `•` to the label and a `Reset` button. A row with `from` draws `From <where>` and no control, so the value this machine holds is not shown. A row with `scope="device"` draws `(this device)` after its label |

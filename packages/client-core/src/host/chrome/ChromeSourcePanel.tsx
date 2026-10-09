@@ -8,7 +8,7 @@ import { panelRegion, regionScope, sourceRegionOwner } from '../../features/dash
 import { activeNodeId } from '../../infra/node/activeNode'
 import { createFleetQuery } from '../../infra/node/fanout'
 import { FRESHNESS_LABELS } from '../../infra/node/freshness'
-import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../kit/components/primitives'
+import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, FilterBar } from '../../kit/components/primitives'
 import { Inline } from '../../kit/components/layout/Inline'
 import { sidebarCollapsed } from '../../kit/lib/layout/collapseState'
 import { IconButton } from '../../kit/components/inputs/IconButton'
@@ -275,7 +275,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
           {props.descriptor.label}
         </SectionHeader>
 
-        <Toolbar size="sm" ariaLabel={`Search ${props.descriptor.label}`}>
+        <FilterBar ariaLabel={`Search ${props.descriptor.label}`}>
           <Input
             kind="filter"
             size="sm"
@@ -284,7 +284,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
             value={filter()}
             onInput={(value) => setFilter(value)}
           />
-        </Toolbar>
+        </FilterBar>
         {/* Only beside rows. With none, the empty state below says the same thing in its place. */}
         <Show when={items().length ? sourceSearchNotice(search) : undefined}>
           {(notice) => <EmptyState align="start" size="sm" busy={search.status() === 'searching'}>{notice()}</EmptyState>}

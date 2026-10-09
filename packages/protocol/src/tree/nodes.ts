@@ -21,7 +21,7 @@ export const TREE_PROTOCOL_VERSION = 1
 /** Every node a tree may name. Mirrors `NODE_SUPPORT` in client-core's kit. */
 export const KIT_NODES = [
   // Grouping
-  'Stack', 'Inline', 'Section', 'Fold', 'Card', 'Timeline', 'Tabs', 'Toolbar',
+  'Stack', 'Inline', 'Section', 'Fold', 'Card', 'Timeline', 'Tabs', 'Toolbar', 'FilterBar',
   'Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover', 'ListDetail', 'ListColumn', 'DetailColumn',
   'Sections',
   'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer', 'SettingsSection', 'SettingRow',

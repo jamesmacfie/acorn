@@ -10,7 +10,7 @@
 
 export {
   Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
-  DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
+  DetailColumn, Field, FilterBar, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
   SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, TableCell, TableHead, TableRow,
   Textarea, ToggleButton, Toolbar, ToolbarSpacer, TreeRow,
 } from '@acorn/client-core/kit/components/primitives.tsx'

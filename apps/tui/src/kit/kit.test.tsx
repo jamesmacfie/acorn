@@ -12,7 +12,7 @@ import { fixtureDocument } from '../fixture'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
   ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
-  Toolbar,
+  Toolbar, FilterBar,
   ToolbarSpacer,
 } from './grouping'
 import {
@@ -157,6 +157,21 @@ const CASES: Case[] = [
     draws: 'children on one line',
     render: () => <Toolbar><Text>left</Text><Text>right</Text></Toolbar>,
     check: (frame) => expect(lineWith(frame, 'left')).toContain('right'),
+  },
+  {
+    node: 'FilterBar',
+    draws: 'an inset control row with a dropdown, input, and filter action',
+    render: () => <FilterBar ariaLabel="Filter history">
+      <Select label="Ref" value="all" options={[{ value: 'all', label: 'All refs' }]} />
+      <Input label="Search history" value="fix" />
+      <Button onPress={() => {}}>Options</Button>
+    </FilterBar>,
+    check: (frame) => {
+      has(frame, 'All refs')
+      expect(lineWith(frame, 'All refs')).toContain('fix')
+      expect(lineWith(frame, 'All refs')).toContain('Options')
+      expect(lineWith(frame, 'All refs').indexOf('All refs')).toBeGreaterThan(0)
+    },
   },
   {
     node: 'ToolbarSpacer',

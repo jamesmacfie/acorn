@@ -94,6 +94,7 @@ acorn-plugin-sdk/remote: value Facts
 acorn-plugin-sdk/remote: value Fallback
 acorn-plugin-sdk/remote: value Field
 acorn-plugin-sdk/remote: value FileHead
+acorn-plugin-sdk/remote: value FilterBar
 acorn-plugin-sdk/remote: value FindBar
 acorn-plugin-sdk/remote: value Fold
 acorn-plugin-sdk/remote: value Grid

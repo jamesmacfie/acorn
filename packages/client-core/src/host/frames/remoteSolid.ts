@@ -94,7 +94,7 @@ export const Slot = kitNode(CHROME_SLOT_NODE)
 // `KIT_NODES`: a name here that the kit does not have is a type error, and a name the kit has that is
 // missing here is caught by ./remoteSolid.test.ts.
 export const {
-  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, Modal, ModalBody,
+  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, FilterBar, Modal, ModalBody,
   ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
   SectionHeader, TabPanel, ToolbarSpacer, SettingsSection, SettingRow, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
   ChipRow, StatusDot, Facts, DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,

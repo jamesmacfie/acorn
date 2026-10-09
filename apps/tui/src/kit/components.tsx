@@ -2,7 +2,7 @@ import type { KitTable } from '@acorn/client-core/host/tree'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
   ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
-  Toolbar,
+  Toolbar, FilterBar,
   ToolbarSpacer,
 } from './grouping'
 import {
@@ -34,7 +34,7 @@ import { HistoryMark } from './historyMark'
 // `RemoteTree` loads this table lazily, so its components are outside the startup graph. The
 // `showing` facade preserves the kit's public names while its implementations live by behavior.
 export const KIT_COMPONENTS: KitTable = {
-  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar,
+  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, FilterBar,
   Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.

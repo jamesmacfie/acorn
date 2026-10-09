@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import { createWorkspaceWords, openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
 import { NOTE_AUTHOR_LABEL, NOTE_SCOPE_LABEL, SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import {
-  Alert, Badge, Button, Checkbox, EmptyState, IconButton, Input, Markdown, Menu, Row, RowActions, Rows, Section,
+  Alert, Badge, Button, Checkbox, EmptyState, IconButton, FilterBar, Input, Markdown, Menu, Row, RowActions, Rows, Section,
   SectionHeader, SegmentedControl, Stack, Text, Textarea, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { NotesModel } from './notesModel'
@@ -23,17 +23,17 @@ const taskRowsOf = (model: NotesModel): NoteSummary[] => {
   return [...rows, ...model.taskOther()]
 }
 
-// The house list header: the label and the count of rows shown, with the filter as its control.
+// The list header and its filter row.
 export function NotesHeader(props: { task: Task; model: NotesModel }) {
   const model = () => props.model
   const count = () => taskRowsOf(model()).length + model().wsNotes().length + model().globalNotes().length
   return (
-    <SectionHeader
-      count={count()}
-      actions={<Input kind="filter" size="sm" label="Filter notes" placeholder="Filter notes…" value={model().filter()} onInput={(value) => model().setFilter(value)} />}
-    >
-      Notes
-    </SectionHeader>
+    <>
+      <SectionHeader count={count()}>Notes</SectionHeader>
+      <FilterBar ariaLabel="Filter notes">
+        <Input kind="filter" size="sm" label="Filter notes" placeholder="Filter notes…" value={model().filter()} onInput={(value) => model().setFilter(value)} />
+      </FilterBar>
+    </>
   )
 }
 

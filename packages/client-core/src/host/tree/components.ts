@@ -16,7 +16,7 @@
 import type { AnyKitComponent, KitEntry, KitTable } from './kitEntry'
 import {
   Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
-  DetailColumn, Field, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
+  DetailColumn, Field, FilterBar, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
   SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, TableCell, TableHead, TableRow,
   Textarea, ToggleButton, Toolbar, TreeRow,
 } from '../../kit/components/primitives'
@@ -71,7 +71,7 @@ import { Rectangle } from '../../kit/components/content/Rectangle'
 const load = (loader: () => Promise<{ default: AnyKitComponent }>): KitEntry => ({ load: loader })
 
 export const KIT_COMPONENTS: KitTable = {
-  Stack, Inline, Section, Fold, Card, Tabs, Toolbar,
+  Stack, Inline, Section, Fold, Card, Tabs, Toolbar, FilterBar,
   Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.
