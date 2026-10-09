@@ -186,33 +186,36 @@ export function WillConfirmationHost() {
               fallback={<Button variant="solid" tone={dangerous(current) ? 'danger' : undefined} onPress={() => finish(true)}>{selected(current).label}</Button>}
             >
               {/* Drawn the way the commit footer draws Commit and its options
-                  (plugins/changes/src/client/ChangesPane.tsx). */}
-              <Toolbar.Group joined>
-                {/* Keyed on the chosen action, so the button is drawn again with its tone. Button reads
-                    its tone once, and Delete has to turn it red. */}
-                <Show when={selected(current)} keyed>
-                  {(chosenAction) => (
-                    <Button variant="solid" tone={dangerous(current) ? 'danger' : undefined} onPress={() => finish(true)}>{chosenAction.label}</Button>
-                  )}
-                </Show>
-                <Menu
-                  ariaLabel={`${current.title} options`}
-                  placement="bottom-end"
-                  trigger={({ open, toggle }) => (
-                    <IconButton icon="chevron-down" variant="outline" label={`${current.title} options`} opens="menu" expanded={open()} onPress={toggle} />
-                  )}
-                >
-                  {(menu) => (
-                    <For each={current.actions}>
-                      {(option) => (
-                        <Menu.Item context={menu} kind="radio" checked={option.id === selected(current).id} onSelect={() => setChosen(option.id)}>
-                          {option.label}
-                        </Menu.Item>
-                      )}
-                    </For>
-                  )}
-                </Menu>
-              </Toolbar.Group>
+                  (plugins/changes/src/client/ChangesPane.tsx), with both halves solid. Keyed on the chosen
+                  action, so both are drawn again in its tone: Button reads its tone once, and Delete has
+                  to turn them red. */}
+              <Show when={selected(current)} keyed>
+                {(chosenAction) => {
+                  const tone = dangerous(current) ? 'danger' : undefined
+                  return (
+                    <Toolbar.Group joined>
+                      <Button variant="solid" tone={tone} onPress={() => finish(true)}>{chosenAction.label}</Button>
+                      <Menu
+                        ariaLabel={`${current.title} options`}
+                        placement="bottom-end"
+                        trigger={({ open, toggle }) => (
+                          <IconButton icon="chevron-down" variant="solid" size="md" tone={tone} label={`${current.title} options`} opens="menu" expanded={open()} onPress={toggle} />
+                        )}
+                      >
+                        {(menu) => (
+                          <For each={current.actions}>
+                            {(option) => (
+                              <Menu.Item context={menu} kind="radio" checked={option.id === chosenAction.id} onSelect={() => setChosen(option.id)}>
+                                {option.label}
+                              </Menu.Item>
+                            )}
+                          </For>
+                        )}
+                      </Menu>
+                    </Toolbar.Group>
+                  )
+                }}
+              </Show>
             </Show>
           </Modal.Actions>
         </Modal>

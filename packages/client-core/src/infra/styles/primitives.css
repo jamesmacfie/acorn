@@ -707,6 +707,12 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   border-start-end-radius: var(--radius-control);
   border-end-end-radius: var(--radius-control);
 }
+/* Two solid halves share one fill, so the later one draws its shared edge in the text colour, faded,
+   to keep the seam between them visible. */
+.ui-toolbar-group[data-joined] > :not(:first-child).ui-btn[data-variant='solid'],
+.ui-toolbar-group[data-joined] > :not(:first-child) > .ui-btn[data-variant='solid'] {
+  border-inline-start-color: color-mix(in srgb, var(--accent-fg) 40%, transparent);
+}
 /* A heading in a bar is one line that gets cut short, never two lines that make the bar taller. A
    session title is a sentence somebody typed, and left to wrap it pushed the bar to twice its height
    and squeezed the controls at the far end off the pane. The extra end margin is so a title that
