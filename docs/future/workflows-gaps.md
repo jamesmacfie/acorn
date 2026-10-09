@@ -39,15 +39,10 @@ without duplicating the external action. A manual retry must retain its authoriz
 
 ## Add dedicated agent control tools
 
-CLI workflow commands are implemented. No dedicated contributed tool for workflow control is
-registered in the Workflows Node entrypoint. Decide which read/start/cancel/retry operations agents
-need before declaring tools. `agent_*` tools control managed sessions and are not workflow controls.
-
-Reuse Workflows' start, trust, invocation, task, gate, and budget rules. A tool must not approve a
-human gate or widen the caller's authority. Bind run and task identity through the authenticated Node.
-
-Acceptance: start a permitted definition, inspect its run, reject an unauthorized task, handle an
-uncertain start without duplication, and refuse human-gate answers from an agent principal.
+[Workflow agent tools](./workflow-agent-tools.md) owns the PRD and acceptance for discovery,
+agent-authored drafts, approved invocation, run inspection, waits, and cancellation. It preserves
+device-only publication, human gates, and retries, and defines scoped admission before root starts
+become available to agents. `agent_*` tools continue to control managed sessions.
 
 ## Define file-owned trigger consent
 
