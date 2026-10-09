@@ -1,9 +1,9 @@
 import type { InstructionFile, InstructionSnapshot } from './instructionSnapshot'
 import { hiddenCharactersIn } from './instructionCheck'
 import { createPatch } from 'diff'
+import type { InstructionFinding, InstructionChange } from '../../shared/instructionReview'
 
-export type InstructionFinding = { file: string; line: number; category: 'command' | 'domain' | 'sensitive-path' | 'permission' | 'override' | 'hidden-character' | 'unsupported'; detail: string }
-export type InstructionChange = { path: string; status: 'added' | 'changed' | 'removed' | 'retargeted'; patch: string | null; beforeCanonical: string | null; afterCanonical: string | null }
+export type { InstructionFinding, InstructionChange } from '../../shared/instructionReview'
 
 const RULES: ReadonlyArray<{ category: InstructionFinding['category']; pattern: RegExp; detail: string }> = [
   { category: 'command', pattern: /(?:^|\s)(?:sudo|curl|wget|rm\s+-|chmod|chown|git\s+config|bash\s+-c|sh\s+-c|python\s+-c|node\s+-e)(?:\s|$)/i, detail: 'Command or shell operation' },

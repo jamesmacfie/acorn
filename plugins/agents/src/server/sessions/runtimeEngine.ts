@@ -47,6 +47,7 @@ import {
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
 import type { InstructionAdmission } from './instructionAdmission'
+import { InstructionAdmissionError } from './instructionAdmissionError'
 import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
   mayBeUsageLimit,
@@ -998,7 +999,7 @@ export class ManagedAgentEngine {
         generation,
         event: {
           type: 'error',
-          code: 'turn_dispatch_failed',
+          code: error instanceof InstructionAdmissionError ? error.code : 'turn_dispatch_failed',
           message: safeProviderMessage(error, 'Agent turn preparation failed.', this.mintedSecrets),
           retryable: false,
         },

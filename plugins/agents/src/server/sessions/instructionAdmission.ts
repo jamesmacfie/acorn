@@ -4,6 +4,8 @@ import { hiddenCharacterReason, hiddenCharactersIn } from './instructionCheck'
 import { InstructionScanIncomplete, scanInstructions, type InstructionSnapshot } from './instructionSnapshot'
 import { InstructionReviewStore, snapshotDigest } from './instructionReviewStore'
 import { analyzeInstruction, instructionChanges } from './instructionAnalysis'
+import { InstructionAdmissionError } from './instructionAdmissionError'
+import type { InstructionReview } from '../../shared/instructionReview'
 
 export type InstructionAdmissionObservation = { taskId: string; projectId: string; checkedAt: number; outcome: 'passed' | 'blocked' | 'incomplete' }
 
@@ -36,11 +38,19 @@ export class InstructionAdmission {
     return { projectId: task.projectId, snapshot }
   }
 
-  async review(taskId: string, signal?: AbortSignal) {
+  async review(taskId: string, signal?: AbortSignal): Promise<InstructionReview> {
     const { projectId, snapshot } = await this.scan(taskId, signal)
     this.checkCancellation(signal)
+    const digest = snapshotDigest(snapshot)
+    const limits = 'A pre-turn scan cannot stop changes during a turn. Global instructions outside this scope are not reviewed. Host processes with owner access can change on-disk state.'
     let prior = null
     try {
+      const matching = await this.store.approved(projectId, digest)
+      this.checkCancellation(signal)
+      if (matching) return {
+        id: matching.id, taskId, projectId, digest, scope: snapshot.scope, analyzerVersion: snapshot.version,
+        baseline: false, approved: true, findings: [], changes: [], limits,
+      }
       const approved = await this.store.approved(projectId)
       prior = approved ? await this.store.get(approved.id) : null
     } catch { /* Damaged or unavailable ciphertext means a fresh baseline review. */ }
@@ -54,9 +64,9 @@ export class InstructionAdmission {
     const saved = await this.store.save(projectId, snapshot, signal)
     return {
       id: saved.id, taskId, projectId, digest: saved.digest, scope: snapshot.scope,
-      analyzerVersion: snapshot.version, baseline: !previous,
+      analyzerVersion: snapshot.version, baseline: !previous, approved: false,
       findings: analyzeInstruction({ ...snapshot, files: snapshot.files.filter((file) => changedPaths.has(file.path)) }), changes,
-      limits: 'A pre-turn scan cannot stop changes during a turn. Global instructions outside this scope are not reviewed. Host processes with owner access can change on-disk state.',
+      limits,
     }
   }
 
@@ -89,7 +99,7 @@ export class InstructionAdmission {
     catch (error) {
       if (signal?.aborted) throw error
       this.observe(taskId, task.projectId, 'incomplete')
-      throw new Error(`Instruction scan incomplete: ${error instanceof Error ? error.message : 'unknown error'}. Retry or change the checks in Settings > Security and backup.`)
+      throw new InstructionAdmissionError('instruction_scan_incomplete', `Instruction scan incomplete: ${error instanceof Error ? error.message : 'unknown error'}. Retry or change the checks in Settings > Security and backup.`)
     }
     this.checkCancellation(signal)
     try {
@@ -97,15 +107,15 @@ export class InstructionAdmission {
         for (const file of result.snapshot.files) {
           if (file.text === null) continue
           const found = hiddenCharactersIn(file.text, file.path, 1)
-          if (found.length) throw new Error(hiddenCharacterReason(found))
+          if (found.length) throw new InstructionAdmissionError('instruction_hidden_characters', hiddenCharacterReason(found))
         }
       }
       if (settings.reviewChangedInstructions) {
         let approved
         try { approved = await this.store.approved(result.projectId, snapshotDigest(result.snapshot)) }
-        catch { throw new Error('Instruction review required: the encrypted approval cannot be opened. Open Security and backup to review again.') }
+        catch { throw new InstructionAdmissionError('instruction_review_required', 'Instruction review required: the saved approval could not be read. Review the instructions again.') }
         if (!approved || approved.digest !== snapshotDigest(result.snapshot)) {
-          throw new Error('Instruction review required: discovered instructions changed or have no approved baseline. Open Security and backup to review and approve them.')
+          throw new InstructionAdmissionError('instruction_review_required', 'Instruction review required: approve the instructions for this task before the agent continues.')
         }
       }
       this.observe(taskId, result.projectId, 'passed')

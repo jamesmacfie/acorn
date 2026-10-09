@@ -49,6 +49,7 @@ the whole plugin system in one page.
 | [authentication.md](./authentication.md) | Device pairing, tokens, principals, and the internal-call scopes. |
 | [security.md](./security.md) | The trust boundaries, what is out of scope, and which page owns each control. |
 | [security/security-diagnostics.md](./security/security-diagnostics.md) | Passive, device-only Node security evidence, scope, and limits. |
+| [security/instruction-review.md](./security/instruction-review.md) | Hidden-character checks, changed instruction approval, first-time setup, and blocked-turn recovery. |
 | [security/transport-and-auth.md](./security/transport-and-auth.md) | TLS and pins, broker limits, the auth gates, mount coverage, task scope, and the WebSocket hub. |
 | [security/credentials.md](./security/credentials.md) | Provider credentials, `SecretService.use`, child environments, and internal token scopes. |
 | [security/process-and-paths.md](./security/process-and-paths.md) | Path confinement, the process broker, config trust, workflow authority, and force push. |

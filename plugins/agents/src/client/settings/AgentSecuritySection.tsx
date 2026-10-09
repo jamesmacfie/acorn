@@ -1,6 +1,6 @@
 import { lazy } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { createSettingSave, readJson, writeJson } from '@acorn/plugin-api/client'
+import { activeTaskId, createSettingSave, readJson, writeJson } from '@acorn/plugin-api/client'
 import { Checkbox, SettingRow, SettingsSection } from '@acorn/plugin-api/ui'
 import { agentSessionDefaultsRoute, type AgentSessionDefaults } from '../../shared/sessionDefaults'
 import { agentSessionDefaultsQueryKey } from './sessionDefaultsClient'
@@ -29,17 +29,19 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
   const save = createSettingSave()
 
   const write = async (field: 'checkInstructionFiles' | 'reviewChangedInstructions', on: boolean) => {
+    const selectedNode = nodeId()
+    const selectedKey = queryKey()
     const saved = await writeJson<AgentSessionDefaults>(
       agentSessionDefaultsRoute,
       {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ [field]: on }),
-        nodeId: nodeId(),
+        nodeId: selectedNode,
       },
       (response) => `instruction setting ${response.status}`,
     )
-    queryClient.setQueryData(queryKey(), saved)
+    queryClient.setQueryData(selectedKey, saved)
     // The agents settings pages read the active node's copy of the same record.
     void queryClient.invalidateQueries({ queryKey: agentSessionDefaultsQueryKey })
   }
@@ -76,7 +78,7 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
             disabled={!stored.isSuccess}
             onChange={(next) => save.run(() => write('reviewChangedInstructions', next))} />
         </SettingRow>
-        <InstructionReviewPanel nodeId={props.nodeId} />
+        <InstructionReviewPanel nodeId={props.nodeId} enabled={stored.data?.reviewChangedInstructions} preferredTaskId={activeTaskId()} />
       </SettingsSection>
       <SettingsSection id="agent-security-check" label="Security check">
         <SecurityDiagnosticsPanel nodeId={props.nodeId} />

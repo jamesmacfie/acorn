@@ -8,6 +8,7 @@ import { FakeAgentDriver } from '../drivers/fake'
 import type { AgentDriverSession, AgentDriverStartOptions } from '../drivers/types'
 import { ManagedAgentRuntime } from './runtime'
 import type { SecretCheckReport } from '@acorn/protocol/secretChecks.ts'
+import { InstructionAdmissionError } from './instructionAdmissionError'
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
@@ -65,7 +66,7 @@ describe('durable queue admission', () => {
 
   it('applies required admission at the shared dispatch point for every queued source', async () => {
     const admission = await runtime.instructionAdmission()
-    const gate = vi.spyOn(admission, 'admit').mockRejectedValue(new Error('Instruction review required.'))
+    const gate = vi.spyOn(admission, 'admit').mockRejectedValue(new InstructionAdmissionError('instruction_review_required', 'Instruction review required.'))
     for (const source of ['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import', 'plugin', 'goal'] as const) {
       const item = await session(source === 'workflow' ? 'workflow' : 'interactive')
       const { turn } = await runtime.store.enqueueTurn(item.id, {
@@ -73,6 +74,9 @@ describe('durable queue admission', () => {
       })
       await runtime['engine'].pump()
       await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('failed'))
+      expect((await runtime.store.snapshot(item.id)).events).toContainEqual(expect.objectContaining({
+        event: expect.objectContaining({ type: 'error', code: 'instruction_review_required' }),
+      }))
     }
     expect(gate).toHaveBeenCalledTimes(8)
     expect(sends).toEqual([])

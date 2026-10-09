@@ -50,6 +50,28 @@ it('requires a first baseline, rejects drift, and restores an approved digest', 
   await expect(admission.admit('task')).rejects.toThrow(/review required/)
 })
 
+it('recognizes an unchanged approved snapshot without creating another pending approval', async () => {
+  preference = JSON.stringify({ reviewChangedInstructions: true })
+  writeFileSync(join(dir, 'AGENTS.md'), 'Read the project documentation.\n')
+  const baseline = await admission.review('task')
+  await admission.approve('task', baseline.id)
+  const save = vi.spyOn(admission.store, 'save')
+  const unchanged = await admission.review('task')
+  expect(unchanged).toMatchObject({ id: baseline.id, approved: true, baseline: false, changes: [], findings: [] })
+  expect(save).not.toHaveBeenCalled()
+  await expect(admission.admit('task')).resolves.toBeUndefined()
+})
+
+it('still requires approval when the scan scope changes but the file text does not', async () => {
+  preference = JSON.stringify({ reviewChangedInstructions: true })
+  writeFileSync(join(dir, 'AGENTS.md'), 'Read the project documentation.\n')
+  const { snapshot } = await admission.scan('task')
+  const older = await admission.store.save('project', { ...snapshot, scope: 'Previous scan coverage' })
+  await admission.store.approve(older.id, 'project')
+  expect(await admission.review('task')).toMatchObject({ approved: false, baseline: false, changes: [] })
+  await expect(admission.admit('task')).rejects.toMatchObject({ code: 'instruction_review_required' })
+})
+
 it('does not let an approval from a different project authorize this task', async () => {
   preference = JSON.stringify({ reviewChangedInstructions: true })
   writeFileSync(join(dir, 'AGENTS.md'), 'Same bytes.\n')
