@@ -5,6 +5,8 @@
       "agents",
       "agents",
       "agents",
+      "agents",
+      "agents",
       "agents/data/sessions",
       "agents/data/usage",
       "browser/captures",
@@ -96,12 +98,14 @@
       "agents.customAgentRegistry",
       "agents.draftAttachments",
       "agents.harnessRegistry",
+      "agents.instructionReviewRoute",
       "agents.loopHooksRoute",
       "agents.managedRoute",
       "agents.mcpServersRoute",
       "agents.requests",
       "agents.reviewInput.v1",
       "agents.runtime",
+      "agents.securityDiagnosticsRoute",
       "agents.sessionControl",
       "agents.sessionExecute",
       "agents.sessions",
@@ -110,6 +114,7 @@
       "agents.usageRoute",
       "browser.captures",
       "changes.localGit",
+      "changes.staticDependencyPolicy",
       "core.scheduler",
       "docker.route",
       "editor.route",
@@ -175,7 +180,8 @@
         "local_diff"
       ],
       "capabilities": [
-        "changes.localGit"
+        "changes.localGit",
+        "changes.staticDependencyPolicy"
       ],
       "databases": [
         "changes.sqlite"

@@ -38,13 +38,15 @@ Verification:
   --maxWorkers=1` (87 tests), focused doc checks (six tests), `rustfmt --check` on the new module,
   and `git diff --check` passed. No full repository test or lint run was made.
 
-The ordinary stage command stopped at an unrelated Node service graph budget:
+The ordinary stage command stopped at the Node service graph budget increased by Phase 04:
 `3180280/3177000B`. Its output and every other stage input built, so the acceptance run used a
 temporary copy of the launcher with only its repeated `stage` call omitted. Its renderer build,
 debug Cargo build, session seeding, WebDriver calls, and shutdown were unchanged. The first launcher
 attempt hit the sandbox's `tsx` IPC socket denial; the authorized socket run passed. The unchanged
 renderer budget is also known to exceed its ceiling, so a complete installer build remains outside
-this phase's evidence. Neither budget was raised or changed.
+this phase's evidence. Phase 05 did not change either budget. The coordinator's separate Phase 04
+integration follow-up measured the required token-renewal boot imports, documented the ceiling
+adjustment, and restored the service build. The renderer budget failure remains unrelated.
 
 Android is not in the macOS and Windows desktop release matrix. The existing vendored Android debug
 server binds all interfaces for WiFi access; this policy would reject requests addressed to that
