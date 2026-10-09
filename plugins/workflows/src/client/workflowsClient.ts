@@ -24,6 +24,7 @@ import type {
   WorkflowSchedulePreparation,
   WorkflowScheduleView,
 } from '../shared/workflowSchedules'
+import type { WorkflowInvocationApproval, WorkflowInvocationPolicy, WorkflowInvocationReview } from '../shared/workflowInvocation'
 
 /** How long the generate route may take.
  *
@@ -70,6 +71,8 @@ export const workflowSaveToRepoRoute = (id: string) => `${workflowDefsRoute}/${i
 export const workflowCatalogRoute = '/v1/p/workflows/catalog'
 export const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
 export const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
+// The owner's approvals for agents to start a workflow, device only (../server/routes/invocation.ts).
+export const workflowInvocationRoute = '/v1/p/workflows/workflows/invocation'
 // The harnesses, with the config options each one advertises. Read from the agents plugin's own route
 // rather than copied into the catalog, so the editor's model and reasoning lists are the same lists the
 // agent pane offers (docs/managed-agents/providers.md § Providers).
@@ -103,6 +106,11 @@ function workflowApiAt(nodeId?: string | null) {
     pauseSchedule: (id: string, paused: boolean) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
     runScheduleNow: (id: string) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/run`, {}),
     deleteSchedule: (id: string) => writeJson<{ deleted: true }>(workflowScheduleRoute(id), { method: 'DELETE' }),
+    invocationReview: (projectId: string, definitionKey: string) =>
+      readJson<WorkflowInvocationReview>(`${workflowInvocationRoute}/review?projectId=${encodeURIComponent(projectId)}&definition=${encodeURIComponent(definitionKey)}`),
+    approveInvocation: (approval: WorkflowInvocationApproval) => post<WorkflowInvocationPolicy>(`${workflowInvocationRoute}/approve`, approval),
+    revokeInvocation: (projectId: string, definitionKey: string) =>
+      post<WorkflowInvocationPolicy | null>(`${workflowInvocationRoute}/revoke`, { projectId, definitionKey }),
     files: (request: import('../shared/workflowFileAuthoring').WorkflowFileRequest) => post<import('../shared/workflowFileAuthoring').WorkflowFileResult>(`${workflowDefsRoute}/files`, request),
     preparePublication: (input: import('../shared/workflowPublication').WorkflowPublicationSelection) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/prepare`, input),
     publish: (id: string) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/publish`, {}),

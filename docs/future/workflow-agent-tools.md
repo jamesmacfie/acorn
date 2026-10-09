@@ -1,6 +1,9 @@
 # Workflow agent tools
 
-Date: October 9, 2026. Status: proposed product requirements; implementation not started.
+Date: October 9, 2026. Status: implemented October 10, 2026. [Workflow tools](../agent-tools/workflow-tools.md)
+owns the shipped behavior, and wins where the two disagree. Open: the both-host and managed Claude
+and Codex acceptance runs through the isolated agent drivers, and terminal-session mutation, which
+this PRD defers.
 
 This PRD defines how agents discover workflows, create recoverable drafts, and invoke approved
 definitions from a task conversation. It is the implementation handoff for the agent-tools item in

@@ -15,6 +15,7 @@ import type { WorkflowPublication } from '../../shared/workflowPublication'
 import type { WorkflowFileOperation } from '../../shared/workflowFileAuthoring'
 import { workflowRecoveryStore, WORKFLOW_AUTOSAVE_MS } from './recoveryStore'
 import type { WorkflowDef } from '../../shared/workflowContracts'
+import type { WorkflowAgentOrigin } from '../../contract/wire'
 import { createWorkflowApi } from '../workflowsClient'
 import { forgetLayout, renameInLayout } from '../layoutPrefs'
 import {
@@ -62,6 +63,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   const [saveState, setSaveState] = createSignal<SaveState>('saved')
   const [publishedRevision, setPublishedRevision] = createSignal<number | null>(null)
   const [publishedDef, setPublishedDef] = createSignal<WorkflowDef | undefined>()
+  const [agentOrigin, setAgentOrigin] = createSignal<WorkflowAgentOrigin | null>(null)
   const [publication, setPublication] = createSignal<WorkflowPublication | undefined>()
   const [fileOperation, setFileOperation] = createSignal<WorkflowFileOperation>()
   const [fileConflicts, setFileConflicts] = createSignal<WorkflowMergeConflict[]>([])
@@ -99,7 +101,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
           const value = result.draft!
           return { id: query.entityId, workspaceId: '', projectId: query.projectId, name: value.def.name,
             revision: value.revision, createdAt: 0, updatedAt: 0, def: value.def,
-            publishedRevision: null, publishedDef: undefined }
+            publishedRevision: null, publishedDef: undefined, agentOrigin: null }
         })
       return { ...row, address: query }
     },
@@ -145,6 +147,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     setRevision(custody.state.revision)
     setPublishedRevision(row.publishedRevision ?? null)
     setPublishedDef(row.publishedDef as WorkflowDef | undefined)
+    setAgentOrigin(row.agentOrigin ?? null)
     baseDef = custody.state.base
     setSaved(toJson(baseDef))
     setMessage(custody.state.message)
@@ -441,7 +444,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   return {
     api: workflowApi, capture, current,
     fileOperation, fileConflicts, resolveFileConflict, publishFiles, prepareExport, discardFiles,
-    saveState, publishedRevision, publishedDef, publication, conflicts, resolveConflict, preparePublication, publish, discardPublication,
+    saveState, publishedRevision, publishedDef, agentOrigin, publication, conflicts, resolveConflict, preparePublication, publish, discardPublication,
     ref,
     readOnly,
     unreadable,

@@ -39,6 +39,11 @@ until one is typed. `POST /v1/p/workflows/defs/validate` reports, the editor dra
 its footer. Run resolves an immutable published revision, never the editable row. A file layer is different: a definition that does not
 validate is listed with its problems rather than hidden.
 
+**An agent can draft a row.** `workflow_draft` saves a draft in the task's project and records its
+agent origin in `agent_origin_json`. The editor labels it **Agent draft**, and it runs only after you
+publish it ([workflow tools](../agent-tools/workflow-tools.md#drafts)). The device-only routes above
+stay closed to agents. The tool writes through the same draft store the editor uses.
+
 **What a row may name.** A run target, a saved query, or an agent profile is checked when the step
 runs, not when the row is saved. The node holding a definition may not have the repository at all, so
 `POST /v1/p/workflows/defs/validate` answers the loader's own problem list and leaves the

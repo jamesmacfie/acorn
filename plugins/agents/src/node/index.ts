@@ -23,6 +23,8 @@ import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import { AGENTS_ACTIVITY, AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionControl } from '../server/sessions/sessionControl'
+import { AGENTS_TOOL_CALLER } from '../contract/toolCaller'
+import { createToolCallers } from '../server/sessions/toolCaller'
 import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
@@ -115,6 +117,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   ]).then(async ([{ McpPackageManager }, { trustedNpmCli }]) =>
     new McpPackageManager(join(dataDir, 'managed-mcp'), await trustedNpmCli(), runtime!.mcpServers))
   let delegation: AgentDelegationService | null = null
+  let toolCallers: ReturnType<typeof createToolCallers> | null = null
   let messages: Promise<SessionMessages> | null = null
   let followUps: Promise<TurnFollowUps> | null = null
   let reconcileMessages: (() => Promise<void>) | null = null
@@ -215,6 +218,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           if (frame.channel === 'plugin:agents:turn-changed' && frame.source === 'delegation') {
             delegation?.reports.deliverSafely(frame.turnId)
           }
+          if (frame.channel === 'plugin:agents:turn-changed') toolCallers?.turnChanged(frame)
           if (frame.channel === 'plugin:agents:request-changed' && frame.status === 'pending') {
             delegation?.reports.deliverRequestSafely(frame.sessionId, frame.requestId)
           }
@@ -506,6 +510,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, async (request) =>
         (await import('../server/sessions/sessionExecute')).createSessionExecute(executeRuntime, followUpRegistry, goalJudge)(request))
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
+      // Who a signed tool call came from, for another plugin's tools (contract/toolCaller.ts).
+      toolCallers = createToolCallers(runtime.store)
+      ctx.capabilities.provide(AGENTS_TOOL_CALLER, toolCallers.lookup)
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
       ctx.capabilities.provide(AGENTS_RUNTIME, {

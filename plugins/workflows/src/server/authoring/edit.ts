@@ -16,8 +16,8 @@ type PromptWorkflowStep = Omit<WorkflowStepDef, 'childWorkflow'> & {
 export type PromptWorkflowDef = Omit<WorkflowDef, 'steps'> & { steps: PromptWorkflowStep[] }
 
 // A contributed kind's `with` is where a literal credential plausibly sits, and neither key teaches
-// anything about the shape of a graph.
-const SCRUBBED_WITH_KEYS = ['headers', 'auth']
+// anything about the shape of a graph. Agent tools hide the same keys (../agentTools/projection.ts).
+export const SCRUBBED_WITH_KEYS = ['headers', 'auth']
 
 const toolsForPrompt = <T extends { allow?: unknown }>(tools: T | undefined): T | undefined => {
   if (!tools || !Object.hasOwn(tools, 'allow')) return tools

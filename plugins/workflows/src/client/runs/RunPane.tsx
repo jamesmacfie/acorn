@@ -7,6 +7,7 @@ import {
 import { RunGraph } from './RunGraph'
 import { formatUsage, kindLabel, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
+import type { WorkflowRunProjection } from '../../shared/api'
 
 // The run pane's list column: this task's runs, then the selected run's steps in the same reading
 // order and the same indentation the editor draws (docs/workflows/routes-and-ui.md § Routes and UI).
@@ -163,6 +164,15 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   )
 }
 
+/** Who started an agent-launched run, and the limits the owner's approval put on it. */
+const launchedByLabel = (launch: NonNullable<WorkflowRunProjection['launchedBy']>): string => {
+  const limits = [
+    launch.limits.maxTurns ? `${launch.limits.maxTurns} turns` : null,
+    launch.limits.maxWallTimeMs ? `${Math.round(launch.limits.maxWallTimeMs / 60_000)} min` : null,
+  ].filter(Boolean)
+  return `Started by agent ${launch.title}${limits.length ? ` (at most ${limits.join(', ')})` : ''}`
+}
+
 /** Under the list: the run's status and what it has cost, and the one control that acts on the
  *  whole run. */
 export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
@@ -172,7 +182,7 @@ export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
     <Show when={model.selectedRun()}>
       {(run) => (
         <Toolbar size="sm" ariaLabel="Run status">
-          <Text emphasis="muted">{[statusLabel(run().status), usage()].filter(Boolean).join(' · ')}</Text>
+          <Text emphasis="muted">{[statusLabel(run().status), usage(), run().launchedBy && launchedByLabel(run().launchedBy!)].filter(Boolean).join(' · ')}</Text>
           <Toolbar.Spacer />
           <Show
             when={isLiveRun(run())}

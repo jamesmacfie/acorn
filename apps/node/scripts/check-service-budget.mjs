@@ -123,7 +123,13 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // admission, and the agents plugin's registration. The MCP and instruction review settings routes
 // could move to first use, but together they are under 10 KB of source. The ceiling keeps about 2 KB
 // of margin.
-const limits = { ceiling: 1_736_500, floor: 1_000_000 }
+// 2026-10-10: 1,749,841 B with the workflow agent tools (docs/agent-tools/workflow-tools.md). The
+// tools' services, the definition projection, drafts, launches, run reads, and the approval routes load
+// on first use; measure:service-graph confirms none of them is statically reachable. What a boot keeps
+// is the nine tools' names, schemas, and descriptions, which the registry needs at init, the settled-turn
+// subscription and approval capability, `agents.toolCaller`, and the start service's launch methods.
+// The ceiling keeps about 2 KB of margin.
+const limits = { ceiling: 1_752_000, floor: 1_000_000 }
 
 const graph = readChunkGraph(dist)
 const files = staticClosure(graph)

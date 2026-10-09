@@ -3,6 +3,7 @@ import {
   contextMenuRegistry, openPane, projectSurfaceRegistry, registerNoticeTargetHandler, type ClientPlugin,
 } from '@acorn/plugin-api/client'
 import { WORKFLOW_CONTROL } from '@acorn/plugin-agents/contract/workflowControl.ts'
+import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { WORKFLOW_GIT_LAUNCH, openWorkflowGitLaunch, workflowGitLaunchRequest } from '../contract/gitLaunch.ts'
 import { workflowApi } from './workflowsClient'
 import { workflowsCommands } from './commands'
@@ -17,6 +18,7 @@ const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
 const StartFromItemHost = lazy(() => import('./StartFromItemHost'))
 const GitLaunchDialog = lazy(() => import('./GitLaunchDialog'))
 const GitLaunchHost = lazy(() => import('./GitLaunchHost'))
+const WorkflowToolCard = lazy(async () => ({ default: (await import('./WorkflowToolCard')).WorkflowToolCard }))
 
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
@@ -42,6 +44,13 @@ export const workflowsClientPlugin: ClientPlugin = {
     // No trigger clock here. The sweep is a node schedule (../node/index.ts): a client one skipped
     // ticks while the window was hidden and did not run at all on a node with no client attached.
     //
+    // What a workflow agent tool call looks like in the transcript, with a link to what it made or
+    // started (./WorkflowToolCard.tsx). The names are a literal, not an import, so the card stays out
+    // of boot.
+    ctx.extensions.register({
+      id: 'workflows.tool-card', point: AGENT_TOOL_CARD_POINT, label: 'Workflow drafts and runs',
+      order: 10, matches: ['workflow_draft', 'workflow_run', 'workflow_read', 'workflow_wait', 'workflow_cancel'], component: WorkflowToolCard,
+    })
     // "Run a workflow" and "Find a run" (./commands.ts). A `paletteRows` source until 2026-09-03.
     for (const contribution of workflowsCommands) ctx.commands.register(contribution)
     // The Workflows rail source and the editor behind it (./sourceContribution.tsx). A local source:

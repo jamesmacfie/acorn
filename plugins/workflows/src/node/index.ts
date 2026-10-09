@@ -1,4 +1,5 @@
 import { describeError, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
+import { activateWorkflowAgentTools } from '../server/agentTools/activation'
 import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
@@ -34,6 +35,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let schedulesCapability: { dispose(): void } | null = null
   let stopScheduleRecovery: (() => void) | null = null
   let stopCheckoutActivity: (() => void) | null = null
+  let agentTools: { dispose(): void } | null = null
   // The step stream, this plugin's own vocabulary rather than a member of the broadcast surface every
   // plugin receives (../contract/notices.ts). It goes out on core's `workflow:` channel, which is why
   // it is written as a frame here rather than reaching for a core helper: `ctx.events` is the seam, and
@@ -118,6 +120,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       ctx.capabilities.provide(WORKFLOW_GATES, workflowGates(store))
       ctx.capabilities.provide(WORKFLOWS_NOTICES, notices)
 
+      // The agent tools and the owner's approvals for them (docs/agent-tools/workflow-tools.md).
+      agentTools = activateWorkflowAgentTools({ store, ctx, runner, starts, drafts: definitions.drafts, reconciled: deps.reconciled })
+
       registerWorkflowTriggers(ctx, runner)
       await definitions.reconcileDraftQueries().catch(error => ctx.log.warn(`Draft query references need reconciliation: ${describeError(error).message}`))
       void deps.reconciled.then(() => active ? scheduleService?.reconcile() : undefined)
@@ -135,6 +140,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       stopCheckoutActivity = null
       stopScheduleRecovery?.()
       stopScheduleRecovery = null
+      agentTools?.dispose()
+      agentTools = null
       live?.stop()
       live = null
       routeCapability?.dispose()

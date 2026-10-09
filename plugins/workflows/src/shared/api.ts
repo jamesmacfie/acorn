@@ -50,6 +50,8 @@ export type WorkflowRunProjection = WireWorkflowRunRow & {
   depth: number
   /** Root runs report the complete tree. Child runs report only their own admitted turns. */
   usage: WorkflowUsageSummary | null
+  /** The agent session that started this run with `workflow_run`, and the limits it ran under. */
+  launchedBy?: { sessionId: string; title: string; limits: import('./workflowContracts').WorkflowBudget }
 }
 
 export type WorkflowStepProjection = WireWorkflowStepRow & {

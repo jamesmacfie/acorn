@@ -104,11 +104,30 @@ export const workflowDefs = sqliteTable(
     revision: integer('revision').notNull().default(1), // bumped per save; a stale one is a 409
     publishedRevision: integer('published_revision'),
     basePublishedRevision: integer('base_published_revision'),
+    // Set only on a draft an agent created through `workflow_draft`: the signed session, the task, the
+    // tool calls, and the source it was based on (WorkflowAgentOrigin in ../contract/wire.ts). Never
+    // inferred from a name or a transport header, and never copied by duplication or publication.
+    agentOriginJson: text('agent_origin_json'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [index('workflow_defs_workspace_idx').on(table.workspaceId, table.updatedAt)],
 )
+
+// One agent tool call that wrote something, keyed by task, signed session, tool, and the MCP proxy's
+// stable call ID. The result is computed and stored before the write, so a repeated call returns the
+// same answer and a call whose response was lost is recovered after a restart
+// (../server/agentTools/drafts.ts).
+export const workflowToolCalls = sqliteTable('workflow_tool_calls', {
+  key: text('key').primaryKey(),
+  tool: text('tool').notNull(),
+  sessionId: text('session_id').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  definitionId: text('definition_id').notNull(),
+  state: text('state').notNull(), // reserved | done
+  resultJson: text('result_json').notNull(),
+  createdAt: integer('created_at').notNull(),
+})
 
 export const workflowRevisions = sqliteTable('workflow_revisions', {
   id: text('id').primaryKey(),
@@ -308,4 +327,52 @@ export const workflowScheduleOccurrences = sqliteTable('workflow_schedule_occurr
   uniqueIndex('workflow_schedule_occurrences_task_uq').on(table.taskId),
   uniqueIndex('workflow_schedule_occurrences_run_uq').on(table.runId),
   index('workflow_schedule_occurrences_state_idx').on(table.scheduleId, table.state, table.updatedAt),
+])
+
+// The owner's approval for agents to start one definition in one project
+// (docs/agent-tools/workflow-tools.md § Invocation authority). One row per project and definition, so
+// replacing or revoking a grant keeps the row and the starts each session has already spent against it.
+// The graph digest covers every executable node and dependency revision; canvas positions and labels
+// are not part of it, and an executable change means the owner reviews again.
+export const workflowInvocationPolicies = sqliteTable('workflow_invocation_policies', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id').notNull(),
+  projectId: text('project_id').notNull(),
+  definitionKey: text('definition_key').notNull(), // db:<id> | repo:<file id> | user:<file id>
+  definitionDigest: text('definition_digest').notNull(),
+  graphDigest: text('graph_digest').notNull(),
+  dependenciesJson: text('dependencies_json').notNull(), // each node's provenance, for review
+  callerInputsJson: text('caller_inputs_json').notNull(), // input names an agent may set
+  fixedInputsJson: text('fixed_inputs_json').notNull(), // input values the owner bound
+  limitsJson: text('limits_json').notNull(),
+  startsPerSession: integer('starts_per_session').notNull(),
+  state: text('state').notNull(), // active | revoked
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, table => [uniqueIndex('workflow_invocation_policies_target_uq').on(table.projectId, table.definitionKey)])
+
+// One `workflow_run` call, persisted before any work starts. Its ID is the run ID it reserves. The
+// frozen graph and effective authority are the admitted snapshot, so a replay or a restart starts
+// exactly what was admitted, and a dispatch waits here until the calling turn settles.
+export const workflowAgentLaunches = sqliteTable('workflow_agent_launches', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull(), // task:session:workflow_run:call id
+  taskId: text('task_id').notNull(),
+  sessionId: text('session_id').notNull(),
+  callerTitle: text('caller_title').notNull(),
+  callerTurnId: text('caller_turn_id'),
+  policyId: text('policy_id').notNull(),
+  definitionKey: text('definition_key').notNull(),
+  graphDigest: text('graph_digest').notNull(),
+  payloadFingerprint: text('payload_fingerprint').notNull(),
+  graphJson: text('graph_json').notNull(),
+  effectiveJson: text('effective_json').notNull(), // { budget, tools }
+  state: text('state').notNull(), // awaiting-caller | started | failed | cancelled
+  error: text('error'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+}, table => [
+  uniqueIndex('workflow_agent_launches_key_uq').on(table.key),
+  index('workflow_agent_launches_session_idx').on(table.sessionId, table.policyId),
+  index('workflow_agent_launches_state_idx').on(table.state),
 ])

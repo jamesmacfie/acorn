@@ -1,7 +1,7 @@
 # Starting runs
 
-This page covers starting a workflow from an integration's row, and the workflows plugin's palette
-rows.
+This page covers starting a workflow from an integration's row, from Git history, from the
+workflows plugin's palette rows, and from an agent.
 
 <a id="starting-a-run-from-an-item"></a>
 
@@ -111,3 +111,12 @@ form's contract, see [Workflow execution](./execution.md#human-gates).
 
 Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
 status and its consequences in front of the person doing it, and a row in a list carries neither.
+
+## From an agent
+
+A managed agent starts a published workflow with `workflow_run` when you've approved it for agents in
+that project. Open the workflow, choose **Agent invocation…** from its overflow menu, and pick the
+inputs agents may set, the limits, and the starts each session gets. The run's trigger is
+`agent-tool`. It starts after the agent's current turn ends, and the run pane names the agent that
+started it. [Workflow tools](../agent-tools/workflow-tools.md#invocation-authority) covers the checks
+and the handoff.

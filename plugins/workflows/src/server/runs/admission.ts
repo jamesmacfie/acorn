@@ -11,7 +11,7 @@ import {
   type WorkflowTaskResolutionScope,
 } from '../definitions/resolution'
 import { WorkflowValidationError } from '../validation/definition'
-import type { WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
+import type { ToolCeiling, WorkflowBudget, WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import type { ResolvedWorkflowGraph } from '../../shared/workflowContracts'
 import { eq } from 'drizzle-orm'
 import * as schema from '../../node/schema'
@@ -177,14 +177,29 @@ export class WorkflowStartService {
     definitionId: string,
     inputs?: Record<string, DataValue>,
   ): Promise<{ graph: ResolvedWorkflowGraph; scope: WorkflowResolutionScope }> {
-    const project = await this.deps.project(projectId)
-    if (!project) throw new Error('That project no longer exists.')
-    const scope = {
-      project,
-      workspaceId: project.workspaceId,
-      projectId: project.id,
-      repoDir: project.path,
-      userDir: this.userDir,
+    return this.prepareInvocation({ projectId }, definitionId, inputs ?? {})
+  }
+
+  /** Resolves and checks a saved definition outside a device start: for a schedule or the owner's
+   *  agent invocation review (a project), or for an agent's launch (a task, whose checkout supplies
+   *  repository files). A `review` has no caller values yet, so required inputs are left unchecked,
+   *  and it skips the trust check, which a start makes on its own. Neither changes the graph's
+   *  executable shape. */
+  async prepareInvocation(
+    target: { projectId: string } | { taskId: string },
+    definitionId: string,
+    inputs: Record<string, DataValue>,
+    purpose: 'review' | 'start' = 'start',
+  ): Promise<{ graph: ResolvedWorkflowGraph; scope: WorkflowResolutionScope }> {
+    let scope: WorkflowResolutionScope
+    if ('taskId' in target) {
+      const taskScope = await this.deps.taskScope(target.taskId)
+      if (!taskScope) throw new Error('That task no longer exists.')
+      scope = taskScope
+    } else {
+      const project = await this.deps.project(target.projectId)
+      if (!project) throw new Error('That project no longer exists.')
+      scope = { workspaceId: project.workspaceId, projectId: project.id, repoDir: project.path, userDir: this.userDir }
     }
     const resolved = await resolveScopedWorkflowDefinition(
       this.db,
@@ -192,7 +207,10 @@ export class WorkflowStartService {
       scope,
       this.runner.validationCatalog(),
     )
-    const graph = await resolveWorkflowGraph(this.db, resolved.definition, {
+    const definition = purpose === 'review' && resolved.definition.inputs
+      ? { ...resolved.definition, inputs: resolved.definition.inputs.map((input) => ({ ...input, required: false })) }
+      : resolved.definition
+    const graph = await resolveWorkflowGraph(this.db, definition, {
       scope,
       catalog: this.runner.validationCatalog(),
       inputs,
@@ -200,7 +218,10 @@ export class WorkflowStartService {
       allowDatabaseDefinitions: true,
       queryRevision: this.deps.queryRevision ? id => this.deps.queryRevision!(id, scope) : undefined,
     })
-    if (graph.requiresRepoTrust) await this.deps.authorizeProjectConfig?.(project.id)
+    if (graph.requiresRepoTrust && purpose === 'start') {
+      if ('taskId' in target) await this.deps.authorizeRepoConfig(target.taskId)
+      else await this.deps.authorizeProjectConfig?.(target.projectId)
+    }
     await this.deps.validateDestination?.(graph, scope)
     return { graph, scope }
   }
@@ -235,6 +256,39 @@ export class WorkflowStartService {
       processingScope: request.processingScope,
       processingBaseline: request.baseline ?? false,
       trigger: 'schedule',
+    })
+  }
+
+  /** Starts an agent launch that was admitted and persisted earlier (../agentTools/launches.ts). The
+   *  intended run ID makes a repeat after a restart return the same run. */
+  async startAgentLaunch(request: {
+    taskId: string
+    graph: ResolvedWorkflowGraph
+    intendedRunId: string
+    callerKey: string
+    payloadFingerprint: string
+    effectiveBudget: WorkflowBudget
+    effectiveTools: ToolCeiling
+  }): Promise<string> {
+    await this.deps.reconciled
+    if (request.graph.requiresRepoTrust) await this.deps.authorizeRepoConfig(request.taskId)
+    const scope = await this.deps.taskScope(request.taskId)
+    if (!scope) throw new Error('That task no longer exists.')
+    await this.deps.validateDestination?.(request.graph, scope)
+    return this.runner.start(request.taskId, request.graph.root, {
+      resolvedGraph: request.graph,
+      intendedRunId: request.intendedRunId,
+      invocation: {
+        callerKey: request.callerKey,
+        payloadFingerprint: request.payloadFingerprint,
+        rootRunId: request.intendedRunId,
+        parentRunId: null,
+        parentStepId: null,
+        depth: 0,
+      },
+      trigger: 'agent-tool',
+      effectiveBudget: request.effectiveBudget,
+      effectiveTools: request.effectiveTools,
     })
   }
 

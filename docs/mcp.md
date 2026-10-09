@@ -60,11 +60,13 @@ register for the addressed task. [Agent tools](./agent-tools.md) owns each tool'
   write `github_pull_create`.
 - Managed-session orchestration, from `agents`: `agent_spawn`, `agent_prompt`, `agent_wait`,
   `agent_read`, and `agent_cancel`.
+- Workflows, from `workflows`: discovery, agent drafts, and starting, reading, waiting on, and
+  cancelling runs the owner approved ([workflow tools](./agent-tools/workflow-tools.md)).
 
-Nothing here reads or writes a file, drives a workflow run, opens a database, or talks to Docker. An agent
-that needs a file uses its harness's own tools in the worktree. Driving a workflow from one of its steps
-would be a loop, the HTTP sender is refused to this principal, and arbitrary SQL would be execute-tier,
-which is denied by default.
+Nothing here reads or writes a file, opens a database, or talks to Docker. An agent that needs a file
+uses its harness's own tools in the worktree. The HTTP sender is refused to this principal, and
+arbitrary SQL would be execute-tier, which is denied by default. A workflow's own step session can't
+start a workflow, because that would be a loop. Nested work goes through child workflow steps.
 
 The task script tools use the launch token's task, so no input can name another task, and they never
 start a script. Check status and wait on setup before work that depends on it. A wait timeout leaves the
