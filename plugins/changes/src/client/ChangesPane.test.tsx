@@ -52,6 +52,8 @@ const model = (changes: LocalChange[], chosen: Partial<ChangeView> = {}, commit:
     task: { id: 't1', projectId: 'p1' },
     isGit: () => true,
     loaded: () => true,
+    secretCheck: () => null,
+    checkingSecrets: () => false,
     groups,
     view,
     setView,
@@ -160,6 +162,26 @@ it('shows dependency read failures and bounded finding details in the expanded r
   const button = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes('Dependencies:'))
   button?.click()
   expect(host.textContent).toContain('lockfile entry has no integrity metadata')
+})
+
+it('runs the secret check on request and lists findings by rule and position', () => {
+  const checked = model([change('a.ts', true)])
+  const checkSecrets = vi.fn()
+  Object.assign(checked, {
+    checkSecrets,
+    secretCheck: () => ({
+      operation: 'commit', destination: 'main in /w',
+      report: { detectorVersion: 'acorn-secrets/1', digest: 'd', counts: { high: 1, heuristic: 0 }, truncated: false, complete: false, limits: ['Checks the staged tree.'],
+        findings: [{ rule: 'npm-token', confidence: 'high', location: 'a.ts', line: 3, column: 9 }],
+        unscanned: [{ location: 'big.json', reason: 'Larger than 8 MiB.' }] },
+    }),
+  })
+  disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={checked} />, host))
+  ;[...host.querySelectorAll('button')].find((item) => item.textContent === 'Check outgoing commits')?.click()
+  expect(checkSecrets).toHaveBeenCalledWith('push')
+  expect(host.textContent).toContain('1 likely secret, 0 to review, incomplete · next commit')
+  expect(host.textContent).toContain('Likely secret · npm-token · a.ts:3:9')
+  expect(host.textContent).toContain('Not checked · big.json: Larger than 8 MiB.')
 })
 
 /** One group's `<details>`, by the label in its summary. */

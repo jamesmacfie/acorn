@@ -79,6 +79,14 @@ while its replacement loads. HEAD and the index are enumerated once, and blob ob
 immutably. If HEAD, the index, or a reviewed disk file changes during acquisition, the report is
 partial with no comparison findings and asks for a retry. Read failures appear in the pane.
 
+Below it, **Check next commit for secrets** and **Check outgoing commits** run the checks a commit or
+push would run and list each finding by rule and position, never by value. The commit check reads the
+index when something is staged and the tracked changes otherwise. The push check asks the remote for
+its refs. With **Block publication with secret findings** on for the node, Commit and Push run the
+same checks first, and a refusal arrives in the pane's error line with the rule, the path, and the
+line. For what each check reads, how a Git hook is handled, and the bounds, see
+[secret checks before publication](../security/secret-publication.md#git).
+
 The parser supports npm lockfile versions 2 and 3 and pnpm lockfile version 9. It compares manifest
 requests, lockfile importer resolutions, package records, sources, integrity fields, lifecycle-script
 names and command-change digests, package-manager versions, release-age settings, build approvals, overrides, catalogs, and

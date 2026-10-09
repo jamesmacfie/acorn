@@ -17,9 +17,11 @@ searches, and [command kinds](../plugins.md#command-kinds) holds the vocabulary.
 | New Codex terminal | Action, needs a task | The same for the `codex` profile |
 | Start new sessions with my last model | Setting, no scope | On and Off over `followLastSession` |
 | Tool call display | Setting, no scope | Start collapsed, start expanded, or carry the last one forward |
-| Agent session | Group, task-scoped | The open session's ••• menu: fork, retry, compact, continue in terminal, regenerate title, rename, two exports, and archive |
+| Agent session | Group, task-scoped | The open session's ••• menu: fork, retry, compact, continue in terminal, regenerate title, rename, four exports, and archive |
 
-The JSON session export includes `version: 1` and `baseline: "acorn-1"`.
+The JSON session export includes `version: 1` and `baseline: "acorn-1"`. The two exports without
+secrets return a redacted copy and leave the stored session unchanged. With blocking on, an original
+export that holds a likely secret is refused ([secret checks](../security/secret-publication.md#agents)).
 
 ## How the rows behave
 

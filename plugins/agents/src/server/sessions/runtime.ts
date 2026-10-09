@@ -856,8 +856,14 @@ export class ManagedAgentRuntime {
     return session
   }
 
-  async exportSession(sessionId: string, format: 'json' | 'markdown'): Promise<string> {
-    return (await this.transcriptCommands()).export(sessionId, format)
+  /** An export is publication: with blocking on, the exact serialized bytes pass the secret gate
+   *  first (./secretPublication.ts). */
+  async exportSession(sessionId: string, format: 'json' | 'markdown', variant: 'original' | 'redacted' = 'original'): Promise<{ content: string; digest: string }> {
+    const exported = await (await this.transcriptCommands()).export(sessionId, format, variant === 'redacted')
+    if (this.core.secretPublication) {
+      await (await import('./secretPublication')).admitExport(this.core.secretPublication, { sessionId, format, variant, ...exported })
+    }
+    return exported
   }
 
   async captureExecution(sessionId: string, turnIds: readonly string[]): Promise<AgentSessionSnapshot> {

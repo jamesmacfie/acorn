@@ -4,6 +4,7 @@ This page is the map of acorn's security model: the trust boundaries, what's out
 page owns each control. Read it before you change anything that crosses a boundary.
 For the device-only **Check this node** report, see [security diagnostics](./security/security-diagnostics.md). For advisory npm and pnpm change review, see [the Changes pane](./diff-rendering/changes-pane.md#the-file-list).
 Managed MCP needs device consent for execution and separate actual-connection catalogue approval; installed code retains device authority. See [managed MCP servers](./mcp/managed-servers.md).
+Acorn checks for likely secrets before its own commit, push, transcript export, and attachment send, and an optional per-Node setting blocks them. See [secret checks before publication](./security/secret-publication.md).
 acorn is single-owner software. A paired device has full owner authority for its Node. So the controls
 protect the transport, credential custody, process boundaries, repository data, and untrusted provider
 and preview content, rather than implementing multi-user roles.
@@ -87,12 +88,11 @@ stops that turn as incomplete and tells you to retry or change the setting. Opti
 The hidden-character check finds Unicode `Default_Ignorable_Code_Point` characters outside real
 emoji sequences and names their file and line. The review compares exact byte hashes and canonical
 path identities with an approved snapshot. First use requires a baseline review. Findings for the
-baseline or changed files identify
-commands, domains, sensitive paths, permission language, override phrases, and hidden characters.
-They are advisory: security documentation can mention these subjects without instructing misuse.
-Findings appear before the files, and each file starts collapsed. Acorn redacts credential-shaped
-spans from displayed text. Approval checks the discovered bytes again and returns a conflict when
-they changed. The next turn checks again, even after approval.
+baseline or changed files identify commands, domains, sensitive paths, permission language, override
+phrases, and hidden characters. They are advisory: security documentation can mention these subjects
+without instructing misuse. Findings appear before the files, and each file starts collapsed. Acorn
+redacts credential-shaped spans from displayed text. Approval checks the discovered bytes again and
+returns a conflict when they changed. The next turn checks again, even after approval.
 
 The scan covers root and nested `AGENTS.md`, `AGENTS.override.md`, `CLAUDE.md`, and
 `CLAUDE.local.md`, including `.claude/CLAUDE.md`. It follows Claude `@path` imports up to five hops.

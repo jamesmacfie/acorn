@@ -48,6 +48,10 @@ export function createApp() {
     (await import('./routes/authoring')).handleAuthoringTurn(c))
   const queries = new Hono<AppEnv>().use('*', requireProviderAccess).post('/:operation', async c =>
     (await import('./routes/queries')).handleQuery(c))
+  const secretPublication = new Hono<AppEnv>()
+    .get('/', async c => (await import('./routes/security/secretPublication')).readSecretPublication(c))
+    .put('/', async c => (await import('./routes/security/secretPublication')).writeSecretPublication(c))
+    .post('/allow', async c => (await import('./routes/security/secretPublication')).allowSecretPublicationOnce(c))
 
   const app = new Hono<AppEnv>()
     // First, unconditionally. Every response carries a request id, so a user-reported failure is
@@ -156,6 +160,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Audit log: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security and backup: this node's posture (security.md § On-disk)
+    .route(`${CORE_NAMESPACE}/security/secret-publication`, secretPublication) // the blocking switch and one-operation allowances (docs/security/secret-publication.md)
     .route(`${CORE_NAMESPACE}/storage`, storage) // Settings → Storage and memory: memory and disk sizes (data-layer.md § What the node reports)
     .route(`${CORE_NAMESPACE}/attachment`, attachment) // Settings → Nodes: the control plane this node is attached to (docs/node-enrollment.md)
     .route(`${CORE_NAMESPACE}/nodes`, nodeProviderRoutes) // plugin-provided nodes and their lifecycle (docs/plugins/node-providers.md § Node providers)

@@ -7,6 +7,7 @@
 
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { DiffSearchRequest, DiffSegmentDescriptor, DiffSegmentRequest } from '@acorn/diff-document/document'
+import type { SecretCheckReport } from '@acorn/protocol/secretChecks.ts'
 
 // Inline annotations on uncommitted changes, owned by this plugin rather than mirrored from GitHub.
 export type ReviewNote = {
@@ -44,6 +45,10 @@ export const localSearchRoute = (taskId: string) => `/v1/p/changes/tasks/${taskI
 export type LocalScope = 'unstaged' | 'staged'
 export const dependencyReviewRoute = (taskId: string, scope: LocalScope) =>
   `/v1/p/changes/tasks/${taskId}/local/dependencies?scope=${scope}`
+// Check for secrets: the check a commit or push would run, on request (docs/security/secret-publication.md).
+export const secretCheckRoute = (taskId: string, operation: 'commit' | 'push') =>
+  `/v1/p/changes/tasks/${taskId}/local/secret-check?operation=${operation}`
+export type GitSecretCheckResult = { operation: 'commit' | 'push'; destination: string; report: SecretCheckReport }
 export type DependencyFinding = {
   path: string
   kind: 'direct' | 'transitive' | 'integrity' | 'source' | 'script' | 'policy' | 'coverage'

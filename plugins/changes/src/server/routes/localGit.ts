@@ -2,8 +2,9 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
+import type { SecretPublicationRefusal } from '@acorn/protocol/secretChecks.ts'
 import type {
-  CommitMessageRequest, CommitOptions, DependencyReview, GeneratedCommitMessage, HeadCommit, LocalDocumentRequest, LocalDocumentResponse, LocalSearchRequest,
+  CommitMessageRequest, CommitOptions, DependencyReview, GeneratedCommitMessage, GitSecretCheckResult, HeadCommit, LocalDocumentRequest, LocalDocumentResponse, LocalSearchRequest,
   LocalSegmentsRequest, PullOptions, PushOptions,
 } from '../../shared/api'
 import { MAX_DOCUMENT_FILES, MAX_SEGMENTS_PER_REQUEST, SEARCH_MAX_QUERY, type DiffSearchPage, type DiffSegmentPayload } from '@acorn/diff-document/document'
@@ -25,7 +26,8 @@ import {
 // in dev:node.
 
 export type { LocalScope } from '../../shared/api'
-export type GitActionResult = { ok: boolean; reason?: string }
+/** `secretCheck` is present when the secret publication gate refused (docs/security/secret-publication.md). */
+export type GitActionResult = { ok: boolean; reason?: string; secretCheck?: SecretPublicationRefusal }
 export type LocalGitBridge = {
   /** One read answers the whole panel: the changes, the branch, its upstream, how far each way, and
    *  whether a merge or rebase is mid-flight. */
@@ -54,6 +56,8 @@ export type LocalGitBridge = {
   fetch(taskId: string): Promise<GitActionResult>
   pull(taskId: string, options?: PullOptions): Promise<GitActionResult>
   push(taskId: string, options?: PushOptions): Promise<GitActionResult>
+  /** The secret check a commit or push would run, on request. Never admits anything. */
+  secretCheck(taskId: string, operation: 'commit' | 'push'): Promise<GitSecretCheckResult>
   /** Undo whichever of a merge or a rebase is mid-flight. Refused when none is. */
   abort(taskId: string): Promise<GitActionResult>
   /** Which backends this owner could generate a message with — a stored key, or an agent CLI
@@ -152,6 +156,12 @@ async function viaModels<T>(c: Context<AppEnv>, fn: (bridge: LocalGitBridge, use
 
 export const localGit = new Hono<AppEnv>()
   .get('/:id/local/status', (c) => viaBridge(c, LOCAL_GIT, (b) => b.status(id(c))))
+  // Reads the index or the outgoing history, never a value: the report names rules and positions.
+  .get('/:id/local/secret-check', (c) => {
+    const operation = z.enum(['commit', 'push']).safeParse(c.req.query('operation'))
+    if (!operation.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, LOCAL_GIT, (b) => b.secretCheck(id(c), operation.data))
+  })
   .get('/:id/local/dependencies', (c) => {
     const selected = scope.safeParse(c.req.query('scope'))
     if (!selected.success) return respondError(c, 400, 'bad_request')

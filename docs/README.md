@@ -55,6 +55,7 @@ the whole plugin system in one page.
 | [security/control-plane.md](./security/control-plane.md) | What enrollment and node providers cost, and what bounds it. |
 | [security/renderer.md](./security/renderer.md) | The renderer CSP, the HTML and markdown sinks, and untrusted provider and authoring input. |
 | [security/webviews.md](./security/webviews.md) | Host-owned webviews, the preview pane's remote refusal, and agent browser tools. |
+| [security/secret-publication.md](./security/secret-publication.md) | The local secret detector, the optional publication gate, one-operation allowances, and coverage limits. |
 | [security/audit.md](./security/audit.md) | The audit trail, plugin audit verbs, on-disk permissions, and backups. |
 | [node-enrollment.md](./node-enrollment.md) | How a provisioned node introduces itself to a control plane, and the versioned protocol it speaks. |
 | [security/node-plugin-security.md](./security/node-plugin-security.md) | The owner of plugin security: the threat model, the containment ladder, and the summary table. |

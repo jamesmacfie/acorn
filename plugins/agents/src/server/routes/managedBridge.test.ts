@@ -187,3 +187,14 @@ it('answers a session for an unknown provider as a bad request', async () => {
   } as unknown as ManagedAgentRuntime
   await expect(managedAgentsBridge(runtime).createSession({ providerId: 'nope' } as never)).rejects.toMatchObject({ status: 400, code: 'bad_request' })
 })
+
+it('answers a secret gate refusal as a conflict that keeps its reason', async () => {
+  const { SecretPublicationRefused } = await import('../sessions/secretPublication')
+  const report = { detectorVersion: 'acorn-secrets/1', digest: 'd', findings: [{ rule: 'npm-token', confidence: 'high' as const, location: 'markdown export', line: 4, column: 1 }], counts: { high: 1, heuristic: 0 }, truncated: false, unscanned: [], complete: true, limits: [] }
+  const runtime = {
+    exportSession: async () => { throw new SecretPublicationRefused({ decisionId: 'a'.repeat(64), operation: 'export', reason: 'findings', report }) },
+  } as unknown as ManagedAgentRuntime
+  await expect(managedAgentsBridge(runtime).exportSession('s1', 'markdown', 'original')).rejects.toMatchObject({
+    status: 409, code: 'secret_check_blocked', message: expect.stringContaining('npm-token at markdown export:4'),
+  })
+})

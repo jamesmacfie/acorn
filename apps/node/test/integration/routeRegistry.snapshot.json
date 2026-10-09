@@ -82,6 +82,7 @@
   "GET /v1/p/changes/tasks/:id/local/head-commit",
   "GET /v1/p/changes/tasks/:id/local/model-connections",
   "GET /v1/p/changes/tasks/:id/local/new-side",
+  "GET /v1/p/changes/tasks/:id/local/secret-check",
   "GET /v1/p/changes/tasks/:id/local/status",
   "GET /v1/p/changes/tasks/:id/review-notes",
   "GET /v1/p/docker/containers",

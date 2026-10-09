@@ -30,6 +30,7 @@ import { AgentDelegationService } from '../delegation/service'
 import { AgentDelegationStore } from '../delegation/store'
 import { saveCustomAgent } from '../customAgents'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
+import type { SecretCheckReport } from '@acorn/protocol/secretChecks.ts'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
 const SECRETS = new SecretService(ENCRYPTION_KEY)
@@ -486,8 +487,49 @@ describe('managed agent runtime conformance', () => {
     expect(session.kind).toBe('imported')
     expect(session.controller).toBe('external')
     const exported = await runtime.exportSession(session.id, 'json')
-    expect(JSON.parse(exported).turns).toHaveLength(1)
+    expect(JSON.parse(exported.content).turns).toHaveLength(1)
     await expect(runtime.verifyImportedResume(session.id)).rejects.toThrow('no provider session reference')
+  })
+
+  it('checks the serialized export, and a redacted copy leaves the stored session alone', async () => {
+    const { taskId } = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    // Assembled at runtime and never issued.
+    const token = 'ghp' + '_' + 'Q7r8S9t0U1v2W3x4Y5z6A7b8C9d0E1f2G3h4'
+    const admitted: SecretCheckReport[] = []
+    let blocking = false
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db, dataDir, internalEnv: () => ({}), secrets: SECRETS, currentUserId: () => null, registry,
+      core: {
+        ...core,
+        secretPublication: {
+          enabled: async () => blocking,
+          admit: async ({ operation, report }) => {
+            admitted.push(report)
+            return report.counts.high ? { decisionId: 'd'.repeat(64), operation, reason: 'findings', report } : null
+          },
+        },
+      },
+    })
+    const session = await runtime.importTranscript({
+      taskId, providerId: 'fake', profileId: 'fake',
+      content: `# Prior work\n\n## User\n\nUse ${token} for the "deploy"\n\n## Assistant\n\nDone.`,
+    })
+
+    expect((await runtime.exportSession(session.id, 'markdown')).content).toContain(token)
+    expect(admitted).toEqual([])
+    blocking = true
+    await expect(runtime.exportSession(session.id, 'json')).rejects.toThrow(/secret check blocked this export: \d+ likely secrets \(github-token at original json export:\d+.*\)\. Choose an export without secrets from the session menu instead/)
+    expect(JSON.stringify(admitted)).not.toContain(token.slice(4))
+
+    const redacted = await runtime.exportSession(session.id, 'json', 'redacted')
+    expect(redacted.content).not.toContain(token)
+    expect(JSON.stringify(JSON.parse(redacted.content).turns)).toContain('[redacted secret] for the \\"deploy\\"')
+    // Same bytes apart from the export time, same digest: an allowance survives the re-export.
+    expect((await runtime.exportSession(session.id, 'json', 'redacted')).digest).toBe(redacted.digest)
+    blocking = false
+    expect((await runtime.exportSession(session.id, 'markdown')).content).toContain(token)
   })
 
   it('shows the worktree failure when a new session cannot get its task root', async () => {

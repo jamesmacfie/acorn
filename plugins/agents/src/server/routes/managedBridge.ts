@@ -16,6 +16,9 @@ import { sessionReferenceContext } from '../sessions/sessionReference'
 // The runtime throws plain Errors and has no idea it is behind HTTP, so the mapping goes by message
 // shape. An unmatched error rethrows and becomes a 500, which is the honest answer for a bug.
 function bridgeFailure(error: unknown): never {
+  // The secret gate's refusal (../sessions/secretPublication.ts § SecretPublicationRefused), matched by
+  // shape so this bridge does not load the checker. Its message names rules and positions, never a value.
+  if (error instanceof Error && 'refusal' in error) throw new BridgeError(409, 'secret_check_blocked', error.message)
   const message = error instanceof Error ? error.message : 'Managed agent operation failed.'
   // A request naming a provider this Node never registered, as opposed to one that is unavailable now.
   if (/^Unknown agent provider/.test(message)) throw new BridgeError(400, 'bad_request', message)
@@ -149,7 +152,7 @@ export function managedAgentsBridge(
     deleteSession: (sessionId) => guarded(() => runtime.deleteSession(sessionId)),
     handoffToTerminal: (sessionId) => guarded(() => runtime.handoffToTerminal(sessionId)),
     resumeManaged: (sessionId) => guarded(() => runtime.resumeManaged(sessionId)),
-    exportSession: (sessionId, format) => guarded(() => runtime.exportSession(sessionId, format)),
+    exportSession: (sessionId, format, variant) => guarded(() => runtime.exportSession(sessionId, format, variant)),
     wait: (sessionId, afterSeq, until, timeoutMs, signal) =>
       guarded(() => runtime.wait(sessionId, afterSeq, until, timeoutMs, signal)),
     search: (query, filter) => guarded(() => runtime.store.searchSessions(query, filter)),

@@ -23,6 +23,8 @@
     "./server/core/index.ts": "./src/server/core/index.ts",
     "./server/core/prefs.ts": "./src/server/core/prefs.ts",
     "./server/core/secrets.ts": "./src/server/core/secrets.ts",
+    "./server/secretChecks/detector.ts": "./src/server/secretChecks/detector.ts",
+    "./server/secretChecks/gate.ts": "./src/server/secretChecks/gate.ts",
     "./server/dataSources": "./src/server/dataSources/public.ts",
     "./server/db/cascade.ts": "./src/server/db/cascade.ts",
     "./server/db/index.ts": "./src/server/db/index.ts",

@@ -928,6 +928,13 @@ export class ManagedAgentEngine {
         this.shutdown.signal.removeEventListener('abort', stopScan)
       }
       if (!this.processes.owns(generation)) return false
+      // Attachments leave the machine with this send. With blocking on, their stored bytes pass the
+      // secret gate here, on every turn source, including a retry (./secretPublication.ts).
+      if (Object.keys(attachments).length && this.core.secretPublication) {
+        const { admitAttachments } = await import('./secretPublication')
+        await admitAttachments(this.core.secretPublication, { sessionId: session.id, providerId: session.providerId, attachments: Object.values(attachments) })
+        if (!this.processes.owns(generation)) return false
+      }
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)

@@ -1,7 +1,7 @@
 # Harden the trust boundaries
 
-Updated: October 9, 2026. Phases 01, 02, and 04 through 09 are implemented and integrated.
-Phase 03 (Node 26) is excluded from this branch; Phase 10 is deferred at the owner's request.
+Updated: October 9, 2026. Phases 01, 02, and 04 through 10 are implemented and integrated.
+Phase 03 (Node 26) is excluded from this branch.
 Each phase's completion notes record the shipped behavior, acceptance evidence, and limitations.
 Trust-boundary source baseline, phases 01 to 05: `823db58295b84ac9f9fb52f3f85b7a6550bd8761`.
 Agent-tooling source baseline, phases 06 to 10: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.

@@ -14,6 +14,7 @@ import { createTaskService, type CompiledTaskService, type TaskService } from '.
 import { createProjectService, type CompiledProjectService, type ProjectService } from './projectRefs'
 import { createTelemetryService, type TelemetryService } from './telemetry'
 import { verifyAgentToolProvenance } from '../agentTools/provenance'
+import type { SecretPublicationGate } from '../secretChecks/gate'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
 //
@@ -54,6 +55,9 @@ export type CoreServices = {
   agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
   /** Bounded passive plugin facts; supplied by the composition root after the host starts. */
   pluginSecurity?: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
+  /** The optional secret publication gate (docs/security/secret-publication.md). Built-ins only; a
+   *  loaded plugin receives no grant for it, and nothing here can allow an exception. */
+  secretPublication?: SecretPublicationGate
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
@@ -109,6 +113,9 @@ export function createCoreServices(options: {
   const projects = createProjectService(options.db, options.activeIdentity)
   const identity = createIdentityService(options.activeIdentity)
   const models = createModelService(options.db, options.secrets)
+  const prefs = createPrefService(options.db)
+  let gate: Promise<SecretPublicationGate> | undefined
+  const secretGate = () => gate ??= import('../secretChecks/gate').then((module) => module.createSecretPublicationGate({ db: options.db, prefs, identity }))
   return {
     agentToolProvenance: { verify: verifyAgentToolProvenance },
     agentTools: {
@@ -134,7 +141,13 @@ export function createCoreServices(options: {
       }),
     },
     data: createDataSourceService({ tasks, projects, fs, proc }),
-    prefs: createPrefService(options.db),
+    prefs,
+    // Loaded on first use, so a node that never commits, pushes, exports, or sends an attachment
+    // carries none of the gate's code.
+    secretPublication: {
+      enabled: async () => (await secretGate()).enabled(),
+      admit: async (input) => (await secretGate()).admit(input),
+    },
     identity,
     projects,
     telemetry: createTelemetryService(),

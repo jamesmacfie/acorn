@@ -1,7 +1,7 @@
 // Local-changes review over loopback HTTP: was `window.acorn.terminal.local`. Pure-Node
 // on the server, so it works in a plain browser (dev:node) too.
 import {
-  dependencyReviewRoute, type DependencyReview,
+  dependencyReviewRoute, type DependencyReview, secretCheckRoute, type GitSecretCheckResult,
   localActionRoute, localCommitMessageRoute, localDocumentRoute, localHeadCommitRoute, localModelBackendsRoute, localNewSideRoute,
   localSearchRoute, localSegmentsRoute, localStatusRoute, type CommitMessageRequest, type CommitOptions, type GeneratedCommitMessage,
   type HeadCommit, type LocalDocumentRequest, type LocalDocumentResponse, type LocalSearchRequest, type LocalSegmentsRequest,
@@ -18,6 +18,7 @@ const post = <T>(url: string, body?: unknown, signal?: AbortSignal) =>
 
 export const localGitApi = {
   dependencies: (taskId: string, scope: 'staged' | 'unstaged', signal?: AbortSignal) => readJson<DependencyReview>(dependencyReviewRoute(taskId, scope), { signal }),
+  secretCheck: (taskId: string, operation: 'commit' | 'push') => readJson<GitSecretCheckResult>(secretCheckRoute(taskId, operation)),
   status: (taskId: string) => readJson<LocalStatus>(localStatusRoute(taskId)),
   // The stacked diff as a document, its segments, and its search pages (docs/diff-rendering/document.md § The
   // document).

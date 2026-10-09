@@ -10,6 +10,7 @@ import { Facts } from '../../kit/components/content/Facts'
 import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
+import SecretPublicationSection from './SecretPublicationSection'
 import './settings.css'
 
 // Settings → Security and backup (docs/security/audit.md § Filesystem and backup): whether the node's disk is encrypted,
@@ -100,6 +101,8 @@ export default function SecuritySettings(props: { nodeId: string | null }) {
           items={[{ label: 'Full-disk encryption', value: posture() ? encryption(posture()!) : posture.loading ? 'Checking…' : 'Unknown' }]}
         />
       </SettingsSection>
+
+      <SecretPublicationSection nodeId={nodeId()} />
 
       <Slot point={CORE_SECURITY_POINT} props={() => ({ nodeId: nodeId() })} />
 

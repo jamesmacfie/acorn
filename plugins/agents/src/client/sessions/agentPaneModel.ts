@@ -262,15 +262,18 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     }, false)
   }
 
-  async function exportHistory(format: 'json' | 'markdown') {
+  // `redacted` is a separate copy with each secret finding replaced by a fixed marker; the stored
+  // session is unchanged. With the node's blocking switch on, an original export with a finding is
+  // refused, and the reason points here (docs/security/secret-publication.md § Agents).
+  async function exportHistory(format: 'json' | 'markdown', variant: 'original' | 'redacted' = 'original') {
     const session = selected()
     if (!session) return
     await action(async () => {
-      const exported = await managedAgentApi.export(session.id, format)
+      const exported = await managedAgentApi.export(session.id, format, variant)
       await saveFile({
         bytes: new TextEncoder().encode(exported.content),
         mimeType: format === 'json' ? 'application/json' : 'text/markdown',
-        suggestedName: `${downloadName(session.title, 80) || 'agent-session'}.${format === 'json' ? 'json' : 'md'}`,
+        suggestedName: `${downloadName(session.title, 80) || 'agent-session'}${variant === 'redacted' ? '-redacted' : ''}.${format === 'json' ? 'json' : 'md'}`,
       })
     }, false)
   }
@@ -380,6 +383,8 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       { id: 'rename', label: 'Rename session', icon: 'pencil', run: () => sessionAction(session, 'rename') },
       { id: 'export-markdown', label: 'Export Markdown', icon: 'download', run: () => void exportHistory('markdown') },
       { id: 'export-json', label: 'Export lossless JSON', icon: 'download', run: () => void exportHistory('json') },
+      { id: 'export-redacted-markdown', label: 'Export Markdown without secrets', icon: 'download', run: () => void exportHistory('markdown', 'redacted') },
+      { id: 'export-redacted-json', label: 'Export JSON without secrets', icon: 'download', run: () => void exportHistory('json', 'redacted') },
       { id: 'archive', label: 'Archive session…', icon: 'archive', tone: 'danger', run: () => sessionAction(session, 'archive') },
     ]
   })

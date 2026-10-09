@@ -87,7 +87,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // Phase 09 follow-up: 3,209,061 B after the managed-root lifetime lease and stale-approval
 // revocation joined the boot-owned MCP store. measure:service-graph confirms the installer,
 // catalogue, and proxy still load on first use. Move the ceiling by 1 KB, leaving 939 B.
-const limits = { ceiling: 3_210_000, floor: 1_000_000 }
+// Phase 10: 3,213,722 B with the secret-check route, the Changes index lane, and the lazy gate
+// shims at the commit, push, export, and dispatch points. measure:service-graph confirms the
+// detector, gate, Git checks, and the agents admission module load on first use. Move the ceiling
+// by 5 KB, leaving 1,278 B.
+const limits = { ceiling: 3_215_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

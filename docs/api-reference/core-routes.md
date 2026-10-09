@@ -30,6 +30,7 @@ Every route in this table is device-only.
 | `GET` | `/v1/core/plugins/:id/bundles/:hash`, `/client.js` | The client bundle with that hash, for device custody, or the installed one, for clients older than the hash route |
 | `GET` | `/v1/core/audit` | Read the audit trail |
 | `GET` | `/v1/core/security` | Read the Node's security posture |
+| `GET`, `PUT`, `POST` | `/v1/core/security/secret-publication`, `/allow` | Read the blocking switch and refused operations, set `{ block }`, or allow one operation once with `{ decisionId }` ([secret checks](../security/secret-publication.md#policy)) |
 | `GET` | `/v1/core/storage` | Node memory and database, plugin database, and blob cache sizes |
 | `GET` | `/v1/core/attachment` | The control plane this Node is attached to, if any |
 | `DELETE` | `/v1/core/attachment` | Detach: revoke the control plane's device row and forget it |
@@ -159,10 +160,9 @@ fails. Worktree creation stays lazy. With a base, every local branch name counts
 one, an unused local branch can be reused. A bad base returns 400, and an exact name conflict returns
 a `worktree-unavailable` 409.
 
-`GET /v1/core/projects/:id/branches` returns
-`{ current, tasks: [{ branch, taskId, title }], other: [{ name, committedAt }] }`. `current` is the
-checkout branch, or `null` for a detached HEAD. `committedAt` is Unix time in milliseconds. A non-Git
-project returns empty groups.
+`GET /v1/core/projects/:id/branches` returns `{ current, tasks: [{ branch, taskId, title }], other:
+[{ name, committedAt }] }`. `current` is the checkout branch, or `null` for a detached HEAD.
+`committedAt` is Unix time in milliseconds. A non-Git project returns empty groups.
 
 `GET /v1/core/projects/:id/worktree-availability` takes `branch` and optional `branchSource` and
 `baseBranch` query parameters. It returns `{ available: true, branch }`, with the next free name for a

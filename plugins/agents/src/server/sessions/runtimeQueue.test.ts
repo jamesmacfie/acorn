@@ -7,6 +7,7 @@ import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import type { AgentDriverSession, AgentDriverStartOptions } from '../drivers/types'
 import { ManagedAgentRuntime } from './runtime'
+import type { SecretCheckReport } from '@acorn/protocol/secretChecks.ts'
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
@@ -75,6 +76,41 @@ describe('durable queue admission', () => {
     }
     expect(gate).toHaveBeenCalledTimes(8)
     expect(sends).toEqual([])
+  })
+
+  it('checks outgoing attachments by their stored bytes before the driver send', async () => {
+    const reports: SecretCheckReport[] = []
+    ctx.core.secretPublication = {
+      enabled: async () => true,
+      admit: async ({ operation, report }) => {
+        reports.push(report)
+        return report.counts.high || !report.complete ? { decisionId: 'd'.repeat(64), operation, reason: report.counts.high ? 'findings' : 'incomplete', report } : null
+      },
+    }
+    const item = await session()
+    vi.spyOn(ctx.core.tasks, 'load').mockResolvedValue({ id: item.taskId } as never)
+    // Assembled at runtime and never issued.
+    const token = 'npm' + '_' + 'Q7r8S9t0U1v2W3x4Y5z6A7b8C9d0E1f2G3h4'
+    const send = async (filename: string, mediaType: string, bytes: Uint8Array) => {
+      const attachment = await runtime.attachments.upload(item.taskId, filename, mediaType, bytes)
+      const { turn } = await runtime.store.enqueueTurn(item.id, {
+        source: 'interactive', input: [{ type: 'attachment', attachmentId: attachment.id }], effectivePolicy: {}, idempotencyKey: randomUUID(),
+      })
+      await runtime['engine'].pump()
+      return turn.id
+    }
+    const failed = async (turnId: string) => vi.waitFor(async () => expect((await runtime.store.turn(turnId))?.status).toBe('failed'))
+
+    await failed(await send('notes.txt', 'text/plain', new TextEncoder().encode(`key ${token}\n`)))
+    expect(reports.at(-1)).toMatchObject({ counts: { high: 1 }, findings: [{ rule: 'npm-token', line: 1, column: 5 }] })
+    const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
+    await failed(await send('shot.png', 'image/png', png))
+    expect(reports.at(-1)).toMatchObject({ complete: false, unscanned: [{ reason: 'Images, PDFs, and other non-text formats are not scanned.' }] })
+    expect(sends).toEqual([])
+    expect(JSON.stringify(reports)).not.toContain(token.slice(4))
+
+    const clean = await send('clean.txt', 'text/plain', new TextEncoder().encode('nothing to see\n'))
+    await vi.waitFor(() => expect(sends).toEqual([clean]))
   })
 
   it('aborts an in-flight instruction scan when its turn is cancelled', async () => {
