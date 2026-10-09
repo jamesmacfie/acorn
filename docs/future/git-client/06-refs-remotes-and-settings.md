@@ -2,6 +2,31 @@
 
 Date: October 7, 2026. Status: complete October 9, 2026.
 
+## Coordinator verification — October 9, 2026
+
+Phases 01–06 are integrated into `git-pane`, including `efcd88dab`. The coordinator repeated the
+affected checks after integration: Core 63/63, plugin API 14/14, desktop client 26/26, TUI 22/22,
+terminal security 2/2, HTTP 40/40, Workflows client 13/13, and the Git browser entry 1/1 passed.
+Node integration passed 49/50; only the unchanged GitHub pull-search golden differs. Architecture
+and documentation checks passed 64/65; only unchanged `plugin-routes.md` at 201 lines fails.
+The earlier architecture subprocess timeouts did not recur. Touched-source oxlint, affected
+package type checks, and the branch whitespace check passed.
+
+After repairing staging and including the installed Rust toolchain in `PATH`, the complete desktop
+package gate passed: 193 Vitest tests, 11 boot checks, and 66 Rust tests. The independent renderer
+budget check reproduces 802,712/775,000 B; its documented baseline overage remains untouched.
+
+The coordinator repaired ignored dependency links to resolve into this checkout's local virtual
+store. The rebuilt Node graph matches the child at 3,194,881/3,200,000 B, confirming the earlier
+overage came from foreign worktree paths in emitted module comments. The TUI graph is
+731,655/732,000 B, and its external runtime imports resolve. No production cap changed.
+
+The full root test and lint gates ran once. Related regressions were corrected; unrelated contract
+fixtures, schema/golden drift, packed-scaffold dependency failures, EditorPane tests, and Workflows
+authoring tests remain for separate work. The renderer cap was already exceeded at the campaign
+baseline, as measured below. Phase 07 and Phase 08 are not started; the user requested a manual
+Phase 07 handoff.
+
 ## Integrated gate fixes — October 9, 2026
 
 The coordinator's first full gate exposed integration contracts that the isolated Phase 06 checks
