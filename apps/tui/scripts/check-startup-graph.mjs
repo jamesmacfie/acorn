@@ -21,7 +21,8 @@ if (graph.entry !== 'main.js' || !graph.roots.includes(graph.entry) || !graph.ch
 // Phase 05's pure address parser and the linked-source Menu identity add about 2.5 KB to the
 // measured pre-render closure. The roster and linked-place resolver still load after first frame.
 // 673,918 B on 2026-10-09, down from 730,269 B, once loaded-plugin frame and chrome registration
-// loaded on the first distribution pass (performance phase 05). The ceiling is about 4% above.
+// loaded on the first distribution pass (docs/testing/selective-renderer-loading-2026-10-09.md). The
+// ceiling is about 4% above.
 const CEILING = 700_000
 const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes', 'drizzle-orm', 'RemoteTree-', 'TreeHost-', 'roster-', 'chromeRegister']
 

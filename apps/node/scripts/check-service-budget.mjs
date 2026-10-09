@@ -110,8 +110,8 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // unminified. The same graph went from 3,193,213 B to 1,824,878 B on macOS arm64; keeping names costs
 // about 122 KB of that. The new ceiling keeps about 2 KB of minified margin. A floor of 1 MB still
 // catches a walk that stops at service.js.
-// 2026-10-09: 1,824,878 -> 1,702,960 B (minified) after performance phase 06 moved four optional paths
-// to first use: the GitHub mirror routers (about 37 KB), the tunnel's `ws` server, the workflow file
+// 2026-10-09: 1,824,878 -> 1,702,960 B (minified) after four optional paths moved to first use
+// (docs/testing/selective-server-loading-2026-10-09.md): the GitHub mirror routers (about 37 KB), the tunnel's `ws` server, the workflow file
 // authoring and export module, and the Claude and Codex usage probes. The ceiling keeps about 2 KB of
 // margin, so any one of those imports returning fails the build.
 // 2026-10-09: 1,710,383 B after merging main's Git plugin work into phase 06. The 7,423 B rise is

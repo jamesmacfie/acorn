@@ -1,9 +1,10 @@
 # Selective renderer loading evidence, October 9, 2026
 
-This page records what performance phase 05 ([selective renderer loading](../future/performance/05-selective-renderer-loading.md))
-changed in the renderer and terminal client startup graphs, and what a real desktop session showed.
-The figures are dated evidence. Don't edit them. The budget rules are in
-[startup budget](../frontend/startup-budget.md).
+This page records what loading renderer implementations on first use changed in the renderer and
+terminal client startup graphs, and what a real desktop session showed. The figures are dated
+evidence. Don't edit them. The budget rules are in [startup budget](../frontend/startup-budget.md).
+Phase numbers below refer to the October 2026 performance programme. Its plans were deleted on
+October 9, 2026, and remain in git history.
 
 ## Setup
 

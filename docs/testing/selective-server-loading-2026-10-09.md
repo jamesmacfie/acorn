@@ -1,8 +1,9 @@
 # Selective server loading evidence, October 9, 2026
 
-This page records what performance phase 06 ([selective server loading](../future/performance/06-selective-server-loading.md))
-changed in the Node service's startup graph, and what a real desktop session showed. The figures are
-dated evidence. Don't edit them. The budget rules are in
+This page records what loading server routes and operations on first use changed in the Node
+service's startup graph, and what a real desktop session showed. The figures are dated evidence.
+Don't edit them. Phase numbers below refer to the October 2026 performance programme.
+Its plans were deleted on October 9, 2026, and remain in git history. The budget rules are in
 [startup budget](../frontend/startup-budget.md#the-node-service), and the helpers are in
 [load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use).
 

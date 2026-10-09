@@ -1,10 +1,11 @@
 # Production minification evidence, October 9, 2026
 
-This page records what performance phase 03 ([production minification](../future/performance/03-production-minification.md))
-changed in the Node service's startup graph, the staged desktop resources, and the service's boot
-time. The figures are dated evidence. Don't edit them. The budget rules are in
-[startup budget](../frontend/startup-budget.md#the-node-service), and the stack lookup is in
-[packaged stacks](../local-development/packaged-stacks.md#find-the-source-line).
+This page records what production minification changed in the Node service's startup graph, the
+staged desktop resources, and the service's boot time. The figures are dated evidence. Don't edit
+them. The budget rules are in [startup budget](../frontend/startup-budget.md#the-node-service), and
+the stack lookup is in [packaged stacks](../local-development/packaged-stacks.md#find-the-source-line).
+Phase numbers below refer to the October 2026 performance programme. Its plans were deleted on
+October 9, 2026, and remain in git history.
 
 ## Setup
 

@@ -27,7 +27,8 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 
 // `scripts` is the measured startup figure plus about 5%. 703,911 B on 2026-10-09, after the loaded
 // plugins' frame, chrome and worker hosts and the promotion modal moved behind their first use
-// (performance phase 05). The measurement before was 808,886 B, over the 775,000 B ceiling below.
+// (docs/testing/selective-renderer-loading-2026-10-09.md). The measurement before was 808,886 B, over
+// the 775,000 B ceiling below.
 // Before that, 726,109 B on 2026-10-02, after the compiled
 // plugin roster moved behind the first paint. Core registration stays eager and workspace restore
 // waits for the roster. The previous measurement was 862,188 B on 2026-10-01, after the security
@@ -48,7 +49,7 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 // imports, so a cut that only moves startup code into the roster saves nothing. 219,353 B on 2026-10-09,
 // down from 242,405 B, plus about 5%. Later that day, merging main added the Git plugin's pane model,
 // source, and commands, and the changes, workflows, and agents launch wiring: 232,231 B, plus about 5%.
-// Pane models are synchronous factories, so they register with the roster (performance phase 05).
+// Pane models are synchronous factories, so they register with the roster (docs/frontend/startup-budget.md).
 const limits = {
   // 2026-10-07: 768,478 B with workspace identity in the topbar and dropdown, under a 775,000 B
   // ceiling. Their shared validation, tile, and authenticated image resource are core chrome.

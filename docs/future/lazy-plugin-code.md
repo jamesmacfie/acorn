@@ -1,7 +1,6 @@
 # Load plugin code on first use
 
-Date: October 6, 2026. Status: implemented October 9, 2026 by
-[Performance phase 06](./performance/06-selective-server-loading.md). No work remains on this page.
+Date: October 6, 2026. Status: implemented October 9, 2026. No work remains on this page.
 
 The helpers and the rules for using them are in
 [load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use). This page

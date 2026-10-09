@@ -1,9 +1,10 @@
 # Runtime packaging evidence, October 9, 2026
 
-This page records what performance phase 02 ([runtime packaging](../future/performance/02-runtime-packaging.md))
-removed from the desktop's staged runtime dependencies and from a standalone Node's install. The
-figures are dated evidence. Don't edit them. The policy itself is in
-[build and packaging](../shell/packaging.md#runtime-file-policy).
+This page records what the October 2026 runtime packaging work removed from the desktop's staged
+runtime dependencies and from a standalone Node's install. The figures are dated evidence. Don't
+edit them. The policy itself is in [build and packaging](../shell/packaging.md#runtime-file-policy).
+Phase numbers below refer to the October 2026 performance programme. Its plans were deleted on
+October 9, 2026, and remain in git history.
 
 ## Setup
 

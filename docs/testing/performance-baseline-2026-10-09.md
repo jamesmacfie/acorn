@@ -1,8 +1,9 @@
 # Performance baseline, October 9, 2026
 
-This page records the startup and size baseline taken at the start of performance phase 01
-([measurements](../future/performance/01-measurements-and-sentry.md)). Later phases compare against
-it. The figures are dated evidence. Don't edit them.
+This page records the startup and size baseline taken before the October 2026 startup and size
+work. Later evidence pages compare against it. The figures are dated evidence. Don't edit them.
+Phase numbers below refer to the October 2026 performance programme. Its plans were deleted on
+October 9, 2026, and remain in git history.
 
 ## Setup
 
