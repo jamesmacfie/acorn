@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { createReadStream } from 'node:fs'
-import { chmod, lstat, mkdir, mkdtemp, opendir, readFile, readlink, realpath, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, lstat, mkdir, mkdtemp, opendir, readlink, realpath, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 const REGISTRY = 'https://registry.npmjs.org/'
@@ -10,6 +10,11 @@ const DEADLINE_MS = 120_000
 const MAX_OUTPUT = 32_768
 const MAX_BYTES = 256 * 1024 * 1024
 const MAX_FILES = 12_000
+const MAX_ENTRIES = 20_000
+const MAX_DEPTH = 32
+const MAX_LOCK_BYTES = 4 * 1024 * 1024
+const MAX_MANIFEST_BYTES = 256 * 1024
+const MAX_BIN_BYTES = 64 * 1024 * 1024
 const EXACT = /^(?:@([a-z0-9][a-z0-9._-]*)\/)?([a-z0-9][a-z0-9._-]*)@([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)$/
 
 export type McpPackageCoordinate = { name: string; version: string }
@@ -71,15 +76,17 @@ function inside(root: string, path: string): boolean {
 
 async function sizeOfTree(root: string): Promise<void> {
   let files = 0
+  let totalEntries = 0
   let bytes = 0
-  const pending = [root]
+  const pending: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }]
   while (pending.length) {
-    const dir = pending.pop()!
+    const { dir, depth } = pending.pop()!
     const entries = await readdir(dir, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
       if (error.code === 'ENOENT') return []
       throw error
     })
     for (const entry of entries) {
+      if (++totalEntries > MAX_ENTRIES) throw new Error('The package exceeds the entry limit.')
       const path = join(dir, entry.name)
       const detail = await lstat(path).catch((error: NodeJS.ErrnoException) => {
         if (error.code === 'ENOENT') return null
@@ -87,7 +94,10 @@ async function sizeOfTree(root: string): Promise<void> {
       })
       if (!detail) continue // npm may rename a temporary cache entry while the monitor walks it.
       if (detail.isSymbolicLink()) continue
-      if (detail.isDirectory()) pending.push(path)
+      if (detail.isDirectory()) {
+        if (depth >= MAX_DEPTH) throw new Error('The package exceeds the directory depth limit.')
+        pending.push({ dir: path, depth: depth + 1 })
+      }
       else if (detail.isFile()) { files++; bytes += detail.size }
       else throw new Error('The package created a special file.')
       if (files > MAX_FILES || bytes > MAX_BYTES) throw new Error('The package exceeds the file or byte limit.')
@@ -99,10 +109,12 @@ export async function mcpTreeDigest(root: string, signal?: AbortSignal): Promise
   const canonicalRoot = await realpath(root)
   const digest = createHash('sha256')
   let files = 0
+  let entries = 0
   let bytes = 0
-  const walk = async (dir: string) => {
+  const walk = async (dir: string, depth: number) => {
     for (const entry of (await readdir(dir, { withFileTypes: true })).sort((a, b) => a.name.localeCompare(b.name))) {
       signal?.throwIfAborted()
+      if (++entries > MAX_ENTRIES) throw new Error('The package exceeds the entry limit.')
       const path = join(dir, entry.name)
       const detail = await lstat(path)
       const rel = relative(canonicalRoot, path)
@@ -112,26 +124,59 @@ export async function mcpTreeDigest(root: string, signal?: AbortSignal): Promise
         if (!inside(canonicalRoot, target)) throw new Error('An installed link escapes the private tree.')
         digest.update(JSON.stringify(['link', rel, await readlink(path)]))
       } else if (detail.isDirectory()) {
+        if (depth >= MAX_DEPTH) throw new Error('The package exceeds the directory depth limit.')
         digest.update(JSON.stringify(['dir', rel]))
-        await walk(path)
+        await walk(path, depth + 1)
       } else if (detail.isFile()) {
         files++; bytes += detail.size
         if (files > MAX_FILES || bytes > MAX_BYTES) throw new Error('The package exceeds its file or byte limit.')
         digest.update(JSON.stringify(['file', rel, detail.size]))
-        for await (const chunk of createReadStream(path)) { signal?.throwIfAborted(); digest.update(chunk as Buffer) }
+        let actualBytes = 0
+        for await (const chunk of createReadStream(path)) {
+          signal?.throwIfAborted()
+          actualBytes += (chunk as Buffer).byteLength
+          if (actualBytes > MAX_BYTES || bytes - detail.size + actualBytes > MAX_BYTES) throw new Error('The package exceeds its actual byte limit.')
+          digest.update(chunk as Buffer)
+        }
+        if (actualBytes !== detail.size) throw new Error('An installed file changed while it was being verified.')
       } else throw new Error('The package contains a special file.')
     }
   }
-  await walk(canonicalRoot)
+  await walk(canonicalRoot, 0)
   return digest.digest('hex')
 }
 
 export async function mcpRuntimeIdentity(signal?: AbortSignal): Promise<string> {
   const executable = await stat(process.execPath)
   if (!executable.isFile() || executable.size > 300 * 1024 * 1024) throw new Error('The Node runtime is too large to verify.')
-  const digest = createHash('sha256')
-  for await (const chunk of createReadStream(process.execPath)) { signal?.throwIfAborted(); digest.update(chunk as Buffer) }
-  return `${process.platform}/${process.arch}/${process.version}/${digest.digest('hex')}`
+  return `${process.platform}/${process.arch}/${process.version}/${(await mcpFileDigest(process.execPath, 300 * 1024 * 1024, signal)).digest}`
+}
+
+async function boundedFile(path: string, limit: number, signal?: AbortSignal): Promise<Buffer> {
+  const chunks: Buffer[] = []
+  let bytes = 0
+  for await (const chunk of createReadStream(path)) {
+    signal?.throwIfAborted()
+    bytes += (chunk as Buffer).byteLength
+    if (bytes > limit) throw new Error('An MCP package file exceeds its byte limit.')
+    chunks.push(chunk as Buffer)
+  }
+  return Buffer.concat(chunks, bytes)
+}
+
+export async function mcpFileDigest(path: string, limit: number, signal?: AbortSignal): Promise<{ digest: string; prefix: string }> {
+  const hash = createHash('sha256')
+  let bytes = 0
+  let prefix = Buffer.alloc(0)
+  for await (const chunk of createReadStream(path)) {
+    signal?.throwIfAborted()
+    const part = chunk as Buffer
+    bytes += part.byteLength
+    if (bytes > limit) throw new Error('An MCP executable exceeds its byte limit.')
+    if (prefix.byteLength < 64) prefix = Buffer.concat([prefix, part.subarray(0, 64 - prefix.byteLength)])
+    hash.update(part)
+  }
+  return { digest: hash.digest('hex'), prefix: prefix.toString('utf8') }
 }
 
 async function npm(npmPath: string, args: string[], cwd: string, signal: AbortSignal): Promise<string> {
@@ -143,7 +188,11 @@ async function npm(npmPath: string, args: string[], cwd: string, signal: AbortSi
   const abort = () => controller.abort(signal.reason)
   signal.addEventListener('abort', abort, { once: true })
   const timer = setTimeout(() => controller.abort(new Error('npm exceeded its two-minute deadline.')), DEADLINE_MS)
-  const monitor = setInterval(() => { void sizeOfTree(cwd).catch((error) => controller.abort(error)) }, 500)
+  let monitorWork: Promise<void> | null = null
+  const monitor = setInterval(() => {
+    if (monitorWork) return
+    monitorWork = sizeOfTree(cwd).catch((error) => controller.abort(error)).finally(() => { monitorWork = null })
+  }, 500)
   let output = ''
   try {
     const child = spawn(npmPath.endsWith('.js') ? process.execPath : npmPath, npmPath.endsWith('.js') ? [npmPath, ...args] : args, {
@@ -169,10 +218,12 @@ async function npm(npmPath: string, args: string[], cwd: string, signal: AbortSi
     if (controller.signal.aborted) throw controller.signal.reason
     if (exit !== 0) throw new Error(`npm failed: ${output.slice(-2_000)}`)
     await sizeOfTree(cwd)
+    if (controller.signal.aborted) throw controller.signal.reason
     return output
   } finally {
     clearTimeout(timer)
     clearInterval(monitor)
+    if (monitorWork) await monitorWork
     signal.removeEventListener('abort', abort)
   }
 }
@@ -192,10 +243,11 @@ function graphFromLock(lock: Lock): McpPackageGraphEntry[] {
   })
 }
 
-async function verifyInstalledGraph(staging: string, lock: Lock): Promise<void> {
+async function verifyInstalledGraph(staging: string, lock: Lock, signal: AbortSignal): Promise<void> {
   const root = await realpath(staging)
   const packages = lock.packages ?? {}
   for (const [path, record] of Object.entries(packages)) {
+    signal.throwIfAborted()
     if (!path) continue
     const location = resolve(root, path)
     if (!inside(root, location) || !path.includes('node_modules/')) throw new Error('The package lock names a path outside the installation.')
@@ -205,7 +257,7 @@ async function verifyInstalledGraph(staging: string, lock: Lock): Promise<void> 
     })
     if (!actual) continue
     if (!inside(root, actual)) throw new Error('An installed package escapes the private tree.')
-    const manifest = JSON.parse(await readFile(join(actual, 'package.json'), 'utf8')) as { name?: string; version?: string }
+    const manifest = JSON.parse((await boundedFile(join(actual, 'package.json'), MAX_MANIFEST_BYTES, signal)).toString('utf8')) as { name?: string; version?: string }
     const expectedName = record.name ?? path.slice(path.lastIndexOf('node_modules/') + 'node_modules/'.length)
     if (manifest.name !== expectedName || manifest.version !== record.version) throw new Error(`Installed package ${expectedName} differs from its frozen lock entry.`)
   }
@@ -249,8 +301,7 @@ export class McpPackageInstaller {
       await writeFile(join(stagingPath, 'package.json'), JSON.stringify({ name: 'acorn-managed-mcp', private: true, version: '1.0.0', dependencies: { [coordinate.name]: coordinate.version } }), { mode: 0o600 })
       const before = new Date(Date.now() - AGE_MS).toISOString()
       await npm(this.#npmPath, ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', ...(exceptions.length ? [] : [`--before=${before}`])], stagingPath, activeSignal)
-      const lockBytes = await readFile(join(stagingPath, 'package-lock.json'))
-      if (lockBytes.byteLength > 4 * 1024 * 1024) throw new Error('The lockfile is too large.')
+      const lockBytes = await boundedFile(join(stagingPath, 'package-lock.json'), MAX_LOCK_BYTES, activeSignal)
       const graph = graphFromLock(JSON.parse(lockBytes.toString('utf8')) as Lock)
       // npm's --before is a resolver filter, but the lock is the authority we activate. Check every
       // resolved version against the registry's publication record, including transitive copies.
@@ -280,12 +331,12 @@ export class McpPackageInstaller {
       if (rejected) throw rejected.reason
       for (const key of exceptionsByCoordinate.keys()) if (!usedExceptions.has(key)) throw new Error(`The exception for ${key} was not needed by this graph.`)
       await npm(this.#npmPath, ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], stagingPath, activeSignal)
-      if (createHash('sha256').update(await readFile(join(stagingPath, 'package-lock.json'))).digest('hex') !== createHash('sha256').update(lockBytes).digest('hex')) {
+      if (createHash('sha256').update(await boundedFile(join(stagingPath, 'package-lock.json'), MAX_LOCK_BYTES, activeSignal)).digest('hex') !== createHash('sha256').update(lockBytes).digest('hex')) {
         throw new Error('The frozen package lock changed during installation.')
       }
-      await verifyInstalledGraph(stagingPath, JSON.parse(lockBytes.toString('utf8')) as Lock)
+      await verifyInstalledGraph(stagingPath, JSON.parse(lockBytes.toString('utf8')) as Lock, activeSignal)
       const packageRoot = join(stagingPath, 'node_modules', coordinate.name)
-      const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')) as { name?: string; version?: string; bin?: unknown; scripts?: unknown }
+      const manifest = JSON.parse((await boundedFile(join(packageRoot, 'package.json'), MAX_MANIFEST_BYTES, activeSignal)).toString('utf8')) as { name?: string; version?: string; bin?: unknown; scripts?: unknown }
       if (manifest.name !== coordinate.name || manifest.version !== coordinate.version) throw new Error('The installed package differs from the requested version.')
       const bins = declaredBins(coordinate.name, manifest.bin)
       if (!Object.keys(bins).length) throw new Error('This package declares no executable.')
@@ -304,7 +355,7 @@ export class McpPackageInstaller {
 
   async activate(plan: McpPackagePlan, bin: string, signal: AbortSignal): Promise<McpInstalledPackage> {
     signal.throwIfAborted()
-    const { relativeEntry, entryDigest } = await this.preview(plan, bin)
+    const { relativeEntry, entryDigest } = await this.preview(plan, bin, signal)
     signal.throwIfAborted()
     const installationId = randomUUID()
     const root = join(this.#root, `${plan.lockDigest}-${installationId}`)
@@ -312,28 +363,35 @@ export class McpPackageInstaller {
     return { coordinate: plan.coordinate, graph: plan.graph, bins: plan.bins, lockDigest: plan.lockDigest, treeDigest: plan.treeDigest, registry: plan.registry, runtime: plan.runtime, policyVersion: plan.policyVersion, installer: plan.installer, exceptions: plan.exceptions, root, installationId, bin, entry: join(root, relativeEntry), entryDigest }
   }
 
-  async preview(plan: McpPackagePlan, bin: string): Promise<{ entry: string; relativeEntry: string; entryDigest: string }> {
+  async preview(plan: McpPackagePlan, bin: string, signal?: AbortSignal): Promise<{ entry: string; relativeEntry: string; entryDigest: string }> {
+    signal?.throwIfAborted()
     if (!plan.bins.includes(bin) || !inside(this.#root, plan.stagingPath) || !plan.stagingPath.startsWith(join(this.#root, 'staging-'))) throw new Error('The staged package or binary choice is invalid.')
     const packageRoot = join(plan.stagingPath, 'node_modules', plan.coordinate.name)
-    const lockBytes = await readFile(join(plan.stagingPath, 'package-lock.json'))
+    const lockBytes = await boundedFile(join(plan.stagingPath, 'package-lock.json'), MAX_LOCK_BYTES, signal)
     if (createHash('sha256').update(lockBytes).digest('hex') !== plan.lockDigest) throw new Error('The staged lockfile changed before activation.')
-    if (await mcpTreeDigest(plan.stagingPath) !== plan.treeDigest) throw new Error('The staged package bytes changed after installation or test.')
-    const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8')) as { bin?: unknown }
+    if (await mcpTreeDigest(plan.stagingPath, signal) !== plan.treeDigest) throw new Error('The staged package bytes changed after installation or test.')
+    const manifest = JSON.parse((await boundedFile(join(packageRoot, 'package.json'), MAX_MANIFEST_BYTES, signal)).toString('utf8')) as { bin?: unknown }
     const path = declaredBins(plan.coordinate.name, manifest.bin)[bin]
     if (!path) throw new Error('The selected executable disappeared.')
     if (!inside(packageRoot, resolve(packageRoot, path))) throw new Error('The executable escapes its installed package.')
     const stagingCanonical = await realpath(plan.stagingPath)
     const entry = await realpath(resolve(packageRoot, path))
     if (!inside(await realpath(packageRoot), entry)) throw new Error('The executable escapes its installed package.')
-    const bytes = await readFile(entry)
-    if (!bytes.subarray(0, 64).toString('utf8').startsWith('#!/usr/bin/env node') && !bytes.subarray(0, 64).toString('utf8').startsWith('#!/usr/bin/node')) {
+    const { digest: entryDigest, prefix } = await mcpFileDigest(entry, MAX_BIN_BYTES, signal)
+    if (!prefix.startsWith('#!/usr/bin/env node') && !prefix.startsWith('#!/usr/bin/node')) {
       throw new Error('The selected executable must be a Node script with a Node shebang. Install scripts are unavailable.')
     }
-    return { entry, relativeEntry: relative(stagingCanonical, entry), entryDigest: createHash('sha256').update(bytes).digest('hex') }
+    return { entry, relativeEntry: relative(stagingCanonical, entry), entryDigest }
   }
 
   async discard(plan: McpPackagePlan): Promise<void> {
     if (inside(this.#root, plan.stagingPath) && plan.stagingPath.startsWith(join(this.#root, 'staging-'))) await rm(plan.stagingPath, { recursive: true, force: true })
+  }
+
+  async discardUnselected(installed: McpInstalledPackage): Promise<void> {
+    if (!inside(this.#root, installed.root) || installed.root !== join(this.#root, `${installed.lockDigest}-${installed.installationId}`)) return
+    await sizeOfTree(installed.root)
+    await rm(installed.root, { recursive: true, force: true })
   }
 
   async cleanOrphans(selected: ReadonlySet<string>): Promise<void> {
@@ -346,7 +404,11 @@ export class McpPackageInstaller {
       const path = join(this.#root, entry.name)
       if (!entry.isDirectory() || selected.has(path)) continue
       if (entry.name.startsWith('staging-') || /^[a-f0-9]{64}-[0-9a-f-]{36}$/.test(entry.name)) {
-        if (Date.now() - (await stat(path)).mtimeMs > 24 * 60 * 60 * 1000) { await rm(path, { recursive: true, force: true }); removed++ }
+        if (Date.now() - (await stat(path)).mtimeMs > 24 * 60 * 60 * 1000) {
+          // A later mutation must not turn background cleanup into an unbounded tree walk.
+          try { await sizeOfTree(path) } catch { continue }
+          await rm(path, { recursive: true, force: true }); removed++
+        }
       }
     }
   }

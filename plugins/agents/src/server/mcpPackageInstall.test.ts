@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { checkedMcpPublication, exactMcpPackage, McpPackageInstaller, mcpTreeDigest, type McpPackagePlan } from './mcpPackageInstall'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { checkedMcpPublication, exactMcpPackage, McpPackageInstaller, mcpTreeDigest, trustedNpmCli, type McpPackagePlan } from './mcpPackageInstall'
 
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
@@ -28,6 +29,104 @@ async function staged(): Promise<{ installer: McpPackageInstaller; plan: McpPack
 }
 
 describe('exact managed MCP packages', () => {
+  async function fakeNpm(childScript: boolean, recentChild: boolean, holdCi = false) {
+    const root = await mkdtemp(join(tmpdir(), 'acorn-managed-npm-'))
+    roots.push(root)
+    const cli = join(root, 'npm-cli.js')
+    const log = join(root, 'calls.txt')
+    const canary = join(root, 'canary')
+    const ciStarted = join(root, 'ci-started')
+    await writeFile(cli, [
+      `const fs = require('node:fs')`,
+      `const path = require('node:path')`,
+      `const log = ${JSON.stringify(log)}`,
+      `fs.appendFileSync(log, JSON.stringify(process.argv.slice(2)) + '\\n')`,
+      `const [action, name] = process.argv.slice(2)`,
+      `const registry = 'https://registry.npmjs.org/'`,
+      `if (action === 'install') fs.writeFileSync('package-lock.json', JSON.stringify({ lockfileVersion: 3, packages: {`,
+      `  '': { name: 'acorn-managed-mcp', version: '1.0.0' },`,
+      `  'node_modules/fixture': { version: '1.0.0', integrity: 'sha512-fixture', resolved: registry + 'fixture/-/fixture-1.0.0.tgz' },`,
+      `  'node_modules/child': { version: '1.0.0', integrity: 'sha512-child', resolved: registry + 'child/-/child-1.0.0.tgz', hasInstallScript: ${childScript} }`,
+      `} }))`,
+      `if (action === 'view') process.stdout.write(JSON.stringify(name === 'child' && ${recentChild} ? new Date().toISOString() : '2020-01-01T00:00:00.000Z'))`,
+      `if (action === 'ci') {`,
+      ...(holdCi ? [`  fs.writeFileSync(${JSON.stringify(ciStarted)}, '')`, `  setInterval(() => {}, 1000)`] : []),
+      `  if (!process.argv.includes('--ignore-scripts')) fs.writeFileSync(${JSON.stringify(canary)}, 'ran')`,
+      `  for (const name of ['fixture', 'child']) {`,
+      `    const dir = path.join('node_modules', name); fs.mkdirSync(dir, { recursive: true })`,
+      `    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name, version: '1.0.0', ...(name === 'fixture' ? { bin: { fixture: 'bin.mjs' } } : {}) }))`,
+      `  }`,
+      `  fs.writeFileSync('node_modules/fixture/bin.mjs', '#!/usr/bin/env node\\n')`,
+      `}`,
+    ].join('\n'))
+    return { root, cli, log, canary, ciStarted }
+  }
+
+  it('passes script suppression to resolution and frozen install without running a canary', async () => {
+    const { root, cli, log, canary } = await fakeNpm(false, false)
+    const installer = new McpPackageInstaller(join(root, 'installs'), cli)
+    const plan = await installer.plan('fixture@1.0.0', [], new AbortController().signal)
+    const calls = (await readFile(log, 'utf8')).trim().split('\n').map((line) => JSON.parse(line) as string[])
+    expect(calls.filter(([action]) => action === 'install' || action === 'ci')).toEqual([
+      expect.arrayContaining(['install', '--package-lock-only', '--ignore-scripts']),
+      expect.arrayContaining(['ci', '--ignore-scripts']),
+    ])
+    await expect(readFile(canary)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(plan.graph.map((entry) => entry.name)).toEqual(['fixture', 'child'])
+  })
+
+  it('refuses a transitive script or recent transitive publication before frozen installation', async () => {
+    for (const [script, recent, message] of [[true, false, 'install script'], [false, true, 'within seven days']] as const) {
+      const { root, cli, log, canary } = await fakeNpm(script, recent)
+      const installer = new McpPackageInstaller(join(root, 'installs'), cli)
+      await expect(installer.plan('fixture@1.0.0', [], new AbortController().signal)).rejects.toThrow(message)
+      const calls = (await readFile(log, 'utf8')).trim().split('\n').map((line) => JSON.parse(line) as string[])
+      expect(calls.some(([action]) => action === 'ci')).toBe(false)
+      await expect(readFile(canary)).rejects.toMatchObject({ code: 'ENOENT' })
+    }
+  })
+
+  it('uses npm ci as the archive integrity authority and rejects a tampered frozen lock', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'acorn-npm-integrity-'))
+    roots.push(root)
+    const source = join(root, 'source')
+    const target = join(root, 'target')
+    const canary = join(root, 'install-script-ran')
+    await mkdir(source); await mkdir(target)
+    await writeFile(join(source, 'package.json'), JSON.stringify({ name: 'fixture', version: '1.0.0', scripts: { install: 'node install.js' } }))
+    await writeFile(join(source, 'index.js'), 'module.exports = true\n')
+    await writeFile(join(source, 'install.js'), "require('node:fs').writeFileSync(process.env.CANARY_PATH, 'ran')\n")
+    const npmPath = await trustedNpmCli()
+    const npm = (cwd: string, args: string[]) => spawnSync(process.execPath, [npmPath, ...args], {
+      cwd, encoding: 'utf8', timeout: 30_000,
+      env: { PATH: process.env.PATH ?? '', HOME: root, CANARY_PATH: canary, npm_config_cache: join(root, 'cache'), npm_config_update_notifier: 'false' },
+    })
+    expect(npm(source, ['pack', '--pack-destination', root, '--ignore-scripts', '--offline']).status).toBe(0)
+    const archive = join(root, 'fixture-1.0.0.tgz')
+    await writeFile(join(target, 'package.json'), JSON.stringify({ name: 'test-install', version: '1.0.0', dependencies: { fixture: `file:${archive}` } }))
+    expect(npm(target, ['install', '--package-lock-only', '--ignore-scripts', '--offline']).status).toBe(0)
+    await expect(access(canary)).rejects.toMatchObject({ code: 'ENOENT' })
+    expect(npm(target, ['ci', '--ignore-scripts', '--offline']).status).toBe(0)
+    await expect(access(canary)).rejects.toMatchObject({ code: 'ENOENT' })
+    const lock = JSON.parse(await readFile(join(target, 'package-lock.json'), 'utf8')) as { packages: Record<string, { integrity?: string }> }
+    lock.packages['node_modules/fixture']!.integrity = `sha512-${Buffer.alloc(64).toString('base64')}`
+    await writeFile(join(target, 'package-lock.json'), JSON.stringify(lock))
+    const frozen = npm(target, ['ci', '--ignore-scripts', '--offline'])
+    expect(frozen.status).not.toBe(0)
+    expect(`${frozen.stdout}${frozen.stderr}`).toMatch(/integrity|checksum/i)
+  })
+
+  it('cancels frozen installation and removes its private staging tree', async () => {
+    const { root, cli, ciStarted } = await fakeNpm(false, false, true)
+    const installRoot = join(root, 'installs')
+    const installer = new McpPackageInstaller(installRoot, cli)
+    const controller = new AbortController()
+    const plan = installer.plan('fixture@1.0.0', [], controller.signal)
+    await vi.waitFor(() => expect(access(ciStarted)).resolves.toBeUndefined())
+    controller.abort(new Error('device cancelled'))
+    await expect(plan).rejects.toThrow('device cancelled')
+    expect(await readdir(installRoot)).toEqual([])
+  })
   it('accepts exact npm versions and refuses moving or non-registry sources', () => {
     expect(exactMcpPackage('@fixture/server@1.2.3')).toEqual({ name: '@fixture/server', version: '1.2.3' })
     for (const coordinate of ['server@latest', 'server@^1.2.3', 'server@1.2', 'server@git+https://example.test/x', 'https://example.test/x.tgz']) {

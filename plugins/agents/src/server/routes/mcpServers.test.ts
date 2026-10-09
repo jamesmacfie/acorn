@@ -61,6 +61,23 @@ describe('Settings → MCP servers routes', () => {
     expect(calls).toEqual([])
   })
 
+  it.each([
+    ['service', { kind: 'internal', userId: 'james', scope: 'service' }],
+    ['plugin frame', { kind: 'plugin', pluginId: 'fixture', userId: 'james' }],
+  ])('refuses managed installation and catalogue approval to a %s caller', async (_label, principal) => {
+    const calls: string[] = []
+    setAgentMcpServersBridge(bridge(calls))
+    const app = as(principal)
+    for (const [path, method, body] of [
+      ['/api/agents/mcp-servers/package-plan', 'POST', { coordinate: 'fixture@1.0.0', targetName: 'fixture', expectedRevision: null, exceptions: [] }],
+      ['/api/agents/mcp-servers/package-plan/96de4913-9027-4eaa-987f-6475ec264c94/test', 'POST', { name: 'fixture', bin: 'fixture' }],
+      ['/api/agents/mcp-servers/fixture/package-activate', 'POST', { planId: '96de4913-9027-4eaa-987f-6475ec264c94', bin: 'fixture', enabled: true }],
+      ['/api/agents/mcp-servers/fixture/test', 'POST', undefined],
+      ['/api/agents/mcp-servers/fixture/review', 'POST', { sessionId: 'session', revision: 'a'.repeat(64), digest: 'b'.repeat(64) }],
+    ] as const) expect((await app.fetch(request(path, method, body), {} as Env)).status).toBe(403)
+    expect(calls).toEqual([])
+  })
+
   it('validates the name and the body at the boundary', async () => {
     const calls: string[] = []
     setAgentMcpServersBridge(bridge(calls))

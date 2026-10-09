@@ -12,7 +12,7 @@ export function presentMcpTools(tools: Record<string, unknown>[], secrets: reado
       return text
     }
     if (Array.isArray(value)) return value.map(redact)
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redact(item)]))
+    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [redact(key) as string, redact(item)]))
     return value
   }
   return tools.map((tool) => redact(tool) as Record<string, unknown>)
@@ -31,7 +31,7 @@ export function mcpReviewFindings(tools: Record<string, unknown>[]): McpReviewFi
         if (phrases.test(value)) findings.push({ tool: name, category: 'instruction', detail: 'Instruction override language' })
         if (paths.test(value)) findings.push({ tool: name, category: 'sensitive-path', detail: 'Sensitive path or credential reference' })
       } else if (Array.isArray(value)) value.forEach(visit)
-      else if (value && typeof value === 'object') Object.values(value).forEach(visit)
+      else if (value && typeof value === 'object') Object.entries(value).forEach(([key, item]) => { visit(key); visit(item) })
     }
     visit(tool)
   }

@@ -6,7 +6,7 @@
 // included, ever sees one.
 import { and, asc, eq } from 'drizzle-orm'
 import { createHash } from 'node:crypto'
-import { readFile, realpath } from 'node:fs/promises'
+import { realpath } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import type { PluginDatabase, SecretService } from '@acorn/plugin-api/node'
 import * as schema from '../node/schema'
@@ -86,6 +86,17 @@ export class AgentMcpServerStore {
   readonly #db: PluginDatabase
   readonly #secrets: SecretService
   readonly #managedRoot: string | undefined
+  readonly #activeManagedRoots = new Set<ReadonlySet<string>>()
+
+  holdManagedRoots(roots: readonly string[]): () => void {
+    const held = new Set(roots)
+    this.#activeManagedRoots.add(held)
+    return () => { this.#activeManagedRoots.delete(held) }
+  }
+
+  activeManagedRoots(): ReadonlySet<string> {
+    return new Set([...this.#activeManagedRoots].flatMap((roots) => [...roots]))
+  }
 
   constructor(db: PluginDatabase, secrets: SecretService, managedRoot?: string) {
     this.#db = db
@@ -199,9 +210,19 @@ export class AgentMcpServerStore {
     return publicServer(row, config)
   }
 
+  async revokeCatalogue(name: string, revision: string, digest: string): Promise<void> {
+    const row = await this.#row(name)
+    const config = row && storedConfig(row)
+    if (!row || !config || config.approvedCatalogue?.revision !== revision || config.approvedCatalogue.digest !== digest) return
+    delete config.approvedCatalogue
+    await this.#db.update(schema.agentMcpServers).set({ configJson: JSON.stringify(config) })
+      .where(and(eq(schema.agentMcpServers.name, name), eq(schema.agentMcpServers.configJson, row.configJson)))
+  }
+
   /** The package was fully installed and checked before this row is changed. A failed save leaves the
    *  previous row selected; the unreferenced package is removed by the bounded orphan sweep. */
-  async saveManaged(name: string, installed: McpInstalledPackage, values: AgentMcpServerInput['values'], enabled: boolean, expectedRevision: string | null): Promise<AgentMcpServer> {
+  async saveManaged(name: string, installed: McpInstalledPackage, values: AgentMcpServerInput['values'], enabled: boolean, expectedRevision: string | null, signal?: AbortSignal): Promise<AgentMcpServer> {
+    signal?.throwIfAborted()
     const before = await this.#row(name)
     const beforeConfig = before && storedConfig(before)
     if ((before && (!beforeConfig || configRevision(beforeConfig, before.enabled) !== expectedRevision)) || (!before && expectedRevision !== null)) {
@@ -235,6 +256,7 @@ export class AgentMcpServerStore {
     }
     // The activation route is the device's explicit consent to this exact staged graph and binary.
     config.consentRevision = configRevision(config, enabled)
+    signal?.throwIfAborted()
     const now = Date.now()
     const changed = before
       ? await this.#db.update(schema.agentMcpServers).set({ configJson: JSON.stringify(config), enabled, updatedAt: now })
@@ -267,10 +289,11 @@ export class AgentMcpServerStore {
     names: readonly string[],
     purpose: string,
     signal?: AbortSignal,
-  ): Promise<{ servers: AgentDriverMcpServer[]; secrets: string[]; unavailable: string[]; revisions: Record<string, { revision: string; reviewTools: boolean }> }> {
+  ): Promise<{ servers: AgentDriverMcpServer[]; secrets: string[]; unavailable: string[]; managedRoots: string[]; revisions: Record<string, { revision: string; reviewTools: boolean }> }> {
     const servers: AgentDriverMcpServer[] = []
     const secrets: string[] = []
     const unavailable: string[] = []
+    const managedRoots: string[] = []
     const revisions: Record<string, { revision: string; reviewTools: boolean }> = {}
     for (const name of names) {
       signal?.throwIfAborted()
@@ -279,6 +302,7 @@ export class AgentMcpServerStore {
       const config = row && storedConfig(row)
       if (!config) continue
       if (config.consentRevision !== configRevision(config, row!.enabled)) { unavailable.push(name); continue }
+      let managedRoot: string | null = null
       if (config.managed) {
         try {
           if (!this.#managedRoot || config.command !== process.execPath || config.args.length !== 1) throw new Error('Invalid managed launch.')
@@ -290,8 +314,9 @@ export class AgentMcpServerStore {
           const entry = await realpath(config.args[0]!)
           const rel = relative(root, entry)
           if (!rel || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error('Managed executable escapes its installation.')
-          const digest = createHash('sha256').update(await readFile(entry)).digest('hex')
+          const digest = (await packageChecks.mcpFileDigest(entry, 64 * 1024 * 1024, signal)).digest
           if (digest !== config.managed.entryDigest) throw new Error('Managed executable changed after installation.')
+          managedRoot = root
         } catch { unavailable.push(name); continue }
       }
       const values: Record<string, string> = {}
@@ -313,6 +338,7 @@ export class AgentMcpServerStore {
         continue
       }
       secrets.push(...revealed)
+      if (managedRoot) managedRoots.push(managedRoot)
       revisions[name] = { revision: configRevision(config, row!.enabled), reviewTools: config.reviewTools === true }
       if (config.transport === 'stdio' && config.command) {
         servers.push({ transport: 'stdio', name, command: config.command, args: config.args, env: values })
@@ -320,7 +346,7 @@ export class AgentMcpServerStore {
         servers.push({ transport: 'http', name, url: config.url, headers: values })
       }
     }
-    return { servers, secrets, unavailable, revisions }
+    return { servers, secrets, unavailable, managedRoots, revisions }
   }
 
   async #row(name: string): Promise<Row | null> {

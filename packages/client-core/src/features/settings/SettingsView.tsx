@@ -10,7 +10,7 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { nodePlugins } from '../../infra/node/nodePlugins'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
-import { pluginRosterKnown } from '../../infra/node/hostCapabilities'
+import { activePluginNodeStale, pluginRosterKnown } from '../../infra/node/hostCapabilities'
 import { confirmAction } from '../../host/registries/shell/willPhase'
 import { buildSettingsIndex, searchSettings, type SettingsSearchObject, type SettingsSearchResult } from '../../host/registries/shell/settingsSearch'
 import {
@@ -192,6 +192,7 @@ export default function SettingsView(props: {
       return page && project ? { page, category: 'workspaces', name: project.name, project, ...(workspace ? { workspace } : {}) } : undefined
     }
     const page = railPages().find((candidate) => candidate.id === selected)
+      ?? (activePluginNodeStale() ? settingsRegistry.get(selected) : undefined)
     return page ? { page, category: settingsCategoryOf(page), name: page.title ?? page.label } : undefined
   })
 

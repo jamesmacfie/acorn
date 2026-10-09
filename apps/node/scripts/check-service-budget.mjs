@@ -84,7 +84,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // and session review dispatch. measure:service-graph confirms mcpCatalogue.ts, the npm installer,
 // probe, and review transport are outside the static service graph. These registration and admission
 // paths are needed at boot. Leave 1,114 B of margin.
-const limits = { ceiling: 3_209_000, floor: 1_000_000 }
+// Phase 09 follow-up: 3,209,061 B after the managed-root lifetime lease and stale-approval
+// revocation joined the boot-owned MCP store. measure:service-graph confirms the installer,
+// catalogue, and proxy still load on first use. Move the ceiling by 1 KB, leaving 939 B.
+const limits = { ceiling: 3_210_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

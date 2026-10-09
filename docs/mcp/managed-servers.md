@@ -9,6 +9,8 @@ seven-day cutoff, and records SHA-512 archive integrity, the lock and installed 
 chosen binary, the Node runtime identity, and the installation policy version. A package with an
 install script is refused. An exact version lacking trustworthy publication evidence or younger than
 seven days needs an explicit reason, stored with the installation and recorded in the owner audit log.
+The registry lock and npm's frozen install provide archive integrity checks; Acorn verifies the
+installed files but does not independently verify each downloaded tarball.
 The staged binary must be tested and its graph and tools reviewed before activation. Updates keep the
 selected version if staging fails. The selected script runs directly with Node from private installed
 bytes; no package runner resolves it on session start. This pins inputs but does not sandbox runtime
@@ -30,3 +32,8 @@ Settings shows added, removed, and changed declarations with escaped text and re
 spans. A call already in flight cannot be undone. If the proxy cannot bind or the harness cannot use
 its HTTP declaration, the server is unavailable under review. Servers from personal harness config
 files remain outside Acorn's proxy.
+
+Installed Codex 0.159.2 keeps the initial empty tool list in an already-running thread after device
+approval. Start a new managed Codex session to use the approved catalogue. A later list change still
+refuses calls on the current connection until the device reviews it again. Event replay on a reviewed
+connection is unavailable; a reconnect starts a fresh reviewed connection.

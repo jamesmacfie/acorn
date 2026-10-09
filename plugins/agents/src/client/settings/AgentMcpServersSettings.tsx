@@ -1,5 +1,5 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { createSignal, For, Index, onCleanup, onMount, Show } from 'solid-js'
+import { createMemo, createSignal, For, Index, onCleanup, onMount, Show } from 'solid-js'
 import { createSettingSave, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Checkbox, CodeBlock, EmptyState, Field, Fold, Icon, IconButton, Inline, Input,
@@ -37,6 +37,15 @@ import {
 } from './mcpServerDraft'
 
 type TestState = { testing: true } | { testing: false; result: AgentMcpProbeResult }
+
+export function consentSource(server: AgentMcpServer): string {
+  if (server.managed) return `${server.managed.package}@${server.managed.version} (${server.managed.bin})`
+  if (server.transport === 'stdio') return `${server.command ?? 'Command'} (${server.args.length} arguments hidden)`
+  try {
+    const url = new URL(server.url ?? '')
+    return `${url.origin}/… (path and credentials hidden)`
+  } catch { return 'HTTP endpoint (address hidden)' }
+}
 
 // The one piece of the settings page context this page uses. Optional, so the page draws on its own
 // in a test.
@@ -93,8 +102,7 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
     const server = current().find((item) => item.name === name)
     if (!server) return
     if (!server.consented) {
-      const source = server.managed ? `${server.managed.package}@${server.managed.version} (${server.managed.bin})`
-        : server.transport === 'stdio' ? `${server.command} ${server.args.join(' ')}` : server.url ?? ''
+      const source = consentSource(server)
       const approved = await confirmAction({
         title: `Use ${name}`,
         actionLabel: 'Consent and test',
@@ -238,19 +246,21 @@ function stableMcpJson(value: unknown): string {
   return JSON.stringify(value)
 }
 
-function CatalogueReview(props: { review: AgentMcpPendingReview; onApproved: () => void }) {
+export function CatalogueReview(props: { review: AgentMcpPendingReview; onApproved: () => void }) {
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const before = new Map(props.review.previousTools.map((tool) => [String(tool.name), tool]))
-  const after = new Map(props.review.tools.map((tool) => [String(tool.name), tool]))
-  const changes = [
-    ...props.review.tools.flatMap((tool) => {
-      const name = String(tool.name)
-      const prior = before.get(name)
-      return !prior ? [{ name, status: 'Added', tool }] : stableMcpJson(prior) !== stableMcpJson(tool) ? [{ name, status: 'Changed', tool }] : []
-    }),
-    ...props.review.previousTools.flatMap((tool) => after.has(String(tool.name)) ? [] : [{ name: String(tool.name), status: 'Removed', tool }]),
-  ]
+  const changes = createMemo(() => {
+    const before = new Map(props.review.previousTools.map((tool) => [String(tool.name), tool]))
+    const after = new Map(props.review.tools.map((tool) => [String(tool.name), tool]))
+    return [
+      ...props.review.tools.flatMap((tool) => {
+        const name = String(tool.name)
+        const prior = before.get(name)
+        return !prior ? [{ name, status: 'Added', tool }] : stableMcpJson(prior) !== stableMcpJson(tool) ? [{ name, status: 'Changed', tool }] : []
+      }),
+      ...props.review.previousTools.flatMap((tool) => after.has(String(tool.name)) ? [] : [{ name: String(tool.name), status: 'Removed', tool }]),
+    ]
+  })
   const approve = async () => {
     setBusy(true); setError('')
     try { await approveAgentMcpReview(props.review); props.onApproved() }
@@ -262,12 +272,13 @@ function CatalogueReview(props: { review: AgentMcpPendingReview; onApproved: () 
     <Stack gap="stack">
       <Show when={error()}><Alert>{error()}</Alert></Show>
       <For each={props.review.findings}>{(finding) => <Alert tone="warn">{finding.tool}: {finding.detail} ({finding.category}). Review the declaration in context.</Alert>}</For>
-      <Show when={!changes.length}><Text>{props.review.previousTools.length ? 'A redacted field or tool ordering changed.' : `First review: ${props.review.tools.length} tools.`}</Text></Show>
-      <For each={changes}>{(change) => <Stack gap="stack">
+      <Show when={!changes().length}><Text>{props.review.previousTools.length ? 'A redacted field or tool ordering changed.' : `First review: ${props.review.tools.length} tools.`}</Text></Show>
+      <For each={changes()}>{(change) => <Stack gap="stack">
         <Text>{change.status}: {change.name}</Text>
         <CodeBlock wrap maxHeight="block">{JSON.stringify(change.tool, null, 2)}</CodeBlock>
       </Stack>}</For>
       <Button tone="accent" variant="solid" busy={busy()} onPress={() => void approve()}>Approve these tool definitions</Button>
+      <Text>Codex may keep its initial empty tool list after approval. Start a new managed session to use approved tools if they remain absent.</Text>
     </Stack>
   </SettingsSection>
 }
@@ -389,7 +400,7 @@ function ServerRow(props: {
     <>
       <SettingRow
         label={server().name}
-        description={server().transport === 'stdio' ? [server().command, ...server().args].join(' ') : server().url ?? undefined}
+        description={consentSource(server())}
         error={enabled.error()}
       >
         <Inline>

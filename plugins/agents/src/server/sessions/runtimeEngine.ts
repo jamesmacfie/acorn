@@ -682,6 +682,7 @@ export class ManagedAgentEngine {
   ): Promise<{ servers: AgentDriverMcpServer[]; unavailable: string[]; retire?: () => Promise<void> }> {
     const userMcp = await this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session', signal)
     signal.throwIfAborted()
+    const releaseManagedRoots = this.mcpServers.holdManagedRoots(userMcp.managedRoots)
     for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
     const servers: AgentDriverMcpServer[] = []
     const unavailable = [...userMcp.unavailable]
@@ -704,12 +705,16 @@ export class ManagedAgentEngine {
       signal.throwIfAborted()
     } catch (error) {
       if (this.mcpReviewsPromise) await (await this.mcpReviewsPromise).closeSession(session.id)
+      releaseManagedRoots()
       throw error
     }
     return {
       servers: [...acornMcpServers(this.mcp(), session, env), ...servers],
       unavailable,
-      retire: () => this.mcpReviewsPromise ? this.mcpReviewsPromise.then((manager) => manager.closeSession(session.id)) : Promise.resolve(),
+      retire: async () => {
+        try { if (this.mcpReviewsPromise) await (await this.mcpReviewsPromise).closeSession(session.id) }
+        finally { releaseManagedRoots() }
+      },
     }
   }
 

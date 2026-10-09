@@ -51,7 +51,7 @@ export class McpReviewManager {
       const proxy = this.#live.get(key)
       if (!proxy) continue
       const approved = await this.#store.approvedCatalogue(proxy.name, proxy.revision)
-      if (approved?.digest === catalogue.digest && approved.version === catalogue.version) continue
+      if (!proxy.needsApproval() && approved?.digest === catalogue.digest && approved.version === catalogue.version) continue
       const previous = await this.#store.previousCatalogue(proxy.name)
       const tools = presentMcpTools(catalogue.tools, this.#secrets())
       out.push({ name: proxy.name, sessionId: proxy.sessionId, revision: proxy.revision,
@@ -67,10 +67,14 @@ export class McpReviewManager {
   async approve(name: string, sessionId: string, revision: string, digest: string): Promise<AgentMcpServer> {
     const proxy = this.#live.get(`${sessionId}/${name}`)
     if (!proxy || proxy.revision !== revision) throw new Error('The MCP connection changed before approval.')
-    const catalogue = await proxy.catalogue()
+    const { catalogue, generation } = await proxy.approvalSnapshot()
     if (catalogue.digest !== digest) throw new Error('The MCP catalogue changed before approval.')
     const saved = await this.#store.approveCatalogue(name, revision, catalogue)
-    await proxy.announceApproval()
+    try { await proxy.announceApproval(generation, digest) }
+    catch (error) {
+      await this.#store.revokeCatalogue(name, revision, digest)
+      throw error
+    }
     return saved
   }
 

@@ -114,7 +114,7 @@ describe('managed startup generations', () => {
   })
 
   it('joins a held startup warning before closing storage', async () => {
-    vi.spyOn(engine.mcpServers, 'resolve').mockResolvedValue({ servers: [], secrets: [], unavailable: ['missing-server'], revisions: {} })
+    vi.spyOn(engine.mcpServers, 'resolve').mockResolvedValue({ servers: [], secrets: [], unavailable: ['missing-server'], managedRoots: [], revisions: {} })
     const held = deferred<void>()
     const record = engine.store.recordEvent.bind(engine.store)
     const writing = vi.spyOn(engine.store, 'recordEvent').mockImplementation(async (sessionId, turnId, event) => {
