@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { chunkBytes, readChunkGraph, staticClosure } from '../../../scripts/chunkGraph.mts'
 import { runtimeBinaryName, runtimeTarget, targetTriple } from './node-runtime.mjs'
 import { readRendererGraph } from './renderer-graph.mjs'
 
@@ -83,39 +84,11 @@ export function inventory(root, { skip = [], seen = new Set() } = {}) {
   return result
 }
 
-/**
- * The static closure of a `startup-graph.json` (apps/tui/startupGraph.ts, apps/node/vite.config.ts).
- * Stale when the graph names a chunk that is not on disk, or a chunk folder holds a script the graph
- * never saw, which is what a graph left over from an earlier build looks like. Only folders the graph
- * already uses are checked, because a worker bundle lands in its own folder and is not a chunk.
- */
+/** Bytes in the static closure of a `startup-graph.json`, read and checked by scripts/chunkGraph.mts. */
 export function graphStartupBytes(dist) {
-  const graph = JSON.parse(readFileSync(join(dist, 'startup-graph.json'), 'utf8'))
-  const named = new Set(Object.keys(graph.chunks))
-  const chunkFolders = new Set([...named].map((file) => dirname(file)).filter((folder) => folder !== '.'))
-  const onDisk = filesUnder(dist).map((path) => relative(dist, path).split(sep).join('/')).filter(isJavaScript)
-  const unknown = onDisk.filter((file) => chunkFolders.has(dirname(file)) && !named.has(file))
-  const absent = [...named].filter((file) => !existsSync(join(dist, file)))
-  if (unknown.length || absent.length || !named.has(graph.entry)) {
-    throw new Error(`${join(dist, 'startup-graph.json')} is stale: ${[
-      ...absent.map((file) => `names missing ${file}`),
-      ...unknown.map((file) => `does not name ${file}`),
-    ].join(', ') || `does not name its entry ${graph.entry}`}. Rebuild it.`)
-  }
-  const closure = new Set()
-  const visit = (file) => {
-    if (closure.has(file) || !graph.chunks[file]) return
-    closure.add(file)
-    for (const next of graph.chunks[file].imports) visit(next)
-  }
-  for (const root of graph.roots) visit(root)
-  return [...closure].reduce((sum, file) => sum + statSync(join(dist, file)).size, 0)
+  const graph = readChunkGraph(dist)
+  return chunkBytes(graph, staticClosure(graph))
 }
-
-const filesUnder = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-  const path = join(dir, entry.name)
-  return entry.isDirectory() ? filesUnder(path) : entry.isFile() ? [path] : []
-})
 
 async function rendererStartup(clientDir) {
   const graph = await readRendererGraph(clientDir)

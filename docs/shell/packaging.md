@@ -28,15 +28,19 @@ fails because node-pty's loader would choose it before a target prebuild. Stagin
 node-pty's `deps/`, `third_party/`, and `src/` folders. They're build inputs, including the Windows-only
 winpty and ConPTY sources, and the staged app never rebuilds the addon. A node-pty version or layout
 change requires review of the policy and its target fixtures.
-`apps/node/scripts/check-service-budget.mjs` runs after the Node build and fails it when `service.js`
-and its static imports pass a byte ceiling. Both builds write the license text of every bundled
+The Node build minifies with Oxc and keeps function and class names. It writes hidden source maps and
+a chunk graph, `startup-graph.json`, into `apps/node/dist`. Staging and the standalone tarball leave
+both out. `apps/node/scripts/check-service-budget.mjs` runs after the build and fails it when `service.js`
+and its static imports pass a byte ceiling. It reads the chunk graph, so formatting can't change what
+it counts. Both builds write the license text of every bundled
 package beside their output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`.
 
 Run `pnpm --filter @acorn/node measure:service-graph` to find what contributes to the boot graph.
 It builds into a temporary directory, reports rendered module bytes by npm package and workspace
 folder, and lists the 50 largest modules. Add `--why smol-toml`, or another path fragment, to print
 the shortest static import chain from the service entry. Dynamic imports stay outside the module
-total. The chunk total includes import lines and generated glue, so it matches the budget check.
+total. Module bytes are rendered source before minification. The chunk total is the emitted,
+minified files, so it matches the budget check.
 
 The helper's production bundle enables Oxc minification in `apps/desktop/vite.helper.config.ts`. On
 October 2, 2026, it measured 269,402 B.

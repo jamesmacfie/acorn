@@ -1,6 +1,5 @@
-import { readFileSync, statSync } from 'node:fs'
-import { builtinModules } from 'node:module'
-import { dirname, join, relative, resolve } from 'node:path'
+import { join, relative, resolve } from 'node:path'
+import { chunkBytes, externalSpecifiers, readChunkGraph, staticClosure } from '../../../scripts/chunkGraph.mts'
 
 // The node service's size budget, run after `vite build`: dist/service.js and every chunk it reaches
 // through static imports, which is what a cold node reads and evaluates before its first boot mark.
@@ -13,8 +12,10 @@ import { dirname, join, relative, resolve } from 'node:path'
 // inside the bundle (./externals.ts), because that made evaluation faster, not slower. So the bytes are
 // a tripwire, and the boot test's timing is the number to watch (apps/desktop/test/boot.test.ts).
 //
-// It also lists the bare imports the graph leaves for Node to resolve at run time, so a new one shows
-// up in the build output rather than as a missing package on somebody's machine.
+// The walk follows the chunk graph the build writes (scripts/chunkGraph.mts), never the text of the
+// chunks, so minified and formatted output count the same way, and the bytes are each file's size on
+// disk. It also lists the bare imports the graph leaves for Node to resolve at run time, so a new one
+// shows up in the build output rather than as a missing package on somebody's machine.
 
 const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
@@ -65,37 +66,20 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: command restart recovery adds event attribution checks, client read projection calls,
 // and lifecycle settlement calls. The command policy and reconciliation queries load on first use.
 // No dependency is added. Static graph: 3,179,747 B. Add 4 KB for the owning runtime's call sites.
-const limits = { ceiling: 3_181_000, floor: 1_000_000 }
+// 2026-10-09: the build minifies with Oxc and keeps function and class names (../vite.config.ts), and
+// this check reads the build's chunk graph instead of the chunk text. Every figure above is
+// unminified. The same graph went from 3,193,213 B to 1,824,878 B on macOS arm64; keeping names costs
+// about 122 KB of that. The new ceiling keeps about 2 KB of minified margin. A floor of 1 MB still
+// catches a walk that stops at service.js.
+const limits = { ceiling: 1_827_000, floor: 1_000_000 }
 
-const builtins = new Set(builtinModules)
-const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
-
-// Rolldown writes one import or re-export per line at the top of a chunk, with double quotes.
-const STATIC = /^(?:import|export)\b[^;]*?\bfrom\s*"([^"]+)"|^import\s*"([^"]+)"/gm
-const DYNAMIC = /\bimport\(\s*"([^"]+)"\s*\)/g
-
-const files = new Set()
-const staticBare = new Set()
-const lazyBare = new Set()
-const visit = (file) => {
-  if (files.has(file)) return
-  files.add(file)
-  const source = readFileSync(file, 'utf8')
-  for (const match of source.matchAll(STATIC)) {
-    const specifier = match[1] ?? match[2]
-    if (specifier.startsWith('.')) visit(resolve(dirname(file), specifier))
-    else if (!isBuiltin(specifier)) staticBare.add(specifier)
-  }
-  for (const [, specifier] of source.matchAll(DYNAMIC)) {
-    if (!specifier.startsWith('.') && !isBuiltin(specifier)) lazyBare.add(specifier)
-  }
-}
-visit(join(dist, 'service.js'))
-
-const bytes = [...files].reduce((total, file) => total + statSync(file).size, 0)
+const graph = readChunkGraph(dist)
+const files = staticClosure(graph)
+const bytes = chunkBytes(graph, files)
+const { atLoad, onFirstUse, required } = externalSpecifiers(graph, files)
 const list = (names) => (names.size ? [...names].sort().join(', ') : 'none')
-console.log(`[service-budget] ${relative(process.cwd(), join(dist, 'service.js'))} and ${files.size - 1} chunk(s): ${bytes}B (ceiling ${limits.ceiling}B)`)
-console.log(`[service-budget] resolved at run time: ${list(staticBare)}; on first use: ${list(lazyBare)}`)
+console.log(`[service-budget] ${relative(process.cwd(), join(dist, graph.entry))} and ${files.size - 1} chunk(s): ${bytes}B (ceiling ${limits.ceiling}B)`)
+console.log(`[service-budget] resolved at run time: ${list(atLoad)}; on first use: ${list(onFirstUse)}; through createRequire: ${list(required)}`)
 
 if (bytes > limits.ceiling) {
   throw new Error(

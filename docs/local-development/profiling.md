@@ -157,11 +157,14 @@ The report keeps four questions apart:
 
 Each file counts once, by device and inode. Symlinks aren't followed, and one that leaves its
 component is listed under `excluded`. Source maps and the report files are excluded by name. A graph
-file that names a chunk the build doesn't have, or misses one it does, fails the report as stale.
-Rebuild that runtime and run it again.
+file that names a chunk the build doesn't have, misses one it does, or records a size a file no longer
+has fails the report as stale. Rebuild that runtime and run it again. The size report, the service
+budget, and the standalone manifest check read graph files through one reader, `scripts/chunkGraph.mts`.
 
-The packaged Node sends the same numbers, and what it measures on disk, as byte gauges
-([shipped bytes](../telemetry/runtimes.md#shipped-bytes)).
+Startup bytes and startup time are separate measurements. On October 9, 2026, minification halved the
+Node service's static graph, and the service's time to listen didn't change measurably
+([production minification evidence](../testing/production-minification-2026-10-09.md)). Time a cold
+start before you claim a byte cut made one faster.
 
 ## Query startup and bytes in Sentry
 

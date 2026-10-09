@@ -1,10 +1,47 @@
 # Phase 03: Minify production JavaScript without weakening graph checks
 
-Date: October 9, 2026. Status: planned. Depends on: phase 01.
+Date: October 9, 2026. Status: implemented October 9, 2026. Depends on: phase 01.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Minify the Node service and loaded-plugin production bundles. Keep budget accounting independent
 of emitted import formatting, and retain useful diagnostics for packaged failures.
+
+## Outcome
+
+The service and both halves of every loaded-plugin package build with Oxc and `output.keepNames`.
+`scripts/chunkGraph.mts` writes each build's chunk graph and reads it for the service budget, the size
+report, and the standalone manifest check. The terminal client writes its graph with the same code.
+The owning references are [startup budget](../../frontend/startup-budget.md#the-node-service),
+[packaged stacks](../../local-development/packaged-stacks.md#find-the-source-line), and
+[build and packaging](../../shell/packaging.md). The dated bytes, timings, and checks are in
+[Testing](../../testing/production-minification-2026-10-09.md).
+
+Decisions made during implementation:
+
+- Function and class names are kept. They cost about 122 KB of the service graph, and in return a
+  packaged stack names its functions with no tooling, and any code that reads `.name` keeps working.
+- The service build always writes hidden source maps into `apps/node/dist`, which never ships. A
+  plugin package is the shipped output, so `build:plugin` writes maps only with `--sourcemap`. The
+  lookup is `pnpm --filter @acorn/node locate-stack`, against a build of the same commit.
+- The graph records the packages a module loads through `createRequire`, read from its unminified
+  source. Minification renames those require functions, which blinded the tarball's text scan.
+- Rolldown leaves external packages out of a chunk's `dynamicImports`. The graph adds them from each
+  module's own record.
+- `pnpm pack:node` checks the service and terminal graphs instead of scanning bundle text. That scan
+  was already partly blind on the minified terminal client. The graph showed the terminal client
+  imports `mermaid` on first use, and the standalone manifest omits it. The renderer falls back to
+  showing the diagram source, so the check names it as an allowed exception.
+- Loaded-plugin builds reuse the service's Vite config, so phase 01's graph plugin wrote a
+  `startup-graph.json` into every plugin package. The graph plugin now skips builds without a
+  service entry.
+
+Known gaps:
+
+- The terminal client's own budget, `apps/tui/scripts/check-startup-graph.mjs`, and its
+  `check-runtime-imports.mjs` still walk their own way. The second scans minified text and misses a
+  dynamic import written with backticks.
+- Minification made no measurable difference to the service's time to listen on macOS arm64.
+- No packaged desktop build, installer, or Linux and Windows target was measured.
 
 ## Starting point and owners
 

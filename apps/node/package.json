@@ -14,6 +14,7 @@
     "build:plugin": "node scripts/build-plugin.mjs",
     "measure:editor-bundle": "node scripts/measure-editor-bundle.mjs",
     "measure:service-graph": "node scripts/measure-service-graph.mjs",
+    "locate-stack": "node scripts/locate-stack.mjs",
     "dev:plugin": "node scripts/dev-plugin.mjs",
     "dev:node": "node --import tsx --watch --env-file-if-exists=../desktop/.env src/entries/standalone.ts"
   },

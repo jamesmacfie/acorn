@@ -32,8 +32,10 @@ need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
 // The service's chunk names carry a content hash, so every build that changes the node writes new
 // ones. Cleared first, or each old chunk stays beside the helper and ships as a resource.
 rmSync(resolve(HELPER, 'chunks'), { recursive: true, force: true })
-// The startup graph is build metadata for scripts/size-report.mjs, not something the helper runs.
-cpSync(dist, HELPER, { recursive: true, filter: (path) => !path.endsWith('startup-graph.json') })
+// The chunk graph and source maps are build metadata, not something the helper runs. The graph feeds
+// scripts/size-report.mjs; the maps stay in apps/node/dist for reading a packaged stack
+// (docs/local-development/packaged-stacks.md § Find the source line).
+cpSync(dist, HELPER, { recursive: true, filter: (path) => !path.endsWith('startup-graph.json') && !path.endsWith('.map') })
 stageRuntimeDependencies(PKG, HELPER, target)
 
 // The installed command runs the headless CLI under the same pinned Node runtime as the desktop.

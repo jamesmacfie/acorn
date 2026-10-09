@@ -52,7 +52,11 @@ function graphDist(dist, entry) {
   json(dist, 'startup-graph.json', {
     entry,
     roots: [entry],
-    chunks: { [entry]: { imports: ['chunks/static.js'], dynamicImports: ['chunks/lazy.js'] }, 'chunks/static.js': { imports: [] }, 'chunks/lazy.js': { imports: [] } },
+    chunks: {
+      [entry]: { imports: ['chunks/static.js'], dynamicImports: ['chunks/lazy.js'], requires: [], modules: [], bytes: 30 },
+      'chunks/static.js': { imports: [], dynamicImports: [], requires: [], modules: [], bytes: 7 },
+      'chunks/lazy.js': { imports: [], dynamicImports: [], requires: [], modules: [], bytes: 500 },
+    },
   })
 }
 

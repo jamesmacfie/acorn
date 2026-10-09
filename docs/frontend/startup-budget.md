@@ -1,8 +1,8 @@
 # Startup budget
 
 This page covers the build checks on what the desktop renderer and the terminal client load before
-they draw. Read it before you add an import that runs at startup, or when a build fails its budget.
-It's part of [frontend](../frontend.md).
+they draw, and what the Node service loads before it answers. Read it before you add an import that
+runs at startup, or when a build fails its budget. It's part of [frontend](../frontend.md).
 
 ## Startup budget
 
@@ -42,6 +42,26 @@ validation still runs before untrusted content is drawn. Other external imports 
 separately, and their package bytes aren't in the budget. The client imports narrow supported
 entrypoints for its model and host adapters, not broad `public.ts` barrels, which would pull DOM
 components and diff code into the closure.
+
+### The node service
+
+`apps/node/scripts/check-service-budget.mjs` runs from `@acorn/node`'s `build`. It counts
+`service.js` and every chunk it reaches through static imports, against a ceiling of 1,827,000 B. The
+ceiling is about 2 KB above the minified measurement of 1,824,878 B on October 9, 2026, on macOS arm64.
+Under 1,000,000 B, the walk has stopped following imports, and the check fails.
+
+The build minifies with Oxc and keeps function and class names, so the ceiling is in minified bytes.
+Earlier ceilings in the script's history were unminified. The check never reads the chunk text. The
+build's `acorn:service-startup-graph` plugin writes `dist/startup-graph.json` from the bundler's records:
+each chunk's static and dynamic edges, its external packages, the packages its modules load through
+`createRequire`, its source modules, and its emitted size. A lazy chunk that gains a static import
+joins the closure and its bytes count, however the output is formatted.
+
+`scripts/chunkGraph.mts` writes and reads that graph, for this check, the size report, and the
+standalone manifest check. The terminal client writes its graph with the same code. The reader fails
+when the graph names a missing file, records a size a file no longer has, misses a script in a chunk
+folder, or has an edge to a chunk it doesn't describe. The check prints the external packages the
+closure loads at startup, on first use, and through `createRequire`.
 
 ### Unused kit components drop out
 

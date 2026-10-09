@@ -27,8 +27,8 @@
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { builtinModules } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { externalSpecifiers, packageName, readChunkGraph } from './chunkGraph.mts'
 import { requiredRuntimePackages } from './nodeRuntimePackages.ts'
 import { REVIEWED_PACKAGES } from './prune-runtime.mjs'
 
@@ -57,81 +57,33 @@ const RUNTIME = [
   'hono',
 ]
 
-// Loaded through `createRequire(...)` rather than a static import. The scanner below matches both
-// spellings, so this list is a second check on the two that would break a boot. It looks for the bare
-// name as a quoted string, which is weaker than the specifier scan and labelled as such rather than
-// folded in silently.
+// Loaded through `createRequire(...)` rather than an import, and the two that would break a boot if
+// the manifest missed them. The build's graph must list both, or its require detection has gone blind
+// (scripts/chunkGraph.mts § requiredSpecifiers).
 const DYNAMIC = ['@xterm/headless', '@xterm/addon-serialize']
 
 const read = (path) => JSON.parse(readFileSync(path, 'utf8'))
 
-// Real import/require specifiers only. Deliberately narrow: a loose "any quoted string after the word
-// import" pattern matches template literals and prose inside the bundle, and a scanner that reports
-// `${startDir}` as a dependency is one nobody trusts enough to act on.
-function importedPackages(files) {
-  const found = new Set()
-  const patterns = [
-    // Static imports sit at the start of a line in Rolldown's output. Anchoring there matters since
-    // third-party code is bundled: its doc comments are full of example lines such as
-    // ` * import { Hono } from 'hono'`.
-    /^(?:import|export)[^;'"]*?from\s*['"]([^'"]+)['"]/gm,
-    /^import\s*['"]([^'"]+)['"]/gm,
-    // The negative lookbehind is load-bearing: `agentProfileRegistry.require("shell")` is a method
-    // named require, and without it the scanner reported `shell` as a missing dependency. A checker
-    // that cries wolf on the first run is one whose next real finding gets waved through.
-    //
-    // There is no pattern for a bare `require("…")`. The output is ESM and has no `require` binding,
-    // so every one in it is text: ajv's code generator writes them into strings. Bundled CommonJS
-    // calls `__require` instead, and only for builtins and the optional native addons ws and pg can
-    // do without, none of which belong in the manifest.
-    /(?<![.\w$])import\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    // The dynamic forms, which are not an edge case here: @xterm/headless and @xterm/addon-serialize
-    // are both loaded this way, because a lazy load turns a load failure into an actionable error
-    // instead of a bare stack at import time. A scanner blind to them declares the manifest complete
-    // and the unpacked tarball dies on `Cannot find module '@xterm/headless'` at boot. Rolldown
-    // renames a binding that two modules share, so `nodeRequire` can arrive as `nodeRequire$1`, and
-    // `.resolve` is how the Claude adapter's path is found.
-    /(?<![.\w$])[A-Za-z_$][\w$]*Require(?:\$\d+)?(?:\.resolve)?\s*\(\s*['"]([^'"]+)['"]/g,
-    /createRequire\([^)]*\)\s*\(\s*['"]([^'"]+)['"]/g,
-  ]
-  for (const file of files) {
-    const source = readFileSync(file, 'utf8')
-    for (const pattern of patterns) {
-      for (const match of source.matchAll(pattern)) {
-        const specifier = match[1]
-        if (specifier.includes('${')) continue // a template placeholder in a bundled error message
-        if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:') || builtinModules.includes(specifier)) continue
-        found.add(specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0])
-      }
-    }
-  }
-  return found
-}
-
 // The one runnable check in this script, and the failure it exists for is silent: a package the bundle
 // imports but the manifest omits produces a tarball that installs cleanly and then throws
 // ERR_MODULE_NOT_FOUND on the operator's machine, at boot, with no clue pointing back here.
-function assertManifestCoversImports(distDir, runtime = RUNTIME) {
-  const visit = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const file = join(dir, entry.name)
-    return entry.isDirectory() ? visit(file) : entry.name.endsWith('.js') ? [file] : []
-  })
-  const files = visit(distDir)
-  const imported = importedPackages(files)
-  const declared = new Set(runtime)
-  const missing = [...imported].filter((name) => !declared.has(name))
+//
+// It reads the chunk graph each build writes rather than the bundle text, because both bundles are
+// minified: one line holds many imports, and a require is called through whatever name the minifier
+// chose. The CLI bundle leaves only Node builtins external (apps/cli/vite.config.ts), so it has nothing
+// to check.
+function assertManifestCoversImports(distDir, runtime) {
+  const graph = readChunkGraph(distDir)
+  const { atLoad, onFirstUse, required } = externalSpecifiers(graph, Object.keys(graph.chunks))
+  const imported = new Set([...atLoad, ...onFirstUse, ...required].map(packageName))
+  const missing = [...imported].filter((name) => !runtime.has(name))
   if (missing.length) {
     throw new Error(
-      `The generated package.json is missing packages the artifact imports: ${missing.join(', ')}.\n` +
+      `The generated package.json is missing packages ${distDir} imports: ${missing.join(', ')}.\n` +
         'Add them to RUNTIME in scripts/pack-node.mjs (and to apps/desktop/package.json if they are new).',
     )
   }
-  const bundled = files.map((file) => readFileSync(file, 'utf8')).join('\n')
-  const missingDynamic = DYNAMIC.filter((name) => !bundled.includes(`'${name}'`) && !bundled.includes(`"${name}"`))
-  if (missingDynamic.length) {
-    throw new Error(`Expected a dynamic require of ${missingDynamic.join(', ')} in the artifact and found none.`)
-  }
-  return imported
+  return { imported, required }
 }
 
 function stageMigrations(target) {
@@ -153,15 +105,22 @@ execFileSync('pnpm', ['--filter', '@acorn/tui', 'build'], { cwd: ROOT, stdio: 'i
 const dist = join(NODE_APP, 'dist')
 if (!existsSync(join(dist, 'standalone.js'))) throw new Error('apps/node/dist/standalone.js is missing after the build.')
 
-const imported = assertManifestCoversImports(dist)
+const { imported, required } = assertManifestCoversImports(dist, new Set(RUNTIME))
+const missingDynamic = DYNAMIC.filter((name) => !required.has(name))
+if (missingDynamic.length) {
+  throw new Error(`Expected the service graph to list a createRequire of ${missingDynamic.join(', ')} and found none.`)
+}
 console.log(`[pack-node] artifact imports ${imported.size} packages, all declared`)
 
 rmSync(OUT, { recursive: true, force: true })
 const staging = join(OUT, 'acorn-node')
 mkdirSync(staging, { recursive: true })
-cpSync(dist, join(staging, 'dist'), { recursive: true })
-cpSync(join(CLI_APP, 'dist'), join(staging, 'dist/cli'), { recursive: true })
-cpSync(join(TUI_APP, 'dist'), join(staging, 'dist/tui'), { recursive: true })
+// The chunk graphs and source maps are build metadata. The maps stay in each app's dist for reading a
+// packaged stack (docs/local-development/packaged-stacks.md § Find the source line).
+const runnable = { recursive: true, filter: (path) => !path.endsWith('.map') && !path.endsWith('startup-graph.json') }
+cpSync(dist, join(staging, 'dist'), runnable)
+cpSync(join(CLI_APP, 'dist'), join(staging, 'dist/cli'), runnable)
+cpSync(join(TUI_APP, 'dist'), join(staging, 'dist/tui'), runnable)
 mkdirSync(join(staging, 'bin'), { recursive: true })
 cpSync(join(CLI_APP, 'bin/acorn.mjs'), join(staging, 'bin/acorn.mjs'))
 mkdirSync(join(staging, 'scripts'), { recursive: true })
@@ -208,8 +167,10 @@ for (const [name, version] of Object.entries(workspaceManifest.acornStandalone.d
 for (const [name, { version }] of Object.entries(REVIEWED_PACKAGES)) {
   if (Object.hasOwn(dependencies, name)) dependencies[name] = version
 }
-assertManifestCoversImports(join(staging, 'dist'), standaloneRuntime)
-console.log('[pack-node] service, CLI, and TUI runtime imports are declared')
+// The terminal's Markdown renderer imports mermaid on first use and leaves a diagram as code when it is
+// absent (packages/client-core/src/kit/lib/rendering/mermaid.ts). The standalone install leaves it out.
+assertManifestCoversImports(join(TUI_APP, 'dist'), new Set([...standaloneRuntime, 'mermaid']))
+console.log('[pack-node] service and TUI runtime imports are declared')
 
 writeFileSync(
   join(staging, 'package.json'),
