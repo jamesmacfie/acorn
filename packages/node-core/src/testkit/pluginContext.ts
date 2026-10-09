@@ -15,6 +15,8 @@ import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
 import type { AppDatabase } from '../server/db'
 import type { AppEnv, Principal } from '../server/middleware/auth'
 import { CapabilityRegistry } from '../server/pluginHost/capabilities'
+import { SCHEDULER } from '../server/schedules'
+import { Scheduler } from '../server/schedules/scheduler'
 import { buildPluginContext } from '../server/pluginHost/context'
 import { clearRegistrations } from '../server/pluginHost/host'
 import { flushTelemetry, onTelemetryBatch, setTelemetryPref } from '../server/telemetry/collector'
@@ -115,9 +117,13 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   const recorder = onTelemetryBatch((batch) => records.push(...batch.records), name)
 
   const env = testEnv({ DB: core.db, SECRETS: secrets })
+  // A scheduler that is never started, so `ctx.schedules.register` records a declaration and nothing
+  // runs on its own. A test runs one with `ctx.capabilities.require(SCHEDULER).runNow(key)`.
+  const capabilities = new CapabilityRegistry()
+  capabilities.provide(SCHEDULER, new Scheduler(core.db))
   const ctx = buildPluginContext({
     plugin: name,
-    capabilities: new CapabilityRegistry(),
+    capabilities,
     core: services,
     env,
     onUndo: (undo) => void undos.push(undo),

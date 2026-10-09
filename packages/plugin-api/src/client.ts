@@ -14,7 +14,9 @@ export { queryOwner } from '@acorn/client-core/infra/node'
 // `workspaceExternalProjectsOptions` is the workspace's whole external-project map, every provider's
 // rows in one read. A plugin needs it to answer "which of my connections serves this repo", which is
 // the question a task link has to settle before it can name one (github/src/client/pullTasks.ts).
+// `deletedTasksOptions` is every deleted task's id, so a reference to one reads "Deleted task".
 export {
+  deletedTasksOptions,
   integrationsOptions,
   modelBackendsOptions,
   prefsOptions,

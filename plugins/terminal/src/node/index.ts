@@ -1,4 +1,6 @@
-import { type NodePlugin, RUN_TARGETS, TASK_CREATED, TASK_SESSIONS } from '@acorn/plugin-api/node'
+import { type NodePlugin, registerDeletedTaskPurge, RUN_TARGETS, TASK_CREATED, TASK_SESSIONS } from '@acorn/plugin-api/node'
+import { inArray } from 'drizzle-orm'
+import { terminalSessions } from './schema'
 import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
 import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
@@ -61,6 +63,9 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // core awaits the chain: the terminal that opens next expects the setup to have finished, and an
       // observer runs alongside by design. The payload comes back untouched — there is nothing here to
       // change, only work to do before the caller carries on.
+      // Archive already stopped and dropped the task's sessions, so only exited rows are left.
+      registerDeletedTaskPurge(ctx, async (taskIds) =>
+        (await db.delete(terminalSessions).where(inArray(terminalSessions.taskId, [...taskIds]))).changes)
       ctx.hooks.handle('core:worktree-created', {
         id: 'setup-script',
         mode: 'transform',

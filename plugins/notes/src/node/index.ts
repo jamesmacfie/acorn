@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { InternalEnvFactory, NodePlugin } from '@acorn/plugin-api/node'
+import { registerDeletedTaskPurge, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
 import { notesSection } from '../server/contextSection'
 import type { NoteAuthor, NoteLocation, NoteScope } from '@acorn/protocol/notes.ts'
 import { NOTES_SEED_TASK, NOTES_STORE } from '../contract/store'
@@ -24,6 +24,7 @@ export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalE
       if (await seedTaskNotes(ctx.core, silent, deps.internalEnv({ scope: 'service' }), task)) store.changed({ scope: 'task', taskId: task.id })
     })
     ctx.routes.register(notes, { prefix: '', note: 'notes CRUD' })
+    registerDeletedTaskPurge(ctx, async (taskIds) => (await import('../server/taskFolders')).removeTaskFolders(join(dataDir, 'notes'), taskIds))
     // notes_list, notes_read, notes_write and notes_append, over the same store the pane and the context
     // assembler read. An agent appending a finding and the human reading it are looking at one file.
     for (const tool of notesAgentTools(store, ctx.core)) ctx.tools.register(tool)

@@ -7,6 +7,8 @@ import { readJson } from '../../infra/node/apiClient'
 import { createActiveWorkspaceId } from '../workspaces/activeWorkspaceId'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { restoreTask } from '../tasks/restoreTask'
+import { confirmTaskDelete } from '../tasks/confirmTaskArchive'
+import { taskBridge } from '../tasks/taskBridge'
 import TaskPaneHost from '../tasks/TaskPaneHost'
 import { openTarget } from '../notifications/notifications'
 import { Alert, Button, DetailColumn, EmptyState, Input, ListColumn, ListDetail, Row, SectionHeader, FilterBar } from '../../kit/components/primitives'
@@ -31,7 +33,8 @@ const listOffsets = new Map<string, number>()
 const archivedOn = (at: number): string => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
 // The archive: archived tasks newest first, a search over every provider, and a read-only preview of
-// the selected task with a way to restore it (docs/workspaces-and-tasks/archive.md § Restoring a task).
+// the selected task with a way to restore it (docs/workspaces-and-tasks/archive.md § Restoring a task)
+// or delete it for good (§ Deleting a task).
 //
 // The page uses the search seam; it does not own it. The same providers can back a search across
 // active tasks, which is `archived=0` on the same route.
@@ -112,6 +115,26 @@ export default function ArchivePage() {
     }
   }
 
+  // One at a time, like restore. The row leaves the list when the tasks change the delete broadcasts
+  // refreshes it.
+  const [deleting, setDeleting] = createSignal<string | null>(null)
+  async function remove(task: ArchivedTask) {
+    if (deleting() || restoring()) return
+    setError('')
+    if (!(await confirmTaskDelete(task)).confirmed) return
+    setDeleting(task.id)
+    try {
+      const result = await taskBridge().task.delete(task.id)
+      if (!result.ok) return setError(result.reason)
+      if (result.taskIds.includes(selectedId() ?? '')) setSelectedId(null)
+      await queryClient.invalidateQueries({ queryKey: tasksKey })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the task.')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
   function openHit(hit: SearchGroup['hits'][number]) {
     if (!hit.taskId || !taskById().has(hit.taskId)) return
     setSelectedId(hit.taskId)
@@ -175,9 +198,14 @@ export default function ArchivePage() {
                             onPress={() => setSelectedId(current().id)}
                             meta={<Text emphasis="muted">{archivedOn(current().archivedAt)}</Text>}
                             trailing={
-                              <Button size="sm" busy={restoring() === current().id} onPress={() => void restore(current())}>
-                                Restore
-                              </Button>
+                              <Inline>
+                                <Button size="sm" busy={restoring() === current().id} onPress={() => void restore(current())}>
+                                  Restore
+                                </Button>
+                                <Button size="sm" tone="danger" busy={deleting() === current().id} onPress={() => void remove(current())}>
+                                  Delete
+                                </Button>
+                              </Inline>
                             }
                           >
                             <Text emphasis="strong">{current().title}</Text>
@@ -254,9 +282,14 @@ export default function ArchivePage() {
                       {[projectName(task.projectId), task.branch].filter(Boolean).join(' · ')}
                     </Text>
                   </Stack>
-                  <Button variant="solid" busy={restoring() === task.id} onPress={() => void restore(task)}>
-                    Restore task
-                  </Button>
+                  <Inline>
+                    <Button tone="danger" busy={deleting() === task.id} onPress={() => void remove(task)}>
+                      Delete task
+                    </Button>
+                    <Button variant="solid" busy={restoring() === task.id} onPress={() => void restore(task)}>
+                      Restore task
+                    </Button>
+                  </Inline>
                 </Inline>
               </header>
               <div class="archive-preview-panes">

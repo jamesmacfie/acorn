@@ -69,6 +69,9 @@ export type CoreTaskService = {
   /** Ask core to create a task rather than writing core-owned rows. The worktree is not created here. */
   createChild(parentTaskId: string, seed: ChildTaskSeed, intendedChildId?: string): Promise<string>
   cancel(taskId: string): Promise<void>
+  /** Every task the owner deleted. Purge your rows for these ids; never infer deletion from a task
+   *  missing from `load` or `active`. */
+  deleted(): Promise<string[]>
 }
 
 /** Six fields off the project row. Never core config, never a database handle. */

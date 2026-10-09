@@ -1,5 +1,7 @@
 import type { NodePlugin, PluginFetchHandler } from '@acorn/plugin-api/node'
-import { principalMayActOnTask } from '@acorn/plugin-api/node'
+import { principalMayActOnTask, registerDeletedTaskPurge } from '@acorn/plugin-api/node'
+import { inArray } from 'drizzle-orm'
+import { browserCaptures } from './schema'
 import { captureStore } from '../server/captures'
 import { browserAgentTools } from '../server/agentTools'
 import { BrowserPool } from '../server/driver'
@@ -49,7 +51,10 @@ export const browserPlugin = (): NodePlugin => {
     // packaged app, and a standalone tarball.
     migrationsModule: import.meta.url,
     init: (ctx) => {
-      captures.current = captureStore(ctx.storage.open(), ctx.events.send)
+      const db = ctx.storage.open()
+      captures.current = captureStore(db, ctx.events.send)
+      registerDeletedTaskPurge(ctx, async (taskIds) =>
+        (await db.delete(browserCaptures).where(inArray(browserCaptures.taskId, [...taskIds]))).changes)
       pool = new BrowserPool(captures.current)
       for (const tool of browserAgentTools(pool)) ctx.tools.register(tool)
       ctx.routes.fetch(serveCapture, { prefix: '/captures', note: '/captures/:captureId' })

@@ -14,7 +14,7 @@ import { runHook } from '../../pluginHost/hooks'
 import { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../../bridge'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
-import { isTaskConfined, mayActOnTask } from '../../middleware/requireUser'
+import { isTaskConfined, mayActOnTask, requireDevice } from '../../middleware/requireUser'
 import { respondError } from '../../respond'
 import { createLogger, describeError } from '../../telemetry/logger'
 
@@ -53,6 +53,8 @@ const archiveBody = z.object({
   applyChecks: z.array(z.string().min(1).max(200)).max(32).optional(),
 })
 const restoreBody = z.object({ newBranch: z.boolean().optional() })
+// The archive options, for the archive a delete of an active task runs first. The worktree always goes.
+const deleteBody = archiveBody.omit({ deleteWorktree: true })
 
 async function capturePreviewUrl(
   db: ReturnType<typeof getDb>,
@@ -170,7 +172,31 @@ export const worktree = new Hono<AppEnv>()
   .post('/tasks/:id/restore', async (c) => {
     const parsed = restoreBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return c.json(await restoreTask(getDb(c.env), c.req.param('id'), parsed.data))
+    const result = await restoreTask(getDb(c.env), c.req.param('id'), parsed.data)
+    return 'busy' in result ? respondError(c, 409, 'task-busy', [result.reason]) : c.json(result)
+  })
+  // Delete for good (docs/workspaces-and-tasks/archive.md § Deleting a task). Device-only, unlike archive:
+  // a task-scoped agent token may archive its own tree, but never destroy one. An active task is
+  // archived first, so with no terminal plugin to run that archive the client archives it itself.
+  .post('/tasks/:id/delete', requireDevice, async (c) => {
+    const parsed = deleteBody.safeParse(await c.req.json().catch(() => ({})))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const db = getDb(c.env)
+    const id = c.req.param('id')
+    const sessions = routeCapabilityFor(c, TASK_SESSIONS)
+    // Loaded on first use, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs).
+    const { deleteTask } = await import('../../storage/taskDeletion')
+    const result = await deleteTask(db, id, {
+      archive: async () => {
+        if (!sessions) return { ok: false, reason: 'Archive the task before deleting it.' }
+        await sessions.ready()
+        return archive(db, id, { ...parsed.data, deleteWorktree: true }, sessions)
+      },
+      taskDeleted: async (taskIds) => {
+        await runHook('core:task-deleted', { taskIds })
+      },
+    })
+    return 'busy' in result ? respondError(c, 409, 'task-busy', [result.reason]) : c.json(result)
   })
 
 export { TEARDOWN_TIMEOUT_MS }

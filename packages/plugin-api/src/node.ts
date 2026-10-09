@@ -32,6 +32,9 @@ export type { TaskConcern } from '@acorn/node-core/server/pluginHost'
 // What `ctx.search.register` takes and what its `search` answers with (server/pluginHost/search.ts).
 export type { SearchProvider, SearchQuery } from '@acorn/node-core/server/pluginHost'
 export type { SearchHit } from '@acorn/protocol/search.ts'
+// The hook and daily catch-up a plugin that stores task data purges deleted tasks from
+// (server/pluginHost/deletedTaskPurge.ts).
+export { registerDeletedTaskPurge } from '@acorn/node-core/server/pluginHost'
 // The major this host speaks to loaded plugins. Exported here for compiled callers, but the private
 // facade's snapshot does not govern when this number changes.
 //

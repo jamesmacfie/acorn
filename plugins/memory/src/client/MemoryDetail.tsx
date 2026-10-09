@@ -1,5 +1,7 @@
 import { createSignal, onCleanup, For, Match, Show, Switch } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
+import { createQuery } from '@tanstack/solid-query'
+import { deletedTasksOptions } from '@acorn/plugin-api/client'
 import { Alert, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Field, Fold, Heading, IconButton, Inline, Input, Markdown, Only, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 import { createMemoryResource } from './memoryResource'
 import { memoryApi, memoryAuthorLabel, memoryDate, memoryTypeLabel, MEMORY_SCOPE_LABEL, MEMORY_TYPE_OPTIONS } from './memoryClient'
@@ -40,6 +42,9 @@ export default function MemoryDetail(props: { address: MemoryAddress; projectId:
     () => memoryApi().edit(props.address, { name: name(), description: description(), type: type(), body: body(), hash: hash() }, 'project', props.projectId),
     { name: name(), scope: 'project', projectId: props.projectId },
   )
+  // A memory outlives the task it was written in. Its origin then reads "Deleted task" and opens nothing.
+  const deletedTasks = createQuery(() => deletedTasksOptions(true))
+  const originDeleted = () => !!document()?.taskId && !!deletedTasks.data?.includes(document()!.taskId!)
   const sessionPath = () => {
     const current = document()
     return current?.taskId && current.sessionId
@@ -93,7 +98,12 @@ export default function MemoryDetail(props: { address: MemoryAddress; projectId:
                 label: 'By',
                 value: <Inline gap="inline">
                   <Text>{memoryAuthorLabel(current().updatedBy)}</Text>
-                  <Show when={sessionPath()}>{(path) => <Button size="xs" variant="ghost" onPress={() => navigate(path())}>Open session</Button>}</Show>
+                  <Show
+                    when={!originDeleted()}
+                    fallback={<Text emphasis="muted">Deleted task</Text>}
+                  >
+                    <Show when={sessionPath()}>{(path) => <Button size="xs" variant="ghost" onPress={() => navigate(path())}>Open session</Button>}</Show>
+                  </Show>
                 </Inline>,
               },
             ]} />

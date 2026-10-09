@@ -1,4 +1,4 @@
-import { describeError, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
+import { describeError, registerDeletedTaskPurge, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
 import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
@@ -116,6 +116,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         start: (request) => starts.startInternal(request),
       })
       ctx.capabilities.provide(WORKFLOW_GATES, workflowGates(store))
+      registerDeletedTaskPurge(ctx, async (taskIds) =>
+        (await import('../server/runs/deletedTaskPurge')).purgeDeletedTaskRuns(store, taskIds))
       ctx.capabilities.provide(WORKFLOWS_NOTICES, notices)
 
       registerWorkflowTriggers(ctx, runner)

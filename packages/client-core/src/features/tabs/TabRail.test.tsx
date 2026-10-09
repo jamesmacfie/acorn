@@ -22,8 +22,10 @@ vi.mock('../tasks/taskMutations', () => ({
 vi.mock('../tasks/taskBridge', () => ({
   taskBridge: () => ({ project: { get: async () => ({ config: { branchPrefix: null } }) } }),
 }))
-vi.mock('../tasks/confirmTaskArchive', () => ({
-  confirmTaskArchive: async () => ({ confirmed: true, checked: [] }),
+// The real archiveOrDeleteTask, over the mocked archiveTask above.
+vi.mock('../tasks/confirmTaskArchive', async (original) => ({
+  ...await original<typeof import('../tasks/confirmTaskArchive')>(),
+  confirmTaskArchive: async () => ({ confirmed: true, checked: [], action: 'archive' }),
 }))
 
 // The rail's hover prefetch. A task switch disposes the whole task scope, so what makes coming back

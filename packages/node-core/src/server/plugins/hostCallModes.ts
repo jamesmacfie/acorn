@@ -40,7 +40,7 @@ const modes = {
     tasks: {
       load: 'async', root: 'async', requireRoot: 'async', resolveCwd: 'async', runConfig: 'async', active: 'async', branchClaims: 'async',
       workspaceId: 'async', workspaceIdOrNull: 'async', idsForWorkspace: 'async', links: 'async',
-      pulls: 'async', attachPull: 'async', adoptPullNumbers: 'async', createChild: 'async', cancel: 'async',
+      pulls: 'async', attachPull: 'async', adoptPullNumbers: 'async', createChild: 'async', cancel: 'async', deleted: 'async',
     },
     context: { injectionEnabled: 'async', assemble: 'async' },
     models: { generateText: 'async', available: 'async' },

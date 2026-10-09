@@ -180,6 +180,7 @@ client: dataFieldsSchema
 client: dataPointerSchema
 client: debounce
 client: defaultDeliveryContext
+client: deletedTasksOptions
 client: describeError
 client: deviceStorage
 client: dispatchActiveLayout
@@ -587,6 +588,7 @@ node: readDataPointer
 node: recordSkillDelivery
 node: redactSecretText
 node: registerAcornMcp
+node: registerDeletedTaskPurge
 node: rendererBaseCheckout
 node: requireDevice
 node: requireProfile

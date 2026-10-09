@@ -1,4 +1,6 @@
-import { type NodePlugin } from '@acorn/plugin-api/node'
+import { registerDeletedTaskPurge, type NodePlugin } from '@acorn/plugin-api/node'
+import { inArray } from 'drizzle-orm'
+import { reviewNotes } from './schema'
 import { localGitAgentTools } from '../server/agentTools'
 import { CHANGES_HOOKS, localGitBridge } from '../server/localGit'
 import { localGit, LOCAL_GIT } from '../server/routes/localGit'
@@ -25,6 +27,8 @@ export const changesPlugin = (): NodePlugin => {
     // database (docs/data-layer/plugin-databases.md § Plugin databases).
     const db = ctx.storage.open()
     ctx.routes.register(reviewNotesRoutes(db, ctx.core, ctx.events.send), { prefix: '/tasks', note: '/:id/review-notes' })
+    registerDeletedTaskPurge(ctx, async (taskIds) =>
+      (await db.delete(reviewNotes).where(inArray(reviewNotes.taskId, [...taskIds]))).changes)
     // localGit holds no tables of its own: it shells out to git in the task worktree, so it needs
     // core's task resolution and nothing else.
     // The two decisions this plugin opens to other plugins, declared before the bridge that runs them

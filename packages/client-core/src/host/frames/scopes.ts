@@ -77,6 +77,11 @@ const RULES: readonly RouteRule[] = [
       + 'the archive page, not something a frame can trigger.',
   },
   {
+    path: shape(`/v1/core/tasks/${SEG}/delete`),
+    scopes: {},
+    note: 'Deletes a task and every plugin\'s data for it, with no undo. Device-only on the node as well.',
+  },
+  {
     path: shape('/v1/core/search'),
     scopes: {},
     note: 'Reaches every task\'s history across every plugin. Device-only on the node as well.',

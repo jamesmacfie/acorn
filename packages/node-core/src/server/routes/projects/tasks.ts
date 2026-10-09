@@ -172,6 +172,13 @@ export const tasks = new Hono<AppEnv>()
     })
     return c.json(list)
   })
+  // Every deleted task's id (docs/workspaces-and-tasks/archive.md § Deleting a task), so the client can
+  // label a reference to one. A task-confined caller never gets here: `/tasks/:id` scope reads
+  // `deleted` as a task id and refuses it (server/index.ts).
+  .get('/deleted', async (c) => {
+    const rows = await getDb(c.env).select({ id: schema.deletedTasks.id }).from(schema.deletedTasks)
+    return c.json(rows.map((row) => row.id))
+  })
   .post('/', async (c) => {
     const parsedSeed = taskSeedBody.safeParse(await c.req.json().catch(() => null))
     if (!parsedSeed.success) return respondError(c, 400, 'bad_request')
