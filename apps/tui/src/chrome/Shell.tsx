@@ -34,6 +34,10 @@ import { createShellModel, type ShellModel } from './model'
 import { installRestore } from './restore'
 import { chooseProject, installRouting, routedProjectId } from './routing'
 import { closeOverlay, isOverlayOpen, openOverlay, topOverlay } from './state'
+import { taskLaunchRequest } from '@acorn/client-core/features/tabs/taskLaunch.ts'
+import { actionPickerRequest } from '@acorn/client-core/host/registries/commands'
+import { clientCapability } from '@acorn/client-core/infra/node'
+import { WORKFLOW_GIT_LAUNCH, workflowGitLaunchRequest, closeWorkflowGitLaunch } from '@acorn/plugin-workflows/contract/gitLaunch.ts'
 import { cyclePane } from './panes'
 import { Rail, railCells } from './Rail'
 import { PANES, SOURCE, topology } from './topology'
@@ -79,8 +83,13 @@ const PromotionHost = lazy(() => import('./PromotionHost').then(({ PromotionHost
 const SessionsHost = lazy(() => import('./SessionsHost').then(({ SessionsHost }) => ({ default: SessionsHost })))
 const FileDialog = lazy(() => import('./FileDialog').then(({ FileDialog }) => ({ default: FileDialog })))
 const SettingsHost = lazy(() => import('./SettingsHost').then(({ SettingsHost }) => ({ default: SettingsHost })))
+const TaskLaunchHost = lazy(() => import('./TaskLaunchHost'))
+const ActionPickerHost = lazy(() => import('./ActionPickerHost'))
 
 export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void; link?: Address; linkReady?: Accessor<boolean> }) {
+  createEffect(() => { if (taskLaunchRequest()) openOverlay('task-launch'); else closeOverlay('task-launch') })
+  createEffect(() => { if (actionPickerRequest()) openOverlay('action-picker'); else closeOverlay('action-picker') })
+  createEffect(() => { if (workflowGitLaunchRequest()) openOverlay('workflow-launch'); else closeOverlay('workflow-launch') })
   const model = createShellModel()
   // One session for the whole shell, not one per open: `./Palette.tsx` is mounted only while the
   // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
@@ -436,6 +445,11 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               <Match when={name() === 'trust'}><Dynamic component={trustPromptComponent() ?? undefined} /></Match>
               <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
               <Match when={name() === 'setup'}><Show when={activeNodeId()} keyed>{(nodeId) => <SetupHost model={model} nodeId={nodeId} initialStep={setupStep()} onClose={() => closeOverlay('setup')} />}</Show></Match>
+              <Match when={name() === 'task-launch'}><Show when={taskLaunchRequest()} keyed>{(request) => <TaskLaunchHost request={request} />}</Show></Match>
+              <Match when={name() === 'action-picker'}><Show when={actionPickerRequest()} keyed>{(request) => <ActionPickerHost request={request} />}</Show></Match>
+              <Match when={name() === 'workflow-launch'}><Show when={workflowGitLaunchRequest()} keyed>{(request) =>
+                <Dynamic component={clientCapability(WORKFLOW_GIT_LAUNCH)?.Dialog} request={request} onClose={() => closeWorkflowGitLaunch(request)} />
+              }</Show></Match>
               <Match when={name() === 'settings'}><SettingsHost nodeId={props.nodeId} onClose={closeSettings} onSetup={() => openSetup()} /></Match>
               <Match when={name() === 'promotion'}><Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show></Match>
               <Match when={name() === 'sessions'}><Show when={model.task()}>{(task) => <SessionsHost task={task()} onClose={() => closeOverlay('sessions')} />}</Show></Match>

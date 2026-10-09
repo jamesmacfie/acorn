@@ -46,12 +46,14 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 // `roster` is the compiled roster's scripts beyond startup, which the workspace restore waits for. A
 // dynamic import moves code off the first frame, but restore still waits on whatever the roster
 // imports, so a cut that only moves startup code into the roster saves nothing. 219,353 B on 2026-10-09,
-// down from 242,405 B, plus about 5%.
+// down from 242,405 B, plus about 5%. Later that day, merging main added the Git plugin's pane model,
+// source, and commands, and the changes, workflows, and agents launch wiring: 232,231 B, plus about 5%.
+// Pane models are synchronous factories, so they register with the roster (performance phase 05).
 const limits = {
   // 2026-10-07: 768,478 B with workspace identity in the topbar and dropdown, under a 775,000 B
   // ceiling. Their shared validation, tile, and authenticated image resource are core chrome.
   scripts: 740_000,
-  roster: 230_000,
+  roster: 244_000,
   styles: 200_000,
   floor: 100_000,
 }

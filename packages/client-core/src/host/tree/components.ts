@@ -51,6 +51,7 @@ import { ChipRow } from '../../kit/components/layout/ChipRow'
 import { Log } from '../../kit/components/content/Log'
 import { Grid } from '../../kit/components/layout/Grid'
 import { Graph } from '../../kit/components/content/Graph'
+import { HistoryMark } from '../../kit/components/content/HistoryMark'
 import { Rows } from '../../kit/components/layout/Rows'
 import { Only } from '../../kit/components/layout/Only'
 import { Fallback } from '../../kit/components/content/Fallback'
@@ -77,7 +78,7 @@ export const KIT_COMPONENTS: KitTable = {
   ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,
   SettingsSection, SettingRow,
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
-  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log,
+  DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, HistoryMark, Meter, CodeBlock, Log,
   EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, IconButton, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,

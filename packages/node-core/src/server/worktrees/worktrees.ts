@@ -76,7 +76,7 @@ export async function listWorktrees(checkout: string): Promise<Array<{ path: str
     const fields = entry.split('\0')
     const path = fields.find((f) => f.startsWith('worktree '))?.slice('worktree '.length)
     const branch = fields.find((f) => f.startsWith('branch refs/heads/'))?.slice('branch refs/heads/'.length)
-    if (path && branch && !fields.some((f) => f === 'bare' || f.startsWith('prunable'))) out.push({ path, branch })
+    if (path && branch && !fields.some((f) => f === 'bare' || f === 'locked' || f.startsWith('locked ') || f.startsWith('prunable'))) out.push({ path, branch })
   }
   return out
 }

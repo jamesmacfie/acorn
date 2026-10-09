@@ -13,6 +13,14 @@
       "docker",
       "editor/tasks",
       "editor/tasks",
+      "git",
+      "git",
+      "git",
+      "git",
+      "git",
+      "git",
+      "git",
+      "git",
       "github",
       "github",
       "github/data/actions",
@@ -217,6 +225,18 @@
       ],
       "databases": [
         "github.sqlite"
+      ]
+    },
+    "git": {
+      "routes": [
+        "git",
+        "git",
+        "git",
+        "git",
+        "git",
+        "git",
+        "git",
+        "git"
       ]
     },
     "preview": {

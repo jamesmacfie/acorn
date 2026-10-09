@@ -19,7 +19,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { shortStatus } from './shortStatus'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
-import { consumeDockerReveal, containerTone, dockerReveal } from './dockerViewStore'
+import { consumeDockerReveal, containerTone, dockerBrowseOffset, dockerReveal, rememberDockerBrowseOffset } from './dockerViewStore'
 
 // What each prune runs, for the tip on its button.
 const PRUNE_COMMAND: Record<DockerPruneKind, string> = {
@@ -344,7 +344,8 @@ export default function DockerBrowse() {
         />
         <Show when={actionError()}>{(error) => <Alert>{error()}</Alert>}</Show>
 
-        <TabPanel id="containers" active={section()} idPrefix="docker-section">
+        <TabPanel id="containers" active={section()} idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('containers')} onChange={(offset) => rememberDockerBrowseOffset('containers', offset)}>
           <Toolbar size="sm" ariaLabel="Filter containers">
             <Input kind="filter" label="Filter containers" placeholder="Filter name / image / project" value={filter()} onInput={(value) => setFilter(value)} />
           </Toolbar>
@@ -376,7 +377,8 @@ export default function DockerBrowse() {
           </Show>
         </TabPanel>
 
-        <TabPanel id="images" active={section()} idPrefix="docker-section">
+        <TabPanel id="images" active={section()} idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('images')} onChange={(offset) => rememberDockerBrowseOffset('images', offset)}>
           <ObjectBar count={(images() ?? []).length} noun="images" kind="images" confirmLabel="Prune images?" />
           <Rows
             id="docker.images"
@@ -413,7 +415,8 @@ export default function DockerBrowse() {
           </Show>
         </TabPanel>
 
-        <TabPanel id="volumes" active={section()} idPrefix="docker-section">
+        <TabPanel id="volumes" active={section()} idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('volumes')} onChange={(offset) => rememberDockerBrowseOffset('volumes', offset)}>
           <ObjectBar count={(volumes() ?? []).length} noun="volumes" kind="volumes" confirmLabel="Remove unused volumes?" />
           <Rows
             id="docker.volumes"
@@ -450,7 +453,8 @@ export default function DockerBrowse() {
           </Show>
         </TabPanel>
 
-        <TabPanel id="networks" active={section()} idPrefix="docker-section">
+        <TabPanel id="networks" active={section()} idPrefix="docker-section"
+          scrollOffset={dockerBrowseOffset('networks')} onChange={(offset) => rememberDockerBrowseOffset('networks', offset)}>
           <ObjectBar count={(networks() ?? []).length} noun="networks" kind="networks" confirmLabel="Prune networks?" />
           <Rows
             id="docker.networks"

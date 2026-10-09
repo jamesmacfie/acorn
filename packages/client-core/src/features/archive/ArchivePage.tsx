@@ -17,12 +17,16 @@ import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
 import { Text } from '../../kit/components/content/Text'
 import { sidebarCollapsed } from '../../kit/lib/layout/collapseState'
+import { retainScroll } from '../../kit/lib/layout/retainScroll'
 import { taskOriginAppearance } from '../tasks/origin'
 import '../tasks/task-view.css'
 import './archive.css'
 
 const SEARCH_DEBOUNCE_MS = 250
 const ARCHIVE_SIDEBAR_KEY = 'archive'
+// Where the list was left, per workspace, for coming back to the archive from elsewhere. Search
+// results are not kept, since the search box starts empty again.
+const listOffsets = new Map<string, number>()
 
 const archivedOn = (at: number): string => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -132,7 +136,11 @@ export default function ArchivePage() {
           </Toolbar>
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
         </Show>
-        <div class="scroll">
+        <div class="scroll" ref={(element) => retainScroll(element, {
+          key: () => query() ? 'search' : `tasks:${workspaceId() ?? ''}`,
+          read: (key) => listOffsets.get(key) ?? 0,
+          write: (key, offset) => { if (key !== 'search') listOffsets.set(key, offset) },
+        })}>
           <Show
             when={query()}
             fallback={

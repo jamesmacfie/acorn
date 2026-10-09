@@ -9,7 +9,7 @@ A compiled plugin is registered in the Node or desktop composition, ships inside
 the shell's own realm, and is trusted like the rest of the app. Being in the binary isn't a privilege.
 What makes a plugin first-party is using something a loaded plugin can't be given.
 
-The compiled plugins are agents, browser, changes, context, docker, editor, github, memory, notes,
+The compiled plugins are agents, browser, changes, context, docker, editor, git, github, memory, notes,
 onboarding, preview, terminal, and workflows. agent-cost, database, http, linear, model-providers,
 rollbar, and sentry-telemetry ship as loaded packages, and nodes-file is a loaded package that isn't
 bundled. All of them live in `plugins/` as source.
@@ -67,6 +67,7 @@ plugins.
 | --- | --- | --- |
 | **browser** | Drives an installed Chrome with Playwright, and `playwright-core` brings a driver and native parts a single bundle can't carry. It isn't required: a Node with no browser loses six agent tools and nothing else | G |
 | **changes** | Nothing keeps it here. Its tool card is a contribution to `agents:tool-card`, an ordinary `remote` point, and its SQLite file, pane, agent tool, and `LOCAL_GIT` capability are all available to loaded plugins. It stays compiled by preference, as one of the panes every task has | — |
+| **git** | Its source and task pane use the shared kit and public Node services. It stays compiled as the built-in Git client on both hosts; its first release covers worktrees, history, stashes, and explanations | — |
 | **github** | Publishes `GITHUB_MIRROR`, which has consumers. Its content links have a manifest form, and its five surfaces are host layouts filled with kit nodes, with no stylesheet. It isn't required | D |
 | **workflows** | Publishes `WORKFLOWS_RUNNER` and `WORKFLOW_ROUTE`, registers a client capability, and declares the three points other plugins add step kinds, policies, and triggers through. All its UI is kit nodes with no stylesheet | D, E, F |
 | **context** | Contributes a `persistedState` slice. Its agent context's synchronous `revision()` keys the automatic task-context snapshot, and a descriptor can't answer synchronously | E |

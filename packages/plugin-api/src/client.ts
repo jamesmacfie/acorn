@@ -174,6 +174,8 @@ export {
 export { isPaneId } from '@acorn/client-core/features/tasks'
 export type { TaskLayout } from '@acorn/client-core/features/tasks'
 export { createTask } from '@acorn/client-core/features/tasks'
+export { requestTaskLaunch } from '@acorn/client-core/features/tabs/taskLaunch.ts'
+export { openActionPicker } from '@acorn/client-core/host/registries/commands'
 export { isArchiving } from '@acorn/client-core/features/tasks'
 export { agentSessionsFor, focusSession, refreshSessionSources, sendToSession, sessionSummaries } from '@acorn/client-core/features/tasks'
 export type { SessionSummary, SessionSubmit } from '@acorn/client-core/features/tasks'

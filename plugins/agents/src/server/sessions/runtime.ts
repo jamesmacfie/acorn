@@ -383,7 +383,8 @@ export class ManagedAgentRuntime {
       ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
       : input
     signal?.throwIfAborted()
-    const outcome = await this.store.enqueueTurn(sessionId, enqueued, context)
+    const outcome = await this.core.checkoutAdmission.admitWork(session.taskId,
+      () => this.store.enqueueTurn(sessionId, enqueued, context))
     const { turn } = outcome
     // An idle session behind the concurrency limit emits no provider event, so publish its queue count.
     this.engine.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
@@ -415,7 +416,8 @@ export class ManagedAgentRuntime {
     if (changed && !changed.ok) throw new Error(`${changed.by}: ${changed.reason}`)
     const prompt = changed?.payload.text ?? CODEX_PLAN_IMPLEMENTATION_PROMPT
     if (!prompt.trim() || prompt.length > 1_000_000) throw new Error('The implementation prompt is invalid.')
-    const { turn, inserted } = await this.store.acceptCodexPlan(sessionId, itemId, prompt)
+    const { turn, inserted } = await this.core.checkoutAdmission.admitWork(session.taskId,
+      () => this.store.acceptCodexPlan(sessionId, itemId, prompt))
     if (inserted) {
       const updated = await this.store.requireSession(sessionId)
       this.engine.emit({ channel: 'agent:session', session: updated })

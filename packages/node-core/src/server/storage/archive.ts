@@ -18,6 +18,7 @@ import { buildSessionEnv } from '../taskEnv'
 import { branchExists, removeWorktree } from '../worktrees/worktrees'
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { broadcastTasksChanged } from '../notify'
+import { admitCheckout, checkoutAdmissionFor } from '../core/checkoutAdmission'
 
 const exec = promisify(execFile)
 
@@ -75,10 +76,16 @@ export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts
   const cleanupFailed = new Set<string>()
   try {
     // Claim the whole tree before awaiting anything, so concurrent archives cannot overlap.
-    for (const task of tree) {
-      if (!beginTaskArchive(task.id)) return { ok: false, reason: 'Task archive is already in progress.' }
-      claimed.push(task.id)
+    const claim = async () => {
+      for (const task of tree) {
+        if (!beginTaskArchive(task.id)) return false
+        claimed.push(task.id)
+      }
+      return true
     }
+    const admitted = checkoutAdmissionFor(db)
+      ? await checkoutAdmissionFor(db)!.admitWork(id, claim) : await claim()
+    if (!admitted) return { ok: false, reason: 'Task archive is already in progress.' }
     for (const task of tree) {
       if (task.status === 'archived') continue
       await waitForTaskWorktreeCreation(task.id)
@@ -228,7 +235,7 @@ export async function restoreTask(db: AppDatabase, id: string, opts: RestoreOpts
   await db.update(schema.tasks).set({ status: 'active', archivedAt: null, updatedAt: Date.now() }).where(eq(schema.tasks.id, id))
   if (checkout && branch) {
     try {
-      await resolveTaskCwd(db, toTaskRef(t), checkout)
+      await admitCheckout(db, t.id, () => resolveTaskCwd(db, toTaskRef(t), checkout))
     } catch (err) {
       await db
         .update(schema.tasks)

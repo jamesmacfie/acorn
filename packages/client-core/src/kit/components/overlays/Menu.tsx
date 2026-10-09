@@ -156,6 +156,7 @@ Menu.Item = (props: {
   checked?: boolean
   /** Arm to confirm: the label the item wears between the first press and the second. */
   confirm?: string
+  onArm?: () => void
   tone?: 'neutral' | 'danger'
   leading?: JSX.Element
   trailing?: JSX.Element
@@ -185,6 +186,7 @@ Menu.Item = (props: {
       }}
       onClick={() => {
         // Arming leaves the menu open, or the prompt would close under the press that raised it.
+        if (props.confirm && !armed.armed()) props.onArm?.()
         if (props.confirm && !armed.request('confirm')) return
         if (props.closeOnSelect ?? props.kind !== 'checkbox') props.context.close()
         props.onSelect()

@@ -9,6 +9,12 @@ import { startRenderTransition } from '../../infra/telemetry/emitter'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 
+export type TaskLaunchRequest = { nodeId: string | null; projectId: string; title: string; baseCommit?: string; worktreePath?: string }
+const [taskLaunch, setTaskLaunch] = createSignal<TaskLaunchRequest | null>(null)
+export const taskLaunchRequest = taskLaunch
+export const requestTaskLaunch = (draft: TaskLaunchRequest): void => { setTaskLaunch(draft) }
+export const closeTaskLaunch = (): void => { setTaskLaunch(null) }
+
 export type { PaneId, TaskLayout } from './taskLayout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 

@@ -7,6 +7,7 @@
   "sideEffects": false,
   "exports": {
     "./client": "./src/client.ts",
+    "./client/task-draft": "./src/client/taskDraft.ts",
     "./node": "./src/node.ts",
     "./testkit": "./src/testkit.ts",
     "./testkit/client": "./src/testkit/client.ts",

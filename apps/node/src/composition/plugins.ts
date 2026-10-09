@@ -8,6 +8,7 @@ import { changesPlugin } from '@acorn/plugin-changes/node/index.ts'
 import { dockerPlugin } from '@acorn/plugin-docker/node/index.ts'
 import { editorPlugin } from '@acorn/plugin-editor/node/index.ts'
 import { githubPlugin } from '@acorn/plugin-github/node/index.ts'
+import { gitPlugin } from '@acorn/plugin-git/node/index.ts'
 import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
 import { notesPlugin } from '@acorn/plugin-notes/node/index.ts'
 import { previewPlugin } from '@acorn/plugin-preview/node/index.ts'
@@ -38,6 +39,7 @@ export const nodePlugins = (dataDir: string, deps: NodePluginDeps): NodePlugin[]
   dockerPlugin(),
   editorPlugin(),
   githubPlugin(),
+  gitPlugin(),
   memoryPlugin(),
   notesPlugin(dataDir, deps.notes),
   previewPlugin(),

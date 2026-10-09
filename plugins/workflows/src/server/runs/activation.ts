@@ -41,6 +41,7 @@ export const createWorkflowExecution = (
     return connectedDispatcher
   }
   const runner = new WorkflowRunner(store, {
+    admitWork: (taskId, action) => core.checkoutAdmission.admitWork(taskId, action),
     invalidStepKind: (id, problems) => ctx.log.warn(`Workflow step '${id}' was rejected: ${problems.join('; ')}`),
     dataAccess: async (taskId, signal) => {
       const task = await core.tasks.load(taskId)

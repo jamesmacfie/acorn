@@ -3,6 +3,7 @@ import {
   contextMenuRegistry, openPane, projectSurfaceRegistry, registerNoticeTargetHandler, type ClientPlugin,
 } from '@acorn/plugin-api/client'
 import { WORKFLOW_CONTROL } from '@acorn/plugin-agents/contract/workflowControl.ts'
+import { WORKFLOW_GIT_LAUNCH, openWorkflowGitLaunch, workflowGitLaunchRequest } from '../contract/gitLaunch.ts'
 import { workflowApi } from './workflowsClient'
 import { workflowsCommands } from './commands'
 import { workflowsSourceContribution, workflowsSurfaceContribution } from './sourceContribution'
@@ -14,10 +15,18 @@ import { openStartFromItem, startFromItemTarget } from './startFromItem'
 
 const WorkflowsSettings = lazy(() => import('./WorkflowsSettings'))
 const StartFromItemHost = lazy(() => import('./StartFromItemHost'))
+const GitLaunchDialog = lazy(() => import('./GitLaunchDialog'))
+const GitLaunchHost = lazy(() => import('./GitLaunchHost'))
 
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
   init: (ctx) => {
+    ctx.capabilities.provide(WORKFLOW_GIT_LAUNCH, { open: openWorkflowGitLaunch, Dialog: GitLaunchDialog })
+    ctx.slots.register({
+      id: 'workflows.git-launch', slot: 'overlay', order: 51,
+      when: () => !!workflowGitLaunchRequest(),
+      component: () => createComponent(GitLaunchHost, {}),
+    })
     ctx.contentLinks.register({ id: 'workflows.run', providerId: 'workflows', parse: () => null,
       target: item => ({ kind: 'workflows.run', item, pane: 'workflows' }), presentations: ['pane'] })
     // The reads plugins/agents' pane needs (docs/plugins/collaboration.md § Collaboration rules). Published under

@@ -15,7 +15,7 @@ import { localGit, setLocalGitBridge, type GitActionResult } from './localGit'
 import { _resetLocalDocuments } from '../localDocument'
 import type { LocalDocumentResponse } from '../../shared/api'
 import type { DiffSearchPage, DiffSegmentPayload } from '@acorn/diff-document/document'
-import { ProviderOperationError, type GenerateTextRequest } from '@acorn/plugin-api/node'
+import { ProviderOperationError, type CoreServices, type GenerateTextRequest } from '@acorn/plugin-api/node'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { Env } from '@acorn/plugin-api/testkit'
 
@@ -35,6 +35,9 @@ const noModels = {
   generateText: () => Promise.reject(new Error('no provider in this test')),
   available: () => Promise.resolve([]),
 }
+const withAdmission = <T extends { tasks: CoreServices['tasks'] }>(core: T) => ({ ...core,
+  checkoutAdmission: { write: async <R>(taskId: string, action: (path: string) => Promise<R>) => action((await core.tasks.root(taskId))!) } as CoreServices['checkoutAdmission'],
+})
 
 const authed = () => {
   const app = new Hono<AppEnv>()
@@ -60,7 +63,7 @@ describe('local-git routes over a real worktree', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
-    setLocalGitBridge(localGitBridge({ tasks: createTaskService(t.db), models: noModels }))
+    setLocalGitBridge(localGitBridge(withAdmission({ tasks: createTaskService(t.db), models: noModels })))
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
@@ -85,7 +88,7 @@ describe('local-git routes over a real worktree', () => {
     const app = authed()
     const status = await statusOf(app)
     // The branch facts travel with the file list, which is the point of the one read.
-    expect(Object.keys(status).sort()).toEqual(['ahead', 'behind', 'branch', 'changes', 'operation', 'upstream'])
+    expect(Object.keys(status).sort()).toEqual(['ahead', 'behind', 'branch', 'changes', 'operation', 'pullPolicy', 'upstream', 'upstreamId'])
     expect(status.changes.find((c) => c.path === 'new.txt')?.status).toBe('untracked')
 
     const staged = await (await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { paths: ['new.txt'] }), {} as Env)).json()
@@ -196,7 +199,7 @@ describe('the hook chains, as the bridge runs them', () => {
     rmSync(work, { recursive: true, force: true })
   })
 
-  const bridge = () => localGitBridge({ tasks: createTaskService(t.db), models: noModels }, () => {}, hooks)
+  const bridge = () => localGitBridge(withAdmission({ tasks: createTaskService(t.db), models: noModels }), () => {}, hooks)
 
   it('hands a handler the amend flag, and commits the message the chain left', { timeout: 15_000 }, async () => {
     verdict = { ok: true, transform: (message) => `lint: ${message}` }
@@ -299,7 +302,7 @@ describe('the generated commit message', () => {
     git('commit', '-q', '-m', 'first')
 
     t = makeTestDb()
-    setLocalGitBridge(localGitBridge({ tasks: createTaskService(t.db), models }))
+    setLocalGitBridge(localGitBridge(withAdmission({ tasks: createTaskService(t.db), models })))
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
@@ -426,7 +429,7 @@ describe('the local diff document', () => {
     git('add', '.')
     git('commit', '-qm', 'base')
     t = makeTestDb()
-    setLocalGitBridge(localGitBridge({ tasks: createTaskService(t.db), models: noModels }))
+    setLocalGitBridge(localGitBridge(withAdmission({ tasks: createTaskService(t.db), models: noModels })))
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({

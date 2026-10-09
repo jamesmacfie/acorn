@@ -48,6 +48,9 @@ const [path, setPath] = createSignal('/')
 /** Where the shell is, as a path. Read by ../chrome/routing.ts, which is the only thing that acts on it. */
 export const currentPath = path
 
+/** The small location shape used by overlays that must discard callbacks after navigation. */
+export const useLocation = (): { readonly pathname: string } => ({ get pathname() { return path().split('?')[0]! } })
+
 /** Core's patterns ahead of the contributed ones, and the contributed ones in the order they were
  *  declared, which `sourceRouteContributions` already sorts. Order is what puts `/p/:id/pulls/new`
  *  in front of `/p/:id/pulls/:number`, so a static segment is tried before a parameter that would

@@ -268,8 +268,9 @@ describe('resolveVars — command execution context', () => {
     const runProcess = vi.spyOn(fx.core.proc, 'runProcess')
     const vars = await resolveVars(fx.db, fx.core, USER, 'project-widget', input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
 
-    expect(runProcess).toHaveBeenCalledOnce()
-    expect(runProcess).toHaveBeenCalledWith(expect.objectContaining({ file: 'bash', cwd: worktree, timeoutMs: 15_000 }))
+    const commandCalls = runProcess.mock.calls.filter(([request]) => request.file === 'bash')
+    expect(commandCalls).toHaveLength(1)
+    expect(commandCalls[0]?.[0]).toEqual(expect.objectContaining({ file: 'bash', cwd: worktree, timeoutMs: 15_000 }))
     const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
     expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
     expect(taskId).toBe('task-1')

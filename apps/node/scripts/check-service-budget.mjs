@@ -66,6 +66,13 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: command restart recovery adds event attribution checks, client read projection calls,
 // and lifecycle settlement calls. The command policy and reconciliation queries load on first use.
 // No dependency is added. Static graph: 3,179,747 B. Add 4 KB for the owning runtime's call sites.
+// 2026-10-08: the Git plugin registers at boot. Its worktree route loads after activation through a
+// dynamic import; the built static graph is 3,185,838 B. Keep about 1 KB for bundler variation.
+// 2026-10-09: history and revision routes remain dynamically loaded; the measured boot graph is
+// 3,186,368 B, 632 B below the same ceiling.
+// 2026-10-09: checkout admission must be present before owner plugins initialize and register their
+// activity readers. Stash routes remain lazy. The measured static graph is 3,194,672 B; leave about
+// 5 KB for bundler variation while keeping the admission coordinator in the boot graph.
 // 2026-10-09: the build minifies with Oxc and keeps function and class names (../vite.config.ts), and
 // this check reads the build's chunk graph instead of the chunk text. Every figure above is
 // unminified. The same graph went from 3,193,213 B to 1,824,878 B on macOS arm64; keeping names costs
@@ -75,7 +82,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // to first use: the GitHub mirror routers (about 37 KB), the tunnel's `ws` server, the workflow file
 // authoring and export module, and the Claude and Codex usage probes. The ceiling keeps about 2 KB of
 // margin, so any one of those imports returning fails the build.
-const limits = { ceiling: 1_705_000, floor: 1_000_000 }
+// 2026-10-09: 1,710,383 B after merging main's Git plugin work into phase 06. The 7,423 B rise is
+// boot-time registration main added: the checkout admission coordinator, which must exist before
+// owner plugins initialize, and smaller task, worktree, and local Git calls. No module in it is
+// optional at boot. The ceiling keeps about 2 KB of margin.
+const limits = { ceiling: 1_712_500, floor: 1_000_000 }
 
 const graph = readChunkGraph(dist)
 const files = staticClosure(graph)

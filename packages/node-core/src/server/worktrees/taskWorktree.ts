@@ -2,7 +2,7 @@ import { taskScripts } from '../taskScripts/service'
 // Task-to-checkout/worktree resolution shared by every privileged main-process surface. The task
 // ID, never a renderer-supplied absolute path, is the capability; paths are re-derived from the
 // database on every call.
-import { statSync } from 'node:fs'
+import { realpathSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, resolve } from 'node:path'
 import { and, eq, isNotNull } from 'drizzle-orm'
@@ -13,6 +13,7 @@ import type { ProjectWorktree } from '@acorn/protocol/api.ts'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../runConfig'
 import { getProject, type ProjectRow } from '../projects'
+import { gitText } from '../core/git'
 import { getProjectConfig } from '../projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../repoConfigSnapshot'
 import { copyWorktreeFiles, ensureWorktree, listWorktrees, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
@@ -116,12 +117,34 @@ export const contextInjectionEnabled = async (db: AppDatabase, userId: string): 
 // reports for the project's checkout.
 export async function unclaimedWorktrees(db: AppDatabase, project: ProjectRow): Promise<ProjectWorktree[]> {
   if (project.vcs !== 'git' || !project.path || !isDir(project.path)) return []
-  const claimed = await db
-    .select({ worktreePath: schema.tasks.worktreePath })
-    .from(schema.tasks)
-    .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
-  const taken = new Set(claimed.map((row) => resolve(row.worktreePath!)))
-  return (await listWorktrees(project.path)).filter((wt) => !taken.has(resolve(wt.path)))
+  const identity = (path: string): string => {
+    try { return realpathSync(path) } catch { return resolve(path) }
+  }
+  const claimed = (await db
+    .select({ id: schema.tasks.id, status: schema.tasks.status, worktreePath: schema.tasks.worktreePath, projectId: schema.tasks.projectId, branch: schema.tasks.branch })
+    .from(schema.tasks)).filter((row) => row.status === 'active' || isTaskArchiving(row.id))
+  const taken = new Set(claimed.filter((row) => row.worktreePath).map((row) => identity(row.worktreePath!)))
+  // A project-folder task has no stored worktree path. Its mapped project may itself be a linked
+  // checkout, and another project alias can point at the same checkout.
+  for (const row of claimed.filter((item) => !item.worktreePath && item.branch === null)) {
+    const owner = await getProject(db, row.projectId)
+    if (owner?.path) taken.add(identity(owner.path))
+  }
+  const roster = await listWorktrees(project.path)
+  const repository = await gitText(['rev-parse', '--git-common-dir'], { cwd: project.path, timeoutMs: 10_000 })
+  const reserved = new Set<string>()
+  for (const row of claimed.filter((item) => !item.worktreePath && item.branch)) {
+    const owner = await getProject(db, row.projectId)
+    if (!owner?.path || owner.vcs !== 'git') continue
+    try {
+      const other = await gitText(['rev-parse', '--git-common-dir'], { cwd: owner.path, timeoutMs: 10_000 })
+      if (identity(resolve(owner.path, other)) === identity(resolve(project.path, repository))) reserved.add(row.branch!)
+    } catch { /* An unavailable project cannot claim this Git registration. */ }
+  }
+  return roster.filter((wt) => {
+    try { return isDir(wt.path) && !taken.has(realpathSync(wt.path)) && !reserved.has(wt.branch) }
+    catch { return false }
+  })
 }
 
 // Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md):

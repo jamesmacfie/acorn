@@ -23,6 +23,9 @@ export type LocalChange = {
 export type LocalStatus = {
   branch: string | null // null on a detached HEAD
   upstream: string | null // null when the branch has no upstream
+  /** Tracking commit observed with this status; a force push leases this exact object. */
+  upstreamId?: string | null
+  pullPolicy?: 'ff-only' | 'rebase'
   ahead: number | null // null, not zero, when there is no upstream to count against
   behind: number | null
   operation: 'merge' | 'rebase' | null // a merge or rebase is mid-flight

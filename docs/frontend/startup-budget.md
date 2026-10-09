@@ -18,8 +18,8 @@ after the loaded-plugin frame, chrome, and worker hosts and the promotion modal 
 first use. A change that needs more raises the ceiling in the same commit, with the reason in the
 commit message.
 
-The same check counts the compiled roster's scripts beyond startup, against a ceiling of 230,000 B,
-about 5% above the 219,353 B measured the same day. The roster loads after the first frame, but the
+The same check counts the compiled roster's scripts beyond startup, against a ceiling of 244,000 B,
+about 5% above the 232,231 B measured the same day once the Git plugin joined the roster. The roster loads after the first frame, but the
 workspace restore waits for its registration. A dynamic import that only moves startup code into the
 roster saves the launch nothing, and this ceiling fails it. The roster's key, `src/client/plugins.ts`,
 lives in `apps/desktop/scripts/renderer-graph.mjs`, which the size report reads too.
@@ -43,9 +43,9 @@ top-level dynamic import in that entry, and their full static dependencies. Impo
 including the roster loaded after the first frame, are outside the set. A dependency reached both
 statically and dynamically still counts.
 
-The ceiling is 700,000 B, about 4% above the production measurement of 673,918 B across 175 chunks on
+The ceiling is 700,000 B, about 3% above the production measurement of 676,436 B across 178 chunks on
 October 9, 2026. Loaded-plugin frame and chrome registration load on the first distribution pass, out
-of the startup graph. Production output is minified with Oxc. Zod is bundled and tree-shaken, and
+of the startup graph. The Git plugin stays in the roster after the first frame. Production output is minified with Oxc. Zod is bundled and tree-shaken, and
 validation still runs before untrusted content is drawn. Other external imports are listed
 separately, and their package bytes aren't in the budget. The client imports narrow supported
 entrypoints for its model and host adapters, not broad `public.ts` barrels, which would pull DOM
@@ -54,10 +54,11 @@ components and diff code into the closure.
 ### The node service
 
 `apps/node/scripts/check-service-budget.mjs` runs from `@acorn/node`'s `build`. It counts
-`service.js` and every chunk it reaches through static imports, against a ceiling of 1,705,000 B. The
-ceiling is about 2 KB above the minified measurement of 1,702,960 B on October 9, 2026, on macOS arm64,
-after the GitHub mirror routes, the tunnel's `ws` server, workflow file authoring, and the usage probes
-moved to first use ([evidence](../testing/selective-server-loading-2026-10-09.md)). Under 1,000,000 B,
+`service.js` and every chunk it reaches through static imports, against a ceiling of 1,712,500 B. The
+ceiling is about 2 KB above the minified measurement of 1,710,383 B on October 9, 2026, on macOS arm64.
+That figure includes the Git plugin's checkout admission, which boot needs, and follows the GitHub
+mirror routes, the tunnel's `ws` server, workflow file authoring, and the usage probes moving to
+first use ([evidence](../testing/selective-server-loading-2026-10-09.md)). Under 1,000,000 B,
 the walk has stopped following imports, and the check fails. To cut the graph, see
 [load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use).
 

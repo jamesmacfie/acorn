@@ -7,6 +7,7 @@ import { Row, Rows, Text } from './showing'
 import { renderCells } from './render'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { ListDetail } from '../layouts/ListDetail'
+import { ScrollViewport } from './scrolling'
 
 const items = (count: number) => Array.from({ length: count }, (_, index) => ({
   key: `row-${index + 1}`,
@@ -23,6 +24,16 @@ const lit = (screen: { runs: () => { text: string; fg: { r: number; g: number; b
   screen.runs().filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1).map((run) => run.text)
 
 describe('scrolling detail viewports', () => {
+  it('keeps wrapped text clear of the scrollbar', async () => {
+    const screen = await renderCells(() => <ScrollViewport>
+      <Text wrap>abcdefghijklmnopqrst</Text>
+      {items(10).map((row) => <Text>{row.label}</Text>)}
+    </ScrollViewport>, { width: 12, height: 4 })
+    try {
+      expect(screen.lines.slice(0, 3).join('').replace(/[^a-z]/g, '')).toContain('abcdefghijklmnopqrst')
+    } finally { screen.done() }
+  })
+
   it('restores a panel reading place after remote offset and content arrive', async () => {
     const [offset, setOffset] = createSignal<number>()
     const [ready, setReady] = createSignal(false)

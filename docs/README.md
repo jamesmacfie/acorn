@@ -93,6 +93,11 @@ the whole plugin system in one page.
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
+| [git-client/worktrees.md](./git-client/worktrees.md) | Git worktree inventory, task ownership, and guarded cleanup in both clients. |
+| [git-client/history.md](./git-client/history.md) | Pinned history pages, read-only revision diffs, limits, and routes in both clients. |
+| [git-client/stashes.md](./git-client/stashes.md) | Stash browsing and guarded task checkout writes in both clients. |
+| [git-client/refs-remotes-settings.md](./git-client/refs-remotes-settings.md) | Guarded refs and remotes, pinned comparison, scoped identity, and Node scheduled fetch. |
+| [git-client/explanations.md](./git-client/explanations.md) | Explicit Git explanations and first-release replacement guidance. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
 | [schedules/plugin-schedules.md](./schedules/plugin-schedules.md) | How a plugin declares a schedule, overrides, lifecycle, and trust. |
 | [schedules/user-schedules.md](./schedules/user-schedules.md) | User schedule targets, consent, workflow schedules, routes, and Settings. |

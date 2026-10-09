@@ -2,6 +2,7 @@ import { Show } from 'solid-js'
 import { paneCollapseKey, sidebarCollapse } from '../../kit/lib/layout/collapseState'
 import { CollapseEdge, SplitHandle } from '../../kit/components/primitives'
 import { createSplitDrag } from '../../kit/lib/layout/split'
+import { retainScroll } from '../../kit/lib/layout/retainScroll'
 import { layoutState } from './state'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
@@ -75,7 +76,11 @@ export function ListDetail(props: LayoutProps) {
           <Show when={collapsed()}><div class="layout-collapsed-header" aria-hidden="true" /></Show>
           <Show when={!collapsed() || props.collapseContent !== 'empty'}>
             {props.regions['list-header']?.()}
-            <div class="layout-list-scroll">{props.regions.list?.()}</div>
+            <div class="layout-list-scroll" ref={(element) => retainScroll(element, {
+              key: () => props.scrollScope ?? '',
+              read: (scope) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[0](),
+              write: (scope, offset) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[1](offset),
+            })}>{props.regions.list?.()}</div>
             <Show when={props.regions['list-footer']}>
               <div class="layout-list-footer">{props.regions['list-footer']?.()}</div>
             </Show>

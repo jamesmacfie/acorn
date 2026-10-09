@@ -1,9 +1,10 @@
 import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, registerCommands, type ContributedCommand, type UiSlotContribution } from '@acorn/plugin-api/client'
-import type { CustomAgent } from '../shared/customAgents'
 import { startSessionFromPalette } from './commands'
+import { agentProvidersOptions } from './providersClient'
 import { customAgentsOptions } from './settings/customAgentsClient'
+import { choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from './settings/sessionDefaultsClient'
 import {
   AGENT_TOOL_FOLD_CHOICES,
@@ -85,41 +86,55 @@ export function AgentCommands() {
     onCleanup(() => commands.dispose())
   })
 
+  const providers = createQuery(() => agentProvidersOptions())
   const customAgents = createQuery(() => customAgentsOptions())
-  registerCustomAgentCommands(() => customAgents.data ?? [])
+  registerNewSessionCommands(() =>
+    newSessionChoices((providers.data ?? []).filter((provider) => provider.installed), customAgents.data ?? []))
 
   return null
 }
 
+/** A row's id. It never changes for a harness or an agent, so a keyboard shortcut can name it. */
+const commandId = (choice: NewSessionChoice): string =>
+  choice.agent ? `agents.custom-agent.${choice.agent.id}` : `agents.harness.${choice.provider.id}`
+
 /**
- * One "New <agent> session" row per custom agent, so typing the agent's name finds it without opening
- * New agent session first. Registered again only when the set of ids changes; a rename reaches the row
- * through the live read in `title`. Desktop only, for the reason the two settings above are: this
- * needs the query cache, and the terminal still reaches every agent through New agent session.
+ * One "New <harness or agent> session" row per choice the pane's New picker offers, so typing
+ * "claude" or an agent's name finds it without opening New agent session first. Registered again only
+ * when the set of ids changes; a rename reaches the row through the live read in `title`. Desktop only,
+ * for the reason the two settings above are: this needs the query cache, and the terminal still
+ * reaches every choice through New agent session.
  */
-function registerCustomAgentCommands(list: () => readonly CustomAgent[]): void {
-  const agents = createMemo(list)
-  const live = (id: string) => agents().find((agent) => agent.id === id)
-  const roster = createMemo(() => agents().map((agent) => agent.id), [] as string[], {
+function registerNewSessionCommands(list: () => readonly NewSessionChoice[]): void {
+  const choices = createMemo(list)
+  const live = (id: string) => choices().find((choice) => commandId(choice) === id)
+  const roster = createMemo(() => choices().map(commandId), [] as string[], {
     equals: (before, after) => before.join() === after.join(),
   })
   createEffect(() => {
     const ids = roster()
     if (!ids.length) return
     const registered = registerCommands(ids.map((id): ContributedCommand => ({
-      id: `agents.custom-agent.${id}`,
-      title: () => `New ${live(id)?.name ?? 'agent'} session`,
-      hint: 'a custom agent, started in this task',
-      keywords: ['agent', 'new', 'session', 'custom'],
+      id,
+      title: () => {
+        const choice = live(id)
+        return `New ${choice ? choiceLabel(choice) : 'agent'} session`
+      },
+      hint: () => (live(id)?.agent ? 'a custom agent, started in this task' : 'an agent session in this task'),
+      keywords: ['agent', 'new', 'session', id.startsWith('agents.custom-agent.') ? 'custom' : 'harness'],
       category: 'action',
       palette: true,
       scope: 'task',
       requires: { plugin: 'agents' },
       when: () => !!live(id),
       run: (context) => {
-        const agent = live(id)
-        if (!agent || !context.taskId) return
-        return startSessionFromPalette(context.taskId, { id: agent.providerId, profileId: agent.profileId }, agent.id)
+        const choice = live(id)
+        if (!choice || !context.taskId) return
+        return startSessionFromPalette(
+          context.taskId,
+          { id: choice.provider.id, profileId: choice.agent?.profileId ?? choice.provider.profileId },
+          choice.agent?.id,
+        )
       },
     })))
     onCleanup(() => registered.dispose())

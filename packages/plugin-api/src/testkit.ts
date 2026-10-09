@@ -21,6 +21,7 @@ export type { TestNodeContext } from '@acorn/node-core/testkit'
 // that needs one without a plugin context, such as a service or a route mounted on its own Hono app.
 // `TEST_ENCRYPTION_KEY` is not here, because `testEnv` bakes it in.
 export { makeTestCoreServices, makeTestDb, makeTestPluginDb, testEnv, testSecretEnv } from '@acorn/node-core/testkit'
+export { beginTaskArchive, finishTaskArchive } from '@acorn/node-core/testkit'
 export type { TestDb, TestPluginDb } from '@acorn/node-core/testkit'
 // Seed the principal exactly as authMiddleware would, then run the real requireUser gate:
 // `.use('/api/*', ...testGate(principal))`.

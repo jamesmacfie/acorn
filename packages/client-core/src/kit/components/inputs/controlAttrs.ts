@@ -20,7 +20,8 @@ export type ControlOwn = {
   autofocus?: boolean
   /** Whether the platform helps with what is typed: spelling, autocorrect, capitalisation. One prop
    *  rather than three attributes, because the answer is always the same for all three. Off for
-   *  anything that is not prose: an identifier, a URL, a query. Defaults to on. */
+   *  anything that is not prose: an identifier, a URL, a query. Defaults to off, because the desktop
+   *  page sets `spellcheck="false"` on its root and every control inherits it. Pass `true` to opt in. */
   assist?: boolean
 }
 

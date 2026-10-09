@@ -395,7 +395,7 @@ describe('remoteReason', () => {
   // The lease refusing is not a case for pressing harder: somebody else pushed.
   it('sends a failed lease to a fetch rather than to another force', () => {
     const said = remoteReason('force', 'stale info: remote ref is at a commit you do not have')
-    expect(said).toContain('Fetch first')
+    expect(said).toContain('Inspect the remote history')
     expect(said).not.toContain('Force push')
   })
 

@@ -16,6 +16,14 @@ collection node, keyed by the collection's id and each item's key, never its ind
 a fresh answer is a new array of new objects, and an index into it points at whatever moved into that
 slot. Keying by the item's key is what makes a refetch keep your place.
 
+A sidebar comes back scrolled to where you left it. Leaving a pane removes its DOM, so the offset lives
+in a store, and `packages/client-core/src/kit/lib/layout/retainScroll.ts` writes it back when the
+scroller mounts again. It retries while the rows arrive and stops as soon as you scroll. A virtual
+`Rows` keeps its offset in the collection's `offset`. The host's `list-detail` layout keeps its list
+column's offset in `packages/client-core/src/host/layouts/state.ts`, once per pane and task. A kit
+`ListColumn` with a `scrollKey` keeps its own, which is how browse sources keep theirs. A list
+that scrolls some other element keeps its own offset, as Docker's browse lists and the archive do.
+
 `packages/client-core/src/host/keys/focusRegions.ts` holds which region of which pane has focus. It's
 the one place `focusedPane` is written and the one place `runtime:focus-changed` is emitted. Where you
 are in a list is a reading posture, not a preference, so neither is persisted

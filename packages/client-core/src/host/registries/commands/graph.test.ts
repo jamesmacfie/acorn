@@ -69,6 +69,12 @@ describe('a valid tree', () => {
     const withKeyword = buildCommandGraph([leaf('appearance', { title: 'Appearance', keywords: ['theme', 'dark'] })])
     expect(withKeyword.search('dark').map((node) => node.id)).toEqual(['appearance'])
   })
+
+  it('matches a query that spans two keywords', () => {
+    // A custom agent's "New Reviewer session" row has neither word of "agent session" in its title.
+    const agent = buildCommandGraph([leaf('agent', { title: 'New Reviewer session', keywords: ['agent', 'new', 'session'] })])
+    expect(agent.search('agent session').map((node) => node.id)).toEqual(['agent'])
+  })
 })
 
 describe('sibling order', () => {

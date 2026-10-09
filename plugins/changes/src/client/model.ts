@@ -117,7 +117,7 @@ export type RemoteVerb = 'publish' | 'pull' | 'push' | 'fetch'
 
 /** Every verb the bar can actually run, which is one more than the button offers: the menu holds the
  *  rebase form of a pull and the leased form of a push, and the banner holds the abort. */
-export type RemoteAction = 'fetch' | 'pull' | 'rebase' | 'push' | 'force' | 'abort'
+export type RemoteAction = 'fetch' | 'pull' | 'pull-ff' | 'rebase' | 'push' | 'force' | 'abort'
 
 /** Where the branch stands against its upstream. Only the three fields that decide it, so a caller
  *  can ask about a hypothetical without building a whole status record. */
@@ -157,19 +157,19 @@ export function remoteCounts(state: RemoteState): string {
  *  to hint on and not to depend on — an unrecognised reason is passed through unchanged. */
 export function remoteReason(action: RemoteAction, reason: string): string {
   const said = (pattern: RegExp) => pattern.test(reason)
-  if (action === 'pull' && said(/fast-forward|diverged/i)) {
+  if ((action === 'pull-ff' || action === 'pull') && said(/fast-forward|diverged/i)) {
     return `${reason} Use Pull with rebase from the menu.`
   }
   // What a push after an amend hits: the branch is ahead of an upstream that still holds the old
   // commit, so git calls it non-fast-forward. Force push is the deliberate next step, and its lease
   // is what makes it safe to name here.
   if (action === 'push' && said(/non-fast-forward|rejected|fetch first/i)) {
-    return `${reason} Force push from the menu replaces it, with a lease that refuses to drop a commit this node has not fetched.`
+    return `${reason} Force push from the menu uses the remote commit shown by the last status read as its lease.`
   }
   // The lease itself refusing. Not a case for pressing harder: somebody else pushed, and the fix is
   // to look at what they pushed.
   if (action === 'force' && said(/stale info|rejected|lease/i)) {
-    return `${reason} Fetch first: the remote has moved since this node last looked.`
+    return `${reason} Inspect the remote history and refresh Changes before retrying.`
   }
   return reason
 }

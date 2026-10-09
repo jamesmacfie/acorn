@@ -95,7 +95,7 @@ describe('starting a workflow from an integration row', () => {
     expect(Array.from(host!.querySelectorAll('option'), (option) => option.textContent))
       .toEqual(['published', 'repository', 'personal'])
     await modal!.action.onTaskReady({ id: 'task-1' } as Task)
-    expect(calls.start).toHaveBeenCalledWith('task-1', { defId: 'published' }, undefined)
+    expect(calls.start).toHaveBeenCalledWith('task-1', { defId: 'published' }, undefined, expect.any(Function), undefined)
   })
 
   it('closes with publication guidance when only unpublished workflows exist', async () => {
@@ -108,7 +108,10 @@ describe('starting a workflow from an integration row', () => {
 
   it.each(['onCreated', 'onAttached'] as const)('exposes the workflow pane before %s navigates to the run', async (land) => {
     const task = { id: `pr-${land}`, title: 'Review PR' } as Task
-    calls.start.mockResolvedValue({ runId: 'run-1' })
+    calls.start.mockImplementation(async (_taskId, _body, _inputs, onTrusted) => {
+      onTrusted('run-1')
+      return { runId: 'run-1' }
+    })
     calls.navigate.mockImplementationOnce(() => expect(taskHasWorkflowRuns(task.id)).toBe(true))
     open()
     await vi.waitFor(() => expect(modal).toBeDefined())

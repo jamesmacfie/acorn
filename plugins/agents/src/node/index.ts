@@ -1,4 +1,5 @@
 import { AGENT_STANDING_CONTEXT } from '../contract/standingContext'
+import { readAgentCheckoutActivity } from '../server/sessions/checkoutActivity'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
@@ -117,6 +118,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
   let lifecycleCapabilities: Array<{ dispose(): void }> = []
+  let stopCheckoutActivity: (() => void) | null = null
   return {
     name: 'agents',
     label: 'Agents',
@@ -137,6 +139,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // See docs/data-layer/migrations.md § Migrations.
       const store = ctx.storage.open()
       const core = ctx.core
+      stopCheckoutActivity = core.checkoutAdmission.registerOwner('turns', (taskIds) => readAgentCheckoutActivity(store, taskIds))
       // The runtime and the Usage page share one service. A suspected limit failure asks only its own
       // harness collector for a fresh reset time; ordinary page reads keep using the cached snapshot.
       const probeDir = join(dataDir, 'agent-usage-probe')
@@ -456,6 +459,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     // Releases what init acquired, in the order docs/managed-agents/operations.md § Operations and failure
     // describes.
     dispose: async () => {
+      stopCheckoutActivity?.()
+      stopCheckoutActivity = null
       // First, so no sender queues a turn on a runtime that is stopping.
       reconcileMessages = null
       void messages?.then((loaded) => loaded.dispose())

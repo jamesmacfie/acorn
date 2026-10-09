@@ -118,6 +118,7 @@ export const NODE_SUPPORT = {
     dom: 'full', tui: 'reduced',
     loss: 'the indented list the editor already draws — one line per card, no positions, no wires, and no dragging an edge into place',
   },
+  HistoryMark: { dom: 'full', tui: 'reduced', loss: 'relationship text and lane number replace drawn connections' },
   Meter: { dom: 'full', tui: 'full' },
   CodeBlock: { dom: 'full', tui: 'full' },
   Log: { dom: 'full', tui: 'full' },

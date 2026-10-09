@@ -27,14 +27,15 @@ contributors are added beside them ([plugins.md](../plugins.md) § Cooperative e
 
 The pull list's **Search** field narrows the loaded tab at once by number, title, author, or branch.
 Once the text settles, it asks the Node's `/repos/:owner/:repo/pulls/search` route, which searches
-GitHub in this repository and the selected Open or Closed tab, beyond the loaded pages. The debounce,
-minimum, and length are the rail's ([searching a source](../plugins/descriptors.md#searching-a-source)).
+GitHub in this repository and the selected Open or Closed tab, beyond the loaded pages. Its hits are
+added after the loaded matches rather than replacing them, because GitHub matches whole words and
+doesn't match authors or branches. The debounce, minimum, and length are the rail's ([searching a source](../plugins/descriptors.md#searching-a-source)).
 
 The route builds the query from the route's repository, `is:pr`, and the tab, and quotes each typed
 word, so a word such as `repo:other/name` is text to match, not a qualifier
 (`pullSearchQuery` in `plugins/github/src/server/routes/pulls/pulls.ts`). A pasted number is looked
 up exactly first. It returns one page of 50 with GitHub's total, and marks it incomplete when GitHub
-holds more or reports an incomplete search. The list then says how many it's showing. Search has its
+holds more or reports an incomplete search. The list then says how many matches GitHub holds. Search has its
 own GitHub rate limit, and a refusal keeps the loaded matches with a line saying the search failed.
 
 A search hit carries no branch. **Create task** reads the pull's detail for its head branch before it
