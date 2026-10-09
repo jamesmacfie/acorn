@@ -23,6 +23,17 @@ export type ScrollStore = {
   write: (key: string, offset: number) => void
 }
 
+// Offsets for a scroller whose owner has no store of its own to keep them in, such as a keyed
+// `ListColumn` (../../components/layout/ListDetail.tsx).
+const keyedOffsets = new Map<string, number>()
+
+/** A store keyed by `key` alone, held here for the session. */
+export const keyedScrollStore = (key: () => string): ScrollStore => ({
+  key,
+  read: (at) => keyedOffsets.get(at) ?? 0,
+  write: (at, offset) => { keyedOffsets.set(at, offset) },
+})
+
 /** Call from a component, with its scroller, for example from the scroller's `ref`. */
 export function retainScroll(element: HTMLElement, store: ScrollStore): void {
   let current = untrack(store.key)

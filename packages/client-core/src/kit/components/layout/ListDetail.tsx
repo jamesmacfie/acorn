@@ -1,6 +1,7 @@
 import { children, createSignal, Show, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { sidebarCollapse } from '../../lib/layout/collapseState'
+import { keyedScrollStore, retainScroll } from '../../lib/layout/retainScroll'
 import { createSplitDrag, type SplitDrag } from '../../lib/layout/split'
 import Icon from '../content/Icon'
 import { Button } from '../inputs/Button'
@@ -186,10 +187,20 @@ export function ListColumn(props: {
    *  inline padding. A column of rows leaves it unset — its rows own their scrolling and sit flush
    *  against the divider, which is what every list in the app does. */
   scroll?: boolean
+  /** Keeps where the column was scrolled to, under this key, for when it is drawn again. Only a
+   *  column of plain rows ever scrolls; a list with a scroller of its own fills the column. */
+  scrollKey?: string
   children: JSX.Element
 }) {
   return (
-    <aside class="ui-listdetail-list" data-scroll={props.scroll ? '' : undefined} aria-label={props.label}>
+    <aside
+      ref={(element) => {
+        if (props.scrollKey !== undefined) retainScroll(element, keyedScrollStore(() => props.scrollKey ?? ''))
+      }}
+      class="ui-listdetail-list"
+      data-scroll={props.scroll ? '' : undefined}
+      aria-label={props.label}
+    >
       {props.children}
     </aside>
   )

@@ -34,6 +34,11 @@ The list column is flat, with no tint: one view divided by a rule. There's no op
 A list column that can be removed passes `list={undefined}`, so `ListDetail` draws one track instead
 of a zero-width first one. Notes' library toggle works this way.
 
+A list column scrolls vertically when its rows run past the bottom. A list with a scroller of its own,
+such as a virtual `Rows`, fills the column instead, so the column never scrolls and the header above
+the list stays put. Pass `scrollKey` to have the column come back where it was left. Browse sources
+get one keyed by the source id.
+
 ### Collapsing to a rail
 
 A sidebar that narrows to a rail says so with `collapseKey`. The column goes to `--tabrail-w`, the

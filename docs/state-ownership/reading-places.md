@@ -20,7 +20,8 @@ A sidebar comes back scrolled to where you left it. Leaving a pane removes its D
 in a store, and `packages/client-core/src/kit/lib/layout/retainScroll.ts` writes it back when the
 scroller mounts again. It retries while the rows arrive and stops as soon as you scroll. A virtual
 `Rows` keeps its offset in the collection's `offset`. The host's `list-detail` layout keeps its list
-column's offset in `packages/client-core/src/host/layouts/state.ts`, once per pane and task. A list
+column's offset in `packages/client-core/src/host/layouts/state.ts`, once per pane and task. A kit
+`ListColumn` with a `scrollKey` keeps its own, which is how browse sources keep theirs. A list
 that scrolls some other element keeps its own offset, as Docker's browse lists and the archive do.
 
 `packages/client-core/src/host/keys/focusRegions.ts` holds which region of which pane has focus. It's
