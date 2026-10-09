@@ -49,6 +49,7 @@ type LiveSession = {
   skills: SkillStart | null
   skillsOwed: boolean
   advertised: Set<string>
+  retireMcp: (() => Promise<void>) | null
 }
 
 export type ProviderLifecyclePorts = {
@@ -60,6 +61,7 @@ export type ProviderLifecyclePorts = {
   mcpServers(session: AgentSession, env: Record<string, string>, signal: AbortSignal): Promise<{
     servers: AgentDriverMcpServer[]
     unavailable: string[]
+    retire?: () => Promise<void>
   }>
   mcpUnavailable(sessionId: string, names: string[]): Promise<void>
   /** The skills a start of this session receives, with a native folder when the driver loads one, and
@@ -219,6 +221,7 @@ export class ProviderSessionLifecycle {
       stopping: false, closing: false, lastActivityAt: Date.now(),
       reconnectAttempt: existing?.reconnectAttempt ?? 0, acceptedResponse: false, driver,
       skills: null, skillsOwed: false, advertised: new Set(),
+      retireMcp: null,
     }
     // Install before any task, ledger, environment, or driver await.
     this.live.set(session.id, live)
@@ -250,6 +253,7 @@ export class ProviderSessionLifecycle {
       signal.throwIfAborted()
       const env = this.ports.scopedEnvironment(session)
       const mcp = await prepare('mcp.prepare', () => read(() => this.ports.mcpServers(session, env, signal)))
+      live.retireMcp = mcp.retire ?? null
       signal.throwIfAborted()
       // A warning write is durable work. Join it even if stop aborts the following driver start.
       if (mcp.unavailable.length) await this.ports.mcpUnavailable(session.id, mcp.unavailable)
@@ -294,7 +298,7 @@ export class ProviderSessionLifecycle {
       throw error
     } finally {
       live.startPromise = null
-      if (!live.handle) await this.retireSkills(live)
+      if (!live.handle) { await this.retireSkills(live); await this.retireMcp(live) }
       if (!live.handle && !live.stopping && !live.retirementFailure && this.live.get(session.id) === live) this.live.delete(session.id)
     }
   }
@@ -305,6 +309,12 @@ export class ProviderSessionLifecycle {
     const skills = live.skills
     live.skills = null
     await skills?.retire()
+  }
+
+  private async retireMcp(live: LiveSession): Promise<void> {
+    const retire = live.retireMcp
+    live.retireMcp = null
+    await retire?.()
   }
 
   private callback(live: LiveSession, work: () => Promise<void>): Promise<void> {
@@ -368,6 +378,7 @@ export class ProviderSessionLifecycle {
       throw failure
     }
     await this.retireSkills(live)
+    await this.retireMcp(live)
     if (!this.owns(live.generation)) return
     const attempt = live.reconnectAttempt++
     await this.ports.closed(sessionId, live.generation, attempt, error)
@@ -450,6 +461,7 @@ export class ProviderSessionLifecycle {
       if (live.retirementFailure) throw live.retirementFailure
       if (live.handle) await live.handle.stop()
       await this.retireSkills(live)
+      await this.retireMcp(live)
       await Promise.allSettled([...live.callbacks])
       if (live.retirementFailure) throw live.retirementFailure
       await this.ports.retirementFlush(sessionId)

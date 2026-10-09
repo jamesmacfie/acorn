@@ -8,9 +8,10 @@ through `webview_windows()`, although its renderer and window remain live. The u
 that projection for every renderer request and returns “No window could be found.”
 
 The patch retains the original renderer handle after its first lookup, reconciles newly created
-windows, and removes closed windows. Behavior changes are confined to `src/server/mod.rs` and
-`src/server/handlers/window.rs`. Three trailing spaces in `src/platform/linux.rs` are removed.
-This package is compiled only by
+windows, and removes closed windows. The server also checks the request's Host and Origin before
+dispatch against the loopback address and selected port used by Acorn's agent launcher. Behavior
+changes are in `src/server/mod.rs`, `src/server/caller.rs`, and `src/server/handlers/window.rs`.
+Three trailing spaces in `src/platform/linux.rs` are removed. This package is compiled only by
 Acorn's `agent-automation` feature, which the shell refuses in release builds.
 
 Remove this vendored copy when the upstream driver supports windows containing child webviews.

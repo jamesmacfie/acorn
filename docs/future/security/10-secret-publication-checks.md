@@ -1,6 +1,44 @@
 # Phase 10: check secrets before publication
 
-Date: October 8, 2026. Status: proposed product requirements; implementation not started.
+> Completion note, October 9, 2026. **Status: implemented.** Core owns a local detector, the
+> per-Node **Block publication with secret findings** setting, and ten-minute one-operation
+> allowances bound to operation, destination, content digest, and detector version. Only a device can
+> change the setting or allow an operation. Changes checks the commit tree from the index, or from a
+> copy of it for `-a`, and checks the recorded tree again after native hooks run. It moves the branch
+> back with a compare-and-swap when a hook adds a refused secret. Push asks the remote for its refs and
+> scans every newly reachable blob and the annotated tags `push.followTags` would send. Agents check the
+> exact serialized export, offer separate redacted exports, and check stored attachment bytes at the
+> shared dispatch point. [Secret checks before publication](../../security/secret-publication.md)
+> owns the shipped behavior, bounds, and coverage limits.
+>
+> Detector choice: Gitleaks needs a signed Go sidecar per platform. secretlint 13.0.7 missed a bare
+> AWS key ID and a key header in our fixtures, has no confidence tiers, and returns the matched value in
+> its messages. Acorn uses 11 high-confidence provider and key rules and three heuristics, each with a
+> runtime-assembled fixture. Phase 06's instruction redactor is unchanged and can move to
+> `redactSecretText` separately.
+>
+> Acceptance evidence: focused tests pass for the detector and gate (26), the Changes Git checks with
+> real repositories and a local bare remote (11), the Changes routes (26) and pane (33), the agents
+> runtime (44), queue (21), bridge (6), routes (66), and client export (3). The Changes suite passes
+> 317 tests and client-core 2,600. `pnpm lint` passes all 37 tasks, and the architecture suite passes
+> 87 tests. The service graph measures 3,213,722 B under a 3,215,000 B ceiling; the detector, gate, Git
+> checks, and agents module load on first use. In an isolated desktop session on a throwaway repository,
+> the manual check reported `npm-token at config.ts:1:12`. With blocking on, Commit was refused. Settings
+> allowed it once, and the retry committed. Publish was refused, and refused again under a new decision
+> after a later commit removed the token. The original export answered 409, and the redacted export
+> replaced the token. The audit rows held counts, rule IDs, and decision IDs only, and the token appeared
+> in no Acorn log or database. The isolated session's own `push.followTags` setting first made every
+> push incomplete; the push check now reads those tags instead.
+>
+> Not passing in this environment: the agents suite has one failure in the unchanged
+> `instructionSnapshot.test.ts` fixture setup (`mkdir` ENOENT). Node core has 7 failing files in plugin
+> loader, reload, and workspace icon tests, because this shell runs Node 24.11.0, below the patched
+> runtime loaded plugins require. The route registry golden still lacks GitHub `pulls/search`. The
+> desktop driver can't read a switch's state, and its screenshots went stale after the first capture;
+> the stored preference and audit rows confirmed each step. The redacted export menu entries were
+> verified by the client test, not by clicking them in the app. No full `pnpm test` run was made.
+
+Date: October 8, 2026. Status: implemented October 9, 2026; historical plan follows.
 Source baseline: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.
 Dependency: none of phases 01 to 09; phase 06 may reuse the detector for review redaction.
 

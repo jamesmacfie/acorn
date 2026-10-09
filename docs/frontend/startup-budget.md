@@ -54,9 +54,10 @@ components and diff code into the closure.
 ### The node service
 
 `apps/node/scripts/check-service-budget.mjs` runs from `@acorn/node`'s `build`. It counts
-`service.js` and every chunk it reaches through static imports, against a ceiling of 1,712,500 B. The
-ceiling is about 2 KB above the minified measurement of 1,710,383 B on October 9, 2026, on macOS arm64.
-That figure includes the Git plugin's checkout admission, which boot needs, and follows the GitHub
+`service.js` and every chunk it reaches through static imports, against a ceiling of 1,736,500 B. The
+ceiling is about 2 KB above the minified measurement of 1,734,384 B on October 9, 2026, on macOS arm64.
+That figure includes the Git plugin's checkout admission and the security programme's MCP server
+store and credential renewal, which boot or every agent session start needs. It follows the GitHub
 mirror routes, the tunnel's `ws` server, workflow file authoring, and the usage probes moving to
 first use ([evidence](../testing/selective-server-loading-2026-10-09.md)). Under 1,000,000 B,
 the walk has stopped following imports, and the check fails. To cut the graph, see

@@ -129,6 +129,12 @@ export class ManagedAgentRuntime {
   stopIdleSessionsNow = () => this.engine.stopIdleSessionsNow()
   processFootprint = (...args: Parameters<ManagedAgentEngine['processFootprint']>) => this.engine.processFootprint(...args)
   diskFootprint = (now?: number) => this.engine.diskFootprint(now)
+  instructionAdmission = () => this.engine.instructionAdmission()
+  observedInstructionAdmission = () => this.engine.observedInstructionAdmission()
+  observedProvider = (id: string) => this.engine.observedProvider(id)
+  pendingMcpReviews = () => this.engine.pendingMcpReviews()
+  approveMcpCatalogue = (name: string, sessionId: string, revision: string, digest: string) =>
+    this.engine.approveMcpCatalogue(name, sessionId, revision, digest)
 
   /** Read once per spawn so the delegation ledger can retain the resolved choices for recovery. */
   async spawnedAgentDefaults(): Promise<SpawnedAgentDefaults> {
@@ -458,6 +464,7 @@ export class ManagedAgentRuntime {
     const live = this.engine.currentSession(sessionId)
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id
+    if (target) this.engine.cancelInstructionScan(target)
     if (!target) {
       const session = await this.store.getSession(sessionId)
       // Disconnect interrupts the turn before recovery starts. Stop must retire that recovery,
@@ -873,8 +880,14 @@ export class ManagedAgentRuntime {
     return session
   }
 
-  async exportSession(sessionId: string, format: 'json' | 'markdown'): Promise<string> {
-    return (await this.transcriptCommands()).export(sessionId, format)
+  /** An export is publication: with blocking on, the exact serialized bytes pass the secret gate
+   *  first (./secretPublication.ts). */
+  async exportSession(sessionId: string, format: 'json' | 'markdown', variant: 'original' | 'redacted' = 'original'): Promise<{ content: string; digest: string }> {
+    const exported = await (await this.transcriptCommands()).export(sessionId, format, variant === 'redacted')
+    if (this.core.secretPublication) {
+      await (await import('./secretPublication')).admitExport(this.core.secretPublication, { sessionId, format, variant, ...exported })
+    }
+    return exported
   }
 
   async captureExecution(sessionId: string, turnIds: readonly string[]): Promise<AgentSessionSnapshot> {

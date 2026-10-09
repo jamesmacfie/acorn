@@ -32,6 +32,12 @@ reorder, edit, or deferred continuation can't dispatch a stale head. The earlies
 blocks later turns in its session. Workflow work gets a dispatch slot after five interactive or
 automation turns.
 
+Immediately before the driver send, the runtime applies enabled
+[instruction checks](../security.md#instruction-file-checks-and-review) to every queued source,
+including resumes, workflow turns, and delegated agents. An incomplete scan or changed snapshot
+fails that turn with a retry or review instruction. Optional `agents:before-send` plugin hooks retain
+their independent failure behavior.
+
 The store captures provider settings and host attendance at the same acceptance boundary, including
 goal turns. Goal turns use the same admission hooks as person turns. Interactive and imported sessions resolve to `attended`,
 delegated sessions to `supervised`, and workflow sessions to `supervised` under `gated` or

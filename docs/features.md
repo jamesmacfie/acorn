@@ -135,7 +135,7 @@ Settings is a full-window view with a searchable rail of nine groups:
 | --- | --- |
 | General | Appearance, Notifications, Keyboard shortcuts, and Command line. |
 | Workspaces and projects | Overview, a table of every project with a bar for moving, hiding, and colouring several at once. Under it, a page per workspace and a page per project with General, Setup and scripts, Preview, Database, and Connections tabs. Values a project's `.acorn/config.toml` sets are read-only. |
-| Agents | Harnesses and defaults, Custom agents, MCP servers, Tools and permissions, MCP config files, and Limits and cost. |
+| Agents | Harnesses and defaults, Custom agents, Tools and permissions, MCP, and Limits and cost. |
 | Connections | Services, with a page per connection and an Add connection gallery, and AI models. |
 | Features | Terminal, Docker, API requests, and any plugin page that names no group. |
 | Automation | Schedules, Run history, and Workflows. |

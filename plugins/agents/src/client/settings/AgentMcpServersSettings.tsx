@@ -1,8 +1,8 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { createSignal, For, Index, Show } from 'solid-js'
+import { createMemo, createSignal, For, Index, onCleanup, onMount, Show } from 'solid-js'
 import { createSettingSave, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Checkbox, EmptyState, Field, Icon, IconButton, Inline, Input,
+  Alert, Button, Checkbox, CodeBlock, EmptyState, Field, Fold, Icon, IconButton, Inline, Input,
   SegmentedControl, SettingRow, SettingsSection, Stack, Text, Textarea,
 } from '@acorn/plugin-api/ui'
 import { confirmAction } from '@acorn/plugin-api/ui/host'
@@ -11,6 +11,9 @@ import {
   validateAgentMcpServerName,
   type AgentMcpProbeResult,
   type AgentMcpServer,
+  type AgentMcpPackagePlan,
+  type AgentMcpPackageTest,
+  type AgentMcpPendingReview,
 } from '../../shared/mcpServers'
 import {
   agentMcpServersOptions,
@@ -18,6 +21,12 @@ import {
   removeAgentMcpServer,
   saveAgentMcpServer,
   testAgentMcpServer,
+  planAgentMcpPackage,
+  activateAgentMcpPackage,
+  testAgentMcpPackagePlan,
+  consentAgentMcpServer,
+  pendingAgentMcpReviews,
+  approveAgentMcpReview,
 } from './mcpServersClient'
 import {
   agentMcpServerDraft,
@@ -29,17 +38,22 @@ import {
 
 type TestState = { testing: true } | { testing: false; result: AgentMcpProbeResult }
 
-// The one piece of the settings page context this page uses. Optional, so the page draws on its own
-// in a test.
-type PageContext = { navigate: (target: string) => void }
+export function consentSource(server: AgentMcpServer): string {
+  if (server.managed) return `${server.managed.package}@${server.managed.version} (${server.managed.bin})`
+  if (server.transport === 'stdio') return `${server.command ?? 'Command'} (${server.args.length} arguments hidden)`
+  try {
+    const url = new URL(server.url ?? '')
+    return `${url.origin}/… (path and credentials hidden)`
+  } catch { return 'HTTP endpoint (address hidden)' }
+}
 
-// Settings → Agents → MCP servers (docs/mcp.md § Your own servers): the servers acorn hands every agent
+// Settings → Agents → MCP, Servers tab (docs/mcp.md § Your own servers): the servers acorn hands every agent
 // session, whichever harness runs it. A list, then one server's editor in the same pane, which the
 // settings header names and offers the way back from (useSettingsDetail). A server's switch saves when
 // it changes. Adding or editing one is a form with Save and Cancel, because a command, its arguments
 // and its secrets only work together. Remove sits in the editor's danger zone. The section matches the
-// one `../index.ts` declares for search.
-export default function AgentMcpServersSettings(props: { context?: PageContext }) {
+// one `../index.ts` declares for search. ./McpSettingsPage.tsx draws it as a tab.
+export default function AgentMcpServersSettings() {
   const queryClient = useQueryClient()
   const servers = createQuery(() => agentMcpServersOptions())
   const [draft, setDraft] = createSignal<AgentMcpServerDraft | null>(null)
@@ -48,6 +62,19 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
   const [saving, setSaving] = createSignal(false)
   const [error, setError] = createSignal('')
   const [tests, setTests] = createSignal<Record<string, TestState>>({})
+  const [packageOpen, setPackageOpen] = createSignal(false)
+  const [packageUpdate, setPackageUpdate] = createSignal<AgentMcpServer | null>(null)
+  const [reviews, setReviews] = createSignal<AgentMcpPendingReview[]>([])
+  const [reviewError, setReviewError] = createSignal('')
+  const refreshReviews = async () => {
+    try { setReviews(await pendingAgentMcpReviews()); setReviewError('') }
+    catch (cause) { setReviewError(cause instanceof Error ? cause.message : 'MCP reviews could not be loaded.') }
+  }
+  onMount(() => {
+    void refreshReviews()
+    const timer = setInterval(() => { void refreshReviews() }, 5_000)
+    onCleanup(() => clearInterval(timer))
+  })
   const openForm = (next: AgentMcpServerDraft | null) => {
     setError('')
     setOpened(next)
@@ -68,6 +95,25 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
   }
 
   const test = async (name: string) => {
+    const server = current().find((item) => item.name === name)
+    if (!server) return
+    if (!server.consented) {
+      const source = consentSource(server)
+      const approved = await confirmAction({
+        title: `Use ${name}`,
+        actionLabel: 'Consent and test',
+        goes: `${server.transport === 'stdio' ? 'Execute local code' : 'Contact the HTTP server'}: ${source}. Declared credential names: ${server.values.filter((value) => value.secret).map((value) => value.name).join(', ') || 'none'}. The test connects and lists tools.`,
+        stays: 'The server can be edited again; any change requires fresh consent.',
+      })
+      if (!approved) return
+      try {
+        const consented = await consentAgentMcpServer(name, server.revision)
+        replaceList(current().map((item) => item.name === name ? consented : item))
+      } catch (cause) {
+        setTests((all) => ({ ...all, [name]: { testing: false, result: { ok: false, error: cause instanceof Error ? cause.message : 'The server changed before consent.' } } }))
+        return
+      }
+    }
     setTests((all) => ({ ...all, [name]: { testing: true } }))
     try {
       const result = await testAgentMcpServer(name)
@@ -96,7 +142,6 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
       const saved = await saveAgentMcpServer(name, parsed.data)
       replaceList([...current().filter((server) => server.name !== name), saved].sort((a, b) => a.name.localeCompare(b.name)))
       openForm(null)
-      void test(name)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The server could not be saved.')
     } finally {
@@ -144,16 +189,23 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
               id="servers"
               label="Servers"
               description="acorn adds these servers to every agent session."
-              help="They go to Claude Code, Codex, and any other harness, including a session you continue in a terminal. A change applies to new sessions. To change an open session, type /mcp in its message box."
+              help="They go to Claude Code, Codex, and any other harness, including a session you continue in a terminal. Test executes a command or contacts the URL. A change applies to new sessions. To change an open session, type /mcp in its message box."
               actions={
                 <>
-                  <Show when={props.context}>
-                    {(context) => <Button variant="ghost" onPress={() => context().navigate('mcp')}>MCP config files</Button>}
-                  </Show>
                   <Button onPress={() => openForm(blankAgentMcpServerDraft())}><Icon name="plus" /> Add server</Button>
+                  <Button onPress={() => { setPackageUpdate(null); setPackageOpen(true) }}>Install an MCP package</Button>
+                  <Button variant="ghost" onPress={() => void refreshReviews()}>Refresh tool reviews</Button>
                 </>
               }
             >
+              <Show when={packageOpen()}>
+                <PackageInstaller existing={current().map((server) => server.name)} updating={packageUpdate()} onClose={() => setPackageOpen(false)} onInstalled={(server) => {
+                  replaceList([...current().filter((each) => each.name !== server.name), server].sort((a, b) => a.name.localeCompare(b.name)))
+                  setPackageOpen(false)
+                }} />
+              </Show>
+              <Show when={reviewError()}><Alert>{reviewError()}</Alert></Show>
+              <For each={reviews()}>{(review) => <CatalogueReview review={review} onApproved={() => void refreshReviews()} />}</For>
               <Show when={!current().length && servers.isSuccess}>
                 <EmptyState align="start" size="sm">No servers.</EmptyState>
               </Show>
@@ -164,7 +216,8 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
                   let last = current().find((server) => server.name === name)!
                   const server = () => (last = current().find((candidate) => candidate.name === name) ?? last)
                   return <ServerRow server={server()} test={tests()[name]} onEdit={() => openForm(agentMcpServerDraft(server()))}
-                    onTest={() => void test(name)} onToggle={(enabled) => toggle(server(), enabled)} />
+                    onTest={() => void test(name)} onToggle={(enabled) => toggle(server(), enabled)}
+                    onUpdate={() => { setPackageUpdate(server()); setPackageOpen(true) }} />
                 }}
               </For>
             </SettingsSection>
@@ -180,12 +233,159 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
   )
 }
 
+function stableMcpJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableMcpJson).join(',')}]`
+  if (value && typeof value === 'object') return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${stableMcpJson(item)}`).join(',')}}`
+  return JSON.stringify(value)
+}
+
+export function CatalogueReview(props: { review: AgentMcpPendingReview; onApproved: () => void }) {
+  const [busy, setBusy] = createSignal(false)
+  const [error, setError] = createSignal('')
+  const changes = createMemo(() => {
+    const before = new Map(props.review.previousTools.map((tool) => [String(tool.name), tool]))
+    const after = new Map(props.review.tools.map((tool) => [String(tool.name), tool]))
+    return [
+      ...props.review.tools.flatMap((tool) => {
+        const name = String(tool.name)
+        const prior = before.get(name)
+        return !prior ? [{ name, status: 'Added', tool }] : stableMcpJson(prior) !== stableMcpJson(tool) ? [{ name, status: 'Changed', tool }] : []
+      }),
+      ...props.review.previousTools.flatMap((tool) => after.has(String(tool.name)) ? [] : [{ name: String(tool.name), status: 'Removed', tool }]),
+    ]
+  })
+  const approve = async () => {
+    setBusy(true); setError('')
+    try { await approveAgentMcpReview(props.review); props.onApproved() }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'The catalogue changed. Refresh the review.') }
+    finally { setBusy(false) }
+  }
+  return <SettingsSection id={`review-${props.review.sessionId}-${props.review.name}`} label={`Review ${props.review.name} tools`}
+    description={`Actual session connection ${props.review.sessionId}. Catalogue SHA-256: ${props.review.digest}. Calls remain blocked until approval.`}>
+    <Stack gap="stack">
+      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <For each={props.review.findings}>{(finding) => <Alert tone="warn">{finding.tool}: {finding.detail} ({finding.category}). Review the declaration in context.</Alert>}</For>
+      <Show when={!changes().length}><Text>{props.review.previousTools.length ? 'A redacted field or tool ordering changed.' : `First review: ${props.review.tools.length} tools.`}</Text></Show>
+      <For each={changes()}>{(change) => <Stack gap="stack">
+        <Text>{change.status}: {change.name}</Text>
+        <CodeBlock wrap maxHeight="block">{JSON.stringify(change.tool, null, 2)}</CodeBlock>
+      </Stack>}</For>
+      <Button tone="accent" variant="solid" busy={busy()} onPress={() => void approve()}>Approve these tool definitions</Button>
+      <Text>Codex may keep its initial empty tool list after approval. Start a new managed session to use approved tools if they remain absent.</Text>
+    </Stack>
+  </SettingsSection>
+}
+
+function PackageInstaller(props: { existing: string[]; updating: AgentMcpServer | null; onClose: () => void; onInstalled: (server: AgentMcpServer) => void }) {
+  const [name, setName] = createSignal(props.updating?.name ?? '')
+  const [coordinate, setCoordinate] = createSignal(props.updating?.managed ? `${props.updating.managed.package}@${props.updating.managed.version}` : '')
+  const [exceptionText, setExceptionText] = createSignal('')
+  const [plan, setPlan] = createSignal<AgentMcpPackagePlan | null>(null)
+  const [packageTest, setPackageTest] = createSignal<AgentMcpPackageTest | null>(null)
+  const [bin, setBin] = createSignal('')
+  const [busy, setBusy] = createSignal(false)
+  const [error, setError] = createSignal('')
+  const prepare = async () => {
+    const nameError = validateAgentMcpServerName(name())
+    if (nameError) return setError(nameError)
+    if (props.existing.includes(name()) && props.updating?.name !== name()) return setError('A server with that name already exists.')
+    setBusy(true); setError('')
+    try {
+      const exceptions = exceptionText().split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
+        const separator = line.indexOf(' | ')
+        if (separator < 0) throw new Error('Write each exception as package@version | reason.')
+        return { coordinate: line.slice(0, separator).trim(), reason: line.slice(separator + 3).trim() }
+      })
+      const next = await planAgentMcpPackage(coordinate(), name(), props.updating?.revision ?? null, exceptions)
+      setPlan(next)
+      setPackageTest(null)
+      if (next.bins.length === 1) setBin(next.bins[0]!)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'The package could not be planned.') }
+    finally { setBusy(false) }
+  }
+  const testPlan = async () => {
+    const selected = plan()
+    if (!selected || !bin()) return setError('Choose the executable to test.')
+    const approved = await confirmAction({
+      title: `Test ${selected.package}@${selected.version}`,
+      actionLabel: 'Run package test',
+      goes: `Execute the staged ${bin()} program as local code and contact its MCP server. ${props.updating ? 'The previous program also runs for a catalogue comparison.' : ''} Credential names: ${props.updating?.values.filter((value) => value.secret).map((value) => value.name).join(', ') || 'none'}.`,
+      stays: 'The selected package and running sessions.',
+    })
+    if (!approved) return
+    setBusy(true); setError('')
+    try { setPackageTest(await testAgentMcpPackagePlan(name(), selected.id, bin())) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'The staged package test failed.') }
+    finally { setBusy(false) }
+  }
+  const activate = async () => {
+    const selected = plan()
+    if (!selected || !bin() || !packageTest()) return setError('Test the selected binary and review its tool declarations before activation.')
+    const approved = await confirmAction({
+      title: `Install ${selected.package}@${selected.version}`,
+      actionLabel: 'Install and enable',
+      goes: `The exact package graph from ${selected.registry} is selected. New sessions can execute ${bin()} as local code. ${props.updating ? 'The previous version stays selected until this activation succeeds.' : ''} Declared credential names: ${props.updating?.values.filter((value) => value.secret).map((value) => value.name).join(', ') || 'none'}.`,
+      stays: 'Your other MCP servers and running sessions.',
+    })
+    if (!approved) return
+    setBusy(true); setError('')
+    try { props.onInstalled(await activateAgentMcpPackage(name(), selected.id, bin(), props.updating)) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'The package could not be activated.') }
+    finally { setBusy(false) }
+  }
+  return <SettingsSection id="package" label="Install an MCP package" description="Install an exact npm version with scripts disabled. Packages published within seven days are refused.">
+    <Stack gap="stack">
+      <Field label="Server name"><Input value={name()} onInput={setName} disabled={!!props.updating} placeholder="docs" /></Field>
+      <Field label="Package and exact version"><Input value={coordinate()} onInput={(value) => { setCoordinate(value); setPlan(null) }} placeholder="@example/mcp@1.2.3" /></Field>
+      <Field label="Publication exceptions" hint="Optional. For a recent version or missing publication evidence, write exact package@version | reason, one per line. The exception is saved with the installed graph.">
+        <Textarea mono rows={2} value={exceptionText()} onInput={(value) => { setExceptionText(value); setPlan(null) }} />
+      </Field>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={plan()}>
+        {(ready) => <>
+          <Text wrap>{ready().graph.length} locked packages from {ready().registry}. Lock SHA-256: {ready().lockDigest}.</Text>
+          <Text wrap>Installed tree SHA-256: {ready().treeDigest}.</Text>
+          <Text wrap>Installer: {ready().installer}. Runtime: {ready().runtime}.</Text>
+          <For each={ready().exceptions}>{(exception) => <Alert tone="warn">Publication exception: {exception.coordinate}. Reason: {exception.reason}</Alert>}</For>
+          <For each={ready().graph}>{(entry) => <Text wrap>{entry.name}@{entry.version} · {entry.publishedAt} · {entry.resolved}</Text>}</For>
+          <Show when={props.updating?.managed}>{(prior) => <Text wrap>Previously selected: {prior().package}@{prior().version}, lock {prior().lockDigest}. Compare the full graph above before activating.</Text>}</Show>
+          <Field label="Executable" group hint="Choose the declared binary. Activation runs this file with the Node runtime.">
+            <SegmentedControl ariaLabel="Executable" value={bin()} options={ready().bins.map((value) => ({ value, label: value }))} onChange={(value) => { setBin(value); setPackageTest(null) }} />
+          </Field>
+        </>}
+      </Show>
+      <Show when={packageTest()}>{(tested) => <>
+        <Text wrap>Staged catalogue SHA-256: {tested().digest}. {tested().tools.length} tools. The actual session connection is reviewed separately when review is enabled.</Text>
+        <For each={tested().findings}>{(finding) => <Alert tone="warn">{finding.tool}: {finding.detail} ({finding.category}).</Alert>}</For>
+        <For each={tested().tools}>{(tool) => <Fold label={`${String(tool.name)} ${(() => {
+          const old = tested().previousTools.find((item) => item.name === tool.name)
+          return !old ? 'added' : stableMcpJson(old) !== stableMcpJson(tool) ? 'changed' : 'retained'
+        })()}`} defaultOpen={false}>
+          <Show when={tested().previousTools.find((item) => item.name === tool.name && stableMcpJson(item) !== stableMcpJson(tool))}>{(old) => <CodeBlock wrap maxHeight="block">Before: {JSON.stringify(old(), null, 2)}</CodeBlock>}</Show>
+          <CodeBlock wrap maxHeight="block">{JSON.stringify(tool, null, 2)}</CodeBlock>
+        </Fold>}</For>
+        <For each={tested().previousTools.filter((old) => !tested().tools.some((tool) => tool.name === old.name))}>{(old) => <Text>Removed: {String(old.name)}</Text>}</For>
+      </>}</Show>
+      <Inline gap="row">
+        <Show when={!plan()} fallback={<>
+          <Button variant="ghost" busy={busy()} onPress={() => void testPlan()}>Test staged package (runs code)</Button>
+          <Show when={packageTest()}><Button tone="accent" variant="solid" busy={busy()} onPress={() => void activate()}>{props.updating ? 'Activate update' : 'Install and enable'}</Button></Show>
+        </>}>
+          <Button tone="accent" variant="solid" busy={busy()} onPress={() => void prepare()}>Review package graph</Button>
+        </Show>
+        <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
+      </Inline>
+    </Stack>
+  </SettingsSection>
+}
+
 function ServerRow(props: {
   server: AgentMcpServer
   test: TestState | undefined
   onEdit: () => void
   onTest: () => void
   onToggle: (enabled: boolean) => Promise<void>
+  onUpdate: () => void
 }) {
   const enabled = createSettingSave()
   const server = () => props.server
@@ -193,7 +393,7 @@ function ServerRow(props: {
     <>
       <SettingRow
         label={server().name}
-        description={server().transport === 'stdio' ? [server().command, ...server().args].join(' ') : server().url ?? undefined}
+        description={consentSource(server())}
         error={enabled.error()}
       >
         <Inline>
@@ -205,7 +405,8 @@ function ServerRow(props: {
             onChange={(checked) => enabled.run(() => props.onToggle(checked))}
           />
           <Button size="sm" variant="ghost" label={`Edit ${server().name}`} onPress={props.onEdit}>Edit</Button>
-          <Button size="sm" variant="ghost" label={`Test ${server().name}`} busy={props.test?.testing} onPress={props.onTest}>Test</Button>
+          <Button size="sm" variant="ghost" label={`Test ${server().name}`} busy={props.test?.testing} onPress={props.onTest}>{server().transport === 'stdio' ? 'Test (runs code)' : 'Test (contacts server)'}</Button>
+          <Show when={server().managed}><Button size="sm" variant="ghost" onPress={props.onUpdate}>Update package</Button></Show>
         </Inline>
       </SettingRow>
       <TestLine state={props.test} />
@@ -292,11 +493,11 @@ function ServerEditor(props: {
               </Field>
             }
           >
-            <Field label="Command" hint="A program on your PATH, or its full path.">
-              <Input value={props.draft.command} placeholder="npx" onInput={(command) => props.onEdit({ command })} />
+            <Field label="Command" hint={props.draft.managed ? 'The selected package owns this executable. Use Update package to change it.' : 'A program on your PATH, or its full path.'}>
+              <Input value={props.draft.command} disabled={!!props.draft.managed} placeholder="npx" onInput={(command) => props.onEdit({ command })} />
             </Field>
             <Field label="Arguments" hint="One per line.">
-              <Textarea mono rows={3} value={props.draft.args} placeholder={'-y\n@example/mcp-server'} onInput={(args) => props.onEdit({ args })} />
+              <Textarea mono rows={3} value={props.draft.args} disabled={!!props.draft.managed} placeholder={'-y\n@example/mcp-server'} onInput={(args) => props.onEdit({ args })} />
             </Field>
           </Show>
           <Field label={valuesLabel()} group hint="Secret values are stored encrypted and never shown again. Leave a saved secret empty to keep it.">
@@ -326,6 +527,7 @@ function ServerEditor(props: {
             </Stack>
           </Field>
           <Checkbox switch label="On for new sessions" checked={props.draft.enabled} onChange={(enabled) => props.onEdit({ enabled })} />
+          <Checkbox switch label="Review tool definition changes" checked={props.draft.reviewTools} onChange={(reviewTools) => props.onEdit({ reviewTools })} />
           <Show when={props.error}><Alert>{props.error}</Alert></Show>
           <Inline gap="row">
             <Button tone="accent" variant="solid" busy={props.saving} onPress={props.onSave}>Save</Button>

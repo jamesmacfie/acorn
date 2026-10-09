@@ -80,7 +80,7 @@ query is never logged. A path in either body is at most 4,096 characters.
 | `/v1/p/agents/custom-agents[/:id]` | Custom agent definitions |
 | `/v1/p/agents/mcp-servers[/:name][/test]` | The owner's MCP servers. Device-only ([MCP](../mcp.md#your-own-servers)) |
 | `/v1/p/agents/sessions`, `/sessions/search` | Session list and transcript search |
-| `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait`. `GET reference-context?taskId=...` is device-only and checks that the source session belongs to the task |
+| `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait`. `export` takes `format` and `variant=original\|redacted`, and answers `409 secret_check_blocked` when the [secret gate](../security/secret-publication.md#agents) refuses. `GET reference-context?taskId=...` is device-only and checks that the source session belongs to the task |
 | `/v1/p/agents/sessions/:id/turns[/:turnId]` | Queue, edit, or remove a turn |
 | `/v1/p/agents/sessions/:id/requests/:requestId/resolve` | Answer a permission or question request |
 | `/v1/p/agents/sessions/:id/{cancel,fork,compact}` | Session controls |
@@ -128,9 +128,9 @@ The Changes pane reads its diff as a document, one staging area at a time, with 
 | `POST …/local/document` | `{ scope, files: { path, key }[] }`, at most 5,000 files | `{ files: { path, patchKey, segments }[] }`, in request order |
 | `POST …/local/document/segments` | `{ scope, requests }`, one to 32 | `DiffSegmentPayload[]` |
 | `POST …/local/document/search` | `{ scope, query, caseSensitive, cursor, files }` | `DiffSearchPage` |
-
-`scope` is `staged` or `unstaged`. `key` is the pane's status key for the file, and the Node diffs
-again only the files whose key moved. A null `patchKey` means the file has no diff in that scope, or
+| `GET …/local/dependencies?scope=staged\|unstaged`, `GET …/local/secret-check?operation=commit\|push` | No body | `DependencyReview` with revision digest, format, coverage, findings, and limits, or `GitSecretCheckResult` with rule IDs and positions, never values ([secret checks](../security/secret-publication.md#git)) |
+`scope` is `staged` or `unstaged`. `key` is the pane's status key; the Node diffs
+again only files whose key moved. A null `patchKey` means the file has no diff in that scope, or
 Git can't read it. A segment or search request naming a digest that isn't the one the last document
 gave that file answers `409 revision_conflict`, and the pane reads the document again. A task with no
 worktree answers `404 not_found`.
@@ -197,5 +197,4 @@ to something that isn't there yet.
 `contributions.agentTools` and `contributions.contextSections` each name a route in the package's
 own `/v1/p/<pluginId>/` namespace. The host calls it with a verified task principal, adapts the
 bounded answer into the agent-tool registry or the context assembler, and removes the registration on
-reload or unload. They project through the core task tool and context routes. See
-[agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers).
+reload or unload. They project through the core task tool and context routes. See [agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers).

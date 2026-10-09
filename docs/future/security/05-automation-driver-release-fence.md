@@ -1,5 +1,60 @@
 # Phase 05: fence the automation driver out of releases
 
+## Completion note: October 9, 2026
+
+Status: implemented. The release fence was already in
+`apps/desktop/src-tauri/src/lib.rs`: a build with `agent-automation` and release assertions disabled
+fails at `compile_error!`. The release workflow calls `pnpm --filter @acorn/desktop run dist
+--prebuilt`, whose Tauri build uses the default Cargo features. The default dependency graph excludes
+`tauri-plugin-wdio-webdriver`; enabling `agent-automation` includes it. No second feature gate was
+added. The shell uses the same `debug_assertions` distinction for its packaged behavior.
+
+The vendored server applies one middleware layer before all WebDriver routes. It requires exactly one
+`Host` of `127.0.0.1:<selected port>` and, when present, exactly one `Origin` of
+`http://127.0.0.1:<selected port>`. Missing, malformed, duplicated, foreign, and wrong-port headers
+are refused with 403. The Node driver uses `fetch` without `Origin` against that exact endpoint.
+Desktop binding remains loopback. The vendored crate declares Tauri's `unstable` feature because its
+existing window lookup uses that API; the desktop already activated it. A direct `tower` test
+dependency exercises the middleware without a Tauri window.
+
+Verification:
+
+- `cargo tree --manifest-path apps/desktop/src-tauri/Cargo.toml -e normal -i
+  tauri-plugin-wdio-webdriver` found no package without the feature. With `--features
+  agent-automation`, it resolved the vendored package under `acorn-desktop`.
+- `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --release --lib` passed after
+  staging. The same command with `--features agent-automation` failed at the existing
+  `compile_error!` in `src/lib.rs:23`. This checks the release profile and resolved feature set used
+  by the real Tauri build path. A signed or bundled installer was not built.
+- The vendored test `only_the_chosen_loopback_endpoint_reaches_a_handler` passed. It covers admission,
+  foreign hosts and origins, wrong ports, duplicate headers, and malformed Origin bytes. The test ran
+  from the vendored manifest with a temporary copy of the desktop lockfile and a shared target
+  directory; both temporary files were removed.
+- The real debug driver built with `--features agent-automation`, launched an isolated macOS window,
+  read `app://acorn` through `pnpm dev:agent:ui ... snapshot`, clicked Agents, and read the Agent
+  Center afterward. Live requests to `/status` returned 200 with the driver's headers and a matching
+  Origin, and 403 for a foreign Origin, foreign Host, or wrong Host port. The session was stopped.
+- `pnpm --filter @acorn/desktop lint`, `pnpm --filter @acorn/arch-tests exec vitest run
+  --maxWorkers=1` (87 tests), focused doc checks (six tests), `rustfmt --check` on the new module,
+  and `git diff --check` passed. No full repository test or lint run was made.
+
+The ordinary stage command stopped at the Node service graph budget increased by Phase 04:
+`3180280/3177000B`. Its output and every other stage input built, so the acceptance run used a
+temporary copy of the launcher with only its repeated `stage` call omitted. Its renderer build,
+debug Cargo build, session seeding, WebDriver calls, and shutdown were unchanged. The first launcher
+attempt hit the sandbox's `tsx` IPC socket denial; the authorized socket run passed. The unchanged
+renderer budget is also known to exceed its ceiling, so a complete installer build remains outside
+this phase's evidence. Phase 05 did not change either budget. The coordinator's separate Phase 04
+integration follow-up measured the required token-renewal boot imports, documented the ceiling
+adjustment, and restored the service build. The renderer budget failure remains unrelated.
+
+Android is not in the macOS and Windows desktop release matrix. The existing vendored Android debug
+server binds all interfaces for WiFi access; this policy would reject requests addressed to that
+non-loopback endpoint. The release compile fence applies to Android too, but mobile driver support
+needs its own caller policy if that debug workflow becomes part of Acorn's supported paths. Host and
+Origin checks protect against browser cross-origin and DNS rebinding requests, not another local
+process able to forge HTTP headers.
+
 Date: October 7, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `823db58295b84ac9f9fb52f3f85b7a6550bd8761`.
 Dependency: none.

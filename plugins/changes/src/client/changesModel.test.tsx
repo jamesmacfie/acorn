@@ -6,7 +6,8 @@ import { afterEach, expect, it, vi } from 'vitest'
 // for against a digest the node no longer describes reads the document again, once, and the viewer
 // draws the new revision. The node's refusal is covered in ../server/routes/localGit.test.ts.
 
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }), useQueryClient: () => ({}) }))
+const projects = vi.hoisted(() => ({ data: undefined as unknown }))
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => projects, useQueryClient: () => ({}) }))
 const inline = vi.hoisted(() => ({ capability: undefined as unknown }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...await original<Record<string, unknown>>(),
@@ -27,6 +28,7 @@ const api = vi.hoisted(() => ({
   search: vi.fn(),
   modelBackends: vi.fn(async () => []),
   headCommit: vi.fn(async () => null),
+  dependencies: vi.fn(),
 }))
 vi.mock('./changesClient', () => ({ localGitApi: api }))
 
@@ -50,7 +52,52 @@ afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose())
   vi.clearAllMocks()
   inline.capability = undefined
+  projects.data = undefined
 })
+
+it('refreshes dependency evidence on scope and status edits and ignores an earlier reply', async () => {
+  projects.data = [{ id: 'p1', vcs: 'git' }]
+  const change = (staged: boolean, contentKey: string) => ({ path: 'package.json', status: 'modified', staged, additions: 1, deletions: 0, contentKey })
+  let changes = [change(false, 'one'), change(true, 'staged')]
+  api.status.mockImplementation(async () => ({ branch: 'main', upstream: null, ahead: null, behind: null, operation: null, changes }))
+  api.document.mockResolvedValue({ files: [] })
+  let answerFirst!: (value: unknown) => void
+  api.dependencies.mockImplementationOnce(() => new Promise((resolve) => { answerFirst = resolve }))
+    .mockResolvedValueOnce({ scope: 'staged', revision: SECOND, findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
+    .mockResolvedValueOnce({ scope: 'unstaged', revision: 'before-edit', findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
+  const model = createRoot((dispose) => {
+    disposers.push(dispose)
+    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+  })
+  await vi.waitFor(() => expect(api.dependencies).toHaveBeenCalledTimes(1))
+  model.select({ path: 'package.json', staged: true })
+  await vi.waitFor(() => expect(model.dependencies()?.scope).toBe('staged'))
+  answerFirst({ scope: 'unstaged', revision: FIRST, findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
+  await flush()
+  expect(model.dependencies()?.scope).toBe('staged')
+  model.select({ path: 'package.json', staged: false })
+  await vi.waitFor(() => expect(model.dependencies()?.revision).toBe('before-edit'))
+  changes = [change(false, 'two')]
+  api.dependencies.mockResolvedValue({ scope: 'unstaged', revision: 'edited', findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
+  await model.refresh()
+  await vi.waitFor(() => expect(model.dependencies()?.revision).toBe('edited'))
+})
+
+it.each(['.pnpmfile.cjs', 'npm.config.js', 'requirements.txt', 'pyproject.toml', 'uv.lock', 'Pipfile.lock'])(
+  'requests an advisory review for %s', async (path) => {
+    projects.data = [{ id: 'p1', vcs: 'git' }]
+    api.status.mockResolvedValue({ branch: 'main', upstream: null, ahead: null, behind: null, operation: null,
+      changes: [{ path, status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'new' }] })
+    api.document.mockResolvedValue({ files: [] })
+    api.dependencies.mockResolvedValue({ scope: 'unstaged', revision: FIRST, findings: [], limits: ['Unsupported dependency configuration'], packageCount: 0, coverage: 'partial', manager: 'unsupported' })
+    const model = createRoot((dispose) => {
+      disposers.push(dispose)
+      return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+    })
+    await vi.waitFor(() => expect(model.dependencies()?.coverage).toBe('partial'))
+    expect(api.dependencies).toHaveBeenCalledWith('t1', 'unstaged')
+  },
+)
 
 it('reads the document again after a revision conflict and draws the new revision, once', async () => {
   api.status.mockResolvedValue({

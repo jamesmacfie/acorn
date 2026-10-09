@@ -15,6 +15,7 @@ import type {
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { SkillReport } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
+import type { McpReviewManager } from '../mcpReviewManager'
 import { sessionMcpSelection } from '../../shared/mcpServers'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
@@ -47,6 +48,8 @@ import { ProviderEventMaterializer } from './providerEventMaterializer'
 import type { RepeatedToolCallWarnings } from './repeatedToolCalls'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
+import type { InstructionAdmission } from './instructionAdmission'
+import { InstructionAdmissionError } from './instructionAdmissionError'
 import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
   mayBeUsageLimit,
@@ -209,6 +212,14 @@ export class ManagedAgentEngine {
   protected readonly mintedSecrets: string[] = []
   /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
   readonly mcpServers: AgentMcpServerStore
+  private mcpReviewsPromise: Promise<McpReviewManager> | null = null
+  private mcpReviews(): Promise<McpReviewManager> {
+    return this.mcpReviewsPromise ??= import('../mcpReviewManager').then(({ McpReviewManager }) => new McpReviewManager(this.mcpServers, () => this.mintedSecrets))
+  }
+  async pendingMcpReviews() { return (await this.mcpReviews()).pending() }
+  async approveMcpCatalogue(name: string, sessionId: string, revision: string, digest: string) {
+    return (await this.mcpReviews()).approve(name, sessionId, revision, digest)
+  }
   protected readonly standingContext?: (taskId: string) => Promise<string | null>
   protected readonly currentUserId: () => string | null
   protected readonly registry: AgentDriverRegistry
@@ -253,6 +264,10 @@ export class ManagedAgentEngine {
   // The probe running now, which every caller that needs one joins.
   protected providerProbe: { generation: number; promise: Promise<AgentProviderDescriptor[]> } | null = null
   protected readonly shutdown = new AbortController()
+  private instructionAdmissionPromise: Promise<InstructionAdmission> | null = null
+  private readonly instructionDataDir: string
+  private readonly instructionSecrets: SecretService
+  private readonly instructionScans = new Map<string, AbortController>()
   protected stopped = false
   private stopPromise: Promise<void> | null = null
   private readonly publicationCallbacks = new Set<Promise<void>>()
@@ -262,6 +277,8 @@ export class ManagedAgentEngine {
     private readonly enqueueGoal: (sessionId: string, prompt: string, key: string, signal?: AbortSignal) => Promise<void>,
   ) {
     this.db = options.db
+    this.instructionDataDir = options.dataDir
+    this.instructionSecrets = options.secrets
     this.core = options.core
     this.internalEnv = options.internalEnv
     this.mcp = options.mcp ?? (() => null)
@@ -304,7 +321,7 @@ export class ManagedAgentEngine {
       },
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
-        message: `This session runs without ${names.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
+        message: `This session runs without ${names.join(', ')}. Check consent, stored credentials, and review availability in Settings → MCP servers.`,
       }).then(() => undefined),
       event: (sessionId, generation, event) => this.onProviderEvent(sessionId, generation, event),
       closed: (sessionId, generation, attempt, error) => this.onProviderClosed(sessionId, generation, attempt, error),
@@ -355,7 +372,7 @@ export class ManagedAgentEngine {
     // accumulates them and the materializer holds a live reference to the same array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
-    this.mcpServers = new AgentMcpServerStore(options.db, options.secrets)
+    this.mcpServers = new AgentMcpServerStore(options.db, options.secrets, join(options.dataDir, 'managed-mcp'))
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
     this.armFootprintSample(options.footprintSampleMs ?? FOOTPRINT_SAMPLE_MS)
   }
@@ -405,6 +422,12 @@ export class ManagedAgentEngine {
       return this.withAdvertisedOptions(cached.descriptors)
     }
     return this.withAdvertisedOptions(await this.probeProviders(force))
+  }
+
+  /** Last already observed descriptor. Diagnostics must never trigger a provider probe. */
+  observedProvider(id: string): AgentProviderDescriptor | null {
+    return this.providerCache?.generation === this.registry.generation
+      ? this.providerCache.descriptors.find((provider) => provider.id === id) ?? null : null
   }
 
   /** Probes discover availability; connected sessions advertise the actual model and effort values.
@@ -552,6 +575,7 @@ export class ManagedAgentEngine {
     } catch (error) {
       retirementFailure = error
     }
+    if (this.mcpReviewsPromise) await (await this.mcpReviewsPromise).close()
     await queueDrain
     await this.processes.joinCallbacks()
     await this.providerEvents.flushAll()
@@ -666,13 +690,42 @@ export class ManagedAgentEngine {
     session: AgentSession,
     env: Record<string, string>,
     signal: AbortSignal,
-  ): Promise<{ servers: AgentDriverMcpServer[]; unavailable: string[] }> {
+  ): Promise<{ servers: AgentDriverMcpServer[]; unavailable: string[]; retire?: () => Promise<void> }> {
     const userMcp = await this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session', signal)
     signal.throwIfAborted()
+    const releaseManagedRoots = this.mcpServers.holdManagedRoots(userMcp.managedRoots)
     for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    const servers: AgentDriverMcpServer[] = []
+    const unavailable = [...userMcp.unavailable]
+    try {
+      for (const server of userMcp.servers) {
+        signal.throwIfAborted()
+        const identity = userMcp.revisions[server.name]
+        if (!identity?.reviewTools) { servers.push(server); continue }
+        try {
+          const reviewed = await (await this.mcpReviews()).prepare(server, session.id, identity.revision)
+          if (reviewed.transport === 'http') {
+            const bearer = reviewed.headers.Authorization
+            if (bearer && !this.mintedSecrets.includes(bearer)) this.mintedSecrets.push(bearer)
+          }
+          servers.push(reviewed)
+        } catch {
+          unavailable.push(`${server.name} (review proxy unavailable)`)
+        }
+      }
+      signal.throwIfAborted()
+    } catch (error) {
+      if (this.mcpReviewsPromise) await (await this.mcpReviewsPromise).closeSession(session.id)
+      releaseManagedRoots()
+      throw error
+    }
     return {
-      servers: [...acornMcpServers(this.mcp(), session, env), ...userMcp.servers],
-      unavailable: userMcp.unavailable,
+      servers: [...acornMcpServers(this.mcp(), session, env), ...servers],
+      unavailable,
+      retire: async () => {
+        try { if (this.mcpReviewsPromise) await (await this.mcpReviewsPromise).closeSession(session.id) }
+        finally { releaseManagedRoots() }
+      },
     }
   }
 
@@ -846,6 +899,24 @@ export class ManagedAgentEngine {
     return this.queue.pump()
   }
 
+  instructionAdmission(): Promise<InstructionAdmission> {
+    return this.instructionAdmissionPromise ??= (async () => {
+      const [{ InstructionAdmission }, { InstructionReviewStore }] = await Promise.all([
+        import('./instructionAdmission'), import('./instructionReviewStore'),
+      ])
+      return new InstructionAdmission(this.core, this.instructionDataDir, new InstructionReviewStore(this.db, this.instructionSecrets))
+    })()
+  }
+
+  /** Do not initialize the admission store merely to answer diagnostics. */
+  observedInstructionAdmission(): Promise<InstructionAdmission | null> {
+    return this.instructionAdmissionPromise ?? Promise.resolve(null)
+  }
+
+  cancelInstructionScan(turnId: string): void {
+    this.instructionScans.get(turnId)?.abort(new Error('Turn cancelled.'))
+  }
+
   private async dispatchQueuedTurn(session: AgentSession, turn: AgentTurn, generation: ProviderGeneration): Promise<boolean> {
     this.processes.beginDispatch(generation)
     await this.store.dispatchTurn(turn.id)
@@ -876,6 +947,26 @@ export class ManagedAgentEngine {
           }),
       )))
       if (!this.processes.owns(generation)) return false
+      // The queue is shared by interactive, resumed, workflow, operation and delegated turns.
+      // Admission belongs immediately before the driver, including retries of a durable turn.
+      const scan = new AbortController()
+      this.instructionScans.set(turn.id, scan)
+      const stopScan = () => scan.abort(this.shutdown.signal.reason)
+      if (this.shutdown.signal.aborted) stopScan()
+      else this.shutdown.signal.addEventListener('abort', stopScan, { once: true })
+      try { await (await this.instructionAdmission()).admit(session.taskId, scan.signal) }
+      finally {
+        this.instructionScans.delete(turn.id)
+        this.shutdown.signal.removeEventListener('abort', stopScan)
+      }
+      if (!this.processes.owns(generation)) return false
+      // Attachments leave the machine with this send. With blocking on, their stored bytes pass the
+      // secret gate here, on every turn source, including a retry (./secretPublication.ts).
+      if (Object.keys(attachments).length && this.core.secretPublication) {
+        const { admitAttachments } = await import('./secretPublication')
+        await admitAttachments(this.core.secretPublication, { sessionId: session.id, providerId: session.providerId, attachments: Object.values(attachments) })
+        if (!this.processes.owns(generation)) return false
+      }
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
@@ -939,7 +1030,7 @@ export class ManagedAgentEngine {
         generation,
         event: {
           type: 'error',
-          code: 'turn_dispatch_failed',
+          code: error instanceof InstructionAdmissionError ? error.code : 'turn_dispatch_failed',
           message: safeProviderMessage(error, 'Agent turn preparation failed.', this.mintedSecrets),
           retryable: false,
         },

@@ -2,7 +2,9 @@
 
 This page is the map of acorn's security model: the trust boundaries, what's out of scope, and which
 page owns each control. Read it before you change anything that crosses a boundary.
-
+For the device-only **Check this node** report, see [security diagnostics](./security/security-diagnostics.md). For advisory npm and pnpm change review, see [the Changes pane](./diff-rendering/changes-pane.md#the-file-list).
+Managed MCP needs device consent for execution and separate actual-connection catalogue approval; installed code retains device authority. See [managed MCP servers](./mcp/managed-servers.md).
+Acorn checks for likely secrets before its own commit, push, transcript export, and attachment send, and an optional per-Node setting blocks them. See [secret checks before publication](./security/secret-publication.md).
 acorn is single-owner software. A paired device has full owner authority for its Node. So the controls
 protect the transport, credential custody, process boundaries, repository data, and untrusted provider
 and preview content, rather than implementing multi-user roles.
@@ -62,42 +64,18 @@ acorn doesn't defend a Node host against root, other users, or a compromised Nod
 sandbox first-party compiled plugin code. A client still treats a paired Node as an untrusted source of
 replies, events, content, and plugin offers until an owner authorizes code.
 
+The shell's application ACL grants its own Tauri commands only to the `main` webview, and dispatch
+checks that webview's top-level renderer URL. [Host-owned webviews](./security/webviews.md) describes
+the plugin iframe's separate cross-origin boundary and the ACL's subframe limit.
+
 The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md).
 
-## Hidden characters in instruction files
+## Instruction file checks and review
 
-Some characters draw as nothing in an editor or a diff: zero-width and direction characters, the soft
-hyphen, fillers, variation selectors, and Unicode tag characters. A line in `CLAUDE.md`, `AGENTS.md`,
-or a skill can carry instructions that nobody reviewing it saw, and a harness reads those files
-itself, with no tool call for a hook to see.
-
-**Check instruction files before each agent turn**, under Settings > Security and backup, is off by
-default. When it's on, the agents plugin's own `agents:before-send` handler reads the root
-instruction files and the files they import with `@path`, the repo's `.claude/skills`,
-`.agents/skills`, and `.codex/skills` folders, and every plugin skill a session may load. If any holds
-a character in Unicode's `Default_Ignorable_Code_Point` set, outside a real emoji sequence, it
-refuses the turn and names the file and line. The code is in
-`plugins/agents/src/server/sessions/instructionCheck.ts`.
-
-The check reads as a harness does rather than as a careful reader would, because a file it skipped
-is one the harness may still read:
-
-- It follows `@path` imports up to five hops and enters linked skill folders.
-- A text file with a NUL byte or an invalid UTF-8 byte is still read, and a byte order mark selects
-  UTF-16. Only a non-text file in a skill folder that isn't valid UTF-8, such as an image, is skipped.
-- A file over 1 MB, or more than 500 files in all, refuses the turn instead of being skipped.
-
-The switch is the `checkInstructionFiles` field of the [agent defaults](./managed-agents/defaults.md),
-whose write route takes only a device, so an agent can't turn it off. The check has these limits:
-
-- It covers turns that acorn sends: managed chats, workflow steps, and delegated agents. Text you type
-  into a harness in a terminal doesn't pass `agents:before-send`.
-- It doesn't read nested `CLAUDE.md` or `AGENTS.md` files that no instruction file imports, which a
-  harness loads later when it works in that folder, or a file that changes partway through a turn.
-- An unexpected failure, or the hook's 5-second timeout, lets the turn through.
-- Text that legitimately uses a zero-width joiner or non-joiner, such as Persian, is refused too.
+[Instruction checks and review](./security/instruction-review.md) covers hidden characters, changed
+instructions, first-time approval, and recovery when a managed turn is blocked.
 
 ## Pages
 

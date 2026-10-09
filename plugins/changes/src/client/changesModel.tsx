@@ -11,7 +11,7 @@ import { documentTopology, loadDiffLineContext, type CodeRow, type DiffLineAncho
 import { sameInlineLine, type InlineDiffOrigin } from '@acorn/plugin-agents/contract/inlineDiff.ts'
 import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClient.ts'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
-import { emptyLocalStatus, reviewNotesRoute, type LocalDocumentResponse, type LocalScope, type ModelPick, type ReviewNote } from '../shared/api'
+import { emptyLocalStatus, reviewNotesRoute, type GitSecretCheckResult, type LocalDocumentResponse, type LocalScope, type ModelPick, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
 import { localGitApi } from './changesClient'
 import { readChangeView, saveChangeView } from './changesPrefs'
@@ -44,6 +44,17 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const [selectedKey, setSelectedKey] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')
   const [statusRevision, setStatusRevision] = createSignal(0)
+  // Check for secrets, on request (docs/security/secret-publication.md). A report, not a gate: blocking
+  // is a node setting, and a refused commit or push explains itself through `actionError`.
+  const [secretCheck, setSecretCheck] = createSignal<GitSecretCheckResult | { error: string } | null>(null)
+  const [checkingSecrets, setCheckingSecrets] = createSignal(false)
+  async function checkSecrets(operation: 'commit' | 'push') {
+    setCheckingSecrets(true)
+    const result = await localGitApi.secretCheck(task.id, operation)
+      .catch((error: unknown) => ({ error: error instanceof Error ? error.message : 'The check failed.' }))
+      .finally(() => setCheckingSecrets(false))
+    setSecretCheck(result)
+  }
 
   // One read behind the whole panel: the changes, the branch, its upstream, how far each way, and
   // whether a merge or rebase is mid-flight (docs/diff-rendering/changes-pane.md § One status read). The list draws the
@@ -136,6 +147,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // The stacked file set: one staging area at a time (./model.ts § stackFor).
   const stack = createMemo(() => stackFor(groups(), selected()))
   const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
+  const [dependencies] = createResource(
+    () => pane.shown() && project()?.vcs === 'git' && !isArchiving(task.id)
+      && status().changes.some((change) => change.staged === (scope() === 'staged') && /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.pnpmfile\.cjs|npm\.config\.js|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?|requirements\.txt|pyproject\.toml|uv\.lock|Pipfile\.lock)$/.test(change.path))
+      ? { scope: scope(), revision: statusRevision() } : undefined,
+    async ({ scope }) => localGitApi.dependencies(task.id, scope),
+  )
 
   // The stack as a document (docs/diff-rendering/document.md § The document). The node diffs, cuts and keys
   // every file's patch; it is asked again whenever the stack or any file's status key moves, and diffs
@@ -420,6 +437,11 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   }
 
   return {
+    dependencies,
+    secretCheck,
+    checkingSecrets,
+    checkSecrets,
+    clearSecretCheck: () => setSecretCheck(null),
     task,
     project,
     isGit: () => project()?.vcs === 'git',

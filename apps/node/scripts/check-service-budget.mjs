@@ -63,6 +63,35 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: 3,176,006 B after combining the instruction check, goal admission callbacks, and
 // reconnect Stop handling. The measured graph adds no dependency; the feature operations remain
 // lazy. Add 2 KB for these acceptance and lifecycle paths, keeping less than 1 KB of margin.
+// 2026-10-09: 3,183,160 B with internal token confinement, 7,154 B above the previous measured
+// graph. The renewal manager is reached through service.ts -> composition/runtime.ts -> auth/public.ts
+// -> renewingEnv.ts. It restores session credential files and starts their refresh timer before
+// plugin initialization can launch children, so it belongs at boot. Keep 840 B of margin; the lazy
+// authoring, sampler, and renderer imports above remain outside this graph.
+// 2026-10-09: 3,184,959 B with the device-only instruction review route and its per-Node setting.
+// The scanner, analyzer, and encrypted snapshot store load on first review or required admission;
+// only route registration, the settings field, and the dispatch call site join the boot graph.
+// Leave about 1 KB for the same narrow registration paths as the previous limits.
+// 2026-10-09: 3,187,622 B after security diagnostics route registration, its owner-scoped bridge,
+// and a narrow, lazy tool-catalog service. The collector and project file reads load only when the
+// owner presses Check this node; the device gate and capability registration must be at boot.
+// Phase 07 follow-up: the passive provider-cache and admission readers plus boot-time wiring for
+// the lazy plugin projection add 1,080 B. measure:service-graph confirms pluginSecurity.ts is not
+// statically reachable. Add 1 KB to the ceiling; the final measured graph leaves 298 B.
+// 2026-10-09: 3,190,861 B after Changes' dependency route and passive policy capability join
+// the boot registrations. measure:service-graph confirms dependencyReview.ts and YAML stay lazy.
+// The 3 KB ceiling increase covers 2,159 B of route and capability wiring; leave 1,139 B of margin.
+// 2026-10-09: 3,207,886 B with managed MCP device route schemas, consent and revision checks,
+// and session review dispatch. measure:service-graph confirms mcpCatalogue.ts, the npm installer,
+// probe, and review transport are outside the static service graph. These registration and admission
+// paths are needed at boot. Leave 1,114 B of margin.
+// Phase 09 follow-up: 3,209,061 B after the managed-root lifetime lease and stale-approval
+// revocation joined the boot-owned MCP store. measure:service-graph confirms the installer,
+// catalogue, and proxy still load on first use. Move the ceiling by 1 KB, leaving 939 B.
+// Phase 10: 3,213,722 B with the secret-check route, the Changes index lane, and the lazy gate
+// shims at the commit, push, export, and dispatch points. measure:service-graph confirms the
+// detector, gate, Git checks, and the agents admission module load on first use. Move the ceiling
+// by 5 KB, leaving 1,278 B.
 // 2026-10-08: command restart recovery adds event attribution checks, client read projection calls,
 // and lifecycle settlement calls. The command policy and reconciliation queries load on first use.
 // No dependency is added. Static graph: 3,179,747 B. Add 4 KB for the owning runtime's call sites.
@@ -73,6 +102,9 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-09: checkout admission must be present before owner plugins initialize and register their
 // activity readers. Stash routes remain lazy. The measured static graph is 3,194,672 B; leave about
 // 5 KB for bundler variation while keeping the admission coordinator in the boot graph.
+// 2026-10-09: merging security with the Git checkout admission and repository metadata coordinator
+// produces a 3,244,622 B static graph. measure:service-graph traces checkoutAdmission through core/index;
+// security detectors, MCP installation, and review collectors remain lazy. Keep 1,378 B of margin.
 // 2026-10-09: the build minifies with Oxc and keeps function and class names (../vite.config.ts), and
 // this check reads the build's chunk graph instead of the chunk text. Every figure above is
 // unminified. The same graph went from 3,193,213 B to 1,824,878 B on macOS arm64; keeping names costs
@@ -86,7 +118,12 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // boot-time registration main added: the checkout admission coordinator, which must exist before
 // owner plugins initialize, and smaller task, worktree, and local Git calls. No module in it is
 // optional at boot. The ceiling keeps about 2 KB of margin.
-const limits = { ceiling: 1_712_500, floor: 1_000_000 }
+// 2026-10-09: 1,734,384 B after merging main's security programme. Most of the 24,001 B rise runs on
+// every agent session start or at boot: the MCP server store, credential renewal, instruction
+// admission, and the agents plugin's registration. The MCP and instruction review settings routes
+// could move to first use, but together they are under 10 KB of source. The ceiling keeps about 2 KB
+// of margin.
+const limits = { ceiling: 1_736_500, floor: 1_000_000 }
 
 const graph = readChunkGraph(dist)
 const files = staticClosure(graph)

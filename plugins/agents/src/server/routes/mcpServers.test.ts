@@ -23,7 +23,7 @@ const device = () => as({ kind: 'device', userId: 'james' })
 const agent = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
 
 const saved: AgentMcpServer = {
-  name: 'linear', transport: 'stdio', command: 'npx', args: [], url: null, values: [], enabled: true, updatedAt: 1,
+  name: 'linear', transport: 'stdio', command: 'npx', args: [], url: null, values: [], enabled: true, updatedAt: 1, revision: 'a'.repeat(64), consented: true, reviewTools: false, approvedCatalogueDigest: null,
 }
 
 describe('Settings → MCP servers routes', () => {
@@ -34,6 +34,12 @@ describe('Settings → MCP servers routes', () => {
     save: async (name) => { calls.push(`save:${name}`); return saved },
     remove: async (name) => { calls.push(`remove:${name}`); return name === 'linear' },
     test: async () => null,
+    consent: async () => saved,
+    planPackage: async () => { throw new Error('not called') },
+    testPackagePlan: async () => { throw new Error('not called') },
+    activatePackage: async () => { throw new Error('not called') },
+    pendingReviews: async () => [],
+    approveReview: async () => { throw new Error('not called') },
   })
 
   // A stdio server is a command the next session runs, so an agent must neither add one nor read them.
@@ -45,6 +51,30 @@ describe('Settings → MCP servers routes', () => {
     expect((await app.fetch(request('/api/agents/mcp-servers'), {} as Env)).status).toBe(403)
     expect((await app.fetch(request('/api/agents/mcp-servers/linear', 'PUT', valid), {} as Env)).status).toBe(403)
     expect((await app.fetch(request('/api/agents/mcp-servers/linear', 'DELETE'), {} as Env)).status).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/package-plan', 'POST', { coordinate: 'fixture@1.0.0' }), {} as Env)).status).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/package-plan/96de4913-9027-4eaa-987f-6475ec264c94/test', 'POST', { name: 'linear', bin: 'mcp' }), {} as Env)).status).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/linear/package-activate', 'POST', { planId: '96de4913-9027-4eaa-987f-6475ec264c94', bin: 'mcp', enabled: true }), {} as Env)).status).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/linear/test', 'POST'), {} as Env)).status).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/linear/consent', 'POST', { revision: 'a'.repeat(64) }), {} as Env)).status).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/reviews'), {} as Env)).status).toBe(403)
+    expect((await app.fetch(request('/api/agents/mcp-servers/linear/review', 'POST', { sessionId: 's', revision: 'a'.repeat(64), digest: 'b'.repeat(64) }), {} as Env)).status).toBe(403)
+    expect(calls).toEqual([])
+  })
+
+  it.each([
+    ['service', { kind: 'internal', userId: 'james', scope: 'service' }],
+    ['plugin frame', { kind: 'plugin', pluginId: 'fixture', userId: 'james' }],
+  ])('refuses managed installation and catalogue approval to a %s caller', async (_label, principal) => {
+    const calls: string[] = []
+    setAgentMcpServersBridge(bridge(calls))
+    const app = as(principal)
+    for (const [path, method, body] of [
+      ['/api/agents/mcp-servers/package-plan', 'POST', { coordinate: 'fixture@1.0.0', targetName: 'fixture', expectedRevision: null, exceptions: [] }],
+      ['/api/agents/mcp-servers/package-plan/96de4913-9027-4eaa-987f-6475ec264c94/test', 'POST', { name: 'fixture', bin: 'fixture' }],
+      ['/api/agents/mcp-servers/fixture/package-activate', 'POST', { planId: '96de4913-9027-4eaa-987f-6475ec264c94', bin: 'fixture', enabled: true }],
+      ['/api/agents/mcp-servers/fixture/test', 'POST', undefined],
+      ['/api/agents/mcp-servers/fixture/review', 'POST', { sessionId: 'session', revision: 'a'.repeat(64), digest: 'b'.repeat(64) }],
+    ] as const) expect((await app.fetch(request(path, method, body), {} as Env)).status).toBe(403)
     expect(calls).toEqual([])
   })
 

@@ -208,7 +208,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
 
 // The session actions an archived task keeps, because they only read or relabel what is stored. Fork,
 // retry, compact and the terminal hand-offs all start a harness, and the task has no worktree for one.
-const READS_STORED_SESSION: ReadonlySet<string> = new Set(['regenerate-title', 'rename', 'export-markdown', 'export-json', 'archive'])
+const READS_STORED_SESSION: ReadonlySet<string> = new Set(['regenerate-title', 'rename', 'export-markdown', 'export-json', 'export-redacted-markdown', 'export-redacted-json', 'archive'])
 
 /** Nothing open yet: one card per harness this node can run, then one per custom agent. */
 function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {

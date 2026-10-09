@@ -3,6 +3,7 @@
 // broadcasts pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it
 // shares the loopback listener and its Host guard.
 import { verifyInternalToken, type InternalClaims } from '../auth/internalTokens'
+import { isLoopbackPeer } from './loopbackPeer'
 import type { IncomingMessage, Server } from 'node:http'
 import type { Duplex } from 'node:stream'
 // Type-only. The `ws` package is loaded on the first upgrade (attachWsHub), never at module load, so a
@@ -343,7 +344,7 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
   // (server/auth/internalTokens.ts). An internal socket still gets `deviceId: null`, since it has no
   // device row to revoke, but the claims are carried so a future sweep can close a task's sockets when
   // the task ends.
-  if (typeof token !== 'string' || !token) return null
+  if (!isLoopbackPeer(req.socket.remoteAddress) || typeof token !== 'string' || !token) return null
   const claims = verifyInternalToken(deps.internalToken, token)
   return claims ? { deviceId: null, internal: claims } : null
 }

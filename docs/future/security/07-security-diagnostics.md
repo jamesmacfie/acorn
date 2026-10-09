@@ -1,5 +1,78 @@
 # Phase 07: explain the effective security controls
 
+## Follow-up completion note: October 9, 2026
+
+The follow-up adds a narrow, read-only core plugin-host projection to the compiled core service:
+counts of active executable grants, development mode, enabled approved and unapproved skills, and
+pending changed packages. The composition roots attach it after host assembly. Plugin names and
+manifest text never enter the report. The agents runtime reads only its existing provider descriptor
+cache. Loop coverage now follows reported `loop_before_tool`, `loop_after_tool`, and `permissions`
+capabilities, so a familiar provider ID alone confers no coverage claim. Unsupported and absent
+descriptors are distinct.
+
+Pre-turn admission retains one latest passed, blocked, or incomplete outcome per task, capped at 100
+tasks in memory. The diagnostic reads an existing admission instance without creating one or scanning;
+project selection uses the most recent matching task. Disabled checks have no observation. The
+previous approval lookup was removed because the store validates approvals by decrypting bodies;
+approval status is therefore unknown in this passive report. The
+selected project policy reader opens with `O_NONBLOCK`, rejects nonregular files before reading,
+handles partial reads, and refuses growth beyond 32 KiB. The route golden now includes only the two
+Phase 07 device routes; its unrelated GitHub pulls search mismatch remains open. Settings links were
+checked against the registered tabs and the existing project settings target.
+
+Focused evidence: collector 12 tests, admission 5, passive provider cache 12, core plugin-host state
+23, UI 2, architecture 87, and TypeScript for agents, Node core, and Node app passed. Changed-code
+oxlint found no new issue (one existing
+`no-useless-spread` warning in the runtime engine). The route registry test passes 35 of 36 tests;
+the remaining mismatch is the pre-existing GitHub pulls search route. The Node service build passes
+at 3,188,702 B after confirming `pluginSecurity.ts` stays outside the static graph. Its ceiling rose
+1 KB to 3,189,000 B for the boot-required cache readers and lazy projection wiring. The locked
+offline pnpm reinstall reused all 546 packages after pnpm 11 invalidated stale links. No new live
+harness or second-Node desktop fixture was run. Phase 08 still owns dependency parsing; Phase 09 still owns managed MCP
+installation and review. Neither should trigger executable work from this report.
+
+## Completion note: October 9, 2026
+
+Status: implemented with explicit unknown and unsupported evidence. **Check this node** now lives in
+the existing agents `core:security` section. Its two device-only routes provide scope choices and an
+on-demand report. Findings carry stable IDs, owner and scope, time, separate evidence state and
+severity, source, limit, and action. The page keeps one report only, expires it after five minutes,
+aborts requests and rejects late replies on Node or scope change, and stops its freshness timer on
+unmount. The terminal client uses its existing desktop fallback for this core page.
+
+The collector reads stored instruction settings, managed MCP
+definitions, core tool preferences, and a selected running session's recorded harness options and
+tool ceiling. Core supplies a narrow registered tool-name and risk catalog so the report can show
+effective per-tool grants after the selected ceiling. Follow-up evidence interprets only cached
+provider capabilities, with no executable probe. Static project reads use the canonical project path, fixed
+filenames, `O_NOFOLLOW`, `O_NONBLOCK`, and 32 KiB file caps. The report does not execute configured code or return
+arguments, environment or header values, URL credentials or query strings, or provider output.
+Current-session permission evidence is separate from the next-session default. A changed default
+cannot overwrite live evidence.
+
+Unknown remains explicit for unobserved harness executable versions and restrictions, global or
+harness-owned MCP servers, absent admission observations, and detailed dependency policy. The
+instruction admission contract now retains only the latest in-memory outcome per task, with no report
+history. The plugin host supplies bounded counts through a narrow passive projection. Phase 08 should
+replace the static project policy summary with its typed dependency result. Phase 09 should add its
+managed MCP review result without exposing command arguments or credentials. Neither should call a
+configured executable from this route. No disk-encryption wire change was made.
+
+Evidence: focused agents collector (four tests), route (two tests), and UI cancellation (two tests)
+pass. The fixtures include a malicious command name, synthetic argument, header, environment and URL
+secrets, a symlink escape, conflicting session/default permissions, unknown metadata, and a 4-second
+deadline. Agents and Node TypeScript checks pass; architecture tests pass (87 tests). The Node
+service build passes at 3,187,622 B after tracing its boot route, with a documented 2 KB ceiling
+increase. The isolated desktop fixture displayed configured and unknown results on its one paired
+Node; a screenshot was saved under the task's ignored `.acorn/agent-dev` directory. The terminal
+settings test passes (five tests). The installed desktop helper reported Node 24.21.0; the build
+tooling used Node 26.9.0. No harness version probe was run, because its passive safety was not
+established. Earlier phase evidence names Claude Code 2.1.292 and Codex 0.159.2, but those versions
+were not independently checked in this fixture. Manual gaps: the fixture had no running session or
+second Node, so live-session and Node-switch presentation were verified by focused tests, not by
+desktop interaction. The desktop driver could not select the fixture project from its popover after
+the option reference went stale; project read and scope clearing have focused tests.
+
 Date: October 8, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.
 Dependency: can start independently; integrate phase 06 when its admission contract exists.

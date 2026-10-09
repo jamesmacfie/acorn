@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { redactSecretText, scanSecretText } from '@acorn/plugin-api/node'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
 import { foldToolEvents } from '../../shared/toolFold'
@@ -106,9 +107,16 @@ export class TranscriptCommands {
     return this.deps.store.requireSession(sessionId)
   }
 
-  async export(sessionId: string, format: 'json' | 'markdown'): Promise<string> {
+  /** The serialized transcript and a digest of it without its export time. `redacted` replaces each
+   *  secret finding with a fixed marker in a copy; the stored session is never changed. JSON is
+   *  redacted string by string, so the copy stays valid JSON. */
+  async export(sessionId: string, format: 'json' | 'markdown', redacted = false): Promise<{ content: string; digest: string }> {
     const snapshot = await this.deps.store.exportSnapshot(sessionId)
-    if (format === 'json') return JSON.stringify({ baseline: ACORN_BASELINE, version: 1, exportedAt: Date.now(), ...snapshot }, null, 2)
+    if (format === 'json') {
+      const body = redacted ? redactStrings(snapshot) : snapshot
+      const digest = sha256(JSON.stringify(body))
+      return checked({ content: JSON.stringify({ baseline: ACORN_BASELINE, version: 1, exportedAt: Date.now(), ...body }, null, 2), digest }, redacted)
+    }
     const lines = [`# ${snapshot.session.title}`, '', `Provider: ${snapshot.session.providerId}`, '']
     // One line per tool call with its last status. The ledger keeps a call's opener beside its latest
     // state (./ledgerFold.ts), and listing both would say the call was still pending.
@@ -122,6 +130,23 @@ export class TranscriptCommands {
       }
       lines.push('')
     }
-    return lines.join('\n')
+    const content = redacted ? redactSecretText(lines.join('\n')) : lines.join('\n')
+    return checked({ content, digest: sha256(content) }, redacted)
   }
+}
+
+const sha256 = (text: string) => createHash('sha256').update(text).digest('hex')
+
+// A copy sold as redacted must not still hold a match, however the serializer arranged the text.
+function checked(exported: { content: string; digest: string }, redacted: boolean): { content: string; digest: string } {
+  if (redacted && scanSecretText(exported.content, 'redacted export').length) throw new Error('The redacted export still holds a likely secret, so it was not returned.')
+  return exported
+}
+
+function redactStrings<T>(value: T): T {
+  if (typeof value === 'string') return redactSecretText(value) as T
+  if (Array.isArray(value)) return value.map(redactStrings) as T
+  // Keys too: tool inputs and provider payloads carry caller-chosen key names.
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [redactSecretText(key), redactStrings(item)])) as T
+  return value
 }

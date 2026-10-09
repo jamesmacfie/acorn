@@ -1,5 +1,93 @@
 # Phase 01: gate desktop commands by caller
 
+## Completion note: October 8, 2026
+
+Status: implemented. The application ACL grants all 30 registered desktop commands only to the
+`main` webview. A second check at the command handler verifies the receiving webview's own label and
+top-level renderer URL before dispatch. The main renderer's command arguments and return values,
+navigation policies, and child-webview URL policies keep their contracts.
+
+The preferred application-manifest approach works on pinned Tauri 2.11.5 and tauri-build 2.6.3.
+The build's default `AppManifest` reads `permissions/`, so the explicit
+`apps/desktop/src-tauri/permissions/renderer-commands.toml` file produces `__app-acl__` without a
+custom build script. `default.json` grants `renderer-commands` alongside `core:default`, with no
+window or remote-origin grant. The handler check covers the whole set in one place rather than
+repeating it in each command. The test-only `tauri-utils` dependency was already in the locked graph;
+it adds no shipped runtime dependency. Automation-only commands remain unregistered in normal builds.
+
+Every registered command was reviewed. None is left open:
+
+| Commands | Asset or effect requiring the renderer |
+| --- | --- |
+| `helper_endpoint` | Helper credential and Node access. |
+| `pick_folder`, `pick_files`, `save_file` | Native dialogs, local paths, file reads, and writes. |
+| `open_external_url`, `reveal_data_folder`, `open_config_file` | OS application launch and local filesystem access. |
+| `take_pending_links` | Private navigation queue and consumption of pending owner requests. |
+| `force_quit`, `quit_approved` | App and helper lifecycle. |
+| `show_notification`, `set_badge`, `set_window_background` | Lower-risk presentation effects, still host-owned and capable of misleading the owner. |
+| `cli_install_status`, `cli_install` | Local installation paths and launcher writes. |
+| `reset_export`, `reset_complete` | Recovery export, the data key, and reset completion. |
+| `webview_diagnostics`, `webview_trial_delay` | Automation process metadata and bounded worker occupancy. |
+| `overlay_debug_focus`, `overlay_begin`, `overlay_update` | Focus, composition, and input routing. |
+| `webview_ensure`, `webview_bounds`, `webview_show`, `webview_hide`, `webview_load`, `webview_command`, `webview_evict`, `webview_evict_previews` | Native page creation, navigation, display, browser actions, and retirement. |
+
+Acceptance evidence and exact checks:
+
+- `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+  desktop_commands_resolve_only_for_the_main_webview -- --nocapture` passes. It reads the actual
+  generated manifests and capabilities, checks `__app-acl__` and `has_app_acl`, matches the whole
+  handler list to the grant, and uses Tauri's `RuntimeAuthority::resolve_access`. Every command is
+  granted to local `main`, refused to local plugin and preview child labels in the same window, and
+  refused to a remote HTTPS origin even with the `main` label. This does not depend on an invoke key.
+  The same test also passes with `--features agent-automation`, against that build's generated ACL.
+- `cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml` passes all 67 Rust tests with local
+  sockets enabled. The sandboxed run first passed 63 and failed four unchanged loopback-server tests
+  with `Operation not permitted`: `a_dev_server_error_reaches_the_window_as_itself`,
+  `an_absent_dev_server_is_the_one_case_that_is_a_502`,
+  `a_real_transform_error_does_not_hold_the_window_closed`, and `waits_for_the_entry_module_to_settle`.
+  The same suite passed outside that socket restriction, without changes to those tests or modules.
+- `pnpm --filter @acorn/desktop test:built` passes 192 unit tests in 32 files, 11 boot tests, and
+  67 Rust tests. Staging and the renderer build ran before this equivalent desktop test gate.
+- `pnpm --filter @acorn/desktop lint` passes TypeScript checking.
+- `pnpm --filter @acorn/arch-tests test` initially passed 87 tests in 12 files. The final concurrent
+  run passed 84 and hit three timeouts in unchanged checks: `boundaries.test.ts`'s
+  `shared runtime code does not execute a named plugin route` exceeded 5 seconds,
+  `testFocus.test.ts`'s `runs one named test and rejects an empty named selection` exceeded 30 seconds,
+  and `tomlSecurity.test.ts`'s workflow-file unterminated-comment child exceeded its deadline with
+  `ETIMEDOUT`. No files those checks execute changed in this phase. The follow-up
+  `pnpm --filter @acorn/arch-tests exec vitest run --maxWorkers=1` passed all 87 tests in 12 files.
+  No source, test, or timeout adjustment was made for those failures.
+- `pnpm dev:agent -- --session phase1-auth-2` built and launched the real automation desktop with
+  the staged renderer. The desktop driver read `app://acorn/p/...` and captured the main window.
+  A temporary WebDriver acceptance harness invoked the real commands from that main renderer:
+  `helper_endpoint` returned a port and credential, `pick_files` returned the selected temporary
+  fixture's exact bytes, `save_file` returned true and wrote those bytes, and `webview_ensure`
+  returned true. `webview_diagnostics` confirmed the native preview label before `webview_evict`.
+  Native Computer Use completed the file dialogs. The driver stopped the isolated session afterward.
+  The first launch failed on the sandbox's `tsx` IPC socket restriction; the rerun succeeded.
+
+The host shell's Node 24.11.0 is below the repo's supported floor. Tooling checks used the installed
+Node 26.9.0; the real desktop used its unchanged staged Node 24.21.0. Locked dependencies were
+installed after the offline store reported a missing `drizzle-kit` tarball. Phase 03's runtime pins,
+dependency versions, and code remain untouched.
+
+Gaps and evidence for later phases:
+
+- The sandboxed plugin interface is an iframe inside `main`. Tauri classifies registered custom
+  schemes such as `app-plugin://` as local and authorizes by receiving webview label. It cannot
+  distinguish a valid invocation from that iframe from its parent. The application ACL protects
+  separate child webviews, but does not remove the iframe's reliance on cross-origin isolation and
+  main-frame-only invoke-key injection. Exposing the key or preload to plugin frames needs another
+  boundary change. The shipped security docs state this limit. An iframe refusal caused by the ACL
+  is not claimed as a pass; plugin-child and preview-origin refusals were verified with the resolver.
+- `pnpm --filter @acorn/desktop build` completed staging and the renderer build, then failed the
+  unchanged startup budget check: scripts `797849/775000B`, styles `121732/200000B`. This phase changes
+  only Rust, ACL configuration, and docs; it changes no renderer source or Vite/budget input. The
+  budget failure is unrelated, and no budget or renderer cleanup was made.
+- The real-window run was an automation debug build on macOS. A packaged release and Windows/Linux
+  windows were not exercised. Child webviews cannot be driven by the desktop driver. No full-repo
+  lint or test run was performed; those remain the coordinator's final gate.
+
 Date: October 7, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `823db58295b84ac9f9fb52f3f85b7a6550bd8761`.
 Dependency: none.

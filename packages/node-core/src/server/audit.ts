@@ -28,6 +28,11 @@ export type CoreAuditAction =
   // The hash-gated acknowledgement of executable repo config. The one place the owner says "yes, run
   // this", so the record of having said it is worth as much as the gate.
   | 'config.trusted'
+  // A publication gate refused content with secret findings, or the owner allowed one exact operation
+  // anyway. Details carry counts, rule ids, the digest, and the decision, never a value
+  // (docs/security/secret-publication.md § Audit).
+  | 'secrets.publication.blocked'
+  | 'secrets.publication.allowed'
   // Node administration: which plugins run decides which routes exist and which databases open.
   | 'plugins.disabled.changed'
   // Attachment to a control plane, both directions (docs/node-enrollment.md). On the same trail as

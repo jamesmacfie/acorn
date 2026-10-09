@@ -67,8 +67,7 @@ The Agents group has six pages, and the agents plugin owns four (`plugins/agents
 | Harnesses and defaults (`agent-defaults`) | agents | Each harness and whether this machine can run it, usage limits, new-session defaults with the task-context switch, inline diff chats, and the device's **Generate with** and **Tool call display** |
 | Custom agents (`custom-agents`) | agents | A list, then one agent's editor with a danger zone |
 | Tools and permissions (`agent-tools`) | core | The three tiers, then every tool grouped by owner or tier |
-| MCP servers (`agent-mcp-servers`) | agents | The servers acorn declares to every session, a list then one server's editor |
-| MCP config files (`mcp`) | core | The servers a CLI loads by itself, for the project picked on the page |
+| MCP (`agent-mcp-servers`) | agents | Two tabs. **Servers** declares servers to every session, a list then one server's editor. **Config files** shows the servers a CLI loads by itself, for the project picked on the tab. `mcp` is an alias. |
 | Limits and cost (`agent-limits`) | agents | Turns at once, then prices. `agent-concurrency` and `agent-pricing` are aliases. |
 
 The task-context switch writes core's `startup_context_injection` preference, which the memory

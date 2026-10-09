@@ -319,3 +319,17 @@ export const agentMcpServers = sqliteTable('agent_mcp_servers', {
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })
+
+// One project owns its review history. Metadata remains queryable without opening instruction bodies.
+// A second row is retained for the previous approved version, never more than two per project.
+export const agentInstructionSnapshots = sqliteTable('agent_instruction_snapshots', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull(),
+  digest: text('digest').notNull(),
+  scope: text('scope').notNull(),
+  analyzerVersion: integer('analyzer_version').notNull(),
+  filesJson: text('files_json').notNull(),
+  bodyEnc: text('body_enc').notNull(),
+  approvedAt: integer('approved_at'),
+  createdAt: integer('created_at').notNull(),
+}, (t) => [index('agent_instruction_snapshots_project_idx').on(t.projectId, t.createdAt)])

@@ -4,7 +4,7 @@
 // localDiff.ts. Pure Node, so it works in dev:node too. Wired in ../node/index.ts.
 import { BridgeError, invalidateWorktreeStatus, type CoreServices, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import { realpath } from 'node:fs/promises'
-import type { LocalGitBridge } from './routes/localGit'
+import type { GitActionResult, LocalGitBridge } from './routes/localGit'
 import { abortOperation, branchOf, commitDiffText, commitStaged, discardAll, discardFile, fetchRemote, gitOperation, headCommit, localNewSideText, localStatus, pullRemote, pushBranch, stageAll, stageFiles, unstageAll, unstageFiles } from './localDiff'
 import { localDocument, localSearch, localSegments } from './localDocument'
 import { buildCommitPrompt, cleanCommitMessage, COMMIT_MESSAGE_SYSTEM, commitDiffScope, commitFiles, splitByBudget, splitPatch } from './commitMessage'
@@ -48,8 +48,11 @@ export const CHANGES_HOOKS = [
 //
 // `hooks` is the owner's half of the two points above. Optional so a test can build the bridge with no
 // host around it, and absent means nobody objects, which is also what an empty chain means.
+//
+// `secretPublication` is core's optional gate (docs/security/secret-publication.md). Absent or off,
+// commit and push run exactly as before, with no check and no added latency.
 export function localGitBridge(
-  core: Pick<CoreServices, 'tasks' | 'models' | 'checkoutAdmission'> & Partial<Pick<CoreServices, 'prefs' | 'identity'>>,
+  core: Pick<CoreServices, 'tasks' | 'models' | 'checkoutAdmission' | 'secretPublication'> & Partial<Pick<CoreServices, 'prefs' | 'identity'>>,
   /** `ctx.events.worktreeStatus`: a stage, a commit, a discard or a remote verb moved the dirty
    *  markers, or the counts the branch bar draws beside them. */
   worktreeChanged: (taskId: string) => void = () => {},
@@ -63,14 +66,25 @@ export function localGitBridge(
     if (!root) throw new BridgeError(404, 'not_found', 'No worktree yet.')
     return root
   }
-  const withRoot = async (taskId: string, fn: (root: string) => Promise<{ ok: boolean; reason?: string }>) => {
+  const withRoot = async (taskId: string, fn: (root: string) => Promise<GitActionResult>): Promise<GitActionResult> => {
     const root = await core.tasks.root(taskId)
     if (!root) return { ok: false, reason: 'No worktree yet.' }
     const res = await fn(root)
     worktreeChanged(taskId)
     return res
   }
+  // Acorn's own index writes take turns per worktree, so a stage from the pane cannot land between a
+  // commit's secret check and the commit it admits. A Git process outside Acorn is not covered.
+  const lanes = new Map<string, Promise<unknown>>()
+  const withIndex = (taskId: string, fn: (root: string) => Promise<GitActionResult>) => withRoot(taskId, (root) => {
+    const run = (lanes.get(root) ?? Promise.resolve()).then(() => fn(root))
+    const settled = run.catch(() => {})
+    lanes.set(root, settled)
+    void settled.then(() => { if (lanes.get(root) === settled) lanes.delete(root) })
+    return run
+  })
   return {
+    dependencies: async (taskId, scope) => (await import('./dependencyReview')).dependencyReview(await rootOf(taskId), scope, taskId),
     status: async (taskId) => {
       const root = await core.tasks.root(taskId)
       if (!root) return emptyLocalStatus()
@@ -94,9 +108,9 @@ export function localGitBridge(
         return { error: e instanceof Error ? e.message : 'read failed' }
       }
     },
-    stage: (taskId, paths) => withRoot(taskId, (root) => stageFiles(root, paths)),
-    unstage: (taskId, paths) => withRoot(taskId, (root) => unstageFiles(root, paths)),
-    discard: (taskId, path, untracked, oldPath) => withRoot(taskId, (root) => discardFile(root, path, !!untracked, oldPath)),
+    stage: (taskId, paths) => withIndex(taskId, (root) => stageFiles(root, paths)),
+    unstage: (taskId, paths) => withIndex(taskId, (root) => unstageFiles(root, paths)),
+    discard: (taskId, path, untracked, oldPath) => withIndex(taskId, (root) => discardFile(root, path, !!untracked, oldPath)),
     // The two hooked mutations. The refusal reaches the pane as the same `{ ok: false, reason }` a git
     // failure does, with the blaming plugin's name in front of it, so the owner's UI needs no second
     // shape for "somebody said no" (docs/plugins/hooks.md § Hooks).
@@ -105,15 +119,21 @@ export function localGitBridge(
       if (!root) return null
       return headCommit(root).catch(() => null)
     },
-    commit: (taskId, message, options = {}) => withRoot(taskId, async (root) => {
-      const verdict = await hooks?.run('before-commit', { taskId, branch: await branchOf(root), message, amend: !!options.amend })
+    commit: (taskId, message, options = {}) => withIndex(taskId, async (root) => {
+      const branch = await branchOf(root)
+      const verdict = await hooks?.run('before-commit', { taskId, branch, message, amend: !!options.amend })
       if (verdict && !verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
       // Transformed, or the original if nobody transformed. One value to act on either way.
-      return commitStaged(root, verdict?.payload.message ?? message, options)
+      const finalMessage = verdict?.payload.message ?? message
+      const gate = core.secretPublication
+      if (!gate || !(await gate.enabled())) return commitStaged(root, finalMessage, options)
+      // Immediately before the commit and after the optional hook, so an allowance cannot outlive a
+      // veto. Loaded only while blocking is on (./secretCheck.ts § gatedCommit).
+      return (await import('./secretCheck')).gatedCommit(root, branch, finalMessage, options, gate)
     }),
-    stageAll: (taskId) => withRoot(taskId, stageAll),
-    unstageAll: (taskId) => withRoot(taskId, unstageAll),
-    discardAll: (taskId) => withRoot(taskId, discardAll),
+    stageAll: (taskId) => withIndex(taskId, stageAll),
+    unstageAll: (taskId) => withIndex(taskId, unstageAll),
+    discardAll: (taskId) => withIndex(taskId, discardAll),
     // The four remote verbs. Each takes 120 seconds rather than the local 30, because the clock is
     // somebody else's server (./localDiff.ts § NETWORK_TIMEOUT_MS).
     fetch: (taskId) => withRoot(taskId, fetchRemote),
@@ -140,10 +160,15 @@ export function localGitBridge(
       }
     },
     push: (taskId, options = {}) => withRoot(taskId, async (root) => {
-      const verdict = await hooks?.run('before-push', { taskId, branch: await branchOf(root), force: !!options.force })
+      const branch = await branchOf(root)
+      const verdict = await hooks?.run('before-push', { taskId, branch, force: !!options.force })
       if (verdict && !verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
-      return pushBranch(root, options)
+      const gate = core.secretPublication
+      if (!gate || !(await gate.enabled())) return pushBranch(root, options)
+      return (await import('./secretCheck')).gatedPush(root, branch, options, gate)
     }),
+    // The same checks, run on request with blocking off or on. Reports only; nothing is admitted.
+    secretCheck: async (taskId, operation) => (await import('./secretCheck')).manualSecretCheck(await rootOf(taskId), operation),
     // Which operation to abort is read off the tree here, not taken from the caller: `merge` and
     // `rebase` are argv, and the panel only offers Abort while its own status read says one is in
     // flight. A request that arrives after somebody finished the rebase in a terminal is refused
@@ -191,3 +216,4 @@ export function localGitBridge(
     },
   }
 }
+

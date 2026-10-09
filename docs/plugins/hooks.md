@@ -96,7 +96,7 @@ Core declares four hooks, because core owns those choke points:
 | core | `core:before-snapshot` | observe, transform, veto | Budget shaping and PII stripping. The payload is section names |
 | changes | `changes:before-commit` | observe, transform, veto | Commit lint and message helpers |
 | changes | `changes:before-push` | observe, veto | Secret scanning, changesets, and branch protection |
-| agents | `agents:before-send` | observe, transform, veto | Prompt policy, redaction, and context injectors. Agents handles it too, with the [instruction file check](../security.md#hidden-characters-in-instruction-files) |
+| agents | `agents:before-send` | observe, transform, veto | Prompt policy, redaction, and context injectors. Required [instruction checks](../security.md#instruction-file-checks-and-review) run separately in the dispatcher. |
 | agents | `agents:before-tool` | observe, veto, ask | Every tool call a bridged harness makes, before it runs. A veto denies it with a reason the model reads, and an ask holds it on a card. Install order, 5 seconds, `onTimeout: allow` ([harness bridges](../managed-agents/loop-hooks.md)) |
 | agents | `agents:after-tool` | observe, transform | Every tool call a bridged harness finished. A transform's `note` reaches the model beside the result ([harness bridges](../managed-agents/loop-hooks.md)) |
 | agents | `agents:before-permission` | observe, veto | Refusing a harness permission request before anyone sees it. Install order, 5 seconds, `onTimeout: allow`, so a timeout means the person decides. Only requests the harness asks about arrive ([permission policy](../managed-agents/permission-policy.md)) |

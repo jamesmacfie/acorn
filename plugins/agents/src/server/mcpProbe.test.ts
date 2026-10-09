@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { probeMcpServer } from './mcpProbe'
+import { probeMcpCatalogue, probeMcpServer } from './mcpProbe'
 
 // A real stdio server, spawned the way Settings' test button spawns one.
 describe('testing an MCP server from Settings', () => {
@@ -31,6 +31,15 @@ describe('testing an MCP server from Settings', () => {
       [],
     )
     expect(result).toEqual({ ok: true, tools: [{ name: 'who_acorn', description: 'Says who.' }] })
+  })
+
+  it('captures full declarations from a staged package test without treating them as approval', async () => {
+    const catalogue = await probeMcpCatalogue(
+      { transport: 'stdio', name: 'probe', command: process.execPath, args: [server], env: { PROBE_NAME: 'acorn' } },
+      [],
+    )
+    expect(catalogue.tools[0]).toMatchObject({ name: 'who_acorn', description: 'Says who.', inputSchema: { type: 'object' } })
+    expect(catalogue.digest).toMatch(/^[a-f0-9]{64}$/)
   })
 
   it('says why a server did not start, with its secrets taken out', async () => {

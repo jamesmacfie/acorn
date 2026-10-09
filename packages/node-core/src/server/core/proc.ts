@@ -30,6 +30,9 @@ export type ProcSpec = {
   maxOutputBytes?: number
   signal?: AbortSignal
   stdin?: string
+  // `latin1` maps each stdout byte to one character, for a caller that slices binary output by byte
+  // counts, such as `git cat-file --batch`. Defaults to UTF-8.
+  stdoutEncoding?: 'utf8' | 'latin1'
   // Live output, chunk by chunk, for a caller that streams a tail while the command runs. Off by
   // default: the collected, capped result is still what `runProcess` resolves with, and a chunk sent
   // here is a copy, not a replacement. Text is decoded across chunk boundaries, so a multi-byte
@@ -222,7 +225,7 @@ function spawnProcess(spec: ProcSpec, label: string): Promise<ProcResult> {
       if (truncated) emitEvent('core', 'proc.truncated', { seam: 'proc.spawn', file: label, 'max.bytes': maxOutputBytes })
       resolve({
         ...result,
-        stdout: decode(buffers.out),
+        stdout: decode(buffers.out, spec.stdoutEncoding),
         stderr: decode(buffers.err),
         timedOut,
         aborted,
@@ -243,8 +246,8 @@ function spawnProcess(spec: ProcSpec, label: string): Promise<ProcResult> {
 // chunk boundaries, which is the property `chunk.toString()` lacked, and `.end()` is deliberately not
 // called, so a sequence left incomplete by the output cap is dropped rather than flushed as U+FFFD.
 // Dropping it is what keeps the result both valid UTF-8 and within maxOutputBytes.
-function decode(chunks: readonly Buffer[]): string {
-  const decoder = new StringDecoder('utf8')
+function decode(chunks: readonly Buffer[], encoding: 'utf8' | 'latin1' = 'utf8'): string {
+  const decoder = new StringDecoder(encoding)
   let out = ''
   for (const chunk of chunks) out += decoder.write(chunk)
   return out

@@ -31,6 +31,7 @@ describe('the MCP servers acorn hands to sessions', () => {
   // reads back.
   it('seals a secret, never returns it, and reveals it only for a session start', async () => {
     const saved = await store.save('linear', linear)
+    await store.consent('linear', saved.revision)
     expect(saved.values).toEqual([
       { name: 'LINEAR_API_KEY', value: null, secret: true },
       { name: 'LOG_LEVEL', value: 'warn', secret: false },
@@ -52,7 +53,8 @@ describe('the MCP servers acorn hands to sessions', () => {
   // How the form edits a server without ever holding its secrets.
   it('keeps a stored secret when an edit leaves its value out, and refuses one it never had', async () => {
     await store.save('linear', linear)
-    await store.save('linear', { ...linear, values: [{ name: 'LINEAR_API_KEY', secret: true }], enabled: false })
+    const edited = await store.save('linear', { ...linear, values: [{ name: 'LINEAR_API_KEY', secret: true }], enabled: false })
+    await store.consent('linear', edited.revision)
     expect((await store.resolve(['linear'], 'test')).servers[0]).toMatchObject({ env: { LINEAR_API_KEY: 'lin_api_0123456789' } })
     expect(await store.enabledNames()).toEqual([])
 
@@ -62,8 +64,10 @@ describe('the MCP servers acorn hands to sessions', () => {
 
   // A session keeps the names it switched on; one removed in Settings since then simply is not there.
   it('drops a name that no longer has a server, and starts without one whose secret will not open', async () => {
-    await store.save('linear', linear)
-    await store.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: true })
+    const linearServer = await store.save('linear', linear)
+    await store.consent('linear', linearServer.revision)
+    const docs = await store.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: true })
+    await store.consent('docs', docs.revision)
     const otherKey = new AgentMcpServerStore(testDb.db, new SecretService('44'.repeat(32)))
 
     const resolved = await otherKey.resolve(['linear', 'docs', 'gone'], 'test')
@@ -72,8 +76,10 @@ describe('the MCP servers acorn hands to sessions', () => {
   })
 
   it('does not read another server after cancellation during a secret reveal', async () => {
-    await store.save('linear', linear)
-    await store.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: true })
+    const linearServer = await store.save('linear', linear)
+    await store.consent('linear', linearServer.revision)
+    const docs = await store.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: true })
+    await store.consent('docs', docs.revision)
     let finish!: (value: string) => void
     const reveal = vi.spyOn(SECRETS, 'reveal').mockReturnValue(new Promise((resolve) => { finish = resolve }))
     const controller = new AbortController()
@@ -84,5 +90,30 @@ describe('the MCP servers acorn hands to sessions', () => {
     testDb.cleanup()
     finish('synthetic secret')
     expect(await resolving).toBe(cancelled)
+  })
+
+  it('holds a saved command until the device consents to the exact secret revision', async () => {
+    const saved = await store.save('linear', linear)
+    expect(saved.consented).toBe(false)
+    expect(await store.resolve(['linear'], 'start')).toMatchObject({ servers: [], unavailable: ['linear'] })
+    await expect(store.consent('linear', '0'.repeat(64))).rejects.toThrow('changed')
+    expect((await store.consent('linear', saved.revision))?.consented).toBe(true)
+    expect((await store.resolve(['linear'], 'start')).servers).toHaveLength(1)
+    const changed = await store.save('linear', { ...linear, values: [{ name: 'LINEAR_API_KEY', value: 'another secret', secret: true }] })
+    expect(changed.revision).not.toBe(saved.revision)
+    expect(changed.consented).toBe(false)
+    expect(await store.resolve(['linear'], 'start')).toMatchObject({ servers: [], unavailable: ['linear'] })
+  })
+
+  it('binds catalogue approval to the sealed configuration revision separately from consent', async () => {
+    const saved = await store.save('linear', { ...linear, reviewTools: true })
+    await store.consent('linear', saved.revision)
+    await store.approveCatalogue('linear', saved.revision, { digest: 'a'.repeat(64), version: 1, tools: [{ name: 'read', description: 'Read' }] })
+    expect((await store.get('linear'))?.approvedCatalogueDigest).toBe('a'.repeat(64))
+    const changed = await store.save('linear', { ...linear, reviewTools: true, values: [{ name: 'LINEAR_API_KEY', value: 'new secret', secret: true }] })
+    expect(changed.consented).toBe(false)
+    expect(changed.approvedCatalogueDigest).toBeNull()
+    expect((await store.previousCatalogue('linear'))?.tools).toEqual([{ name: 'read', description: 'Read' }])
+    await expect(store.approveCatalogue('linear', saved.revision, { digest: 'b'.repeat(64), version: 1, tools: [] })).rejects.toThrow('changed')
   })
 })

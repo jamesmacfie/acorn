@@ -83,6 +83,10 @@ A tier you've never touched falls back to `TOOL_TIER_DEFAULTS` in
 execute tool added in a later release stays off until you turn the tier on. The Node's
 `isToolPermitted` and the Settings page read the same constant.
 
+Security diagnostics reads the registered name and risk catalog through core's narrow `agentTools`
+service, then applies the stored preference and selected session ceiling. It shows only catalogued
+tool names; a stale preference key cannot introduce a tool into the report.
+
 ## Safety rules
 
 - The Node validates tool input and every path and task ID at its boundary.

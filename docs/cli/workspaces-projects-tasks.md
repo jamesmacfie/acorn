@@ -95,7 +95,10 @@ A skip keeps its reason, and passing doesn't mean dependencies were installed. C
 only the local wait.
 
 Inside a task-scoped launch, `TASK_ID` may be left out. The CLI reads `ACORN_TASK_ID`, the task's
-`ACORN_API_TOKEN`, the expected `ACORN_NODE_ID`, and `NODE_EXTRA_CA_CERTS` from the launch environment,
-and checks the pinned certificate and Node identity before it sends the token. A different task or Node
+`ACORN_API_TOKEN` (or the refreshed token in `ACORN_API_TOKEN_FILE`), the expected `ACORN_NODE_ID`,
+and `NODE_EXTRA_CA_CERTS` from the launch environment, and checks the pinned certificate and Node
+identity before it sends the token. It reads the file on each request, so a long-running task shell
+can use the CLI after its launch token expires. An older task shell can find the file from its data
+root, task ID, and session ID. A different task or Node
 is rejected. That connection permits only the task's script reads and never falls back to device
 credentials, and every other command is refused.

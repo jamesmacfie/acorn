@@ -1,6 +1,51 @@
 # Phase 09: pin MCP packages and review tool changes
 
-Date: October 8, 2026. Status: proposed product requirements; implementation not started.
+> Completion note — 2026-10-09. Optional managed installation accepts exact npm coordinates, resolves
+> and installs with lifecycle scripts disabled, checks publication evidence for every locked version,
+> and records npm's archive integrity plus lock, installed tree, executable, runtime, and policy identities.
+> Staging, file reads, process output, deadlines, and cleanup are bounded. Device consent precedes the
+> first Test or launch for each configuration and secret revision. Activation selects recorded local
+> bytes atomically; a failed update leaves the previous selection. Active provider generations retain
+> older installed roots until retirement. Command and HTTP modes remain supported. Review is off by
+> default. When enabled, a session-owned proxy on the actual harness path withholds tools for separate
+> device approval, binds the full canonical catalogue and configuration revision, and quarantines
+> notifications, drift, interrupted listing, and stale approvals. Phase 07 reads passive management
+> facts only. Personal harness configurations stay outside this proxy.
+>
+> Acceptance: On isolated desktop data, Settings planned, tested, and activated
+> `@modelcontextprotocol/server-everything@2025.9.25` (127 locked packages; ten tools), then planned,
+> tested, and activated `@modelcontextprotocol/server-everything@2025.11.25` (11 tools). The selected
+> newer version and installation identity persisted across a stopped and restarted desktop. The
+> previously observed Settings reset did not recur through these long flows; its transient node
+> availability remount is covered by a client-core regression. Installed Claude Code and Codex each
+> reached a reviewed HTTP fixture through Acorn's managed session driver. Both saw the initial refusal,
+> produced a device review, called the approved echo tool, and refused a call after list change. Codex
+> 0.159.2 kept its initial empty tool list within the already-running thread after approval; a new
+> managed Codex session saw the stored approval and called the tool. Settings and the MCP guide disclose
+> this refresh limit.
+>
+> Focused proof: SDK fixtures cover notification during a held list and approval, elicitation response,
+> cancellation, request ceiling, aggregate catalogue deadline, disconnect/reconnect, and explicit event
+> replay refusal. A/B/A silent drift remains quarantined, and a cancelled call waiting on catalogue
+> admission never reaches the upstream tool. Installer fixtures cover transitive scripts and publication
+> cutoff, cancellation, retained old bytes, selection conflicts, FIFO substitution, and pre-aborted reads.
+> A local package canary confirmed real npm suppressed
+> scripts during lock resolution and `npm ci`; a tampered integrity in its frozen lock made `npm ci`
+> fail. npm is the archive integrity authority; Acorn does not independently re-verify tarballs.
+> Scoped agents/client-core type checks and focused tests passed; the affected Node build and
+> architecture/doc checks passed. The static service graph measured 3,209,061 B under a 3,210,000 B
+> ceiling; installer, catalogue, and proxy remain lazy. No migration changed. Earlier broad-suite
+> observations remain: host-access agents suite 180 files/1,315 tests, one skip; unrelated route golden
+> missing GitHub `pulls/search` and sandbox socket/process cases are left untouched.
+>
+> Limits: Event replay is explicitly unavailable (HTTP 409), so a client reconnects to a fresh
+> reviewed connection. A forwarded in-flight call cannot be undone after a later list change. Installed
+> MCP code executes with the device user's authority; managed installation does not sandbox it. A host
+> without no-follow file opens reports managed installation unavailable. Later
+> phases must preserve the configuration-revision, consent, managed-root lease, and catalogue-approval
+> contracts.
+
+Date: October 8, 2026. Status: implemented October 9, 2026; historical plan follows.
 Source baseline: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.
 Dependency: can start independently; phase 07 displays its management and coverage state.
 

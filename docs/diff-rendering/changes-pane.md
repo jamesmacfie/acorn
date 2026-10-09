@@ -74,6 +74,39 @@ bodies, so badges and delivery gates react without receiving review content.
 
 ## The file list
 
+When the selected staging area contains a manifest, lockfile, or package policy change, the list
+shows an expandable dependency summary. `plugins/changes/src/server/dependencyReview.ts` reads HEAD
+against the index for staged review and the index against disk for unstaged review. It includes
+relevant untracked files. The report names its scope, format, analyzer version, and digest of both
+sets of bytes. A status refresh or stage operation requests a fresh report; the pane hides a report
+while its replacement loads. HEAD and the index are enumerated once, and blob object IDs are read
+immutably. If HEAD, the index, or a reviewed disk file changes during acquisition, the report is
+partial with no comparison findings and asks for a retry. Read failures appear in the pane.
+
+Below it, **Check next commit for secrets** and **Check outgoing commits** run the checks a commit or
+push would run and list each finding by rule and position, never by value. The commit check reads the
+index when something is staged and the tracked changes otherwise. The push check asks the remote for
+its refs. With **Block publication with secret findings** on for the node, Commit and Push run the
+same checks first, and a refusal arrives in the pane's error line with the rule, the path, and the
+line. For what each check reads, how a Git hook is handled, and the bounds, see
+[secret checks before publication](../security/secret-publication.md#git).
+
+The parser supports npm lockfile versions 2 and 3 and pnpm lockfile version 9. It compares manifest
+requests, lockfile importer resolutions, package records, sources, integrity fields, lifecycle-script
+names and command-change digests, package-manager versions, release-age settings, build approvals, overrides, catalogs, and
+registry settings. It preserves aliases, peer variants, optional flags, and workspace links in
+resolution identities. Display values are redacted and abbreviated independently of complete bounded
+comparison identities. Finding details explain when the visible value was abbreviated. Missing,
+malformed, mixed, unsupported, unreadable, or oversized inputs yield
+partial or unsupported coverage and leave ordinary diff and Git actions available. Git blobs and
+disk reads have a 6 MiB per-file and 16 MiB combined read bound; disk paths pass the worktree
+confinement check. Nested independent project configuration is reported as incomplete.
+
+The review does not install packages or run project configuration. It cannot infer installed package
+scripts, publisher identity, release dates, provenance, or malware status from a lockfile. Integrity
+is a byte-match claim, not proof of publisher intent. It does not block commits, pushes, terminal
+installs, or package-manager commands. The report has no external metadata lookup.
+
 The list is a navigator, not a selector. Every file's hunks stack in one scroller, and clicking a row
 scrolls to it, as in the pull request pane. Staging is a checkbox, one per row and one per group. The
 row's checkbox is its last control, so it lines up with its group's. Discard and **Send to agent** are

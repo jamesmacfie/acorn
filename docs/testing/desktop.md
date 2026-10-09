@@ -38,7 +38,8 @@ The Rust tests in `apps/desktop/src-tauri/src/` cover what a headless helper run
 - The data key's shape and its file fallback.
 - The plugin scheme's hash grammar and frame CSP.
 - The webview URL policies and the key grammar that picks between them.
-- Navigation history, the capability file's webview scoping, and three packaging properties in
+- Navigation history, the generated application ACL's command coverage and caller resolution,
+  the capability file's webview scoping, and three packaging properties in
   `tauri.conf.json`.
 
 [Continuous integration](./ci.md) says which workflows run these and the boot test.

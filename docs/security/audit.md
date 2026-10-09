@@ -12,6 +12,8 @@ records:
 
 - pairing windows opened and closed, and devices paired and revoked;
 - config-trust acknowledgements;
+- publication blocked by a secret check, and one operation allowed
+  ([secret checks](./secret-publication.md#audit));
 - secrets created, replaced, and deleted;
 - plugin toggles, installs, updates, uninstalls, reloads, and review decisions;
 - the owner's answer to an agent's plugin request;
@@ -23,7 +25,7 @@ tamper-evident against someone who already controls the database file.
 
 ## The vocabulary is closed, and a plugin can add to it
 
-Core's 18 verbs are a closed union in `server/audit.ts`. The settings page groups and filters on it,
+Core's 28 verbs are a closed union in `server/audit.ts`. The settings page groups and filters on it,
 and an action nobody can enumerate is one nobody reviews. A plugin declares its own verbs in its
 manifest's `contributions.auditActions` or through `ctx.audit.declare`, and writes rows with
 `ctx.audit.record`. Four rules keep the set closed:

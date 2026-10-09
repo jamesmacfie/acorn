@@ -85,7 +85,7 @@ export type ManagedAgentsBridge = {
   deleteSession(sessionId: string): Promise<AgentDeleteResult>
   handoffToTerminal(sessionId: string): Promise<AgentSession>
   resumeManaged(sessionId: string): Promise<AgentSession>
-  exportSession(sessionId: string, format: 'json' | 'markdown'): Promise<string>
+  exportSession(sessionId: string, format: 'json' | 'markdown', variant: 'original' | 'redacted'): Promise<{ content: string; digest: string }>
   wait(sessionId: string, afterSeq: number, until: 'ready' | 'attention' | 'turn_completed' | 'stopped', timeoutMs: number, signal?: AbortSignal): Promise<AgentSessionSnapshot>
   search(
     query: string,
@@ -107,7 +107,9 @@ const pageQuerySchema = z.object({
   fold: z.literal('1').optional(),
 })
 
-const exportQuerySchema = z.object({ format: z.enum(['json', 'markdown']).default('json') })
+// `redacted` is a separate copy with each secret finding replaced by a fixed marker; the stored
+// session is unchanged (docs/security/secret-publication.md § Agents).
+const exportQuerySchema = z.object({ format: z.enum(['json', 'markdown']).default('json'), variant: z.enum(['original', 'redacted']).default('original') })
 const forkBodySchema = z.object({ title: z.string().trim().min(1).max(500).optional() })
 const cancelBodySchema = z.object({ turnId: z.string().uuid().optional() })
 const implementPlanBodySchema = z.object({ itemId: z.string().min(1).max(2_000) })
@@ -437,7 +439,8 @@ export const managedAgents = new Hono<AppEnv>()
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, async (bridge) => ({
       format: parsed.data.format,
-      content: await bridge.exportSession(c.req.param('sessionId'), parsed.data.format),
+      variant: parsed.data.variant,
+      ...await bridge.exportSession(c.req.param('sessionId'), parsed.data.format, parsed.data.variant),
     }))
   })
   .get('/sessions/:sessionId/wait', (c) => {

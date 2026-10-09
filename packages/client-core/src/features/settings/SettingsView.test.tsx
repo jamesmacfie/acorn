@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   attention: [] as unknown[],
   // An accessor for the same reason: a test flips it to stand in for the roster arriving.
   rosterKnown: (() => true) as () => boolean,
+  stale: (() => false) as () => boolean,
+  capable: (() => true) as () => boolean,
   mode: 'on' as 'on' | 'off',
 }))
 vi.mock('@tanstack/solid-query', () => ({
@@ -45,6 +47,8 @@ vi.mock('../../infra/node/fleet', () => ({
 vi.mock('../../infra/node/hostCapabilities', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../infra/node/hostCapabilities')>(),
   pluginRosterKnown: () => mocks.rosterKnown(),
+  activePluginNodeStale: () => mocks.stale(),
+  hasHostCapability: (requirement: unknown) => (requirement as { plugin?: string } | undefined)?.plugin === 'fixture' ? mocks.capable() : true,
 }))
 vi.mock('../notifications/attentionInbox', () => ({ createAttentionInbox: () => () => ({ rows: mocks.attention, unavailable: [] }) }))
 
@@ -99,6 +103,8 @@ beforeEach(() => {
   mocks.integrations = undefined
   mocks.attention = []
   mocks.rosterKnown = () => true
+  mocks.stale = () => false
+  mocks.capable = () => true
   mocks.nodes = [{ nodeId: 'node-a', label: 'Laptop' }, { nodeId: 'node-b', label: 'Build box' }]
   setActiveNode('node-a')
   host = document.createElement('div')
@@ -199,6 +205,28 @@ describe('SettingsView', () => {
     held.push(settingsRegistry.register(page('late', { label: 'Late' })))
     setKnown(true)
     expect(title()).toBe('Late')
+  })
+
+  it('keeps an open plugin form mounted during a stale node observation, then respects a confirmed disable', () => {
+    const [stale, setStale] = createSignal(false)
+    const [capable, setCapable] = createSignal(true)
+    mocks.stale = stale
+    mocks.capable = capable
+    let mounts = 0
+    held.push(settingsRegistry.register(page('fixture-settings', {
+      label: 'Fixture', requires: { plugin: 'fixture' },
+      component: () => { mounts++; return <input aria-label="Installer draft" value="kept" /> },
+    })))
+    open({ target: 'fixture-settings' })
+    const field = host.querySelector<HTMLInputElement>('input[aria-label="Installer draft"]')!
+    field.value = 'staged package'
+    setStale(true)
+    setCapable(false)
+    expect(host.querySelector('input[aria-label="Installer draft"]')).toBe(field)
+    expect(field.value).toBe('staged package')
+    expect(mounts).toBe(1)
+    setStale(false)
+    expect(title()).toBe('Appearance')
   })
 
   it('lists the node\'s workspaces after Overview and draws the workspace page for one', () => {

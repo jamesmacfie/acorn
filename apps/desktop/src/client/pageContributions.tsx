@@ -7,7 +7,6 @@ const ServicesSettings = lazy(() => import('@acorn/client-core/features/settings
 const AiModelsSettings = lazy(() => import('@acorn/client-core/features/settings/models/AiModelsSettings.tsx'))
 const WorkspaceSettings = lazy(() => import('@acorn/client-core/features/settings/WorkspaceSettings.tsx'))
 const ProjectSettings = lazy(() => import('@acorn/client-core/features/settings/ProjectSettings.tsx'))
-const McpSettings = lazy(() => import('@acorn/client-core/features/settings/McpSettings.tsx'))
 const AgentToolsSettings = lazy(() => import('@acorn/client-core/features/settings/AgentToolsSettings.tsx'))
 const AppearanceSettings = lazy(() => import('@acorn/client-core/features/settings/AppearanceSettings.tsx'))
 const NotificationSettings = lazy(() => import('@acorn/client-core/features/settings/NotificationSettings.tsx'))
@@ -45,7 +44,6 @@ const components: Record<CoreSettingsPageId, SettingsContribution['component']> 
     ? <ProjectSettings project={props.context.scope.project} context={props.context} />
     : null,
   'agent-tools': (props) => <AgentToolsSettings navigate={props.context.navigate} />,
-  mcp: (props) => <McpSettings context={props.context} />,
   integrations: (props) => <ServicesSettings context={props.context} />,
   'ai-models': (props) => <AiModelsSettings context={props.context} />,
   schedules: (props) => <SchedulesSettings nodeId={props.context.scope.nodeId} />,

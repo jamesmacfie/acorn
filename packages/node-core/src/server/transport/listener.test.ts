@@ -1,6 +1,6 @@
 import { request as httpsRequest } from 'node:https'
 import { createServer as createNetServer } from 'node:net'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { seedTlsCert } from '../../testkit/tls.ts'
@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { openDataRoot, type DataRoot } from '../storage/dataRoot'
 import { makeRuntime, startListener, type Listener } from './listener'
 import { disposeWsHub } from './wsHub'
+import { mintInternalToken } from '../auth/internalTokens'
 
 // The listener's transport contract, asserted against a real socket: it speaks TLS with the
 // certificate it reports, that certificate validates for 127.0.0.1 (no `rejectUnauthorized: false`
@@ -21,7 +22,7 @@ type Probe = { status: number; body: string }
 // valid, and the hostname check then has to pass on the IP:127.0.0.1 SAN. If either is wrong this
 // rejects, which is the whole point, because the MCP child (docs/mcp.md) trusts the same file the
 // same way.
-function probe(listener: Listener, path: string, host?: string): Promise<Probe> {
+function probe(listener: Listener, path: string, host?: string, headers: Record<string, string> = {}): Promise<Probe> {
   return new Promise((resolve, reject) => {
     const req = httpsRequest(
       {
@@ -32,7 +33,7 @@ function probe(listener: Listener, path: string, host?: string): Promise<Probe> 
         ca: [listener.certPem],
         rejectUnauthorized: true,
         agent: false, // a fresh connection per probe, so no pooled socket carries a previous request's terms
-        ...(host ? { headers: { host } } : {}),
+        headers: { ...(host ? { host } : {}), ...headers },
       },
       (res) => {
         let body = ''
@@ -106,6 +107,13 @@ describe('the loopback TLS listener', () => {
     const started = await start()
     expect((await probe(started, '/v1/node', 'localhost:1234')).status).toBe(403)
     expect((await probe(started, '/v1/node', `127.0.0.1:${started.endpoint.port}`)).status).toBe(200)
+  }, 20_000)
+
+  it('authenticates an internal token using the adapter socket peer', async () => {
+    const started = await start()
+    const token = mintInternalToken(readFileSync(join(dataDir!, 'internal-token'), 'utf8').trim(), { scope: 'service' })
+    const response = await probe(started, '/v1/core/tasks', undefined, { 'x-acorn-internal': token })
+    expect(response.status).toBe(200)
   }, 20_000)
 
   // "The Node serves no web assets" (docs/architecture-overview.md): the renderer loads from app://acorn,

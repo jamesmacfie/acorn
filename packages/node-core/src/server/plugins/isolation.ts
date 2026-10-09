@@ -140,6 +140,9 @@ export async function isolateNodePlugin(options: {
 
   const execArgv = [
     '--permission',
+    // Freeze shared JavaScript intrinsics before trusted bootstrap imports or plugin code can run.
+    // The worker also captures Web API accessors, which this Node flag does not freeze.
+    '--frozen-intrinsics',
     ...[...read].map((path) => `--allow-fs-read=${path}`),
     ...[...write].map((path) => `--allow-fs-write=${path}`),
     // Node 26 added network permissions. The supported Node 24 line relies on the bootstrap's raw

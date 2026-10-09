@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Show } from 'solid-js'
+import { createEffect, createSignal, For, Show } from 'solid-js'
 import { featureUsable, fileStatusMeta, type Task } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu,
@@ -187,6 +187,62 @@ function NotesBanner(props: { model: ChangesModel }) {
   )
 }
 
+function DependencySummary(props: { model: ChangesModel }) {
+  const [open, setOpen] = createSignal(false)
+  const review = () => !props.model.dependencies || props.model.dependencies.loading || props.model.dependencies.error ? undefined : props.model.dependencies()
+  return <><Show when={props.model.dependencies?.error}><Text>Dependency review failed. Refresh Changes to retry.</Text></Show><Show when={review()}>
+    {(answer) => <Stack gap="none">
+      <Button variant="ghost" size="sm" onPress={() => setOpen(!open())}>
+        Dependencies: {answer().packageCount} package{answer().packageCount === 1 ? '' : 's'}, {answer().findings.length} finding{answer().findings.length === 1 ? '' : 's'} · {answer().coverage} · {answer().scope}
+      </Button>
+      <Show when={open()}>
+        <Text>{answer().manager}{answer().managerVersion ? ` ${answer().managerVersion}` : ''}. Advisory review; integrity is not provenance.</Text>
+        <For each={answer().findings}>{(finding) =>
+          <Stack gap="none">
+            <Text>{finding.warning ? 'Warning · ' : ''}{finding.kind}: {finding.name} {finding.before ?? 'absent'} → {finding.after ?? 'absent'}</Text>
+            <Show when={finding.detail}><Text>{finding.detail}</Text></Show>
+            <Button variant="ghost" size="sm" onPress={() => props.model.select({ path: finding.path, staged: answer().scope === 'staged' })}>{finding.path}</Button>
+          </Stack>
+        }</For>
+        <For each={answer().limits}>{(limit) => <Text>{limit}</Text>}</For>
+      </Show>
+    </Stack>}
+  </Show></>
+}
+
+// Check for secrets in what the next commit takes, or in what a push would send. Rule ids and
+// positions only; the node never returns a matched value.
+function SecretCheckSummary(props: { model: ChangesModel }) {
+  const result = () => props.model.secretCheck()
+  const failure = () => { const value = result(); return value && 'error' in value ? value.error : null }
+  const check = () => { const value = result(); return value && !('error' in value) ? value : null }
+  return <Stack gap="none">
+    <Inline gap="inline">
+      <Button variant="ghost" size="sm" disabled={props.model.checkingSecrets()} onPress={() => void props.model.checkSecrets('commit')}>
+        {props.model.checkingSecrets() ? 'Checking for secrets…' : 'Check next commit for secrets'}
+      </Button>
+      <Button variant="ghost" size="sm" disabled={props.model.checkingSecrets()} onPress={() => void props.model.checkSecrets('push')}>
+        Check outgoing commits
+      </Button>
+    </Inline>
+    <Show when={failure()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
+    <Show when={check()}>
+      {(answer) => <>
+        <Text>
+          {answer().report.counts.high} likely secret{answer().report.counts.high === 1 ? '' : 's'}, {answer().report.counts.heuristic} to review
+          {answer().report.complete ? '' : ', incomplete'} · {answer().operation === 'commit' ? 'next commit' : answer().destination}
+        </Text>
+        <For each={answer().report.findings}>{(finding) =>
+          <Text>{finding.confidence === 'high' ? 'Likely secret' : 'Review'} · {finding.rule} · {finding.location}:{finding.line}:{finding.column}</Text>
+        }</For>
+        <For each={answer().report.unscanned}>{(item) => <Text>Not checked · {item.location}: {item.reason}</Text>}</For>
+        <For each={answer().report.limits}>{(limit) => <Text emphasis="muted" wrap>{limit}</Text>}</For>
+      </>}
+    </Show>
+    <Show when={result()}><Button variant="ghost" size="sm" onPress={() => props.model.clearSecretCheck()}>Dismiss</Button></Show>
+  </Stack>
+}
+
 /** What `Rows` hands a row of its collection: the roving tabindex, the id, and the focus callback. */
 type RowItem = Parameters<Parameters<typeof Rows>[0]['children']>[1]
 
@@ -350,6 +406,8 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
     <Show when={model().isGit()}>
       <Stack gap="none">
         <NotesBanner model={model()} />
+        <DependencySummary model={model()} />
+        <SecretCheckSummary model={model()} />
         {SECTIONS.map(({ key, title }) => (
           <Show when={sectionOf(key)}>
             {(section) => {

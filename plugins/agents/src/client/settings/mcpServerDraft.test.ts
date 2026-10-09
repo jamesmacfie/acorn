@@ -14,6 +14,10 @@ describe('the MCP server form', () => {
     ],
     enabled: true,
     updatedAt: 1,
+    revision: 'a'.repeat(64),
+    consented: true,
+    reviewTools: false,
+    approvedCatalogueDigest: null,
   }
 
   // The form never holds a stored secret, so an untouched one has to go back as "keep it" rather than

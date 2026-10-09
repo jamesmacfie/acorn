@@ -1,5 +1,61 @@
 # Phase 02: make the plugin realm policy tamper-resistant
 
+## Completion note: October 9, 2026
+
+Status: implemented. Loaded plugin workers start with `--frozen-intrinsics`, which freezes the
+JavaScript prototypes used by the builtin and hostname policies before the bootstrap imports. The
+bootstrap freezes `URL.prototype` and `Request.prototype` and captures their native accessors before
+the plugin entrypoint imports. For non-Request inputs, native `fetch` receives the URL spelling that
+the wrapper checked. ESM resolution, scoped `require`, `process.getBuiltinModule`, and fetch keep their
+existing grants, worker data and RPC shapes, and author-facing refusal messages.
+
+The built-in flag was compatible with the trusted bootstrap and loaded plugins on the bundled Node
+24.21.0: the real `loader.test.ts` worker suite passed all 63 tests under the cached bundle binary.
+Node 26.9.0 also passed the full node-core suite. Node emits an experimental warning for each worker
+started with the flag. Plugins that assign to frozen JavaScript prototypes or redefine the frozen URL
+and Request accessors receive a `TypeError`. The URL and Request freeze is necessary in addition to
+capturing getters: a hostile rewrite of `URL.prototype.href` made the captured native `Request.url`
+getter return a forged host before the freeze was added. No trusted dependency needed an exception.
+
+Acceptance and scoped verification:
+
+- Hostile worker code attempts to rewrite Set, String, RegExp, Array, and Function methods before
+  requesting `node:net`, `node:child_process`, and `node:sqlite` through all three builtin entry
+  points. Each refusal retains its original error. A second hostile worker changes the URL and
+  Request globals and tries to replace their accessors before fetching. Declared hosts work and
+  undeclared hosts throw. An honest worker loads granted `net` through all three paths, reaches its
+  declared fetch host, and receives the existing error for ungranted sqlite. The two prior hostile
+  sqlite plugins still fail before opening a database.
+- `pnpm test:focus @acorn/node-core src/server/plugins/loader.test.ts`: 63 passed under bundled
+  Node 24.21.0. `pnpm --filter @acorn/node-core test`: 1,673 passed in 162 files under Node 26.9.0
+  with loopback sockets enabled. The sandboxed attempt hit socket restrictions in unchanged transport
+  tests and was interrupted; the same suite then passed outside that restriction.
+- `pnpm --filter @acorn/protocol test`: 295 passed in 38 files.
+  `pnpm --filter @acorn/custody test`: 188 passed in 17 files.
+  `pnpm --filter @acorn/node exec vitest run test/integration/pluginSystem/pluginLoader.test.ts
+  test/integration/plugins/httpLoaded.test.ts test/integration/plugins/databaseLoaded.test.ts
+  test/integration/pluginSystem/loadedModelProviders.test.ts
+  test/integration/pluginSystem/loadedLinear.test.ts --maxWorkers=1`: all 14 tests passed.
+  `pnpm --filter @acorn/arch-tests test`: 87 passed in 12 files.
+- Scoped `tsc --noEmit` passed for node-core, protocol, node, custody, and tui. Scoped oxlint passed
+  for all changed TypeScript. `pnpm --filter @acorn/node build` passed, including its service budget.
+
+Unrelated consumer failures left unchanged: the full `@acorn/node` suite passed 272 tests and failed
+one route-registry golden assertion because its golden list lacks
+`GET /v1/p/github/repos/:owner/:repo/pulls/search`. The full `@acorn/tui` suite passed 720 tests,
+skipped two, and timed out in `src/node/boot.test.ts` (rows persisted) and
+`src/plugins/workerFactoryOwnership.test.ts` (worker fixture deadline). Both TUI files passed all 16
+tests with `pnpm --filter @acorn/tui exec vitest run src/plugins/workerFactoryOwnership.test.ts
+src/node/boot.test.ts --maxWorkers=1`. One of the five Node integration files also timed out under
+parallel load; all 14 passed with one worker. None of those failures runs changed source. No full-repo
+test or lint command was run.
+
+Later phases must not treat these JavaScript guards as a native network boundary. The unchanged
+bundled Node 24.21.0 grants no runtime network permission, and the fetch hostname list does not
+confine other socket paths or SQLite by itself. Phase 03 was excluded: runtime pins, CI runtime line,
+and permission flags other than `--frozen-intrinsics` remain unchanged. Phase 03 should recheck this
+experimental flag against its selected runtime and retain the Web API freeze or equivalent protection.
+
 Date: October 7, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `823db58295b84ac9f9fb52f3f85b7a6550bd8761`.
 Relationship: build before [phase 03](./03-runtime-network-and-fs-backstop.md).

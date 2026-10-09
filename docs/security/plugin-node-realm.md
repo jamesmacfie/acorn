@@ -115,6 +115,19 @@ socket and process families need their grants. A dependency must resolve to an a
 real file inside the package. Incoming fetch requests have `Authorization`, `x-acorn-internal`,
 cookies, and proxy authorization removed before they cross into the worker.
 
+The worker starts with Node's experimental `--frozen-intrinsics` flag. It freezes the JavaScript
+prototypes used by those guards, including Set, String, RegExp, Array, and Function, before the
+bootstrap or plugin imports run. Node leaves Web API prototypes mutable. Before importing the plugin,
+the bootstrap freezes URL and Request prototypes and captures their native accessors. It passes the
+checked URL spelling to native `fetch` for non-Request inputs. A plugin that patches those globals or
+prototypes cannot change the guard's hostname decision. Attempts to rewrite these frozen prototypes
+receive a `TypeError`.
+
+This JavaScript policy is one layer, not a network boundary by itself. The bundled Node 24.21.0
+runtime does not enforce a network permission, so a plugin with another route to a socket could bypass
+the fetch hostname list. The raw socket builtin denylist and the fetch wrapper remain in-process
+checks. The OS-level boundary described below has not shipped.
+
 **RPC exports have owners.** Lifecycle contexts, route registrations, subscriptions, disposal handles,
 and capability results belong to the realm. A fetch call owns its request context and provider
 services. Provider, secret, and telemetry visitors lend their callback only until the operation

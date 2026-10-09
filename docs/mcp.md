@@ -7,7 +7,7 @@ how a harness receives servers.
 acorn ships a stdio MCP server, a thin child-process client. It receives a task-scoped environment,
 resolves the Node endpoint from the data root, and calls `/v1` over loopback. It never opens SQLite or
 owns a second domain implementation. acorn also hands every agent session the servers you add in
-Settings → MCP servers, whichever harness runs it ([your own servers](#your-own-servers)).
+Settings → MCP, whichever harness runs it ([your own servers](#your-own-servers)).
 
 ## Launch environment
 
@@ -15,6 +15,10 @@ The Node gives the MCP process only what it needs:
 
 - `ACORN_DATA_DIR`: the data root, used to resolve the preferred or bound port.
 - `ACORN_API_TOKEN`: an HMAC task-scoped internal token.
+- `ACORN_API_TOKEN_FILE`: a task child file with the current token. The MCP server reads it for
+  every request, including after a Node restart. A preexisting tmux shell can locate the same file
+  from its data root, task ID, and session ID without this variable. A missing explicitly supplied
+  file fails closed; an older shell may use its launch token until the derived file appears.
 - `NODE_EXTRA_CA_CERTS`: the Node's self-signed certificate, for normal TLS validation.
 - The task and session identifiers, plus the allowlisted process environment. The token, not the
   environment or a request header, is authoritative for the session ID and the tool ceiling.
@@ -28,9 +32,10 @@ The harness bridge, `loop-hook.js`, runs from a harness's own command hook under
 and reaches the Node the same way, with the same task token
 ([harness bridges](./managed-agents/loop-hooks.md#the-bridge-program)).
 
-The endpoint is resolved at call time, because Node ports are ephemeral. The signing key persists, so a
-tmux-reattached process still authenticates after a Node restart, and rotating the key revokes every
-outstanding token.
+The endpoint and current token are resolved at call time: Node ports are ephemeral and a launch token
+expires after 48 hours. The Node refreshes the same signed scope, task, session, and ceiling in the
+file every 12 hours and at boot, so a tmux-reattached process can authenticate after a restart.
+Rotating the signing key revokes every outstanding token.
 
 ## Tool surface
 
@@ -98,8 +103,8 @@ never writes the signed token into the user's config file (`acornMcpServers` in 
 
 The declaration names the whole launch environment rather than relying on inheritance, because an agent
 may scrub credential-shaped names from what it passes its children. DeepSeek's does, and a stdio server
-that loses `ACORN_API_TOKEN` fails every call. The token is declared again on every start, because the
-previous one is dead.
+that loses `ACORN_API_TOKEN_FILE` fails after the launch token expires. The token file is declared again
+on every start, because it is the reattach credential source.
 
 A standalone Node offers no server through either path. It gets no service handshake, so it never learns
 the staging directory its `mcp.js` is in (`configureAcornMcp` in
@@ -109,7 +114,7 @@ development build goes stale after a reinstall, and a restored tmux session neve
 isolated `dev:agent` or `dev:tui:agent` session sets `ACORN_SKIP_MCP_REGISTRATION=1` and skips both, so
 a throwaway checkout never takes over the person's `acorn-dev` entry.
 
-**Settings → MCP config files** lists the servers each CLI loads from its own config files, with secret
+The **Config files** tab of **Settings → MCP** lists the servers each CLI loads from its own config files, with secret
 values masked, and never starts one. It reads one project, picked on the page, starting on the open
 task's project: `.mcp.json` and `.cursor/mcp.json` in the project's folder, and `~/.claude.json`
 (`GET /v1/core/projects/:id/mcp`). **Create .mcp.json** writes an empty file into the project's folder
@@ -119,13 +124,26 @@ routes are device-only.
 
 ## Your own servers
 
-Settings → MCP servers holds the servers acorn declares to agent sessions: a list, then one server's
-editor with **Save**, **Cancel**, and **Remove server**. It links to MCP config files, and that page
-links back, because the two have different owners. The agents plugin owns these, one row per server in
+**Check this node** in Settings > Security and backup reads the managed server definitions without
+connecting to them. It reports enabled state, transport, a known executable family or a custom
+executable label, and flags common unpinned package runners and shell or download commands. The
+response excludes arguments, environment entries, headers, credentials, and URL paths and query
+strings. A running session's MCP panel can report harness state, but there is no passive cached
+contract for global or harness-owned servers. The diagnostic calls those unknown rather than treating
+the managed list as complete. This check does not replace the explicit **Test** action below. It also
+reads stored package, consent, and review facts without installing, probing, or opening credentials.
+
+The **Servers** tab of Settings → MCP holds the servers acorn declares to agent sessions: a list, then
+one server's editor with **Save**, **Cancel**, and **Remove server**. The agents plugin owns the page
+and draws core's config file list as its second tab. The old `mcp` page id is an alias for that tab.
+The agents plugin owns these servers, one row per server in
 its database (`plugins/agents/src/server/mcpServerStore.ts`). A server is a command with arguments and
 an environment, or a URL with headers. A value marked secret is sealed by the Node's secret service,
 read back as a name with no value, and kept when an edit leaves it empty. The routes accept only an
 interactive device, reads included, because a stdio server is a command the next session runs.
+
+Exact npm installation, device consent, and tool catalogue review are described in
+[managed MCP servers](./mcp/managed-servers.md).
 
 acorn never writes these into a CLI's config file. Each harness receives them on every start, because
 none keeps declared servers between processes:

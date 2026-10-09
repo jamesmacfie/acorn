@@ -1,5 +1,5 @@
 // The settings form's working copy of one server, and the two conversions it needs.
-import type { AgentMcpServer, AgentMcpServerInput, AgentMcpTransport } from '../../shared/mcpServers'
+import type { AgentMcpManagedPackage, AgentMcpServer, AgentMcpServerInput, AgentMcpTransport } from '../../shared/mcpServers'
 
 /** `stored` marks a secret the node already holds. Left empty, it is kept. */
 export type AgentMcpPairDraft = { name: string; value: string; secret: boolean; stored: boolean }
@@ -16,6 +16,8 @@ export type AgentMcpServerDraft = {
   url: string
   values: AgentMcpPairDraft[]
   enabled: boolean
+  reviewTools: boolean
+  managed: AgentMcpManagedPackage | null
 }
 
 export const blankAgentMcpServerDraft = (): AgentMcpServerDraft => ({
@@ -27,6 +29,8 @@ export const blankAgentMcpServerDraft = (): AgentMcpServerDraft => ({
   url: '',
   values: [],
   enabled: true,
+  reviewTools: false,
+  managed: null,
 })
 
 export const agentMcpServerDraft = (server: AgentMcpServer): AgentMcpServerDraft => ({
@@ -43,6 +47,8 @@ export const agentMcpServerDraft = (server: AgentMcpServer): AgentMcpServerDraft
     stored: pair.secret,
   })),
   enabled: server.enabled,
+  reviewTools: server.reviewTools,
+  managed: server.managed ?? null,
 })
 
 export function agentMcpServerInput(draft: AgentMcpServerDraft): AgentMcpServerInput {
@@ -58,6 +64,7 @@ export function agentMcpServerInput(draft: AgentMcpServerDraft): AgentMcpServerI
       args: draft.args.split('\n').map((arg) => arg.trim()).filter(Boolean),
       values,
       enabled: draft.enabled,
+      reviewTools: draft.reviewTools,
     }
-    : { transport: 'http', url: draft.url.trim(), values, enabled: draft.enabled }
+    : { transport: 'http', url: draft.url.trim(), values, enabled: draft.enabled, reviewTools: draft.reviewTools }
 }

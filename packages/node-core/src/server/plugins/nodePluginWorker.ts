@@ -103,19 +103,35 @@ process.getBuiltinModule = ((specifier: string) => {
 syncBuiltinESMExports()
 
 const nativeFetch = globalThis.fetch.bind(globalThis)
+// --frozen-intrinsics protects the JavaScript prototypes used by the builtin and hostname
+// policies. Node leaves Web API prototypes mutable, so keep their native accessors as well.
+const NativeURL = URL
+const requestUrl = Object.getOwnPropertyDescriptor(Request.prototype, 'url')!.get!
+const urlHostname = Object.getOwnPropertyDescriptor(NativeURL.prototype, 'hostname')!.get!
+const urlHref = Object.getOwnPropertyDescriptor(NativeURL.prototype, 'href')!.get!
+// Request.url may itself read URL.prototype.href. Capturing its getter alone does not protect that
+// indirect call, and --frozen-intrinsics does not cover either Web API prototype.
+Object.freeze(NativeURL.prototype)
+Object.freeze(Request.prototype)
 if (options.allowNetwork) {
   const hosts = new Set(options.networkHosts)
   const anyHost = hosts.has('*')
   globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
-    const url = input instanceof Request ? new URL(input.url) : new URL(input)
-    if (!networkHostAllowed(url.hostname, hosts)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${url.hostname}'`)
+    let requestAddress: string | undefined
+    try { requestAddress = requestUrl.call(input) } catch { /* A URL or string, not a native Request. */ }
+    const url = new NativeURL(requestAddress ?? (input as string | URL))
+    const hostname = urlHostname.call(url) as string
+    if (!networkHostAllowed(hostname, hosts)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${hostname}'`)
+    // Use the checked spelling for non-Request inputs. Their string conversion can change between
+    // policy evaluation and native fetch; a Request's internal URL is immutable.
+    const fetchInput = requestAddress === undefined ? urlHref.call(url) as string : input
     // An explicit any-host grant also permits redirects to any host. Keep the caller's redirect
     // policy instead of forcing manual redirects on an API client.
-    if (anyHost) return nativeFetch(input, init)
+    if (anyHost) return nativeFetch(fetchInput, init)
     // Never let the native fetch implementation follow a redirect before this wrapper has checked
     // its destination. The plugin may inspect Location and make another fetch, which re-enters the
     // same hostname gate.
-    return nativeFetch(input, { ...init, redirect: 'manual' })
+    return nativeFetch(fetchInput, { ...init, redirect: 'manual' })
   }) as typeof fetch
 } else {
   delete (globalThis as Record<string, unknown>).fetch

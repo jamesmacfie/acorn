@@ -479,10 +479,12 @@ node: ResolvedQuery
 node: RouteFailure
 node: RouteResult
 node: RunTarget
+node: SECRET_DETECTOR_VERSION
 node: ScheduleSkipped
 node: SearchHit
 node: SearchProvider
 node: SearchQuery
+node: SecretPublicationGate
 node: SecretService
 node: SecretUnavailableError
 node: SessionTaskInfo
@@ -528,9 +530,11 @@ node: dataComparisons
 node: dataFieldSchema
 node: dataFieldsSchema
 node: dataPointerSchema
+node: decodeSecretInput
 node: defaultBudgets
 node: deliverableSkills
 node: describeError
+node: describeSecretRefusal
 node: diffDocumentBlobKey
 node: encodeCached
 node: envFlags
@@ -581,6 +585,7 @@ node: queryReferenceSchema
 node: queryScopeSchema
 node: readDataPointer
 node: recordSkillDelivery
+node: redactSecretText
 node: registerAcornMcp
 node: rendererBaseCheckout
 node: requireDevice
@@ -596,7 +601,9 @@ node: respondError
 node: routeCapability
 node: routeCapabilityFor
 node: runHeadless
+node: scanSecretText
 node: scrub
+node: secretReport
 node: selectDataRecords
 node: serveThenRevalidate
 node: serverName
@@ -772,6 +779,7 @@ ui/host: Drawer
 ui/host: IconPicker
 ui/host: IconPickerProps
 ui/host: InlineSlot
+ui/host: McpConfigFiles
 ui/host: ModelPickerPopover
 ui/host: PaletteSurface
 ui/host: PromoteTaskAction

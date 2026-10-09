@@ -1,6 +1,8 @@
 # Harden the trust boundaries
 
-Date: October 8, 2026. Status: proposed product requirements; implementation not started.
+Updated: October 9, 2026. Phases 01, 02, and 04 through 10 are implemented and integrated.
+Phase 03 (Node 26) is excluded from this branch.
+Each phase's completion notes record the shipped behavior, acceptance evidence, and limitations.
 Trust-boundary source baseline, phases 01 to 05: `823db58295b84ac9f9fb52f3f85b7a6550bd8761`.
 Agent-tooling source baseline, phases 06 to 10: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.
 
@@ -11,8 +13,8 @@ each includes starting points, authority, data flow, limits, and acceptance chec
 
 The trust-boundary review compared the October 1, 2026 baseline in
 [the dated review](../../security/review-2026-10-01.md) with its follow-up source baseline. The tooling
-phases use the October 8, 2026 survey of Acorn and reference apps. They are proposed features, not
-claims that every inspected application is vulnerable or that these controls contain arbitrary code.
+phases use the October 8, 2026 survey of Acorn and reference apps. The historical requirements below
+do not claim that every inspected application is vulnerable or that these controls contain arbitrary code.
 
 ## Product goal
 
@@ -112,6 +114,34 @@ These invariants hold across the programme:
   and blocking features start off for migrated data. No phase rewrites personal harness settings.
 
 ## Combined acceptance
+
+### Integration handoff: October 9, 2026
+
+Phases 01, 02, and 04 through 09 landed sequentially on `security-phase`. The combined review
+corrected the plugin ownership golden for the instruction-review and diagnostics routes and the
+Changes static-policy capability. Focused regeneration passed 14 tests; the normal ownership run
+then passed all 13 tests against the corrected golden.
+The Phase 05 note now attributes the earlier service-budget increase to Phase 04's renewal lifecycle.
+The final focused documentation checks passed all six tests, and `git diff --check` passed.
+
+The final full gates ran once with tooling Node 26.9.0; the bundled runtime remains Node 24.21.0.
+`pnpm lint` passed all 37 tasks. `pnpm test` completed all 36 tasks, with 33 passing. This included
+1,686 Node core tests, 1,333 agents tests, 304 Changes tests, 570 workflow tests, 722 TUI tests,
+87 architecture tests, 203 desktop JavaScript tests, and 67 Rust tests. The production service
+graph passed at 3,209,061 bytes against its 3,210,000-byte ceiling.
+
+After the ownership golden correction, the remaining failures are outside the security changes:
+
+- The unchanged published plugin manifest schema lacks the contract's `search` property.
+- The unchanged diff-viewer test left a resident segment provisional in its timing assertion.
+- The Node route golden lacks the existing GitHub `pulls/search` route.
+
+These failures were left untouched at the owner's request. The full test gate is therefore not green.
+No packaged installer or separate Runn development workload was exercised in this final pass.
+Phase-specific desktop and installed-harness evidence remains in the completion notes. Codex 0.159.2
+needs a new managed session to see an MCP catalogue approved after its initial empty list.
+
+### Release workflow
 
 Each developer runs the phase's focused tests, `pnpm lint`, affected package and consumer suites,
 and `pnpm --filter @acorn/arch-tests test`. Complete the full `pnpm test` gate before the programme's

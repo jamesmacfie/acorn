@@ -81,6 +81,13 @@ export const pluginRosterKnown = (): boolean => {
   return (nodeId !== null && distribution().byNode.has(nodeId)) || !!nodePlugins()
 }
 
+/** A stale fleet observation is a connection gap, not an explicit plugin disable. Keep an open
+ * settings form mounted until the node is observed again. */
+export const activePluginNodeStale = (): boolean => {
+  const nodeId = activeNodeId()
+  return nodeId !== null && distribution().byNode.get(nodeId)?.stale === true
+}
+
 export const hasHostCapability = (requirement: HostCapabilityRequirement = 'none'): boolean => {
   if (requirement === 'none') return true
   return Array.isArray(requirement) ? requirement.every(meets) : meets(requirement as HostRequirement)

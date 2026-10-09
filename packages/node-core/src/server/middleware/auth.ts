@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory'
 import type { Env } from '../bindings'
 import { verifyInternalToken, type InternalScope } from '../auth/internalTokens'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
+import { isLoopbackPeer } from '../transport/loopbackPeer'
 
 // The authenticated caller. A device is a paired owner client. An internal principal is a Node-owned
 // service or child process carrying a scoped HMAC token. Provider credentials are separate encrypted
@@ -42,6 +43,7 @@ export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; 
 // credential itself. secretEquals is no longer used here; verifyInternalToken does its own
 // constant-time comparison over the signature.
 function internalPrincipal(c: { env: Env; req: { header(name: string): string | undefined } }): Principal | null {
+  if (!isLoopbackPeer(c.env.incoming?.socket.remoteAddress)) return null
   const token = c.req.header('x-acorn-internal')
   if (!token || !c.env.INTERNAL_TOKEN) return null
   const claims = verifyInternalToken(c.env.INTERNAL_TOKEN, token)

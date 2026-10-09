@@ -15,6 +15,7 @@ import { createTaskService, type CompiledTaskService, type TaskService } from '.
 import { createProjectService, type CompiledProjectService, type ProjectService } from './projectRefs'
 import { createTelemetryService, type TelemetryService } from './telemetry'
 import { verifyAgentToolProvenance } from '../agentTools/provenance'
+import type { SecretPublicationGate } from '../secretChecks/gate'
 import { createCheckoutAdmission, registerCheckoutAdmission, type CheckoutAdmission } from './checkoutAdmission'
 import { getProject } from '../projects'
 import { realpathSync } from 'node:fs'
@@ -53,6 +54,14 @@ export type CoreProcService = {
 export type CoreServices = {
   /** Verify provenance that the authenticated tool route minted for one signed invocation. */
   agentToolProvenance?: { verify(input: import('../agentTools/provenance').AgentToolProvenance): boolean | Promise<boolean> }
+  /** Registered names and risk tiers only. Diagnostics combines this catalog with owner preferences
+   *  and a session ceiling; a loaded plugin receives no grant for this facet. */
+  agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
+  /** Bounded passive plugin facts; supplied by the composition root after the host starts. */
+  pluginSecurity?: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
+  /** The optional secret publication gate (docs/security/secret-publication.md). Built-ins only; a
+   *  loaded plugin receives no grant for it, and nothing here can allow an exception. */
+  secretPublication?: SecretPublicationGate
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
@@ -124,8 +133,15 @@ export function createCoreServices(options: {
   }
   const identity = createIdentityService(options.activeIdentity)
   const models = createModelService(options.db, options.secrets)
+  const prefs = createPrefService(options.db)
+  let gate: Promise<SecretPublicationGate> | undefined
+  const secretGate = () => gate ??= import('../secretChecks/gate').then((module) => module.createSecretPublicationGate({ db: options.db, prefs, identity }))
   return {
     agentToolProvenance: { verify: verifyAgentToolProvenance },
+    agentTools: {
+      catalog: async () => (await import('../agentTools/registry')).agentToolContributions()
+        .map(({ name, risk }) => ({ name, risk })),
+    },
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
     // real modules rather than a second declaration that can drift off them.
     fs: fs satisfies CoreFsService,
@@ -157,7 +173,13 @@ export function createCoreServices(options: {
       }),
     },
     data: createDataSourceService({ tasks, projects, fs, proc }),
-    prefs: createPrefService(options.db),
+    prefs,
+    // Loaded on first use, so a node that never commits, pushes, exports, or sends an attachment
+    // carries none of the gate's code.
+    secretPublication: {
+      enabled: async () => (await secretGate()).enabled(),
+      admit: async (input) => (await secretGate()).admit(input),
+    },
     identity,
     projects,
     telemetry: createTelemetryService(),

@@ -83,12 +83,6 @@ const agentTools: SearchDeclaration = {
     { id: 'tools', label: 'Tools', keywords: ['by owner', 'by tier'] },
   ],
 }
-const mcp: SearchDeclaration = {
-  keywords: ['.mcp.json', 'claude.json', 'cursor', 'servers', 'model context protocol'],
-  sections: [
-    { id: 'files', label: 'Config files', rows: ['Project', 'Starter file'] },
-  ],
-}
 // A connection's own page is a detail of the list, drawn once per connection, so its sections are
 // declared on the list page: search lands on the list, where the connection is one click away. A
 // connection's name, indexed by the settings view, opens its page directly.
@@ -219,11 +213,9 @@ export const CORE_SETTINGS_PAGES = [
   { id: 'workspace.detail', ...workspaceDetail, label: 'Workspace', category: 'workspaces', scope: 'workspace', icon: 'folder', order: 20 },
   { id: 'project.detail', ...projectDetail, label: 'Project', category: 'workspaces', scope: 'project', icon: 'folder', order: 30 },
 
-  // Agents. The agents plugin files its own pages here too; these two are core's. Tools and
-  // permissions, because the tool registry it edits is projected from every plugin's contributions,
-  // so no single plugin owns the page.
+  // Agents. The agents plugin files its own pages here too; this one is core's, because the tool
+  // registry it edits is projected from every plugin's contributions, so no single plugin owns it.
   { id: 'agent-tools', ...agentTools, label: 'Tools and permissions', category: 'agents', scope: 'node', icon: 'wrench', order: 30 },
-  { id: 'mcp', ...mcp, label: 'MCP config files', category: 'agents', scope: 'node', icon: 'file-code', order: 50 },
 
   // Connections. Services keeps the id `integrations`, which plugins and notices deep-link to. A model
   // key is a connection too, but it is listed on AI models, beside the agent CLIs it competes with.

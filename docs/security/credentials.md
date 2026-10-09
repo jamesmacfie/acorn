@@ -53,9 +53,10 @@ whatever else it read while failing.
 
 ## Internal tokens
 
-Internal tokens are stateless HMAC credentials. The signing key persists across restarts, so a
-tmux-reattached agent session keeps authenticating after the Node restarts. Rotating the key revokes
-every outstanding token. Tokens carry no expiry, so scope and rotation are the only lifetime controls.
+Internal tokens are stateless HMAC credentials with a 48-hour expiry. Verification returns the same
+null result for expired, malformed, and forged tokens. The signing key persists across restarts;
+rotating it revokes every outstanding token. The Node accepts these tokens only from a loopback TCP
+peer, even when its listener is advertised. Forwarded headers do not establish that peer.
 
 Two scopes exist:
 
@@ -72,6 +73,24 @@ and the listener's address, which don't exist until every plugin's `init` has ru
 once per child with the scope that child needs, for example
 `{ scope: 'task', taskId, sessionId, toolCeiling }`. Workflow and delegated sessions persist their
 ceiling before the runtime mints the token, and later configuration updates can't widen it.
+
+For a task child, the factory also writes a 0600 token file in the data root and passes
+`ACORN_API_TOKEN_FILE`. The Node refreshes session files every 12 hours and at boot, so a tmux session
+can reattach after its original environment token expires. The MCP server and task CLI read the file
+for each request; a missing explicitly supplied file fails closed. Refresh re-signs only the existing
+verified scope, task, session, and ceiling. Files untouched for 30 days while the Node is down are
+removed at boot.
+
+When the terminal plugin reattaches a preexisting tmux session, it mints that session's file and updates
+tmux's session environment. A running shell retains its old environment, so new MCP and task CLI
+processes can also derive the same file path from the existing data root, task ID, and session ID.
+Until that file appears, they may use the environment token, which the Node can reject. The task and
+its data do not need to be recreated.
+
+A one-shot workflow step gets a separate file while its child runs. The Node refreshes it on the
+same timer and removes it when the step ends; orphaned child files are removed at startup.
+Node-owned service calls mint on demand. A direct custom loopback client in a long-lived PTY should
+read the file for each request instead of retaining `ACORN_API_TOKEN` from its environment.
 
 The agent-tool route reads session identity and tool limits from the verified principal only. The
 `x-acorn-session-id` and `x-acorn-tool-ceiling` headers grant nothing. Session-required tools drop

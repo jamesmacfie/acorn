@@ -3,6 +3,7 @@ import { clearDataSources, registerDataSource } from '../dataSources/registry'
 import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { PluginRosterEntry } from './host'
 import { pluginState, type PluginsBridge } from './state'
+import { pluginSecuritySnapshot } from './pluginSecurity'
 import type { InputGrant } from '../plugins/inputGrants'
 import type { PluginDevelopmentState } from '../plugins/development'
 
@@ -76,6 +77,21 @@ const bridge = (situation: Situation): PluginsBridge => {
 }
 
 const row = (result: ReturnType<typeof pluginState>, name: string) => result.plugins.find((entry) => entry.name === name)
+
+it('projects bounded plugin security counts without package supplied text', () => {
+  const executable = installed('SyntheticSecretXYZ987', { permissions: { ...NO_PERMISSIONS, node: { ...NO_PERMISSIONS.node, exec: true } } })
+  const snapshot = pluginSecuritySnapshot(bridge({ installed: [executable],
+    review: { [executable.id]: { reviewId: 'r', requestId: 'q', fingerprint: 'f', stagedAt: 1 } },
+    development: { [executable.id]: { on: true } },
+  }))
+  expect(snapshot).toMatchObject({ packages: 1, pendingReview: 1, developmentEnabled: 1 })
+  expect(JSON.stringify(snapshot)).not.toContain(executable.id)
+  const running = bridge({ installed: [executable], roster: [{ name: executable.id, state: 'active', disabled: false, required: false }] as PluginRosterEntry[] })
+  running.booted = () => [{ ...activeSnapshot(executable.id, executable.version), identity: {
+    ...activeSnapshot(executable.id, executable.version).identity, permissions: executable.permissions,
+  } }]
+  expect(pluginSecuritySnapshot(running).executableGrants).toBe(1)
+})
 
 describe('pluginState', () => {
   it('holds a staged client-only package and an orphan marker for recovery without a restart banner', () => {

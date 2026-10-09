@@ -327,6 +327,21 @@ it('retires a failed reconciliation attachment without deleting its preexisting 
   expect(state.exec.some(args => args[0] === 'kill-session')).toBe(false)
 })
 
+it('updates a reattached tmux session for newly started MCP children', async () => {
+  state.tmux = true
+  const f = fixture()
+  const meta = await f.terminal.create({ taskId: 'task' })
+  disposeTerminal()
+  state.aliveTmux = meta.tmuxSession!
+  registerTerminalChannel(f.db as never, f.core as never, {
+    internalEnv: () => ({ ACORN_API_TOKEN: 'renewed', ACORN_API_TOKEN_FILE: '/data/session.token' }),
+    launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve(),
+  })
+  await reconcileTmux()
+  expect(state.exec).toContainEqual(['set-environment', '-t', meta.tmuxSession, 'ACORN_API_TOKEN', 'renewed'])
+  expect(state.exec).toContainEqual(['set-environment', '-t', meta.tmuxSession, 'ACORN_API_TOKEN_FILE', '/data/session.token'])
+})
+
 
 it('waits for standing context before spawn and avoids a duplicate idle-edge push', async () => {
   state.agent = true; state.systemPrompt = true

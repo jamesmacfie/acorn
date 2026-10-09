@@ -7,10 +7,10 @@ import type { Task } from '@acorn/plugin-api/client'
 // Exporting a transcript, end to end through the platform seam. Like the composer's attach test, the
 // stub is a host on `window.acorn` rather than a mocked module, so the real `saveFile` is what runs.
 
-const exportSession = vi.fn(async (_sessionId: string, _format: string) => ({ content: '# A session\n' }))
+const exportSession = vi.fn(async (_sessionId: string, _format: string, _variant?: string) => ({ content: '# A session\n' }))
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
-    export: (sessionId: string, format: string) => exportSession(sessionId, format),
+    export: (sessionId: string, format: string, variant?: string) => exportSession(sessionId, format, variant),
     providers: async () => [],
   },
 }))
@@ -36,7 +36,7 @@ afterEach(() => {
   exportSession.mockClear()
 })
 
-const runExport = async (id: 'export-markdown' | 'export-json') =>
+const runExport = async (id: 'export-markdown' | 'export-json' | 'export-redacted-json') =>
   await new Promise<void>((resolve) => {
     createRoot((dispose) => {
       managedAgentStore.upsertSession(session)
@@ -70,5 +70,16 @@ describe('exporting a session transcript', () => {
     const request = save.mock.calls[0]![0]
     expect(request.mimeType).toBe('application/json')
     expect(request.suggestedName).toBe('Fix-the-login-logout-flow.json')
+  })
+
+  it('asks for the redacted copy and names it apart from the original', async () => {
+    const save = saveSpy()
+    vi.stubGlobal('window', { acorn: { files: { pick: vi.fn(), save } } })
+
+    await runExport('export-redacted-json')
+    await vi.waitFor(() => expect(save).toHaveBeenCalled())
+
+    expect(exportSession).toHaveBeenCalledWith('s1', 'json', 'redacted')
+    expect(save.mock.calls[0]![0].suggestedName).toBe('Fix-the-login-logout-flow-redacted.json')
   })
 })

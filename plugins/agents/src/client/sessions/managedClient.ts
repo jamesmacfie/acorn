@@ -169,8 +169,8 @@ export const managedAgentApi = {
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/resume-managed'), 'POST'),
   verifyImportedResume: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/verify-imported-resume'), 'POST'),
-  export: (sessionId: string, format: 'json' | 'markdown') =>
-    readJson<{ format: 'json' | 'markdown'; content: string }>(
-      sessionRoute(sessionId, `/export?format=${format}`),
+  export: (sessionId: string, format: 'json' | 'markdown', variant: 'original' | 'redacted' = 'original') =>
+    readJson<{ format: 'json' | 'markdown'; variant: 'original' | 'redacted'; content: string; digest: string }>(
+      sessionRoute(sessionId, `/export?format=${format}&variant=${variant}`),
     ),
 }

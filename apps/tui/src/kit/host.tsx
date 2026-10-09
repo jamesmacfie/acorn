@@ -163,6 +163,14 @@ export function PromoteToTaskModal(_props: {
 // Type-only, so the DOM component this names is erased rather than imported.
 export type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
 
+/** The Config files tab of the agents plugin's MCP page.
+ *
+ *  Absent, and it says so. Core draws the list with the desktop's own controls, and it had no terminal
+ *  form when it was a page of its own either. */
+export function McpConfigFiles() {
+  return <Line role="muted">The servers each CLI loads from its own config files are listed on this tab in the desktop app.</Line>
+}
+
 /** "Is there a task for this thing, and if not, start one".
  *
  *  Absent, and it says so. The DOM control is a `Select` of repos and a create button wired to the

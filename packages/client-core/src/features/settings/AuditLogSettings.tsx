@@ -33,6 +33,8 @@ const ACTION_LABELS: Record<string, string> = {
   'secret.replaced': 'Credential replaced',
   'secret.deleted': 'Credential removed',
   'config.trusted': 'Repo config trusted',
+  'secrets.publication.blocked': 'Publication blocked by secret check',
+  'secrets.publication.allowed': 'Publication allowed once',
   'plugins.disabled.changed': 'Plugins changed',
   'backup.created': 'Backup created',
 }

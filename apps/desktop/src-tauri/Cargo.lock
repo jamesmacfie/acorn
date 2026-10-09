@@ -26,6 +26,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-wdio-webdriver",
+ "tauri-utils",
  "ureq",
 ]
 

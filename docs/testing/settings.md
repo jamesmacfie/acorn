@@ -113,11 +113,11 @@ in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx
 124. On Custom agents, create an agent, then edit it. Confirm that the editor opens in the pane, that
      the header names it with a back link, and that ⌘[ with an unsaved change asks before going back.
      Delete it from the danger zone and confirm that it leaves New and the palette.
-125. On MCP servers, add a server, edit it, and remove it from its danger zone. Confirm that each step
-     happens in the pane, that the list names `/mcp`, and that its link opens MCP config files.
-126. With no task open, open MCP config files, pick a project with a committed `.mcp.json`, and note
-     its servers. Open a task in that project, open the page again, and confirm that it starts on that
-     project and lists the same servers.
+125. On MCP's Servers tab, add a server, edit it, and remove it from its danger zone. Confirm that each
+     step happens in the pane and that the list names `/mcp`.
+126. With no task open, open MCP's Config files tab, pick a project with a committed `.mcp.json`, and
+     note its servers. Open a task in that project, open the tab again, and confirm that it starts on
+     that project and lists the same servers.
 127. On Tools and permissions, switch between **By owner** and **By tier**. Confirm that a loaded
      plugin's tools sit under its id, and that turning the Execute tier on and off moves every execute
      tool's switch.
@@ -187,7 +187,7 @@ The following checks cover [mcp.md](../mcp.md) § Your own servers. The store, r
 drivers, handoff flags, and test button have automated coverage in `plugins/agents`. These checks cover
 the real harnesses and the window.
 
-142. In Settings → MCP servers, add a stdio server with one secret environment variable and press
+142. In Settings → MCP, add a stdio server with one secret environment variable and press
      **Test**. The tools are listed. Edit it, leave the secret empty, save, and test again: it still
      connects.
 143. Open a Claude Code session and a Codex session, and ask each to call one of the server's tools.

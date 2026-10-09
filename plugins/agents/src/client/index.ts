@@ -34,7 +34,7 @@ const AgentConversation = lazy(() => import('./sessions/AgentConversation'))
 const InlineDiffCard = lazy(() => import('./inlineDiff/InlineDiffCard.tsx'))
 const AgentLimitsSettings = lazy(() => import('./settings/AgentLimitsSettings'))
 const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
-const AgentMcpServersSettings = lazy(() => import('./settings/AgentMcpServersSettings'))
+const McpSettingsPage = lazy(() => import('./settings/McpSettingsPage'))
 const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'))
 const AgentStorageSection = lazy(() => import('./settings/AgentStorageSection'))
 const AgentSecuritySection = lazy(() => import('./settings/AgentSecuritySection'))
@@ -119,8 +119,7 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.persistedStateSlices.register(agentToolFoldSlice)
     ctx.persistedStateSlices.register(sessionOrderSlice)
     // The Agents group's pages, each with the sections and rows it draws for search (each page's file
-    // draws the same ones). Core's Tools and permissions (order 30) and MCP config files (order 50) sit
-    // between them.
+    // draws the same ones). Core's Tools and permissions (order 30) sits between them.
     ctx.settingsPages.register({
       id: 'agent-defaults', label: 'Harnesses and defaults', category: 'agents', scope: 'node', icon: 'sliders-horizontal', order: 10, requires: { plugin: 'agents' },
       // A section per installed harness is drawn as well, and left out because it depends on the node.
@@ -150,12 +149,17 @@ export const agentsClientPlugin: ClientPlugin = {
       sections: [{ id: 'agents', label: 'Your agents' }],
       component: CustomAgentsSettings,
     })
-    // Beside core's MCP config files page, which lists the servers each CLI loads by itself.
+    // Two tabs: the servers acorn adds to every session, and the ones each CLI loads by itself, which
+    // was core's MCP config files page. Its old id is an alias, so a link to it lands on its tab.
     ctx.settingsPages.register({
-      id: 'agent-mcp-servers', label: 'MCP servers', category: 'agents', scope: 'node', icon: 'server-cog', order: 40, requires: { plugin: 'agents' },
-      keywords: ['mcp', 'model context protocol', 'tools', 'stdio', 'http', '/mcp'],
-      sections: [{ id: 'servers', label: 'Servers' }],
-      component: AgentMcpServersSettings,
+      id: 'agent-mcp-servers', label: 'MCP', category: 'agents', scope: 'node', icon: 'server-cog', order: 40, requires: { plugin: 'agents' },
+      aliases: ['mcp#files'],
+      keywords: ['mcp', 'model context protocol', 'tools', 'stdio', 'http', '/mcp', '.mcp.json', 'claude.json', 'cursor'],
+      sections: [
+        { id: 'servers', label: 'Servers' },
+        { id: 'files', label: 'Config files', rows: ['Project', 'Starter file'] },
+      ],
+      component: McpSettingsPage,
     })
     // This plugin's numbers on core's Settings > Storage and memory page: running agents, their
     // memory, and the stop for idle ones (./settings/AgentStorageSection.tsx).
