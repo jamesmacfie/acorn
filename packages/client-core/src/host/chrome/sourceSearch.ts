@@ -14,8 +14,9 @@ import { filterSourceItems } from './sourceFilter'
 // both say the same thing at the same moment (docs/plugins/descriptors.md § Searching a source).
 //
 // Typing narrows the loaded rows at once. Once the text settles, a source with a `search` route asks
-// the plugin, and the provider's answer replaces the local matches, because provider matching and a
-// local substring are not the same rule. Until it answers, or if it fails, the local matches stay.
+// the plugin, and the provider's rows are added after the local matches. They aren't swapped in,
+// because the provider matches differently: GitHub matches whole words and Linear an exact number, so
+// a loaded row that plainly matches would vanish when the answer arrived.
 
 /**
  * - `idle`: no text, so the ordinary list.
@@ -89,10 +90,15 @@ export function createSourceSearch(input: {
     return 'done'
   }
 
+  const merged = createMemo(() => {
+    const seen = new Set(local().map((item) => item.id))
+    return [...local(), ...(remote.data?.items ?? []).filter((item) => !seen.has(item.id))]
+  })
+
   return {
     items: () => {
       if (!text()) return input.loaded()
-      return status() === 'done' ? remote.data?.items ?? [] : local()
+      return status() === 'done' ? merged() : local()
     },
     status,
     incomplete: () => status() === 'done' && !!remote.data?.incomplete,

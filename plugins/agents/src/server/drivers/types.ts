@@ -50,7 +50,10 @@ export type AgentDriverInputRequest = {
   respond(resolution: unknown): void
 }
 
-export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest | AgentDriverInputRequest
+export type AgentDriverEvent = (AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest | AgentDriverInputRequest) & {
+  /** Driver-owned attribution. Null explicitly means no managed turn; absent uses the live turn. */
+  acornTurnId?: string | null
+}
 
 /**
  * An MCP server acorn asks the agent to connect to, for the session it is starting.

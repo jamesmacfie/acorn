@@ -50,7 +50,7 @@ export type TuiKeymap = Keymap<Renderable, KeyEvent>
 // intent it already has, which is what a per-host key table is for; a key that meant something a
 // desktop intent does not would be a second keymap, and that is refused
 // (docs/tui/reporting.md § What must never happen).
-const HOST_KEYS: Partial<Record<Intent, readonly string[]>> = {
+export const HOST_KEYS: Partial<Record<Intent, readonly string[]>> = {
   nextRegion: ['tab'],
   prevRegion: ['shift+tab'],
 }

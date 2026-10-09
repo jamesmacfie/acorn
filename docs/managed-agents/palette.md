@@ -1,6 +1,6 @@
 # From the command palette
 
-The agents plugin registers its own palette rows, one more per custom agent, plus the open session's
+The agents plugin registers its own palette rows, one more per installed harness and custom agent, plus the open session's
 actions. [Command palette and shortcuts](../command-palette-and-shortcuts.md) covers how the palette
 searches, and [command kinds](../plugins.md#command-kinds) holds the vocabulary.
 
@@ -9,7 +9,7 @@ searches, and [command kinds](../plugins.md#command-kinds) holds the vocabulary.
 | Row | Kind | What it does |
 | --- | --- | --- |
 | New agent session | Search, task-scoped | Lists installed harnesses, then the custom agents on them. Picking one creates the session, selects it, and shows the Agent pane |
-| New *agent* session | Action, task-scoped | One row per custom agent. Desktop only |
+| New *harness* session, New *agent* session | Action, task-scoped | One row per choice New agent session lists, so typing a harness or agent name finds it. IDs are `agents.harness.<provider>` and `agents.custom-agent.<id>`. Desktop only |
 | Open Agent Center | Action, no scope | Selects the `agents` rail source |
 | Mark all agents read | Action, no scope | Clears every finished or failed agent and marks their notices read. Shown only when one exists |
 | Find an agent session | Search, task-scoped | The Node's search over session titles, events, and artifacts, for the captured task |
@@ -17,7 +17,7 @@ searches, and [command kinds](../plugins.md#command-kinds) holds the vocabulary.
 | New Codex terminal | Action, needs a task | The same for the `codex` profile |
 | Start new sessions with my last model | Setting, no scope | On and Off over `followLastSession` |
 | Tool call display | Setting, no scope | Start collapsed, start expanded, or carry the last one forward |
-| Agent session | Group, task-scoped | The open session's ••• menu: fork, retry, compact, continue in terminal, regenerate title, rename, two exports, and archive |
+| Agent session | Group, task-scoped | The open session's ••• menu: fork, retry, compact, continue in terminal, regenerate title, rename, summarize, two exports, and archive |
 
 The JSON session export includes `version: 1` and `baseline: "acorn-1"`.
 

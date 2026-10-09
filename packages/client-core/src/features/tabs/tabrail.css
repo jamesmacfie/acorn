@@ -102,8 +102,9 @@
   color: var(--text);
   border-left-color: var(--rail-accent, var(--accent));
 }
-/* Semantic tone. Only the hover colour differs; a rail control at rest is muted whatever it does. */
-.tabrail-tab[data-tone="danger"]:hover { color: var(--del-marker); }
+/* Semantic tone. A rail control at rest is muted; a destructive action stays red while busy. */
+.tabrail-tab[data-tone="danger"]:hover,
+.tabrail-tab[data-tone="danger"][aria-busy="true"] { color: var(--del-marker); }
 .tabrail-tab[data-tone="warn"]:hover { color: var(--warn); }
 
 /* The bottom-pinned action on either rail: the left "+" and the right "close task". Same square box

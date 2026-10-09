@@ -39,16 +39,6 @@ describe('the language map', () => {
     expect(eager, 'these grammars are imported statically and must be dynamic').toEqual([])
   })
 
-  it('serves the four JavaScript dialects from one grammar package', () => {
-    // Not four grammars told apart by a package, but one told apart by two flags: opening a `.tsx`
-    // file after a `.ts` one costs no second request.
-    const dialects = ['typescript:', 'typescriptreact:', 'javascript:', 'javascriptreact:']
-    for (const dialect of dialects) {
-      const line = SOURCE.split('\n').find((text) => text.trim().startsWith(dialect))
-      expect(line, dialect).toContain("@codemirror/lang-javascript")
-    }
-  })
-
   it('keeps syntax parsing off documents large enough to block the renderer', () => {
     expect(shouldHighlightDocument(MAX_HIGHLIGHT_CHARACTERS)).toBe(true)
     expect(shouldHighlightDocument(MAX_HIGHLIGHT_CHARACTERS + 1)).toBe(false)

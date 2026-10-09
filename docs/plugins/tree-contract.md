@@ -31,7 +31,8 @@ A node is `{ id, type, props, children }`:
 - `id` is minted by the sandbox adapter and stays stable for the node's life. Events and patches
   address it.
 - `props` is a plain object. A prop can't hold more UI. A shell component may accept a JSX slot such
-  as `Tabs.actions`, but a tree spells that as a child or sibling node.
+  as `Tabs.actions`, but a tree spells that as a child or sibling node. A `Tabs` node draws its
+  children at the strip's trailing end, where `actions` goes.
 - Text is its own node, `#text`, never an attribute.
 
 The sandbox copies JSON data out of framework proxies before posting, leaves out `undefined` fields,

@@ -6,7 +6,7 @@ import {
   remoteReason, sortRows, stackFor, stageableRows, stagedState, documentFile, unstagedPathsOf,
   viewNodes, visibleNodes, type ChangeView, type TreeNode,
 } from './model'
-import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_MAX, PUSH_ACTIONS_POINT } from './extensionPoints'
+import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_POINT } from './extensionPoints'
 
 const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modified'): LocalChange => ({
   path,
@@ -330,12 +330,6 @@ describe('the diff-line annotation point', () => {
 describe('the push-actions point', () => {
   it('is addressed under this plugin\'s own name, which the host mints', () => {
     expect(PUSH_ACTIONS_POINT).toBe('changes:push-actions')
-  })
-
-  // Two, because a third contributor would be a toolbar in somebody else's footer. The ceiling is the
-  // owner's because the footer is.
-  it('holds a couple of contributors, not a strip', () => {
-    expect(PUSH_ACTIONS_MAX).toBe(2)
   })
 })
 

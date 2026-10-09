@@ -65,10 +65,19 @@
   .ui-tab { transition: none; }
 }
 
-/* The selected tab can scroll while its actions stay in view. */
-.ui-tabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding-left: var(--space-2); }
+/* The selected tab can scroll while its actions stay in view. The end pad matches the strip's start,
+   where the tab's own pad makes up the rest, so the last action ends on the pane pad like a header
+   bar's buttons do. A row of badges has no hit area to fill that. */
+.ui-tabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding-inline: var(--space-2) var(--space-6); }
 .ui-tab-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .ui-tab-panel[hidden] { display: none; }
 /* A panel that is a split drops the inline pad a padded region hands it, so the split's divider reaches
    the region's edge. Rollbar's Occurrences tab is the case. */
 .ui-tab-panel:has(> .ui-listdetail) { padding-inline: 0; }
+/* And it sits on the strip, for the same reason: a stack's gap is for content, and above a split it
+   drew a band of pane background between the strip and both columns. `~` because the hidden panels
+   before it are still siblings. */
+.ui-stack > .ui-tabs ~ .ui-tab-panel:has(> .ui-listdetail) { margin-block-start: calc(-1 * var(--kit-gap)); }
+/* A strip straight under a header bar is that header's lower half, the same rule shell.css keeps for a
+   tree's top-level bars, here for bars a stack away (Rollbar's header and its tabs). */
+.ui-stack > .ui-toolbar[data-variant='bar'] + .ui-tabs { margin-block-start: calc(-1 * var(--kit-gap)); }

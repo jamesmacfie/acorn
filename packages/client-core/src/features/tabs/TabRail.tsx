@@ -90,7 +90,9 @@ export default function TabRail() {
     await saveOrder(moveTask(railOrder(), orderedTasks().map((t) => t.id), id, targetId, position))
   }
   const railDrag = createRailDrag({
-    items: () => visibleTasks(),
+    // Drag by the drawn tree. A task whose parent is gone, for example archived, is drawn as a
+    // root, so it orders with the other roots.
+    items: () => taskRows().map(({ task, depth }) => ({ id: task.id, parentId: depth ? task.parentId : null })),
     onDrop: (id, targetId, position) => void commitDrop(id, targetId, position),
   })
   const [draft, setDraft] = createSignal<TaskDraft | null>(null)

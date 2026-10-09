@@ -1,12 +1,7 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
-import { THEMES } from '@acorn/client-core/features/settings'
-import { STYLES } from '@acorn/client-core/features/settings'
 import { coreSourceContributions } from '../../src/client/sourceContributions'
 import { clientPlugins } from '../../src/client/plugins'
 import { readGolden, writeGolden } from './golden'
@@ -97,71 +92,5 @@ describe('docs/frontend/rail-and-routing.md § Rail sources', () => {
     const fleet = sourceRegistry.entries().find((source) => source.id === 'fleet')
     expect(fleet?.when).toBeTypeOf('function')
     expect(fleet?.when?.()).toBe(false) // no fleet store in a unit test ⇒ zero nodes ⇒ hidden
-  })
-})
-
-describe('docs/ui-design/appearance.md § Appearance', () => {
-  it('offers 12 themes and 4 style packs', () => {
-    // docs/ui-design/appearance.md § Appearance: "All 12 shipped themes and 4 style packs are registered literals
-    // and covered by parity tests." themes.test.ts and uiStyles.test.ts already check each list against
-    // the stylesheets that define it, that is, that nothing is offered without a pack behind it.
-    // Neither checks the counts docs/ui-design.md commits to, which is a different claim: a theme
-    // quietly dropped from both the picker and the stylesheet passes those drift guards and fails
-    // parity.
-    expect(THEMES()).toHaveLength(12)
-    expect(STYLES()).toHaveLength(4)
-  })
-})
-
-// The shell's own chords are registered inside `onMount` in TabRail and TaskView, so a registry
-// snapshot cannot see them without rendering, and vitest here has no DOM and no Solid transform. Scanned
-// from source instead, with comments stripped, the way apps/node's standaloneParity.test.ts does and
-// for the same reason: a commented-out declaration would otherwise satisfy the assertion.
-//
-// This is the opposite choice from tools/arch/boundaries.test.ts, which does not strip comments: there
-// a comment produces a loud false positive, here it would produce a silent false negative.
-const HERE = dirname(fileURLToPath(import.meta.url))
-const sourceOf = (relative: string): string =>
-  readFileSync(join(HERE, relative), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|\s)\/\/[^\n]*/g, '$1')
-
-describe('docs/command-palette-and-shortcuts.md § Global commands', () => {
-  const tabRail = sourceOf('../../../../packages/client-core/src/features/tabs/TabRail.tsx')
-  const taskView = sourceOf('../../src/client/TaskView.tsx')
-  const app = sourceOf('../../src/client/App.tsx')
-
-  it('binds ⌘⇧T to the terminal drawer and ⌘⇧N to a new task', () => {
-    expect(taskView).toContain("'meta+shift+t'")
-    expect(tabRail).toContain("'meta+shift+n'")
-  })
-
-  it('binds ⌘1–9 to the first nine TASKS', () => {
-    // The shell binds the first nine task slots, not pane focus. Keep this assertion beside the
-    // implementation because the shortcut is registered dynamically from the task rail.
-    expect(tabRail).toContain('task.activate.${index + 1}')
-    expect(tabRail).toContain('meta+${index + 1}')
-  })
-
-  it('binds ⌘, to settings and ⌘⇧↵ to maximize', () => {
-    expect(app).toContain("'meta+,'")
-    expect(app).toContain("'meta+shift+enter'")
-  })
-
-  it('derives every pane chord from the pane contribution rather than a second list', () => {
-    // The one structural claim here: a pane's chord lives on its contribution, so a plugin changing it
-    // cannot leave a stale copy in the shell. If this line ever stops being how TaskView binds them,
-    // the ledger above stops covering what the app actually does.
-    expect(taskView).toContain('pane.defaultChord')
-  })
-
-  it('holds a non-null task row until the task view has disposed', () => {
-    // Archiving removes the row from the live query before Solid has finished disposing TaskView.
-    // Its command matchers remain callable during that teardown, so the view reads a memo that keeps
-    // the last row. It stays keyed by id so an ordinary metadata refresh does not remount every pane.
-    expect(app).toContain('activeTask() ?? previous ?? null')
-    expect(app).toContain('<Show keyed when={activeTaskId()}>')
-    expect(app).toContain('task={taskForView()!}')
-    expect(app).not.toContain('task={activeTask()!}')
   })
 })

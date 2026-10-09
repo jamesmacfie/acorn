@@ -40,7 +40,7 @@ function mount(source: PluginSourceDescriptor) {
 
 const settle = () => vi.advanceTimersByTimeAsync(300)
 
-it('narrows the loaded rows at once, then shows the provider answer in their place', async () => {
+it('narrows the loaded rows at once, then adds the provider rows after them', async () => {
   let answer!: (value: unknown) => void
   readJson.mockReturnValueOnce(new Promise((resolve) => { answer = resolve }))
   const { search, setText } = mount(descriptor('/v1/p/board/search'))
@@ -52,10 +52,10 @@ it('narrows the loaded rows at once, then shows the provider answer in their pla
   await settle()
   expect(readJson).toHaveBeenCalledTimes(1)
   expect(readJson.mock.calls[0][0]).toBe('/v1/p/board/search?project=project-1&q=crash')
-  answer({ items: [{ id: 'a:900', title: 'Crash on login' }], incomplete: true })
+  answer({ items: [{ id: 'a:1', title: 'Login crash' }, { id: 'a:900', title: 'Crash on login' }], incomplete: true })
   await settle()
   expect(search.status()).toBe('done')
-  expect(search.items().map((item) => item.id)).toEqual(['a:900'])
+  expect(search.items().map((item) => item.id)).toEqual(['a:1', 'a:900'])
   expect(search.incomplete()).toBe(true)
 
   setText('')
@@ -92,16 +92,17 @@ it('never draws an earlier project\'s answer for a new one', async () => {
   const { search, setText, setProjectId } = mount(descriptor('/v1/p/board/search'))
   setText('crash')
   await settle()
-  expect(search.items().map((item) => item.id)).toEqual(['a:900'])
+  expect(search.items().map((item) => item.id)).toEqual(['a:1', 'a:900'])
 
   setProjectId('project-2')
   await settle()
   expect(search.status()).toBe('searching')
   expect(search.items().map((item) => item.id)).toEqual(['a:1'])
+  // An empty answer never hides a loaded row that matches, since the provider matches differently.
   answer({ items: [] })
   await settle()
   expect(search.status()).toBe('done')
-  expect(search.items()).toEqual([])
+  expect(search.items().map((item) => item.id)).toEqual(['a:1'])
 })
 
 it('searches only the loaded rows for a source with no search route or a one-letter query', async () => {

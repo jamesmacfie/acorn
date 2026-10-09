@@ -1,4 +1,4 @@
-import { createEffect, For, on, onCleanup, Show, type JSX } from 'solid-js'
+import { children, createEffect, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import Icon from '../content/Icon'
 import { createCollection } from '../../keys/collection'
 import { revealActiveTab, trackTabOverflow } from './tabScroll'
@@ -31,7 +31,13 @@ export function Tabs(props: {
   level?: 'pane'
   /** Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to get this. */
   actions?: JSX.Element
+  /** The same trailing slot, spelled the way a remote tree can: a tree's props are data, so its
+   *  controls arrive as child nodes (docs/plugins/tree-contract.md § Nodes). */
+  children?: JSX.Element
 }) {
+  // A tree host always hands over its node's children, so an empty list is the common case and must
+  // not draw an empty, padded actions box.
+  const trailing = children(() => props.actions ?? props.children)
   let stripRef: HTMLDivElement | undefined
   // A remote tree's props arrive one at a time and the host drops a bad one on its own, so this node
   // has to survive arriving without its list rather than throw and take the whole region with it.
@@ -85,7 +91,7 @@ export function Tabs(props: {
           </button>
         )}</For>
       </div>
-      <Show when={props.actions}><span class="ui-tabs-actions">{props.actions}</span></Show>
+      <Show when={trailing.toArray().length}><span class="ui-tabs-actions">{trailing()}</span></Show>
     </div>
   )
 }

@@ -145,3 +145,20 @@ it('marks the edge of the strip that hides tabs', async () => {
     host.remove()
   }
 })
+
+it('draws tree children as trailing actions, and no actions box when there are none', () => {
+  const host = document.createElement('div')
+  const tabs = [{ id: 'one', label: 'One' }]
+  const [items, setItems] = createSignal<string[]>([])
+  const dispose = render(() => (
+    <Tabs tabs={tabs} active="one" onChange={() => {}} idPrefix="kids" ariaLabel="Kids">
+      {/* The shape a tree host hands over: a list that may be empty. */}
+      {items().map((item) => <b>{item}</b>)}
+    </Tabs>
+  ), host)
+  try {
+    expect(host.querySelector('.ui-tabs-actions')).toBeNull()
+    setItems(['Error'])
+    expect(host.querySelector('.ui-tabs-actions')?.textContent).toBe('Error')
+  } finally { dispose() }
+})

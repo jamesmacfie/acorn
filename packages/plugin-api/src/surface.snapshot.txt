@@ -211,6 +211,7 @@ client: localSearch
 client: markAttentionSeen
 client: markTargetsRead
 client: modelBackendsOptions
+client: modelPickLabel
 client: nodeReady
 client: nodeState
 client: nodes

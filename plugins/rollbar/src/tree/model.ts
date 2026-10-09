@@ -39,6 +39,14 @@ export function occurrenceContext(item: RollbarItemMetadata, occurrence: Rollbar
   return lines.join('\n')
 }
 
+/** The stack as one block of text: a location line per frame, with its source lines indented under
+ *  it. "›" marks the line that threw. */
+export const traceText = (frames: RollbarOccurrenceDetail['frames']): string =>
+  frames.map((frame) => [
+    `${frame.filename}${frame.line == null ? '' : `:${frame.line}`}${frame.method ? ` · ${frame.method}` : ''}`,
+    ...frame.code.map((line) => `  ${line.line === frame.line ? '›' : ' '} ${String(line.line).padStart(4)}  ${line.text}`),
+  ].join('\n')).join('\n')
+
 // Status is a toned badge with a word (docs/ui-design/states.md § States): a map per field, not a regex over
 // whatever string arrived. An unknown value keeps its own word, capitalised, and stays neutral.
 type Tone = 'neutral' | 'ok' | 'warn' | 'danger'

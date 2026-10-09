@@ -138,7 +138,8 @@ anything. `children` stays for a compound center, but prefer `glyph` plus `subla
 `aria-expanded`, because source navigation, a multi-open pane, a running process, and an open drawer
 say different things. `busy` swaps the glyph for the shared spinner, sets `aria-busy`, switches the
 tooltip to `busyLabel`, and refuses activation without native `disabled`, which would swallow the
-pointer event the tooltip needs.
+pointer event the tooltip needs. A control with `tone="danger"` uses the theme's danger color while
+busy, including when it isn't hovered.
 
 ### Status markers
 
@@ -157,7 +158,7 @@ bottom-start   bottom-end
 ID, gives each the first free position on its list, draws at most one per position, and lists the
 rest in the tooltip legend and the control's accessible description. Compact chrome may hide an icon,
 never a state. `bottom-center` is reserved for host lifecycle: a pulsing dot while a setup script
-prepares a new worktree, and a spinner while teardown removes it.
+prepares a new worktree, and a spinner in the theme's danger color while teardown removes it.
 
 Core's markers come from `tasks/railStatus.ts`. Compiled plugins publish theirs through
 `packages/client-core/src/features/tabs/railMarkers.ts` ([plugins](../plugins.md) § Rail markers).

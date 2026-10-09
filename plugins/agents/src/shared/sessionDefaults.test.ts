@@ -80,6 +80,8 @@ describe('stored defaults', () => {
     expect(validateAgentSessionDefaults({ continueAfterUsageLimit: 'yes' }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ stopIdleAfterMinutes: 45 }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ stopIdleAfterMinutes: 0 })).toEqual({ ok: true, value: { stopIdleAfterMinutes: 0 } })
+    expect(validateAgentSessionDefaults({ warnRepeatedToolCallsAfter: 4 }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ warnRepeatedToolCallsAfter: 0 })).toEqual({ ok: true, value: { warnRepeatedToolCallsAfter: 0 } })
     expect(validateAgentSessionDefaults({ keepArchivedHistoryDays: 7 }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ keepArchivedHistoryDays: 365 })).toEqual({ ok: true, value: { keepArchivedHistoryDays: 365 } })
     expect(validateAgentSessionDefaults([]).ok).toBe(false)

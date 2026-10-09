@@ -62,6 +62,9 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: 3,176,006 B after combining the instruction check, goal admission callbacks, and
 // reconnect Stop handling. The measured graph adds no dependency; the feature operations remain
 // lazy. Add 2 KB for these acceptance and lifecycle paths, keeping less than 1 KB of margin.
+// 2026-10-08: command restart recovery adds event attribution checks, client read projection calls,
+// and lifecycle settlement calls. The command policy and reconciliation queries load on first use.
+// No dependency is added. Static graph: 3,179,747 B. Add 4 KB for the owning runtime's call sites.
 // 2026-10-08: the Git plugin registers at boot. Its worktree route loads after activation through a
 // dynamic import; the built static graph is 3,185,838 B. Keep about 1 KB for bundler variation.
 // 2026-10-09: history and revision routes remain dynamically loaded; the measured boot graph is

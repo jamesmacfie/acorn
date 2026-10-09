@@ -4,6 +4,10 @@ This page covers the Changes pane's side of the diff viewer: the one status read
 tree's document is built, the file list, discard, the branch bar, and what the panel refuses. It's
 part of [diff rendering](../diff-rendering.md). The plugin lives in `plugins/changes`.
 
+The pane is missing from a task's pane rail when the task's project isn't a Git repository. The pane
+shows while the project list is still loading, and in the terminal client, which doesn't load the
+list.
+
 ## One status read
 
 Editor asks Changes for a separate status-only projection through the declared
@@ -103,7 +107,7 @@ a push from behind fails.
 
 Nothing watches the file system. The panel reads again after its own writes, on the rail's status
 poll every 10 seconds, and on `head:changed` ([events](../api-reference/websocket.md)). An agent's
-save shows within 10 seconds, the same freshness as the rail's dirty marker. The poll and
+save shows within 10 seconds, the same freshness as the rail's changes dot. The poll and
 `head:changed` count only while the pane is drawn. The host keeps the pane's model after you leave the
 task, and a missed refresh runs once when the pane is drawn again
 ([pane models](../panes/models.md) § Pane models).

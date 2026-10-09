@@ -57,11 +57,11 @@ checks five of these after every press, so a new pane or control is covered the 
 | 2 | Every stop acts: focusing it and pressing Enter calls the handler. | `kit/kit.test.tsx` § every control is a stop |
 | 3 | One caret. At most one `›` is on screen, and it marks what has the keys. | `reachability.test.tsx`, after every press |
 | 4 | Escape is bounded and ends in the rail. | `reachability.test.tsx` § escape is bounded |
-| 5 | One deferred decision: `queueMicrotask` appears once in `keys/` and never in `kit/`. | `invariants.test.ts` |
+| 5 | One deferred decision: `queueMicrotask` appears only in `keys/regions.ts` and never in `kit/`. | `invariants.test.ts` |
 | 6 | Focus never sits on a node that's gone. | `reachability.test.tsx`, after every press |
 | 7 | No chord this host can't press: `super+` is spelled only where it's rewritten. | `invariants.test.ts` |
 | 8 | The footer is accurate: the word beside a key is what the key does there. | `reachability.test.tsx`, against the word table |
-| 9 | There's one focus value, and it names a node in the tree that can hold the keys. | `reachability.test.tsx`, after every press. `setFocusedNode` appears once, `.focus()` and `.blur()` once each in the caret mirror, no source asks the renderer what has the keys, and `focusable =` appears only where `invariants.test.ts` allows. |
+| 9 | There's one focus value, and it names a node in the tree that can hold the keys. | `reachability.test.tsx`, after every press. `invariants.test.ts` keeps `setFocusedNode`, `.focus()`, and `.blur()` in the region store, and no source asks the renderer what has the keys. |
 | 10 | Focus is inside the top scope: with a dialog open, no key moves the keys out of it. | `reachability.test.tsx`, after every press on the overlay surface |
 | 11 | A claimed key changed something. A handler that changed nothing returns `false`, and the key bubbles. | `reachability.test.tsx` § crossKeys, which presses `h` and `l` on every kind of focused thing and checks the footer's word came true |
 

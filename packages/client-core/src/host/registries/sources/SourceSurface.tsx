@@ -26,7 +26,7 @@ export function SourceSurface(props: { source: SourceContribution }) {
         // where it was left (kit/lib/layout/collapseState.ts). Every source that hands over two halves is a
         // list beside a detail, so none of them has to ask for the control.
         <ListDetail split collapseKey={props.source.id}>
-          <ListColumn>
+          <ListColumn scrollKey={props.source.id}>
             <Dynamic component={regions().list} />
           </ListColumn>
           <DetailColumn scroll={regions().scroll} measure={regions().measure}>

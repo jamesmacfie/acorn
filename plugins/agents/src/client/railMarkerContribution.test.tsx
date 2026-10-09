@@ -86,3 +86,15 @@ describe('the Workflows pane button', () => {
     expect(workflowsButton('wf-b')).toMatchObject([{ id: 'working', busy: true, placements: ['top-end'] }])
   })
 })
+
+it('marks a ready parent with an active child and keeps attention ahead of child activity', () => {
+  managedAgentStore.activate()
+  const task = { kind: 'task' as const, id: 'child-task' }
+  const child = { id: 'child', status: 'running' as const, title: 'Child', turnId: null, startedAt: 1, updatedAt: 2 }
+  managedAgentStore.upsertSession(row('parent-child', task.id, { subagents: [child] }))
+  expect(agentRailMarkerContribution.markers(task)).toMatchObject([{ id: 'working', busy: true }])
+  managedAgentStore.upsertSession(row('parent-child', task.id, { subagents: [child], attention: 'question' }))
+  expect(agentRailMarkerContribution.markers(task).map((marker) => marker.id)).toEqual(['attention'])
+  managedAgentStore.upsertSession(row('parent-child', task.id, { subagents: [child], runtimeState: 'stopped' }))
+  expect(agentRailMarkerContribution.markers(task)).toEqual([])
+})

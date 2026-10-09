@@ -1,6 +1,6 @@
 # Future implementation handoffs
 
-Reviewed October 8, 2026. This folder holds proposed work and acceptance that remains open.
+Reviewed October 9, 2026. This folder holds proposed work and acceptance that remains open.
 Use the linked entry page to identify the next task, its prerequisites, and its completion checks.
 Shipped contracts belong in reference pages under `docs/`; those pages win if a plan disagrees.
 
@@ -12,6 +12,7 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
+| [performance/](./performance/README.md) | Seven phases for Sentry measurements, installed Claude, packaging, minification, startup messages, selective loading, and acceptance. | Approved direction October 9, 2026. Implementation not started. |
 | [security/](./security/README.md) | Ten phases for desktop authorization, plugin enforcement, internal tokens, automation, instruction review, diagnostics, dependencies, MCP review, and secret publication. | Proposed October 8, 2026. Implementation not started; restricted agent execution is excluded. |
 | [editor/](./editor/README.md) | Review the implemented editor and finish repository and supported-platform acceptance. | Six phases implemented. Final review and full test gate remain open. Completion notes moved to Testing. |
 | [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Implementation not started. |
@@ -26,16 +27,19 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | File | Developer handoff | Status |
 | --- | --- | --- |
+| [agent-search-startup.md](./agent-search-startup.md) | Stop the full search-index check and re-index the agents plugin runs after every Node start. | Proposed October 9, 2026. Implementation not started. |
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
 | [editor-files.md](./editor-files.md) | Plugin file viewers through an Editor replacement point and a confined read-only file capability. | Proposed. Implementation not started. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
-| [lazy-plugin-code.md](./lazy-plugin-code.md) | A shared promise-caching `lazyFetch` helper and selective route conversion. | Proposed. Handwritten lazy routes exist; the shared helper is unbuilt. |
+| [lazy-plugin-code.md](./lazy-plugin-code.md) | A shared promise-caching `lazyFetch` helper and selective route conversion. | Proposed; assigned to [Performance phase 06](./performance/06-selective-server-loading.md). Handwritten lazy routes exist; the shared helper is unbuilt. |
 | [multi-account.md](./multi-account.md) | Per-account harness configuration pinned to sessions. | Research and proposal. Implementation not started. |
+| [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
 | [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
 | [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
+| [task-deletion.md](./task-deletion.md) | Delete a task and its plugin data from the archive dialog or the Archive page, with tombstones for plugin catch-up and **Deleted task** labels. | Proposed October 9, 2026. Implementation not started. |
 | [workflow-agent-goals.md](./workflow-agent-goals.md) | Completion conditions for managed workflow agent steps and For each agents, with bounded continuations, persisted verdicts, and workflow-owned controls and budgets. | Implemented October 8, 2026. See the [reference](../workflows/agent-steps.md#completion-conditions). The standalone Agent pane doesn't yet show a workflow session's goal. |
 | [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 

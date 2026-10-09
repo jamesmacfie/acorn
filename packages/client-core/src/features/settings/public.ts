@@ -1,7 +1,7 @@
 export { THEMES } from './builtInThemes.ts'
 export { connectionAttention } from './connections/connectionAttention.ts'
 export { defaultModelIdFor } from './models/defaultModel.ts'
-export { effectiveModelPick, readGeneratePick, saveGeneratePick } from './models/generatePick.ts'
+export { effectiveModelPick, modelPickLabel, readGeneratePick, saveGeneratePick } from './models/generatePick.ts'
 export type { ModelPick } from './models/generatePick.ts'
 export { createSettingSave, createTextSetting } from './settingSave.ts'
 export type { SettingSave, TextSetting } from './settingSave.ts'

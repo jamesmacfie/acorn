@@ -2,6 +2,18 @@
 
 Date: October 7, 2026. Status: complete October 9, 2026.
 
+## Main merge verification — October 9, 2026
+
+Merged `main` at `13a7a4a6c` into `git-pane`. The service-budget conflict retains both measurement
+records and the branch's 3,200,000 B ceiling. Focused Git, public API, Agent admission, task draft,
+tab rail, modal, and Node integration checks passed 188 tests; only the unchanged GitHub route
+golden failed. Client Core, plugin API, Git, and Node type checks passed.
+
+The merged Node graph measures 3,205,243/3,200,000 B. An isolated archive of the incoming `main`,
+built with the same supported Node and locally resolved dependencies, measures
+3,192,688/3,181,000 B. Its budget failure predates this merge and remains for separate work;
+the ceiling was not raised. Phase 07 and Phase 08 remain unstarted.
+
 ## Coordinator verification — October 9, 2026
 
 Phases 01–06 are integrated into `git-pane`, including `efcd88dab`. The coordinator repeated the

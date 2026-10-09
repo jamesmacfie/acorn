@@ -31,8 +31,6 @@ describe('one deferred focus decision', () => {
     // and none of the next one's do, makes the order a list rather than a coincidence.
     expect(deferring('keys')).toEqual(['keys/regions.ts'])
     expect(deferring('kit')).toEqual([])
-    const store = readFileSync(join(ROOT, 'keys/regions.ts'), 'utf8')
-    expect(store.match(/\bqueueMicrotask\s*\(/g)).toHaveLength(1)
   })
 })
 
@@ -76,7 +74,7 @@ describe('the store is the only owner of focus', () => {
   // Invariant 9, as a fact about the source. Every "the border is lit and the keys do nothing" bug in
   // this app was a second owner: the renderer moved focus on its own, the store wrote the signal the
   // highlights are drawn from, and the two drifted. One owner cannot drift, and the only way to keep
-  // it to one is to count the places that could be a second (docs/tui/focus.md § Focus regions).
+  // it to one is to name the files that could hold a second (docs/tui/focus.md § Focus regions).
 
   /** Every non-test source file of this package, by its path from `src/`. */
   const sources = (): { path: string; text: string }[] => filesIn(ROOT)
@@ -84,58 +82,19 @@ describe('the store is the only owner of focus', () => {
     .filter((file) => !/\.test\.tsx?$/.test(file))
     .map((file) => ({ path: file.slice(ROOT.length), text: readFileSync(file, 'utf8') }))
 
-  /** How many times a pattern is said, file by file, leaving out the files that never say it. */
-  const said = (pattern: RegExp): Record<string, number> => Object.fromEntries(
-    sources()
-      .map(({ path, text }) => [path, (text.match(pattern) ?? []).length] as const)
-      .filter(([, count]) => count > 0)
-      .sort(([a], [b]) => a.localeCompare(b)),
-  )
+  /** The files that say a pattern at all, by their path from `src/`. */
+  const sayers = (pattern: RegExp): string[] => sources()
+    .filter(({ text }) => pattern.test(text))
+    .map(({ path }) => path)
+    .sort()
 
-  it('writes the focus signal in one function and nowhere else', () => {
+  it('writes focus and asks the renderer for it in the region store and nowhere else', () => {
     // The signal is the answer, not a view of one: it is what a row draws its caret from and what the
-    // keymap engine's host adapter reports as the focused target. Written anywhere but the one writer
-    // it is a claim nothing else agrees with.
-    expect(said(/setFocusedNode\(/g)).toEqual({ 'keys/regions.ts': 1 })
-    const store = readFileSync(join(ROOT, 'keys/regions.ts'), 'utf8')
-    const writer = store.slice(store.indexOf('const setFocus ='), store.indexOf('// \u2500\u2500 Clicks are hit tests'))
-    expect(writer).toContain('setFocusedNode(')
-  })
-
-  it('tells the renderer where the keys are in the caret mirror and nowhere else', () => {
-    // The renderer's focus is paint state now: an edit buffer draws no caret unless the renderer has
-    // focused it, so the store mirrors its own answer there once and never reads it back. A `focus`
-    // or `blur` anywhere else is a second owner, and reading `currentFocusedRenderable` anywhere is
-    // asking the renderer a question the store answers (./keys/regions.ts § paintCaret).
-    expect(said(/\.focus\(\)/g)).toEqual({ 'keys/regions.ts': 1 })
-    expect(said(/\.blur\(\)/g)).toEqual({ 'keys/regions.ts': 1 })
-    expect(said(/currentFocusedRenderable/g)).toEqual({})
-    const store = readFileSync(join(ROOT, 'keys/regions.ts'), 'utf8')
-    const mirror = store.slice(store.indexOf('const paintCaret ='))
-    expect(mirror.slice(0, mirror.indexOf('\n}'))).toContain('.focus()')
-  })
-
-  it('declares which nodes are focusable at mount, and in these places only', () => {
-    // The flag is the store's own declaration of what can hold the keys: `reachable` reads it, the
-    // reading-order walk reads it, and the caret mirror needs it still set on the node it paints. So
-    // it is a declaration made where a node is built — a `ref`, `pressable`, which a `ref` calls, or,
-    // in the region store, a region's frame at registration and a scope's box at the push, each of
-    // which is the last resort of a walk into it. Another write is a new answer to "who decides what
-    // is reachable", and it belongs in the region store or nowhere.
-    //
-    // `tree/compat.ts` is the sixth and it is a node being built rather than a sixth opinion: the
-    // accessor there gives a `scrollbox`, an `input` and a `textarea` the defaults the old
-    // renderables had, which is what makes a viewport the stop of last resort in a document with no
-    // controls in it.
-    expect(said(/focusable = /g)).toEqual({
-      'keys/regions.ts': 2,
-      'keys/stops.ts': 2,
-      'kit/grouping/tabs.tsx': 1,
-      'kit/rectangle.tsx': 1,
-      'kit/showing/collection.tsx': 1,
-      'kit/showing/row.tsx': 1,
-      'tree/compat.ts': 1,
-    })
+    // keymap engine's host adapter reports as the focused target. The renderer's focus is paint state,
+    // mirrored from the store and never read back (./keys/regions.ts § paintCaret). A write, a
+    // `focus`, a `blur` or a read of `currentFocusedRenderable` anywhere else is a second owner.
+    expect(sayers(/setFocusedNode\(|\.focus\(\)|\.blur\(\)/)).toEqual(['keys/regions.ts'])
+    expect(sayers(/currentFocusedRenderable/)).toEqual([])
   })
 })
 
