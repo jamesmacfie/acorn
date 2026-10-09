@@ -1,6 +1,6 @@
 # Reduce startup work and packaged size
 
-Date: October 9, 2026. Status: approved direction; phase 01 implemented October 9, 2026.
+Date: October 9, 2026. Status: approved direction; phases 01 and 02 implemented October 9, 2026.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Use these phases to reduce Acorn's shipped bytes and startup work, explain loading progress, and
@@ -31,7 +31,7 @@ dated acceptance evidence into Testing. Do not create a branch unless the operat
 | Phase | Result | Depends on | Status |
 | --- | --- | --- | --- |
 | [01: Measurements](./01-measurements-and-sentry.md) | Defined milestones, artifact inventories, and consent-controlled Sentry records. | None | Implemented |
-| [02: Packaging](./02-runtime-packaging.md) | Installed Claude executable used; reviewed runtime files shipped. | 01's inventory format | Planned |
+| [02: Packaging](./02-runtime-packaging.md) | Installed Claude executable used; reviewed runtime files shipped. | 01's inventory format | Implemented |
 | [03: Minification](./03-production-minification.md) | Smaller production output with a formatting-independent budget check. | 01 | Planned |
 | [04: Startup UX](./04-startup-and-loading-ux.md) | Meaningful startup messages, recovery, local loading placeholders, and an optional early rail. | 01 | Planned |
 | [05: Renderer loading](./05-selective-renderer-loading.md) | Smaller eager graph and less mandatory work behind the first frame. | 01, 04 | Planned |

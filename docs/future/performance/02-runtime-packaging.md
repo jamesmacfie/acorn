@@ -1,10 +1,36 @@
 # Phase 02: Use installed Claude Code and trim runtime resources
 
-Date: October 9, 2026. Status: planned. Depends on: phase 01's inventory format.
+Date: October 9, 2026. Status: implemented October 9, 2026. Depends on: phase 01's inventory format.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Remove the SDK's bundled Claude executable from Acorn's installation and ship reviewed runtime
 resources. Preserve the ACP adapter and require the user to install Claude Code on the executing Node.
+
+## Outcome
+
+`scripts/prune-runtime.mjs` owns the reviewed cuts. Desktop staging, the standalone install step, and
+bundle verification all run it. The owning references are
+[build and packaging](../../shell/packaging.md#runtime-file-policy),
+[Node distribution](../../node-distribution.md#install-and-start), and
+[harnesses](../../managed-agents/harnesses.md#claude-code). The dated bytes and checks are in
+[Testing](../../testing/runtime-packaging-2026-10-09.md).
+
+Decisions made during implementation:
+
+- Declarations and source maps are cut by file type across every package, not by package and
+  version. Node loads neither, so the rule doesn't depend on a package's layout, and a per-package
+  list would fail on every unrelated update.
+- node-pty's `deps/`, `third_party/`, and `src/` are cut only from the desktop. A standalone Node can
+  need them for `npm rebuild`.
+- The standalone prune is a separate command, not an npm install script, because npm skips install
+  scripts when `ignore-scripts` is set.
+
+Known gaps:
+
+- No packaged desktop build ran `verify:bundle` with the policy, and no Linux or Windows target was
+  staged.
+- The real-host Claude session checks weren't run on a pruned install. Acorn passed the installed
+  `claude` to the adapter before this phase too, so those sessions never used the removed executable.
 
 ## Starting point and owners
 

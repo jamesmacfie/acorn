@@ -4,7 +4,11 @@ import { runtimeTarget } from './node-runtime.mjs'
 
 // node-pty 1.1.0 loads build/Release, build/Debug, then prebuilds/<platform>-<arch>.
 // Keep the selected prebuild directory whole: Windows can load ConPTY or winpty,
-// including the DLLs and executables beside their addons.
+// including the DLLs and executables beside their addons. deps/, third_party/, and src/
+// are build inputs, including the Windows-only winpty and ConPTY sources, and the
+// staged desktop never rebuilds the addon.
+const BUILD_INPUTS = new Set(['deps', 'third_party', 'src'])
+
 export function nativePackageFilter(name, source, target) {
   if (name !== 'node-pty') return () => true
   const selected = runtimeTarget(target.triple)
@@ -44,6 +48,7 @@ export function nativePackageFilter(name, source, target) {
     }
   }
   return (path) => {
+    if (BUILD_INPUTS.has(relative(source, path).split(sep)[0])) return false
     const parts = relative(prebuilds, path).split(sep)
     return parts[0] === '..' || parts[0] === '' || parts[0] === selectedDir
   }

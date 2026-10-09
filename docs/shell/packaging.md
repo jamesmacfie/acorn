@@ -24,7 +24,9 @@ directory and omits the other reviewed prebuild directories. It checks the selec
 remain in the package. Other package graphs retain their installed files and dependency edges.
 Linux has no prebuild in the installed 1.1.0 package, so Linux staging requires a local Linux build
 with `build/Release/pty.node` and `spawn-helper`. A cross-target stage with an unqualified local addon
-fails because node-pty's loader would choose it before a target prebuild. A node-pty version or layout
+fails because node-pty's loader would choose it before a target prebuild. Staging also omits
+node-pty's `deps/`, `third_party/`, and `src/` folders. They're build inputs, including the Windows-only
+winpty and ConPTY sources, and the staged app never rebuilds the addon. A node-pty version or layout
 change requires review of the policy and its target fixtures.
 `apps/node/scripts/check-service-budget.mjs` runs after the Node build and fails it when `service.js`
 and its static imports pass a byte ceiling. Both builds write the license text of every bundled
@@ -82,6 +84,31 @@ manual dispatch of `.github/workflows/ci.yml`, after that workflow's Linux job p
 commit. Pushes to main run the unsigned desktop tests and build no installer. Both jobs build the
 bundle inputs once, run the boot test and the Rust suite against them before the bundler, and package
 the same output. Artifacts are kept for one day. Publishing is refused while builds are ad-hoc signed.
+
+### Runtime file policy
+
+`scripts/prune-runtime.mjs` removes installed files that no Acorn runtime loads. Desktop staging runs
+it on `dist/helper/node_modules` after copying, and `verify:bundle` runs it as a dry run that fails on
+anything it would remove. A standalone Node runs it after `npm ci`
+([Node distribution](../node-distribution.md#install-and-start)). It removes these files:
+
+- The Claude Agent SDK's executable packages, `@anthropic-ai/claude-agent-sdk-<platform>-<arch>`,
+  wherever they're installed. Staging skips them before copying.
+- The SDK's `bridge.mjs` and `browser-sdk.js`. The adapter imports only the SDK's main entry.
+- Type declarations and JavaScript source maps in every package. Node loads neither, and Acorn's
+  runtimes don't turn on source maps.
+
+The SDK cuts are reviewed against `@agentclientprotocol/claude-agent-acp` 0.54.1 and
+`@anthropic-ai/claude-agent-sdk` 0.3.197. Any other version of either, or an SDK executable package
+for a platform the policy doesn't list, fails staging and verification. To accept an update, check
+that the adapter's `claudeCliPath()` returns `CLAUDE_CODE_EXECUTABLE` before it looks for a bundled
+executable and that the adapter imports only the SDK's main entry. Then update `REVIEWED_PACKAGES`.
+The staging tests stage the installed adapter outside the checkout and check both.
+
+Without the bundled executable, the Node that runs a Claude session needs Claude Code installed
+([harnesses](../managed-agents/harnesses.md#claude-code)). Other optional dependencies keep their own
+target rules, so Sharp's and ripgrep's platform packages still ship. The
+[runtime packaging evidence](../testing/runtime-packaging-2026-10-09.md) records the bytes removed.
 
 ### Windows test installer
 

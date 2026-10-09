@@ -38,6 +38,18 @@ transcript. The driver reads that answer from the error code, `-32002` or `-3260
 answers an unknown reference with `-32603`, an internal error, so its session fails to start instead.
 The `sessionPersistence` quirk covers only the terminal handoff.
 
+### Claude Code
+
+Claude runs through `@agentclientprotocol/claude-agent-acp`, which uses the Claude Agent SDK. The ACP
+driver resolves `claude` on the `PATH` of the Node that runs the session and passes it to the adapter
+as `CLAUDE_CODE_EXECUTABLE` (`requires` in `claudeHarness.ts`). Acorn doesn't ship the SDK's bundled
+executable ([runtime file policy](../shell/packaging.md#runtime-file-policy)). Install Claude Code on
+every Node that runs Claude sessions, including a remote or standalone Node. The desktop never sends
+its own path to another Node.
+
+Without `claude` on `PATH`, the provider reports as not installed with the diagnostic
+`claude is not available on PATH.`, and a launch fails with the same message. Acorn downloads nothing.
+
 ### Codex
 
 The native driver lists Default and Plan through `collaborationMode/list`, expands the chosen preset

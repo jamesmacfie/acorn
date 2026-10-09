@@ -14,6 +14,8 @@
 //
 //   dist/          the Node artifact plus cli/ and tui/ client bundles
 //   bin/acorn.mjs  thin command-versus-terminal launcher
+//   scripts/prune-runtime.mjs  run after `npm ci`: removes files no runtime loads, including the Claude
+//                  SDK's bundled executable
 //   migrations/    every Drizzle chain: core's at the root, each plugin's under its own name
 //   package.json   generated, listing only the real runtime dependencies (see RUNTIME below)
 //   package-lock.json  resolved at pack time, so every operator installs the same versions
@@ -28,6 +30,7 @@ import { dirname, join, resolve } from 'node:path'
 import { builtinModules } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { requiredRuntimePackages } from './nodeRuntimePackages.ts'
+import { REVIEWED_PACKAGES } from './prune-runtime.mjs'
 
 // The standalone manifest uses the same supported security range as the checkout.
 const workspaceManifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -161,6 +164,8 @@ cpSync(join(CLI_APP, 'dist'), join(staging, 'dist/cli'), { recursive: true })
 cpSync(join(TUI_APP, 'dist'), join(staging, 'dist/tui'), { recursive: true })
 mkdirSync(join(staging, 'bin'), { recursive: true })
 cpSync(join(CLI_APP, 'bin/acorn.mjs'), join(staging, 'bin/acorn.mjs'))
+mkdirSync(join(staging, 'scripts'), { recursive: true })
+cpSync(join(ROOT, 'scripts/prune-runtime.mjs'), join(staging, 'scripts/prune-runtime.mjs'))
 const chains = stageMigrations(join(staging, 'migrations'))
 console.log(`[pack-node] staged ${chains} migration chains`)
 
@@ -197,6 +202,11 @@ for (const name of standaloneRuntime) {
 for (const [name, version] of Object.entries(workspaceManifest.acornStandalone.dependencyPins)) {
   if (!Object.hasOwn(dependencies, name)) throw new Error(`${name} is pinned but absent from the standalone runtime set.`)
   dependencies[name] = version
+}
+// The install prunes against exact reviewed versions and refuses any other, so lock those versions here.
+// The adapter pins its SDK exactly, which covers the one reviewed package that isn't direct.
+for (const [name, { version }] of Object.entries(REVIEWED_PACKAGES)) {
+  if (Object.hasOwn(dependencies, name)) dependencies[name] = version
 }
 assertManifestCoversImports(join(staging, 'dist'), standaloneRuntime)
 console.log('[pack-node] service, CLI, and TUI runtime imports are declared')
@@ -258,8 +268,12 @@ writeFileSync(
     'A headless acorn node. The desktop app pairs with it over TLS and drives it exactly like its own',
     'bundled node.',
     '',
+    'Claude Code agents need the `claude` command installed on this machine and on its PATH. The node',
+    'never downloads it.',
+    '',
     '```sh',
     'npm ci --omit=dev   # installs the locked versions; builds node-pty against THIS Node if no prebuilt fits',
+    'node scripts/prune-runtime.mjs   # removes files no runtime loads, including the SDK\'s Claude executable',
     'SESSION_ENC_KEY=$(openssl rand -hex 32) GITHUB_CLIENT_ID=<your oauth app> node dist/standalone.js',
     'node bin/acorn.mjs --help   # headless commands; no arguments open the terminal client',
     '```',
