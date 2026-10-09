@@ -44,8 +44,19 @@ export async function repositoryMetadataKey(project: ProjectRow): Promise<string
 
 // Serialize task reservations and metadata writes across project aliases sharing an object store.
 // The callback completes its write before releasing the queue.
-export async function withBranchReservation<T>(db: AppDatabase, project: ProjectRow, action: () => Promise<T>): Promise<T> {
-  const key = await repositoryMetadataKey(project)
+export async function withBranchReservation<T>(db: AppDatabase, project: ProjectRow, action: () => Promise<T>,
+  allowUnavailable = false): Promise<T> {
+  const keyFor = async (mapped: ProjectRow) => {
+    try { return await repositoryMetadataKey(mapped) }
+    catch (error) {
+      if (!allowUnavailable) throw error
+      // Legacy lazy tasks reserve a database branch even when Git cannot inspect the checkout.
+      // Metadata writes and tasks with a pinned base still require the verified common directory.
+      try { return `checkout:${realpathSync(mapped.path!)}` }
+      catch { return `checkout:${resolve(mapped.path!)}` }
+    }
+  }
+  const key = await keyFor(project)
   const entries = queues.get(db) ?? new Map<string, Promise<void>>()
   queues.set(db, entries)
   const previous = entries.get(key) ?? Promise.resolve()
@@ -55,7 +66,9 @@ export async function withBranchReservation<T>(db: AppDatabase, project: Project
   await previous
   try {
     const current = await getProject(db, project.id)
-    if (!current || await repositoryMetadataKey(current) !== key) throw new TaskBranchError(409, 'The project repository changed. Reopen the action.')
+    if (!current || current.path !== project.path || current.vcs !== project.vcs || await keyFor(current) !== key) {
+      throw new TaskBranchError(409, 'The project repository changed. Reopen the action.')
+    }
     return await action()
   }
   finally {

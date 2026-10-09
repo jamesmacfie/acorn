@@ -150,34 +150,17 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 `GET /v1/core/tasks`, `GET /v1/core/task-statuses`, and `GET /v1/core/runs` are filtered rather than
 gated: a task token gets its own task and nothing else.
 
-`POST /v1/core/tasks` takes `origin` and `projectId`, plus optional `title`, `icon`, `branch`,
-`branchSource`, `baseBranch`, `baseCommit`, `targetIdentity`, `worktreePath`, `skipSetup`, `pullNumber`, and `links`.
-`branchSource` is `exact` by default; `derived` lets the Node add a numeric suffix on a collision.
-Choose at most one of `baseBranch`, `baseCommit`, and `worktreePath`. A base needs a task branch.
-`baseBranch` names a local branch. `baseCommit` is a full SHA-1 or SHA-256 object ID for a commit
-available in the target repository. The Node creates the task branch from the captured commit before
-saving the task, and removes it if the insert fails. A `baseCommit` submission must include the opaque
-`targetIdentity` returned by its availability preview. The Node compares the checkout and Git object
-store identity during reservation and returns 409 if the project mapping changed. Worktree creation
-stays lazy. With a base, every
-local branch name counts as taken. Without one, an unused local branch can be reused. A bad base
-returns 400, and an exact name conflict returns a `worktree-unavailable` 409. Attachment rechecks
-Git registration, lock state, and active or archiving task ownership under the task reservation
-before saving.
+`POST /v1/core/tasks` takes `origin` and `projectId` and may take a branch, pinned base, or
+worktree attachment. See [task creation and navigation](../workspaces-and-tasks/task-creation.md#branch-names)
+for the body fields, identity token, reservation rules, and refusal codes.
 
 `GET /v1/core/projects/:id/branches` returns
 `{ current, tasks: [{ branch, taskId, title }], other: [{ name, committedAt }] }`. `current` is the
 checkout branch, or `null` for a detached HEAD. `committedAt` is Unix time in milliseconds. A non-Git
 project returns empty groups.
 
-`GET /v1/core/projects/:id/worktree-availability` takes `branch` and optional `branchSource` and
-`baseBranch` or `baseCommit` query parameters. It returns `{ available: true, branch }`, with the next free name for a
-derived request, or `{ available: false, branch, reason }`. The preview doesn't reserve the name.
-For `baseCommit`, the response also carries `targetIdentity`; keep this value with the draft and send
-it unchanged on creation. A fresh preview after a remap cannot authorize an older pinned draft.
-Callers that create a task before a follow-on operation can query the route again with that commit
-and compare `targetIdentity` to their original observation. The identity is returned even when the
-task branch now makes the requested branch name unavailable.
+`GET /v1/core/projects/:id/worktree-availability` previews a branch without reserving it. Its
+query and response fields are in [task creation and navigation](../workspaces-and-tasks/task-creation.md#branch-names).
 
 Executable repository configuration is hash-gated before use
 ([process and path controls](../security/process-and-paths.md)).

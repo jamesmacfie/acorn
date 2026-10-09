@@ -7,6 +7,7 @@
       "docker",
       "editor",
       "pr",
+      "git",
       "notes",
       "preview",
       "workflows"
@@ -47,6 +48,7 @@
       "agents",
       "docker",
       "github",
+      "git",
       "memory",
       "workflows"
     ],
@@ -58,6 +60,8 @@
       "docker",
       "docker.project",
       "editor",
+      "git",
+      "git-display",
       "terminal",
       "workflows"
     ],
@@ -67,6 +71,7 @@
       "overlay/github.shortcuts",
       "overlay/onboarding.first-run",
       "drawer/terminal.drawer",
+      "overlay/workflows.git-launch",
       "overlay/workflows.start-from-item"
     ],
     "extensionPoints": [
@@ -275,6 +280,18 @@
         "github"
       ]
     },
+    "git": {
+      "panes": [
+        "git"
+      ],
+      "sources": [
+        "git"
+      ],
+      "settingsPages": [
+        "git",
+        "git-display"
+      ]
+    },
     "onboarding": {
       "slots": [
         "overlay/onboarding.first-run"
@@ -307,6 +324,7 @@
         "workflows"
       ],
       "slots": [
+        "overlay/workflows.git-launch",
         "overlay/workflows.start-from-item"
       ],
       "schedules": [

@@ -159,7 +159,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         }).run()
         return true
       })
-      const created = project.vcs === 'git' ? await (await import('../worktrees/taskBranch')).withBranchReservation(db, project, reserve) : await reserve()
+      const created = project.vcs === 'git' ? await (await import('../worktrees/taskBranch')).withBranchReservation(db, project, reserve, true) : await reserve()
       if (created) {
         await recordSetupDecision(db, intendedTaskId, false)
         broadcastWorktreeStatusChanged({ taskId: intendedTaskId })
@@ -368,7 +368,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
           }).run()
           return true
         })
-      })
+      }, !seed.baseBranch)
       if (!created) return id
       await recordSetupDecision(db, id, false)
       broadcastWorktreeStatusChanged({ taskId: id })

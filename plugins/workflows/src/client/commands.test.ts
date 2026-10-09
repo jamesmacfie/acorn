@@ -100,11 +100,11 @@ describe('the workflows plugin catalogue', () => {
     const world = context('task-1')
     const rows = await run.query('', world, signal())
     expect(await run.select(rows[0], world)).toEqual({ effect: 'close' })
-    expect(mocks.start).toHaveBeenCalledWith('task-1', { defId: 'repo:ship' })
+    expect(mocks.start).toHaveBeenCalledWith('task-1', { defId: 'repo:ship' }, undefined, expect.any(Function), undefined)
     expect(taskHasWorkflowRuns('task-1')).toBe(true)
     // A row is addressed by its own id, because it belongs to no layer.
     await run.select(rows[1], world)
-    expect(mocks.start).toHaveBeenLastCalledWith('task-1', { defId: 'mine' })
+    expect(mocks.start).toHaveBeenLastCalledWith('task-1', { defId: 'mine' }, undefined, expect.any(Function), undefined)
   })
 
   // A definition that asks for something opens the dialog instead of starting a run with an empty

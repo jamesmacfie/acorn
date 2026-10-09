@@ -2,6 +2,52 @@
 
 Date: October 7, 2026. Status: complete October 9, 2026.
 
+## Integrated gate fixes — October 9, 2026
+
+The coordinator's first full gate exposed integration contracts that the isolated Phase 06 checks
+had not exercised. Core's shared metadata queue now permits the established unbased lazy task
+reservation when Git inspection is unavailable, using the checkout path as a fallback key and
+rechecking the project mapping before admission. Pinned starts and metadata writes still require
+verified Git identity. The three previously failing task-route cases and the direct Core callers
+pass with the reservation and alias tests (63/63 focused). No checkout or task lifecycle moved
+into Git.
+
+Reviewed goldens now include Git's eight Node route ownership contributions, 33 plugin route
+entries, the desktop Git pane/source/settings contributions, and the public plugin API exports.
+The browser-realm task-draft entry is classified and imported under the Git client test host.
+Terminal and HTTP security tests distinguish admitted read-only Git inspection from execution of
+the requested user command. Workflow start tests verify the submitted launch callback before
+navigation. The Core route reference moved its task-create field and identity detail into the
+owning task-creation page, leaving `core-routes.md` at 194 lines with a working link. The TUI
+startup assertion names the shipped 732,000 B cap; the viewport case checks the visible clipped
+extension row; the Codex-plan case walks to the selected, clipped session title.
+
+Focused results: Core 63/63; plugin API 13/13 plus Git browser entry 1/1; Node plugin-disable and
+route registry 49/50 (the sole failure is the unrelated unchanged GitHub pull-search route missing
+from its golden); terminal security 2/2; HTTP send 40/40 with loopback process access; Workflows
+client start 13/13; TUI affected files 22/22; desktop client parity, disable, host, and task bridge
+31/31; desktop renderer-budget tests 13/13. Narrow oxlint passed. Node Core, plugin API, Node,
+terminal, HTTP, Git, desktop, and TUI type checks passed. Workflows type checking retains the
+unchanged `workflowMapLifecycle.test.ts:222` null `HeadlessArgv` fixture error. Documentation
+paths/citations passed 5/6; only unchanged `plugin-routes.md` at 201 lines fails the length rule.
+
+Production builds in this worktree measured Node 3,194,881/3,200,000 B (101 static chunks) and
+TUI 731,655/732,000 B (169 startup chunks). The coordinator's earlier Node staging measured
+3,205,357 B because its `apps/node/node_modules` external package links (including `hono`,
+`drizzle-orm`, and `vite`) resolved into this longer Phase 06 worktree: the emitted chunks contain
+that foreign worktree path in module comments. Its local dependency links need repair before a
+meaningful repeat budget check; source cuts or a higher cap would mask the staging fault. The
+renderer still measures 802,712/775,000 B. The original campaign merge base measured
+798,468 B with the same supported Node/dependencies, so 23,468 B of that overage predates the
+campaign and the Phase 06 branch adds 4,244 B. The cap remains unchanged. The desktop constituent
+tests and renderer build above ran without the blocked aggregate budget gate. No rendered behavior
+changed in this integration pass; the prior rebuilt desktop and 80×24/120×40 terminal host
+snapshots remain the layout evidence. Both isolated host session records say `stopped`.
+
+The coordinator's other full-gate failures remain outside this scope: plugin-types contract
+fixtures, packed create-acorn-plugin examples, EditorPane cases, two Workflows authoring cases,
+and the unchanged GitHub route golden noted above. Phase 07 and 08 remain untouched.
+
 ## Final Phase 06 follow-up — October 9, 2026
 
 Ref and remote mutations now retain the executed command's exit/error and the original repository

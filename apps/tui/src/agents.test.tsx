@@ -28,11 +28,16 @@ describe('running an agent from a terminal', () => {
     try {
       await screen.until('Implement plan')
       let found = false
-      for (let step = 0; step < 12 && !found; step += 1) {
-        found = (await screen.caret()).text.includes('Find why the old passwor')
+      const trail: string[] = []
+      // A session row can be clipped in the narrow browse column, so use the visible caret row.
+      // Git adds a Menu stop before Agents; traverse the full menu and browse focus cycle.
+      for (let step = 0; step < 18 && !found; step += 1) {
+        const caret = (await screen.frame()).split('\n').find((line) => line.includes('›')) ?? ''
+        trail.push(caret.trim())
+        found = caret.includes('Find why the old passwo')
         if (!found) await screen.press('TAB')
       }
-      expect(found, await screen.frame()).toBe(true)
+      expect(found, trail.join(' | ')).toBe(true)
       await screen.press('RETURN')
       await enterDetail(screen)
       const frame = await screen.until('Implement plan')

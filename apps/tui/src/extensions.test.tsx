@@ -79,7 +79,8 @@ describe('a contribution inside somebody else’s surface', () => {
       // stamped with the plugin that said it. The code itself is clipped at the column's edge, which
       // is the diff behaving: a patch line is `wrapMode="none"` and wider than the panel, and it is
       // why the mark goes under the line rather than after it (./kit/showing/diffRows.tsx § AnnotatedDiffLine).
-      expect(lines[at - 1]).toMatch(/2 \+ {2}const account = await loadAccountByEmailAddress/)
+      // The viewport reserves its last cell for the scrollbar; the final s is clipped at this width.
+      expect(lines[at - 1]).toMatch(/2 \+ {2}const account = await loadAccountByEmailAddres\s*│$/)
       expect(lines[at]).toContain('fixture')
       // …and on that line only. The second insert is not marked and does not gain a line.
       expect(lines.filter((line) => line.includes('uncovered'))).toHaveLength(1)
