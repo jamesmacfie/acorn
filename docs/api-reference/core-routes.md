@@ -175,6 +175,9 @@ project returns empty groups.
 derived request, or `{ available: false, branch, reason }`. The preview doesn't reserve the name.
 For `baseCommit`, the response also carries `targetIdentity`; keep this value with the draft and send
 it unchanged on creation. A fresh preview after a remap cannot authorize an older pinned draft.
+Callers that create a task before a follow-on operation can query the route again with that commit
+and compare `targetIdentity` to their original observation. The identity is returned even when the
+task branch now makes the requested branch name unavailable.
 
 Executable repository configuration is hash-gated before use
 ([process and path controls](../security/process-and-paths.md)).

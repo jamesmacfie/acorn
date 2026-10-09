@@ -1,5 +1,36 @@
 # Phase 05: task and workflow launches
 
+## Recovery completion note, October 9, 2026
+
+The original Core `targetIdentity` now stays with a Workflows launch after task creation. Core
+rechecks that observation through the public availability route before every follow-on start,
+including a retry after reopening. A moved project mapping refuses the start and keeps the task,
+typed inputs, and launch identity. The real Git fixture confirms two repositories with the same
+commit return different identities, and confirms that the availability route still returns an
+identity after the task branch exists. The actual Core draft test covers failed start → remap →
+reopen → refused retry, followed by retry on the original mapping with the same task and no second
+creation.
+
+Workflows freezes the selected definition and effective inputs at Submit, before asynchronous task
+creation. Edits during that request cannot change the invocation, and a retry after a lost response
+uses the same payload and UUID. A completed launch retires its recovery entry only after visible run
+navigation or explicit opening of its run or task. A dismissed uncertain start keeps its entry; a
+later deliberate launch after completion gets a new task and launch identity. Dismissal before any
+task or run exists releases the unused entry. Deferred dialog tests cover the in-flight edits,
+payload reuse, and new launch after completion. In the changed disposable desktop build, Git →
+History → root commit `5d371c42` → **Start workflow here** created task
+`d377aa36-14a7-4646-897e-595bf615c0c7` and opened a completed fixture run. Reopening the
+same commit offered a fresh **Create task and run** form; submitting it created distinct task
+`ed603869-d074-4f75-9e11-6b14d1ebbade` and opened its own completed run. The inspected
+screenshots are `.acorn/agent-dev/git-phase05/screenshots/phase05-fresh-second-launch.png` and
+`.acorn/agent-dev/git-phase05/screenshots/phase05-second-run.png`. The earlier uncertain recovery
+screen is `.acorn/agent-dev/git-phase05/screenshots/followup-final-recovery.png`; the terminal
+80×24 and 120×40 evidence remains in the follow-up note below. This desktop build measured
+802,591/775,000 B of startup scripts; the renderer budget remains over its existing cap, which
+was not raised.
+
+---
+
 ## Follow-up completion note, October 9, 2026
 
 Status: reviewed fixes implemented. A Git workflow launch now sends one UUID through the public

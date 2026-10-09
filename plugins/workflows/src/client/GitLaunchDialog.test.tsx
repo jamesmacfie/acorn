@@ -6,6 +6,8 @@ import type { Task } from '@acorn/protocol/api.ts'
 const calls = vi.hoisted(() => ({ defsList: vi.fn(), start: vi.fn(), navigate: vi.fn(), close: vi.fn(), openRun: vi.fn(),
   pathname: '/p/project/x/git/history', nodeId: null as string | null, readNodes: [] as Array<string | null>, apiNodes: [] as Array<string | null> }))
 const task = { id: 'created-task', title: 'Review', projectId: 'project' } as Task
+let nextTask = task
+let createGate: Promise<void> | undefined
 let created: (() => Promise<void>) | undefined
 let savedTask: Task | null = null
 vi.mock('@solidjs/router', () => ({ useNavigate: () => calls.navigate, useLocation: () => ({ get pathname() { return calls.pathname } }) }))
@@ -25,8 +27,9 @@ vi.mock('@acorn/plugin-api/client/task-draft', () => ({
     const [error, setError] = createSignal('')
     const [current, setCurrent] = createSignal<Task | null>(existing?.() ?? null)
     created = async () => {
-      setCurrent(task); savedTask = task; onPersisted?.(task)
-      try { await onCreated(task); close() } catch (cause) { setError((cause as Error).message) }
+      await createGate
+      setCurrent(nextTask); savedTask = nextTask; onPersisted?.(nextTask)
+      try { await onCreated(nextTask); close() } catch (cause) { setError((cause as Error).message) }
     }
     return { text: () => 'Review', setText: vi.fn(), branchTouched: () => false, branchText: () => '',
       effectiveBranch: () => 'review', checkedAvailability: () => ({ available: true }), setBranch: vi.fn(),
@@ -47,6 +50,7 @@ import { openWorkflowGitLaunch, workflowGitLaunchRequest, closeWorkflowGitLaunch
 let host: HTMLElement | undefined
 let dispose: (() => void) | undefined
 afterEach(() => { dispose?.(); host?.remove(); host = undefined; dispose = undefined; savedTask = null; created = undefined;
+  nextTask = task; createGate = undefined;
   calls.pathname = '/p/project/x/git/history'; calls.nodeId = null; calls.readNodes.length = 0; calls.apiNodes.length = 0;
   closeWorkflowGitLaunch(); vi.resetAllMocks() })
 
@@ -75,6 +79,60 @@ it('requires workflow input and retries a refused start on the created task', as
   await vi.waitFor(() => expect(calls.start).toHaveBeenCalledTimes(2))
   expect(calls.start).toHaveBeenNthCalledWith(2, task.id, { defId: 'review' }, { reason: 'Because' }, expect.any(Function), expect.any(String), expect.any(Object))
   expect(calls.openRun).toHaveBeenCalledWith(task, 'run-1', calls.navigate)
+})
+
+it('freezes workflow and inputs before a delayed task creation resolves, then reuses that invocation', async () => {
+  let finishTask!: () => void
+  createGate = new Promise<void>((resolve) => { finishTask = resolve })
+  calls.defsList.mockResolvedValue({ workflows: [
+    { id: 'review', name: 'Review', source: 'database', publishedRevision: 1, inputs: [{ name: 'reason', required: true }], steps: [] },
+    { id: 'other', name: 'Other', source: 'database', publishedRevision: 1, inputs: [{ name: 'reason', required: true }], steps: [] },
+  ], errors: [] })
+  calls.start.mockResolvedValueOnce({ error: 'response lost' }).mockResolvedValueOnce({ runId: 'same-run' })
+  const request = { nodeId: null, projectId: 'project', commitId: '2'.repeat(40), title: 'Review' }
+  host = document.createElement('div'); document.body.append(host)
+  dispose = render(() => <GitLaunchDialog request={request} onClose={calls.close} />, host)
+  await vi.waitFor(() => expect(document.body.textContent).toContain('Create task and run'))
+  const reason = document.body.querySelector('input') as HTMLInputElement
+  reason.value = 'Original'; reason.dispatchEvent(new InputEvent('input', { bubbles: true }))
+  await vi.waitFor(() => expect(Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent === 'Create task and run')?.disabled).toBe(false))
+  Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent === 'Create task and run')!.click()
+  const select = document.body.querySelector('select')!
+  select.value = 'other'; select.dispatchEvent(new Event('change', { bubbles: true }))
+  reason.value = 'Changed'; reason.dispatchEvent(new InputEvent('input', { bubbles: true }))
+  finishTask()
+  await vi.waitFor(() => expect(calls.start).toHaveBeenCalledOnce())
+  expect(calls.start).toHaveBeenCalledWith(task.id, { defId: 'review' }, { reason: 'Original' }, expect.any(Function), expect.any(String), expect.any(Object))
+  const firstId = calls.start.mock.calls[0]![4]
+  dispose(); host.innerHTML = ''
+  dispose = render(() => <GitLaunchDialog request={request} onClose={calls.close} />, host)
+  await vi.waitFor(() => expect(document.body.textContent).toContain('Retry workflow'))
+  expect((document.body.querySelector('input') as HTMLInputElement).value).toBe('Original')
+  Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent === 'Retry workflow')!.click()
+  await vi.waitFor(() => expect(calls.start).toHaveBeenCalledTimes(2))
+  expect(calls.start.mock.calls[1]!.slice(0, 5)).toEqual([task.id, { defId: 'review' }, { reason: 'Original' }, expect.any(Function), firstId])
+})
+
+it('retires a completed launch after navigation so the same commit can start again', async () => {
+  calls.defsList.mockResolvedValue({ workflows: [{ id: 'review', name: 'Review', source: 'database', publishedRevision: 1,
+    inputs: [], steps: [] }], errors: [] })
+  calls.start.mockResolvedValueOnce({ runId: 'first-run' }).mockResolvedValueOnce({ runId: 'second-run' })
+  const request = { nodeId: null, projectId: 'project', commitId: '3'.repeat(40), title: 'Review' }
+  host = document.createElement('div'); document.body.append(host)
+  dispose = render(() => <GitLaunchDialog request={request} onClose={calls.close} />, host)
+  await vi.waitFor(() => expect(document.body.textContent).toContain('Create task and run'))
+  Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent === 'Create task and run')!.click()
+  await vi.waitFor(() => expect(calls.openRun).toHaveBeenCalledWith(task, 'first-run', calls.navigate))
+  const firstId = calls.start.mock.calls[0]![4]
+  dispose(); host.innerHTML = ''
+  nextTask = { ...task, id: 'second-task' }
+  dispose = render(() => <GitLaunchDialog request={request} onClose={calls.close} />, host)
+  await vi.waitFor(() => expect(document.body.textContent).toContain('Create task and run'))
+  expect(document.body.textContent).not.toContain('Open run')
+  Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent === 'Create task and run')!.click()
+  await vi.waitFor(() => expect(calls.openRun).toHaveBeenCalledWith(nextTask, 'second-run', calls.navigate))
+  expect(calls.start.mock.calls[1]![0]).toBe('second-task')
+  expect(calls.start.mock.calls[1]![4]).not.toBe(firstId)
 })
 
 it('opens the trusted run when the trust prompt completes without a second start', async () => {

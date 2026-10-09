@@ -10,6 +10,9 @@ type Session = {
   setRunId: (runId: string) => void
   pending: Accessor<boolean>
   setPending: (pending: boolean) => void
+  invocation: Accessor<{ selectionId: string; definitionId: string; inputs: Record<string, DataValue> } | null>
+  setInvocation: (value: { selectionId: string; definitionId: string; inputs: Record<string, DataValue> }) => void
+  targetIdentity: string | null
   values: Record<string, DataValue>
   defId: string
   launchId: string
@@ -24,12 +27,19 @@ export function gitLaunchSession(request: WorkflowGitLaunchRequest): Session {
     const [task, setTask] = createSignal<Task | null>(null)
     const [runId, setRunId] = createSignal<string | null>(null)
     const [pending, setPending] = createSignal(false)
-    session = { task, setTask, runId, setRunId, pending, setPending, values: {}, defId: '', launchId: crypto.randomUUID() }
+    const [invocation, setInvocation] = createSignal<ReturnType<Session['invocation']>>(null)
+    session = { task, setTask, runId, setRunId, pending, setPending, invocation, setInvocation,
+      targetIdentity: null, values: {}, defId: '', launchId: crypto.randomUUID() }
     sessions.set(id, session)
   }
   return session
 }
 
-export function forgetGitLaunchSession(request: WorkflowGitLaunchRequest): void {
-  sessions.delete(key(request))
+export function forgetGitLaunchSession(request: WorkflowGitLaunchRequest, expected?: Session): void {
+  const id = key(request)
+  if (!expected || sessions.get(id) === expected) sessions.delete(id)
+}
+
+export function forgetUnusedGitLaunchSession(request: WorkflowGitLaunchRequest, expected: Session): void {
+  if (!expected.task() && !expected.runId() && !expected.pending()) forgetGitLaunchSession(request, expected)
 }

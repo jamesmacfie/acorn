@@ -62,6 +62,13 @@ without creating another task. Disabling Workflows removes the launch capability
 that the action is unavailable. Both desktop and terminal render the owner-provided form. Loading
 and read failures remain visible in that form, with retry and close actions.
 
+The selected definition and effective input values freeze when Submit is pressed, before task
+creation completes. Core retains the repository identity seen in the original pinned-commit preview
+and checks it again before each workflow start or retry; a project remap preserves the task and
+inputs but refuses the run. An uncertain start keeps its launch ID across dismissal and reopening.
+After a run is opened, the launch is complete, so selecting **Start workflow here** again begins a
+new task and run at the same commit.
+
 ## From the command palette
 
 Three rows at the palette root, all registered by this plugin's client half

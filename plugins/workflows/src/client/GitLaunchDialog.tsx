@@ -11,11 +11,13 @@ import { workflowApiForNode } from './workflowsClient'
 import { startWorkflow } from './startWorkflow'
 import { openWorkflowRun } from './runs/runStore'
 import TypedValueField from './editor/TypedValueField'
-import { gitLaunchSession } from './gitLaunchSession'
+import { forgetGitLaunchSession, forgetUnusedGitLaunchSession, gitLaunchSession } from './gitLaunchSession'
 import { workflowGitLaunchRequest } from '../contract/gitLaunch.ts'
 
 export default function GitLaunchDialog(props: { request: WorkflowGitLaunchRequest; onClose: () => void }) {
   const api = workflowApiForNode(props.request.nodeId)
+  const session = gitLaunchSession(props.request)
+  const dismiss = () => { props.onClose(); forgetUnusedGitLaunchSession(props.request, session) }
   const location = useLocation()
   const openedAt = location.pathname
   const current = () => activeNodeId() === props.request.nodeId && location.pathname === openedAt
@@ -31,53 +33,59 @@ export default function GitLaunchDialog(props: { request: WorkflowGitLaunchReque
     const definitions = await api.defsList(workspace.id)
     return { projects: projects.projects, definitions: definitions.workflows }
   })
-  return <Modal title="Start workflow here" onDismiss={props.onClose} size="md">
+  return <Modal title="Start workflow here" onDismiss={dismiss} size="md">
     <Show when={target.loading}><Modal.Body><Text>Loading workflow definitions…</Text></Modal.Body></Show>
     <Show when={target.error}><Modal.Body><Stack gap="row"><Alert>{String(target.error)}</Alert><Button onPress={() => void refetch()}>Retry loading</Button></Stack></Modal.Body></Show>
     <Show when={!target.loading && !target.error && target()}>{(loaded) =>
       <GitLaunchForm request={props.request} projects={loaded().projects} definitions={loaded().definitions}
-        onClose={props.onClose} current={current} api={api} />
+        onClose={dismiss} current={current} api={api} session={session} />
     }</Show>
-    <Show when={target.loading || target.error}><Modal.Actions><Button onPress={props.onClose}>Close</Button></Modal.Actions></Show>
+    <Show when={target.loading || target.error}><Modal.Actions><Button onPress={dismiss}>Close</Button></Modal.Actions></Show>
   </Modal>
 }
 
 function GitLaunchForm(props: { request: WorkflowGitLaunchRequest; projects: Project[]; definitions: WorkflowDefSummary[];
-  onClose: () => void; current: () => boolean; api: ReturnType<typeof workflowApiForNode> }) {
-  const session = gitLaunchSession(props.request)
+  onClose: () => void; current: () => boolean; api: ReturnType<typeof workflowApiForNode>;
+  session: ReturnType<typeof gitLaunchSession> }) {
+  const session = props.session
   const navigate = useNavigate()
   const [tasks] = createResource(() => readJson<Task[]>(tasksRoute, { nodeId: props.request.nodeId }))
   const definitions = createMemo(() => props.definitions.filter((entry) => !entry.problems?.length &&
     (entry.projectId == null || entry.projectId === props.request.projectId) && (entry.source !== 'database' || !!entry.publishedRevision)))
   const [defId, setDefId] = createSignal(session.defId)
-  const chosen = () => definitions().find((entry) => entry.id === (defId() || definitions()[0]?.id))
+  const chosen = () => definitions().find((entry) => entry.id === (session.invocation()?.selectionId ?? (defId() || definitions()[0]?.id)))
   const [values, setValues] = createSignal<Record<string, DataValue>>(session.values)
   const [invalid, setInvalid] = createSignal<Record<string, boolean>>({})
   const inputs = () => chosen()?.inputs ?? []
-  const filled = () => ({ ...Object.fromEntries(inputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])), ...values() })
-  const ready = () => !!chosen() && inputs().every((input) => !input.required || filled()[input.name] !== undefined) && !Object.values(invalid()).some(Boolean)
+  const filled = () => session.invocation()?.inputs ?? { ...Object.fromEntries(inputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])), ...values() }
+  const ready = () => !!session.invocation() || !!chosen() && inputs().every((input) => !input.required || filled()[input.name] !== undefined) && !Object.values(invalid()).some(Boolean)
   const model = createTaskDraftStore({ mode: 'new', nodeId: props.request.nodeId, projectId: props.request.projectId,
-    projects: props.projects, title: props.request.title, baseCommit: props.request.commitId }, tasks, props.onClose, navigate,
+    projects: props.projects, title: props.request.title, baseCommit: props.request.commitId,
+    targetIdentity: session.targetIdentity ?? undefined }, tasks, props.onClose, navigate,
   async (task) => {
     if (!props.current()) throw new Error('The launch moved. Reopen it to continue on this task.')
-    const selected = chosen()
-    if (!selected) throw new Error('Choose a workflow.')
-    const defId = selected.source === 'database' ? selected.id : `${selected.source}:${selected.id}`
-    const input = filled()
+    const invocation = session.invocation()
+    if (!invocation) throw new Error('Choose a workflow.')
     const opened = (runId: string) => {
       session.setRunId(runId)
-      if (props.current()) { props.onClose(); openWorkflowRun(task, runId, navigate) }
+      if (props.current()) { props.onClose(); openWorkflowRun(task, runId, navigate); forgetGitLaunchSession(props.request, session) }
     }
-    const answer = await startWorkflow(task.id, { defId }, Object.keys(input).length ? input : undefined,
+    const answer = await startWorkflow(task.id, { defId: invocation.definitionId }, Object.keys(invocation.inputs).length ? invocation.inputs : undefined,
       opened, session.launchId, props.api)
     if (answer.error) throw new Error(answer.error)
     if (!answer.runId) throw new Error('The workflow did not return a run ID.')
     const visible = props.current()
     opened(answer.runId)
     if (!visible) throw new Error('The launch moved. Reopen it to view the run.')
-  }, session.task, session.setTask)
+  }, session.task, session.setTask, (identity) => { session.targetIdentity ??= identity })
   const submit = async () => {
-    if (session.pending() || session.runId() || !props.current()) return
+    if (session.pending() || session.runId() || !props.current() || !ready() || !model.canSubmit()) return
+    if (!session.invocation()) {
+      const selected = chosen()!
+      session.setInvocation({ selectionId: selected.id,
+        definitionId: selected.source === 'database' ? selected.id : `${selected.source}:${selected.id}`,
+        inputs: structuredClone(filled()) })
+    }
     session.setPending(true)
     try { await model.submit() } finally { session.setPending(false) }
   }
@@ -91,11 +99,11 @@ function GitLaunchForm(props: { request: WorkflowGitLaunchRequest; projects: Pro
       <Show when={model.createdTask()}>{(task) => <Alert>Task {task().title} was created. {session.runId() ? 'Open the task or its run.' : 'Retry on this task or open it.'}</Alert>}</Show>
       <Show when={session.pending()}><Alert>The launch request is still finishing.</Alert></Show>
       <Show when={session.runId()}>{(runId) => <Alert>Workflow run {runId()} was created. Open that run.</Alert>}</Show>
-      <Field label="Workflow"><Select value={chosen()?.id ?? ''} options={definitions().map((entry) => ({ value: entry.id, label: entry.name }))} onChange={(id) => { session.defId = id; setDefId(id); setInvalid({}) }} /></Field>
+      <Field label="Workflow"><Select disabled={!!session.invocation()} value={chosen()?.id ?? ''} options={definitions().map((entry) => ({ value: entry.id, label: entry.name }))} onChange={(id) => { if (session.invocation()) return; session.defId = id; setDefId(id); setInvalid({}) }} /></Field>
       <For each={inputs()}>{(input) => <TypedValueField label={input.required ? `${input.label ?? input.name} *` : input.label ?? input.name}
-        schema={input.schema} required={input.required} hint={input.description} value={filled()[input.name]}
-        onValidity={(valid) => setInvalid((current) => ({ ...current, [input.name]: !valid }))}
-        onChange={(value) => setValues((current) => { const next = { ...current }; if (value === undefined) delete next[input.name]; else next[input.name] = value; session.values = next; return next })} />}</For>
+        schema={input.schema} required={input.required} hint={input.description} value={filled()[input.name]} disabled={!!session.invocation()}
+        onValidity={(valid) => { if (!session.invocation()) setInvalid((current) => ({ ...current, [input.name]: !valid })) }}
+        onChange={(value) => { if (session.invocation()) return; setValues((current) => { const next = { ...current }; if (value === undefined) delete next[input.name]; else next[input.name] = value; session.values = next; return next }) }} />}</For>
       <Show when={!model.createdTask()}>
         <Field label="Task title"><Input value={model.text()} onInput={model.setText} /></Field>
         <Field label="New branch" error={model.branchError()}><Input value={model.branchTouched() ? model.branchText() : model.checkedAvailability()?.branch ?? model.effectiveBranch()} onInput={model.setBranch} /></Field>
@@ -104,10 +112,14 @@ function GitLaunchForm(props: { request: WorkflowGitLaunchRequest; projects: Pro
     </Stack></Modal.Body>
     <Modal.Actions>
       <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
-      <Show when={model.createdTask()}><Button variant="ghost" onPress={model.openCreatedTask}>Open task</Button></Show>
+      <Show when={model.createdTask()}><Button variant="ghost" onPress={() => {
+        if (!props.current()) return
+        model.openCreatedTask()
+        if (session.runId()) forgetGitLaunchSession(props.request, session)
+      }}>Open task</Button></Show>
       <Show when={session.runId()}>{(runId) => <Button variant="solid" onPress={() => {
         const task = session.task()
-        if (task && props.current()) { props.onClose(); openWorkflowRun(task, runId(), navigate) }
+        if (task && props.current()) { props.onClose(); openWorkflowRun(task, runId(), navigate); forgetGitLaunchSession(props.request, session) }
       }}>Open run</Button>}</Show>
       <Show when={!session.runId()}><Button variant="solid" disabled={!props.current() || session.pending() || !ready() || !model.canSubmit()}
         onPress={() => void submit()}>{model.createdTask() ? 'Retry workflow' : 'Create task and run'}</Button></Show>

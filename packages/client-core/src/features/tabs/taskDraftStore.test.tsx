@@ -17,19 +17,24 @@ afterEach(() => { vi.clearAllMocks(); mocks.nodeId = null })
 it('retains the created task and retries a failed follow-on action on that task', async () => {
   const task = { id: 'task-1', title: 'Review', projectId: 'project' } as Task
   const project = { id: 'project', name: 'Project', vcs: 'git' } as Project
+  let targetIdentity = 'a'.repeat(64)
   mocks.createTask.mockResolvedValue(task)
   mocks.readJson.mockImplementation((path: string) => {
     if (path.endsWith('/config')) return Promise.resolve({ config: { branchPrefix: null } })
     if (path.endsWith('/branches')) return Promise.resolve({ current: 'main', tasks: [], other: [] })
     if (path.endsWith('/worktrees')) return Promise.resolve([])
-    return Promise.resolve({ available: true, branch: 'review', targetIdentity: 'a'.repeat(64) })
+    return Promise.resolve({ available: true, branch: 'review', targetIdentity })
   })
   const action = vi.fn().mockRejectedValueOnce(new Error('Run refused')).mockResolvedValue(undefined)
+  const [recovered, setRecovered] = createSignal<Task | null>(null)
+  let observedTarget: string | undefined
+  const draft = { mode: 'new' as const, nodeId: null, projects: [project], projectId: project.id,
+    title: 'Review', baseCommit: 'a'.repeat(40) }
   let dispose!: () => void
   const model = createRoot((release) => {
     dispose = release
-    return createTaskDraftStore({ mode: 'new', nodeId: null, projects: [project], projectId: project.id,
-      title: 'Review', baseCommit: 'a'.repeat(40) }, () => [], mocks.close, mocks.navigate, action)
+    return createTaskDraftStore(draft, () => [], mocks.close, mocks.navigate, action, recovered, setRecovered,
+      (identity) => { observedTarget = identity })
   })
   try {
     await vi.waitFor(() => expect(model.canSubmit()).toBe(true))
@@ -38,7 +43,17 @@ it('retains the created task and retries a failed follow-on action on that task'
     expect(model.createdTask()?.id).toBe(task.id)
     expect(mocks.createTask).toHaveBeenCalledOnce()
     expect(mocks.createTask).toHaveBeenCalledWith(expect.objectContaining({ baseCommit: 'a'.repeat(40) }), null)
-    await model.submit()
+    dispose()
+    targetIdentity = 'b'.repeat(64)
+    const reopened = createRoot((release) => { dispose = release; return createTaskDraftStore({ ...draft, targetIdentity: observedTarget },
+      () => [], mocks.close, mocks.navigate, action, recovered, setRecovered) })
+    await reopened.submit()
+    expect(reopened.error()).toContain('repository changed')
+    expect(action).toHaveBeenCalledOnce()
+    expect(reopened.createdTask()).toBe(task)
+    expect(mocks.createTask).toHaveBeenCalledOnce()
+    targetIdentity = 'a'.repeat(64)
+    await reopened.submit()
     expect(action).toHaveBeenCalledTimes(2)
     expect(action).toHaveBeenNthCalledWith(2, task)
     expect(mocks.createTask).toHaveBeenCalledOnce()
@@ -59,18 +74,20 @@ it('records a task returned after dismissal without starting the follow-on actio
   let finish!: (task: Task) => void
   mocks.createTask.mockReturnValue(new Promise<Task>((resolve) => { finish = resolve }))
   const [recovered, setRecovered] = createSignal<Task | null>(null)
+  let observedTarget: string | undefined
   const follow = vi.fn().mockResolvedValue(undefined)
   const draft = { mode: 'new' as const, nodeId: null, projects: [project], projectId: project.id,
     title: 'Review', baseCommit: 'b'.repeat(40) }
   let dismiss!: () => void
   const first = createRoot((release) => { dismiss = release; return createTaskDraftStore(draft, () => [], mocks.close, mocks.navigate,
-    follow, recovered, setRecovered) })
+    follow, recovered, setRecovered, (identity) => { observedTarget = identity }) })
   await vi.waitFor(() => expect(first.canSubmit()).toBe(true))
   const pending = first.submit()
   dismiss()
   finish(task)
   await pending
   expect(recovered()).toBe(task)
+  expect(observedTarget).toBe('a'.repeat(64))
   expect(follow).not.toHaveBeenCalled()
   expect(mocks.createTask).toHaveBeenCalledOnce()
 
@@ -78,11 +95,16 @@ it('records a task returned after dismissal without starting the follow-on actio
   targetIdentity = 'c'.repeat(64)
 
   let dispose!: () => void
-  const reopened = createRoot((release) => { dispose = release; return createTaskDraftStore(draft, () => [], mocks.close, mocks.navigate,
+  const reopened = createRoot((release) => { dispose = release; return createTaskDraftStore({ ...draft, targetIdentity: observedTarget }, () => [], mocks.close, mocks.navigate,
     follow, recovered, setRecovered) })
   try {
     await vi.waitFor(() => expect(reopened.canSubmit()).toBe(true))
     expect(reopened.createdTask()).toBe(task)
+    await reopened.submit()
+    expect(reopened.error()).toContain('repository changed')
+    expect(follow).not.toHaveBeenCalled()
+    expect(mocks.createTask).toHaveBeenCalledOnce()
+    targetIdentity = 'a'.repeat(64)
     await reopened.submit()
     expect(follow).toHaveBeenCalledExactlyOnceWith(task)
     expect(mocks.createTask).toHaveBeenCalledOnce()

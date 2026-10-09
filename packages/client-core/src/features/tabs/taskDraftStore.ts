@@ -10,7 +10,7 @@ import { randomIconName } from '../../kit/components/inputs/IconPicker'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 
 export type TaskDraft =
-  | { mode: 'new'; nodeId: string | null; projects: Project[]; projectId: string; title?: string; baseCommit?: string; worktreePath?: string }
+  | { mode: 'new'; nodeId: string | null; projects: Project[]; projectId: string; title?: string; baseCommit?: string; targetIdentity?: string; worktreePath?: string }
   | { mode: 'rename'; nodeId: string | null; task: Task }
 
 type TaskSource = 'new' | 'folder' | 'worktree'
@@ -18,7 +18,8 @@ type TaskSource = 'new' | 'folder' | 'worktree'
 // One owner for the dialog's edits and requests. The rail supplies a project snapshot and a live
 // task revision; changing workspace cannot silently replace the project's choices in an open form.
 export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | undefined>, close: () => void, navigate: (path: string) => void,
-  onCreated?: (task: Task) => Promise<void>, existingTask?: Task | Accessor<Task | null>, onPersisted?: (task: Task) => void) {
+  onCreated?: (task: Task) => Promise<void>, existingTask?: Task | Accessor<Task | null>, onPersisted?: (task: Task) => void,
+  onTargetObserved?: (targetIdentity: string) => void) {
   const queryClient = useQueryClient()
   const [text, setText] = createSignal(draft.mode === 'rename' ? draft.task.title : draft.title ?? '')
   const [icon, setIcon] = createSignal<string | null>(draft.mode === 'rename' ? draft.task.icon : randomIconName())
@@ -33,7 +34,7 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
   const [saving, setSaving] = createSignal(false)
   const [localCreatedTask, setCreatedTask] = createSignal<Task | null>(typeof existingTask === 'function' ? null : existingTask ?? null)
   const createdTask = createMemo(() => localCreatedTask() ?? (typeof existingTask === 'function' ? existingTask() : null))
-  const [pinnedTargetIdentity, setPinnedTargetIdentity] = createSignal<string | null>(null)
+  const [pinnedTargetIdentity, setPinnedTargetIdentity] = createSignal<string | null>(draft.mode === 'new' ? draft.targetIdentity ?? null : null)
   let alive = true
   onCleanup(() => { alive = false })
 
@@ -70,7 +71,7 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
   }
   createEffect(() => {
     const identity = baseCommit() ? checkedAvailability()?.targetIdentity : undefined
-    if (identity && !pinnedTargetIdentity()) setPinnedTargetIdentity(identity)
+    if (identity && !pinnedTargetIdentity()) { setPinnedTargetIdentity(identity); onTargetObserved?.(identity) }
   })
   const branchError = () => {
     const result = checkedAvailability()
@@ -87,6 +88,16 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
     if (source() === 'worktree') return !!chosenWorktree()
     return !!effectiveBranch() && !config.loading && !branches.loading && !availability.loading && checkedAvailability()?.available === true
       && (!baseCommit() || !!pinnedTargetIdentity() && checkedAvailability()?.targetIdentity === pinnedTargetIdentity())
+  }
+  const revalidatePinnedTarget = async () => {
+    if (draft.mode !== 'new' || !draft.baseCommit) return
+    if (projectId() !== draft.projectId) throw new Error('The project changed. Reopen the task draft.')
+    const current = request()
+    if (!current) throw new Error('The starting repository is unavailable.')
+    const pinned = pinnedTargetIdentity()
+    if (!pinned) throw new Error('The starting repository has not been verified.')
+    const available = await readJson<WorktreeAvailability>(projectWorktreeAvailabilityRoute(current.projectId, current.branch, current), { nodeId: current.nodeId })
+    if (available.targetIdentity !== pinned) throw new Error('The project repository changed. Reopen the task draft.')
   }
   const submit = async () => {
     if (!canSubmit()) return
@@ -108,6 +119,8 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
         }, draft.nodeId)
         onPersisted?.(task)
         setCreatedTask(task)
+        if (!alive || activeNodeId() !== draft.nodeId || projectId() !== project.id) return
+        await revalidatePinnedTarget()
         if (!alive || activeNodeId() !== draft.nodeId || projectId() !== project.id) return
         if (onCreated) await onCreated(task)
         if (!alive || activeNodeId() !== draft.nodeId) return

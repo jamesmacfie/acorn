@@ -474,6 +474,8 @@ describe('creating a task on an existing worktree', () => {
     expect(created.status).toBe(200)
     expect(revision('historical')).toBe(root)
     expect(await created.json()).toMatchObject({ worktreePath: null })
+    const retryPreview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${new URLSearchParams({ branch: 'historical', baseCommit: root })}`)
+    expect(await retryPreview.json()).toMatchObject({ available: false, targetIdentity: expect.stringMatching(/^[0-9a-f]{64}$/) })
   })
 
   it('refuses a pinned commit after a project remap even when both repositories contain it', async () => {
@@ -485,6 +487,8 @@ describe('creating a task on an existing worktree', () => {
     execFileSync('git', ['clone', '-q', join(dir, 'checkout'), second])
     expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: second, encoding: 'utf8' }).trim()).toBe(root)
     await t.db.update(schema.projects).set({ path: second }).where(eq(schema.projects.id, 'p'))
+    const movedPreview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${query}`)
+    expect((await movedPreview.json() as { targetIdentity: string }).targetIdentity).not.toBe(targetIdentity)
     const refused = await createSeed({ branch: 'mapped-child', baseCommit: root, targetIdentity })
     expect(refused.status).toBe(409)
     expect((await refused.json() as { error: { message: string } }).error.message).toContain('repository changed')
