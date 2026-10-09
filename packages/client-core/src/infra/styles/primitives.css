@@ -1811,6 +1811,8 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-row:has(.ui-history-mark) .ui-row-leading { align-self: stretch; align-items: stretch; }
 .ui-history-mark { display: block; flex: none; position: relative; min-height: 100%; }
 .ui-history-mark svg { position: absolute; inset: 0; }
+/* The edges stretch with each row. The commit dot keeps equal dimensions at every row height. */
+.ui-history-mark .ui-history-node { inset: 50% auto auto; width: 8px; height: 8px; transform: translate(-50%, -50%); }
 
 /* ── The kit's grouping and showing nodes ───────────────────────────────────────────────────
    The ten nodes added when the kit closed (docs/ui-design/closed-kit.md § The closed kit). Each one replaces
@@ -2066,7 +2068,7 @@ a.ui-row:hover { background: var(--bg-hover); }
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--pane-pad);
   overflow: auto;
   background: var(--bg-subtle);
   font-family: var(--font-mono);

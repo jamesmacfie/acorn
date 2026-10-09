@@ -23,7 +23,10 @@ container, and the body is the shared container detail. The Docker Source is a `
 strip over containers, images, volumes, and networks in the list column, and the same container detail
 in the other.
 
-The container detail is a `Tabs` node. Info is a `Facts` list, Logs is a `Log` with a `FindBar`, Stats
+The container detail places `Tabs` directly below the header, with lifecycle actions beside the tabs.
+A compact status footer holds the container name, image, state, and health. Info uses grouped `Facts`
+and shared `Table` nodes for mounts and environment variables. Info and Stats have pane padding;
+loading stats are centered. Logs is a `Log` with a `FindBar`, Stats
 is a run of `Meter`s, and Terminal is a `Rectangle kind="pty"` wrapping the exec surface. A rectangle
 is the kit's admission that a PTY owns its own pixels: the node owns the box and the way in and out of
 it with the keyboard, and xterm owns everything inside.
@@ -42,7 +45,10 @@ LRU limit remains shared across views.
 Client live state belongs to a Node selection generation. Switching Nodes retires stream interests,
 exec PTYs, log buffers, and detached task roots before incoming regions attach. Cleanup addresses the
 originating Node without acquiring its event interest. Task selection and detail preferences are
-partitioned by Node. Reads and actions capture their Node and document identity before awaiting;
+partitioned by Node. Browser section, selection, filter, collapsed groups, and list offsets survive
+navigation for the session. Each container retains its detail tab, Info and Stats offsets, environment
+visibility, and log position, follow toggle, and search. Task views keep separate reading places.
+Reads and actions capture their Node and document identity before awaiting;
 stale completions cannot refresh another document, remove its selection, or focus its terminal.
 Failed observations preserve established inventory and task links. This state stays outside the
 persisted query cache. Plugin retirement disposes application refresh subscriptions.

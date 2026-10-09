@@ -119,6 +119,7 @@
     "persistedStateSlices": [
       "agents.tool-fold",
       "agents.session-order",
+      "agents.composer-expansion",
       "changes.view",
       "context.section-selection",
       "docker.prefs",

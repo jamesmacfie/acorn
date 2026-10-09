@@ -14,6 +14,8 @@ import type { CoreTelemetryService } from './telemetry.js'
  * ones you asked for. The type says otherwise on purpose: describing a shape only loaded plugins see
  * would make every facet optional for the compiled plugins that have all of them. */
 export type CoreServices = {
+  /** Available with the `agent-tool-provenance` permission. */
+  agentToolProvenance?: { verify(input: { taskId: string; sessionId: string; tool: string; proof: string }): boolean | Promise<boolean> }
   fs: CoreFsService
   git: CoreGitService
   proc: CoreProcService

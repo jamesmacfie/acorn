@@ -48,6 +48,8 @@ export type Principal = {
   /** The task an internal credential is bound to. Compare it against the task in your URL. */
   taskId?: string
   sessionId?: string
+  /** The tool allowlist and risk limit carried by an internal credential. */
+  toolCeiling?: { allow?: string[]; maxRisk?: 'read' | 'write' | 'execute' }
 }
 
 export type RouteFailure = { error: string; status: 401 | 403 | 404 | 429 | 502; detail?: string[] }

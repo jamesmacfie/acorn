@@ -19,7 +19,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { shortStatus } from './shortStatus'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
-import { consumeDockerReveal, containerTone, dockerBrowseOffset, dockerReveal, rememberDockerBrowseOffset } from './dockerViewStore'
+import { consumeDockerReveal, containerTone, dockerBrowseOffset, dockerBrowseState, dockerReveal, rememberDockerBrowseOffset, rememberDockerBrowseState } from './dockerViewStore'
 
 // What each prune runs, for the tip on its button.
 const PRUNE_COMMAND: Record<DockerPruneKind, string> = {
@@ -66,10 +66,14 @@ export default function DockerBrowse() {
   let mounted = true
   onCleanup(() => { mounted = false })
   const current = () => mounted && owner.current()
-  const [section, setSection] = createSignal<SectionId>('containers')
-  const [selected, setSelected] = createSignal<string | null>(null)
-  const [filter, setFilter] = createSignal('')
-  const [collapsed, setCollapsed] = createSignal<Set<string>>(new Set())
+  const saved = dockerBrowseState()
+  const [section, setSection] = createSignal<SectionId>(saved?.section ?? 'containers')
+  const [selected, setSelected] = createSignal<string | null>(saved?.selected ?? null)
+  const [filter, setFilter] = createSignal(saved?.filter ?? '')
+  const [collapsed, setCollapsed] = createSignal<Set<string>>(new Set(saved?.collapsed))
+  createEffect(() => {
+    if (current()) rememberDockerBrowseState({ section: section(), selected: selected(), filter: filter(), collapsed: [...collapsed()] })
+  })
   const [rowBusy, setRowBusy] = createSignal<string | null>(null)
   const [groupBusy, setGroupBusy] = createSignal<string | null>(null)
   const [actionError, setActionError] = createSignal('')

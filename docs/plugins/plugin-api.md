@@ -103,6 +103,10 @@ Reaching for a compiled-only member from a loaded plugin is a `tsc` error. A thi
 `HostPluginContext`, holds the node actions, harnesses, and custom agents the host replays from a
 manifest. It stays off both authoring types, because no plugin writes those calls.
 
+`CompiledCoreServices` owns checkout admission, repository metadata writes, security diagnostics,
+and secret publication. Loaded plugins receive the permission-scoped `CoreServices` type, including
+tool provenance verification when granted `agent-tool-provenance`.
+
 `packages/client-core/src/host/registries/extensionPoints/plugin.ts` splits the client the same way,
 into `ClientPluginContext` and `CompiledClientPluginContext`. A loaded plugin's client half is a
 manifest plus a tree or a frame, so it never receives either object.
