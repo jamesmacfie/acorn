@@ -45,6 +45,55 @@ function harness(over: Partial<ExporterDeps> = {}): Harness {
 
 const itemTypeOf = (body: string): string => JSON.parse(body.split('\n')[1]).type
 
+describe('the performance contract at a test endpoint', () => {
+  it('delivers every startup, feature, and byte record with its units, labels, and original times', async () => {
+    const world = harness()
+    const navigation = NOW - 600_000
+    const span = (name: string, spanId: string, attrs: Record<string, string | number | boolean>, durationMs = 400): Extract<TelemetryRecord, { kind: 'span' }> => ({
+      kind: 'span', traceId: 'a'.repeat(32), spanId, name, start: navigation, durationMs, status: 'ok',
+      attrs: { owner: 'core', runtime: 'renderer', seam: name, ...attrs },
+    })
+    const bytes = (name: string, value: number, attrs: Record<string, string | boolean>): TelemetryRecord => ({
+      kind: 'metric', at: NOW, name, type: 'gauge', value, unit: 'byte',
+      attrs: { owner: 'core', runtime: 'node', release: '1.2.3', installation: 'packaged', ...attrs },
+    })
+    const exporter = createExporter(world.deps)
+    exporter.accept(batch([
+      span('renderer.startup.first_frame', '1'.repeat(16), { method: 'paint', proxy: false, visibility: 'visible' }, 150),
+      span('renderer.startup.restored', '2'.repeat(16), { visibility: 'visible' }, 480),
+      span('renderer.startup.usable', '3'.repeat(16), { visibility: 'visible', features: 1, proxy: false, outcome: 'usable' }, 530),
+      { ...span('ui.feature.open', '4'.repeat(16), { 'feature.id': 'editor', 'feature.kind': 'pane', first: true, state: 'content', outcome: 'usable' }, 120), traceId: 'b'.repeat(32) },
+      bytes('app.startup.bytes', 924_543, { 'startup.runtime': 'renderer', phase: 'startup', method: 'build', 'build.mode': 'production' }),
+      bytes('app.bundle.bytes', 297_035_258, { component: 'runtime-dependencies', artifact: 'installed', method: 'walk', complete: true }),
+    ]))
+    await exporter.settled()
+
+    const sent = world.fetch.mock.calls.map((call) => {
+      const [header, item, payload] = String((call[1] as RequestInit).body).split('\n')
+      return { url: String(call[0]), header: JSON.parse(header), item: JSON.parse(item), payload: JSON.parse(payload) }
+    })
+    for (const envelope of sent) {
+      expect(envelope.url).toBe('https://o42.ingest.us.sentry.io/api/1234567/envelope/')
+      expect(envelope.header.dsn).toBe('https://abc123@o42.ingest.us.sentry.io/1234567')
+    }
+    const transactions = sent.filter((envelope) => envelope.item.type === 'transaction').map((envelope) => envelope.payload)
+    expect(transactions.map((transaction) => transaction.transaction).sort()).toEqual([
+      'renderer.startup.first_frame', 'renderer.startup.restored', 'renderer.startup.usable', 'ui.feature.open',
+    ])
+    for (const transaction of transactions) {
+      // Ten minutes late, still stamped at navigation, and still in milliseconds' precision.
+      expect(transaction.start_timestamp).toBe(navigation / 1000)
+      expect(transaction.environment).toBe('development')
+    }
+    expect(transactions.find((transaction) => transaction.transaction === 'ui.feature.open').tags).toMatchObject({ first: 'true', 'feature.id': 'editor' })
+    const [metrics] = sent.filter((envelope) => envelope.item.type === 'trace_metric').map((envelope) => envelope.payload.items)
+    expect(metrics).toMatchObject([
+      { name: 'app.startup.bytes', type: 'gauge', value: 924_543, unit: 'byte', attributes: { phase: { value: 'startup' }, release: { value: '1.2.3' } } },
+      { name: 'app.bundle.bytes', type: 'gauge', value: 297_035_258, unit: 'byte', attributes: { component: { value: 'runtime-dependencies' }, complete: { value: true, type: 'boolean' } } },
+    ])
+  })
+})
+
 describe('the exporter', () => {
   let world: Harness
 

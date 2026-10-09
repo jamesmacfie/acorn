@@ -284,6 +284,10 @@ export { telemetryFor } from '@acorn/client-core/infra/telemetry/emitter.ts'
 export type { PluginTelemetry, RenderTransitionHandle, SpanHandle } from '@acorn/client-core/infra/telemetry/emitter.ts'
 export { createLogger, describeError } from '@acorn/client-core/infra/telemetry'
 export type { Logger } from '@acorn/client-core/infra/telemetry'
+// A pane that sets `reportsUsable` calls this once its content can be used
+// (docs/plugin-authoring/telemetry.md § Reporting a usable pane).
+export { featureUsable } from '@acorn/client-core/infra/telemetry'
+export type { UsableState } from '@acorn/client-core/infra/telemetry'
 
 // ── Small helpers ─────────────────────────────────────────────────────────────────────────────
 export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/infra/highlight'

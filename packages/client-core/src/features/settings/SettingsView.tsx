@@ -34,6 +34,7 @@ import { createUnsavedChanges, UnsavedChangesContext } from './unsavedChanges'
 import { createSettingsDetails, SettingsDetailContext } from './settingsDetail'
 import { PluginStrip } from './plugins/PluginStrip'
 import { connectionPageOf, openConnectionPage } from './connections/connections'
+import { featureUsable } from '../../infra/telemetry/featureOpening'
 import './settings.css'
 
 // Settings as a place: a full-window layer with a rail of nine groups on the left and one page on the
@@ -127,6 +128,13 @@ function landOnSection(page: () => HTMLElement | undefined, section: string): ()
     stopWatching()
     clearMark()
   }
+}
+
+/** Beside the page inside its Suspense, which holds this mount until the page's code and the data it
+ *  read have arrived. That is when Settings can be used (docs/telemetry/renderer.md § Feature openings). */
+function SettingsUsable() {
+  onMount(() => featureUsable('settings'))
+  return null
 }
 
 export default function SettingsView(props: {
@@ -706,6 +714,7 @@ export default function SettingsView(props: {
                             <UnsavedChangesContext.Provider value={unsaved}>
                               <SettingsDetailContext.Provider value={details}>
                                 <Dynamic component={page.component} context={context} />
+                                <SettingsUsable />
                               </SettingsDetailContext.Provider>
                             </UnsavedChangesContext.Provider>
                           </ContributionBoundary>

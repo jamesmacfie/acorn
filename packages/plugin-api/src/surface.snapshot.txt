@@ -123,6 +123,7 @@ client: TextSetting
 client: TopbarData
 client: TopbarProps
 client: UiSlotContribution
+client: UsableState
 client: VersionedDataValue
 client: VisibleElementRect
 client: WORKSPACES_PREF_KEY
@@ -185,6 +186,7 @@ client: dispatchActiveLayout
 client: dispatchLayout
 client: effectiveModelPick
 client: elementRectKey
+client: featureUsable
 client: fileStatusMeta
 client: focusSession
 client: focusedPane

@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
-import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, featureUsable, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, copyText, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
@@ -468,7 +468,10 @@ export default function EditorPane(props: { task: Task }) {
       watchFocus(false)
     })
     void (async () => {
-      if (!api) return setRoot(null)
+      if (!api) {
+        setRoot(null)
+        return featureUsable('editor', 'error')
+      }
       // Opening this pane used to be three steps in a row — read the root, mount the rectangle the
       // root gated, read the file — of which two are requests. The file the reader left open does not
       // depend on the root, so it is read now, beside it, and `show()` finds it already in the pool
@@ -492,6 +495,12 @@ export default function EditorPane(props: { task: Task }) {
       }).catch(() => null)
       if (disposed) return
       setRoot(r) // renders the rectangle synchronously when truthy, and `mountEditor` builds the view
+      // Usable now unless a text document is still on its way, which `show()` reports instead
+      // (docs/telemetry/renderer.md § Feature openings). No checkout is an actionable error.
+      const opening = active()
+      if (!r) featureUsable('editor', 'error')
+      else if (!opening) featureUsable('editor', 'empty')
+      else if (!graphical || mode() !== 'graphical' || imageTypeForPath(opening)) featureUsable('editor', 'content')
       if (!r) return
       watchFocus(true)
     })()
@@ -719,7 +728,11 @@ export default function EditorPane(props: { task: Task }) {
     // A read may finish after the reader chose another tab. Active state changes synchronously at
     // the interaction boundary; a stale read must not put its document on screen afterward.
     if (disposed || !view || active() !== relPath || admitted !== showGeneration) return
-    if (!state) { view.setState(emptyState()); return }
+    if (!state) {
+      view.setState(emptyState())
+      if (saveErr()) featureUsable('editor', 'error')
+      return
+    }
     const entryAtShow = pool.files.get(relPath)
     if (!entryAtShow) return
     if (entryAtShow.stale) await revalidate(relPath)
@@ -730,6 +743,7 @@ export default function EditorPane(props: { task: Task }) {
     updateStatus()
     noteActivated(nodeId, taskId, relPath)
     view.setState(adopt(relPath, entryAtShow))
+    featureUsable('editor', 'content')
     updateStatus()
     // A cached state carries the theme it was built with, so a file opened before a theme change
     // comes back wearing the old one until this line.

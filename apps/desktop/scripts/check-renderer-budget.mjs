@@ -1,5 +1,6 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
+import { readRendererGraph } from './renderer-graph.mjs'
 
 // The startup budget for a built renderer, run against the bytes the bundler will pick up: every script
 // and stylesheet a cold window loads before it draws.
@@ -11,9 +12,8 @@ import { basename, resolve } from 'node:path'
 //
 //   node scripts/check-renderer-budget.mjs [--dir <built client dir>]
 //
-// The graph comes from Vite's manifest, which vite.config.ts moves to `renderer-manifest.json` beside
-// the client dir, and the denylist also reads `renderer-modules.json` there, the source modules in
-// each chunk. The built index.html is not enough on its own: on 2026-09-24 its entry became a
+// The graph comes from Vite's manifest and the source modules in each chunk, read by
+// ./renderer-graph.mjs. The built index.html is not enough on its own: on 2026-09-24 its entry became a
 // small guard that loads the app with one dynamic import, the HTML named a single 9.6 KB script, and
 // this check passed on that while the window loaded 870 KB.
 //
@@ -24,8 +24,6 @@ import { basename, resolve } from 'node:path'
 const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
 const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist/client') : args[dirFlag + 1])
-const manifestPath = resolve(clientDir, '../renderer-manifest.json')
-const modulesPath = resolve(clientDir, '../renderer-modules.json')
 
 // `scripts` is the measured startup figure plus about 5%: 726,109 B on 2026-10-02, after the compiled
 // plugin roster moved behind the first paint. Core registration stays eager and workspace restore
@@ -49,14 +47,6 @@ const limits = {
   styles: 200_000,
   floor: 100_000,
 }
-
-// Source modules that are dynamically imported but still load before the first draw, keyed as the
-// manifest keys them. Every other dynamic import is a lazy surface and stays out of the count. A module
-// listed here that has no chunk of its own is skipped: index.html loads src/client/index.tsx directly,
-// so today it is part of the entry chunk, and the entry is counted anyway. It stays listed because an
-// entry module that dynamic-imports the app is the shape that blinded this check once (see above), and
-// that import is startup whatever syntax loads it.
-const STARTUP_IMPORTS = ['src/client/index.tsx']
 
 // Name prefixes that must not be fetched at startup, whatever they weigh. Each one is a lazy surface
 // that leaked into the eager graph through a registry holding values instead of loaders.
@@ -93,50 +83,7 @@ const DENYLIST = [
 // name that reappears fails the build outright and this list should stay empty.
 const KNOWN = []
 
-const html = await readFile(resolve(clientDir, 'index.html'), 'utf8')
-const readGraph = async (path) => JSON.parse(
-  await readFile(path, 'utf8').catch(() => {
-    throw new Error(
-      `No ${basename(path)} at ${path}. The acorn:renderer-graph plugin in vite.config.ts writes it; `
-      + 'build the renderer with `vite build` before running this check.',
-    )
-  }),
-)
-const manifest = await readGraph(manifestPath)
-const chunkModules = await readGraph(modulesPath)
-
-// A manifest left over from an earlier build would describe chunks this one does not have, so the
-// entry it names has to be the script this index.html loads.
-const htmlPaths = (pattern) => [...html.matchAll(pattern)].map((match) => match[1].replace(/^\//, ''))
-const entryKey = Object.keys(manifest).find((key) => manifest[key].isEntry)
-if (!entryKey || !htmlPaths(/<script[^>]+src="([^"]+)"/g).includes(manifest[entryKey].file)) {
-  throw new Error(`${manifestPath} does not describe the entry ${clientDir}/index.html loads. Rebuild the renderer.`)
-}
-
-// The static closure of the startup modules: each chunk, the chunks it imports, and their stylesheets.
-// `hops` is how many fetches run one after another before the last of them can start. Vite preloads a
-// chunk's whole static closure alongside it, so a static edge costs no round trip; the entry and each
-// startup import cost one each.
-const startupKeys = [entryKey, ...STARTUP_IMPORTS.filter((key) => key !== entryKey && manifest[key])]
-const closure = (roots) => {
-  const keys = new Set()
-  const visit = (key) => {
-    if (keys.has(key) || !manifest[key]) return
-    keys.add(key)
-    for (const next of manifest[key].imports ?? []) visit(next)
-  }
-  for (const root of roots) visit(root)
-  return keys
-}
-const filesOf = (keys) => new Set([...keys].flatMap((key) => [manifest[key].file, ...manifest[key].css ?? []]))
-
-const startupChunks = closure(startupKeys)
-// Whatever index.html names directly is startup too, whatever the manifest says.
-const startupFiles = new Set([
-  ...filesOf(startupChunks),
-  ...htmlPaths(/<script[^>]+src="([^"]+)"/g),
-  ...htmlPaths(/<link[^>]+rel="(?:modulepreload|stylesheet)"[^>]+href="([^"]+)"/g),
-])
+const { manifest, chunkModules, startupKeys, startupChunks, startupFiles, closure, filesOf } = await readRendererGraph(clientDir)
 const scriptAssets = [...startupFiles].filter((path) => !path.endsWith('.css'))
 const styleAssets = [...startupFiles].filter((path) => path.endsWith('.css'))
 const hops = startupKeys.length

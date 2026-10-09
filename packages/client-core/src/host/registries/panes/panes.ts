@@ -7,6 +7,7 @@ import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { markPaneDrawn, paneDrawn, paneModel, paneModelScope } from './paneModels'
 import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
+import { featureMounted } from '../../../infra/telemetry/featureOpening'
 import { Registry, type Disposable } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 
@@ -49,6 +50,12 @@ type PaneCommon = {
    * would find no worktree, and a pane that can start work would start it on a task that is archived.
    */
   readsArchived?: boolean
+  /**
+   * This pane calls `featureUsable(id)` once its content can be used
+   * (docs/telemetry/renderer.md § Feature openings). Without it the host closes the pane's opening
+   * record when the pane mounts, and labels that measurement a proxy.
+   */
+  reportsUsable?: boolean
 }
 
 export type PaneContribution = PaneCommon & {
@@ -140,10 +147,12 @@ export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
  * waiting on a `lazy()` import or a resource ends its span when the reader can see it, not when the
  * host asked for it.
  */
-function MeasuredRegion(props: { span: SpanHandle; children: JSX.Element }): JSX.Element {
+function MeasuredRegion(props: { paneId: PaneId; span: SpanHandle; children: JSX.Element }): JSX.Element {
   onMount(() => {
     recordSample('core', 'pane.region.mount', 1)
     props.span.end()
+    // The first region with content is the proxy for a pane that does not report usable for itself.
+    featureMounted(props.paneId)
   })
   return props.children
 }
@@ -205,6 +214,7 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
             fallback: null,
             get children() {
               return createComponent(MeasuredRegion, {
+                paneId: entry.id,
                 span,
                 get children() {
                   return createComponent(Region, {

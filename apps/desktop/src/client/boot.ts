@@ -47,6 +47,10 @@ const LAST = 'nodeReady'
 
 const marks: { label: string; at: number }[] = []
 
+/** One trace for this window's launch: the boot account here and the startup milestones in
+ *  ./startupMilestones.ts, so a vendor shows them side by side. */
+export const startupTraceId = newTraceId()
+
 export function bootMark(label: string): void {
   const at = performance.now()
   marks.push({ label, at })
@@ -91,7 +95,7 @@ function spanAt(
   attrs: Record<string, string>,
   parent?: { traceId: string; spanId: string },
 ): { traceId: string; spanId: string } {
-  const traceId = parent?.traceId ?? newTraceId()
+  const traceId = parent?.traceId ?? startupTraceId
   const spanId = newSpanId()
   emitSpan('core', {
     traceId,

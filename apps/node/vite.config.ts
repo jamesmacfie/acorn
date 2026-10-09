@@ -13,6 +13,20 @@ export default defineConfig({
       const contract = readFileSync(resolve(__dirname, '../../plugins/memory/src/server/memoryContract.md'), 'utf8')
       return code.replace("readFileSync(new URL('./memoryContract.md', import.meta.url), 'utf8')", JSON.stringify(contract))
     },
+  }, {
+    // The service's chunk edges, in the shape the terminal client writes (apps/tui/startupGraph.ts), so
+    // apps/desktop/scripts/size-report.mjs counts the service's startup closure the same way. The
+    // closure is service.js and everything it imports statically; a dynamic import is post-startup.
+    // Staging leaves this file out of the bundle (apps/desktop/scripts/stage.mjs).
+    name: 'acorn:service-startup-graph',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const chunks: Record<string, { imports: string[]; dynamicImports: string[] }> = {}
+      for (const output of Object.values(bundle)) {
+        if (output.type === 'chunk') chunks[output.fileName] = { imports: output.imports, dynamicImports: output.dynamicImports }
+      }
+      this.emitFile({ type: 'asset', fileName: 'startup-graph.json', source: JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }) })
+    },
   }],
   // Node resolution, not browser: prefer the `node` condition and never the `browser` field.
   resolve: {

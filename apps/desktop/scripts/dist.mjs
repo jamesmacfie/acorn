@@ -17,3 +17,6 @@ execFileSync(process.execPath, [require.resolve('@tauri-apps/cli/tauri.js'), 'bu
   env: { ...process.env, CI: 'true' },
 })
 runPnpm(['run', 'verify:bundle'], { cwd: pkg, stdio: 'inherit' })
+// The installed report rode into the bundle during `build`. This one is written after packaging, so it
+// also has the compressed release files, and it stays outside the bundle it describes.
+runPnpm(['run', 'size-report', '--', '--out', 'dist/release-size-report.json'], { cwd: pkg, stdio: 'inherit' })

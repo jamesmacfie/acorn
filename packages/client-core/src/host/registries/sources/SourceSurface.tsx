@@ -1,7 +1,8 @@
-import { Show } from 'solid-js'
+import { createEffect, createRenderEffect, on, onCleanup, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { DetailColumn, ListColumn, ListDetail } from '../../../kit/components/primitives'
-import type { SourceContribution } from './sources'
+import { featureMounted, openFeature } from '../../../infra/telemetry/featureOpening'
+import { sourceRegistry, type SourceContribution } from './sources'
 
 // A browse source on screen, whichever way it declared itself.
 //
@@ -15,6 +16,13 @@ import type { SourceContribution } from './sources'
 // difference is the one that asked for the field. The terminal reads `regions` itself and never calls
 // this, because it draws the two halves in two different panels (apps/tui/src/chrome/Shell.tsx).
 export function SourceSurface(props: { source: SourceContribution }) {
+  // No source reports usable content, so its opening is a mount proxy
+  // (docs/telemetry/renderer.md § Feature openings). Keyed on the id rather than on this component,
+  // because switching sources hands this same component a new source. The render effect opens the
+  // record before the surface draws, and the effect closes it once the surface has mounted.
+  const sourceId = () => props.source.id
+  createRenderEffect(on(sourceId, (id) => onCleanup(openFeature(id, sourceRegistry.ownerOf(id) ?? 'core', { kind: 'source', reportsUsable: false }))))
+  createEffect(on(sourceId, featureMounted))
   return (
     <Show when={props.source.regions} fallback={
       <Show when={props.source.component}>

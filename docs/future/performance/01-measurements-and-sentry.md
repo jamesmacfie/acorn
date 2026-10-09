@@ -1,10 +1,26 @@
 # Phase 01: Measure startup, feature opening, and shipped bytes
 
-Date: October 9, 2026. Status: planned. Depends on: none.
+Date: October 9, 2026. Status: implemented October 9, 2026. Depends on: none.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Implement this phase before evaluating optimizations. It defines comparable milestones and exports
 bounded numeric records through Acorn's telemetry pipeline to the bundled Sentry sink.
+
+## Outcome
+
+The contract below shipped. The owning references are [renderer telemetry](../../telemetry/renderer.md)
+for the startup milestones and feature openings, [telemetry runtimes](../../telemetry/runtimes.md) for
+the byte gauges, and [profiling](../../local-development/profiling.md) for the size report and Sentry
+queries. The baseline is in [Testing](../../testing/performance-baseline-2026-10-09.md).
+
+Known gaps for later phases:
+
+- Every rail source, and every pane except Agent, Editor, and Changes, is a mount proxy.
+- The Node can't see the window become usable, so it measures installed bytes a fixed minute after
+  boot.
+- The baseline has no visible launch, and a cold relaunch on an established data root never ran the
+  startup restore. The baseline page describes both.
+- Live Sentry delivery is unverified. Phase 07 owns it.
 
 ## Starting point and owners
 

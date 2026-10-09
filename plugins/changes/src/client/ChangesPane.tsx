@@ -1,5 +1,5 @@
-import { createSignal, Show } from 'solid-js'
-import { fileStatusMeta, type Task } from '@acorn/plugin-api/client'
+import { createEffect, createSignal, Show } from 'solid-js'
+import { featureUsable, fileStatusMeta, type Task } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu,
   paneCollapseKey, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text, Toolbar, TreeRow,
@@ -199,6 +199,14 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
   // the path in the tooltip (client-core kit/lib/layout/collapseState.ts).
   const collapsed = sidebarCollapsed(paneCollapseKey('changes'))
   const model = () => props.model
+  // Usable once the first status read has answered, with changes or a clean tree, or once it is
+  // clear there is nothing to read (docs/telemetry/renderer.md § Feature openings).
+  createEffect(() => {
+    const project = model().project()
+    if (project && project.vcs !== 'git') return featureUsable('changes', 'empty')
+    if (model().status.error) return featureUsable('changes', 'error')
+    if (model().loaded()) featureUsable('changes', model().sections().length ? 'content' : 'empty')
+  })
 
   // One call for a group's checkbox and a folder's, which want the same two things: stage what is not
   // staged yet, or unstage the lot. Unstaging a path that was never staged is a no-op in git, so the

@@ -24,6 +24,7 @@ import { startDeviceConfigSync } from '@acorn/client-core/infra/persistence/devi
 import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
 import { bootMark, emitBootSpans } from './boot'
+import { markFirstFrame } from './startupMilestones'
 import { startDesktopLinks } from './links'
 
 const noop = () => null
@@ -205,6 +206,7 @@ const fillIn = () => {
 const pluginFallback = setTimeout(fillIn, 250)
 requestAnimationFrame(() => {
   bootMark('first paint')
+  markFirstFrame()
   setTimeout(fillIn, 0)
 })
 createRoot((dispose) => {

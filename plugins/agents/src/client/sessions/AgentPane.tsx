@@ -1,6 +1,6 @@
-import { createMemo, createResource, For, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { clientCapability, openPane, type Task } from '@acorn/plugin-api/client'
+import { clientCapability, featureUsable, openPane, type Task } from '@acorn/plugin-api/client'
 import {
   AGENT_SESSION_HEADER_POINT,
   type AgentSessionHeaderProps,
@@ -27,6 +27,7 @@ import { agentPricingOptions } from '../pricingClient'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
 import SessionSummaryModal from './SessionSummaryModal'
+import { AGENT_PANE_ID } from '../paneIdentity'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
@@ -301,6 +302,16 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
   // The header's ••• menu, in the palette too, for as long as this region is mounted (../commands.ts).
   // Not for an archived task: most of those actions start work, and the preview has nowhere to run it.
   if (!archived()) registerSessionActionCommands(model)
+  // Usable once the session list has answered and the reader can see either the open session's
+  // transcript, the start cards with the harnesses checked, or why it failed
+  // (docs/telemetry/renderer.md § Feature openings). The host ignores every report after the first.
+  createEffect(() => {
+    if (model.error()) return featureUsable(AGENT_PANE_ID, 'error')
+    if (!model.rosterSettled()) return
+    if (model.selected()) {
+      if (model.snapshot()) featureUsable(AGENT_PANE_ID, 'content')
+    } else if (archived() || !model.providersLoading()) featureUsable(AGENT_PANE_ID, 'empty')
+  })
   return (
     <>
       <AgentDetailHeader task={props.task} model={model} />

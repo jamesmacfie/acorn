@@ -28,7 +28,7 @@ import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/cl
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins, clientPluginsReady } from './activate'
-import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { createLogger, openFeature } from '@acorn/client-core/infra/telemetry'
 import { registerAddressHostWhenReady } from './addressHostRegistration'
 import { PromoteToTaskModal } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
 import { clearCache } from './clearCache'
@@ -54,6 +54,7 @@ import { availableSources } from '@acorn/client-core/features/tabs'
 import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { emitBootSpans } from './boot'
+import { claimStartupAccount, emitStartupMilestones } from './startupMilestones'
 import { telemetryOn } from '@acorn/client-core/features/settings'
 import type { TopbarProps } from '@acorn/protocol/chrome.ts'
 import Topbar from '@acorn/client-core/host/chrome/Topbar.tsx'
@@ -89,7 +90,14 @@ export default function App() {
   const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
   const [settingsLink, setSettingsLink] = createSignal<{ nodeId: string; place: Extract<Place, { kind: 'settings' }> } | null>(null)
   const [linkPromotion, setLinkPromotion] = createSignal<{ projectId: string; sourceId: string; item: unknown; itemTitle: string } | null>(null)
-  const openSettings = (target?: string): void => { setSettingsRequest(target ? { target } : {}) }
+  // Settings' opening record starts at the request rather than in SettingsView, so a first opening
+  // also counts loading the view's code (docs/telemetry/renderer.md § Feature openings).
+  let cancelSettingsOpening = () => {}
+  onCleanup(() => cancelSettingsOpening())
+  const openSettings = (target?: string): void => {
+    if (!settingsRequest()) cancelSettingsOpening = openFeature('settings', 'core', { kind: 'settings', reportsUsable: true })
+    setSettingsRequest(target ? { target } : {})
+  }
   // Panes deep-link here rather than receiving an `openSettings` prop: the layer is the shell's, and
   // threading a callback through every pane that might ever want one is worse than one event.
   onMount(() => onCleanup(clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))))
@@ -402,7 +410,10 @@ export default function App() {
   createEffect(() => {
     const on = telemetryOn(prefs.data)
     setTelemetryEnabled(on)
-    if (on) emitBootSpans()
+    if (on) {
+      emitBootSpans()
+      emitStartupMilestones()
+    }
   })
 
   let explicitProjectPath: string | undefined
@@ -462,6 +473,9 @@ export default function App() {
   // Waits for the whole restore pass, because opening a task with no layout in memory gives it a
   // default one, and the saved layouts land in the last phase.
   const [placeRestored, setPlaceRestored] = createSignal(false)
+  // The launch's restored and usable milestones (./startupMilestones.ts). They belong to the first Node
+  // whose shell restores. A later switch to another Node drops any that weren't sent.
+  const startupAccount = claimStartupAccount(mountedNodeId)
   createEffect(() => {
     if (placeRestored() || !startup.restored()) return
     untrack(() => {
@@ -474,6 +488,7 @@ export default function App() {
       if (ws) openWorkspaceView(ws)
     })
     setPlaceRestored(true)
+    startupAccount.restored()
   })
 
   // A linked project chooses its own route and source. Keep that choice when the route enters a
@@ -719,7 +734,7 @@ export default function App() {
         }}
       </Show>
       <Show when={settingsRequest()}>
-        {(request) => <Portal><SettingsView request={request()} onClose={() => { setSettingsRequest(null); setSettingsLink(null) }}
+        {(request) => <Portal><SettingsView request={request()} onClose={() => { cancelSettingsOpening(); setSettingsRequest(null); setSettingsLink(null) }}
           onLinkPlace={setSettingsLink} onCopyLink={copyVisibleLink} /></Portal>}
       </Show>
       {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}

@@ -9,7 +9,9 @@ Each pane contributes its ID, label, order, default chord, minimum width, and an
 availability check through `paneRegistry`. It then draws itself in one of two ways: with a
 `component`, or with a `layout` and a `regions` record, in which case the registry builds the
 component. Through its plugin, a pane can also register palette rows, commands and keybindings,
-persisted state, and contributions to another plugin's extension points.
+persisted state, and contributions to another plugin's extension points. A pane that sets
+`reportsUsable` reports when its content is usable
+([telemetry](../plugin-authoring/telemetry.md#reporting-a-usable-pane)).
 
 ```ts
 ctx.panes.register({

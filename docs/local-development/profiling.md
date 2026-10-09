@@ -99,6 +99,19 @@ callback, and macOS pauses those while the window is hidden. Bring the window to
 reload, or read `tree built` instead. That line prints when `render` returns, wherever the window is,
 and it marks the end of the renderer's own work.
 
+### Read the startup milestones
+
+The renderer also marks three milestones on the performance timeline, whatever the switches say:
+`acorn:startup:first_frame`, `acorn:startup:restored`, and `acorn:startup:usable`.
+[Renderer telemetry](../telemetry/renderer.md#startup-milestones) defines them. Read them with
+`performance.getEntriesByType('mark')` in devtools, or through the WebDriver client of a
+`pnpm dev:agent` session, as `apps/desktop/scripts/agent/webdriver.mjs` does for measures.
+
+A `pnpm dev:agent` window reports `document.visibilityState` as `hidden`, so its numbers are
+background-priority launches. Compare them with each other, never with a visible launch. In a hidden
+window WebKit still reports `first-contentful-paint` on a cold launch, but after a reload it can land
+later than `usable`.
+
 ## Timing a task switch
 
 Renderer spans such as `nav.change`, `pane.region`, `pane.model`, and `api.request` go to telemetry
@@ -123,3 +136,43 @@ Keep the window visible for the whole run. WebKit runs no animation frames for a
 another window or on a locked screen. `nav.change` never ends there, virtualized lists such as the
 diff rows never draw, and timers slow to about one a second. Synchronous work and request counts
 still measure correctly in a hidden window.
+
+## Measuring shipped bytes
+
+`pnpm --filter @acorn/desktop build` ends with `apps/desktop/scripts/size-report.mjs`, which prints
+one line per number and writes `dist/helper/size-report.json` in the desktop package. Run it alone with
+`pnpm --filter @acorn/desktop size-report` after any build. `--out <file>` writes elsewhere, and
+`--bundle <dir>` points it at a Tauri bundle folder for the compressed release files. The packaging
+script, `apps/desktop/scripts/dist.mjs`, writes `dist/release-size-report.json` that way.
+
+The report keeps four questions apart:
+
+- `startup` is what each runtime loads before it can draw or answer: the renderer's startup closure,
+  its `registration` closure after the first frame, the Node service's static graph, and the terminal
+  client's graph. Each comes from the build's own graph file.
+- `components` is installed bytes per app-owned folder, with JavaScript counted apart. The runtime
+  dependencies under `helper/node_modules` are their own component, not part of the service.
+- `releaseArtifacts` is the compressed installers, present only after packaging.
+- `missing` names every component or graph the build didn't produce. A missing number is never zero.
+
+Each file counts once, by device and inode. Symlinks aren't followed, and one that leaves its
+component is listed under `excluded`. Source maps and the report files are excluded by name. A graph
+file that names a chunk the build doesn't have, or misses one it does, fails the report as stale.
+Rebuild that runtime and run it again.
+
+The packaged Node sends the same numbers, and what it measures on disk, as byte gauges
+([shipped bytes](../telemetry/runtimes.md#shipped-bytes)).
+
+## Query startup and bytes in Sentry
+
+The milestones are transactions named after the span. In **Explore → Traces**, filter on
+`span.op:renderer.startup.usable visibility:visible` and chart `p50(span.duration)`,
+`p75(span.duration)`, and `p95(span.duration)`, grouped by `release`. Add `proxy:false` to leave out
+launches that landed on a mount-proxy feature. Use `span.op:ui.feature.open first:true` grouped by
+`feature.id` for first openings, and `first:false` for repeated ones.
+
+Byte gauges are trace metrics. In **Explore → Metrics**, chart `max(app.bundle.bytes)` filtered on
+`method:walk`, grouped by `component` and `release`, for installed bytes. Use
+`app.startup.bytes` grouped by `startup.runtime` and `phase` for startup graphs. Filter on
+`installation:packaged` to leave out development builds.
+

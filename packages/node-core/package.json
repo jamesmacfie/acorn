@@ -58,6 +58,7 @@
     "./server/sync/engine.ts": "./src/server/sync/engine.ts",
     "./server/taskEnv.ts": "./src/server/taskEnv.ts",
     "./server/telemetry": "./src/server/telemetry/public.ts",
+    "./server/telemetry/installedBytes": "./src/server/telemetry/installedBytes.ts",
     "./server/transport": "./src/server/transport/public.ts",
     "./server/transport/tls.ts": "./src/server/transport/tls.ts",
     "./server/transport/listener.ts": "./src/server/transport/listener.ts",
