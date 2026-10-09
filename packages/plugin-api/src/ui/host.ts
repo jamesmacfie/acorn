@@ -1,6 +1,5 @@
 // Compiled-host UI only. See docs/plugins/plugin-api.md § The plugin API for the boundary between this and
 // @acorn/plugin-api/ui: nothing here is safe to bundle into an isolated plugin frame.
-export { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 // The shell's one confirmation: a danger zone's delete, uninstall, unpair and revoke, said as what
 // goes and what stays.
@@ -45,8 +44,6 @@ export { default as RefPanelTaskLink } from '@acorn/client-core/host/components/
 // underneath, exported for a host that has already resolved who draws.
 export { Slot } from '@acorn/client-core/host/tree/Slot.tsx'
 export type { SlotProps } from '@acorn/client-core/host/tree'
-// "Is anyone offering to fill this?", for an owner that decides whether to draw the box at all.
-export { slotFills } from '@acorn/client-core/host/tree'
 export { RemoteTree } from '@acorn/client-core/host/tree/RemoteTree.tsx'
 export type { RemoteTreeProps } from '@acorn/client-core/host/tree'
 // Marks other plugins pinned to the items this surface draws (the `annotation` kind). Two calls: ask

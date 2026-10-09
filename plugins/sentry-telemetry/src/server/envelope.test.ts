@@ -173,6 +173,55 @@ describe('spans', () => {
   })
 })
 
+describe('startup and feature spans', () => {
+  // Built retroactively and posted long after the launch, so the navigation time is the start.
+  const navigation = 1_700_000_000_000.25
+  const usable = span({
+    name: 'renderer.startup.usable',
+    spanId: hex16('2'),
+    start: navigation,
+    durationMs: 1_840.5,
+    attrs: { owner: 'core', runtime: 'renderer', seam: 'renderer.startup.usable', visibility: 'visible', proxy: false, features: 2, outcome: 'usable' },
+  })
+  const phase = span({
+    name: 'renderer.startup.phase',
+    spanId: hex16('3'),
+    parentSpanId: hex16('2'),
+    start: navigation + 900,
+    durationMs: 940.5,
+    attrs: { owner: 'core', runtime: 'renderer', seam: 'renderer.startup.phase', phase: 'content' },
+  })
+  const opening = span({
+    name: 'ui.feature.open',
+    traceId: OTHER_TRACE,
+    spanId: hex16('4'),
+    start: navigation + 5_000,
+    durationMs: 120,
+    attrs: { owner: 'editor', runtime: 'renderer', seam: 'ui.feature.open', 'feature.id': 'editor', first: true, state: 'content', outcome: 'usable' },
+  })
+
+  it('keeps the original millisecond times, the labels, and the phase children', () => {
+    const [startup, feature] = buildEnvelopes(batchOf([usable, phase, opening]), options())
+    const transaction = payloadOf(startup)
+    expect(transaction).toMatchObject({
+      transaction: 'renderer.startup.usable',
+      platform: 'javascript',
+      start_timestamp: navigation / 1000,
+      timestamp: (navigation + 1_840.5) / 1000,
+      tags: { visibility: 'visible', proxy: 'false', features: '2' },
+      release: 'acorn@1.0.0',
+      environment: 'development',
+    })
+    expect(transaction.spans).toMatchObject([{ op: 'renderer.startup.phase', start_timestamp: (navigation + 900) / 1000, data: { phase: 'content' } }])
+    expect(payloadOf(feature)).toMatchObject({ transaction: 'ui.feature.open', tags: { 'feature.id': 'editor', first: 'true', state: 'content' } })
+  })
+
+  it('samples them by trace like any other span', () => {
+    const settings = { ...DEFAULT_SETTINGS, sampleRate: 0 }
+    expect(buildEnvelopes(batchOf([usable, phase, opening]), options({ settings }))).toEqual([])
+  })
+})
+
 describe('groupSpans', () => {
   it('terminates on a parent cycle instead of walking it forever', () => {
     // A batch posted by another runtime is caller-controlled input and nothing upstream checks
@@ -376,6 +425,32 @@ describe('metrics', () => {
     ])
     // No unit on the count: it says how many samples there were, not how many milliseconds of them.
     expect(payloadOf(envelope).items[3]).not.toHaveProperty('unit')
+  })
+
+  it('names durations and sizes with Sentry units and keeps the labels a release query needs', () => {
+    const duration = metric({ name: 'ui.page.layout', type: 'histogram', unit: 'ms', value: { count: 1, sum: 3, min: 3, max: 3, p50: 3, p95: 3 } })
+    const bytes = metric({
+      name: 'app.bundle.bytes',
+      type: 'gauge',
+      unit: 'byte',
+      value: 227_251_472,
+      attrs: { owner: 'core', runtime: 'node', artifact: 'installed', component: 'helper', release: '1.0.0', platform: 'darwin', arch: 'arm64', method: 'walk' },
+    })
+    const [envelope] = buildEnvelopes(batchOf([duration, bytes]), options())
+    const items = payloadOf(envelope).items
+    expect(items[0]).toMatchObject({ name: 'ui.page.layout.p50', unit: 'millisecond' })
+    expect(items[4]).toMatchObject({
+      name: 'app.bundle.bytes',
+      type: 'gauge',
+      value: 227_251_472,
+      unit: 'byte',
+      timestamp: 1_700_000_000,
+      attributes: {
+        component: { value: 'helper', type: 'string' },
+        release: { value: '1.0.0', type: 'string' },
+        method: { value: 'walk', type: 'string' },
+      },
+    })
   })
 
   it('sends nothing when metrics are switched off', () => {

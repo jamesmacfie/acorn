@@ -7,12 +7,14 @@ type PluginStartupOptions = {
   activeNode: () => string | null
   disabled: () => readonly string[]
   onReady: () => void
+  onFailed: (error: unknown) => void
 }
 
 /** Registration follows the first shell paint. Node applications wait for it and only commit to
  * the node still on screen; an unanswered roster remains retryable. */
 export function createPluginStartup(options: PluginStartupOptions) {
   let start: Promise<readonly ClientPlugin[]> | undefined
+  let failed = false
   let release: () => void = () => {}
   const started = new Promise<void>((resolve) => { release = resolve })
   let applied: string | null = null
@@ -24,10 +26,25 @@ export function createPluginStartup(options: PluginStartupOptions) {
         options.register(plugins, options.disabled())
         options.onReady()
         return plugins
+      }).catch((error: unknown) => {
+        failed = true
+        options.onFailed(error)
+        throw error
       })
       release()
     }
     return start
+  }
+
+  // Only a settled failure is discarded, so a retry can never run beside the attempt it replaces.
+  // A partial registration needs no cleanup here: the plugin host takes back each plugin's previous
+  // contributions before that plugin registers again.
+  const retry = (): Promise<readonly ClientPlugin[]> => {
+    if (failed) {
+      failed = false
+      start = undefined
+    }
+    return initialize()
   }
 
   const apply = (nodeId: string): Promise<void> => {
@@ -36,8 +53,9 @@ export function createPluginStartup(options: PluginStartupOptions) {
     if (existing) return existing
     const pass = async (): Promise<void> => {
       await started
-      const plugins = await start!
-      if (options.activeNode() !== nodeId) return
+      // A failed roster is the startup screen's to show. Its retry applies the node again.
+      const plugins = await start!.catch(() => null)
+      if (!plugins || options.activeNode() !== nodeId) return
       const disabled = await options.refresh(nodeId)
       if (options.activeNode() !== nodeId) return
       options.register(plugins, disabled ?? options.disabled())
@@ -48,5 +66,5 @@ export function createPluginStartup(options: PluginStartupOptions) {
     return result
   }
 
-  return { initialize, apply }
+  return { initialize, retry, apply }
 }

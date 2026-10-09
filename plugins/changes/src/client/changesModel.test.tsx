@@ -8,10 +8,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const projects = vi.hoisted(() => ({ data: undefined as unknown }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => projects, useQueryClient: () => ({}) }))
-vi.mock('@acorn/plugin-api/ui/host', () => ({ registerKeybindings: () => ({ dispose() {} }) }))
 const inline = vi.hoisted(() => ({ capability: undefined as unknown }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...await original<Record<string, unknown>>(),
+  registerKeybindings: () => ({ dispose() {} }),
   clientCapability: () => inline.capability,
   isArchiving: () => false,
   taskStatusRevision: () => 0,

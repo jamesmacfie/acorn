@@ -46,6 +46,7 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Which backend and model every Generate control spends (`models.generatePick`) | Device |
 | The query cache | Node |
 | Task layout, open files, PR filters, and context selection | Owning Node's preferences, keyed by Node and task or repository |
+| Agent input expansion | Owning Node's preferences, keyed by Node, task, and agent session |
 | Dashboard panel definitions and their placements | Owning Node's preferences, one app-scoped slice |
 | Last view per workspace | Owning Node's preferences, keyed by Node and workspace |
 | Last workspace and the two-workspace shortcut pair | Active Node's app-scoped preferences |

@@ -1,5 +1,5 @@
 import type { ServerType } from '@hono/node-server'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { ServiceEndpoint, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { resolveDeviceToken } from '@acorn/node-core/server/auth'
@@ -95,6 +95,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   let dbClosed = false
   let pluginStateCapability: { dispose(): void } | null = null
   let scheduler: ReturnType<typeof createScheduler> | null = null
+  let stopInstalledBytes = () => {}
   let schedulerCapability: { dispose(): void } | null = null
   let stopInternalCredentials = () => {}
 
@@ -166,6 +167,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       dataRoot: async () => { stopInternalCredentials(); dataRoot.release() },
     })
     if (outcome === 'timeout') stopLog.warn('drain exceeded its deadline; exiting anyway')
+    stopInstalledBytes()
     stateChanged('stopped')
     mark('teardown')
     // The last chance a sink gets, and where `ACORN_PERF=1` prints its histograms. A node that was
@@ -264,6 +266,24 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     mark('listener-up')
     await scheduler.start()
     mark('scheduler')
+
+    // The app's shipped and installed bytes, once, a minute after boot (node-core
+    // server/telemetry/installedBytes.ts). Only the desktop app hands over its resource directory, as
+    // the parent of its bundled plugins, so a standalone node reports nothing here. Imported here
+    // rather than at the top, so the walker stays out of the service's startup graph.
+    const bundledPluginsDir = config.bundledPluginsDir
+    if (bundledPluginsDir) {
+      void import('@acorn/node-core/server/telemetry/installedBytes').then(({ scheduleInstalledBytesReport }) => {
+        if (stopped) return
+        stopInstalledBytes = scheduleInstalledBytesReport({
+          resourceRoot: dirname(bundledPluginsDir),
+          release: config.version ?? '0',
+          packaged: config.isPackaged,
+          nativeRuntime: config.hostRuntimePath,
+          excludedRoots: [config.dataDir],
+        })
+      })
+    }
 
     stateChanged('reconciling')
     if (process.env.NODE_ENV !== 'test') {

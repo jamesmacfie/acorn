@@ -118,12 +118,15 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   onCleanup(releaseSocket)
   const rosterOwner = managedAgentStore.captureRead()
   const sessionsLoaded = managedAgentStore.loadTask(task.id)
+  // Whether the session list has answered, either way. The pane reports itself usable only after it.
+  const [rosterSettled, setRosterSettled] = createSignal(false)
   void sessionsLoaded
     .then((sessions) => {
       rosterOwner.check()
       if (!selectedManagedSession(task.id) && sessions[0]) restoreManagedSessionSelection(task.id, sessions[0].id)
     })
     .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load agent sessions.'))
+    .finally(() => setRosterSettled(true))
 
   // No snapshot load here. The conversation owns that, because it is the thing that needs one and it
   // is mounted in two panes now (./AgentConversation.tsx). Loading it here as well made two requests
@@ -398,6 +401,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   return {
     task,
     sessionsLoaded,
+    rosterSettled,
     providers: () => providers() ?? [],
     /** True until the first providers answer arrives, so a control can say so rather than look empty. */
     providersLoading,

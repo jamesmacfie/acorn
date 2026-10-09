@@ -1,5 +1,6 @@
-import { relative, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import type { Plugin } from 'vite'
+import { describeChunks } from '../../scripts/chunkGraph.mts'
 
 // Top-level imports in main are awaited before rendering. Imports inside functions are optional or
 // post-frame work. Read the parsed module so minification and a module reached by both static and
@@ -29,17 +30,11 @@ export function startupGraph(): Plugin {
       visit(this.parse(code))
 
       const moduleChunks = new Map<string, string>()
-      const chunks: Record<string, { imports: string[]; dynamicImports: string[]; modules: string[] }> = {}
       let entryFile: string | undefined
       for (const output of Object.values(bundle)) {
         if (output.type !== 'chunk') continue
         if (output.facadeModuleId === entry) entryFile = output.fileName
         for (const id of Object.keys(output.modules)) moduleChunks.set(id, output.fileName)
-        chunks[output.fileName] = {
-          imports: output.imports,
-          dynamicImports: output.dynamicImports,
-          modules: Object.keys(output.modules).map((id) => relative(repo, id.replace(/\?.*$/, ''))),
-        }
       }
       if (!entryFile) throw new Error('Cannot find the terminal startup entry chunk.')
       const roots = new Set([entryFile])
@@ -49,6 +44,7 @@ export function startupGraph(): Plugin {
         if (!chunk) throw new Error(`Cannot find startup import '${source}' in the terminal bundle.`)
         roots.add(chunk)
       }
+      const chunks = describeChunks(this, bundle, repo)
       this.emitFile({ type: 'asset', fileName: 'startup-graph.json', source: JSON.stringify({ entry: entryFile, roots: [...roots], chunks }) })
     },
   }

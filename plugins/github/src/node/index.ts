@@ -1,23 +1,10 @@
-import type { NodePlugin } from '@acorn/plugin-api/node'
+import { lazyFetch, lazyRouter, type NodePlugin } from '@acorn/plugin-api/node'
 import { pullRequestSection } from '../server/contextSection'
 import { GITHUB_MIRROR } from '../contract/mirror'
-import { actions } from '../server/routes/checks/actions'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
 import { createGithubProvider } from '../server/provider'
-import { mentions } from '../server/routes/pulls/mentions'
 import { pins } from '../server/routes/pulls/pins'
-import { prActions } from '../server/routes/pulls/prActions'
-import { prCreate } from '../server/routes/pulls/prCreate'
-import { pullBlob } from '../server/routes/pulls/pullBlob'
-import { diffDocument } from '../server/routes/pulls/diffDocument'
-import { pullConflicts } from '../server/routes/pulls/pullConflicts'
-import { pullDetail } from '../server/routes/pulls/pullDetail'
-import { pullFiles } from '../server/routes/pulls/pullFiles'
-import { pulls } from '../server/routes/pulls/pulls'
-import { pullsBatch } from '../server/routes/pulls/pullsBatch'
-import { repoLabels } from '../server/routes/repos/repoLabels'
-import { repos } from '../server/routes/repos/repos'
 import { failingChecksFor, mirrorFootprint, mirroredPullRequest } from '../server/mirrorQueries'
 import { pruneOrphanedGithubMirror } from '../server/mirrorRetention'
 import { githubClientId } from '../server/config'
@@ -28,7 +15,6 @@ import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirro
 import { pullSource } from '../shared/pullSource'
 import { actionsSource } from '../shared/actionsRegistration'
 import { branchSource } from '../shared/branchSource'
-import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
 import { startPullDiscovery } from '../server/pullDiscovery'
@@ -75,52 +61,26 @@ export const githubPlugin = (): NodePlugin => {
       // registry, so only a fresh data root reveals the break.
       //
       // The device-flow router registers separately below because github's routes share a namespace
-      // with twelve mirror routers whose registration order is load-bearing.
+      // with the mirror routers, whose order is load-bearing (server/routes/mirrorRoutes.ts).
       ctx.providers.integration(createGithubProvider({ connectable: githubClientId() !== '' }))
-      let pullHandler: PluginFetchHandler | undefined
-      ctx.routes.fetch(async (request, context) => {
-        pullHandler ??= (await import('../server/data/pullSourceHandler')).createPullSourceHandler()
-        return pullHandler(request, context)
-      }, { prefix: '/data/pulls' })
+      // The three source handlers load on their first request (docs/plugin-authoring/the-node-half.md
+      // § Load a route on first use). The descriptors register now, so the sources exist before then.
+      ctx.routes.fetch(lazyFetch(async () =>
+        (await import('../server/data/pullSourceHandler')).createPullSourceHandler()), { prefix: '/data/pulls' })
       ctx.dataSources.register(pullSource)
-      let branchHandler: PluginFetchHandler | undefined
-      ctx.routes.fetch(async (request, context) => {
-        branchHandler ??= (await import('../server/data/branchSourceHandler')).createBranchSourceHandler(ctx.dataSources.invoke)
-        return branchHandler(request, context)
-      }, { prefix: '/data/branches' })
+      ctx.routes.fetch(lazyFetch(async () =>
+        (await import('../server/data/branchSourceHandler')).createBranchSourceHandler(ctx.dataSources.invoke)), { prefix: '/data/branches' })
       ctx.dataSources.register(branchSource)
-      let actionsHandler: PluginFetchHandler | undefined
-      ctx.routes.fetch(async (request, context) => {
-        actionsHandler ??= (await import('../server/data/actionsSourceHandler')).createActionsSourceHandler()
-        return actionsHandler(request, context)
-      }, { prefix: '/data/actions' })
+      ctx.routes.fetch(lazyFetch(async () =>
+        (await import('../server/data/actionsSourceHandler')).createActionsSourceHandler()), { prefix: '/data/actions' })
       ctx.dataSources.register(actionsSource)
 
-      // /v1/p/github/repos/* is the mirror. Several of these routers declare overlapping paths under
-      // the same prefix (/:owner/:repo/pulls/:number/...), so registration order is the order Hono
-      // matches them. Reshuffling it changes which handler wins.
-      ctx.routes.register(repos(store, emit), { prefix: '/repos' })
-      ctx.routes.register(repoLabels(store, emit), { prefix: '/repos', note: '/:owner/:repo/labels' })
-      // Takes `core` as well as the handle: refreshing the open-PR list also adopts a PR into any
-      // local-first task on that branch (Flow B). `tasks` is core's table, so that write goes through
-      // CoreServices.tasks.adoptPullNumbers instead of the mirror's transaction.
-      ctx.routes.register(pulls(store, ctx.core, emit), { prefix: '/repos' })
-      ctx.routes.register(pullDetail(store, emit), { prefix: '/repos' })
-      // The one github router with no plugin database handle: it shells out to git in the mapped project
-      // checkout, and the path comes from CoreServices.projects through the core git seam.
-      ctx.routes.register(pullConflicts(ctx.core), { prefix: '/repos', note: '/:owner/:repo/pulls/:number/conflicts' })
-      ctx.routes.register(pullFiles(store, emit), { prefix: '/repos' })
-      ctx.routes.register(pullBlob(store, emit), { prefix: '/repos' })
-      // A diff document's segment and search reads, shared by pull requests and compare previews.
-      ctx.routes.register(diffDocument(store, emit), { prefix: '/repos' })
-      ctx.routes.register(pullsBatch(store, emit), { prefix: '/repos' })
-      ctx.routes.register(prActions(store, emit), { prefix: '/repos' })
-      // Workflow-run and job reads and re-runs. It resolves everything from the GitHub API and the
-      // URL, so it holds no mirror state and takes no handle.
-      ctx.routes.register(actions, { prefix: '/repos' })
-      ctx.routes.register(prCreate(store, emit), { prefix: '/repos' })
+      // /v1/p/github/repos/* is the mirror: thirteen routers, about 39 KB of the node's minified boot
+      // graph, that serve nothing until a client asks for GitHub data. They load on that first request,
+      // in the order server/routes/mirrorRoutes.ts keeps.
+      ctx.routes.register(lazyRouter(async () =>
+        (await import('../server/routes/mirrorRoutes')).mirrorRoutes(store, ctx.core, emit)), { prefix: '/repos', note: 'repository and pull request mirror' })
       ctx.routes.register(taskPulls(ctx.core), { prefix: '/tasks', note: '/:taskId/pulls — durable task PR relations' })
-      ctx.routes.register(mentions(store), { prefix: '/repos' })
       // `pinned_repos` moved out of core, so /v1/core/pins became /v1/p/github/pins. The repo
       // selector is the only caller.
       ctx.routes.register(pins(store), { prefix: '/pins' })

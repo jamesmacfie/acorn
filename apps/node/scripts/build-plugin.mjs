@@ -4,6 +4,7 @@
 //
 //   pnpm --filter @acorn/node build:plugin rollbar
 //   pnpm --filter @acorn/node build:plugin rollbar -- --package-root /path/to/resources/plugins
+//   pnpm --filter @acorn/node build:plugin rollbar -- --package-root /tmp/maps --sourcemap
 //   pnpm dev:plugin rollbar          # the same build, re-run on every save
 //   pnpm dev:node
 //
@@ -92,7 +93,7 @@ const args = process.argv.slice(2)
 const id = args[0]
 const configPath = id ? join(PLUGINS_DIR, id, CONFIG_FILE) : null
 if (!configPath || !existsSync(configPath)) {
-  console.error(`Usage: build-plugin.mjs <${buildable().join('|')}> [--package-root <directory>]`)
+  console.error(`Usage: build-plugin.mjs <${buildable().join('|')}> [--package-root <directory>] [--sourcemap]`)
   process.exit(1)
 }
 // The directory name IS the plugin id — it binds the `/v1/p/<id>` namespace, provider ids and task
@@ -102,6 +103,10 @@ const pluginPackage = JSON.parse(readFileSync(join(PLUGINS_DIR, id, 'package.jso
 const packageRootIndex = args.indexOf('--package-root')
 const packageRoot = packageRootIndex === -1 ? null : args[packageRootIndex + 1]
 if (packageRootIndex !== -1 && !packageRoot) throw new Error('--package-root requires a directory')
+// Both halves are minified and keep function and class names, like the service (apps/node/vite.config.ts).
+// The package is what ships, so source maps are written into it only on request, to read a packaged
+// stack against a matching build (docs/local-development/packaged-stacks.md § Find the source line).
+const sourcemap = args.includes('--sourcemap') ? 'hidden' : false
 
 // Matches server/storage/paths.ts's dev root, and honours the same override the node itself reads.
 const dataRoot = process.env.ACORN_DATA_DIR || join(NODE_APP, '.acorn')
@@ -168,7 +173,8 @@ try {
         target: 'node22',
         outDir: join(outDir, 'dist'),
         ssr: true,
-        minify: false,
+        minify: 'oxc',
+        sourcemap,
         emptyOutDir: true,
         reportCompressedSize: false,
         rollupOptions: {
@@ -179,7 +185,7 @@ try {
           // not the host's class. Structurally compatible at the same version; if the provider routes
           // ever stop answering after a hono bump, this is the reason.
           external: (source) => builtinModules.includes(source.replace(/^node:/, '')),
-          output: { format: 'es', entryFileNames: 'node.js', chunkFileNames: 'chunks/[name]-[hash].js' },
+          output: { format: 'es', keepNames: true, entryFileNames: 'node.js', chunkFileNames: 'chunks/[name]-[hash].js' },
         },
       },
     })
@@ -199,7 +205,8 @@ try {
         // browser bundle so Vite never applies SSR dependency externalization to frame imports.
         ssr: false,
         outDir: join(outDir, 'dist'),
-        minify: false,
+        minify: 'oxc',
+        sourcemap,
         // Preserve node.js when there is a node half. Otherwise clear a node.js left by an older
         // version of this package; the generated manifest would rightly stop naming it, but a
         // package builder should not carry dead executable bytes forward.
@@ -209,6 +216,7 @@ try {
           input: resolve(PLUGINS_DIR, id, spec.client.entry),
           output: {
             format: 'es',
+            keepNames: true,
             entryFileNames: 'client.js',
             codeSplitting: false,
           },

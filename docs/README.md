@@ -133,6 +133,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, the environment, and the database commands. |
 | [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
+| [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
 | [testing.md](./testing.md) | The way into the tests: the commands, focused runs, and the topic pages. |
 | [testing/commands.md](./testing/commands.md) | Every test command, concurrency limits, caching, timeouts, and coverage measurement. |
 | [testing/layers.md](./testing/layers.md) | What each runtime's suites cover, composition-root tests, and the testkit. |
@@ -154,6 +155,11 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |
+| [testing/performance-baseline-2026-10-09.md](./testing/performance-baseline-2026-10-09.md) | Dated startup timings, startup graph bytes, and installed bytes taken before the October 2026 startup and size work. |
+| [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by the October 2026 runtime packaging work. |
+| [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins. |
+| [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use. |
+| [testing/selective-server-loading-2026-10-09.md](./testing/selective-server-loading-2026-10-09.md) | Dated Node startup graph bytes, the cuts chosen and refused, and real-app route checks from loading server routes and operations on first use. |
 | [telemetry.md](./telemetry.md) | The map of telemetry: the record kinds, the switch, and which page owns each seam. |
 | [telemetry/model.md](./telemetry/model.md) | The switch, the five kinds, span admission, attributes, privacy, and traces. |
 | [telemetry/plugins-and-sinks.md](./telemetry/plugins-and-sinks.md) | Writing telemetry from a plugin or frame, writing a sink, and the Sentry sink. |
@@ -315,8 +321,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   conditions, bounded continuations, run inspection, and budgets on workflow agent steps.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
-- [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's
-  code on first use, to keep heavy, rarely used routes out of the node's boot graph.
+- [Lazy plugin routes](./future/lazy-plugin-code.md): the original design for loading a plugin
+  route's code on first use, implemented October 9, 2026.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
@@ -400,22 +406,6 @@ These pages describe planned work, not shipped behavior. The first release ends 
 | [Phase 06](./future/git-client/06-refs-remotes-and-settings.md) | Refs, remotes, comparison, scoped settings, and opt-in Node fetching. |
 | [Phase 07](./future/git-client/07-operations.md) | Task operations, recovery controls, and Editor/Changes conflict handoff. |
 | [Phase 08](./future/git-client/08-conflict-resolution.md) | Three-way resolution, safe result saving/staging, and combined acceptance. |
-
-## Future performance handoffs
-
-These planned phases reduce shipped bytes and startup work, explain loading progress, and export
-performance measurements to Sentry. They do not describe shipped behavior.
-
-| Document | What it holds |
-| --- | --- |
-| [Performance programme](./future/performance/README.md) | Decisions, phase order, dated starting evidence, owners, and scope. |
-| [Phase 01: Measurements](./future/performance/01-measurements-and-sentry.md) | Startup and feature milestones, artifact inventories, consent, and Sentry export. |
-| [Phase 02: Packaging](./future/performance/02-runtime-packaging.md) | Installed Claude, removal of the SDK executable, and reviewed runtime files. |
-| [Phase 03: Minification](./future/performance/03-production-minification.md) | Production service and plugin minification, diagnostics, and graph-based budgets. |
-| [Phase 04: Startup UX](./future/performance/04-startup-and-loading-ux.md) | Changing startup messages, failure recovery, and feature loading placeholders. |
-| [Phase 05: Renderer loading](./future/performance/05-selective-renderer-loading.md) | Smaller eager imports, contribution readiness, and first-use behavior. |
-| [Phase 06: Server loading](./future/performance/06-selective-server-loading.md) | Shared lazy handlers, route ordering, and required startup obligations. |
-| [Phase 07: Acceptance](./future/performance/07-acceptance-and-budgets.md) | Combined gates, packaged-host checks, before-and-after measurements, and live Sentry evidence. |
 
 ## Plugin topic pages
 

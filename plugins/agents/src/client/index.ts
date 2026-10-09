@@ -24,6 +24,7 @@ import { agentCommandsSlotContribution } from './AgentCommands'
 import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
 import { sessionOrderSlice } from './sessions/sessionOrder'
+import { composerExpansionSlice } from './composer/composerPrefs'
 import { sessionContextContribution } from './sessionContextContribution'
 
 // The conversation, for whoever else has a session to draw (../contract/conversation.ts). Lazy like
@@ -118,6 +119,7 @@ export const agentsClientPlugin: ClientPlugin = {
     // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
     ctx.persistedStateSlices.register(agentToolFoldSlice)
     ctx.persistedStateSlices.register(sessionOrderSlice)
+    ctx.persistedStateSlices.register(composerExpansionSlice)
     // The Agents group's pages, each with the sections and rows it draws for search (each page's file
     // draws the same ones). Core's Tools and permissions (order 30) sits between them.
     ctx.settingsPages.register({

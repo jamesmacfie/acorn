@@ -88,5 +88,26 @@ streaming updates, pointer moves, or component bodies.
 This is the compiled tier's bargain: your code is in acorn's process, so the id is a convention, not a
 wall. A loaded plugin's node half has `ctx.log` and needs neither.
 
+### Reporting a usable pane
+
+The host times every pane opening as a `ui.feature.open` span. By default it closes the span when
+the pane's first content mounts and labels it a proxy, because the host can't tell when your data
+arrived ([feature openings](../telemetry/renderer.md#feature-openings)). To report real readiness,
+set `reportsUsable: true` on the pane contribution and call `featureUsable` once the reader can use
+the pane:
+
+```ts
+import { featureUsable } from '@acorn/plugin-api/client'
+
+createEffect(() => {
+  if (list.error) return featureUsable('notes', 'error')
+  if (list.data) featureUsable('notes', list.data.length ? 'content' : 'empty')
+})
+```
+
+The first argument is the pane ID. The state is `content`, `empty`, `offline`, or `error`. Report a
+cached list, a finished empty result, an editable document, or a recoverable error. Never report a
+spinner. The host ignores every call after the first for one opening, so an effect can call it freely.
+
 Asserting on telemetry in a test is in [testing](./testing.md#in-tests). [Plugins and
 sinks](../telemetry/plugins-and-sinks.md) covers the collector side.

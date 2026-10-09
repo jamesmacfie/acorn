@@ -8,6 +8,7 @@ import { registerPageFact } from '../../infra/telemetry/pageFacts'
 import { createIsolatedTreeWorker, type TreeSandbox } from './isolatedWorker'
 import type { TreeTransport } from './TreeHost'
 import { failedWorkerHandle } from './failedWorkerHandle'
+import { installTreeWorkerTeardown } from './workerTeardown'
 export { treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant } from './bridgeAuthority'
 
 export const pluginWorkerUrl = (hash: string): string => `/plugin-worker/${hash}.js`
@@ -547,3 +548,5 @@ export function _stopAllTreeWorkers(): void {
 export function stopTreeWorker(key: TreeWorkerKey, reason: string): void {
   for (const live of [...workers.values()]) if (workerKey(live.owner) === workerKey(key)) stop(live, reason)
 }
+// Distribution reaches the function above through ./workerTeardown.ts, so it doesn't load this module.
+installTreeWorkerTeardown(stopTreeWorker)

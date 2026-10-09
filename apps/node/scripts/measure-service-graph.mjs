@@ -72,8 +72,10 @@ try {
   }
   const total = [...lengths.values()].reduce((sum, size) => sum + size, 0)
   const emitted = [...staticChunks].reduce((sum, name) => sum + chunks.get(name).bytes, 0)
-  console.log(`Service static modules: ${bytes(total)} in ${lengths.size} modules`)
-  console.log(`Service static chunks: ${bytes(emitted)} in ${staticChunks.size} chunks (includes imports and chunk glue)`)
+  // Module lengths are the bundler's rendered source, before minification; the chunk bytes are the
+  // emitted, minified files the budget counts (./check-service-budget.mjs).
+  console.log(`Service static modules: ${bytes(total)} in ${lengths.size} modules (rendered source, before minification)`)
+  console.log(`Service static chunks: ${bytes(emitted)} in ${staticChunks.size} chunks (emitted and minified, as the budget counts them)`)
 
   const packages = new Map()
   const folders = new Map()

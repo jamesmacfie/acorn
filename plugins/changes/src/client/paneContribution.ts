@@ -26,5 +26,7 @@ export const changesPaneContribution: PaneLayoutContribution<ChangesModel> = {
   model: (task, pane) => createChangesModel(task, pane),
   collapsible: true,
   collapseContent: 'empty',
+  // The list region says when the pane is usable (./ChangesPane.tsx).
+  reportsUsable: true,
   regions: { 'list-header': ChangesHeader, list: ChangesList, 'list-footer': ChangesFooter, detail: ChangesDiff },
 }

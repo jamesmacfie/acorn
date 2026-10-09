@@ -1,6 +1,5 @@
 import { onCleanup } from 'solid-js'
-import { registerCommands } from '@acorn/plugin-api/client'
-import { registerKeybindings } from '@acorn/plugin-api/ui/host'
+import { registerCommands, registerKeybindings } from '@acorn/plugin-api/client'
 
 /** Keyboard access to the in-field size toggle omitted from the terminal. */
 export default function TerminalComposerShortcut(props: { toggle: () => void }) {

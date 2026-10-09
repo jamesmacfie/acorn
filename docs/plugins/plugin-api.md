@@ -17,11 +17,11 @@ The facade has 14 entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
-| `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser`, `respondError`, `portableCarrier`), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef` and `TaskRef` projections, `capabilityId`, and provider and integration contracts |
-| `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task, workspace, and fleet state, the design system's plain functions, and `readLocal`, `writeLocal`, and `clearLocal` for per-device scraps such as an unsent draft |
+| `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser`, `respondError`, `portableCarrier`, and the first-use loaders `lazyFetch` and `lazyRouter` from [Load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use)), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef` and `TaskRef` projections, `capabilityId`, and provider and integration contracts |
+| `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, registration seams such as `registerCommands`, `registerKeybindings`, and `slotFills`, task, workspace, and fleet state, the design system's plain functions, and `readLocal`, `writeLocal`, and `clearLocal` for per-device scraps such as an unsent draft |
 | `@acorn/plugin-api/ui` | Frame-safe presentation components from the kit, the diff rows, `DiffPane`, `attachPty`, and `createTimelineWindow` |
 | `@acorn/plugin-api/ui/diff` | The diff row model, highlighter, find marks, the `DiffSource` port, the diff-document types, and `createDiffSnippets` ([the diff document](../diff-rendering/document.md)) |
-| `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components, composed controls, and registration seams. Never import it from a frame |
+| `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components, composed controls, and the confirmation and will-phase seams. Never import it from a frame |
 | `@acorn/plugin-api/ui/editor` | The host-owned CodeMirror theme, view state, and `languageForPath`. Compiled panes only. The terminal client aliases it to a stub ([host switch](../tui/host-switch.md)) |
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, plus `mountFrame` and `mountTree` |
 | `@acorn/plugin-api/ui/tree` | The kit as nodes a remote tree writes in JSX, and the Solid adapter behind them |
@@ -45,6 +45,13 @@ code that touches `window` at module scope, so `/client` holds no `.tsx`. The `/
 presentation components. Router, query, and registry-connected components, and composed controls
 such as `ModelPickerPopover`, sit on `/ui/host`. The facade is declared side-effect free, so a frame
 bundle keeps only the components it imports.
+
+That doesn't hold inside the desktop shell. The client-core modules behind `/ui/host` create stores
+when they load, so the bundler keeps every one of them once a module imports any name from the
+barrel. Code that runs while a compiled plugin registers, such as a pane model, imports from
+`/client`. Until October 9, 2026, one keybinding import from the changes model loaded the
+loaded-plugin frame host, worker host, and promotion modal before the workspace could restore
+([startup budget](../frontend/startup-budget.md)).
 
 `packages/plugin-api/src/entrypoints.test.ts` imports every entrypoint except `/ui`, `/ui/host`, and
 `/ui/editor` in a node-environment worker, the same shape a plugin's own suite runs in. That check

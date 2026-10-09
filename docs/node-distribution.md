@@ -120,9 +120,21 @@ tar -xzf acorn-node-*.tgz
 cd acorn-node-*
 npm ci --omit=dev
 npm rebuild
+node scripts/prune-runtime.mjs
 ACORN_DATA_DIR=/var/lib/acorn-node npm start
 node bin/acorn.mjs --help
 ```
+
+`scripts/prune-runtime.mjs` removes installed files that no runtime loads, including the Claude Agent
+SDK's executable for this platform ([runtime file policy](./shell/packaging.md#runtime-file-policy)).
+It's a separate command because npm skips install scripts when `ignore-scripts` is set. Running it
+again removes nothing. Run it again after every `npm ci`. npm still downloads the executable package,
+because the lockfile lists it as an optional dependency, so the download is larger than what stays
+installed. The packer pins the Claude adapter to the version the policy reviewed, so `npm ci` can't
+install one the prune step refuses.
+
+Claude Code agents need `claude` installed on this machine and on the Node process's `PATH`. The Node
+never downloads it ([harnesses](./managed-agents/harnesses.md#claude-code)).
 
 The machine needs Node 22.23.2 or later in branch 22, 24.18.1 or later in branch 24, or 26.5.1 or later
 in branch 26. These floors include the
@@ -138,7 +150,8 @@ certificate persist under `tls/` and are reused, including ones OpenSSL made.
 
 `node-pty` is the only native module. It ships prebuilt binaries for macOS and Windows and compiles from
 source on Linux, which needs the usual build tools. If installation skipped lifecycle scripts, run
-`npm rebuild` before diagnosing a missing-bindings failure.
+`npm rebuild` before diagnosing a missing-bindings failure. The prune step keeps node-pty's sources, so
+a later `npm rebuild` still works.
 
 `SESSION_ENC_KEY` is optional. Unset, the Node generates one into `session.key` in the data root at mode
 `0600` and never mints it again. A damaged key file is an error, because a silent replacement would turn

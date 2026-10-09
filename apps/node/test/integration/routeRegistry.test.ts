@@ -2,8 +2,10 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
+import type { ApiError } from '@acorn/protocol/api.ts'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { nodePlugins } from '../../src/composition/plugins'
+import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices, SecretService } from '@acorn/node-core/server/core/index.ts'
@@ -88,8 +90,8 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 // (docs/api-reference/plugin-routes.md § Plugin routes): a router that names its own top-level segment repeats it
 // under its plugin namespace, e.g. `/v1/p/memory/memory`.
 //
-// Duplicates are kept rather than deduped. Several github routers register under one path with
-// different handlers, and collapsing them would stop the list noticing nine of them disappearing.
+// Duplicates are kept rather than deduped. A route with its own middleware lists once per handler,
+// and collapsing them would stop the list noticing a gate like requireDevice disappearing.
 //
 // What's not in here, and would be a real change if it appeared: any route from a loaded package.
 // Linear's and http's routes left when those plugins did; a loaded plugin's routes reach the mount
@@ -165,6 +167,28 @@ describe('assembled routes', () => {
     // design, so this comes down as plugins ship loaded instead.
     expect(actual.length).toBeGreaterThanOrEqual(30)
     expect(actual).toEqual(readGolden<string[]>(PLUGIN_ROUTES))
+  })
+
+  // The GitHub mirror is one lazy mount (plugins/github/src/node/index.ts), so the golden above shows
+  // `ALL /v1/p/github/repos/*` and plugins/github/src/server/routes/mirrorRoutes.test.ts pins the routes
+  // behind it. These requests go through the assembled app: the auth gate, the first-use load, and a
+  // handler that reads the caller from the host's request context.
+  it('serves the GitHub mirror through its lazy mount', async () => {
+    const env = {
+      DEVICES: { authenticate: async () => ({ deviceId: 'd1' }) },
+      ACTIVE_IDENTITY: { get: () => 'james' },
+    } as unknown as Env
+    const call = (path: string, authorization?: string) =>
+      createApp().fetch(new Request(`http://127.0.0.1:4317${path}`, { headers: authorization ? { authorization } : {} }), env)
+    const conflicts = '/v1/p/github/repos/acme/web/pulls/1/conflicts?base=main'
+    expect((await call(conflicts)).status).toBe(401)
+    // No project maps acme/web here, so the conflicts route answers its own "unavailable" body.
+    expect(await (await call(conflicts, 'Bearer d')).json()).toEqual({ available: false, files: [] })
+    expect(((await (await call('/v1/p/github/repos/acme/web/pulls/x/conflicts', 'Bearer d')).json()) as ApiError).error)
+      .toMatchObject({ code: 'bad_number' })
+    // A path the mirror doesn't serve falls through to the app's 404, as it did when the routers were
+    // mounted at boot.
+    expect((await call('/v1/p/github/repos/acme/web/nothing-here', 'Bearer d')).status).toBe(404)
   })
 
   it('does not mount routes outside the current /v1 namespaces', () => {

@@ -3,7 +3,6 @@ import { homedir } from 'node:os'
 import type { NodePlugin, PluginDatabase } from '@acorn/plugin-api/node'
 import { loadWorkflowFiles } from './files'
 import { getDef, listDefs, mergedList } from './store'
-import { workflowFileAuthoring } from '../files/authoring'
 import { workflowDraftQueries } from '../publication/draftQueries'
 import { workflowPublication } from '../publication/service'
 import { publishedWorkflow } from '../publication/store'
@@ -37,7 +36,10 @@ export const workflowDefinitions = (
       { principal: { kind: 'internal', scope: 'service', userId }, signal: AbortSignal.timeout(60_000) }, remove)
   })
   const bridge: WorkflowDefsBridge = {
+    // File authoring and export load on first use: about 28 KB of the node's boot graph for an action a
+    // person starts from the editor.
     files: async request => {
+      const { workflowFileAuthoring } = await import('../files/authoring')
       const result = await workflowFileAuthoring(store, {
         catalog: runner.validationCatalog(),
         scope: async (projectId, source) => {

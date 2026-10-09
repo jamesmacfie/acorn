@@ -38,3 +38,12 @@ panel draws a blank line where it drew `Loading…`. An empty string is a legal 
 the cell host's orphan-text rule went with the terminal rewrite (`apps/tui/src/tree/renderer.ts`) —
 so this is a frame of nothing, not a refused mount.
 `packages/client-core/src/host/registries/panes/panes.test.tsx` checks the installed copy carries it.
+
+## solid-js: a failed `lazy()` import loads again
+
+Upstream `lazy()` keeps the promise from its first import. When that import rejects, the promise stays
+rejected, so an error boundary's **Try again** draws the component and throws the same error without
+fetching anything. The patch forgets a rejected import: the next time the component renders after
+its resource errored, `lazy()` starts a fresh import. A successful import is still kept for the life of
+the document. `packages/client-core/src/host/registries/panes/panes.test.tsx` checks the installed copy
+carries it.

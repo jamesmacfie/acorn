@@ -2068,7 +2068,7 @@ a.ui-row:hover { background: var(--bg-hover); }
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--pane-pad);
   overflow: auto;
   background: var(--bg-subtle);
   font-family: var(--font-mono);

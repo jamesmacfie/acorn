@@ -123,6 +123,7 @@ client: TextSetting
 client: TopbarData
 client: TopbarProps
 client: UiSlotContribution
+client: UsableState
 client: VersionedDataValue
 client: VisibleElementRect
 client: WORKSPACES_PREF_KEY
@@ -185,6 +186,7 @@ client: dispatchActiveLayout
 client: dispatchLayout
 client: effectiveModelPick
 client: elementRectKey
+client: featureUsable
 client: fileStatusMeta
 client: focusSession
 client: focusedPane
@@ -269,6 +271,7 @@ client: refResolutionsOptions
 client: refreshSessionSources
 client: registerCommands
 client: registerContextMenuItems
+client: registerKeybindings
 client: registerNoticeTargetHandler
 client: registerWsBinaryHandler
 client: registerWsChannel
@@ -299,6 +302,7 @@ client: setManagedAgentReferenceHandler
 client: setRecipeBrowserUrl
 client: setSelectedSource
 client: setTerminalOpen
+client: slotFills
 client: sourceRegistry
 client: splitRefTokens
 client: storageKeyFor
@@ -413,6 +417,7 @@ node: HookVerdict
 node: InternalEnvFactory
 node: Launcher
 node: LayoutRecipe
+node: LazyRouteLoadError
 node: Logger
 node: MISSING
 node: ManifestCustomAgent
@@ -549,6 +554,8 @@ node: isRecord
 node: isRepoConfigTrustError
 node: isTaskConfined
 node: launcherSpec
+node: lazyFetch
+node: lazyRouter
 node: lineDelimitedJsonAdapter
 node: listProfileDefs
 node: listProfiles
@@ -787,11 +794,9 @@ ui/host: SlotProps
 ui/host: Wizard
 ui/host: annotationsFor
 ui/host: confirmAction
-ui/host: registerKeybindings
 ui/host: registerWillHandler
 ui/host: requestAnnotations
 ui/host: selectPaneTab
-ui/host: slotFills
 ui/model-provider-failure: modelProviderFailure
 ui/sdk: AcornBridge
 ui/sdk: AcornBridgeError

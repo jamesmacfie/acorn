@@ -92,12 +92,28 @@ The accounts meet at `[helper:boot] service.start`, where the Node reports that 
 span from `ready line` to `service.start` is the Node's share of the launch. `node selected` is the
 fleet selection, which happens before the Node is up. `nodeReady` is the local Node's first status
 reaching the renderer, which is when the shell mounts and sends its first reads.
-[Frontend](../frontend/data-and-startup.md) § Startup readiness describes the loader.
+[Frontend](../frontend/data-and-startup.md) § Startup readiness describes the startup screen.
 
 `[renderer:boot] first paint` doesn't print from a background window. It's a `requestAnimationFrame`
 callback, and macOS pauses those while the window is hidden. Bring the window to the front before you
 reload, or read `tree built` instead. That line prints when `render` returns, wherever the window is,
 and it marks the end of the renderer's own work.
+
+### Read the startup milestones
+
+The renderer also marks four milestones on the performance timeline, whatever the switches say:
+`acorn:startup:first_frame`, `acorn:startup:shell`, `acorn:startup:restored`, and
+`acorn:startup:usable`. The gap from `first_frame` to `shell` is the time the startup screen was up.
+Its messages follow the stages in [data and startup](../frontend/data-and-startup.md#startup-stages),
+so a slow stage shows on screen as well as in the gap.
+[Renderer telemetry](../telemetry/renderer.md#startup-milestones) defines them. Read them with
+`performance.getEntriesByType('mark')` in devtools, or through the WebDriver client of a
+`pnpm dev:agent` session, as `apps/desktop/scripts/agent/webdriver.mjs` does for measures.
+
+A `pnpm dev:agent` window reports `document.visibilityState` as `hidden`, so its numbers are
+background-priority launches. Compare them with each other, never with a visible launch. In a hidden
+window WebKit still reports `first-contentful-paint` on a cold launch, but after a reload it can land
+later than `usable`.
 
 ## Timing a task switch
 
@@ -123,3 +139,56 @@ Keep the window visible for the whole run. WebKit runs no animation frames for a
 another window or on a locked screen. `nav.change` never ends there, virtualized lists such as the
 diff rows never draw, and timers slow to about one a second. Synchronous work and request counts
 still measure correctly in a hidden window.
+
+## Measuring shipped bytes
+
+`pnpm --filter @acorn/desktop build` ends with `apps/desktop/scripts/size-report.mjs`, which prints
+one line per number and writes `dist/helper/size-report.json` in the desktop package. Run it alone with
+`pnpm --filter @acorn/desktop size-report` after any build. `--out <file>` writes elsewhere, and
+`--bundle <dir>` points it at a Tauri bundle folder for the compressed release files. The packaging
+script, `apps/desktop/scripts/dist.mjs`, writes `dist/release-size-report.json` that way.
+
+The report keeps four questions apart:
+
+- `startup` is what each runtime loads before it can draw or answer: the renderer's startup closure,
+  its `registration` closure after the first frame, the Node service's static graph, and the terminal
+  client's graph. Each comes from the build's own graph file.
+- `components` is installed bytes per app-owned folder, with JavaScript counted apart. The runtime
+  dependencies under `helper/node_modules` are their own component, not part of the service.
+- `releaseArtifacts` is the compressed installers, present only after packaging.
+- `missing` names every component or graph the build didn't produce. A missing number is never zero.
+
+Each file counts once, by device and inode. Symlinks aren't followed, and one that leaves its
+component is listed under `excluded`. Source maps and the report files are excluded by name. A graph
+file that names a chunk the build doesn't have, misses one it does, or records a size a file no longer
+has fails the report as stale. Rebuild that runtime and run it again. The size report, the service
+budget, and the standalone manifest check read graph files through one reader, `scripts/chunkGraph.mts`.
+
+Startup bytes and startup time are separate measurements. On October 9, 2026, minification halved the
+Node service's static graph, and the service's time to listen didn't change measurably
+([production minification evidence](../testing/production-minification-2026-10-09.md)). Time a cold
+start before you claim a byte cut made one faster.
+
+To find what to move off the Node's boot path, run `pnpm --filter @acorn/node measure:service-graph`.
+It lists the largest packages, folders, and modules in the static graph. Add `--why <path fragment>`
+to print the import chain that keeps one module there. A module with one chain from a plugin's `init`
+is a candidate for [loading on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use).
+After a cut, request the route once and time the first and second answers. The first one pays the
+import.
+
+## Query startup and bytes in Sentry
+
+The milestones are transactions named after the span. In **Explore → Traces**, filter on
+`span.op:renderer.startup.usable visibility:visible` and chart `p50(span.duration)`,
+`p75(span.duration)`, and `p95(span.duration)`, grouped by `release`. Add `proxy:false` to leave out
+launches that landed on a mount-proxy feature, and `outcome:usable` to leave out launches that
+stopped on a failure or offline screen. Chart `span.op:renderer.startup.shell` the same way for the
+time the startup screen held the window. In **Issues**, search `seam:renderer.startup` grouped by
+`startup.step` for the launches that failed. Use `span.op:ui.feature.open first:true` grouped by
+`feature.id` for first openings, and `first:false` for repeated ones.
+
+Byte gauges are trace metrics. In **Explore → Metrics**, chart `max(app.bundle.bytes)` filtered on
+`method:walk`, grouped by `component` and `release`, for installed bytes. Use
+`app.startup.bytes` grouped by `startup.runtime` and `phase` for startup graphs. Filter on
+`installation:packaged` to leave out development builds.
+
