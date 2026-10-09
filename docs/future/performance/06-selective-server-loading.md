@@ -1,10 +1,38 @@
 # Phase 06: Load substantial server handlers on first use
 
-Date: October 9, 2026. Status: planned. Depends on: phases 01 and 03.
+Date: October 9, 2026. Status: implemented October 9, 2026. Depends on: phases 01 and 03.
 Source baseline: `989b069c389df6143b90ffb9889dfeaae5db6010`.
 
 Implement promise-cached lazy route handlers and remove measured optional operations from the Node
 startup graph. Preserve migrations, recovery, route authorization, and required registrations.
+
+## Outcome
+
+The Node service's static graph dropped from 1,824,878 B to 1,702,960 B of minified JavaScript, and
+the ceiling went from 1,827,000 B to 1,705,000 B. The GitHub mirror accounts for 37,374 B of that.
+The [evidence](../../testing/selective-server-loading-2026-10-09.md) has the method, the cuts made and
+refused, and the real-app checks. The owning reference is
+[load a route on first use](../../plugin-authoring/the-node-half.md#load-a-route-on-first-use).
+
+Decisions made during implementation:
+
+- The plan's fetch carrier can't serve the GitHub mirror. Its routers read `ownerId(c)`, `c.env.BLOBS`,
+  and stored credentials off the host's request context, and `ctx.routes.fetch` hands a handler only
+  a plugin request context. `lazyRouter` keeps the mount under `ctx.routes.register` and runs the
+  loaded router with the host's variables, bindings, error handler, and fall-through.
+- Both helpers live in `packages/node-core/src/server/pluginHost/lazyRoutes.ts`. The plugin API
+  facade re-exports them, because the boundary test keeps implementation out of the facade.
+- The mirror's thirteen routers build in one module, `plugins/github/src/server/routes/mirrorRoutes.ts`,
+  in their former order. A test pins that order, because the Node's route golden now lists one
+  `ALL /v1/p/github/repos/*` mount.
+- Step 5 cut three more paths: the preview tunnel's static `ws` import, workflow file authoring and
+  export, and the Claude and Codex usage probes. It refused dashboard planning and the plugin
+  installer, which boot code still calls, and left `pg` and `jose` static.
+- The lazily built handlers and routers hold in-memory maps and closures over handles `init` opened,
+  and no connections, timers, or subscriptions. Each plugin instance builds its own, so a reload
+  starts fresh and disposal needs no new owner.
+- Time to listen wasn't measured beyond one boot of each build. The PR screens weren't driven,
+  because a `dev:agent` session has no GitHub sign-in.
 
 ## Starting point and owners
 

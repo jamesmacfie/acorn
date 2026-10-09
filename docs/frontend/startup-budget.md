@@ -54,9 +54,12 @@ components and diff code into the closure.
 ### The node service
 
 `apps/node/scripts/check-service-budget.mjs` runs from `@acorn/node`'s `build`. It counts
-`service.js` and every chunk it reaches through static imports, against a ceiling of 1,827,000 B. The
-ceiling is about 2 KB above the minified measurement of 1,824,878 B on October 9, 2026, on macOS arm64.
-Under 1,000,000 B, the walk has stopped following imports, and the check fails.
+`service.js` and every chunk it reaches through static imports, against a ceiling of 1,705,000 B. The
+ceiling is about 2 KB above the minified measurement of 1,702,960 B on October 9, 2026, on macOS arm64,
+after the GitHub mirror routes, the tunnel's `ws` server, workflow file authoring, and the usage probes
+moved to first use ([evidence](../testing/selective-server-loading-2026-10-09.md)). Under 1,000,000 B,
+the walk has stopped following imports, and the check fails. To cut the graph, see
+[load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use).
 
 The build minifies with Oxc and keeps function and class names, so the ceiling is in minified bytes.
 Earlier ceilings in the script's history were unminified. The check never reads the chunk text. The

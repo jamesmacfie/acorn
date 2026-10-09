@@ -1,10 +1,19 @@
 # Load plugin code on first use
 
-Date: October 6, 2026. Status: proposal. Nothing in it is built.
+Date: October 6, 2026. Status: implemented October 9, 2026 by
+[Performance phase 06](./performance/06-selective-server-loading.md). No work remains on this page.
 
-Implementation belongs to [Performance phase 06](./performance/06-selective-server-loading.md),
-planned October 9, 2026. That phase owns prerequisites, verification, and completion. This page
-retains the helper design and its dated measurements.
+The helpers and the rules for using them are in
+[load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use). This page
+keeps the original design and its dated measurements. The build differs from it in three ways:
+
+- `lazyFetch` lives in `packages/node-core/src/server/pluginHost/lazyRoutes.ts`, and
+  `@acorn/plugin-api/node` re-exports it, because the facade holds no implementation.
+- The GitHub mirror uses `lazyRouter`, not `lazyFetch`. Its routers read the caller and the Node's
+  bindings off the host's request context, which the fetch carrier doesn't pass. `lazyRouter` runs the
+  loaded router with that context and keeps it under `ctx.routes.register`.
+- A failed load answers with a `LazyRouteLoadError`, so the Node's log tells it apart from a handler
+  that threw.
 
 This page proposes an opt-in helper that lets a plugin load a route's code on its first request
 instead of at node boot. Read it before you add a heavy route to a compiled plugin, or before you

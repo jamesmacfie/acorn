@@ -150,6 +150,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/runtime-packaging-2026-10-09.md](./testing/runtime-packaging-2026-10-09.md) | Dated bytes removed from desktop staging and a standalone install by performance phase 02. |
 | [testing/production-minification-2026-10-09.md](./testing/production-minification-2026-10-09.md) | Dated startup graph bytes, installed bytes, and boot timings from minifying the Node service and loaded plugins in performance phase 03. |
 | [testing/selective-renderer-loading-2026-10-09.md](./testing/selective-renderer-loading-2026-10-09.md) | Dated renderer and terminal startup graph bytes, roster bytes, and real-app checks from loading renderer implementations on first use in performance phase 05. |
+| [testing/selective-server-loading-2026-10-09.md](./testing/selective-server-loading-2026-10-09.md) | Dated Node startup graph bytes, the cuts chosen and refused, and real-app route checks from loading server routes and operations on first use in performance phase 06. |
 | [telemetry.md](./telemetry.md) | The map of telemetry: the record kinds, the switch, and which page owns each seam. |
 | [telemetry/model.md](./telemetry/model.md) | The switch, the five kinds, span admission, attributes, privacy, and traces. |
 | [telemetry/plugins-and-sinks.md](./telemetry/plugins-and-sinks.md) | Writing telemetry from a plugin or frame, writing a sink, and the Sentry sink. |
@@ -311,8 +312,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   conditions, bounded continuations, run inspection, and budgets on workflow agent steps.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
-- [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's
-  code on first use, to keep heavy, rarely used routes out of the node's boot graph.
+- [Lazy plugin routes](./future/lazy-plugin-code.md): the original design for loading a plugin
+  route's code on first use, implemented by performance phase 06.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 

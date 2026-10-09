@@ -415,6 +415,7 @@ node: HookVerdict
 node: InternalEnvFactory
 node: Launcher
 node: LayoutRecipe
+node: LazyRouteLoadError
 node: Logger
 node: MISSING
 node: ManifestCustomAgent
@@ -547,6 +548,8 @@ node: isRecord
 node: isRepoConfigTrustError
 node: isTaskConfined
 node: launcherSpec
+node: lazyFetch
+node: lazyRouter
 node: lineDelimitedJsonAdapter
 node: listProfileDefs
 node: listProfiles

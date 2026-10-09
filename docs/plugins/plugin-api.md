@@ -17,7 +17,7 @@ The facade has 14 entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
-| `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser`, `respondError`, `portableCarrier`), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef` and `TaskRef` projections, `capabilityId`, and provider and integration contracts |
+| `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser`, `respondError`, `portableCarrier`, and the first-use loaders `lazyFetch` and `lazyRouter` from [Load a route on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use)), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef` and `TaskRef` projections, `capabilityId`, and provider and integration contracts |
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, registration seams such as `registerCommands`, `registerKeybindings`, and `slotFills`, task, workspace, and fleet state, the design system's plain functions, and `readLocal`, `writeLocal`, and `clearLocal` for per-device scraps such as an unsent draft |
 | `@acorn/plugin-api/ui` | Frame-safe presentation components from the kit, the diff rows, `DiffPane`, `attachPty`, and `createTimelineWindow` |
 | `@acorn/plugin-api/ui/diff` | The diff row model, highlighter, find marks, the `DiffSource` port, the diff-document types, and `createDiffSnippets` ([the diff document](../diff-rendering/document.md)) |

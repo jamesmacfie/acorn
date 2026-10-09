@@ -25,8 +25,6 @@ import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
 import { contributedCustomAgent, customAgentRegistry, deleteCustomAgent, readCustomAgents, saveCustomAgent } from '../server/customAgents'
-import { collectClaudeUsage } from '../server/usage/claudeUsage'
-import { collectCodexUsage } from '../server/usage/codexUsage'
 import { createAgentUsageService } from '../server/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
@@ -69,6 +67,8 @@ function registerBuiltInDrivers(): void {
 // The two built-in plan-usage probes, one per built-in harness. They register beside the drivers rather
 // than inside the usage service, because a plugin-contributed harness feeds the same registry
 // (../server/usage/collectors.ts). `probeDir` is only known at init, so it arrives as a parameter.
+// Each probe's module loads on its first collection: about 27 KB of the node's boot graph for a read
+// that spawns the provider's CLI and takes seconds anyway.
 let builtInCollectorDisposables: (() => void)[] | null = null
 function registerBuiltInUsageCollectors(probeDir: string): void {
   if (builtInCollectorDisposables) return
@@ -77,13 +77,13 @@ function registerBuiltInUsageCollectors(probeDir: string): void {
       provider: claudeHarness.id,
       label: claudeHarness.label,
       ...(claudeHarness.glyph ? { glyph: claudeHarness.glyph } : {}),
-      collect: (pricing) => collectClaudeUsage({ probeDir, pricing }),
+      collect: async (pricing) => (await import('../server/usage/claudeUsage')).collectClaudeUsage({ probeDir, pricing }),
     }),
     agentUsageCollectors.register({
       provider: 'codex',
       label: 'Codex',
       glyph: 'brand:agents/codex',
-      collect: () => collectCodexUsage({ cwd: probeDir }),
+      collect: async () => (await import('../server/usage/codexUsage')).collectCodexUsage({ cwd: probeDir }),
     }),
   ]
 }

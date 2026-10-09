@@ -71,7 +71,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // unminified. The same graph went from 3,193,213 B to 1,824,878 B on macOS arm64; keeping names costs
 // about 122 KB of that. The new ceiling keeps about 2 KB of minified margin. A floor of 1 MB still
 // catches a walk that stops at service.js.
-const limits = { ceiling: 1_827_000, floor: 1_000_000 }
+// 2026-10-09: 1,824,878 -> 1,702,960 B (minified) after performance phase 06 moved four optional paths
+// to first use: the GitHub mirror routers (about 37 KB), the tunnel's `ws` server, the workflow file
+// authoring and export module, and the Claude and Codex usage probes. The ceiling keeps about 2 KB of
+// margin, so any one of those imports returning fails the build.
+const limits = { ceiling: 1_705_000, floor: 1_000_000 }
 
 const graph = readChunkGraph(dist)
 const files = staticClosure(graph)
@@ -85,7 +89,9 @@ if (bytes > limits.ceiling) {
   throw new Error(
     `The node service's static graph is ${bytes}B, over the ${limits.ceiling}B ceiling. Find what grew before raising it: `
     + 'run pnpm --filter @acorn/node measure:service-graph [--why <path fragment>]. '
-    + 'Anything a boot does not need belongs behind a dynamic import in the plugin that owns it.',
+    + 'Anything a boot does not need belongs behind a dynamic import in the plugin that owns it: '
+    + 'lazyRouter or lazyFetch for a route, or an `await import()` inside the operation '
+    + '(docs/plugin-authoring/the-node-half.md § Load a route on first use).',
   )
 }
 if (bytes < limits.floor) {

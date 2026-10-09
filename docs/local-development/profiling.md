@@ -169,6 +169,13 @@ Node service's static graph, and the service's time to listen didn't change meas
 ([production minification evidence](../testing/production-minification-2026-10-09.md)). Time a cold
 start before you claim a byte cut made one faster.
 
+To find what to move off the Node's boot path, run `pnpm --filter @acorn/node measure:service-graph`.
+It lists the largest packages, folders, and modules in the static graph. Add `--why <path fragment>`
+to print the import chain that keeps one module there. A module with one chain from a plugin's `init`
+is a candidate for [loading on first use](../plugin-authoring/the-node-half.md#load-a-route-on-first-use).
+After a cut, request the route once and time the first and second answers. The first one pays the
+import.
+
 ## Query startup and bytes in Sentry
 
 The milestones are transactions named after the span. In **Explore → Traces**, filter on
