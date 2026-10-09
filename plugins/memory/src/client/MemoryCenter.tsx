@@ -1,7 +1,7 @@
 import { createQuery } from '@tanstack/solid-query'
 import { useParams } from '@solidjs/router'
 import { createEffect, createMemo, createSignal, Match, onCleanup, Show, Switch } from 'solid-js'
-import { Button, EmptyState, Heading, Icon, Input, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Button, EmptyState, Heading, Icon, Input, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text, FilterBar } from '@acorn/plugin-api/ui'
 import { formatRelativeTime, onPluginFrame, tasksOptions, type Task } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { memoryApi } from './memoryClient'
@@ -69,9 +69,9 @@ function ProjectMemoryList(props: { projectId: string }) {
       Memories
     </SectionHeader>
     <Show when={!collapsed()}>
-      <Toolbar size="sm" ariaLabel="Filter memories">
+      <FilterBar ariaLabel="Filter memories">
         <Input kind="filter" label="Filter memories" placeholder="Filter memories…" title="Matches names, descriptions, and bodies." value={filter()} onInput={setFilter} />
-      </Toolbar>
+      </FilterBar>
     </Show>
     <Switch>
       <Match when={!loaded()}><EmptyState busy align="start" size="sm">Loading…</EmptyState></Match>

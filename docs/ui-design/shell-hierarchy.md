@@ -83,8 +83,9 @@ See [workspace icons](../workspaces-and-tasks/workspace-icons.md).
 
 `--pane-head-h` is the height of every bar that's a pane's chrome: a plain `Toolbar`, a pane-level
 `SectionHeader`, and `.diff-toolbar`. Chrome means the bar at the top of a pane, or the header of a
-list or detail column. `Toolbar size="sm"` is for a strip inside the content, such as a filter row,
-a find bar, or a status line. Tab strips are the exception at `--tab-h`, so a strip under a pane
+list or detail column. `FilterBar` owns the inset around sidebar search and filter controls.
+`Toolbar size="sm"` is for a strip inside the content, such as a find bar
+or a status line. Tab strips are the exception at `--tab-h`, so a strip under a pane
 header reads as subordinate. When a `Tabs` or `DocumentTabs` strip is itself the header,
 `level="pane"` gives it `--pane-head-h`. Both heights include the bottom divider. The editor's file
 navigation and document strip, the host's `tabs` layout, and the terminal drawer use the pane level.

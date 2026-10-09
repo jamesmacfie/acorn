@@ -1,5 +1,6 @@
 export { ChipRow } from './ChipRow.tsx'
 export { DocumentTabs } from './DocumentTabs.tsx'
+export { FilterBar, type FilterBarProps } from './FilterBar.tsx'
 export { Fold } from './Fold.tsx'
 export { Grid } from './Grid.tsx'
 export { Inline } from './Inline.tsx'

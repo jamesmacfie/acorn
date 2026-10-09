@@ -2,7 +2,7 @@
 import { createSignal, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens'
-import type { SectionProps } from '@acorn/client-core/kit/components/layout'
+import type { FilterBarProps, SectionProps } from '@acorn/client-core/kit/components/layout'
 import { isCompact, slotColor } from '../../appearance'
 import { Line, slot } from '../cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from '../roles'
@@ -172,6 +172,13 @@ type ToolbarProps = { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel
 export function Toolbar(props: ToolbarProps) {
   return <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>
     {props.variant === 'status' ? <>{props.primary}{props.essential}{props.actions}{props.secondary}</> : props.children}
+  </box>
+}
+
+export function FilterBar(props: FilterBarProps) {
+  return <box flexDirection="row" flexWrap="wrap" flexShrink={0} minWidth={0}
+    paddingLeft={spaceCells('inline')} paddingRight={spaceCells('inline')} columnGap={spaceCells('inline')}>
+    {props.children}
   </box>
 }
 

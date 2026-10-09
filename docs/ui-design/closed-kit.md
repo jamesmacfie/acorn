@@ -55,6 +55,24 @@ Compiled controls can compose nodes without joining the remote vocabulary. `Mode
 row. The terminal `IconPicker` draws an editable icon name and a reset button, without previews or
 random selection.
 
+### Sidebar filters
+
+Use `FilterBar` for a sidebar search or filter row. It owns the padding, control gap, background, and
+bottom divider. Put an `Input`, `Select`, or `Picker` inside it, followed by any filter actions.
+Each control keeps its label, value, and handlers. The bar groups the controls without adding a tab
+stop or owning the search state.
+
+```tsx
+<FilterBar ariaLabel="Search history">
+  <Input kind="filter" label="Search history" value={query()} onInput={setQuery} />
+  <IconButton icon="list-filter" label="Search options" onPress={openOptions} />
+</FilterBar>
+```
+
+For loaded plugins, import it from `@acorn/plugin-api/ui/tree` or `acorn-plugin-sdk/remote`, and use
+`onChange` for the input's committed value. In the terminal, the controls have an inline inset and
+wrap when they do not fit. Use `Toolbar` for action strips and `FindBar` for match navigation.
+
 ### Special nodes
 
 **`Graph` is a picture and a list.** It draws cards on a grid with curved edges. The workflows editor

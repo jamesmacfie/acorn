@@ -1,7 +1,7 @@
 import { createMemo, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeNodeId, openActionPicker, prefsOptions, PrefKeys, requestTaskLaunch } from '@acorn/plugin-api/client'
-import { Alert, Button, EmptyState, HistoryMark, IconButton, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, Toolbar, historyLayout } from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, HistoryMark, IconButton, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, FilterBar, historyLayout } from '@acorn/plugin-api/ui'
 import type { HistoryModel } from './historyModel'
 import { commitActionRequest, launchWorkflowAtCommit, sameGitActionScope } from './launchWorkflow'
 
@@ -31,11 +31,11 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
   const items = createMemo(() => commits().map((commit) => ({ key: commit.id, label: `${commit.subject} ${commit.id}` })))
   return <Stack gap="none">
     <SectionHeader count={commits().length} actions={<IconButton icon="refresh-cw" label="Refresh history" spin={props.model.first.isFetching} onPress={props.onRefresh ?? props.model.refresh} />}>History</SectionHeader>
-    <Toolbar size="sm" ariaLabel="History ref">
+    <FilterBar ariaLabel="History ref">
       <Select size="sm" label="Ref" value={props.model.ref() ?? ''} options={[{ value: '', label: 'All refs and HEAD' }, ...(props.model.first.data?.refs ?? []).map((ref) => ({ value: ref, label: ref }))]}
         onChange={(value) => props.model.setRef(value || null)} />
-    </Toolbar>
-    <Toolbar size="sm" ariaLabel="Search history">
+    </FilterBar>
+    <FilterBar ariaLabel="Search history">
       <Input kind="filter" label="Search history" type="search" value={props.model.query()} maxLength={128} onInput={props.model.setQuery}
         placeholder={searchFields.find((field) => field.value === props.model.field())!.placeholder} />
       <Menu ariaLabel="Search in" placement="bottom-end" trigger={({ open, toggle }) =>
@@ -45,7 +45,7 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
           <Menu.Item context={menu} kind="radio" checked={props.model.field() === field.value} onSelect={() => props.model.setField(field.value)}>{field.label}</Menu.Item>
         }</For></>}
       </Menu>
-    </Toolbar>
+    </FilterBar>
     <Show when={props.onChanges}><Button variant="ghost" onPress={props.onChanges}>Working changes in Changes</Button></Show>
     <Show when={props.model.first.isLoading}><EmptyState title="Loading history" /></Show>
     <Show when={props.model.first.error}><Alert tone="warn">{String(props.model.first.error)}{props.model.first.data ? ' Showing the last available page.' : ''}</Alert></Show>

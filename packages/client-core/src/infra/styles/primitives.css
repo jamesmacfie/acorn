@@ -655,11 +655,20 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    had drifted to this rung, which is why the browser preview's address bar was half the height of
    the agents header one pane over. Chrome is 48, a strip inside it is 26. */
 .ui-toolbar[data-size='sm'] { min-height: var(--control-h-sm); gap: var(--space-3); padding: 0 var(--space-4); }
-/* A filter strip is an input, not a row of buttons, and an input flush against the divider above
-   and the first row below reads as part of the list. Only the filter strip gets the inset, so the
-   button strips keep their height. A find bar is a filter strip too, with its field one level down
-   inside `.ui-findbar-search`. */
-.ui-toolbar[data-size='sm']:has(> .ui-input[data-kind='filter'], > .ui-findbar-search) { padding-block: var(--space-3); }
+/* Sidebar filters own their inset regardless of whether the control is an input or a dropdown. */
+.ui-filterbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--pane-pad);
+  font-size: var(--fs-sm);
+  background: var(--bg-subtle);
+  border-bottom: var(--chrome-divider);
+}
+/* In-content find keeps its match navigation and keyboard contract. */
+.ui-toolbar[data-size='sm']:has(> .ui-findbar-search) { padding-block: var(--space-3); }
 /* A bar that ends a region which fills its pane is that region's footer, so its rule goes on top, where
    it meets the content, and not under it against the pane's edge. The workflow editor's problem bar is
    the one case. */

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { activeNodeId, queryOwner, debounce } from '@acorn/plugin-api/client'
-import { Alert, CopyButton, EmptyState, IconButton, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, CopyButton, EmptyState, IconButton, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, FilterBar, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import { taskSearchState, updateTaskSearchState } from './searchState'
@@ -143,7 +143,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
       {/* Stacked, not a row: the sidebar is narrow, and an input sharing it with three toggles
           leaves about a hundred pixels to type a query into. Two sm strips, so both sit on the pane's
           inset. The option buttons share one row; the result count sits below it. */}
-      <Toolbar size="sm" ariaLabel="Search">
+      <FilterBar ariaLabel="Search">
         <Input
           ref={input}
           autofocus={props.active}
@@ -155,7 +155,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
           assist={false}
           onInput={(value) => onInput(value)}
         />
-      </Toolbar>
+      </FilterBar>
       <Toolbar size="sm" ariaLabel="Search options">
         <IconButton icon="case-sensitive" label="Match case" pressed={!!state().opts.caseSensitive}
           onPress={() => setOption('caseSensitive', !state().opts.caseSensitive)} />

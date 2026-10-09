@@ -861,6 +861,7 @@ ui/tree: Facts
 ui/tree: Fallback
 ui/tree: Field
 ui/tree: FileHead
+ui/tree: FilterBar
 ui/tree: FindBar
 ui/tree: Fold
 ui/tree: Grid
@@ -959,6 +960,7 @@ ui: Facts
 ui: Fallback
 ui: Field
 ui: FileHead
+ui: FilterBar
 ui: FindBar
 ui: Fold
 ui: Graph

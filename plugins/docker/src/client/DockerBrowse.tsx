@@ -15,7 +15,7 @@ import ContainerDetail from './ContainerDetail'
 import { CONTAINER_POINT } from './extensionPoints'
 import {
   Alert, Badge, Button, ConfirmButton, EmptyState, IconButton, Inline, Input, ListDetail, Row, Rows, Section,
-  SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar, TreeRow,
+  SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, FilterBar, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import { shortStatus } from './shortStatus'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
@@ -350,9 +350,9 @@ export default function DockerBrowse() {
 
         <TabPanel id="containers" active={section()} idPrefix="docker-section"
           scrollOffset={dockerBrowseOffset('containers')} onChange={(offset) => rememberDockerBrowseOffset('containers', offset)}>
-          <Toolbar size="sm" ariaLabel="Filter containers">
+          <FilterBar ariaLabel="Filter containers">
             <Input kind="filter" label="Filter containers" placeholder="Filter name / image / project" value={filter()} onInput={(value) => setFilter(value)} />
-          </Toolbar>
+          </FilterBar>
           <Show when={staleProjects().length}>
             <Alert
               tone="warn"

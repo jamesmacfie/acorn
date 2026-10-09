@@ -9,7 +9,7 @@ import {
 } from '@acorn/plugin-api/client'
 import {
   Alert, Button, EmptyState, Icon, Inline, Input, Menu, Row, RowActions, Rows, sidebarCollapsed,
-  StatusDot, Tabs, Text, Toolbar, UserAvatar,
+  StatusDot, Tabs, Text, FilterBar, UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { debounce } from '@acorn/plugin-api/client'
 import {
@@ -284,9 +284,9 @@ export default function PullList() {
         {/* Under the strip rather than beside it. Open and Closed choose which list this is; the filter
             is about the list that choice produced, and squeezed into the tab row it had no room and no
             inset of its own. */}
-        <Toolbar size="sm" ariaLabel="Search pull requests">
-          <Input kind="filter" placeholder="Search…" value={filter()} onInput={setFilter} />
-        </Toolbar>
+        <FilterBar ariaLabel="Search pull requests">
+          <Input kind="filter" label="Search pull requests" placeholder="Search…" value={filter()} onInput={setFilter} />
+        </FilterBar>
         <Show when={shown().length ? searchNotice() : undefined}>
           {(notice) => <EmptyState align="start" size="sm" busy={searchStatus() === 'searching'}>{notice()}</EmptyState>}
         </Show>

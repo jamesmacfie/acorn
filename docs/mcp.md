@@ -114,7 +114,7 @@ development build goes stale after a reinstall, and a restored tmux session neve
 isolated `dev:agent` or `dev:tui:agent` session sets `ACORN_SKIP_MCP_REGISTRATION=1` and skips both, so
 a throwaway checkout never takes over the person's `acorn-dev` entry.
 
-The **Config files** tab of **Settings → MCP** lists the servers each CLI loads from its own config files, with secret
+The **Config files** section of **Settings → MCP** lists the servers each CLI loads from its own config files, with secret
 values masked, and never starts one. It reads one project, picked on the page, starting on the open
 task's project: `.mcp.json` and `.cursor/mcp.json` in the project's folder, and `~/.claude.json`
 (`GET /v1/core/projects/:id/mcp`). **Create .mcp.json** writes an empty file into the project's folder
@@ -133,9 +133,9 @@ contract for global or harness-owned servers. The diagnostic calls those unknown
 the managed list as complete. This check does not replace the explicit **Test** action below. It also
 reads stored package, consent, and review facts without installing, probing, or opening credentials.
 
-The **Servers** tab of Settings → MCP holds the servers acorn declares to agent sessions: a list, then
+The **Servers** section of Settings → MCP holds the servers acorn declares to agent sessions: a list, then
 one server's editor with **Save**, **Cancel**, and **Remove server**. The agents plugin owns the page
-and draws core's config file list as its second tab. The old `mcp` page id is an alias for that tab.
+and draws core's config file list below it. The old `mcp` page id is an alias for the Config files section.
 The agents plugin owns these servers, one row per server in
 its database (`plugins/agents/src/server/mcpServerStore.ts`). A server is a command with arguments and
 an environment, or a URL with headers. A value marked secret is sealed by the Node's secret service,
