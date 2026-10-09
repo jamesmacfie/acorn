@@ -4,7 +4,7 @@ import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:f
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { checkedMcpPublication, exactMcpPackage, McpPackageInstaller, mcpTreeDigest, trustedNpmCli, type McpPackagePlan } from './mcpPackageInstall'
+import { checkedMcpPublication, exactMcpPackage, McpPackageInstaller, mcpFileDigest, mcpTreeDigest, trustedNpmCli, type McpPackagePlan } from './mcpPackageInstall'
 
 const roots: string[] = []
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
@@ -165,5 +165,25 @@ describe('exact managed MCP packages', () => {
     await writeFile(join(plan.stagingPath, 'node_modules', '@fixture', 'server', 'package.json'), JSON.stringify({ name: '@fixture/server', version: '1.0.0', bin: { mcp: '../../../../outside.mjs' } }))
     plan.treeDigest = await mcpTreeDigest(plan.stagingPath)
     await expect(installer.activate(plan, 'mcp', new AbortController().signal)).rejects.toThrow('escapes')
+  })
+
+  it('rejects a substituted FIFO before reading the staged lock or executable', async () => {
+    const { installer, plan, entry } = await staged()
+    const lock = join(plan.stagingPath, 'package-lock.json')
+    await rm(lock)
+    expect(spawnSync('mkfifo', [lock]).status).toBe(0)
+    await expect(installer.preview(plan, 'mcp')).rejects.toThrow('bounded regular file')
+    await rm(entry)
+    expect(spawnSync('mkfifo', [entry]).status).toBe(0)
+    await expect(mcpFileDigest(entry, 1024)).rejects.toThrow('bounded regular file')
+    await expect(mcpTreeDigest(plan.stagingPath)).rejects.toThrow('special file')
+  })
+
+  it('stops an already-aborted read and preview before opening staged files', async () => {
+    const { installer, plan, entry } = await staged()
+    const controller = new AbortController()
+    controller.abort(new Error('cancelled before read'))
+    await expect(mcpFileDigest(entry, 1024, controller.signal)).rejects.toThrow('cancelled before read')
+    await expect(installer.preview(plan, 'mcp', controller.signal)).rejects.toThrow('cancelled before read')
   })
 })

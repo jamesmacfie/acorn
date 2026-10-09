@@ -35,6 +35,7 @@ export class McpReviewProxy {
   readonly #pending = new Map<string | number, { resolve: (message: Rpc) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>()
   readonly #forwarded = new Map<string | number, { timer: NodeJS.Timeout; method: string }>()
   readonly #serverRequests = new Map<string | number, NodeJS.Timeout>()
+  readonly #gated = new Map<string | number, { cancelled: boolean }>()
   #startPromise: Promise<void> | null = null
   #closed = false
   #quarantined = true
@@ -42,7 +43,6 @@ export class McpReviewProxy {
   #lastDigest: string | null = null
   #busyCatalogue: { generation: number; promise: Promise<McpCatalogue> } | null = null
   #generation = 0
-  #gatedRequests = 0
   readonly name: string
   readonly sessionId: string
   readonly revision: string
@@ -106,12 +106,22 @@ export class McpReviewProxy {
 
   async #fromHarness(message: Rpc): Promise<void> {
     const gated = message.id !== undefined && (message.method === 'tools/list' || message.method === 'tools/call')
-    if (gated && ++this.#gatedRequests > MAX_REQUESTS) {
-      this.#gatedRequests--
-      await this.#replyError(message.id!, 'Too many outstanding MCP review requests.').catch(() => undefined)
-      return
+    const gate = gated ? { cancelled: false } : null
+    if (gate) {
+      if (this.#gated.has(message.id!)) { await this.#replyError(message.id!, 'Duplicate MCP request id.').catch(() => undefined); return }
+      if (this.#gated.size >= MAX_REQUESTS) { await this.#replyError(message.id!, 'Too many outstanding MCP review requests.').catch(() => undefined); return }
+      this.#gated.set(message.id!, gate)
     }
     try {
+      if (message.method === 'notifications/cancelled') {
+        const requestId = message.params?.requestId
+        if (typeof requestId === 'string' || typeof requestId === 'number') {
+          const waiting = this.#gated.get(requestId)
+          if (waiting) { waiting.cancelled = true; return }
+          const forwarded = this.#forwarded.get(requestId)
+          if (forwarded) { clearTimeout(forwarded.timer); this.#forwarded.delete(requestId) }
+        }
+      }
       await this.#start()
       if (message.id !== undefined && !message.method) {
         const timer = this.#serverRequests.get(message.id)
@@ -125,6 +135,7 @@ export class McpReviewProxy {
         const catalogue = await this.catalogue()
         const generation = this.#generation
         const approved = await this.#ports.approved()
+        if (gate?.cancelled) return
         const admitted = generation === this.#generation && !this.#quarantined && approved?.revision === this.revision && approved.version === catalogue.version && approved.digest === catalogue.digest
         await this.#send(this.#downstream, { jsonrpc: '2.0', id: message.id, result: { tools: admitted ? catalogue.tools : [] } } as Rpc)
         return
@@ -133,19 +144,11 @@ export class McpReviewProxy {
         const catalogue = await this.catalogue()
         const generation = this.#generation
         const approved = await this.#ports.approved()
+        if (gate?.cancelled) return
         const name = message.params?.name
         if (generation !== this.#generation || this.#quarantined || approved?.revision !== this.revision || approved.version !== catalogue.version || approved.digest !== catalogue.digest || !approved.tools.some((tool) => tool.name === name)) {
           await this.#replyError(message.id, 'This MCP tool definition needs device review on the current connection.')
           return
-        }
-      }
-      if (message.method === 'notifications/cancelled') {
-        const requestId = message.params?.requestId
-        if (typeof requestId === 'string' || typeof requestId === 'number') {
-          const forwarded = this.#forwarded.get(requestId)
-          if (forwarded) { clearTimeout(forwarded.timer); this.#forwarded.delete(requestId) }
-          const serverTimer = this.#serverRequests.get(requestId)
-          if (serverTimer) { clearTimeout(serverTimer); this.#serverRequests.delete(requestId) }
         }
       }
       if (message.id !== undefined && message.method) {
@@ -158,7 +161,9 @@ export class McpReviewProxy {
         }, this.#deadlineMs)
         this.#forwarded.set(message.id, { timer, method: message.method })
       }
+      if (gate?.cancelled) return
       if (message.method === 'tools/call' && this.#quarantined) { await this.#replyError(message.id!, 'This MCP tool definition needs device review on the current connection.'); return }
+      if (gate) this.#gated.delete(message.id!) // The request is now tracked by #forwarded.
       await this.#send(this.#upstream, message)
       if (message.method === 'notifications/initialized') void this.catalogue().catch(() => undefined)
     } catch {
@@ -166,9 +171,9 @@ export class McpReviewProxy {
         const forwarded = this.#forwarded.get(message.id)
         if (forwarded) { clearTimeout(forwarded.timer); this.#forwarded.delete(message.id) }
       }
-      if (message.id !== undefined && message.method) await this.#replyError(message.id, 'The MCP review proxy could not forward this request.').catch(() => undefined)
+      if (!gate?.cancelled && message.id !== undefined && message.method) await this.#replyError(message.id, 'The MCP review proxy could not forward this request.').catch(() => undefined)
     } finally {
-      if (gated) this.#gatedRequests--
+      if (gate && this.#gated.get(message.id!) === gate) this.#gated.delete(message.id!)
     }
   }
 
@@ -207,8 +212,6 @@ export class McpReviewProxy {
         if (typeof requestId === 'string' || typeof requestId === 'number') {
           const timer = this.#serverRequests.get(requestId)
           if (timer) { clearTimeout(timer); this.#serverRequests.delete(requestId) }
-          const forwarded = this.#forwarded.get(requestId)
-          if (forwarded) { clearTimeout(forwarded.timer); this.#forwarded.delete(requestId) }
         }
       }
       if (message.id !== undefined && message.method) {
@@ -268,6 +271,10 @@ export class McpReviewProxy {
         if (!result.nextCursor) {
           const catalogue = mcpCatalogue(tools)
           if (this.#lastDigest !== catalogue.digest) {
+            if (this.#lastDigest !== null) {
+              this.#quarantined = true
+              this.#requiresFreshApproval = true
+            }
             this.#lastDigest = catalogue.digest
             this.#ports.observed(catalogue)
           }
@@ -310,6 +317,7 @@ export class McpReviewProxy {
     this.#pending.clear()
     for (const { timer } of this.#forwarded.values()) clearTimeout(timer)
     this.#forwarded.clear()
+    this.#gated.clear()
     for (const timer of this.#serverRequests.values()) clearTimeout(timer)
     this.#serverRequests.clear()
     try { this.#listener.close() } catch { /* A failed bind has no listener to close. */ }

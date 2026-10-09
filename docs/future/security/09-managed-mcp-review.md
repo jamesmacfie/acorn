@@ -26,8 +26,10 @@
 >
 > Focused proof: SDK fixtures cover notification during a held list and approval, elicitation response,
 > cancellation, request ceiling, aggregate catalogue deadline, disconnect/reconnect, and explicit event
-> replay refusal. Installer fixtures cover transitive scripts and publication cutoff, cancellation,
-> retained old bytes, and selection conflicts. A local package canary confirmed real npm suppressed
+> replay refusal. A/B/A silent drift remains quarantined, and a cancelled call waiting on catalogue
+> admission never reaches the upstream tool. Installer fixtures cover transitive scripts and publication
+> cutoff, cancellation, retained old bytes, selection conflicts, FIFO substitution, and pre-aborted reads.
+> A local package canary confirmed real npm suppressed
 > scripts during lock resolution and `npm ci`; a tampered integrity in its frozen lock made `npm ci`
 > fail. npm is the archive integrity authority; Acorn does not independently re-verify tarballs.
 > Scoped agents/client-core type checks and focused tests passed; the affected Node build and
@@ -38,7 +40,8 @@
 >
 > Limits: Event replay is explicitly unavailable (HTTP 409), so a client reconnects to a fresh
 > reviewed connection. A forwarded in-flight call cannot be undone after a later list change. Installed
-> MCP code executes with the device user's authority; managed installation does not sandbox it. Later
+> MCP code executes with the device user's authority; managed installation does not sandbox it. A host
+> without no-follow file opens reports managed installation unavailable. Later
 > phases must preserve the configuration-revision, consent, managed-root lease, and catalogue-approval
 > contracts.
 

@@ -11,6 +11,7 @@ install script is refused. An exact version lacking trustworthy publication evid
 seven days needs an explicit reason, stored with the installation and recorded in the owner audit log.
 The registry lock and npm's frozen install provide archive integrity checks; Acorn verifies the
 installed files but does not independently verify each downloaded tarball.
+Managed installation reports unavailable on a host without no-follow file opens.
 The staged binary must be tested and its graph and tools reviewed before activation. Updates keep the
 selected version if staging fails. The selected script runs directly with Node from private installed
 bytes; no package runner resolves it on session start. This pins inputs but does not sandbox runtime

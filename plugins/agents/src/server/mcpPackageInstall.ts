@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
-import { createReadStream } from 'node:fs'
-import { chmod, lstat, mkdir, mkdtemp, opendir, readlink, realpath, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { constants, type Stats } from 'node:fs'
+import { chmod, lstat, mkdir, mkdtemp, open, opendir, readlink, realpath, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 const REGISTRY = 'https://registry.npmjs.org/'
@@ -131,14 +131,7 @@ export async function mcpTreeDigest(root: string, signal?: AbortSignal): Promise
         files++; bytes += detail.size
         if (files > MAX_FILES || bytes > MAX_BYTES) throw new Error('The package exceeds its file or byte limit.')
         digest.update(JSON.stringify(['file', rel, detail.size]))
-        let actualBytes = 0
-        for await (const chunk of createReadStream(path)) {
-          signal?.throwIfAborted()
-          actualBytes += (chunk as Buffer).byteLength
-          if (actualBytes > MAX_BYTES || bytes - detail.size + actualBytes > MAX_BYTES) throw new Error('The package exceeds its actual byte limit.')
-          digest.update(chunk as Buffer)
-        }
-        if (actualBytes !== detail.size) throw new Error('An installed file changed while it was being verified.')
+        await scanRegularFile(path, MAX_BYTES - (bytes - detail.size), signal, (chunk) => digest.update(chunk), detail)
       } else throw new Error('The package contains a special file.')
     }
   }
@@ -147,35 +140,54 @@ export async function mcpTreeDigest(root: string, signal?: AbortSignal): Promise
 }
 
 export async function mcpRuntimeIdentity(signal?: AbortSignal): Promise<string> {
-  const executable = await stat(process.execPath)
+  const runtimePath = await realpath(process.execPath)
+  const executable = await stat(runtimePath)
   if (!executable.isFile() || executable.size > 300 * 1024 * 1024) throw new Error('The Node runtime is too large to verify.')
-  return `${process.platform}/${process.arch}/${process.version}/${(await mcpFileDigest(process.execPath, 300 * 1024 * 1024, signal)).digest}`
+  return `${process.platform}/${process.arch}/${process.version}/${(await mcpFileDigest(runtimePath, 300 * 1024 * 1024, signal)).digest}`
+}
+
+/** Open before reading so a swapped FIFO, symlink, or special file cannot block on its first byte. */
+async function scanRegularFile(path: string, limit: number, signal: AbortSignal | undefined, onChunk: (chunk: Buffer) => void, expected?: Stats): Promise<void> {
+  signal?.throwIfAborted()
+  if (!constants.O_NOFOLLOW) throw new Error('Managed MCP installation is unavailable: no-follow file opens are unsupported on this host.')
+  const handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOFOLLOW)
+  try {
+    signal?.throwIfAborted()
+    const before = await handle.stat()
+    if (!before.isFile() || before.size > limit || (expected && (before.dev !== expected.dev || before.ino !== expected.ino || before.size !== expected.size))) {
+      throw new Error('An MCP package file is not the expected bounded regular file.')
+    }
+    const deadline = AbortSignal.timeout(DEADLINE_MS)
+    const readSignal = signal ? AbortSignal.any([signal, deadline]) : deadline
+    let bytes = 0
+    for await (const chunk of handle.createReadStream({ autoClose: false, signal: readSignal })) {
+      bytes += chunk.byteLength
+      if (bytes > limit || bytes > before.size) throw new Error('An MCP package file grew beyond its byte limit.')
+      onChunk(chunk)
+    }
+    const after = await handle.stat()
+    if (bytes !== before.size || after.size !== before.size || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs) {
+      throw new Error('An MCP package file changed while it was being verified.')
+    }
+  } finally {
+    await handle.close()
+  }
 }
 
 async function boundedFile(path: string, limit: number, signal?: AbortSignal): Promise<Buffer> {
   const chunks: Buffer[] = []
-  let bytes = 0
-  for await (const chunk of createReadStream(path)) {
-    signal?.throwIfAborted()
-    bytes += (chunk as Buffer).byteLength
-    if (bytes > limit) throw new Error('An MCP package file exceeds its byte limit.')
-    chunks.push(chunk as Buffer)
-  }
+  await scanRegularFile(path, limit, signal, (chunk) => chunks.push(chunk))
+  const bytes = chunks.reduce((total, chunk) => total + chunk.byteLength, 0)
   return Buffer.concat(chunks, bytes)
 }
 
 export async function mcpFileDigest(path: string, limit: number, signal?: AbortSignal): Promise<{ digest: string; prefix: string }> {
   const hash = createHash('sha256')
-  let bytes = 0
   let prefix = Buffer.alloc(0)
-  for await (const chunk of createReadStream(path)) {
-    signal?.throwIfAborted()
-    const part = chunk as Buffer
-    bytes += part.byteLength
-    if (bytes > limit) throw new Error('An MCP executable exceeds its byte limit.')
-    if (prefix.byteLength < 64) prefix = Buffer.concat([prefix, part.subarray(0, 64 - prefix.byteLength)])
-    hash.update(part)
-  }
+  await scanRegularFile(path, limit, signal, (chunk) => {
+    if (prefix.byteLength < 64) prefix = Buffer.concat([prefix, chunk.subarray(0, 64 - prefix.byteLength)])
+    hash.update(chunk)
+  })
   return { digest: hash.digest('hex'), prefix: prefix.toString('utf8') }
 }
 
