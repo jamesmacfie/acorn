@@ -28,8 +28,7 @@ Authoring, folder installation, reload, and worker isolation are implemented. Us
 - [The Node realm](../../security/plugin-node-realm.md) covers permission-scoped workers and their limits.
 - [Plugin activation](../../plugins/activation.md) covers installation, activation, and replacement.
 
-The security programme proposes additional boundary checks. Verify those requirements separately;
-a permission-scoped worker is not a claim of operating-system isolation or crash containment.
+Verify the documented worker limits before relying on containment for plugin distribution.
 
 ## Mutable folder sources
 
@@ -47,5 +46,5 @@ hooks, and cooperative extension points provide interoperation without importing
 ## Verify before distribution
 
 - Test fetched hashes, downgrade refusal, update consent, and staged-install failure recovery.
-- Recheck hostile worker fixtures and the security programme's additional requirements.
+- Recheck hostile worker fixtures against the Node realm security contract.
 - Verify lockfile migration and mutable-source disclosure under the accepted signing design.

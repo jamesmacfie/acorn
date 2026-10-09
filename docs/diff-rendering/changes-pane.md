@@ -83,8 +83,13 @@ while its replacement loads. HEAD and the index are enumerated once, and blob ob
 immutably. If HEAD, the index, or a reviewed disk file changes during acquisition, the report is
 partial with no comparison findings and asks for a retry. Read failures appear in the pane.
 
-Below it, **Check next commit for secrets** and **Check outgoing commits** run the checks a commit or
-push would run and list each finding by rule and position, never by value. The commit check reads the
+The header's **Check next commit for secrets** and **Check outgoing commits** icon buttons run the
+checks a commit or push would run. Results below the header start with a banner that sums up the
+check, then fold the findings into **Likely secrets** and **To review**. Each finding shows its file,
+line, and rule, never the matched value. Clicking a finding opens the file in the editor at that line
+and column. For a push check, that's the worktree's copy, which can be newer than the commit that
+holds the finding. **About this check** holds the push destination and the check's limits. Both
+buttons are disabled while a check runs. The commit check reads the
 index when something is staged and the tracked changes otherwise. The push check asks the remote for
 its refs. With **Block publication with secret findings** on for the node, Commit and Push run the
 same checks first, and a refusal arrives in the pane's error line with the rule, the path, and the

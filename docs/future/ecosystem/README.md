@@ -15,9 +15,7 @@ operating-system containment and a separate crash boundary remain outside that g
 
 The panel studio and derived sources are implemented. Their remaining work is in
 [dashboard followups](../dashboards-gaps.md). They do not block a signing design.
-[Security hardening](../security/README.md) has separate proposed requirements for the worker
-boundary and agent tooling. Do not treat a recorded containment implementation as proof that those
-followups are complete.
+[The Node realm](../../security/plugin-node-realm.md) documents the worker boundary and its limits.
 
 ## Remaining work
 
@@ -53,6 +51,6 @@ for the implemented contract. Avoid duplicating those rules in a release service
 ## Verify before building
 
 - Recheck published entrypoints, package installation, trust records, and worker enforcement.
-- Read the security programme before relying on an untested adversarial boundary.
+- Read the Node realm security contract before relying on an untested adversarial boundary.
 - Confirm signing setup and release ownership instead of treating the August blocker list as live evidence.
 - Keep discovery dependent on a reviewed signing design and its installed-package acceptance.

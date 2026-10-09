@@ -13,6 +13,7 @@ import { sameInlineLine, type InlineDiffOrigin } from '@acorn/plugin-agents/cont
 import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClient.ts'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { emptyLocalStatus, reviewNotesRoute, type GitSecretCheckResult, type LocalDocumentResponse, type LocalScope, type ModelPick, type ReviewNote } from '../shared/api'
+import type { SecretFinding } from '@acorn/protocol/secretChecks.ts'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
 import { localGitApi } from './changesClient'
 import { readChangeView, saveChangeView } from './changesPrefs'
@@ -443,6 +444,10 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     checkingSecrets,
     checkSecrets,
     clearSecretCheck: () => setSecretCheck(null),
+    // A finding opens the worktree's copy of its file. For a push check that copy can be newer than
+    // the commit that holds the finding, so the line is a best guess there.
+    openFinding: (finding: SecretFinding) =>
+      openPane(task.id, 'editor', { kind: 'editor:reveal', path: finding.location, line: finding.line, column: finding.column }, 'add'),
     task,
     project,
     isGit: () => project()?.vcs === 'git',

@@ -5,6 +5,8 @@ import {
   paneCollapseKey, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
+import type { SecretCheckReport, SecretFinding } from '@acorn/protocol/secretChecks.ts'
+import type { GitSecretCheckResult } from '../shared/api'
 import { type ChangesModel } from './changesModel'
 import { CommitField, CommitOptionsMenu, commitButtonLabel, commitButtonTip, gitCommitLine } from './commitEditor'
 import { CommitModal } from './CommitModal'
@@ -128,6 +130,19 @@ export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
       count={model().isGit() ? changedCount(model()) : undefined}
       actions={
         <Show when={model().isGit()}>
+          <IconButton
+            icon="shield-check"
+            label="Check next commit for secrets"
+            disabled={model().checkingSecrets()}
+            onPress={() => void model().checkSecrets('commit')}
+          />
+          <IconButton
+            icon="scan-search"
+            label="Check outgoing commits"
+            tip="Check outgoing commits for secrets"
+            disabled={model().checkingSecrets()}
+            onPress={() => void model().checkSecrets('push')}
+          />
           <ViewMenu model={model()} />
           <IconButton
             icon="refresh-cw"
@@ -212,35 +227,113 @@ function DependencySummary(props: { model: ChangesModel }) {
 
 // Check for secrets in what the next commit takes, or in what a push would send. Rule ids and
 // positions only; the node never returns a matched value.
-function SecretCheckSummary(props: { model: ChangesModel }) {
+//
+// The answer is a banner that says what was checked and what turned up, then one fold per kind of
+// finding, drawn the way the change rows below are drawn. A finding row opens its file in the
+// editor at the line and column the check reported.
+function SecretCheckSummary(props: { model: ChangesModel; taskId: string }) {
   const result = () => props.model.secretCheck()
   const failure = () => { const value = result(); return value && 'error' in value ? value.error : null }
   const check = () => { const value = result(); return value && !('error' in value) ? value : null }
-  return <Stack gap="none">
-    <Inline gap="inline">
-      <Button variant="ghost" size="sm" disabled={props.model.checkingSecrets()} onPress={() => void props.model.checkSecrets('commit')}>
-        {props.model.checkingSecrets() ? 'Checking for secrets…' : 'Check next commit for secrets'}
-      </Button>
-      <Button variant="ghost" size="sm" disabled={props.model.checkingSecrets()} onPress={() => void props.model.checkSecrets('push')}>
-        Check outgoing commits
-      </Button>
-    </Inline>
-    <Show when={failure()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
-    <Show when={check()}>
-      {(answer) => <>
-        <Text>
-          {answer().report.counts.high} likely secret{answer().report.counts.high === 1 ? '' : 's'}, {answer().report.counts.heuristic} to review
-          {answer().report.complete ? '' : ', incomplete'} · {answer().operation === 'commit' ? 'next commit' : answer().destination}
-        </Text>
-        <For each={answer().report.findings}>{(finding) =>
-          <Text>{finding.confidence === 'high' ? 'Likely secret' : 'Review'} · {finding.rule} · {finding.location}:{finding.line}:{finding.column}</Text>
-        }</For>
-        <For each={answer().report.unscanned}>{(item) => <Text>Not checked · {item.location}: {item.reason}</Text>}</For>
-        <For each={answer().report.limits}>{(limit) => <Text emphasis="muted" wrap>{limit}</Text>}</For>
-      </>}
+  const dismiss = () => props.model.clearSecretCheck()
+  return <>
+    <Show when={props.model.checkingSecrets()}>
+      <Alert variant="banner" tone="muted">Checking for secrets…</Alert>
     </Show>
-    <Show when={result()}><Button variant="ghost" size="sm" onPress={() => props.model.clearSecretCheck()}>Dismiss</Button></Show>
-  </Stack>
+    <Show when={!props.model.checkingSecrets() && failure()}>
+      {(message) => <Alert variant="banner" tone="warn" onDismiss={dismiss}>{message()}</Alert>}
+    </Show>
+    <Show when={!props.model.checkingSecrets() && check()}>
+      {(answer) => {
+        const report = () => answer().report
+        const high = () => report().findings.filter((finding) => finding.confidence === 'high')
+        const review = () => report().findings.filter((finding) => finding.confidence === 'heuristic')
+        return <>
+          <Alert variant="banner" tone={secretTone(report())} title={secretHeadline(report())} onDismiss={dismiss}>
+            {secretScope(answer())}
+          </Alert>
+          <SecretFindings taskId={props.taskId} kind="high" title="Likely secrets" findings={high()} model={props.model} />
+          <SecretFindings taskId={props.taskId} kind="review" title="To review" findings={review()} model={props.model} />
+          <Show when={report().unscanned.length}>
+            <Fold label="Not checked" count={report().unscanned.length} contentIndent="none" persistKey="changes.secrets.unscanned" defaultOpen>
+              <Rows
+                id={`changes.${props.taskId}.secrets.unscanned`}
+                ariaLabel="Not checked"
+                items={report().unscanned.map((item, index) => ({ key: String(index), label: item.location, item }))}
+              >
+                {(entry, item) => (
+                  <Row item={item} density="compact" label={entry.label} title={`${entry.item.location}: ${entry.item.reason}`}
+                    meta={<Text emphasis="muted">{entry.item.reason}</Text>}>
+                    <Text emphasis="mono">{entry.item.location}</Text>
+                  </Row>
+                )}
+              </Rows>
+            </Fold>
+          </Show>
+          {/* The fine print, folded away so the banner stays one glance: where a push check
+              looked, and what any check cannot see. */}
+          <Fold label="About this check" persistKey="changes.secrets.about">
+            <Stack gap="none">
+              <Show when={answer().operation === 'push'}>
+                <Text emphasis="muted" wrap>Destination: {answer().destination}</Text>
+              </Show>
+              <For each={report().limits}>{(limit) => <Text emphasis="muted" wrap>{limit}</Text>}</For>
+            </Stack>
+          </Fold>
+        </>
+      }}
+    </Show>
+  </>
+}
+
+const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
+
+// Red for a likely secret, amber for anything a person should still look at, including a check that
+// could not read everything, and green only when the check read it all and found nothing.
+const secretTone = (report: SecretCheckReport) =>
+  report.counts.high ? 'danger' as const : report.counts.heuristic || !report.complete ? 'warn' as const : 'ok' as const
+
+const secretHeadline = (report: SecretCheckReport) => {
+  if (!report.counts.high && !report.counts.heuristic) return report.complete ? 'No secrets found' : 'No secrets found so far'
+  const parts = [report.counts.high ? plural(report.counts.high, 'likely secret') : '', report.counts.heuristic ? `${report.counts.heuristic} to review` : '']
+  return parts.filter(Boolean).join(', ')
+}
+
+const secretScope = (answer: GitSecretCheckResult) => [
+  answer.operation === 'commit' ? 'Checked the next commit.' : 'Checked the outgoing commits.',
+  answer.report.complete ? '' : "Some files weren't checked.",
+  answer.report.truncated ? `Showing the first ${answer.report.findings.length} findings.` : '',
+].filter(Boolean).join(' ')
+
+// One kind of finding as a fold of two-line rows: the file name and line on top, where a narrow
+// column cannot cut the line off, and the rule and folder under it.
+function SecretFindings(props: { taskId: string; kind: 'high' | 'review'; title: string; findings: SecretFinding[]; model: ChangesModel }) {
+  return (
+    <Show when={props.findings.length}>
+      <Fold label={props.title} count={props.findings.length} contentIndent="none" persistKey={`changes.secrets.${props.kind}`} defaultOpen={props.kind === 'high'}>
+        <Rows
+          id={`changes.${props.taskId}.secrets.${props.kind}`}
+          ariaLabel={props.title}
+          // Keyed by position: a push check can report the same place twice, once for each commit
+          // that holds the file.
+          items={props.findings.map((finding, index) => ({ key: String(index), label: `${finding.location}:${finding.line}`, finding }))}
+        >
+          {(entry, item) => (
+            <Row
+              item={item}
+              variant="stacked"
+              label={`Open ${entry.label}`}
+              title={`${entry.finding.location}:${entry.finding.line}:${entry.finding.column} · ${entry.finding.rule}`}
+              onPress={() => props.model.openFinding(entry.finding)}
+            >
+              <Text emphasis="mono">{fileName(entry.finding.location)}:{entry.finding.line}</Text>
+              <Text emphasis="muted">{entry.finding.rule}{directory(entry.finding.location) ? ` · ${directory(entry.finding.location)}` : ''}</Text>
+            </Row>
+          )}
+        </Rows>
+      </Fold>
+    </Show>
+  )
 }
 
 /** What `Rows` hands a row of its collection: the roving tabindex, the id, and the focus callback. */
@@ -399,7 +492,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
       <Stack gap="none">
         <NotesBanner model={model()} />
         <DependencySummary model={model()} />
-        <SecretCheckSummary model={model()} />
+        <SecretCheckSummary model={model()} taskId={props.task.id} />
         {SECTIONS.map(({ key, title }) => (
           <Show when={sectionOf(key)}>
             {(section) => {

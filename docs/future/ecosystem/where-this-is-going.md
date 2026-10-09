@@ -7,7 +7,7 @@ requirements, dependencies, and acceptance. Implemented contracts remain in the 
 
 | Work | Starting point and next step |
 | --- | --- |
-| Security hardening | Worker isolation is implemented. [Security requirements](../security/README.md) proposes intrinsic protection, a runtime backstop, and additional agent-tooling checks. |
+| Security hardening | [The Node realm](../../security/plugin-node-realm.md) documents worker isolation, enforcement, and remaining limits. |
 | Compiled plugin migration | [The migration assessment](../compiled-tier.md) records candidates and their actual host dependencies. Editor needs PTY, persistence, and multi-document contracts; bundle size is not its blocker. |
 | Signing and discovery | Published authoring packages and compatibility checks are implemented. [Distribution work](./work-plan.md) covers attestation and then listing. |
 | Repository extraction | [Package extraction](../split.md) covers outside builds, artifact pinning, reconciliation, and cross-repository development. |

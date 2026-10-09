@@ -13,7 +13,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
 | [performance/](./performance/README.md) | Seven phases for Sentry measurements, installed Claude, packaging, minification, startup messages, selective loading, and acceptance. | Approved direction October 9, 2026. Implementation not started. |
-| [security/](./security/README.md) | Ten phases for desktop authorization, plugin enforcement, internal tokens, automation, instruction review, diagnostics, dependencies, MCP review, and secret publication. | Proposed October 8, 2026. Implementation not started; restricted agent execution is excluded. |
 | [editor/](./editor/README.md) | Review the implemented editor and finish repository and supported-platform acceptance. | Six phases implemented. Final review and full test gate remain open. Completion notes moved to Testing. |
 | [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Implementation not started. |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |

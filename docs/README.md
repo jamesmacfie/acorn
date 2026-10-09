@@ -326,26 +326,6 @@ Keep one owning page for each contract, and add every new page to this index in 
 [Write and maintain docs](./writing-docs.md) covers where a doc goes, the house style, how to split a
 long page, how to cite a doc from code, and the checks that enforce it.
 
-## Future security handoff
-
-These requirements preserve the five trust-boundary phases and add five agent-tooling phases.
-Restricted agent execution is outside scope. The programme index defines dependencies and combined acceptance.
-
-| Document | What it holds |
-| --- | --- |
-| [Security programme](./future/security/README.md) | Goals, source baselines, phase order, ownership, and combined verification. |
-| [Scope boundaries](./future/security/refused.md) | Excluded execution isolation, format limits, and authority and coverage constraints. |
-| [Phase 01](./future/security/01-desktop-command-authorization.md) | Explicit caller authorization for Acorn's Tauri commands. |
-| [Phase 02](./future/security/02-plugin-realm-intrinsics.md) | Plugin policies that survive shared-intrinsic tampering. |
-| [Phase 03](./future/security/03-runtime-network-and-fs-backstop.md) | Node 26 in the bundle, so plugins with no network grant get no sockets. |
-| [Phase 04](./future/security/04-internal-token-confinement.md) | Loopback confinement, expiry, and renewal for internal tokens. |
-| [Phase 05](./future/security/05-automation-driver-release-fence.md) | Release exclusion and caller checks for the development automation driver. |
-| [Phase 06](./future/security/06-instruction-review.md) | Instruction changes, bounded discovery, digest-bound review, and incomplete-check refusals. |
-| [Phase 07](./future/security/07-security-diagnostics.md) | Passive evidence, unknown states, harness policy coverage, and repair actions. |
-| [Phase 08](./future/security/08-dependency-review.md) | npm and pnpm resolution and install-policy reviews tied to Changes revisions. |
-| [Phase 09](./future/security/09-managed-mcp-review.md) | Exact MCP packages, disabled install scripts, and actual-connection tool review. |
-| [Phase 10](./future/security/10-secret-publication-checks.md) | Local secret detection, publication gates, exact-operation exceptions, and redacted exports. |
-
 ## Editor acceptance handoff
 
 The six implementation phases are complete. Review the combined change and finish the full test gate

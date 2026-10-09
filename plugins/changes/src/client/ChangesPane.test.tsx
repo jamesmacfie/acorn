@@ -167,8 +167,10 @@ it('shows dependency read failures and bounded finding details in the expanded r
 it('runs the secret check on request and lists findings by rule and position', () => {
   const checked = model([change('a.ts', true)])
   const checkSecrets = vi.fn()
+  const openFinding = vi.fn()
   Object.assign(checked, {
     checkSecrets,
+    openFinding,
     secretCheck: () => ({
       operation: 'commit', destination: 'main in /w',
       report: { detectorVersion: 'acorn-secrets/1', digest: 'd', counts: { high: 1, heuristic: 0 }, truncated: false, complete: false, limits: ['Checks the staged tree.'],
@@ -176,12 +178,21 @@ it('runs the secret check on request and lists findings by rule and position', (
         unscanned: [{ location: 'big.json', reason: 'Larger than 8 MiB.' }] },
     }),
   })
-  disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={checked} />, host))
-  ;[...host.querySelectorAll('button')].find((item) => item.textContent === 'Check outgoing commits')?.click()
+  disposers.push(render(() => <>
+    <ChangesHeader task={{ id: 't1' } as unknown as Task} model={checked} />
+    <ChangesList task={{ id: 't1' } as unknown as Task} model={checked} />
+  </>, host))
+  host.querySelector<HTMLButtonElement>('button[aria-label="Check next commit for secrets"]')!.click()
+  expect(checkSecrets).toHaveBeenCalledWith('commit')
+  host.querySelector<HTMLButtonElement>('button[aria-label="Check outgoing commits"]')!.click()
   expect(checkSecrets).toHaveBeenCalledWith('push')
-  expect(host.textContent).toContain('1 likely secret, 0 to review, incomplete · next commit')
-  expect(host.textContent).toContain('Likely secret · npm-token · a.ts:3:9')
-  expect(host.textContent).toContain('Not checked · big.json: Larger than 8 MiB.')
+  expect(host.textContent).toContain('1 likely secret')
+  expect(host.textContent).toContain("Checked the next commit. Some files weren't checked.")
+  expect(group('Likely secrets').textContent).toContain('a.ts:3')
+  expect(group('Likely secrets').textContent).toContain('npm-token')
+  expect(group('Not checked').textContent).toContain('Larger than 8 MiB.')
+  group('Likely secrets').querySelector<HTMLElement>('.ui-row')!.click()
+  expect(openFinding).toHaveBeenCalledWith({ rule: 'npm-token', confidence: 'high', location: 'a.ts', line: 3, column: 9 })
 })
 
 /** One group's `<details>`, by the label in its summary. */
