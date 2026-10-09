@@ -52,7 +52,7 @@ export function GitSourceList() {
   const compare = () => !!compareBase() || !!compareEntry()
   const section = () => compare() ? 'compare' : remotes() ? 'remotes' : refs() ? 'refs' : stashes() ? 'stashes' : worktrees() ? 'worktrees' : 'history'
   const sectionPath = (id: string) => `/p/${encodeURIComponent(params.projectId)}/x/git/${id}`
-  return <Stack gap="section" grow>
+  return <Stack gap="none" grow>
     <Tabs idPrefix={`git-sections-${params.projectId}`} ariaLabel="Git sections" active={section()} onChange={(id) => navigate(sectionPath(id))}
       tabs={[{ id: 'history', label: 'History' }, { id: 'stashes', label: 'Stashes' }, { id: 'worktrees', label: 'Worktrees' },
         { id: 'refs', label: 'Refs' }, { id: 'remotes', label: 'Remotes' }, { id: 'compare', label: 'Compare' }]} />
