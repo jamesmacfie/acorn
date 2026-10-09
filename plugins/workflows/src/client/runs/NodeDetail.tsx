@@ -3,7 +3,7 @@ import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useSearchParams } from '@solidjs/router'
 import {
-  clientCapability, openPane, pathForTask, refreshSessionSources, requestTerminalFocusIntent, setTerminalOpen,
+  clientCapability, deletedTasksOptions, openPane, pathForTask, refreshSessionSources, requestTerminalFocusIntent, setTerminalOpen,
   type Task, tasksOptions,
 } from '@acorn/plugin-api/client'
 import {
@@ -80,6 +80,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   const navigate = useNavigate()
   const [search] = useSearchParams()
   const tasks = createQuery(() => tasksOptions(true))
+  const deletedTasks = createQuery(() => deletedTasksOptions(true))
   const [retrying, setRetrying] = createSignal<string | null>(null)
   const searchValue = (value: string | string[] | undefined): string | undefined =>
     Array.isArray(value) ? value[0] : value
@@ -94,6 +95,9 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     const id = inputs()?.childTaskId
     return id ? (tasks.data ?? []).find((candidate) => candidate.id === id) : undefined
   })
+  // The step's own task was deleted while the run kept going (docs/workspaces-and-tasks/archive.md §
+  // Deleting a task). Said so, rather than leaving the line out.
+  const childTaskDeleted = () => !!inputs()?.childTaskId && !!deletedTasks.data?.includes(inputs()!.childTaskId!)
 
   // Every unrecognised event, as JSON. The vocabulary in ../../shared/stepEvents.ts is what the
   // bodies below draw; anything else a kind sends is still worth keeping where somebody can read it.
@@ -257,7 +261,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   )
 
   const childTaskLine = () => (
-    <Show when={childTask()}>
+    <Show when={childTask()} fallback={<Show when={childTaskDeleted()}><Text>Runs in its own task: Deleted task</Text></Show>}>
       {(child) => (
         <Text>
           Runs in its own task: <Link onPress={() => navigate(pathForTask(child()))}>{child().title}</Link>

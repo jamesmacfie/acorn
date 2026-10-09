@@ -1,9 +1,10 @@
 # Archive and restore
 
 Archiving a task removes its worktree and stops what was running in it, and keeps everything else.
-This page covers the archive dialog, the order the Node tears a task down in, and how restore puts
-it back. `archiveTask` and `restoreTask` in `packages/node-core/src/server/storage/archive.ts` own
-both.
+This page covers the archive dialog, the order the Node tears a task down in, how restore puts it
+back, and how delete removes it for good. `archiveTask` and `restoreTask` in
+`packages/node-core/src/server/storage/archive.ts` own archive and restore, and `deleteTask` in
+`packages/node-core/src/server/storage/taskDeletion.ts` owns delete.
 
 ## Archive a task
 
@@ -70,8 +71,9 @@ terminal plugin's saved sessions, and clears client memory. It keeps the task ro
 requests, its branch, its agent sessions, its notes, and every plugin's rows. Plugins store `task_id`
 as a plain ID, and none of them deletes on archive.
 
-Two things delete later or elsewhere:
+Three things delete later or elsewhere:
 
+- [Deleting a task](#deleting-a-task) removes it and every plugin's rows for it.
 - If you set **Keep agent history for archived tasks**, a task archived longer than that loses its
   agent transcripts. Its sessions still list, with a note
   ([retention](../data-layer/backup-and-retention.md)).
@@ -92,7 +94,8 @@ and remembers its state on the device.
 
 ## Restoring a task
 
-Restore is `POST /v1/core/tasks/:id/restore`. It sets the task active and rebuilds the worktree
+Restore is `POST /v1/core/tasks/:id/restore`. It answers 409 when the task was deleted, or restored by
+another request, while it checked the branch. It sets the task active and rebuilds the worktree
 before it answers, through the same `resolveTaskCwd` a pane would use, so the copied files and setup
 run again. It rebuilds right away because both ways it can fail need you:
 
@@ -107,3 +110,72 @@ Containers, terminal sessions, and scrollback don't come back. Agent sessions do
 session under an archived task as retired, so it returns with its task. Its provider process stopped
 at archive, and the next prompt starts it and resumes the conversation. A session you archived on its
 own comes back from Agent Center ([client surfaces](../managed-agents/client-surfaces.md)).
+
+## Deleting a task
+
+Delete removes a task, its subtasks, and every plugin's data for them. It can't be undone. The git
+branch stays, because a local branch can hold commits that exist nowhere else. Remove it from the Git
+client or a terminal.
+
+You delete from two places:
+
+- **The archive dialog.** The confirm button is a split button. Its menu offers **Archive task** and
+  **Delete task**. Choosing **Delete task** relabels the button, gives it the danger tone, and shows a
+  warning. Plugin concerns and cleanups work as they do for archive. `WillConfirmationHost` takes a
+  list of actions, and `WillDecision.action` says which one you chose.
+- **The Archive page.** Each row and the preview have **Delete**, which opens the same dialog with
+  **Delete task** as the only action.
+
+Delete is `POST /v1/core/tasks/:id/delete`. Unlike archive, it's device-only: a task-scoped agent
+token can archive its own tree but never delete one. The Node runs these steps:
+
+1. If any task in the tree is still active, archive the tree first with the options you chose. A
+   refused archive stops the delete and answers with the archive's reason. Without the terminal
+   plugin, the client archives with the status flip first and then deletes.
+2. Claim every task in the tree with the archive gate and check that each is still archived. Another
+   archive in progress, or a restore that got there first, answers 409.
+3. In one core transaction, delete the `tasks`, `task_pulls`, `task_links`, and `task_script_attempts`
+   rows, and the client preferences keyed by those task ids, and insert a row in `deleted_tasks` for
+   each.
+4. Broadcast the tasks change, run the `core:task-deleted` hook with the deleted ids, and answer
+   `{ ok: true, taskIds }`.
+
+Steps 2 and 3 await nothing, so a restore either writes before them and is refused, or finds the rows
+gone and answers 409.
+
+### Tombstones and plugin purges
+
+`deleted_tasks` keeps one row per deleted task forever. `ctx.core.tasks.deleted()` returns the ids to
+plugins, and `GET /v1/core/tasks/deleted` returns them to the client. A plugin must never infer
+deletion from a task missing from `load` or `active`, because a transient empty answer would read as
+every task gone.
+
+Every plugin that stores task data calls `registerDeletedTaskPurge` from `@acorn/plugin-api/node` with
+one idempotent purge function. The helper runs it from two places: the `core:task-deleted` hook, and a
+daily `<plugin>:deleted-task-purge` schedule at 04:10 that hands it every tombstoned id. The schedule
+catches up a plugin that was disabled, slow, or restarting when the hook ran.
+
+| Plugin | What its purge deletes |
+| --- | --- |
+| agents | Sessions with their events, search rows, turns, requests, attachment references, and artifacts. Then the tasks' attachments, spawn rows, webhooks, and the deleted sessions' idempotency records. Files nothing else uses go too. A session with a provider process or a turn in flight waits for the daily run |
+| browser | Captures |
+| changes | Review notes |
+| database | The task's scratch buffer. Saved queries belong to the project and stay |
+| http | Ad-hoc requests. A request saved to the repo tree has no task id and stays |
+| notes | The `notes/task/<taskId>/` folder |
+| terminal | Saved session rows |
+| workflows | Settled runs on the task, with their steps, turn admissions, dispatch rows, and agent launch receipts. A running or cancelling run waits for the daily run. Processing history stays, so a scheduled workflow doesn't process the same records again |
+
+Provider-side sessions, such as a Claude Code session file, stay, for the reason the archived-history
+prune leaves them ([retention](../data-layer/backup-and-retention.md#retention)). The database file
+keeps its size until a `VACUUM`.
+
+### References that outlive a task
+
+Memory entries and the memory feed keep their rows, and the origin reads **Deleted task** without a
+link. So does a workflow step whose child task was deleted. Notes promoted to the workspace keep their
+`originTaskId`. Delegated child sessions and child tasks go with their parent. Notices left the bell
+when the task was archived.
+
+Deleting a project still deletes its task rows without tombstones, so plugin rows for those tasks stay
+behind.

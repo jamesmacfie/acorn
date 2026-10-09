@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidSlug, NotesStore, parseNote, serializeNote, slugifyTitle } from './notes'
+import { removeTaskFolders } from './taskFolders'
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
@@ -121,5 +122,24 @@ describe('NotesStore over a temp dir', () => {
   it('rejects traversal slugs and workspace ids at the boundary', async () => {
     await expect(store.read(workspace, '../evil')).rejects.toThrow('Invalid note slug')
     await expect(store.read({ scope: 'workspace', workspaceId: '../ws' }, 'x')).rejects.toThrow('Invalid note location id')
+  })
+})
+
+describe('removing deleted tasks\' notes', () => {
+  let root: string
+  beforeEach(() => { root = mkdtempSync(join(tmpdir(), 'acorn-notes-delete-')) })
+  afterEach(() => rmSync(root, { recursive: true, force: true }))
+
+  it('removes the task folders and keeps notes promoted to the workspace', async () => {
+    const store = new NotesStore(root)
+    await store.create({ scope: 'task', taskId: 'gone' }, 'Plan')
+    await store.create({ scope: 'task', taskId: 'kept' }, 'Plan')
+    await store.create({ scope: 'workspace', workspaceId: 'ws' }, 'Promoted', { originTaskId: 'gone' })
+
+    expect(await removeTaskFolders(root, ['gone', 'never-had-notes', '../escape'])).toBe(1)
+
+    expect(readdirSync(join(root, 'task'))).toEqual(['kept'])
+    expect((await store.list({ scope: 'workspace', workspaceId: 'ws' })).map((note) => note.originTaskId)).toEqual(['gone'])
+    expect(await removeTaskFolders(root, ['gone'])).toBe(0)
   })
 })

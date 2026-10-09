@@ -8,7 +8,7 @@ import type { ModelBackendsResponse } from '@acorn/protocol/modelProviders.ts'
 import type { RunTargetInfo } from '@acorn/protocol/runTargets.ts'
 import { readJson } from './node/apiClient'
 import { mergePrefs } from './persistence/devicePrefs'
-import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, runTargetsRoute, tasksKey, tasksRoute, archivedTasksRoute, type ArchivedTask, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, runTargetsRoute, tasksKey, tasksRoute, archivedTasksRoute, deletedTasksRoute, type ArchivedTask, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
 
 export { integrationsKey, modelBackendsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
 export type { ArchivedTask, Integration, IntegrationMapping, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
@@ -30,6 +30,16 @@ export const archivedTasksOptions = (enabled: boolean) => ({
   queryKey: archivedTasksKey,
   enabled,
   queryFn: async ({ signal }: QueryContext): Promise<ArchivedTask[]> => readJson<ArchivedTask[]>(archivedTasksRoute, { signal }),
+})
+
+// Every deleted task's id (docs/workspaces-and-tasks/archive.md § Deleting a task), so a reference to
+// one reads "Deleted task" instead of a link to nothing. Under tasksKey, so the tasks change a delete
+// broadcasts refreshes it. An array rather than a Set, because the query cache is persisted as JSON.
+export const deletedTasksKey = [...tasksKey, 'deleted'] as const
+export const deletedTasksOptions = (enabled: boolean) => ({
+  queryKey: deletedTasksKey,
+  enabled,
+  queryFn: async ({ signal }: QueryContext): Promise<string[]> => readJson<string[]>(deletedTasksRoute, { signal }),
 })
 
 // One task's run targets, for the run buttons in the task's pane switcher. A visit draws the cached

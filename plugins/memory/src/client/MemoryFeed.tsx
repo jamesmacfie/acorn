@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { formatRelativeTime } from '@acorn/plugin-api/client'
+import { createQuery } from '@tanstack/solid-query'
+import { deletedTasksOptions, formatRelativeTime } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, Fold, Row, Stack, Text } from '@acorn/plugin-api/ui'
 import { createMemoryResource } from './memoryResource'
 import { MEMORY_ACTION_LABEL, MEMORY_SCOPE_LABEL, memoryApi, memoryAuthorLabel, memoryDate } from './memoryClient'
@@ -22,6 +23,9 @@ export default function MemoryFeed(props: { projectId: string }) {
   const { value: changes, error: loadError, loaded } = createMemoryResource(() => [props.projectId, memoryRevision()] as const, async ([projectId]) => (await memoryApi().changes(projectId)).filter((change) => change.scope === 'project' && change.projectId === projectId), [])
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
+  // A change made in a task that was deleted since keeps its row. Its origin reads "Deleted task".
+  const deletedTasks = createQuery(() => deletedTasksOptions(true))
+  const originDeleted = (change: MemoryChange) => !!change.taskId && !!deletedTasks.data?.includes(change.taskId)
   async function undo(id: string) {
     setError(''); setBusy(true)
     try { await memoryApi().undo(id) }
@@ -41,7 +45,9 @@ export default function MemoryFeed(props: { projectId: string }) {
                 onPress={() => selectMemory({ name: change.name, scope: change.scope, projectId: change.projectId })}
                 meta={<Text emphasis="muted">{formatRelativeTime(Date.parse(change.at))}</Text>}
                 trailing={<>
-                  <Show when={originPath(change)}>{(path) => <Button size="xs" variant="ghost" onPress={() => navigate(path())}>{change.sessionId ? 'Session' : 'Task'}</Button>}</Show>
+                  <Show when={!originDeleted(change)} fallback={<Text emphasis="muted">Deleted task</Text>}>
+                    <Show when={originPath(change)}>{(path) => <Button size="xs" variant="ghost" onPress={() => navigate(path())}>{change.sessionId ? 'Session' : 'Task'}</Button>}</Show>
+                  </Show>
                   <Show when={change.canUndo}><Button size="xs" disabled={busy()} onPress={() => void undo(change.id)}>Undo</Button></Show>
                 </>}
               >

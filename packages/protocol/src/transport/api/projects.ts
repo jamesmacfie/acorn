@@ -205,6 +205,10 @@ export const projectMcpStarterRoute = (id: string) => `${projectRoute(id)}/mcp/s
 export type ProjectMcpFile = { file: string; servers: McpServerSummary[] }
 export const taskArchiveRoute = (id: string) => `/v1/core/tasks/${id}/archive`
 export const taskRestoreRoute = (id: string) => `/v1/core/tasks/${id}/restore`
+// Delete a task for good (docs/workspaces-and-tasks/archive.md § Deleting a task). Device-only.
+export const taskDeleteRoute = (id: string) => `/v1/core/tasks/${id}/delete`
+// Every deleted task's id, so a reference to one reads "Deleted task" instead of a broken link.
+export const deletedTasksRoute = '/v1/core/tasks/deleted'
 // What every plugin has to say about archiving this task, asked once when the dialog opens
 // (node-core/server/pluginHost/taskChecks.ts).
 export const taskArchiveConcernsRoute = (id: string) => `/v1/core/tasks/${id}/archive-concerns`

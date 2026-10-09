@@ -1,7 +1,7 @@
 import { AGENT_STANDING_CONTEXT } from '../contract/standingContext'
 import { readAgentCheckoutActivity } from '../server/sessions/checkoutActivity'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
+import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, registerDeletedTaskPurge, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import type { McpPackageManager } from '../server/mcpPackageManager'
@@ -499,6 +499,11 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           signal,
         }),
       })
+
+      // Deleted tasks' sessions, transcripts and the rest (docs/workspaces-and-tasks/archive.md § Deleting
+      // a task). The longest timeout the engine allows, because a task with a long history takes a while
+      // at 22,000 events a second; the next run carries on from where one stops.
+      registerDeletedTaskPurge(ctx, (taskIds, signal) => runtime!.purgeDeletedTasks(taskIds, signal), { timeout: 300 })
 
       // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call
       // time and falls back to its own headless runner, so a node without this plugin still runs

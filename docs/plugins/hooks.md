@@ -86,12 +86,13 @@ anyway" exists.
 
 ## Hooks that exist
 
-Core declares four hooks, because core owns those choke points:
+Core declares five hooks, because core owns those choke points:
 
 | Owner | Hook | Allows | Use |
 | --- | --- | --- | --- |
 | core | `core:worktree-created` | observe, transform | Setup scripts. The terminal plugin handles it |
 | core | `core:task-archiving` | observe, transform | Stopping work a task owns before its worktree goes. Runs on every archive, after the teardown script. The agents plugin stops the task's provider processes |
+| core | `core:task-deleted` | observe | Purging a plugin's rows for deleted tasks. The payload is `taskIds`. Use `registerDeletedTaskPurge`, which also adds a daily catch-up ([deleting a task](../workspaces-and-tasks/archive.md#deleting-a-task)) |
 | core | `core:before-tool-call` | observe, veto | Approval gates beyond the built-in tiers. `onTimeout: deny`, alone among these |
 | core | `core:before-snapshot` | observe, transform, veto | Budget shaping and PII stripping. The payload is section names |
 | changes | `changes:before-commit` | observe, transform, veto | Commit lint and message helpers |

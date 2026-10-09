@@ -588,6 +588,16 @@ export class AgentSessionRepository {
    * Synchronous, so a caller can check and write with nothing in between.
    */
   sessionWithHistory(taskIds: readonly string[], live: ReadonlySet<string>): string | null {
+    return this.idleSessionOf(taskIds, live, true)
+  }
+
+  /** The same, with or without stored history, for deleting a deleted task's sessions outright
+   *  (runtime.ts § purgeDeletedTasks). */
+  idleSessionOfTasks(taskIds: readonly string[], live: ReadonlySet<string>): string | null {
+    return this.idleSessionOf(taskIds, live, false)
+  }
+
+  private idleSessionOf(taskIds: readonly string[], live: ReadonlySet<string>, withHistory: boolean): string | null {
     if (!taskIds.length) return null
     const running = this.db
       .select({ id: schema.agentTurns.id })
@@ -601,7 +611,7 @@ export class AgentSessionRepository {
       .from(schema.agentSessions)
       .where(and(
         inArray(schema.agentSessions.taskId, [...taskIds]),
-        isNull(schema.agentSessions.historyRemovedAt),
+        withHistory ? isNull(schema.agentSessions.historyRemovedAt) : undefined,
         notExists(running),
         live.size ? notInArray(schema.agentSessions.id, [...live]) : undefined,
       ))

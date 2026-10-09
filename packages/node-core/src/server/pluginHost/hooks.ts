@@ -110,6 +110,21 @@ const CORE_POINTS: readonly HookPointRegistration[] = [
     collect: false,
   },
   {
+    // Tasks were deleted for good (../storage/taskDeletion.ts). Core's rows and the tombstones are
+    // already committed, so each plugin purges its own rows for `taskIds` here. Observe only, because
+    // there is nothing left to refuse or rewrite, and an observer never holds up the delete route. The
+    // timeout only marks a slow purge in the developer view. A missed or failed one is caught up by the
+    // plugin's daily read of `ctx.core.tasks.deleted()`.
+    id: 'core:task-deleted',
+    ownerId: 'core',
+    payload: { taskIds: 'string[]' },
+    allows: ['observe'],
+    timeoutMs: 30_000,
+    onTimeout: 'allow',
+    order: 'priority',
+    collect: false,
+  },
+  {
     // The gate in front of every agent tool call, wherever the call came from: an MCP client, a managed
     // harness, or the renderer's own typed projection all land on one route (../routes/agentTools.ts).
     // Core's rather than the agents plugin's, because core owns the tool registry and the route; the

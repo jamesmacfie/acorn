@@ -1,4 +1,6 @@
-import type { NodePlugin } from '@acorn/plugin-api/node'
+import { registerDeletedTaskPurge, type NodePlugin } from '@acorn/plugin-api/node'
+import { inArray } from 'drizzle-orm'
+import { httpRequests } from './schema'
 import { WORKFLOW_STEP_KIND } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { createHttpFetch } from '../server/routes/http'
 import { describeHttpStep, httpStepHandler, validateHttpStep } from '../server/workflowStep'
@@ -20,6 +22,9 @@ export const httpPlugin = (): NodePlugin => ({
   init: (ctx) => {
     const db = ctx.storage.open()
     ctx.routes.fetch(createHttpFetch(db, ctx.core, ctx.events.send), { prefix: '', note: '/projects/:projectId/*' })
+    // The task's ad-hoc requests. One saved to the repo tree has no task id and stays.
+    registerDeletedTaskPurge(ctx, async (taskIds) =>
+      (await db.delete(httpRequests).where(inArray(httpRequests.taskId, [...taskIds]))).changes)
     // The `http:request` workflow step (./workflowStep.ts). Contributed rather than granted: workflows
     // opens the point and any plugin may fill it, so this needs no special case in that package.
     //

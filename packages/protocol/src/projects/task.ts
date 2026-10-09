@@ -32,6 +32,17 @@ export type RestoreOpts = {
   newBranch?: boolean
 }
 
+// Result of deleting a task for good (docs/workspaces-and-tasks/archive.md § Deleting a task). An active
+// task is archived first, so a refusal before the delete is the archive's, with its fields. `taskIds`
+// is the task and every descendant deleted with it. Plugin data goes after the answer.
+export type DeleteResult =
+  | { ok: true; taskIds: string[]; cleanupFailed?: string[] }
+  | Extract<ArchiveResult, { ok: false }>
+
+// The archive options that still mean something when the archive is a step on the way to a delete.
+// The worktree always goes.
+export type DeleteOpts = Omit<ArchiveOpts, 'deleteWorktree'>
+
 // What a plugin said about a task the owner is about to archive, as the dialog receives it. The node
 // mints `id` (`<pluginId>:<checkId>:<concernId>`) and stamps `pluginId`, so a package can neither
 // collide with another's checkbox nor draw a row under its name.

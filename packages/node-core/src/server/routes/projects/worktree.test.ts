@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Env } from '../../bindings'
 import type { AppEnv } from '../../middleware/auth'
 import { requireUser } from '../../middleware/requireUser'
@@ -13,6 +13,7 @@ import { makeTestDb, testSecretEnv, type TestDb } from '../../../testkit/db'
 import { setTaskSessionsBridge, worktree, type TaskSessionsBridge } from './worktree'
 import { loadTask, setWorktreesRoot } from '../../worktrees/taskWorktree'
 import { registerCheckoutAdmission, type CheckoutAdmission } from '../../core/checkoutAdmission'
+import { registerHookHandler } from '../../pluginHost/hooks'
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -131,6 +132,33 @@ describe('worktree routes', () => {
     const res = await app.fetch(req('/core/tasks/task1/archive', 'POST', { force: true }), env())
     expect(res.status).toBe(200)
     expect(seen).toEqual(['count:task1'])
+  })
+
+  it('delete archives an active task, deletes it, and tells plugins which ids went', async () => {
+    const deleted = vi.fn(async () => undefined)
+    const handler = registerHookHandler({ id: 'test:purge', pluginId: 'test', point: 'core:task-deleted', mode: 'observe', priority: 0, call: deleted })
+    try {
+      setTaskSessionsBridge(sessions())
+      const res = await authed().fetch(req('/core/tasks/task1/delete', 'POST', { force: true }), env())
+      expect(await res.json()).toEqual({ ok: true, taskIds: ['task1'] })
+      expect(await loadTask(testDb.db, 'task1')).toBeUndefined()
+      await vi.waitFor(() => expect(deleted).toHaveBeenCalledWith({ taskIds: ['task1'] }, expect.anything()))
+    } finally {
+      handler.dispose()
+    }
+  })
+
+  // Archive admits a task-scoped token for its own tree. Delete never does.
+  it('refuses a delete from a caller confined to the task', async () => {
+    setTaskSessionsBridge(sessions())
+    const confined = new Hono<AppEnv>()
+      .use('/core/*', async (c, next) => {
+        c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
+        await next()
+      })
+      .route('/core', worktree)
+    expect((await confined.fetch(req('/core/tasks/task1/delete', 'POST', {}), env())).status).toBe(403)
+    expect(await loadTask(testDb.db, 'task1')).toBeDefined()
   })
 
   it('401s without a principal', async () => {

@@ -834,6 +834,15 @@ export class ManagedAgentRuntime {
     return totals
   }
 
+  /** Deletes everything this plugin holds for deleted tasks (./deletedTaskPurge.ts). Loaded on first
+   *  use, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs). */
+  async purgeDeletedTasks(taskIds: readonly string[], signal?: AbortSignal): Promise<number> {
+    const { purgeDeletedTasks } = await import('./deletedTaskPurge')
+    return purgeDeletedTasks({
+      engine: this.engine, store: this.store, attachments: this.attachments, artifacts: this.artifacts, db: this.db, batch: HISTORY_BATCH, mergeSearchIndex,
+    }, taskIds, signal)
+  }
+
   async handoffToTerminal(sessionId: string): Promise<AgentSession> {
     if (await this.store.activeTurn(sessionId)) {
       throw new Error('Finish or cancel the active turn before continuing in the terminal.')

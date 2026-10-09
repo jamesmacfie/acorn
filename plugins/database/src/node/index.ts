@@ -1,4 +1,6 @@
-import type { NodePlugin } from '@acorn/plugin-api/node'
+import { registerDeletedTaskPurge, type NodePlugin } from '@acorn/plugin-api/node'
+import { inArray } from 'drizzle-orm'
+import { dbScratch } from './schema'
 import { WORKFLOW_STEP_KIND } from '@acorn/plugin-workflows/contract/extensions.ts'
 import { DATABASE_QUERY } from '../contract/query'
 import { databaseBridge, type DatabaseBridge } from '../server/database'
@@ -30,6 +32,9 @@ export const databasePlugin = (): NodePlugin => {
       const data = databaseBridge(ctx.core, ctx.events.send)
       bridge = data
       ctx.routes.fetch(createDatabaseFetch(db, ctx.core, data, ctx.events.send), { prefix: '', note: '/tasks/:taskId/*' })
+      // The task's scratch buffer. Saved queries are the project's and stay.
+      registerDeletedTaskPurge(ctx, async (taskIds) =>
+        (await db.delete(dbScratch).where(inArray(dbScratch.taskId, [...taskIds]))).changes)
       // One read path for the two workflow steps and for anything later that wants a repo's data, so
       // the row cap and the read-only refusal are written once (docs/database/palette-and-workflows.md § Workflow steps).
       const query = databaseQuery(data)

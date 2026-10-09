@@ -1,6 +1,9 @@
 # Delete a task
 
-Date: October 9, 2026. Status: proposed; implementation not started.
+Date: October 9, 2026. Status: implemented October 10, 2026. The
+[reference](../workspaces-and-tasks/archive.md#deleting-a-task) describes what shipped. It differs from
+this design in two places: `ctx.core.tasks.deleted()` is on the public task service, because the loaded
+http and database plugins purge too, and the workflows purge keeps processing history.
 
 [Archive and restore](../workspaces-and-tasks/archive.md) owns the archive lifecycle this plan builds
 on. [Retention](../data-layer/backup-and-retention.md#retention) owns the time-based prune of archived

@@ -8,7 +8,7 @@ import { taskScripts } from '../taskScripts/service'
 import { execFile } from 'node:child_process'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { ArchiveOpts, ArchiveResult, RestoreOpts, RestoreResult } from '@acorn/protocol/task.ts'
@@ -23,6 +23,10 @@ import { admitCheckout, checkoutAdmissionFor } from '../core/checkoutAdmission'
 const exec = promisify(execFile)
 
 export const TEARDOWN_TIMEOUT_MS = 2 * 60 * 1000
+
+// Another lifecycle change holds the task: an archive tearing it down, a delete, or a restore that
+// got there first. The routes answer 409 (routes/projects/worktree.ts).
+export type TaskBusy = { ok: false; reason: string; busy: true }
 
 export type TeardownResult = { exitCode: number | null; output: string; reason?: 'timeout' | 'spawn_failed' | 'cancelled' | 'nonzero_exit' }
 
@@ -219,7 +223,7 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
 // The worktree is rebuilt now rather than by the first pane that asks for it, because the two ways it
 // fails (the branch is checked out somewhere else, or it no longer exists) need the owner, and a pane
 // that silently gets no folder would hide both. A failed rebuild leaves the task archived.
-export async function restoreTask(db: AppDatabase, id: string, opts: RestoreOpts = {}): Promise<RestoreResult> {
+export async function restoreTask(db: AppDatabase, id: string, opts: RestoreOpts = {}): Promise<RestoreResult | TaskBusy> {
   const t = await loadTask(db, id)
   if (!t) return { ok: false, reason: 'Task not found.' }
   if (t.status === 'active') return { ok: true }
@@ -231,8 +235,14 @@ export async function restoreTask(db: AppDatabase, id: string, opts: RestoreOpts
   if (checkout && branch && t.pullNumber == null && !opts.newBranch && !(await branchExists(checkout, branch))) {
     return { ok: false, reason: `Branch '${branch}' no longer exists.`, branchMissing: true }
   }
+  // Only a row that is still archived. A delete that ran during the branch check above removed it, and
+  // rebuilding a worktree for it would leave a folder no task owns.
+  const restored = db.update(schema.tasks)
+    .set({ status: 'active', archivedAt: null, updatedAt: Date.now() })
+    .where(and(eq(schema.tasks.id, id), eq(schema.tasks.status, 'archived')))
+    .run()
+  if (!Number(restored.changes)) return { ok: false, reason: 'The task was deleted or restored while this restore ran.', busy: true }
   if (!checkout || !branch) taskScripts(db).newGeneration(id)
-  await db.update(schema.tasks).set({ status: 'active', archivedAt: null, updatedAt: Date.now() }).where(eq(schema.tasks.id, id))
   if (checkout && branch) {
     try {
       await admitCheckout(db, t.id, () => resolveTaskCwd(db, toTaskRef(t), checkout))

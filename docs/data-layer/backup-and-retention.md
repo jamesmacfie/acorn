@@ -43,6 +43,7 @@ prune nothing ([schedules](../schedules.md#what-is-registered)). Times are Node-
 | Audit rows | 90 days | `core:audit-prune`, daily at 03:20 |
 | Dashboard measure history | Its own retention | `core:compact-history`, daily at 03:40 |
 | Agent history of archived tasks | Forever, or 30 days, 90 days, or one year | `agents:archived-history-prune`, daily at 03:50 |
+| A deleted task's plugin rows | Until the plugin purges them | The `core:task-deleted` hook, then each plugin's `deleted-task-purge`, daily at 04:10 ([deleting a task](../workspaces-and-tasks/archive.md#deleting-a-task)) |
 | Terminal replay | Bounded per session | The terminal plugin |
 | Logs | The runtime's size and age policy | The Node runtime |
 | Plugin databases | While the plugin is disabled | Explicit deletion only |

@@ -43,6 +43,13 @@
       "when": 1791360764428,
       "tag": "0005_right_ego",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791572841840,
+      "tag": "0006_deleted_tasks",
+      "breakpoints": true
     }
   ]
 }

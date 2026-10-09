@@ -5,7 +5,6 @@ import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-j
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, runTargetsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/infra/queries.ts'
-import { archiveTask } from '@acorn/client-core/features/tasks'
 import { paneAvailable, paneContributions } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { projectPath, registerCommands } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/host/registries/commands'
@@ -14,14 +13,13 @@ import { refreshSessionSources } from '@acorn/client-core/features/tasks'
 import { requestTerminalFocusIntent } from '@acorn/client-core/host/registries/commands'
 import { hasHostCapability } from '@acorn/client-core/infra/node'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
-import { taskBridge } from '@acorn/client-core/features/tasks'
 import { runApi } from '@acorn/client-core/features/tasks'
 import { activeTaskId, dispatchLayout, layoutForTask, maximizedPane, setActiveTaskId, setMaximizedPane, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { formatChord } from '@acorn/client-core/features/tasks'
 import { taskStatus } from '@acorn/client-core/features/tasks'
 import TaskPaneHost from '@acorn/client-core/features/tasks/TaskPaneHost.tsx'
-import { confirmTaskArchive } from '@acorn/client-core/features/tasks/confirmTaskArchive.ts'
+import { archiveOrDeleteTask, confirmTaskArchive } from '@acorn/client-core/features/tasks/confirmTaskArchive.ts'
 import { Alert, Button, StatusDot } from '@acorn/client-core/kit/components/primitives.tsx'
 import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { TaskSlotHost } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
@@ -51,7 +49,6 @@ export default function TaskView(props: {
   // shell has no business holding write/attach/kill/resize, which is what importing
   // client/terminalClient handed it.
   const hasEngine = () => hasHostCapability({ plugin: 'terminal' })
-  const bridge = taskBridge()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const tasksQuery = createQuery(() => tasksOptions(true))
@@ -100,6 +97,7 @@ export default function TaskView(props: {
     // Held rather than passed straight through, because the teardown-failed path re-invokes the
     // archive from a button and the cleanups the owner ticked are still the cleanups they ticked.
     setPendingChecks(decision.checked)
+    setPendingAction(decision.action)
     await confirmClose()
   }
 
@@ -196,8 +194,10 @@ export default function TaskView(props: {
   // this task's close button and its rail row both spin, off the one shared flag in
   // client-core/features/tasks/archiveLifecycle.ts.
   const closing = () => isArchiving(props.task.id)
-  // The plugin cleanups this archive is carrying, from the dialog to the request (and to the retry).
+  // The plugin cleanups this archive is carrying, and whether the owner chose to delete instead, from
+  // the dialog to the request (and to the retry).
   const [pendingChecks, setPendingChecks] = createSignal<string[]>([])
+  const [pendingAction, setPendingAction] = createSignal('')
 
   async function confirmClose(skipTeardown = false) {
     if (closing()) return
@@ -210,8 +210,8 @@ export default function TaskView(props: {
       // node's TASK_SESSIONS bridge, which the terminal plugin fills; without it the route 503s, so a node
       // that does not run terminals gets the plain status flip instead.
       if (hasEngine()) {
-        const result = await bridge.task.archive(archivedTaskId, {
-          deleteWorktree: true, force: true, skipTeardown, applyChecks: pendingChecks(),
+        const result = await archiveOrDeleteTask(archivedTaskId, pendingAction(), {
+          guarded: true, force: true, skipTeardown, applyChecks: pendingChecks(),
         })
         if (!result.ok) {
           if (result.archivedTaskIds?.length) {
@@ -227,8 +227,10 @@ export default function TaskView(props: {
         archivedTaskIds = result.archivedTaskIds ?? [archivedTaskId]
         setPendingChecks([])
       } else {
-        const result = await archiveTask(archivedTaskId)
+        const result = await archiveOrDeleteTask(archivedTaskId, pendingAction(), { guarded: false })
         archivedTaskIds = result.archivedTaskIds ?? [archivedTaskId]
+        // Archived even when the delete after it was refused, so the task still leaves the rail.
+        if (!result.ok) setCloseError(result.reason)
       }
       finishArchive(archivedTaskIds)
       await queryClient.invalidateQueries({ queryKey: tasksKey })

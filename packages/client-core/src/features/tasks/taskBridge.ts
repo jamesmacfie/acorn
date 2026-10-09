@@ -1,9 +1,10 @@
-import type { ArchiveOpts, ArchiveResult, RestoreOpts, RestoreResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/task.ts'
+import type { ArchiveOpts, ArchiveResult, DeleteOpts, DeleteResult, RestoreOpts, RestoreResult, TaskArchiveConcern, TaskStatus } from '@acorn/protocol/task.ts'
 import {
   projectConfigRoute,
   projectRunTargetsRoute,
   taskArchiveConcernsRoute,
   taskArchiveRoute,
+  taskDeleteRoute,
   taskOnCreatedRoute,
   taskPreviewUrlRoute,
   taskRestoreRoute,
@@ -29,6 +30,9 @@ export type TaskBridge = {
     // rejects into the caller: a node that cannot answer means no plugin rows, not no dialog.
     archiveConcerns(id: string): Promise<TaskArchiveConcern[]>
     restore(id: string, opts?: RestoreOpts): Promise<RestoreResult>
+    // Delete for good (docs/workspaces-and-tasks/archive.md § Deleting a task). An active task is
+    // archived first with `opts`, which needs the terminal plugin; without it, archive the task first.
+    delete(id: string, opts?: DeleteOpts): Promise<DeleteResult>
     onCreated(id: string, nodeId?: string | null): Promise<void>
     statuses(): Promise<TaskStatus[]>
   }
@@ -59,6 +63,7 @@ export const taskBridge = (): TaskBridge => {
           return []
         }),
       restore: (id, opts) => post<RestoreResult>(taskRestoreRoute(id), opts ?? {}),
+      delete: (id, opts) => post<DeleteResult>(taskDeleteRoute(id), opts ?? {}),
       onCreated: (id, nodeId) => post<{ ok: boolean }>(taskOnCreatedRoute(id), undefined, nodeId).then(() => undefined),
       statuses: () => readJson<TaskStatus[]>(taskStatusesRoute),
     },

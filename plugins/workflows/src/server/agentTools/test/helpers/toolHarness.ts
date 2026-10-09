@@ -7,7 +7,7 @@ import { join } from 'node:path'
 import { vi } from 'vitest'
 import { makeTestNodeContext, schema as coreSchema } from '@acorn/plugin-api/testkit'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { agentProfileRegistry, DEFAULT_PROFILE_ID, routeCapability, type AgentToolContribution, type ToolContext } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, DEFAULT_PROFILE_ID, type AgentToolContribution, type ToolContext } from '@acorn/plugin-api/node'
 import { AGENTS_TOOL_CALLER, type AgentSettledTurn } from '@acorn/plugin-agents/contract/toolCaller.ts'
 import { AGENTS_REQUESTS, AGENTS_TURNS, type AgentRequestState, type AgentTurnState } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import { AGENTS_SESSION_EXECUTE, type AgentSessionExecute, type AgentSessionExecuteRequest } from '@acorn/plugin-agents/contract/sessionExecute.ts'
@@ -79,12 +79,6 @@ export async function bootWorkflowTools(existingRoot?: string) {
   ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, execute)
   // Agent steps write a handoff note when they finish. Nothing here reads it back.
   ctx.capabilities.provide(NOTES_STORE, { append: async () => undefined, setIncluded: async () => undefined } as never)
-  // Workflows registers a schedule and a schedule target at init. Nothing fires in these tests.
-  const registered = () => ({ dispose: () => undefined })
-  ctx.capabilities.provide(routeCapability<{ register(schedule: unknown): { dispose(): void }; registerTarget(target: unknown): { dispose(): void } }>('core.scheduler'), {
-    register: registered,
-    registerTarget: registered,
-  })
 
   const at = Date.now()
   await ctx.db.insert(coreSchema.workspaces).values({ id: 'workspace', name: 'Workspace', isDefault: true, sort: 0, createdAt: at, updatedAt: at })

@@ -116,6 +116,11 @@ export type TaskService = {
   // Cancel a task, the child-task half of cancelling a dispatched run. A distinct verb rather than a
   // general `setStatus`, so a plugin cannot archive or restore a task outside core's own routes.
   cancel(taskId: string): Promise<void>
+  // Every task the owner deleted, from core's tombstones (docs/workspaces-and-tasks/archive.md § Deleting
+  // a task). A plugin's daily catch-up reads it to purge rows a missed `core:task-deleted` hook left
+  // behind (server/pluginHost/deletedTaskPurge.ts). Never infer deletion from a task missing from
+  // `load` or `active`: a transient empty answer would read as every task gone.
+  deleted(): Promise<string[]>
 }
 
 export type CompiledTaskService = TaskService & {
@@ -174,6 +179,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         .where(and(eq(schema.tasks.status, 'archived'), lt(schema.tasks.archivedAt, before)))
       return rows.map((row) => row.id)
     },
+    deleted: async () => (await db.select({ id: schema.deletedTasks.id }).from(schema.deletedTasks)).map((row) => row.id),
     adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
       if (!branchToPull.size) return 0
       const candidates = await db

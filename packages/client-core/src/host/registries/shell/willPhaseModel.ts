@@ -23,6 +23,9 @@ export const DETAILS_MAX = 5
 export type WillEventMap = {
   'task:archive': { taskId: string }
   'task:restore': { taskId: string }
+  // Deleting an archived task from the Archive page. No handler answers yet: an archived task has no
+  // worktree and no running sessions to warn about.
+  'task:delete': { taskId: string }
   'workspace:remove': { workspaceId: string; name: string }
   'app:quit': Record<string, never>
 }
@@ -39,6 +42,7 @@ type RegisteredHandler = { feature: string; run: (payload: never) => Concern | C
 const BUDGET_MS: Record<WillEventKind, number> = {
   'task:archive': 2_500,
   'task:restore': 250,
+  'task:delete': 250,
   'workspace:remove': 250,
   'app:quit': 250,
 }

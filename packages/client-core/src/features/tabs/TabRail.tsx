@@ -2,7 +2,6 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Task, type Workspace } from '../../infra/queries'
-import { archiveTask } from '../tasks/taskMutations'
 import { applyRailOrder, applySourceOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
 import { activeTaskId, layoutForTask, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
@@ -24,11 +23,10 @@ import { unreadForTask } from '../notifications/notifications'
 import { toast } from '../notifications/toast'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
-import { taskBridge } from '../tasks/taskBridge'
 import { registerCommands } from '../../host/registries/commands/commands'
 import { keybindingRegistry, registerKeybindings, resolveKeybindings } from '../../host/registries/commands/keybindings'
 import { formatChord } from '../../kit/lib/rendering/formatChord'
-import { confirmTaskArchive } from '../tasks/confirmTaskArchive'
+import { archiveOrDeleteTask, confirmTaskArchive } from '../tasks/confirmTaskArchive'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
@@ -307,23 +305,23 @@ export default function TabRail() {
   async function openArchive(w: Task) {
     setMenuId(null)
     const decision = await confirmTaskArchive(w)
-    if (decision.confirmed) await archive(w, decision.checked)
+    if (decision.confirmed) await archive(w, decision.action, decision.checked)
   }
 
-  async function archive(w: Task, applyChecks: string[] = []) {
+  async function archive(w: Task, action: string, applyChecks: string[] = []) {
     if (isArchiving(w.id)) return
     // Wrapped so the row keeps a spinner for the whole teardown, the same one the task pane's
     // close button shows (tasks/archiveLifecycle.ts).
-    await withArchiving(w.id, () => archiveInner(w, applyChecks))
+    await withArchiving(w.id, () => archiveInner(w, action, applyChecks))
   }
 
-  async function archiveInner(w: Task, applyChecks: string[]) {
+  async function archiveInner(w: Task, action: string, applyChecks: string[]) {
     let archivedTaskIds = [w.id]
     if (hasHostCapability({ plugin: 'terminal' })) {
       // `force`, matching the task pane's own archive. With no options, a dirty worktree came back
       // "uncommitted changes, confirm to discard" after the owner had already confirmed that on the
       // danger row.
-      const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
+      const res = await archiveOrDeleteTask(w.id, action, { guarded: true, force: true, applyChecks })
       archivedTaskIds = res.archivedTaskIds ?? (res.ok ? [w.id] : [])
       if (!res.ok) {
         finishArchive(w, archivedTaskIds)
@@ -334,8 +332,10 @@ export default function TabRail() {
       if (res.cleanupFailed?.length) warnings.push(`cleanup failed for: ${res.cleanupFailed.join(', ')}`)
       if (warnings.length) toast(`Archived, but ${warnings.join('; ')}.`, { tone: 'danger' })
     } else {
-      const res = await archiveTask(w.id)
+      const res = await archiveOrDeleteTask(w.id, action, { guarded: false })
       archivedTaskIds = res.archivedTaskIds ?? [w.id]
+      // Archived even when the delete after it was refused, so the task still leaves the rail.
+      if (!res.ok) toast(res.reason, { tone: 'danger' })
     }
     finishArchive(w, archivedTaskIds)
     await invalidate()

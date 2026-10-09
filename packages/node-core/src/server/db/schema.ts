@@ -187,6 +187,14 @@ export const tasks = sqliteTable('tasks', {
   archivedAt: integer('archived_at'), // set on archive; row kept for history/teardown audit
 })
 
+// One row per task the owner deleted, kept forever (docs/workspaces-and-tasks/archive.md § Deleting a
+// task). Plugins read it to purge rows a missed `core:task-deleted` hook left behind, and the client
+// reads it to label a reference to a deleted task. Never inferred from a task missing from `tasks`.
+export const deletedTasks = sqliteTable('deleted_tasks', {
+  id: text('id').primaryKey(), // the deleted tasks.id
+  deletedAt: integer('deleted_at').notNull(),
+})
+
 // Pull requests Acorn created while acting inside a task. `tasks.pull_number` remains the task's
 // operational primary (worktree/checks/context); these rows preserve the one-to-many relation and
 // agent provenance that GitHub cannot reconstruct after the fact. Repository identity is stored with

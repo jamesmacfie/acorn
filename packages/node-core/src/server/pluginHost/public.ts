@@ -9,6 +9,7 @@ export type { CustomAgentRegistry, ManifestCustomAgent } from './customAgents.ts
 export { deliverableSkills, recordSkillDelivery } from './skills.ts'
 export type { DeliverableSkill } from './skills.ts'
 export { registerHookPoint, runHook } from './hooks.ts'
+export { registerDeletedTaskPurge } from './deletedTaskPurge.ts'
 export { portableCarrier } from './portable.ts'
 export { PLUGIN_STATE, pluginState } from './state.ts'
 export type { PluginsBridge } from './state.ts'

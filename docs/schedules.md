@@ -70,6 +70,11 @@ disabling a plugin doesn't delete the owner's pause or run history.
   the switch. It stops itself after four minutes, under the 300-second ceiling, and the next run carries
   on.
 
+- `<plugin>:deleted-task-purge`, daily at 04:10, one for each plugin that stores task data. It removes
+  that plugin's rows for every deleted task the `core:task-deleted` hook missed
+  ([deleting a task](./workspaces-and-tasks/archive.md#deleting-a-task)). The agents plugin's run has
+  the 300-second ceiling, and the next run carries on.
+
 Core declares all but the audit prune only when the composition root passes `env` to
 `createScheduler`, which both Node hosts do. A scheduler built without it, as in a test, declares only
 the prune.

@@ -256,4 +256,47 @@ describe('removing the agent history of long-archived tasks', () => {
     expect(row(old.id).historyRemovedAt).toBeNull()
     expect(count('agent_events', old.id)).toBe(4)
   })
+
+  // The same runtime, deleting a deleted task's sessions outright (runtime.ts § purgeDeletedTasks).
+  describe('purging deleted tasks', () => {
+    it('deletes the sessions, transcripts, files and ledgers of deleted tasks only', async () => {
+      const gone = await session(await task('gone', 'archived', now), 'kettle')
+      const kept = await session(await task('kept', 'archived', now), 'teapot')
+      db.insert(schema.agentWebhooks).values({
+        id: 'hook', taskId: 'gone', url: 'https://example.test', eventsJson: '[]', secretEnc: 'x', createdAt: now, updatedAt: now,
+      }).run()
+      db.insert(schema.agentSpawns).values({
+        id: 'spawn', rootTaskId: 'kept', rootSessionId: kept.id, ownerTaskId: 'kept', ownerSessionId: kept.id, childTaskId: 'gone',
+        depth: 1, isolation: 'worktree', provisioningState: 'provisioned', idempotencyKey: 'k', createdAt: now, updatedAt: now,
+      }).run()
+
+      expect(await runtime.purgeDeletedTasks(['gone'])).toBeGreaterThan(0)
+
+      expect(db.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, gone.id)).get()).toBeUndefined()
+      for (const table of ['agent_events', 'agent_turns', 'agent_requests', 'agent_artifacts'] as const) expect(count(table, gone.id)).toBe(0)
+      expect(indexed(gone.id)).toBe(0)
+      expect(existsSync(gone.attachmentPath)).toBe(false)
+      expect(existsSync(gone.artifactPath)).toBe(false)
+      expect(db.select().from(schema.agentAttachments).where(eq(schema.agentAttachments.taskId, 'gone')).all()).toEqual([])
+      expect(db.select().from(schema.agentWebhooks).all()).toEqual([])
+      expect(db.select().from(schema.agentSpawns).all()).toEqual([])
+      expect(await runtime.store.searchTaskSessions('kettle bug', ['gone'], 10)).toEqual([])
+
+      expect(row(kept.id).historyRemovedAt).toBeNull()
+      expect(count('agent_events', kept.id)).toBe(6)
+      expect(existsSync(kept.attachmentPath)).toBe(true)
+
+      expect(await runtime.purgeDeletedTasks(['gone'])).toBe(0)
+    })
+
+    it('leaves a session with a turn in flight for a later pass', async () => {
+      const running = await session(await task('gone', 'archived', now), 'kettle')
+      db.update(schema.agentTurns).set({ status: 'active' }).where(eq(schema.agentTurns.sessionId, running.id)).run()
+
+      await runtime.purgeDeletedTasks(['gone'])
+
+      expect(count('agent_events', running.id)).toBe(6)
+      expect(existsSync(running.attachmentPath)).toBe(true)
+    })
+  })
 })

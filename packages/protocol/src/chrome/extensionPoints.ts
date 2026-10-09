@@ -297,7 +297,7 @@ export type HookVerdict<T extends HookPayload = HookPayload> = {
  * declaration. Same shape as `CORE_EXCLUSIVE_SLOTS` below and for the same reason: a designated list
  * a plugin may name but not extend.
  */
-export const CORE_HOOK_POINTS = ['core:worktree-created', 'core:task-archiving', 'core:before-tool-call', 'core:before-snapshot'] as const
+export const CORE_HOOK_POINTS = ['core:worktree-created', 'core:task-archiving', 'core:task-deleted', 'core:before-tool-call', 'core:before-snapshot'] as const
 
 export type CoreHookPoint = (typeof CORE_HOOK_POINTS)[number]
 

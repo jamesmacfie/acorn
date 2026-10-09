@@ -134,7 +134,9 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 | `POST` | `/v1/core/tasks/:id/preview-url` | Resolve the task's preview URL |
 | `POST` | `/v1/core/tasks/:id/on-created` | Prepare a new branch task's worktree and setup |
 | `GET` | `/v1/core/tasks/:id/archive-concerns` | What each plugin says about archiving this task |
-| `POST` | `/v1/core/tasks/:id/archive`, `/restore` | Archive or restore a task |
+| `POST` | `/v1/core/tasks/:id/archive`, `/restore` | Archive or restore a task. Restore answers 409 when a delete got there first |
+| `POST` | `/v1/core/tasks/:id/delete` | Delete a task and its subtasks for good. Device-only ([deleting a task](../workspaces-and-tasks/archive.md#deleting-a-task)) |
+| `GET` | `/v1/core/tasks/deleted` | Every deleted task's id |
 | `GET` | `/v1/core/tasks/:id/run` | The task's run targets |
 | `GET` | `/v1/core/tasks/:id/run/default-url` | The default run target's URL |
 | `POST` | `/v1/core/tasks/:id/run/:target/start`, `/stop`, `/restart` | Control one run target |
