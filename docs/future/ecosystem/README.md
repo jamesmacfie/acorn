@@ -1,110 +1,58 @@
-# Ecosystem: acorn as a shell over third-party plugins
+# Finish plugin distribution
 
-Design notes from the ecosystem-feasibility session (2026-08-14), pruned 2026-08-16 to what is
-still ahead. Nothing here is scheduled. It is the umbrella over the remaining design material —
-`docs/future/dashboards/` and `docs/future/compiled-tier.md` — plus `docs/extensibility.md` and
-`docs/security.md`. Where this folder disagrees with any of those, those win.
+Date: October 8, 2026. Status: authoring and worker containment implemented; package signing and discovery remain proposed.
 
-## The end goal being assessed
+Use this folder to plan plugin signing and discovery. Read
+[the work plan](./work-plan.md) for dependencies and acceptance requirements.
+[Extensibility](../../extensibility.md) and [security](../../security.md) own the implemented boundaries.
 
-A user points acorn at a folder on their machine — or at GitHub, or a marketplace — and installs
-their own plugins onto the desktop node or a remote node. Long term, acorn becomes a shell: a
-small core owning what security and universality demand, and everything else a plugin. Users
-compose their own experience — dashboards, plugins, plugins talking to each other. Third-party
-authors get developer experience good enough that building a quality acorn plugin is an afternoon,
-not a week.
+## Starting point
 
-Device-held client-only bundles are a separate provenance for this installer. They do not change
-the signing or discovery work assessed here.
+The scaffold, published SDK and declarations, folder installation, loaded-package reload, input
+approval, development mode, remote trees, and cooperative extension points are implemented.
+Loaded Node code runs in a permission-scoped worker realm. This is application isolation;
+operating-system containment and a separate crash boundary remain outside that guarantee.
 
-## Where this stands (2026-08-16)
+The panel studio and derived sources are implemented. Their remaining work is in
+[dashboard followups](../dashboards-gaps.md). They do not block a signing design.
+[Security hardening](../security/README.md) has separate proposed requirements for the worker
+boundary and agent tooling. Do not treat a recorded containment implementation as proof that those
+followups are complete.
 
-Much of the original assessment has shipped. The agent-authored dev loop is real: the authoring
-contract is `docs/plugin-authoring.md`; a loaded plugin hot-reloads in place
-(`POST /v1/core/plugins/:id/reload`, candidate-then-commit, a `plugins:changed` event the client
-re-syncs on); the agent raises installs through an approval-mediated tool and iterates under a
-per-(plugin, node) dev grant; plugin themes, declarative chrome, context menus, cooperative
-extension points and exclusive slots are manifest vocabulary (`docs/plugins.md`,
-`docs/ui-design.md § Plugin themes`). The node-first review's contracts also landed: the
-client↔node version contract (`docs/api-reference.md § Versioning`), the platform seam, and
-node-side ownership of user compositions (`docs/state-ownership.md`).
+## Remaining work
 
-The front door is now finished too. `npm create acorn-plugin` and `acorn-plugin-sdk` both ship
-(`packages/create-acorn-plugin`, `packages/plugin-sdk`), so an author with no checkout gets the whole
-no-bundler profile in one command or the typed bridge if they run a bundler
-(`docs/plugins.md § What is published`); and as of **2026-08-16** the **folder install** works on every
-build, so the directory the scaffold just wrote installs on a packaged acorn instead of being refused
-(`docs/security.md § Installing from a folder`).
+Design package attestation, then discovery over verified packages. Define update consent and
+revocation before changing automatic update behavior. A listing must state whether anyone reviews
+its packages; package signature verification alone does not establish a code review.
 
-What remains is two programs plus one map. Rung-2 containment has shipped:
+[Node release packaging](../bundle.md) owns runtime downloads, native binaries, installers, and
+macOS signing. [Repository extraction](../split.md) owns moving first-party packages out of the
+workspace. These are separate from plugin-package attestation.
 
-1. **Dashboards** — shipped (`docs/dashboards.md`); the remaining backlog is
-   `docs/future/dashboards/`. Independent of the above; this is where plugin composition becomes
-   visible to users.
-2. **Distribution, last** — signing, the `docs/future/bundle.md` release work so a remote node is
-   a download, then discovery over signed packages. (`work-plan.md`)
+## Read this folder
 
-`docs/future/compiled-tier.md` is not a phase — it is the standing per-plugin map for shrinking
-the compiled tier, consulted whenever a move is considered. Since 2026-08-28 the answer for the three
-couplings that were component-shaped is the remote component tree
-([docs/plugins.md](../../plugins.md) § Descriptors for facts, trees for UI, rectangles for pixels),
-which is what lets memory's tray section, changes' tool card, and docker's chrome leave the compiled
-tier without widening the sandbox.
-
-Before picking one up, read `work-plan.md § What is actually waiting on something`. The short version:
-discovery still waits on package signing, while the only item no amount of engineering effort routes
-around is the Apple Developer Program purchase, which macOS node downloads and desktop auto-update are
-both stuck behind.
-
-## The files
-
-| File | What it holds |
+| File | Purpose |
 | --- | --- |
-| `blockers.md` | The gates still standing between today and strangers installing plugins — each with its designed answer and owning doc. |
-| `shell-vision.md` | The tension between "acorn as shell" and the permanent tier line, and the stance adopted. |
-| `work-plan.md` | The remaining sequenced work with dependencies, pointing at the owning design docs. |
-| `references-survey.md` | What the projects in `references/` do, which ones acorn can replace, and the five capabilities that recur across all of them. |
-| `where-this-is-going.md` | The next steps for the plugin system, moved from `docs/extensibility.md` on October 4, 2026. |
+| [Distribution gates](./blockers.md) | What signing and discovery must establish, and which prerequisites are implemented. |
+| [Work plan](./work-plan.md) | Remaining steps, dependencies, acceptance, and handoff. |
+| [Host responsibilities](./shell-vision.md) | Why the host retains security, rendering, and transport responsibilities. |
+| [Reference survey](./references-survey.md) | Dated research to recheck before choosing implementation requirements. |
+| [Related direction](./where-this-is-going.md) | Separate containment, migration, cloud, and browser work. |
+| [Scope decisions](./refused.md) | Limits on discovery, updates, frame authority, and folder provenance. |
 
-`dx.md` was here and is gone: everything it asked for shipped. The bar it set is below; the
-differentiator it argued is in `shell-vision.md`; the residue it asked people to watch is enforced in
-code rather than described in prose — the scaffold's drift lock
-(`packages/create-acorn-plugin/index.test.ts`), the published declaration's
-(`packages/plugin-sdk/src/contract.test.ts`), the testkit deep-import ceiling (`MAX_DEEP_IMPORTS` in
-`tools/arch/boundaries.test.ts`), the three `// prune candidate` markers in
-`packages/plugin-api/src/client.ts`, and the unverified-chrome items in the
-[desktop and plugin checks](../../testing/desktop-and-plugins.md), items 11 to 16.
+## Developer requirements
 
-## The bar for plugin DX
+Keep authoring possible without an Acorn checkout. Preserve published declarations, manifest
+compatibility, scaffold tests, installed-package tests, and error messages that name the failed step.
+A development install must continue to disclose its mutable bytes and must not claim a signed digest.
 
-A stranger with no checkout of this repo can go from "I want a pane that shows X" to a working,
-installable plugin in an afternoon, and from there to something they'd publish in a weekend — without
-reading acorn's source. Concretely: install one package, follow one guide, get errors that name
-themselves, test without the host, and iterate without restarts.
+Use [published packages](../../plugins/publishing.md),
+[plugin authoring](../../plugin-authoring.md), and [the development loop](../../plugins/dev-loop.md)
+for the implemented contract. Avoid duplicating those rules in a release service.
 
-Every clause in that sentence holds today, the last one included since the folder install landed. What
-clears it: one authoring document
-(`docs/plugin-authoring.md`) and one command (`npm create acorn-plugin`); a reload-shaped loop with a
-dev grant that keeps trust prompts out of iteration; an agent taught by `plugin_authoring` from the
-live schema rather than from memory, with `plugin_request` turning its installs into human approvals;
-failures that name themselves (roster `reason`/`stage`, the attention inbox, labelled frame
-placeholders); a real context from `@acorn/plugin-api/testkit`; a pinned API surface; and host-owned
-storage.
+## Verify before building
 
-Built after all, and here is why the earlier refusal was overturned. This paragraph used to read
-"deliberately not built: a JSON Schema for `acorn-plugin.json`", on the grounds that a second schema is
-a second source of truth. That was the right answer for a hand-maintained copy and the wrong one for a
-generated file. `packages/plugin-types/acorn-plugin.schema.json` is written out of the Zod contract by
-`packages/plugin-types/src/pluginSchema.test.ts`, which fails when the committed bytes and the contract disagree, so there is
-still exactly one source of truth. The install error and `plugin_authoring` do catch the failure they
-always caught; what neither can do is put completion and inline errors in the author's editor before
-the file is ever loaded. See docs/plugins.md § The manifest schema.
-
-## Drift warning — read this before building
-
-Behavioral claims here were verified against the tree on **2026-08-14** and re-checked
-**2026-08-16**. The codebase will drift before the rest is built; `references/` may move or be
-deleted. Treat the *decisions and orderings* here as durable and the *paths* as hints. The owning
-docs for current behavior are `docs/plugins.md`, `docs/plugin-authoring.md`, `docs/security.md`,
-`docs/extensibility.md`, and `docs/loaded-plugin-migration.md` — where this folder disagrees with
-those, those win.
+- Recheck published entrypoints, package installation, trust records, and worker enforcement.
+- Read the security programme before relying on an untested adversarial boundary.
+- Confirm signing setup and release ownership instead of treating the August blocker list as live evidence.
+- Keep discovery dependent on a reviewed signing design and its installed-package acceptance.

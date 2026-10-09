@@ -33,8 +33,9 @@ export class ProviderEventMaterializer {
   async map(
     sessionId: string,
     turnId: string | null,
-    providerEvent: AgentDriverEvent,
+    attributedEvent: AgentDriverEvent,
   ): Promise<AgentNormalizedEvent[]> {
+    const { acornTurnId: _turnId, ...providerEvent } = attributedEvent
     if (providerEvent.type === 'generated_artifact') {
       if (providerEvent.bytes.byteLength === 0 || providerEvent.bytes.byteLength > MAX_GENERATED_ARTIFACT_BYTES) {
         return [{

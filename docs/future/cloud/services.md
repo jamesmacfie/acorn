@@ -29,7 +29,7 @@ Recommended split:
 - **This repository, open source:** the Node image build, enrollment v2 and grant verification in
   `packages/node-core`, the relay client and server, the relay transport in `@acorn/custody`, the
   history-transfer and archive code, the cloud plugin, and every protocol type in `@acorn/protocol`.
-  Keeping the relay here honors [remote access](../remote.md#the-relay-service-acorndev-or-similar):
+  Keeping the relay here honors [remote access](../remote.md#coordinate-the-relay):
   anyone can run their own. Put the relay server in `apps/relay` and the cloud plugin in
   `plugins/cloud`, both new.
 - **A private repository:** the account service, the admin web app, the provisioner, billing, and

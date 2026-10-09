@@ -36,8 +36,9 @@ top-level dynamic import in that entry, and their full static dependencies. Impo
 including the roster loaded after the first frame, are outside the set. A dependency reached both
 statically and dynamically still counts.
 
-The ceiling is 720,000 B, about 4% above the production measurement of 692,052 B across 158 chunks on
-October 2, 2026. Production output is minified with Oxc. Zod is bundled and tree-shaken, and
+The ceiling is 730,000 B. The October 9, 2026 build measured 729,585 B after the Git plugin joined
+the post-frame roster and the terminal installed the project lookup. The Git plugin remains outside
+the startup closure. Production output is minified with Oxc. Zod is bundled and tree-shaken, and
 validation still runs before untrusted content is drawn. Other external imports are listed
 separately, and their package bytes aren't in the budget. The client imports narrow supported
 entrypoints for its model and host adapters, not broad `public.ts` barrels, which would pull DOM

@@ -97,6 +97,26 @@ still wins. A failure leaves the title and adds nothing to the transcript. The r
 call per session. Deleting a session aborts and joins that call first, and shutdown joins every one
 before the database closes.
 
+## Run summaries
+
+Choose **Summarize run…** from the session menu or the command palette's **Agent session** group.
+Add optional context, choose a backend and model with the sparkle picker, and press **Generate Markdown**.
+The dialog expands during generation and shows read-only Markdown with **Copy Markdown** and
+**Generate again**. The model choice shares the device's Generate preference.
+
+`POST /v1/p/agents/sessions/:sessionId/summarize` requires a device credential. It accepts `backendId`,
+optional `modelId`, and `context` of up to 10,000 characters. The Node captures the durable session
+after flushing buffered events, then generates through `CoreServices.models`. It returns `markdown`,
+`truncated`, and `throughSeq`, the last event sequence in the capture. Generation adds no turn and
+changes no session state. The provider deadline is three minutes. Closing the dialog aborts the
+client request; runtime shutdown also aborts generation.
+
+The prompt includes turn inputs and statuses, assistant messages, tool names and statuses, plans,
+file changes, and errors. It excludes raw tool output and attachment contents. Above 120,000
+transcript characters, it keeps the first 30,000 and last 90,000, marks the omitted middle, and tells
+the model to disclose that limit. The dialog also reports truncation. A running agent can continue
+while the summary describes the captured point in its history.
+
 ## Where the code is
 
 `runtime.ts` coordinates session commands with the provider engine, `sessionTitleGeneration.ts` owns

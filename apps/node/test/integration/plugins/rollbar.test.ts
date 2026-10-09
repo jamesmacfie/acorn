@@ -12,7 +12,6 @@ import { getDb, schema } from '@acorn/node-core/server/db/index.ts'
 import type { AppEnv } from '@acorn/node-core/server/middleware/auth.ts'
 import { rollbarFetch } from '@acorn/plugin-rollbar/testkit'
 import { encryptSecret } from '@acorn/node-core/server/secretBox.ts'
-import { ROLLBAR_ITEMS_STALE_AFTER_MS } from '@acorn/plugin-rollbar/testkit'
 import { settleBackground } from '@acorn/node-core/server/background.ts'
 import { integrations } from '@acorn/node-core/server/routes'
 import { createRollbarFetch } from '@acorn/plugin-rollbar/testkit'
@@ -295,7 +294,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
     await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
     await settleBackground()
 
-    await t.db.update(schema.issues).set({ fetchedAt: Date.now() - ROLLBAR_ITEMS_STALE_AFTER_MS - 1 })
+    await t.db.update(schema.issues).set({ fetchedAt: Date.now() - 2 * 60_000 - 1 })
     vi.mocked(rollbarFetch).mockResolvedValue(new Response('boom', { status: 500 }))
     const res = await app.fetch(new Request(`http://acorn.test/api/rollbar/items/142?integration=${integrationId}`), env())
     expect(res.status).toBe(200)

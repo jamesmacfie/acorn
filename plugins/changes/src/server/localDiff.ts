@@ -139,6 +139,7 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
   // reads four, which is why the two callers can share one command.
   const stdout = (await worktreeStatusText(worktree)) ?? ''
   const parsed = parsePorcelainV2(stdout)
+  const upstreamId = parsed.upstream ? await worktreeGitText(worktree, ['rev-parse', '--verify', '@{upstream}'], { timeoutMs: 10_000 }) : null
   // The line counts share that window too, and are dropped with it when the node writes under the
   // path. Not skipped when the status text is unchanged: a second edit to a file that is already
   // modified moves its counts and leaves its porcelain line alone. A null is git failing, and stats
@@ -150,7 +151,7 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
   ])
   const counted = mergeNumstat(mergeNumstat(parsed.changes, unstaged ?? '', false), staged ?? '', true)
   const changes = await stampLocalChanges(worktree, counted)
-  return { ...parsed, changes, operation: await operation }
+  return { ...parsed, upstreamId: upstreamId?.trim() || null, changes, operation: await operation }
 }
 
 // Everything before the first hunk header is git's file header. The client re-synthesizes its
@@ -199,7 +200,7 @@ export type GitActionResult = { ok: true } | { ok: false; reason: string }
  *  rather than a blocked prompt (`packages/node-core/src/server/core/git.ts`). */
 export const NETWORK_TIMEOUT_MS = 120_000
 
-const run = async (worktree: string, args: string[], timeoutMs = 30_000): Promise<GitActionResult> => {
+const run = async (worktree: string, args: string[], timeoutMs = 30_000, env?: Record<string, string>): Promise<GitActionResult> => {
   // Every mutation this file makes goes through here, which makes it the one place that has to drop the
   // coalesced `git status` for the path. Before the command, not after: a status read that starts while
   // `git add` is running must not be able to store its pre-stage answer under the new timestamp
@@ -208,7 +209,7 @@ const run = async (worktree: string, args: string[], timeoutMs = 30_000): Promis
   // A fetch touches no file in the worktree and still belongs here: it moves the behind count, which
   // the panel reads out of the same coalesced status.
   invalidateWorktreeStatus(worktree)
-  const result = await git(args, { cwd: worktree, timeoutMs })
+  const result = await git(args, { cwd: worktree, timeoutMs, env })
   invalidateWorktreeStatus(worktree)
   if (result.spawnError) return { ok: false, reason: result.spawnError }
   if (result.timedOut) return { ok: false, reason: 'git timed out' }
@@ -336,15 +337,15 @@ export function pullArgs(options: PullOptions = {}): string[] {
 }
 
 export function pushArgs(options: PushOptions = {}): string[] {
-  // `--force-with-lease` with no argument compares the remote ref against this node's
-  // remote-tracking ref, so a commit somebody else pushed since the last fetch makes the push fail
-  // with a reason instead of dropping their work. Never a bare `--force`
+  // An explicit lease pins the remote object shown to the person. A background fetch may move the
+  // tracking ref after that observation, but it cannot relax this lease.
   // (docs/security/process-and-paths.md § Process, path, and configuration controls).
   //
   // `--set-upstream` on every push, not only the first: it is harmless where the upstream is already
   // set, and it means a branch whose upstream was deleted republishes without a second verb. That is
   // also why Publish and Push are one call with two labels.
-  return ['push', ...(options.force ? ['--force-with-lease'] : []), '--set-upstream', 'origin', 'HEAD']
+  return ['push', ...(options.force ? [`--force-with-lease=refs/heads/${options.expectedBranch}:${options.expectedRemoteId}`] : []),
+    '--set-upstream', 'origin', ...(options.force ? [`HEAD:refs/heads/${options.expectedBranch}`] : ['HEAD'])]
 }
 
 /** Undo whichever operation is mid-flight. The operation is read off the tree rather than taken
@@ -352,14 +353,27 @@ export function pushArgs(options: PushOptions = {}): string[] {
  *  the panel cannot vouch for. */
 export const abortArgs = (operation: 'merge' | 'rebase'): string[] => [operation, '--abort']
 
+const networkArgs = (args: string[]): string[] => [
+  '-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always', '-c', 'protocol.ssh.allow=always',
+  '-c', 'protocol.https.allow=always', '-c', 'protocol.git.allow=always', ...args,
+]
+
+const runNetwork = (worktree: string, args: string[]): Promise<GitActionResult> =>
+  run(worktree, networkArgs(args), NETWORK_TIMEOUT_MS, { GIT_SSH_COMMAND: 'ssh' })
+
 export const fetchRemote = (worktree: string): Promise<GitActionResult> =>
-  run(worktree, ['fetch'], NETWORK_TIMEOUT_MS)
+  runNetwork(worktree, ['fetch'])
 
 export const pullRemote = (worktree: string, options: PullOptions = {}): Promise<GitActionResult> =>
-  run(worktree, pullArgs(options), NETWORK_TIMEOUT_MS)
+  runNetwork(worktree, pullArgs(options))
 
-export const pushBranch = (worktree: string, options: PushOptions = {}): Promise<GitActionResult> =>
-  run(worktree, pushArgs(options), NETWORK_TIMEOUT_MS)
+export async function pushBranch(worktree: string, options: PushOptions = {}): Promise<GitActionResult> {
+  if (options.force) {
+    const refusal = await (await import('./pushLease')).forceLeaseRefusal(worktree, options)
+    if (refusal) return { ok: false, reason: refusal }
+  }
+  return runNetwork(worktree, pushArgs(options))
+}
 
 export const abortOperation = (worktree: string, operation: 'merge' | 'rebase'): Promise<GitActionResult> =>
   run(worktree, abortArgs(operation))

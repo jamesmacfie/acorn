@@ -173,6 +173,8 @@ export {
 export { isPaneId } from '@acorn/client-core/features/tasks'
 export type { TaskLayout } from '@acorn/client-core/features/tasks'
 export { createTask } from '@acorn/client-core/features/tasks'
+export { requestTaskLaunch } from '@acorn/client-core/features/tabs/taskLaunch.ts'
+export { openActionPicker } from '@acorn/client-core/host/registries/commands'
 export { isArchiving } from '@acorn/client-core/features/tasks'
 export { agentSessionsFor, focusSession, refreshSessionSources, sendToSession, sessionSummaries } from '@acorn/client-core/features/tasks'
 export type { SessionSummary, SessionSubmit } from '@acorn/client-core/features/tasks'
@@ -230,7 +232,7 @@ export { saveJsonPref, savePref } from '@acorn/client-core/features/settings/sav
 // a plugin's Generate dialog reads the pick, resolves it against the backends it was given, and writes
 // the reader's next choice back for every other dialog to open on.
 export {
-  effectiveModelPick, readGeneratePick, saveGeneratePick,
+  effectiveModelPick, modelPickLabel, readGeneratePick, saveGeneratePick,
 } from '@acorn/client-core/features/settings'
 export type { ModelPick } from '@acorn/client-core/features/settings'
 export { openRepoConfigTrust } from '@acorn/client-core/features/settings'

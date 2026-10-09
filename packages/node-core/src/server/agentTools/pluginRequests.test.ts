@@ -28,7 +28,10 @@ describe('the tool cannot install', () => {
     // handler's output would notice.
     const source = readFileSync(new URL('./pluginRequests.ts', import.meta.url), 'utf8')
     const imports = [...source.matchAll(/^import[^\n]*from '([^']+)'/gm)].map((match) => match[1])
-    expect(imports).toEqual(['node:crypto', 'zod', './registry.ts', '@acorn/protocol/api.ts'])
+    // Anti-vacuity: a pattern that matched nothing would pass the check below.
+    expect(imports).toContain('./registry.ts')
+    const reach = /plugins\/|installer|node:(fs|child_process|http|https|net)\b|fetch/
+    expect(imports.filter((specifier) => reach.test(specifier!))).toEqual([])
   })
 
   it('raises a pending request and refuses the call, rather than doing anything', async () => {

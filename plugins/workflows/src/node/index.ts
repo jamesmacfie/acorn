@@ -1,4 +1,5 @@
 import { describeError, type InternalEnvFactory, type NodePlugin } from '@acorn/plugin-api/node'
+import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
@@ -32,6 +33,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
   let defsCapability: { dispose(): void } | null = null
   let schedulesCapability: { dispose(): void } | null = null
   let stopScheduleRecovery: (() => void) | null = null
+  let stopCheckoutActivity: (() => void) | null = null
   // The step stream, this plugin's own vocabulary rather than a member of the broadcast surface every
   // plugin receives (../contract/notices.ts). It goes out on core's `workflow:` channel, which is why
   // it is written as a frame here rather than reaching for a core helper: `ctx.events` is the seam, and
@@ -59,6 +61,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // close over the handle, so no request can reach an unmigrated database.
       const store = ctx.storage.open()
       const core = ctx.core
+      stopCheckoutActivity = core.checkoutAdmission.registerOwner('runs', (taskIds) => readWorkflowCheckoutActivity(store, taskIds))
       const notices = buildNotices(ctx)
       // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
       // runner is built so a contribution filed during someone else's init is visible on the first
@@ -128,6 +131,8 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     // outlives its database writes its outcome onto a closed connection. Run rows stay 'running' and
     // reconcile() sweeps them to 'pending' on the next boot.
     dispose: () => {
+      stopCheckoutActivity?.()
+      stopCheckoutActivity = null
       stopScheduleRecovery?.()
       stopScheduleRecovery = null
       live?.stop()

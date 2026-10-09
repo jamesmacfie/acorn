@@ -43,6 +43,8 @@ its children by. Its `Viewport` type is what the key tables, the store's reveal,
 a viewport. A viewport is the fallback stop for a document with no controls. When it holds a real stop,
 it's transparent to focus, and a focused child is revealed through every scroll ancestor with
 `scrollChildIntoView`. A viewport that hides asks for a landing pass ([focus](./focus.md)).
+The content always reserves the last cell for the overlaid scrollbar, so wrapped text stays readable
+without changing width when the bar appears.
 
 A region that clips beats a region that scrolls wherever the pane pins something. The `list-detail`
 detail column clips, and what's inside it scrolls, as on the desktop, where `.layout-region-detail` is

@@ -15,15 +15,18 @@ import { WORKFLOW_CONTROL } from '../../contract/workflowControl'
 import AgentConversation from './AgentConversation'
 import AgentUsageIndicator from '../usage/AgentUsageIndicator'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
-import RuntimeStateIcon from './RuntimeStateIcon'
+import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
 import { choiceDescription, choiceGlyph, choiceLabel, type NewSessionChoice } from './newSessionChoices'
 import { sessionCustomAgent } from '../../shared/customAgents'
-import { canStopAgent } from './agentActivity'
+import { canStopAgent, canStopSubagent } from './agentActivity'
+import { selectedManagedSubagent } from './managedSelection'
+import { subagentStatusLabel } from './subagentDisplay'
 import { managedAgentApi } from './managedClient'
 import { agentPricingOptions } from '../pricingClient'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
+import SessionSummaryModal from './SessionSummaryModal'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
@@ -109,16 +112,25 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
       <Show when={model.selected()}>
         {(narrowed) => {
           const session = narrowed
+          const subagentId = () => selectedManagedSubagent(session().id)
+          const subagent = () => session().subagents.find((child) => child.id === subagentId())
           return (
           <>
             <Inline>
-              <RuntimeStateIcon state={session().runtimeState} />
-              <Text emphasis="muted">{session().runtimeState}</Text>
+              <Show when={subagentId()} fallback={<RuntimeStateIcon state={session().runtimeState} />}>
+                <SubagentStateIcon status={subagent()?.status} />
+              </Show>
+              <Text emphasis="muted">{subagentId() ? subagentStatusLabel(subagent()?.status) : session().runtimeState}</Text>
             </Inline>
             <Button
               size="sm"
-              disabled={!canStopAgent(session())}
-              onPress={() => void model.action(() => managedAgentApi.cancel(session().id))}
+              disabled={subagentId() ? !canStopSubagent(session(), subagent()) : !canStopAgent(session())}
+              onPress={() => {
+                const childId = subagentId()
+                void model.action(() => childId
+                  ? managedAgentApi.cancelSubagent(session().id, childId)
+                  : managedAgentApi.cancel(session().id))
+              }}
             >
               Stop
             </Button>
@@ -242,6 +254,9 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return (
     <>
+      <Show when={model.dialog()?.kind === 'summary' ? model.dialog()!.session : undefined} keyed>
+        {(session) => <SessionSummaryModal session={session} onDismiss={() => model.setDialog(null)} />}
+      </Show>
       <Show when={model.dialog()?.kind === 'rename'}>
         <Modal onDismiss={() => model.setDialog(null)} title="Rename session" size="sm">
           <Modal.Body>

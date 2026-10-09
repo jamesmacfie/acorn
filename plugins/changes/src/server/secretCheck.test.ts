@@ -29,7 +29,7 @@ const gate: SecretPublicationGate = {
     return { decisionId: 'd'.repeat(64), operation: input.operation, reason: input.report.counts.high ? 'findings' : 'incomplete', report: input.report }
   },
 }
-const bridge = () => localGitBridge({ tasks: { root: async () => dir } as never, models: {} as never, secretPublication: gate })
+const bridge = () => localGitBridge({ tasks: { root: async () => dir } as never, models: {} as never, checkoutAdmission: {} as never, secretPublication: gate })
 const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim()
 const write = (name: string, text: string) => writeFileSync(join(dir, name), text)
 

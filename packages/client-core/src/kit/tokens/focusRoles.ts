@@ -77,6 +77,7 @@ export const NODE_FOCUS = {
   // A collection, and the cards are its items: one tab stop, the arrows walk them, type-ahead finds
   // one by name. A picture nobody can reach by keyboard is a picture, not a node.
   Graph: 'collection',
+  HistoryMark: 'none',
   Meter: 'none',
   CodeBlock: 'none',
   Log: 'stop',

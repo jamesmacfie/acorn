@@ -27,7 +27,7 @@ export const routeTestCapabilityFor = <T>(id: CapabilityId<T>): T | undefined =>
 // bridge throws propagates to onServerError → 500 'internal'.
 export class BridgeError extends Error {
   constructor(
-    readonly status: 400 | 403 | 404 | 409 | 422,
+    readonly status: 400 | 403 | 404 | 409 | 422 | 503,
     readonly code: string,
     message?: string,
   ) {

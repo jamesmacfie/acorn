@@ -46,6 +46,29 @@ The modal is drawn in the shell's `overlay` slot, because the list the row sits 
 somebody else. The terminal client mounts no overlay slot and its descriptor source panel draws no row
 menu, so this flow is desktop-only for now ([tui.md](../tui/plugin-losses.md) § What a plugin loses here).
 
+## From Git history
+
+Git commit and local branch-tip menus capture the full commit ID before opening a launch form.
+Workflows provides the definition picker and typed required inputs through its client capability;
+Git holds only the pinned launch request. The form creates a task branch from that commit through
+Core, then starts the selected workflow through the normal start route. The form retains one launch
+identity across retries, including a lost response or a delayed trust approval. The device start
+route accepts this `launchId` UUID and binds it to the task, definition, and inputs; replay returns
+the same run, while changed payload returns a conflict. If start fails, Workflows retains the task
+ID and input values for retry on the same task. Dismissal or a Node/project switch stops a pending
+task response from starting a workflow or navigating. A task or run that was already created remains
+available when the same pinned launch is reopened. **Open task** leaves the failed run attempt
+without creating another task. Disabling Workflows removes the launch capability, and Git reports
+that the action is unavailable. Both desktop and terminal render the owner-provided form. Loading
+and read failures remain visible in that form, with retry and close actions.
+
+The selected definition and effective input values freeze when Submit is pressed, before task
+creation completes. Core retains the repository identity seen in the original pinned-commit preview
+and checks it again before each workflow start or retry; a project remap preserves the task and
+inputs but refuses the run. An uncertain start keeps its launch ID across dismissal and reopening.
+After a run is opened, the launch is complete, so selecting **Start workflow here** again begins a
+new task and run at the same commit.
+
 ## From the command palette
 
 Three rows at the palette root, all registered by this plugin's client half

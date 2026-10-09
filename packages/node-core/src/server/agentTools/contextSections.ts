@@ -8,6 +8,7 @@ import { schema } from '../db'
 import { runHook } from '../pluginHost/hooks'
 import { parseCached } from '../integrations/codec'
 import { integrationProviderRegistry } from '../integrations/registry'
+import type { IntegrationProviderContribution } from '../integrations/types'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 
@@ -154,8 +155,30 @@ export const linkedIssuesSection: ContextSectionContribution = {
     if (!items.length && !absent) return ''
     const lines = ['## Linked issues', ...items.map((item) => `- [${item.kind}] ${item.label}${item.details?.[0] ? ` (${item.details[0]})` : ''}`)]
     if (absent) lines.push(`- ⚠ ${absent.detail}`)
-    return lines.join('\n') + formatOmitted(omitted)
+    const hint = trackerToolsHint(items)
+    return lines.join('\n') + formatOmitted(omitted) + (hint ? `\n${hint}` : '')
   },
+}
+
+// Names core's tracker tools for the providers actually linked. An agent sees only tool names until it
+// searches, so without this line a Linear or Rollbar MCP server the person also runs looks like the way
+// in. Each tool is offered only for providers that declare the hook behind it, so a new provider plugin
+// gets an accurate line with no change here, and a summary-only provider is never promised a tool.
+export function trackerToolsHint(items: readonly ContextItem[]): string {
+  const providers = [...new Set(items.map((item) => item.providerId))]
+    .map((id) => (id ? integrationProviderRegistry.get(id) : undefined))
+    .filter((provider): provider is IntegrationProviderContribution => provider?.detail != null)
+  if (!providers.length) return ''
+  const names = (subset: IntegrationProviderContribution[], type: Intl.ListFormatType) =>
+    new Intl.ListFormat('en', { type }).format(subset.map((provider) => provider.label))
+  const commenters = providers.filter((provider) => provider.comment)
+  const imageReaders = providers.filter((provider) => provider.image)
+  const uses = [
+    `issue_detail to read a ${names(providers, 'disjunction')} item in full`,
+    ...(commenters.length ? [`issue_comment to reply on a ${names(commenters, 'disjunction')} item`] : []),
+    ...(imageReaders.length ? [`issue_image to see an image attached to a ${names(imageReaders, 'disjunction')} item`] : []),
+  ]
+  return `Use ${new Intl.ListFormat('en', { type: 'conjunction' }).format(uses)}. These go through acorn's own ${names(providers, 'conjunction')} connections, so you don't need a ${names(providers, 'disjunction')} MCP server for them.`
 }
 
 // ─── The contribution point ─────────────────────────────────────────────────────────────────────

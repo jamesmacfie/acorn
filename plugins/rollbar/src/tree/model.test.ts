@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { RollbarItemMetadata, RollbarOccurrenceDetail } from '../shared/api'
-import { failureReason, levelWord, occurrenceContext, relativeTime, statusWord, taskRollbarTargets } from './model'
+import { failureReason, levelWord, occurrenceContext, relativeTime, statusWord, taskRollbarTargets, traceText } from './model'
 
 describe('Rollbar frame model', () => {
   it('keeps only Rollbar links from the host task projection', () => {
@@ -35,6 +35,22 @@ describe('Rollbar frame model', () => {
     expect(text).toContain('Rollbar #142 [error] Checkout failed')
     expect(text).toContain('at src/checkout.ts:12 (run)')
     expect(text).not.toContain('private@example.com')
+  })
+
+  it('draws the stack as one block, with source lines under their frame', () => {
+    const frames = [
+      { filename: 'app/models/contract.rb', line: 12, method: 'validate', inProject: true, column: null, code: [
+        { line: 11, text: 'def validate' },
+        { line: 12, text: '  raise Invalid' },
+      ] },
+      { filename: 'gems/rails/base.rb', line: null, method: null, inProject: false, column: null, code: [] },
+    ] as unknown as RollbarOccurrenceDetail['frames']
+    expect(traceText(frames)).toBe([
+      'app/models/contract.rb:12 · validate',
+      '      11  def validate',
+      '  ›   12    raise Invalid',
+      'gems/rails/base.rb',
+    ].join('\n'))
   })
 
   it('reads levels and statuses as sentence-case words with their own tone', () => {

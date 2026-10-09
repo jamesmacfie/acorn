@@ -29,6 +29,13 @@ const draw = (tool: AgentToolCall, startsOpen = true, createdAt = Date.parse('20
   return host
 }
 
+it.each(['interrupted', 'cancelled', 'unknown', undefined] as const)('shows %s without pulsing saved execution', (status) => {
+  const host = draw({ id: 'cmd', title: 'Command output', kind: 'execute', status, output: 'saved output' })
+  expect(host.textContent).toContain(status ?? 'unknown')
+  expect(host.textContent).toContain('saved output')
+  expect(host.querySelector('[data-pulse]')).toBeNull()
+})
+
 it('shows recorded patches in the fallback when no plugin contributes a file-tool card', () => {
   const host = draw({ id: 'edit', title: 'Edit' }, false, 0, [
     { path: 'a.ts', patch: '@@ -1 +1 @@\n-old\n+new' },

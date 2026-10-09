@@ -1,7 +1,8 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, lazy, Show, type Accessor, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
-import { prefsOptions, tasksOptions } from '@acorn/client-core/infra/queries.ts'
+import { prefsOptions, projectsKey, tasksOptions, type Project } from '@acorn/client-core/infra/queries.ts'
+import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { telemetryOn } from '@acorn/client-core/features/settings'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
@@ -133,6 +134,9 @@ export function App(props: {
   onNoTask?: (id: string) => void
   onQuit: () => void
 }) {
+  // Compiled panes can ask which project owns a task before their component mounts. The desktop
+  // installs this lookup from its query cache; the terminal uses the selected Node's same cache.
+  setProjectsLookup(() => clientFor(activeNodeId() ?? props.nodeId).client.getQueryData<Project[]>(projectsKey) ?? [])
   let shownNode: string | undefined
   const forNode = (nodeId: string) => {
     if (shownNode && shownNode !== nodeId) {

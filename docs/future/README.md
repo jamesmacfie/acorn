@@ -1,61 +1,67 @@
-# docs/future: the design record for work not yet built
+# Future implementation handoffs
 
-This folder holds designs, analyses, sequenced plans, and delivery records whose final acceptance is
-still open. Shipped behaviour belongs in an owning doc under `docs/`; retained programme files record
-decisions and evidence. Where a file here disagrees with an owning doc, the owning doc wins.
+Reviewed October 9, 2026. This folder holds proposed work and acceptance that remains open.
+Use the linked entry page to identify the next task, its prerequisites, and its completion checks.
+Shipped contracts belong in reference pages under `docs/`; those pages win if a plan disagrees.
 
-Every file states its date and status near the top, keeps its paths as hints rather than promises,
-and ends with a verify-before-building list where it names code. Nothing here is scheduled.
+A proposal is not a scheduled task. Recheck its dated starting point against the target checkout
+before implementation. Keep scope, authority, stored data, and acceptance requirements explicit.
+Dated delivery evidence belongs in `docs/testing/` or the dated security reviews.
 
 ## The programmes
 
-Multi-file designs with an order of work. Every one of them carries a `refused.md` holding what it
-decided not to do and why, so a later session argues with the reasoning rather than with silence.
-
-| Folder | What it is | Status |
+| Folder | Developer handoff | Status |
 | --- | --- | --- |
-| [security/](./security/README.md) | Ten phases covering trust-boundary hardening, instruction review, security diagnostics, dependency review, managed MCP installation and tool review, and secret publication checks. Restricted agent execution is excluded. | Proposed, October 8, 2026; implementation not started. |
-| [editor/](./editor/README.md) | Six product requirement phases for document conflicts, file management, Git status, tabs/navigation, editing controls, and scoped search, with combined acceptance and scope boundaries. | Proposed, October 7, 2026; implementation not started. |
-| [git-client/](./git-client/README.md) | Built-in Git repository source and task pane: worktrees, commit history, stashes, AI explanations, task/workflow launches, refs/remotes/settings, operations, and conflict resolution. Eight sequential phases with retained screenshot references. | Planned, October 7, 2026; implementation not started. |
-| [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
-| [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
-| [dashboards/](./dashboards/README.md) | The panel studio: a launcher, a full-window studio with an outline, live preview, and inspector, a docked AI that reviews proposals on the plan, and quick edits from the panel menu. Then derived sources: plugin sources built from other sources' data with the plugin's own logic, with host-mediated reads, input approval, an SDK, and a dev loop. Twelve phases. | Proposed, 2026-10-05; all twelve phases shipped 2026-10-05, with phase 8's GitHub branch source move left open. Replaces the dashboards workstreams, which shipped by 2026-10-04. |
-| [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
-| [ui-extension/](./ui-extension/README.md) | Contextual plugin UI: link previews, transcript media, workflow bodies, resource actions, detail regions, annotations, selections, document intelligence, fences, and toolbar additions. Fifteen sequential phases after Editor file viewers, ending with documentation. | Planned, October 6, 2026; implementation not started. |
-| [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
+| [performance/](./performance/README.md) | Seven phases for Sentry measurements, installed Claude, packaging, minification, startup messages, selective loading, and acceptance. | Approved direction October 9, 2026. Implementation not started. |
+| [security/](./security/README.md) | Ten phases for desktop authorization, plugin enforcement, internal tokens, automation, instruction review, diagnostics, dependencies, MCP review, and secret publication. | Proposed October 8, 2026. Implementation not started; restricted agent execution is excluded. |
+| [editor/](./editor/README.md) | Review the implemented editor and finish repository and supported-platform acceptance. | Six phases implemented. Final review and full test gate remain open. Completion notes moved to Testing. |
+| [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Implementation not started. |
+| [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
+| [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
+| [dynamic-ui/](./dynamic-ui/README.md) | A spike and five phases for agent-built task apps, project publishing, plugin export, and team use. | Proposed October 1, 2026. Implementation not started. |
+| [ui-extension/](./ui-extension/README.md) | Fifteen phases for contextual plugin UI after Editor file viewers. | Planned October 6, 2026. Implementation not started. Built-in Editor menus and Git marks are implemented prerequisites, not these public extension contracts. |
+| [marketing/](./marketing/README.md) | Public site structure and plugin documentation. | Proposed. Implementation not started. |
+| [tui-review/](./tui-review/README.md) | Finish terminal forms, feature journeys, host comparison, and packaged acceptance. | Startup, text controls, setup, Settings routing, files, promotion, and PTY paths implemented. Broader acceptance remains open. |
 
 ## The single files
 
-| File | What it is | Status |
+| File | Developer handoff | Status |
 | --- | --- | --- |
-| [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
-| [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
-| [editor-files.md](./editor-files.md) | Letting plugins render files in the editor pane: one `replace` point keyed by file, a read-only file capability, and a catalogue of renderers for third-party plugins. | Design proposal, 2026-09-29. Not started. |
-| [group-projects-later.md](./group-projects-later.md) | Separate projects can become grouped workspaces from Settings, with confirmation and live client wording. | Implemented October 8, 2026. [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project) owns the rule. |
-| [find-in-file.md](./find-in-file.md) | Shared inline find and replace controls built from Acorn components, with CodeMirror search ownership, keyboard behavior, lifecycle rules, and acceptance criteria. | Product requirements, October 7, 2026. Shipped October 8, 2026; [editor](../editor.md#find-in-a-file) owns the behavior. |
-| [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
-| [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
-| [lazy-plugin-code.md](./lazy-plugin-code.md) | An opt-in `lazyFetch` helper that loads a plugin route's code on its first request, so heavy, rarely used routes stay out of the node's boot graph. | Proposal, October 6, 2026. Not started. |
-| [multi-account.md](./multi-account.md) | Running more than one Claude Code or Codex subscription: how other tools do it, the terms risk, and a per-account config folder pinned to each session. | Research and proposal, October 6, 2026. Not started. |
-| [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
-| [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
-| [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |
-| [workflows-gaps.md](./workflows-gaps.md) | Known workflow gaps: graph navigation, prompt display, retries of unknown outcomes, and agent control of runs. | Moved from workflows.md, 2026-10-04. Not started. |
-| [workspace-icons.md](./workspace-icons.md) | Workspace glyphs on colour or gradient backgrounds, uploaded images, icons in the desktop switcher, and an optional further-left workspace rail. The TUI keeps its workspace switcher. | Implemented October 7, 2026. See the [reference](../workspaces-and-tasks/workspace-icons.md) and proposal evidence. |
+| [agent-search-startup.md](./agent-search-startup.md) | Stop the full search-index check and re-index the agents plugin runs after every Node start. | Proposed October 9, 2026. Implementation not started. |
+| [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
+| [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
+| [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
+| [editor-files.md](./editor-files.md) | Plugin file viewers through an Editor replacement point and a confined read-only file capability. | Proposed. Implementation not started. |
+| [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
+| [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
+| [lazy-plugin-code.md](./lazy-plugin-code.md) | A shared promise-caching `lazyFetch` helper and selective route conversion. | Proposed; assigned to [Performance phase 06](./performance/06-selective-server-loading.md). Handwritten lazy routes exist; the shared helper is unbuilt. |
+| [multi-account.md](./multi-account.md) | Per-account harness configuration pinned to sessions. | Research and proposal. Implementation not started. |
+| [opencode.md](./opencode.md) | An external OpenCode harness package: one manifest, a conformance run, and a narrower `envPassthrough` in the authoring example. | Proposed October 9, 2026. Implementation not started. |
+| [remote.md](./remote.md) | Browser auth, transport, custody, multiple Nodes, and a mobile progressive web app. | Host foundations implemented. Browser and mobile clients remain proposed; Cloud owns the relay. |
+| [split.md](./split.md) | Extract loaded plugins and the authoring toolkit with packed-artifact compatibility and host seeding. | Published authoring packages implemented. Repository extraction remains proposed. |
+| [task-deletion.md](./task-deletion.md) | Delete a task and its plugin data from the archive dialog or the Archive page, with tombstones for plugin catch-up and **Deleted task** labels. | Proposed October 9, 2026. Implementation not started. |
+| [workflow-agent-goals.md](./workflow-agent-goals.md) | Completion conditions for managed workflow agent steps and For each agents, with bounded continuations, persisted verdicts, and workflow-owned controls and budgets. | Implemented October 8, 2026. See the [reference](../workflows/agent-steps.md#completion-conditions). The standalone Agent pane doesn't yet show a workflow session's goal. |
+| [workflows-gaps.md](./workflows-gaps.md) | Assess graph navigation, prompt display, retry safety, agent control, and file triggers. | Proposed gaps. Confirm each against Workflows before implementation. |
 
-## How these relate
+## Choose the owning plan
 
-Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2026-08. The terminal
-client ([tui.md](../tui.md)) was the second host built on it, which is why the kit's `tui` column is
-read rather than asserted. The terminal and headless clients now ship in the standalone Node tarball;
-desktop embedding and platform release artifacts remain in [bundle.md](./bundle.md).
-The PWA is the layouts' narrow projections,
-compiled-tier's component couplings dissolved into slots, the `core:task` annotation point carries
-loaded task status, and the marketing plugin docs should be written against the tree rather than the
-frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
-beside them; nothing in it waits any more. Ecosystem's shipped rung-2 containment is recorded in
-`blockers.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
+Editor final acceptance does not include plugin file viewers, resource actions, annotations, or Git
+merge resolution. Those plans retain their own requirements. Dashboard followups do not require
+rebuilding the studio. Node packaging and repository extraction can proceed beside plugin signing;
+discovery depends on accepted package verification. Cloud owns relay order and account identity.
+
+## Completed plans removed on October 8, 2026
+
+These plans remain in Git history. Use their reference owners for implemented behavior:
+
+| Removed plan | Owner or remaining handoff |
+| --- | --- |
+| `group-projects-later.md` | [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project). |
+| `find-in-file.md` | [Find in a file](../editor.md#find-in-a-file). |
+| `workspace-icons.md` | [Workspace icons](../workspaces-and-tasks/workspace-icons.md). |
+| `test-feedback.md` | [Testing](../testing.md). Broader excluded performance ideas remain in Git history, not assigned requirements. |
+| `dashboards/` | [Dashboard reference](../dashboards.md), [derived sources](../data-sources/derived-sources.md), and [remaining work](./dashboards-gaps.md). |
+| Six Editor phase plans | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [final acceptance](./editor/README.md). |
 
 ## Retired folders
 
@@ -74,7 +80,7 @@ plans and verification records remain in Git history.
 `project-workspace/` was implemented and deleted on October 8, 2026. [Workspaces and tasks](../workspaces-and-tasks.md)
 owns the `core.workspaces` mode, and [projects and workspaces](../workspaces-and-tasks/projects.md)
 owns the one-project rule and the first-run **Layout** step. Its refused alternatives and deferred
-list remain in Git history. [Group projects later](./group-projects-later.md) picks up one deferred item.
+list remain in Git history. Later grouping is implemented; [workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project) owns it.
 
 `outdated-review-comments.md` was implemented and deleted on October 7, 2026.
 [Review locations](../github-integration/mirror.md#review-locations) owns provider status, historical

@@ -25,6 +25,7 @@
     "@acorn/plugin-docker": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/plugin-github": "workspace:*",
+    "@acorn/plugin-git": "workspace:*",
     "@acorn/plugin-memory": "workspace:*",
     "@acorn/plugin-notes": "workspace:*",
     "@acorn/plugin-preview": "workspace:*",

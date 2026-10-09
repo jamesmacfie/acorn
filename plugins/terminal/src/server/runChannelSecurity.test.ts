@@ -38,7 +38,8 @@ describe('run-channel snapshot trust integration', () => {
       })
       await expect(service[operation]('task', 'dev')).rejects.toMatchObject({ code: 'needs-trust' })
       expect(startSession).not.toHaveBeenCalled()
-      expect(runProcess).not.toHaveBeenCalled()
+      // Checkout admission may inspect Git. It must not run the selected command.
+      expect(runProcess.mock.calls.filter(([request]) => request.file !== 'git')).toEqual([])
       // Ordinary acknowledged repository configuration still admits a start.
       expect(await service.start('task', 'dev')).toMatchObject({ ok: true, sessionId: 'session' })
       expect(startSession).toHaveBeenCalledWith('task', expect.objectContaining({ command: 'approved-command' }), repo)

@@ -42,6 +42,28 @@ Creation serializes branch allocation and row reservation, child tasks included.
 returns a `worktree-unavailable` 409. If saving the row fails, acorn removes only a branch that
 request created. **Existing worktree** uses its own ownership check.
 
+`POST /v1/core/tasks` takes `origin` and `projectId`, plus optional `title`, `icon`, `branch`,
+`branchSource`, `baseBranch`, `baseCommit`, `targetIdentity`, `worktreePath`, `skipSetup`,
+`pullNumber`, and `links`. `branchSource` defaults to `exact`; `derived` adds a numeric suffix on
+collision. Choose at most one of `baseBranch`, `baseCommit`, and `worktreePath`. A base needs a
+task branch. `baseBranch` names a local branch. `baseCommit` is a full SHA-1 or SHA-256 commit ID
+in the target repository. The Node creates the branch from that commit before saving the task and
+removes it if the insert fails. Worktree creation stays lazy. A bad base returns 400.
+
+For `baseCommit`, first call `GET /v1/core/projects/:id/worktree-availability` with `branch` and
+`baseCommit`. The response includes opaque `targetIdentity`, even when the requested branch is
+unavailable. Keep it with the draft and submit it unchanged. The Node checks the checkout and Git
+object store identity during reservation and returns 409 after a remap. A later preview cannot
+authorize an older draft. A follow-on operation can preview the same commit again and compare its
+identity with the original.
+
+The availability route also accepts optional `branchSource` and `baseBranch`. It returns
+`{ available: true, branch }`, with the next free derived name, or
+`{ available: false, branch, reason }`. A preview does not reserve a name. Attachment rechecks
+Git registration, lock state, and active or archiving task ownership under the reservation.
+Without a base, a lazy task can reserve its branch when Git inspection is unavailable; the database
+still refuses another task claiming it. Pinned starts and ref/remote writes require Git identity.
+
 `slugifyBranch`, `dedupeBranch`, and the other name rules are in
 `packages/protocol/src/projects/branch.ts`.
 Provider promotions keep a seeded branch, resolve or create the project and the task link, and reuse

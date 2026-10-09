@@ -33,6 +33,7 @@ import { mergeSearchIndex } from './ledgerCompaction'
 import { defaultSpawnedAgentDefaults, type SpawnedAgentDefaults } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import type { TurnAttendanceContext, WorkflowPosture } from './attendance'
+import type { SessionSummaryInput } from '../../shared/sessionSummary'
 
 // Events deleted per step by removeArchivedHistory. Each is a row and its search row. On 20,000
 // synthetic tool rows of about 2 KB, a step of 200 held the node for a median of 7 ms and 18 ms at the
@@ -388,7 +389,8 @@ export class ManagedAgentRuntime {
       ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
       : input
     signal?.throwIfAborted()
-    const outcome = await this.store.enqueueTurn(sessionId, enqueued, context)
+    const outcome = await this.core.checkoutAdmission.admitWork(session.taskId,
+      () => this.store.enqueueTurn(sessionId, enqueued, context))
     const { turn } = outcome
     // An idle session behind the concurrency limit emits no provider event, so publish its queue count.
     this.engine.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
@@ -420,7 +422,8 @@ export class ManagedAgentRuntime {
     if (changed && !changed.ok) throw new Error(`${changed.by}: ${changed.reason}`)
     const prompt = changed?.payload.text ?? CODEX_PLAN_IMPLEMENTATION_PROMPT
     if (!prompt.trim() || prompt.length > 1_000_000) throw new Error('The implementation prompt is invalid.')
-    const { turn, inserted } = await this.store.acceptCodexPlan(sessionId, itemId, prompt)
+    const { turn, inserted } = await this.core.checkoutAdmission.admitWork(session.taskId,
+      () => this.store.acceptCodexPlan(sessionId, itemId, prompt))
     if (inserted) {
       const updated = await this.store.requireSession(sessionId)
       this.engine.emit({ channel: 'agent:session', session: updated })
@@ -433,6 +436,14 @@ export class ManagedAgentRuntime {
   /** Regenerate the title from the first durable text prompt. */
   async regenerateTitle(sessionId: string): Promise<AgentSession> {
     return this.titleGeneration.regenerate(sessionId)
+  }
+
+  async summarizeSession(sessionId: string, userId: string, request: SessionSummaryInput, signal: AbortSignal) {
+    const { generateSessionSummary } = await import('./sessionSummary')
+    await this.engine.flushProviderEvents(sessionId)
+    const snapshot = await this.store.exportSnapshot(sessionId)
+    return generateSessionSummary(this.core.models, userId, snapshot, request,
+      AbortSignal.any([signal, this.engine.shutdownSignal]))
   }
 
   setGoal(sessionId: string, objective: string | null): Promise<AgentSession> {
@@ -481,6 +492,19 @@ export class ManagedAgentRuntime {
     await this.store.expirePendingRequests(sessionId)
     if (live) await this.engine.withCurrentSessionHandle(live.generation, (handle) => handle.cancel())
     await this.store.cancelTurn(target)
+  }
+
+  async cancelSubagent(sessionId: string, subagentId: string): Promise<void> {
+    const session = await this.store.requireSession(sessionId)
+    if (!session.subagents.some((child) => child.id === subagentId)) throw new Error('Subagent not found in this session.')
+    if (session.archivedAt) throw new Error('This session is archived.')
+    if (session.controller !== 'acorn') throw new Error('This session is controlled outside Acorn.')
+    const cancelled = await this.engine.sessionHandleIfPresent(sessionId, async (handle) => {
+      if (!handle.cancelSubagent) throw new Error('This harness does not support stopping individual subagents.')
+      await handle.cancelSubagent(subagentId)
+      return true
+    })
+    if (!cancelled) throw new Error('The subagent connection is unavailable.')
   }
 
   async patchQueuedTurn(

@@ -309,9 +309,14 @@ export default function TaskView(props: {
             <>
               <span class="workspace-footer-worktree">
                 Worktree
-                <CopyButton text={path} title="Copy worktree path" />
+                <CopyButton text={path} title="Copy worktree path" always />
               </span>
-              <span class="workspace-footer-branch"><Icon name="git-branch" /> {props.task.branch}</span>
+              <span class="workspace-footer-branch">
+                <Icon name="git-branch" /> {props.task.branch}
+                <Show when={props.task.branch}>
+                  {(branch) => <CopyButton text={branch} title="Copy branch name" always />}
+                </Show>
+              </span>
               <Show when={status()?.missing}>
                 <span class="workspace-footer-repair"><Icon name="triangle-alert" /> Worktree folder is missing</span>
               </Show>

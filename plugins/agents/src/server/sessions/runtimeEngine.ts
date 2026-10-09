@@ -45,6 +45,8 @@ import {
   SUBAGENT_QUIET_MS,
 } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
+import type { RepeatedToolCallWarnings } from './repeatedToolCalls'
+import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
 import type { InstructionAdmission } from './instructionAdmission'
 import { InstructionAdmissionError } from './instructionAdmissionError'
@@ -165,6 +167,9 @@ export type AgentRuntimeOptions = {
   usageLimitResetAt?(providerId: string): Promise<number | null>
   /** Test seam for the small delay after the provider's advertised reset boundary. */
   usageContinuationGraceMs?: number
+  /** `ctx.events.notice`, for a bell row when an agent repeats a tool call. Optional so a test can build
+   *  an engine with no host around it. */
+  notice?(notice: PluginNotice): void
 }
 
 export type WaitCondition = import('../../contract/wire').AgentWaitCondition
@@ -225,6 +230,9 @@ export class ManagedAgentEngine {
   protected readonly telemetry?: PluginTelemetry
   protected readonly usageLimitResetAt?: (providerId: string) => Promise<number | null>
   protected readonly usageContinuationGraceMs: number
+  protected readonly notice?: (notice: PluginNotice) => void
+  // Loaded on the first tool call that has input (./repeatedToolCalls.ts).
+  private repeatedToolCalls: Promise<RepeatedToolCallWarnings> | null = null
   // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
   // for the reason `live` is: a turn only runs inside the node that started it, and a turn the
   // process died in the middle of reports nothing, which is the honest answer.
@@ -284,6 +292,7 @@ export class ManagedAgentEngine {
     this.telemetry = options.telemetry
     this.usageLimitResetAt = options.usageLimitResetAt
     this.usageContinuationGraceMs = options.usageContinuationGraceMs ?? USAGE_CONTINUATION_GRACE_MS
+    this.notice = options.notice
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.idleSweepMs = options.idleSweepMs ?? IDLE_SWEEP_MS
     this.skillFolders = join(options.dataDir, 'agent-skills')
@@ -507,10 +516,11 @@ export class ManagedAgentEngine {
     // active is one whose ending we will never hear. These sessions are not in `unsettledSessions`:
     // a backgrounded child leaves its parent `ready`, which is exactly why the row was stranded.
     for (const session of await this.store.sessionsWithActiveSubagents()) {
-      for (const id of quietedSubagents(session.subagents, Date.now())) {
+      for (const id of session.subagents.filter(isActiveSubagent).map((child) => child.id)) {
         await this.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
       }
     }
+    await this.settleCommands()
     await this.store.cancelWorkflowFollowUps()
     await this.attachments.collectGarbage()
     // A start's skill folder goes when its process stops. One left by a Node that died is removed here,
@@ -732,7 +742,7 @@ export class ManagedAgentEngine {
     const live = this.processes.current(sessionId)
     if (!live || live.closing || !this.processes.owns(generation)) return
     this.processes.heard(generation, !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type))
-    const turnId = live.activeTurnId
+    const turnId = event.acornTurnId === undefined ? live.activeTurnId : event.acornTurnId
     if (event.type === 'request' || event.type === 'permission_request' || event.type === 'input_request') {
       const session = await this.store.requireSession(sessionId)
       const turn = turnId ? await this.store.turn(turnId) : null
@@ -812,15 +822,36 @@ export class ManagedAgentEngine {
       }
     }
     await this.record(sessionId, turnId, event)
+    // Advisory, so a failure is logged and never holds up the event behind it.
+    if (event.type === 'tool' && turnId && event.tool.input) {
+      await this.repeatedToolCallWarnings()
+        .then((warnings) => warnings.observe(sessionId, turnId, event.tool))
+        .catch((error: unknown) => log.warn(`repeated tool call check failed: ${describeError(error).message}`))
+    }
     // The two things that change what the roster knows: a roster update, which is also how a child
     // first appears, and a child's own traffic. Each pushes the quiet sweep back, so a child that
     // keeps streaming keeps its row and a child that stops loses it a window later. Turn boundaries
     // are deliberately not on this list, and a session with no children never holds a timer.
     if (event.type === 'subagent' || eventSubagentId(event)) this.processes.armQuiet(sessionId)
     if (settlesTurn) {
+      if (this.repeatedToolCalls) (await this.repeatedToolCalls).forget(sessionId)
       if (turnId) void this.goals().then((goals) => goals.check(sessionId, turnId))
       void this.pump()
     }
+  }
+
+  private repeatedToolCallWarnings(): Promise<RepeatedToolCallWarnings> {
+    return this.repeatedToolCalls ??= import('./repeatedToolCalls').then(({ RepeatedToolCallWarnings }) =>
+      new RepeatedToolCallWarnings({
+        limit: async () => {
+          const userId = this.currentUserId()
+          return (userId ? await readAgentSessionDefaults(this.core.prefs, userId) : defaultAgentSessionDefaults())
+            .warnRepeatedToolCallsAfter
+        },
+        record: (sessionId, turnId, event) => this.stopped ? Promise.resolve() : this.record(sessionId, turnId, event),
+        session: (sessionId) => this.store.requireSession(sessionId),
+        notice: (notice) => { if (!this.stopped) this.notice?.(notice) },
+      }))
   }
 
   // A backgrounded child never reports that it finished. Its spawning `Agent` call returns a launch
@@ -1014,9 +1045,17 @@ export class ManagedAgentEngine {
     event: AgentNormalizedEvent,
   ): Promise<AgentEventRecord> {
     const record = await this.store.recordEvent(sessionId, turnId, event)
-    this.emit({ channel: 'agent:event', event: record })
-    await this.emitProjection(sessionId, turnId, event)
     const session = await this.store.requireSession(sessionId)
+    let clientRecord = record
+    if (record.event.type === 'tool' && record.event.tool.kind === 'execute' && record.event.tool.status !== undefined) {
+      const { commandStatus } = await import('./commandLifecycle')
+      const turn = record.turnId ? await this.store.turn(record.turnId) : null
+      clientRecord = { ...record, event: { type: 'tool', tool: {
+        ...record.event.tool, status: commandStatus(record.event.tool, turn ?? undefined, session),
+      } } }
+    }
+    this.emit({ channel: 'agent:event', event: clientRecord })
+    await this.emitProjection(sessionId, record.turnId, event)
     // Only when the event changed what the row says. Most events in a streamed reply move nothing on
     // the row except its sequence and clock, and the row runs 26 KB on average and up to 58 KB, mostly
     // the harness's skills list. Sent after every event, rows were about 96% of the agent socket's
@@ -1025,7 +1064,28 @@ export class ManagedAgentEngine {
     if (event.type === 'session_metadata' || this.sentRows.get(sessionId) !== listedRow(session)) {
       this.emit({ channel: 'agent:session', session })
     }
+    if (event.type === 'turn_completed' || event.type === 'error'
+      || (event.type === 'session_state' && ['ready', 'stopped', 'failed', 'archived'].includes(event.state))
+      || (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))) {
+      await this.settleCommands(sessionId)
+    }
     return record
+  }
+
+  /** Append lifecycle endings past client cursors. Read projection also covers untouched history. */
+  private async settleCommands(sessionId?: string): Promise<void> {
+    const { commandStatus } = await import('./commandLifecycle')
+    for (const record of await this.store.unfinishedCommands(sessionId)) {
+      if (record.event.type !== 'tool') continue
+      const session = await this.store.requireSession(record.sessionId)
+      const turn = record.turnId ? await this.store.turn(record.turnId) : null
+      const status = commandStatus(record.event.tool, turn ?? undefined, session)
+      if (status === record.event.tool.status) continue
+      await this.record(record.sessionId, record.turnId, { type: 'tool', tool: {
+        id: record.event.tool.id, title: '', kind: 'execute', status,
+        subagentId: record.event.tool.subagentId,
+      } })
+    }
   }
 
   // The row a projected event changed, sent with the event.

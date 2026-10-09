@@ -27,7 +27,7 @@ export const KIT_NODES = [
   'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer', 'SettingsSection', 'SettingRow',
   // Showing
   'Text', 'Link', 'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
-  'DescriptionList', 'Table', 'TableHead', 'TableRow', 'TableCell', 'Grid', 'Graph', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
+  'DescriptionList', 'Table', 'TableHead', 'TableRow', 'TableCell', 'Grid', 'Graph', 'HistoryMark', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
   'FileHead', 'StackedDiff', 'NonCodeRow', 'SplitCell', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Icon',
   // Asking
   'Button', 'IconButton', 'Input', 'Textarea', 'Select', 'Checkbox', 'SegmentedControl', 'ToggleButton', 'Picker',

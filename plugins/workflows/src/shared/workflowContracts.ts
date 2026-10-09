@@ -60,6 +60,8 @@ export type WorkflowMapSource = {
 
 export type WorkflowMapAgent = {
   prompt: string
+  /** Each item's completion condition. Plain text, like the prompt. */
+  goal?: string
   profileId?: string
   model?: string
   configOptions?: Record<string, string>
@@ -94,6 +96,9 @@ export type WorkflowStepDef = {
   profileId?: string
   model?: string
   prompt?: string
+  // `agent` only. What counts as finished: the step continues in the same session until a check finds
+  // this met (docs/workflows/agent-steps.md § Completion conditions). Templated like the prompt.
+  goal?: string
   schema?: object
   policy?: string
   maxIterations?: number
@@ -170,6 +175,8 @@ export type StepHandlerContext = {
   step: WorkflowStepRow
   def: WorkflowStepDef
   renderedPrompt: string
+  // The step's completion condition, rendered once and frozen with the attempt's inputs.
+  renderedGoal?: string
   tools: ToolCeiling
   budget: WorkflowBudget
   signal: AbortSignal

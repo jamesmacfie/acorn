@@ -61,6 +61,8 @@
     "./features/settings/savePref.ts": "./src/features/settings/savePref.ts",
     "./features/settings/trust/ConfigTrustDialog.tsx": "./src/features/settings/trust/ConfigTrustDialog.tsx",
     "./features/tabs": "./src/features/tabs/public.ts",
+    "./features/tabs/taskLaunch.ts": "./src/features/tabs/taskLaunch.ts",
+    "./features/tabs/taskDraftStore.ts": "./src/features/tabs/taskDraftStore.ts",
     "./features/tabs/RailTab.tsx": "./src/features/tabs/RailTab.tsx",
     "./features/tabs/TabRail.tsx": "./src/features/tabs/TabRail.tsx",
     "./features/tasks": "./src/features/tasks/public.ts",

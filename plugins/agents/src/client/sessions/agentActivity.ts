@@ -1,4 +1,4 @@
-import type { AgentSession } from '../../contract/wire.ts'
+import type { AgentSession, AgentSubagent } from '../../contract/wire.ts'
 
 // Which runtime states count as "this agent is doing something". Shared by Agent Center's `active`
 // filter and header count and by the Fleet home stat below, which is why it moved out of the component:
@@ -23,6 +23,10 @@ export const isActiveAgent = (session: AgentSession): boolean => ACTIVE_AGENT_ST
 // fires when the button next to it is greyed out is a shortcut nobody trusts.
 export const canStopAgent = (session: AgentSession): boolean =>
   ['working', 'waiting', 'cancelling', 'reconnecting'].includes(session.runtimeState)
+
+export const canStopSubagent = (session: AgentSession, subagent: AgentSubagent | undefined): boolean =>
+  session.driverKind === 'codex-app-server' && session.controller === 'acorn' && !session.archivedAt
+  && subagent?.status === 'running'
 
 // "Needs you": anything but a settled or merely-unread attention state. Same reasoning, since Agent
 // Center's filter, its header count and the attention inbox all have to agree.

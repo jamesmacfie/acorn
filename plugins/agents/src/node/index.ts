@@ -1,4 +1,5 @@
 import { AGENT_STANDING_CONTEXT } from '../contract/standingContext'
+import { readAgentCheckoutActivity } from '../server/sessions/checkoutActivity'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
@@ -129,6 +130,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
   let lifecycleCapabilities: Array<{ dispose(): void }> = []
+  let stopCheckoutActivity: (() => void) | null = null
   return {
     name: 'agents',
     label: 'Agents',
@@ -152,6 +154,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // See docs/data-layer/migrations.md § Migrations.
       const store = ctx.storage.open()
       const core = ctx.core
+      stopCheckoutActivity = core.checkoutAdmission.registerOwner('turns', (taskIds) => readAgentCheckoutActivity(store, taskIds))
       // The runtime and the Usage page share one service. A suspected limit failure asks only its own
       // harness collector for a fresh reset time; ordinary page reads keep using the cached snapshot.
       const probeDir = join(dataDir, 'agent-usage-probe')
@@ -196,6 +199,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // Read per call, never captured. Agent records and credentials remain scoped to the active
         // account, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
+        notice: (notice) => ctx.events.notice(notice),
         usageLimitResetAt: async (providerId) => {
           const userId = core.identity.active()
           if (!userId) return null
@@ -497,8 +501,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // non-managed workflow steps.
       // Loaded on the first step, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs).
       const executeRuntime = runtime
+      // The judge is the same one interactive goals use, so a step's completion check runs through its own harness.
+      const goalJudge = { models: ctx.core.models, currentUserId: () => ctx.core.identity.active() }
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, async (request) =>
-        (await import('../server/sessions/sessionExecute')).createSessionExecute(executeRuntime, followUpRegistry)(request))
+        (await import('../server/sessions/sessionExecute')).createSessionExecute(executeRuntime, followUpRegistry, goalJudge)(request))
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
@@ -520,6 +526,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     // Releases what init acquired, in the order docs/managed-agents/operations.md § Operations and failure
     // describes.
     dispose: async () => {
+      stopCheckoutActivity?.()
+      stopCheckoutActivity = null
       // First, so no sender queues a turn on a runtime that is stopping.
       reconcileMessages = null
       void messages?.then((loaded) => loaded.dispose())

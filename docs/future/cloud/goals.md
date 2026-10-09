@@ -49,7 +49,7 @@ Model usage is not resold. Teams bring their own provider keys. For the pricing 
 
 - A browser workspace. The web app administers accounts and infrastructure. It never shows code or
   transcripts. The contracts must leave a future browser client possible
-  ([remote access](../remote.md#web-client-what-changes-and-what-doesnt)).
+  ([remote access](../remote.md#build-a-single-node-browser-host)).
 - Continuous two-way sync of a local worktree with a cloud task. A snapshot goes up once. Results
   come back as a branch, pull request, or patch.
 - Sharing a person's local Node with their team. The relay lets an owner reach their own Node.

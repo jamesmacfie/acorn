@@ -884,4 +884,52 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(after[1].status).toBe('done')
     expect(after[1].error).toContain('re-queued after app restart')
   })
+
+  // A step with a completion condition (docs/workflows/agent-steps.md § Completion conditions). The
+  // managed session is scripted: what matters here is what the runner sends it and records.
+  describe('completion conditions', () => {
+    const summary = (status: 'continuing' | 'satisfied' | 'stopped') => ({
+      objective: 'The tests for login pass.', status, continuations: 1, repairs: 0, verdict: null, automaticTurns: [],
+    })
+    const capture = { result: 'Done.', structuredOutput: null, sessionId: null, costUsd: null, events: [] }
+    const def = (budget?: WorkflowDef['budget']): WorkflowDef => ({
+      baseline: 'acorn-1', formatVersion: 1, name: 'goal', budget,
+      inputs: [{ name: 'area', schema: { type: 'string' }, default: 'login' }],
+      steps: [{ id: 'fix', name: 'fix', prompt: 'Fix ${inputs.area}.', goal: 'The tests for ${inputs.area} pass.' }],
+    })
+
+    it('renders the goal once, freezes it with the attempt, and records its final state', async () => {
+      const sent: Array<string | undefined> = []
+      const d = deps()
+      d.runStep = async (_taskId, _def, opts) => {
+        sent.push(opts.goal)
+        opts.onGoal?.(summary('continuing'))
+        return { status: 'ok', exitCode: 0, capture, stderrTail: '', goal: summary('satisfied') }
+      }
+      const runner = new WorkflowRunner(wf.db, d)
+      const runId = await runner.start('task1', def())
+      expect((await waitDone(runner, runId)).status).toBe('done')
+      const [step] = await runner.steps(runId)
+      expect(sent).toEqual(['The tests for login pass.'])
+      expect(JSON.parse(step!.inputsJson!).goal).toBe('The tests for login pass.')
+      expect(JSON.parse(step!.goalJson!).status).toBe('satisfied')
+      // Host metadata stays out of what the next step reads.
+      expect(step!.structuredJson).toBeNull()
+    })
+
+    it('ends on the safety rail when the budget refuses an automatic turn', async () => {
+      const d = deps()
+      d.runStep = async (_taskId, _def, opts) => {
+        const reason = await opts.admitAutomatic!({ kind: 'turn', usage: { costUsd: null, usage: undefined } })
+        return { status: 'error', exitCode: null, capture, stderrTail: reason ?? '', goal: { ...summary('stopped'), reason: reason ?? undefined } }
+      }
+      const runner = new WorkflowRunner(wf.db, d)
+      const runId = await runner.start('task1', def({ maxTurns: 1 }))
+      const run = await waitDone(runner, runId)
+      expect(run.status).toBe('safety-rail')
+      expect(run.error).toMatch(/turn budget exhausted \(1 of 1/)
+      const [step] = await runner.steps(runId)
+      expect(JSON.parse(step!.goalJson!).status).toBe('stopped')
+    })
+  })
 })

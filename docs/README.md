@@ -92,10 +92,15 @@ the whole plugin system in one page.
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
 | [dashboards.md](./dashboards.md) | Published dashboard panels over typed data sources, placements, datasets, coverage, and measure history. |
-| [Panel studio](./future/dashboards/README.md) | Proposed redesign of how dashboard panels are created, edited, and previewed, plus derived sources that let plugins build panel data from other sources with their own logic. Twelve phases. |
+| [Dashboard followups](./future/dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision after the implemented studio and derived sources. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
+| [git-client/worktrees.md](./git-client/worktrees.md) | Git worktree inventory, task ownership, and guarded cleanup in both clients. |
+| [git-client/history.md](./git-client/history.md) | Pinned history pages, read-only revision diffs, limits, and routes in both clients. |
+| [git-client/stashes.md](./git-client/stashes.md) | Stash browsing and guarded task checkout writes in both clients. |
+| [git-client/refs-remotes-settings.md](./git-client/refs-remotes-settings.md) | Guarded refs and remotes, pinned comparison, scoped identity, and Node scheduled fetch. |
+| [git-client/explanations.md](./git-client/explanations.md) | Explicit Git explanations and first-release replacement guidance. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
 | [schedules/plugin-schedules.md](./schedules/plugin-schedules.md) | How a plugin declares a schedule, overrides, lifecycle, and trust. |
 | [schedules/user-schedules.md](./schedules/user-schedules.md) | User schedule targets, consent, workflow schedules, routes, and Settings. |
@@ -243,7 +248,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   [Custom agents](./managed-agents/custom-agents.md), [New-session
   defaults](./managed-agents/defaults.md), [Managed delegation](./managed-agents/delegation.md),
   [Harnesses](./managed-agents/harnesses.md), [Harness bridges](./managed-agents/loop-hooks.md), [Archived agent
-  history](./managed-agents/history-retention.md), [Operations](./managed-agents/operations.md),
+  history](./managed-agents/history-retention.md), [Operations](./managed-agents/operations.md), [Repeated tool
+  calls](./managed-agents/repeated-tool-calls.md),
   [From the command palette](./managed-agents/palette.md), [Native
   skills](./managed-agents/native-skills.md), [Permission
   policy](./managed-agents/permission-policy.md), [Providers and plan
@@ -305,14 +311,12 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
   delivery records kept while acceptance is open. Its README indexes every programme and single file.
   Shipped behavior belongs in an owning doc above.
+- [Workflow agent goals](./future/workflow-agent-goals.md): the implemented requirements for completion
+  conditions, bounded continuations, run inspection, and budgets on workflow agent steps.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's
   code on first use, to keep heavy, rarely used routes out of the node's boot graph.
-- [Find in file](./future/find-in-file.md): product requirements for shared inline find and replace
-  controls built from Acorn components across the graphical editors.
-- [Workspace icons](./future/workspace-icons.md): product requirements for workspace icons and images,
-  icons in the desktop switcher, and an optional workspace rail. The TUI keeps its workspace switcher.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
@@ -342,21 +346,18 @@ Restricted agent execution is outside scope. The programme index defines depende
 | [Phase 09](./future/security/09-managed-mcp-review.md) | Exact MCP packages, disabled install scripts, and actual-connection tool review. |
 | [Phase 10](./future/security/10-secret-publication-checks.md) | Local secret detection, publication gates, exact-operation exceptions, and redacted exports. |
 
-## Future editor improvements
+## Editor acceptance handoff
 
-These product requirements keep everyday file management and editing small. Implement the six phases
-in order; plugin file viewers, inline find controls, and Git merge resolution keep their separate owners.
+The six implementation phases are complete. Review the combined change and finish the full test gate
+and supported-platform acceptance. Plugin file viewers and UI extensions keep separate plans.
 
 | Document | What it holds |
 | --- | --- |
-| [Editor programme](./future/editor/README.md) | Product goal, phase order, ownership, related plans, research, and verification. |
+| [Final Editor acceptance](./future/editor/README.md) | Owners, final review, repository gate, connected host checks, and completion criteria. |
 | [Scope boundaries](./future/editor/refused.md) | Deferred functionality and its reasons. |
-| [Phase 01](./future/editor/01-document-lifecycle.md) | Disk revisions, external-change freshness, save conflicts, recovery, and writer suspension. |
-| [Phase 02](./future/editor/02-file-management.md) | Create, rename, and move to trash through file/folder menus, with document reconciliation. |
-| [Phase 03](./future/editor/03-git-status.md) | Optional Git status provider, file/tab marks, folder summaries, and batched refresh. |
-| [Phase 04](./future/editor/04-tabs-and-navigation.md) | Tab menus, guarded bulk close, reopen, recent quick open, position input, and back/forward. |
-| [Phase 05](./future/editor/05-editing-controls.md) | File status, word wrap, indentation controls, and engine command discovery. |
-| [Phase 06](./future/editor/06-search-and-acceptance.md) | Folder search, include/exclude patterns, ignored-file visibility, tree controls, and release acceptance. |
+| [Editor completion records](./testing/editor-delivery-2026-10-08.md) | Dated implementation and verification notes from the retired six phase plans. |
+| [Phase six evidence](./testing/editor-phase06-2026-10-08.md) | Initial scoped-search and tree acceptance results. |
+| [Phase six followup](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected local flow, measurements, and unavailable checks. |
 
 ## Future UI extension handoffs
 
@@ -399,6 +400,22 @@ These pages describe planned work, not shipped behavior. The first release ends 
 | [Phase 06](./future/git-client/06-refs-remotes-and-settings.md) | Refs, remotes, comparison, scoped settings, and opt-in Node fetching. |
 | [Phase 07](./future/git-client/07-operations.md) | Task operations, recovery controls, and Editor/Changes conflict handoff. |
 | [Phase 08](./future/git-client/08-conflict-resolution.md) | Three-way resolution, safe result saving/staging, and combined acceptance. |
+
+## Future performance handoffs
+
+These planned phases reduce shipped bytes and startup work, explain loading progress, and export
+performance measurements to Sentry. They do not describe shipped behavior.
+
+| Document | What it holds |
+| --- | --- |
+| [Performance programme](./future/performance/README.md) | Decisions, phase order, dated starting evidence, owners, and scope. |
+| [Phase 01: Measurements](./future/performance/01-measurements-and-sentry.md) | Startup and feature milestones, artifact inventories, consent, and Sentry export. |
+| [Phase 02: Packaging](./future/performance/02-runtime-packaging.md) | Installed Claude, removal of the SDK executable, and reviewed runtime files. |
+| [Phase 03: Minification](./future/performance/03-production-minification.md) | Production service and plugin minification, diagnostics, and graph-based budgets. |
+| [Phase 04: Startup UX](./future/performance/04-startup-and-loading-ux.md) | Changing startup messages, failure recovery, and feature loading placeholders. |
+| [Phase 05: Renderer loading](./future/performance/05-selective-renderer-loading.md) | Smaller eager imports, contribution readiness, and first-use behavior. |
+| [Phase 06: Server loading](./future/performance/06-selective-server-loading.md) | Shared lazy handlers, route ordering, and required startup obligations. |
+| [Phase 07: Acceptance](./future/performance/07-acceptance-and-budgets.md) | Combined gates, packaged-host checks, before-and-after measurements, and live Sentry evidence. |
 
 ## Plugin topic pages
 

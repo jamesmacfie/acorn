@@ -28,7 +28,7 @@ export type AgentToolCardCall = {
   name?: string
   title: string
   kind?: string
-  status?: 'pending' | 'running' | 'completed' | 'failed'
+  status?: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted' | 'unknown'
   input?: string
   output?: string
   outputAppend?: boolean

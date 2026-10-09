@@ -1,5 +1,12 @@
 import { z } from 'zod'
+import { agentProfileRegistry, type CoreServices } from '@acorn/plugin-api/node'
+import { HARNESS_BACKEND_PREFIX } from '@acorn/protocol/modelProviders.ts'
 import type { AgentEventRecord, AgentGoalBlocker, AgentGoalVerdict, AgentSession, AgentTurn } from '../../contract/wire.ts'
+
+// Shared by interactive goals and workflow completion conditions, so both stop at the same point.
+export const MAX_GOAL_CONTINUATIONS = 8
+export const MAX_GOAL_NO_PROGRESS = 2
+export const GOAL_CHECK_TIMEOUT_MS = 30_000
 
 const blockers = ['none', 'missing_evidence', 'needs_user_input', 'run_failed', 'external_wait', 'goal_not_met_yet'] as const
 const verdictSchema = z.object({
@@ -49,13 +56,13 @@ export function goalEvidence(objective: string, events: readonly AgentEventRecor
 export function goalDecision(session: AgentSession, turn: AgentTurn, verdict: AgentGoalVerdict,
   events: readonly AgentEventRecord[]): { status: NonNullable<AgentSession['goal']>['status']; continuations: number; noProgress: number } {
   const goal = session.goal!
-  const progress = events.some(({ event }) => event.type === 'tool' || event.type === 'file_change')
+  const progress = goalProgress(events)
   const noProgress = turn.source === 'goal' ? (progress ? 0 : goal.noProgress + 1) : goal.noProgress
   const continuations = goal.continuations + (verdict.blocker === 'goal_not_met_yet' ? 1 : 0)
   const status = verdict.satisfied ? 'satisfied'
     : verdict.blocker !== 'goal_not_met_yet' ? 'blocked'
-      : continuations > 8 || noProgress >= 2 ? 'exhausted' : 'active'
-  return { status, continuations: Math.min(continuations, 8), noProgress }
+      : continuations > MAX_GOAL_CONTINUATIONS || noProgress >= MAX_GOAL_NO_PROGRESS ? 'exhausted' : 'active'
+  return { status, continuations: Math.min(continuations, MAX_GOAL_CONTINUATIONS), noProgress }
 }
 
 export function goalContinuationPrompt(objective: string, reason: string): string {
@@ -66,3 +73,59 @@ export const goalCheckFailure = (turnId: string): AgentGoalVerdict => ({
   turnId, satisfied: false, blocker: 'missing_evidence' as AgentGoalBlocker,
   reason: 'The goal check failed.', evidence_summary: 'The verdict was unavailable.', relied_on_assumption: false,
 })
+
+/** Whether any of these events is a tool call or a file change, which is what counts as progress. */
+export const goalProgress = (events: readonly AgentEventRecord[]): boolean =>
+  events.some(({ event }) => event.type === 'tool' || event.type === 'file_change')
+
+export type GoalJudgePorts = {
+  models: CoreServices['models']
+  currentUserId(): string | null
+}
+
+/** Why a session on this profile can't have its goal checked, or null when it can. The judge runs as
+ *  a one-shot call through the session's own harness, so the profile needs a one-shot mode. */
+export function goalJudgeUnavailable(ports: GoalJudgePorts, profileId: string): string | null {
+  if (!agentProfileRegistry.get(profileId)?.aiArgv) return `The ${profileId} harness has no one-shot mode, so Acorn can't check a completion condition on it.`
+  if (!ports.currentUserId()) return "No one is signed in, so Acorn can't check a completion condition."
+  return null
+}
+
+/**
+ * One goal check: the judge model reads the evidence and returns a verdict. Throws when the call
+ * fails, times out, is aborted, or answers in the wrong shape. The caller decides what that means.
+ */
+export async function judgeGoal(ports: GoalJudgePorts, input: {
+  profileId: string
+  objective: string
+  events: readonly AgentEventRecord[]
+  turnId: string
+  signal?: AbortSignal
+  timeoutMs?: number
+}): Promise<{ verdict: AgentGoalVerdict; usage?: { inputTokens?: number; outputTokens?: number } }> {
+  const userId = ports.currentUserId()
+  if (!userId) throw new Error('No one is signed in.')
+  const timeoutMs = Math.min(input.timeoutMs ?? GOAL_CHECK_TIMEOUT_MS, GOAL_CHECK_TIMEOUT_MS)
+  const controller = new AbortController()
+  const abort = () => controller.abort(input.signal?.reason)
+  if (input.signal?.aborted) abort()
+  else input.signal?.addEventListener('abort', abort, { once: true })
+  const timeout = setTimeout(() => controller.abort(new Error('goal_check_timeout')), timeoutMs)
+  try {
+    controller.signal.throwIfAborted()
+    const result = await ports.models.generateText({
+      userId, backendId: `${HARNESS_BACKEND_PREFIX}${input.profileId}`,
+      input: {
+        system: GOAL_JUDGE_SYSTEM,
+        prompt: goalEvidence(input.objective, input.events),
+        ...(input.profileId === 'claude-code' ? { modelId: 'haiku' } : {}),
+        maxOutputTokens: 500,
+        signal: controller.signal,
+      }, timeoutMs,
+    })
+    return { verdict: parseGoalVerdict(result.text, input.turnId), usage: result.usage }
+  } finally {
+    clearTimeout(timeout)
+    input.signal?.removeEventListener('abort', abort)
+  }
+}

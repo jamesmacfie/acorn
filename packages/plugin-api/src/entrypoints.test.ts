@@ -19,6 +19,7 @@ const PKG = JSON.parse(readFileSync(join(import.meta.dirname, '../package.json')
 // which is the difference between a property and an allowlist. The three below are excluded because
 // they legitimately need a browser realm, and each says so in its own header:
 const BROWSER_REALM = new Set([
+  './client/task-draft', // task draft store reaches the TSX icon picker through its client dependencies
   './ui', // frame-safe presentation components, .tsx, so Solid-compiled
   './ui/data-sources', // connected typed-data authoring components, .tsx
   './ui/host', // registration and connected shell surfaces, also .tsx

@@ -621,7 +621,7 @@ describe('architecture boundaries', () => {
       // `features/editor/documentCustody.ts`, merged in from perf. One more on 2026-10-06 for
       // `kit/lib/ansi`, so the terminal kit's CodeBlock strips escape codes without that barrel.
       // The address parser is a pure leaf for the terminal before its renderer host connects.
-      '@acorn/client-core': 173, // Includes the no-projects surface, workspace rail, and device preference reader.
+      '@acorn/client-core': 175, // Phase 05 exposes a lean task launch signal and lazy draft model to both hosts.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
@@ -724,7 +724,8 @@ describe('architecture boundaries', () => {
     // the `browser` plugin. Those rules are the preview pane's page-fill rules and belong to
     // `preview`. Nothing in `plugins/browser` reads them.
     const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts', 'contextTime.ts']
-    const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
+    // Git is also core's VCS vocabulary. A `git` file name alone cannot imply plugin ownership.
+    const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin' && p.name !== '@acorn/plugin-git').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)
       // Source ownership folders do not change whether a module names a plugin.
@@ -839,7 +840,11 @@ describe('architecture boundaries', () => {
         })
         .join('\n')
 
-    const roster = new Set(PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', '')))
+    // Core's `git` literals name the VCS and commands, not the Git plugin. Check explicit package,
+    // route, and source ids separately so this collision does not hide a real plugin dependency.
+    const roster = new Set(PACKAGES.filter((p) => p.kind === 'plugin' && p.name !== '@acorn/plugin-git').map((p) => p.name.replace('@acorn/plugin-', '')))
+    const namesGitPlugin = (source: string): boolean =>
+      /@acorn\/plugin-git\b|\/v1\/p\/git(?:\/|\b)|\bgit\.worktrees\b/.test(codeOnly(source))
     const namesAPlugin = (source: string): string[] => {
       const found = new Set<string>()
       for (const m of codeOnly(source).matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)) {
@@ -856,7 +861,9 @@ describe('architecture boundaries', () => {
       for (const file of walk(pkg.src)) {
         if (isTestCode(file)) continue
         scanned++
-        const names = namesAPlugin(readFileSync(file, 'utf8'))
+        const source = readFileSync(file, 'utf8')
+        if (namesGitPlugin(source)) offenders.push(`${rel(file)}: git plugin reference`)
+        const names = namesAPlugin(source)
         if (!names.length) continue
         matched.add(rel(file))
         if (!NAMES_A_PLUGIN_OK.has(rel(file))) offenders.push(`${rel(file)}: ${names.join(', ')}`)
@@ -870,6 +877,8 @@ describe('architecture boundaries', () => {
     // the prose explaining where that name went.
     expect(scanned).toBeGreaterThan(300)
     expect(namesAPlugin("const x = 'linear'")).toEqual(['linear'])
+    expect(namesGitPlugin("import x from '@acorn/plugin-git/client/index.ts'")).toBe(true)
+    expect(namesGitPlugin("const x = 'git'")).toBe(false)
     expect(namesAPlugin('const x = "github"')).toEqual(['github'])
     expect(namesAPlugin("// this used to branch on 'linear'")).toEqual([])
     expect(namesAPlugin("/* moved to 'github' */")).toEqual([])

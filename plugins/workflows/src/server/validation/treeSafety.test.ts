@@ -113,6 +113,32 @@ describe('workflow tree safety', () => {
     expect(await store.db.select().from(schema.workflowTurnAdmissions)).toHaveLength(1)
   })
 
+  it('counts automatic turns against the turn budget and checks against usage, charging usage once', async () => {
+    let id = 0
+    const safety = new WorkflowTreeSafety(store.db, () => `turn-${++id}`)
+    const run = await insertRun('root', { budget: { maxTurns: 2, maxCostUsd: 1 } })
+    const step = await insertStep(run.id, 'work')
+    const opening = safety.reserveTurn(run, step, {})
+
+    // A check takes no turn. A turn takes the second admission, and a third is refused.
+    expect(safety.admitAutomatic(opening, run, step, {}, 'check', { costUsd: 0.25 })).toBeNull()
+    expect(safety.admitAutomatic(opening, run, step, {}, 'turn', { costUsd: 0.5 })).toBeNull()
+    expect(safety.admitAutomatic(opening, run, step, {}, 'turn', { costUsd: 0.5 })).toMatch(/turn budget exhausted \(2 of 2/)
+    // The opening admission holds the step's usage so far, replaced each time rather than added.
+    expect(await safety.usage(run.id)).toMatchObject({ costUsd: 0.5 })
+    expect(safety.admitAutomatic(opening, run, step, {}, 'check', { costUsd: 1 })).toMatch(/cost budget exhausted/)
+    expect(await safety.settleTurn(opening, { costUsd: 0.75 })).toBeNull()
+    expect(await safety.usage(run.id)).toMatchObject({ costUsd: 0.75 })
+  })
+
+  it('refuses a second agent turn for a step allowed one', async () => {
+    const safety = new WorkflowTreeSafety(store.db, (() => { let id = 0; return () => `turn-${++id}` })())
+    const run = await insertRun('root')
+    const step = await insertStep(run.id, 'work')
+    const opening = safety.reserveTurn(run, step, { maxTurns: 1 })
+    expect(safety.admitAutomatic(opening, run, step, { maxTurns: 1 }, 'turn', {})).toMatch(/step turn budget exhausted \(1 of 1/)
+  })
+
   it('admits an active sibling turn while another branch keeps the run gated', async () => {
     const safety = new WorkflowTreeSafety(store.db, () => 'turn')
     const run = await insertRun('root', { budget: { maxTurns: 2 } })

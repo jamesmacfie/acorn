@@ -84,6 +84,7 @@ query is never logged. A path in either body is at most 4,096 characters.
 | `/v1/p/agents/sessions/:id/turns[/:turnId]` | Queue, edit, or remove a turn |
 | `/v1/p/agents/sessions/:id/requests/:requestId/resolve` | Answer a permission or question request |
 | `/v1/p/agents/sessions/:id/{cancel,fork,compact}` | Session controls |
+| `/v1/p/agents/sessions/:id/subagents/:subagentId/cancel` | Stop a Codex child through its parent session ([subagents](../managed-agents/subagents.md#stop-a-codex-child)) |
 | `/v1/p/agents/sessions/:id/goal[/resume]` | Device-only interactive goal set, clear, and resume ([operations](../managed-agents/operations.md#session-goals)) |
 | `/v1/p/agents/sessions/:id/{handoff-terminal,implement-plan,regenerate-title}` | Session actions |
 | `/v1/p/agents/sessions/:id/{resume-managed,verify-imported-resume}`, `/transcript-imports` | Resume and transcript import |
@@ -196,5 +197,4 @@ to something that isn't there yet.
 `contributions.agentTools` and `contributions.contextSections` each name a route in the package's
 own `/v1/p/<pluginId>/` namespace. The host calls it with a verified task principal, adapts the
 bounded answer into the agent-tool registry or the context assembler, and removes the registration on
-reload or unload. They project through the core task tool and context routes. See
-[agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers).
+reload or unload. They project through the core task tool and context routes. See [agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers).

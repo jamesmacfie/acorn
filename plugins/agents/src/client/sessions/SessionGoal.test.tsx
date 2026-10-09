@@ -31,15 +31,17 @@ it('keeps a pending goal write on its origin and ignores its reply after switchi
   await refreshFleet()
   setActiveNode('A')
   const [selected, setSelected] = createSignal(session('From A'))
+  const [openToken, setOpenToken] = createSignal(0)
   managedAgentStore.upsertSession(selected())
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => <SessionGoal session={selected()} openToken={0}
+  const dispose = render(() => <SessionGoal session={selected()} openToken={openToken()}
     onUpdate={managedAgentStore.upsertSession} />, host)
   const button = (label: string) => [...document.querySelectorAll('button')]
     .findLast((element) => element.textContent?.trim() === label) as HTMLButtonElement | undefined
   try {
-    button('Set goal')!.click()
+    expect(button('Set goal')).toBeUndefined()
+    setOpenToken((token) => token + 1)
     const input = document.querySelector('input')!
     input.value = 'Finish A'
     input.dispatchEvent(new Event('input', { bubbles: true }))
@@ -52,7 +54,7 @@ it('keeps a pending goal write on its origin and ignores its reply after switchi
     managedAgentStore.upsertSession(fromB)
     setSelected(fromB)
     await Promise.resolve()
-    button('Set goal')!.click()
+    setOpenToken((token) => token + 1)
     const nextInput = document.querySelector('input')!
     nextInput.value = 'Finish B'
     nextInput.dispatchEvent(new Event('input', { bubbles: true }))

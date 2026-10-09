@@ -31,6 +31,7 @@ export const PrefKeys = {
   prFilters: 'pr_filters',
   keybindings: 'keybindings',
   diffView: 'diff_view',
+  gitGraphVisible: 'git_graph_visible',
   railOrder: 'rail_order',
   // Which plugin sources the desktop rail draws, as `{ "<pluginId>:<sourceId>": shown }`
   // (features/tabs/railVisibility.ts). Apart from `rail_order` so a drag and a switch never overwrite

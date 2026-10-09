@@ -2,7 +2,8 @@
 // commit, discard, and the four remote verbs over the task's worktree. The LocalGitBridge behind the HTTP routes in
 // ./routes/localGit.ts. The taskId is the capability, and relative paths are validated inside
 // localDiff.ts. Pure Node, so it works in dev:node too. Wired in ../node/index.ts.
-import { BridgeError, type CoreServices, type PluginHookRegistry } from '@acorn/plugin-api/node'
+import { BridgeError, invalidateWorktreeStatus, type CoreServices, type PluginHookRegistry } from '@acorn/plugin-api/node'
+import { realpath } from 'node:fs/promises'
 import type { GitActionResult, LocalGitBridge } from './routes/localGit'
 import { abortOperation, branchOf, commitDiffText, commitStaged, discardAll, discardFile, fetchRemote, gitOperation, headCommit, localNewSideText, localStatus, pullRemote, pushBranch, stageAll, stageFiles, unstageAll, unstageFiles } from './localDiff'
 import { localDocument, localSearch, localSegments } from './localDocument'
@@ -51,7 +52,7 @@ export const CHANGES_HOOKS = [
 // `secretPublication` is core's optional gate (docs/security/secret-publication.md). Absent or off,
 // commit and push run exactly as before, with no check and no added latency.
 export function localGitBridge(
-  core: Pick<CoreServices, 'tasks' | 'models' | 'secretPublication'>,
+  core: Pick<CoreServices, 'tasks' | 'models' | 'checkoutAdmission' | 'secretPublication'> & Partial<Pick<CoreServices, 'prefs' | 'identity'>>,
   /** `ctx.events.worktreeStatus`: a stage, a commit, a discard or a remote verb moved the dirty
    *  markers, or the counts the branch bar draws beside them. */
   worktreeChanged: (taskId: string) => void = () => {},
@@ -87,7 +88,10 @@ export function localGitBridge(
     status: async (taskId) => {
       const root = await core.tasks.root(taskId)
       if (!root) return emptyLocalStatus()
-      return localStatus(root).catch(() => emptyLocalStatus())
+      const status = await localStatus(root).catch(() => emptyLocalStatus())
+      const owner = core.identity?.active()
+      const policy = owner && core.prefs ? await (await import('./pullPolicy')).readPullPolicy(core.prefs, owner).catch(() => null) : null
+      return { ...status, pullPolicy: policy === 'rebase' ? 'rebase' : 'ff-only' }
     },
     // The diff as a document, then its segments and search pages (./localDocument.ts). git's default
     // -U3, so the pane shows hunks with expandable gaps between them rather than every line of every
@@ -133,7 +137,28 @@ export function localGitBridge(
     // The four remote verbs. Each takes 120 seconds rather than the local 30, because the clock is
     // somebody else's server (./localDiff.ts § NETWORK_TIMEOUT_MS).
     fetch: (taskId) => withRoot(taskId, fetchRemote),
-    pull: (taskId, options = {}) => withRoot(taskId, (root) => pullRemote(root, options)),
+    pull: async (taskId, options = {}) => {
+      const root = await core.tasks.root(taskId)
+      if (!root) return { ok: false, reason: 'No worktree yet.' }
+      const owner = core.identity?.active()
+      const preference = options.rebase === undefined && owner && core.prefs ? await (await import('./pullPolicy')).readPullPolicy(core.prefs, owner) : null
+      try {
+        return await core.checkoutAdmission.write(taskId, async (checkout) => {
+          if (await realpath(root) !== await realpath(checkout)) return { ok: false, reason: 'Target checkout moved. Refresh and try again.' }
+          const task = await core.tasks.load(taskId)
+          invalidateWorktreeStatus(root)
+          const status = await localStatus(root)
+          if (!task || (task.branch && status.branch !== task.branch)) return { ok: false, reason: 'Task branch changed. Refresh and try again.' }
+          if (status.operation || status.changes.length) return { ok: false, reason: 'Finish the current operation and commit or discard local changes before pulling.' }
+          const result = await pullRemote(root, { rebase: options.rebase ?? (preference === 'rebase') })
+          worktreeChanged(taskId)
+          return result
+        })
+      } catch (error) {
+        if (error instanceof BridgeError) return { ok: false, reason: error.message }
+        throw error
+      }
+    },
     push: (taskId, options = {}) => withRoot(taskId, async (root) => {
       const branch = await branchOf(root)
       const verdict = await hooks?.run('before-push', { taskId, branch, force: !!options.force })

@@ -91,10 +91,20 @@ export class AgentSessionRepository {
 
   async recordEvent(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
     await this.ensureSearchProjection()
+    const commands = event.type === 'tool' && event.tool.kind === 'execute' && turnId === null
+      ? await import('./commandLifecycle') : null
     const timestamp = now()
-    const projection = projectAgentEvent(event, turnId)
     const eventId = randomUUID()
     const committed = this.db.transaction((tx) => {
+      if (event.type === 'tool' && event.tool.kind === 'execute' && turnId === null) {
+        turnId = commands!.commandTurn(tx, sessionId, event.tool)
+      }
+      const turn = turnId ? tx.select({ status: schema.agentTurns.status }).from(schema.agentTurns)
+        .where(eq(schema.agentTurns.id, turnId)).get() : undefined
+      // Attribution keeps a late update on its card; only an active turn can claim parent work.
+      const lifecycleEnding = event.type === 'tool' && ['interrupted', 'cancelled', 'unknown'].includes(event.tool.status ?? '')
+      const projection = lifecycleEnding ? {} : projectAgentEvent(event,
+        turn && ['dispatching', 'active'].includes(turn.status) && !eventSubagentId(event) ? turnId : null)
       const current = tx
         .select({
           lastEventSeq: schema.agentSessions.lastEventSeq,
@@ -130,7 +140,7 @@ export class AgentSessionRepository {
       // An event the harness attributed to a child marks that child heard from, which is what keeps a
       // backgrounded row honest: its own updates stop at the launch receipt, so without this the only
       // clock the roster has is one that stopped ticking minutes ago.
-      const touchedId = event.type === 'subagent' ? undefined : eventSubagentId(event)
+      const touchedId = event.type === 'subagent' || lifecycleEnding ? undefined : eventSubagentId(event)
       const roster = event.type === 'subagent'
         ? foldSubagentRoster(parseSubagents(current.subagentsJson), event.subagent, turnId, timestamp)
         : []

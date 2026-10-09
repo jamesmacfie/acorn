@@ -4,6 +4,7 @@ import { contextClientPlugin } from '@acorn/plugin-context/client/index.ts'
 import { dockerClientPlugin } from '@acorn/plugin-docker/client/index.ts'
 import { editorClientPlugin } from '@acorn/plugin-editor/client/index.ts'
 import { githubClientPlugin } from '@acorn/plugin-github/client/index.ts'
+import { gitClientPlugin } from '@acorn/plugin-git/client/index.ts'
 import { memoryClientPlugin } from '@acorn/plugin-memory/client/index.ts'
 import { notesClientPlugin } from '@acorn/plugin-notes/client/index.ts'
 import { onboardingClientPlugin } from '@acorn/plugin-onboarding/client/index.ts'
@@ -13,14 +14,14 @@ import { workflowsClientPlugin } from '@acorn/plugin-workflows/client/index.ts'
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
-// because that is where a pane comes from on the desktop too. It is the same twelve the desktop
-// registers, and eight panes reach the strip (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin
+// because that is where a pane comes from on the desktop too. It is the same thirteen the desktop
+// registers, and nine panes reach the strip (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin
 // is not on this list and never will be: it arrives from a node as a bundle, and
 // `watchPluginChanges` in main.tsx is what finds it, once a node is reachable.
 //
 // ## Why this is its own module, imported after the first frame
 //
-// These twelve imports were the terminal client's eager module graph. `App.tsx` held them so their
+// The original twelve imports were the terminal client's eager module graph. `App.tsx` held them so their
 // `init` could register at module scope, and `main.tsx` awaits `App` before it creates a renderer — so
 // every pane, every source and every query module in twelve plugins was evaluated before a cell was
 // drawn. That was 224 KB of the 1.03 MB the shell loaded to draw a rail
@@ -39,6 +40,7 @@ export function installRoster(): void {
     dockerClientPlugin,
     editorClientPlugin,
     githubClientPlugin,
+    gitClientPlugin,
     memoryClientPlugin,
     notesClientPlugin,
     onboardingClientPlugin,

@@ -256,6 +256,7 @@ function viewportBox(props: ViewportProps): JSX.Element {
         props.onBox?.(element as Renderable & Viewport)
       }}
     >
+      {/* The scrollbar paints over the viewport's last cell. Keep content out of it. */}
       <box
         flexDirection="column"
         alignSelf="flex-start"
@@ -263,6 +264,7 @@ function viewportBox(props: ViewportProps): JSX.Element {
         flexShrink={0}
         minWidth="100%"
         maxWidth="100%"
+        paddingRight={1}
         onSizeChange={clampCurrent}
         ref={(element: Renderable) => { content = element as unknown as Node }}
       >

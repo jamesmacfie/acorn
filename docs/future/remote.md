@@ -1,163 +1,108 @@
-# Remote access: web client, mobile, and a relay service
+# Build browser and mobile clients
 
-Design notes from the third-party-plugins session (2026-08-08). Nothing here is scheduled; this
-records the analysis so a future project starts from conclusions instead of re-deriving them.
-The terminal client is the other non-desktop surface, and it shipped: [tui.md](../tui.md) owns it.
-It shares this file's reasoning about auth and custody and none of its browser constraints.
-The later [cloud-tasks programme](./cloud/README.md) chooses an administration-only web app first
-and brings the opaque relay forward for desktop and TUI access to private Nodes. Its relay timing
-and account scope supersede those proposals below; this file still owns the future browser
-workspace and mobile-client analysis.
-The three cheap preparation items at the bottom ARE worth doing early — they are annotated in
-the plugin docs (`docs/plugins.md`, `docs/security.md`).
+Date: October 8, 2026. Status: client foundations implemented; browser and mobile clients remain proposed.
 
-Browser-side plugin custody must implement the complete `PluginCustody` group, including device
-install and remove. It can use the fetch-injected source resolver, IndexedDB for bundles, and
-WebCrypto for hashing; a browser host offers no local-folder installation. GitHub, npm, and URL
-sources need CORS or the same proxy that TLS needs. Device bundles render in the same sandboxed
-opaque-origin iframe as Node bundles. A replaced rail or topbar is a desktop surface, so the mobile
-shell hides an offer whose `formFactor` excludes it.
+Use this design to plan a browser workspace and a mobile progressive web app.
+[Cloud](./cloud/README.md) owns account services, hosted tasks, and the relay.
+Its administration web app is separate from the workspace proposed here.
 
-## The shape of the demand
+## Starting point
 
-The signal from surveying herdr's plugin ecosystem: the most-wanted remote surface is not the
-workspace — it is monitoring, approvals, notifications, and quick actions on a phone (collie,
-herdr-remote, mobile-relay were three of the top 25 plugins). Mobile v1 is therefore a focused
-subset shell — attention inbox, agent status, approve/respond, task list, start a task — not a
-responsive port of the pane workspace. Making the pane workspace responsive would be a
-permanent tax on every future pane; a deliberate subset is buildable and matches what people
-actually do on phones.
+The desktop and terminal clients share Node APIs, node-scoped caches, host components, and the
+platform adapter in `packages/client-core/src/infra/platform/`. A standalone Node runs the same
+service graph as the desktop-supervised Node. These foundations are implemented.
 
-## Web client: what changes and what doesn't
+Frame form factors and the bridge's scheme-independent messages are implemented too.
+Browser authentication, asset serving, plugin custody, and browser-valid transport require their
+own host adapters and Node contracts. The terminal client's local token storage is not a browser
+implementation.
 
-A web client is a browser talking to a Node directly. The Node already runs shell-free
-(docs/architecture-overview.md: a standalone Node uses the same service graph). Three assumptions
-break:
+## Build a single-Node browser host
 
-### 1. Auth inverts (the big one)
+Start with [runtime architecture](../architecture-overview.md), [transport and auth](../security/transport-and-auth.md),
+[platform access](../frontend.md), and [plugin custody](../caching.md).
+Trace requests through client transport, authorization, Node routes, query caches, and plugin mounts.
 
-On desktop the renderer never holds a token; the desktop helper brokers every request with pinned
-HTTPS and a device bearer. A browser IS the client — it must hold a session. The Node needs real
-web auth: httpOnly-cookie or bearer sessions, CSRF protection, rate limiting, lockout, session
-revocation. A web session should be modeled as a **device row** — the existing device-token
-model extends naturally, giving revocation UI ("this browser session") for free. The public
-automation API work (docs/api-reference.md: bearer tokens, registry, rate limits) is the down payment.
+Complete these design decisions before implementing authentication:
 
-Token custody on web is strictly worse than desktop custody, and no design fixes that fully:
+1. Choose browser session storage and renewal. Model each revocable browser session as an identifiable
+   client of the Node; preserve task and owner authorization.
+2. Define HTTP and WebSocket authentication. Browsers cannot set the desktop's bearer header on a
+   WebSocket upgrade. Avoid long-lived credentials in URLs or logs.
+3. Define cross-site request protection, allowed origins, request limits, failed-login handling,
+   logout, and revocation. Test cookies and bearer alternatives against the chosen deployment shape.
+4. Decide where the shell bundle is served. Document who controls its bytes and whether a connected
+   Node can replace them.
+5. Select browser-valid TLS and reachability. Browser transport cannot implement the native broker's
+   certificate pinning. Record the changed trust model and certificate validation behavior.
 
-- Tokens for every connected node live in JS-reachable storage; one XSS in the shell is
-  fleet-wide credential theft.
-- Mitigations worth doing, with honest limits: encrypt tokens under a **non-extractable
-  WebCrypto key** in IndexedDB (exfiltrated DB is ciphertext; in-page script can still decrypt);
-  short-lived per-node tokens with refresh; strict shell CSP; and the third-party UI sandbox —
-  sandboxed plugin frames have opaque origins and cannot touch shell storage, so plugin UI is
-  NOT in the XSS trust zone. That sandbox decision pays off again here.
+Acceptance: a browser can sign in, open a task, supervise an agent, answer a permission request,
+reconnect, and sign out. A revoked session loses HTTP and WebSocket access. Cross-origin and
+unauthorized task requests fail. Reload preserves only the state and credentials the design permits.
 
-### 2. The Node serves the shell, and trust inverts with it
+## Implement browser plugin custody
 
-Today the Node "serves no web assets"; for web it serves the renderer bundle. This quietly
-inverts the plugin trust model: on desktop the app comes from us and plugin bundles come from a
-possibly-hostile node, so bytes-hash prompts are the consent surface. On web, the WHOLE app
-comes from the node — trusting the node is the ballgame, and per-bundle prompts mostly protect
-plugin-vs-plugin blast radius. When web becomes real, `docs/security.md` needs a section stating
-this inversion; the per-device trust
-store also moves server-side (per-user acknowledgements on the node) because per-browser
-localStorage acks are weak and evictable.
+Implement the complete `PluginCustody` group, including install and removal of device bundles.
+Use a browser store for bundles and trust decisions, and cryptographic hashing for exact-byte identity.
+Fetched sources need origin permission or a scoped proxy. Browser hosts cannot install local folders.
 
-### 3. TLS and reachability
+Keep loaded UI in an opaque-origin sandbox and preserve contribution authority, manifest limits,
+update consent, and fallback behavior. Decide how trust records survive storage eviction and how
+shared browsers keep users separate. A non-extractable encryption key can protect copied storage;
+code running in the shell can still use it. Do not describe that as protection from shell script injection.
 
-Browsers will not accept the self-signed pinned certs nodes mint today, and there is no
-cert-pinning API. Each node needs browser-valid TLS — realistically **Tailscale Serve** (valid
-certs + NAT/LAN reachability in one move) or a reverse proxy with real certs. Pinning is traded
-for CA trust: a deliberate, acceptable downgrade to write down, not hide. Additional browser
-constraints: every node must allow the shell's origin in CORS, and Chrome's Private Network
-Access rules block public-origin → private-IP requests — another reason the shell should be
-served from inside the same tailnet as the nodes. Pairing needs a browser flow (QR / short code
-minting the web session) — `/v2/pair` is most of it; the service protocol is not reachable from
-a browser.
+Acceptance: install, render, update, revoke, remove, and recover a device bundle after reload.
+Verify tampered bytes, unavailable sources, denied permissions, and browser storage loss.
 
-## Multi-node from a browser: fan-out vs hub
+## Add multiple Nodes
 
-Fan-out itself is just N fetch targets + N WebSockets; a browser does that fine. The per-node
-query caches are already node-scoped, built for N from day one. Two architectures:
+Use browser connections to independent Nodes as the initial design. Keep one connection and one
+query-cache scope per Node. Implement its transport and token custody through the host adapter.
+Start with one Node before adding remembered endpoints, switching, and concurrent reads.
 
-- **Browser-side fan-out** (recommended): the client platform adapter grows a `WebBroker` — the web
-  host's composition of `@acorn/custody`, which is a package rather than the desktop's, with endpoint
-  records + tokens in IndexedDB, one WS per node, and the same node-scoped caches. Truest to
-  the existing model: nodes stay independent peers, zero new server-side machinery. Costs: the
-  token-custody downgrade above, per-node TLS/CORS setup, N sockets on a phone (fine for the
-  foreground-brief mobile subset).
-- **Hub node**: browser holds one session to one node, which proxies to its peers. One socket,
-  one origin, one cert — but nodes currently have **no peer relationships at all** ("no shared
-  database or cross-node transaction"), so a hub invents node-to-node pairing and proxying from
-  scratch, and the hub sees all traffic. Bigger architectural change than web auth itself. Only
-  revisit if fan-out's per-node setup proves to be the adoption blocker.
+A hub that proxies between Nodes needs peer pairing, proxy authority, and failure contracts.
+Revisit it only if direct browser connections fail a demonstrated deployment requirement.
 
-Sequencing either way: ship single-node web first; fan-out is additive because the adapter seam
-and node-scoped caches already assume N.
+Acceptance: two Nodes with overlapping task identifiers keep data, credentials, trust, and pending
+responses separate. Switching Nodes during a read or action cannot apply the result to the other Node.
 
-## Mobile
+## Define the mobile subset
 
-Decided 2026-08-28 while planning the layout programme: mobile is a PWA, not a native app, and
-host-owned layouts are what make the subset shell cheap. Every pane declares one of eight host-owned
-layouts, each with a narrow projection written before it lands
-([docs/panes.md § Layout model](../panes/layout.md#layout-model)), so responsiveness is paid once per layout
-rather than once per pane. The rest of what the kit owes a mobile host — breakpoints as style tokens,
-`formFactor` on surfaces so a desktop-shaped rectangle is hidden rather than mangled, no node reading
-the window width, and hover that is never load-bearing — is
-[docs/ui-design.md § What a mobile PWA needs from this](../ui-design.md). What this file says about
-auth, serving, TLS, and the relay is unchanged and is none of that design's business.
+Build a progressive web app for attention, agent status, permission and question replies, task
+navigation, and explicit task starts. Confirm this subset before extending it to a pane workspace.
+Reuse narrow host layouts and form-factor declarations; do not expose a desktop-only frame on a phone.
 
-The web client, responsive, PWA first. Home-screen install; iOS supports PWA push since 16.4.
-Wrap in Capacitor only if app-store presence or push reliability forces it; a native rewrite is
-not justified by the use case. Two mobile-specific facts that shape the design:
+Define focus, touch targets, navigation, and recovery for narrow screens. Use explicit actions for
+controls that rely on hover in the desktop. Document unsupported file and terminal operations.
 
-- **Background sockets die on phones.** Push notifications are the background channel, not an
-  enhancement — which requires a node-side event→push seam (agent finished, needs input,
-  attention item created). This is the same "event hooks" seam identified in the herdr analysis;
-  it serves ntfy-style plugins AND mobile push.
-- **Descriptors render on mobile for free.** Declarative chrome (sources, badges, attention
-  items, palette rows) is form-factor-neutral by construction — the host renders it natively, so
-  the mobile shell reuses the same contributions in a mobile layout. Third-party frame surfaces
-  are desktop-shaped; the manifest's `formFactor` field (since shipped in the manifest schema) lets a plugin opt a
-  surface into mobile explicitly rather than rendering an unusable desktop pane in a phone
-  viewport.
+Background delivery needs a push subscription and a Node-owned event path because a suspended
+phone cannot retain a foreground socket. Define subscription authority, revocation, duplicate
+handling, and notification content. Keep secrets and task contents out of routing metadata.
 
-## The relay service (acorn.dev or similar)
+Acceptance: test the supported mobile browsers on real devices, foreground reconnect, background
+notification, expired sessions, approval completion, and a Node that becomes unavailable mid-action.
+Record install behavior and host limitations rather than assuming desktop component support proves them.
 
-Web push and browser reachability both eventually want a rendezvous point that is not the user's
-own network: something at a stable public URL that (a) relays push notifications to
-web/mobile/native clients, (b) optionally tunnels browser↔node traffic when no tailnet exists,
-and (c) could carry pairing handshakes ("enter this code on your node"). Notes:
+## Coordinate the relay
 
-- This is the first component in the architecture that is **ours, hosted, and chargeable** — a
-  plausible commercial seam (free local/tailnet forever; pay for the relay), the same shape as
-  herdr-remote's "free tunnel for remote" and Tailscale's funnel.
-- Design it as **dumb pipes**: end-to-end encrypted frames between node and client, relay sees
-  routing metadata only. This keeps the trust story clean (the relay is availability
-  infrastructure, not a data processor), keeps self-hosting honest (the relay protocol should be
-  runnable by anyone), and limits what a relay compromise yields.
-- The node-side pieces it needs are the same ones mobile needs anyway: the event→push seam and
-  outbound tunnel client. Nothing else in the architecture changes — nodes still own their data,
-  clients still authenticate to nodes, the relay just moves bytes.
-- Do not build any of this before a web client exists; it is meaningless without one.
+[Cloud relay](./cloud/relay.md) and [its phase plan](./cloud/phases/04-relay.md) own opaque routing,
+account scope, and implementation order. Desktop and TUI relay access can precede a browser workspace.
+Remove the earlier requirement to wait for the browser client.
 
-## Preparation items (cheap now, expensive later)
+A browser integration must preserve end-to-end client/Node authority and document its browser TLS
+and session model. Push delivery is a separate contract even if it uses the same hosted service.
 
-All three are reflected in the shipped system. Item 1 was **not** true when this file first claimed
-it — a 2026-08-15 survey found the seam existed as a TypeScript type and nothing else — and it landed
-that day (`git history: docs/future/node-first/platform-seam.md`). Everything else here waits.
+## Verify and hand off
 
-1. **Platform adapter seam in client-core.** (Shipped — `packages/client-core/src/infra/platform/`.)
-   Everything that touches `window.acorn` (apiClient's nodeFetch, stream attach, plugin cache access,
-   trust prompts) is behind capability-grouped interfaces with the desktop bridge as their only
-   implementation, and `boundaries.test.ts` fails any file outside the seam that reads the global.
-   Two facts pinned for the eventual web implementation: the device bearer rides the WS *upgrade
-   header* today, which a browser cannot set, so the node needs a second auth carrier; and `nodeFetch`
-   buffers whole responses (streaming cannot cross IPC), so a web transport is free to return a
-   streaming response — the type is per-implementation and does not impose the desktop's limit.
-2. **`formFactor` on frame surfaces** in the plugin manifest, default `["desktop"]`. One field,
-   added while the schema is young. Descriptors need nothing. (Shipped — `plugin/contract.ts`.)
-3. **Keep the sandbox bridge scheme-agnostic.** The MessageChannel bridge and SDK must not
-   hardcode `app-plugin://` — on web the same isolation is a sandboxed iframe with an opaque
-   origin and CSP headers. (Held today — `frames/sdk.ts` names no origin.)
+Split authentication, the browser host, custody, multi-Node access, and mobile delivery into reviewable
+implementation tasks after the deployment decisions are recorded. Each task must name contracts,
+migrations, fixtures, and acceptance environments.
+Update the owning architecture, auth, custody, and host reference docs as behavior ships.
+Run owner and consumer suites, lint, architecture checks, and browser integration acceptance.
+
+## Verify before building
+
+- Inspect platform groups, custody interfaces, Node authentication, origin checks, and WebSocket setup.
+- Recheck browser constraints for the supported browsers and chosen deployment.
+- Read cloud relay and identity decisions before adding another account or tunnel contract.
+- Verify the sandbox and contribution selection under the actual browser origin and storage model.

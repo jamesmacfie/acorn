@@ -51,8 +51,10 @@ The inspector draws whatever the list has selected. For a node that is its name,
 on as removable chips with a picker beside them, the agent fields when the kind runs an agent, then
 the kind's own fields in declared order. A prompt field carries a chip per declared input and per
 step that is certain to have finished first, and pressing one appends the reference. A `decide` node
-draws its branches as verdict-to-step rows. For each selects **Agent session** or **Child workflow**. Agent sessions show a prompt, harness,
-model and reasoning options, and an **On failure** choice. Each receives its current item
+draws its branches as verdict-to-step rows. An **Ask an agent** node has an optional **Completion condition** after **Prompt**
+([agent steps](./agent-steps.md#completion-conditions)). For each selects **Agent session** or
+**Child workflow**. Agent sessions show a prompt, a completion condition, harness, model and
+reasoning options, and an **On failure** choice. Each receives its current item
 automatically and runs in the parent folder. Child workflows show the saved target and typed
 item bindings.
 A **Wait for a person** node has a **Form** section: the inputs list for its fields, with a 20-field

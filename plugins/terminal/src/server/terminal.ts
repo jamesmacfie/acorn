@@ -472,7 +472,7 @@ async function maybeRunSetup(t: TaskRef, cwd: string, engine: EngineOwner): Prom
 // what it should not run; this half spawns it the way the worktree-created hook does.
 async function runSetup(taskId: string, engine: EngineOwner): Promise<{ sessionId: string }> {
   assertOwner(engine)
-  const admitted = engine.core.taskScripts.admitManualSetup(taskId)
+  const admitted = await engine.core.taskScripts.admitManualSetup(taskId)
   try {
     const t = await engine.core.tasks.load(taskId)
     assertOwner(engine)

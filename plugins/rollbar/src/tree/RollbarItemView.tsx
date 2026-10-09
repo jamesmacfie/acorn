@@ -9,7 +9,7 @@ import type {
   RollbarOccurrenceSummary,
 } from '../shared/api'
 import type { RollbarRailTarget } from '../shared/rail'
-import { levelWord, relativeTime, statusWord } from './model'
+import { levelWord, relativeTime, statusWord, traceText } from './model'
 
 export type RollbarViewState = {
   target: RollbarRailTarget
@@ -59,13 +59,8 @@ export function RollbarItemView(props: {
         <Alert variant="banner" title="Couldn't refresh this error. Showing the last data we got.">{detail()}</Alert>
       )}</Show>
 
-      {/* Level and status as words from a map; the environment stays as the project spelled it. */}
-      <ChipRow ariaLabel="Error status">
-        <Show when={item().level}>{(level) => <Badge tone={levelWord(level()).tone} size="xs">{levelWord(level()).label}</Badge>}</Show>
-        <Show when={item().environment}>{(environment) => <Badge size="xs">{environment()}</Badge>}</Show>
-        <Show when={item().status}>{(status) => <Badge tone={statusWord(status()).tone} size="xs">{statusWord(status()).label}</Badge>}</Show>
-      </ChipRow>
-
+      {/* The status sits at the strip's end, so the strip meets the header with no row between.
+          Level and status as words from a map; the environment stays as the project spelled it. */}
       <Tabs
         tabs={[
           { id: 'overview', label: 'Overview' },
@@ -75,7 +70,13 @@ export function RollbarItemView(props: {
         onChange={props.onSelect}
         idPrefix="rollbar"
         ariaLabel="Error sections"
-      />
+      >
+        <ChipRow ariaLabel="Error status">
+          <Show when={item().level}>{(level) => <Badge tone={levelWord(level()).tone} size="xs">{levelWord(level()).label}</Badge>}</Show>
+          <Show when={item().environment}>{(environment) => <Badge size="xs">{environment()}</Badge>}</Show>
+          <Show when={item().status}>{(status) => <Badge tone={statusWord(status()).tone} size="xs">{statusWord(status()).label}</Badge>}</Show>
+        </ChipRow>
+      </Tabs>
 
       {/* Mono only for a version, the one value here that is code. */}
       <TabPanel idPrefix="rollbar" id="overview" active={props.activeTab}>
@@ -182,8 +183,10 @@ function OccurrenceContent(props: {
     detail().server?.host ? { label: 'Server', value: detail().server!.host!, mono: true } : null,
   ].filter((fact) => fact !== null)
 
+  // A fragment, so the bar is the detail column's first child and the column seats it on its top edge
+  // rather than a scroll pad below it.
   return (
-    <Stack gap="section">
+    <>
       <Toolbar variant="bar">
         <Stack gap="row">
           <Text emphasis="strong">{occurrenceTitle(detail())}</Text>
@@ -200,32 +203,20 @@ function OccurrenceContent(props: {
           Copy details
         </Button>
       </Toolbar>
-      <Show when={facts().length}><Facts items={facts()} /></Show>
-      <Trace detail={detail()} />
-    </Stack>
+      <Stack gap="section">
+        <Show when={facts().length}><Facts items={facts()} /></Show>
+        <Trace detail={detail()} />
+      </Stack>
+    </>
   )
 }
 
-/** The stack, shared by Overview's newest occurrence and the occurrence detail. */
+/** The stack, shared by Overview's newest occurrence and the occurrence detail. One block, so the
+ *  trace reads as one log set apart from the facts around it. */
 function Trace(props: { detail: RollbarOccurrenceDetail }) {
   return (
-    <Stack gap="row">
-      {/* A location line and a CodeBlock per frame. The left border that marked an in-project frame
-          is now the muting of the ones that are not: a border width is a pixel a plugin no longer
-          picks, and "this frame is not yours" is the thing it was saying. "›" marks the line that
-          threw. */}
-      <For each={props.detail.frames}>{(frame) => (
-        <Stack gap="row">
-          <Text emphasis="mono" wrap tone={frame.inProject === false ? 'muted' : 'neutral'}>
-            {frame.filename}{frame.line == null ? '' : `:${frame.line}`}{frame.method ? ` · ${frame.method}` : ''}
-          </Text>
-          <Show when={frame.code.length}>
-            <CodeBlock size="xs" maxHeight="block">
-              {frame.code.map((line) => `${line.line === frame.line ? '›' : ' '} ${String(line.line).padStart(4)}  ${line.text}`).join('\n')}
-            </CodeBlock>
-          </Show>
-        </Stack>
-      )}</For>
-    </Stack>
+    <Show when={props.detail.frames.length}>
+      <CodeBlock size="xs" wrap>{traceText(props.detail.frames)}</CodeBlock>
+    </Show>
   )
 }

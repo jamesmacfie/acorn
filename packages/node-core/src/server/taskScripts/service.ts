@@ -151,14 +151,23 @@ export function taskScripts(db: AppDatabase): TaskScriptService {
   if (!service) { service = new TaskScriptService(db); services.set(db, service) }
   return service
 }
+/** Durable setup evidence remains busy from admission through process settlement. */
+export function setupCheckoutActivity(db: AppDatabase, taskIds: readonly string[]) {
+  return taskIds.flatMap((taskId) => {
+    const state = taskScripts(db).select(taskId, 'setup').state
+    return state === 'starting' || state === 'running' ? [{ taskId, description: `setup ${state}` }] : []
+  })
+}
 // First-party process evidence seam. Loaded plugins receive neither a ledger writer nor a DB handle.
-export type TaskScriptEvidenceService = Pick<TaskScriptService, 'admitManualSetup' | 'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'>
+export type TaskScriptEvidenceService = Omit<Pick<TaskScriptService, 'admitManualSetup' | 'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'>, 'admitManualSetup'> & {
+  admitManualSetup(taskId: string): Promise<TaskScriptSnapshot>
+}
 
 /** Runtime projection: process owners receive no storage handle or worktree policy methods. */
-export function taskScriptEvidence(db: AppDatabase): TaskScriptEvidenceService {
+export function taskScriptEvidence(db: AppDatabase, admitWork: <T>(taskId: string, action: () => Promise<T>) => Promise<T>): TaskScriptEvidenceService {
   const service = taskScripts(db)
   return {
-    admitManualSetup: service.admitManualSetup.bind(service),
+    admitManualSetup: (taskId) => admitWork(taskId, async () => service.admitManualSetup(taskId)),
     takeSetup: service.takeSetup.bind(service), report: service.report.bind(service),
     forSession: service.forSession.bind(service), reconcile: service.reconcile.bind(service),
     close: service.close.bind(service),

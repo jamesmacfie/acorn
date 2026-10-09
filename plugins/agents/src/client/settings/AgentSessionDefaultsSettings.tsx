@@ -6,6 +6,7 @@ import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   AGENT_ARCHIVED_HISTORY_CHOICES,
   AGENT_IDLE_STOP_CHOICES,
+  AGENT_REPEATED_TOOL_CALL_CHOICES,
   defaultAgentSessionDefaults,
   type AgentSessionDefaults,
 } from '../../shared/sessionDefaults'
@@ -74,6 +75,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   }
   const continueAfterLimit = createSettingSave()
   const idleStop = createSettingSave()
+  const repeatedCalls = createSettingSave()
   const archivedHistory = createSettingSave()
   const followLast = createSettingSave()
   const inlineProviderSave = createSettingSave()
@@ -156,6 +158,21 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
             value={String(record().stopIdleAfterMinutes)}
             options={AGENT_IDLE_STOP_CHOICES.map((choice) => ({ value: String(choice.minutes), label: choice.label }))}
             onChange={(value) => void idleStop.run(() => save({ stopIdleAfterMinutes: Number(value) }))}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection id="repeated-calls" label="Stuck agents">
+        <SettingRow
+          label="Warn when an agent repeats a tool call"
+          help="An agent that runs the same tool with the same input again and again may be stuck. acorn warns in the conversation and in the bell. It doesn't stop the agent, because some tools, such as waiting for a build, repeat on purpose."
+          error={repeatedCalls.error()}
+        >
+          <Select
+            label="Warn when an agent repeats a tool call"
+            value={String(record().warnRepeatedToolCallsAfter)}
+            options={AGENT_REPEATED_TOOL_CALL_CHOICES.map((choice) => ({ value: String(choice.calls), label: choice.label }))}
+            onChange={(value) => void repeatedCalls.run(() => save({ warnRepeatedToolCallsAfter: Number(value) }))}
           />
         </SettingRow>
       </SettingsSection>

@@ -28,6 +28,7 @@ import {
 } from './asking'
 import { Fallback, Only, Rectangle } from './pixels'
 import { Graph } from './graph'
+import { HistoryMark } from './historyMark'
 import { Line } from './cells'
 import { _resetCollections } from '../keys/collection'
 import { focusedRenderable } from '../keys/regions'
@@ -65,7 +66,7 @@ const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => l
 /** The text inside a `Textarea`, which is two frames in: the panel each case is drawn in, and the
  *  field's own border inside it (./asking/fields.tsx § Textarea). */
 const fieldLines = (frame: Frame, count: number): string[] =>
-  frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/[│█]+$/, '').trimEnd())
+  frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/(?:\s*[│█])+\s*$/, '').trimEnd())
 
 const noteFile = {
   path: 'src/login.ts',
@@ -541,6 +542,13 @@ const CASES: Case[] = [
       expect(lineWith(frame, 'review').indexOf('review'))
         .toBeGreaterThan(lineWith(frame, 'investigate').indexOf('investigate'))
     },
+  },
+  {
+    node: 'HistoryMark',
+    draws: 'reduced: a commit dot, optional lane number, and continuation mark',
+    render: () => <HistoryMark slot={{ id: 'commit', lane: 1, lanes: 2, edges: [], continuation: true, disconnected: false }} />,
+    size: { width: 12, height: 2 },
+    check: (frame) => has(frame, '●⋯ 2'),
   },
   {
     node: 'Meter',

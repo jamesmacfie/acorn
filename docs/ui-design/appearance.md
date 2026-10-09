@@ -11,9 +11,8 @@ Style packs set typography, radius, spacing, density, chrome, and motion. You pi
 and feature components never choose literal colors. CSS custom properties are the runtime contract,
 and feature CSS is scoped to its plugin.
 
-The 12 built-in themes and 4 style packs are registered literals, covered by parity tests
-(`apps/desktop/test/client/parity.test.ts`). Appearance is a device preference, so it doesn't depend
-on the active Node.
+The 12 built-in themes and 4 style packs are registered literals. Appearance is a device
+preference, so it doesn't depend on the active Node.
 
 Feature styles live beside the components that use them. For example, the GitHub pull list, pull
 detail, and checks panel import their own plugin styles, and shared integration settings stay in

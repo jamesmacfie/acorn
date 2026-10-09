@@ -267,7 +267,9 @@ export class WorkflowRunner {
     if (opts?.resolvedGraph && JSON.stringify(opts.resolvedGraph.root) !== JSON.stringify(def)) {
       throw new Error('The frozen resolved definition graph does not match the workflow being started.')
     }
-    const { runId, created, deadlineAt, invocationParent } = await persistWorkflowStart(this.db, taskId, def, opts)
+    const persist = () => persistWorkflowStart(this.db, taskId, def, opts)
+    const { runId, created, deadlineAt, invocationParent } = this.deps.admitWork
+      ? await this.deps.admitWork(taskId, persist) : await persist()
     if (!created) return runId
     this.#state.startRunSpan(runId, opts?.trigger ?? def.trigger ?? 'manual', def.steps.length)
     if (!invocationParent || (deadlineAt != null && deadlineAt < (invocationParent.deadlineAt ?? Number.POSITIVE_INFINITY))) {
@@ -473,6 +475,27 @@ export class WorkflowRunner {
   /** Put a failed node back to pending and let the run carry on from there
    *  (docs/workflows/execution.md § Execution model). A device action: an agent may not retry its own run. */
   async retryStep(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }> {
+    const existing = await this.run(runId)
+    const result = existing && this.deps.admitWork
+      ? await this.deps.admitWork(existing.taskId, () => this.retryStepAdmitted(runId, stepId, prompt))
+      : await this.retryStepAdmitted(runId, stepId, prompt)
+    if (result.ok) {
+      const run = await this.run(runId)
+      if (run) {
+        const ancestors: WorkflowRunRow[] = []
+        let parent = run.parentRunId ? await this.run(run.parentRunId) : undefined
+        while (parent) {
+          ancestors.push(parent)
+          parent = parent.parentRunId ? await this.run(parent.parentRunId) : undefined
+        }
+        for (const ancestor of ancestors.reverse()) void this.tick(ancestor.id)
+      }
+      void this.tick(runId)
+    }
+    return result
+  }
+
+  private async retryStepAdmitted(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }> {
     const run = await this.run(runId)
     if (!run) return { ok: false, error: 'No such run.' }
     if (!['failed', 'safety-rail', 'completed-with-failures'].includes(run.status)) return { ok: false, error: `A ${run.status} run cannot be retried.` }
@@ -544,9 +567,7 @@ export class WorkflowRunner {
       this.armDeadline(ancestor)
       child = ancestor
     }
-    for (const ancestor of ancestors.reverse()) void this.tick(ancestor.id)
     this.armDeadline(run)
-    void this.tick(runId)
     return { ok: true }
   }
 

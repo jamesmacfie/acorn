@@ -1,4 +1,5 @@
-import type { HeadlessOpts, HeadlessResult, PluginHookRegistry, PluginTelemetry, StreamEvent } from '@acorn/plugin-api/node'
+import type { HeadlessOpts, PluginHookRegistry, PluginTelemetry, StreamEvent } from '@acorn/plugin-api/node'
+import type { AgentSessionExecuteRequest, AgentSessionExecuteResult } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import type { ToolCeiling, WorkflowStepDef } from '../../shared/workflowContracts'
 import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus } from '../../contract/events'
 import type { WorkflowDispatchRequest, WorkflowDispatchResult } from '../dispatch/dispatcher'
@@ -28,15 +29,20 @@ export type RunStepOptions = HeadlessOpts & {
   requireManagedSession?: boolean
   managedSessionId?: string
   timeoutMs?: number
+  /** The rendered completion condition. A step with one runs only as a managed session. */
+  goal?: string
+  admitAutomatic?: AgentSessionExecuteRequest['admitAutomatic']
+  onGoal?: AgentSessionExecuteRequest['onGoal']
 }
 
 /** A handler leaves profile selection to workflow execution. */
 export type StepRunRequest = Omit<RunStepOptions, 'profileId'>
 
 export type RunnerDeps = {
+  admitWork?<T>(taskId: string, action: () => Promise<T>): Promise<T>
   invalidStepKind?: (id: string, problems: readonly string[]) => void
   dataAccess?: import('../steps/data').WorkflowDataServices['access']
-  runStep(taskId: string, def: WorkflowStepDef, opts: RunStepOptions): Promise<HeadlessResult>
+  runStep(taskId: string, def: WorkflowStepDef, opts: RunStepOptions): Promise<AgentSessionExecuteResult>
   writeHandoff(taskId: string, runId: string, stepName: string, body: string): Promise<void>
   finishHandoffs?(taskId: string, runId: string): Promise<void>
   assembleContext(taskId: string, runId: string): Promise<string>

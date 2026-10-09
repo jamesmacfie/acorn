@@ -26,8 +26,8 @@ Focus is a value the store holds, and nothing else decides it. One signal says w
 keys, and one function writes it, along with which region that is and what the region remembers.
 Everything that moves the keys calls `focusRenderable`, which decides and reports whether they moved.
 A node's `focus` and `blur` are no-ops kept as a one-way mirror in `paintCaret`.
-`apps/tui/src/invariants.test.ts` counts the calls, and no source file outside a test asks anything
-but the store where the keys are. A second owner of focus produces a lit border with dead arrows
+`apps/tui/src/invariants.test.ts` checks that only the store writes focus, and no source file
+outside a test asks anything but the store where the keys are. A second owner of focus produces a lit border with dead arrows
 whenever the two disagree.
 
 The caret draws from the same value. A field asks the store whether it has the keys and writes the
@@ -98,7 +98,7 @@ registers or a scope moves.
 A focus decision that needs a node the current render hasn't produced waits in `ensureFocus`, queued
 at most once per turn by `scheduleSettle`. It's a microtask, because Solid commits synchronously and
 every node of the current render exists at the end of the task. `apps/tui/src/invariants.test.ts`
-holds `keys/` to one `queueMicrotask` and the kit to none.
+keeps `queueMicrotask` to the region store in `keys/` and out of the kit.
 
 The pass asks one question: can the node that has the keys still hold them, and is it the real thing,
 not a stand-in? Holding them means alive, visible all the way to the root, still `focusable`, and

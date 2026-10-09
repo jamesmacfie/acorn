@@ -12,6 +12,7 @@ import { schema } from '../../db'
 import { makeTestDb, testSecretEnv, type TestDb } from '../../../testkit/db'
 import { setTaskSessionsBridge, worktree, type TaskSessionsBridge } from './worktree'
 import { loadTask, setWorktreesRoot } from '../../worktrees/taskWorktree'
+import { registerCheckoutAdmission, type CheckoutAdmission } from '../../core/checkoutAdmission'
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -45,6 +46,7 @@ const sessions = (over: Partial<TaskSessionsBridge> = {}): TaskSessionsBridge =>
 
 beforeEach(async () => {
   testDb = makeTestDb()
+  registerCheckoutAdmission(testDb.db, { admitWork: async (_taskId: string, action: () => Promise<unknown>) => action() } as unknown as CheckoutAdmission)
   dir = mkdtempSync(join(tmpdir(), 'acorn-worktree-route-'))
   const now = Date.now()
   await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })

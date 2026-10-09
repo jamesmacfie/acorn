@@ -1,6 +1,7 @@
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import { Field, Fold, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import type { WorkflowCatalog, WorkflowMapAgent } from '../../shared/workflowContracts'
+import { GOAL_FIELD } from '../../shared/stepFields'
 import AgentNodeForm from './AgentNodeForm'
 import PromptField from './PromptField'
 import SchemaFieldEditor from './SchemaFieldEditor'
@@ -17,6 +18,9 @@ export default function MapAgentForm(props: {
     <PromptField label="Prompt" value={props.agent.prompt} required references={[]} disabled={props.disabled}
       hint="Each session receives the current item as context. Describe what it should do with that item."
       onChange={prompt => change({ prompt })} />
+    <PromptField label={GOAL_FIELD.label} hint={GOAL_FIELD.hint} placeholder={GOAL_FIELD.placeholder}
+      value={props.agent.goal ?? ''} references={[]} disabled={props.disabled}
+      onChange={goal => change({ goal: goal || undefined })} />
     <AgentNodeForm step={{ ...props.agent, name: 'Agent session' }}
       catalog={props.catalog ? { ...props.catalog, profiles: props.catalog.profiles.filter(profile => profile.managed) } : undefined}
       providers={props.providers} sharedTask disabled={props.disabled}

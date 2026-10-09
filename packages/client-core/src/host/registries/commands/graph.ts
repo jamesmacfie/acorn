@@ -100,10 +100,12 @@ const orderOf = (command: CommandContribution): number => command.order ?? DEFAU
 const bySibling = (a: Draft, b: Draft): number => orderOf(a.command) - orderOf(b.command) || a.at - b.at
 
 /** Everything the root search indexes a node under. The breadcrumb is in here rather than only in the
- *  display, so typing a parent's word finds its children. */
+ *  display, so typing a parent's word finds its children. The keywords are in twice, one by one and
+ *  joined, so a query that spans two of them, like "agent session", still finds the row. */
 const haystack = (node: CommandNode): readonly string[] => [
   node.title,
   ...(node.command.keywords ?? []),
+  ...(node.command.keywords?.length ? [node.command.keywords.join(' ')] : []),
   ...(node.hint ? [node.hint] : []),
   node.breadcrumb.join(' '),
 ]

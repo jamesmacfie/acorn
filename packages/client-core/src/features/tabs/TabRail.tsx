@@ -48,6 +48,9 @@ import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
 import { TaskDraftDialog } from './TaskDraftDialog'
+import { ActionPickerDialog } from './ActionPickerDialog'
+import { actionPickerRequest } from '../../host/registries/commands/actionPicker'
+import { closeTaskLaunch, taskLaunchRequest } from './taskLaunch'
 import type { TaskDraft } from './taskDraftStore'
 import type { RailProps } from '@acorn/protocol/chrome.ts'
 import { mintSlotRef, NestedChromeSlot } from '../../host/plugins/NestedChromeSlot'
@@ -87,7 +90,9 @@ export default function TabRail() {
     await saveOrder(moveTask(railOrder(), orderedTasks().map((t) => t.id), id, targetId, position))
   }
   const railDrag = createRailDrag({
-    items: () => visibleTasks(),
+    // Drag by the drawn tree. A task whose parent is gone, for example archived, is drawn as a
+    // root, so it orders with the other roots.
+    items: () => taskRows().map(({ task, depth }) => ({ id: task.id, parentId: depth ? task.parentId : null })),
     onDrop: (id, targetId, position) => void commitDrop(id, targetId, position),
   })
   const [draft, setDraft] = createSignal<TaskDraft | null>(null)
@@ -544,6 +549,10 @@ export default function TabRail() {
       <Show when={draft()} keyed>
         {(open) => <TaskDraftDialog draft={open} tasks={() => query.data} onClose={() => setDraft(null)} />}
       </Show>
+      <Show when={taskLaunchRequest()} keyed>
+        {(open) => <TaskDraftDialog draft={{ mode: 'new', ...open, projects: projects.data ?? [] }} tasks={() => query.data} onClose={closeTaskLaunch} />}
+      </Show>
+      <Show when={actionPickerRequest()} keyed>{(open) => <ActionPickerDialog request={open} />}</Show>
     </div>
   )
 }

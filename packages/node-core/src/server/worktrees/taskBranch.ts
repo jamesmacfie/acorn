@@ -1,42 +1,97 @@
 import { dedupeBranch, isValidBranch } from '@acorn/protocol/branch.ts'
 import type { WorktreeAvailability } from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
-import type { ProjectRow } from '../projects'
+import { getProject, type ProjectRow } from '../projects'
 import { git, gitOrThrow, gitText } from '../core/git'
 import { branchExists } from './worktrees'
 import { worktreeAvailability, worktreeNameConflict } from './worktreeAvailability'
 import { localBranches } from './branches'
+import { createHash } from 'node:crypto'
+import { realpathSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-export type TaskBranchSeed = { branch: string | null; branchSource?: 'derived' | 'exact'; baseBranch?: string }
+export type TaskBranchSeed = { branch: string | null; branchSource?: 'derived' | 'exact'; baseBranch?: string; baseCommit?: string; targetIdentity?: string }
+
+// An opaque observation of both the mapped checkout and its Git object store. A draft made before
+// a project remap must not be admitted against another repository with the same commit object.
+export async function projectTargetIdentity(project: ProjectRow): Promise<string> {
+  try {
+    const common = await gitText(['rev-parse', '--git-common-dir'], { cwd: project.path!, timeoutMs: 10_000 })
+    return createHash('sha256').update(JSON.stringify([
+      realpathSync(project.path!), realpathSync(resolve(project.path!, common)),
+    ])).digest('hex')
+  } catch {
+    throw new TaskBranchError(409, 'The project repository is unavailable. Reopen the task draft.')
+  }
+}
 
 export class TaskBranchError extends Error {
   constructor(public readonly status: 400 | 409, message: string) { super(message) }
 }
 
 const occupied = 'This branch name already exists in another worktree'
-const queues = new WeakMap<AppDatabase, Promise<void>>()
+const queues = new WeakMap<AppDatabase, Map<string, Promise<void>>>()
 
-// Serialize Git checks and row reservation across projects on this Node: different projects can
-// map to the same worktree directory. The callback must save synchronously before releasing it.
-export async function withBranchReservation<T>(db: AppDatabase, action: () => Promise<T>): Promise<T> {
-  const previous = queues.get(db) ?? Promise.resolve()
+export async function repositoryMetadataKey(project: ProjectRow): Promise<string> {
+  if (project.vcs !== 'git' || !project.path) return `project:${project.id}`
+  try {
+    const common = await gitText(['rev-parse', '--git-common-dir'], { cwd: project.path, timeoutMs: 10_000 })
+    return realpathSync(resolve(project.path, common))
+  } catch {
+    throw new TaskBranchError(409, 'The project repository is unavailable. Reopen the action.')
+  }
+}
+
+// Serialize task reservations and metadata writes across project aliases sharing an object store.
+// The callback completes its write before releasing the queue.
+export async function withBranchReservation<T>(db: AppDatabase, project: ProjectRow, action: () => Promise<T>,
+  allowUnavailable = false): Promise<T> {
+  const keyFor = async (mapped: ProjectRow) => {
+    try { return await repositoryMetadataKey(mapped) }
+    catch (error) {
+      if (!allowUnavailable) throw error
+      // Legacy lazy tasks reserve a database branch even when Git cannot inspect the checkout.
+      // Metadata writes and tasks with a pinned base still require the verified common directory.
+      try { return `checkout:${realpathSync(mapped.path!)}` }
+      catch { return `checkout:${resolve(mapped.path!)}` }
+    }
+  }
+  const key = await keyFor(project)
+  const entries = queues.get(db) ?? new Map<string, Promise<void>>()
+  queues.set(db, entries)
+  const previous = entries.get(key) ?? Promise.resolve()
   let release!: () => void
   const next = new Promise<void>((resolve) => { release = resolve })
-  queues.set(db, next)
+  entries.set(key, next)
   await previous
-  try { return await action() }
+  try {
+    const current = await getProject(db, project.id)
+    if (!current || current.path !== project.path || current.vcs !== project.vcs || await keyFor(current) !== key) {
+      throw new TaskBranchError(409, 'The project repository changed. Reopen the action.')
+    }
+    return await action()
+  }
   finally {
     release()
-    if (queues.get(db) === next) queues.delete(db)
+    if (entries.get(key) === next) entries.delete(key)
   }
 }
 
 async function baseCommit(project: ProjectRow, seed: TaskBranchSeed): Promise<string | undefined> {
-  if (seed.baseBranch === undefined) return undefined
+  if (seed.baseBranch !== undefined && seed.baseCommit !== undefined) throw new TaskBranchError(400, 'Choose one starting point.')
+  if (seed.baseBranch === undefined && seed.baseCommit === undefined) return undefined
   if (project.vcs !== 'git' || !project.path || !seed.branch) {
-    throw new TaskBranchError(400, 'A base branch requires a new Git worktree task.')
+    throw new TaskBranchError(400, 'A starting commit requires a new Git worktree task.')
   }
-  if (!isValidBranch(seed.baseBranch)) throw new TaskBranchError(400, 'Invalid base branch name.')
+  if (seed.baseCommit !== undefined) {
+    if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(seed.baseCommit)) throw new TaskBranchError(400, 'Use a full commit ID.')
+    try {
+      const actual = await gitText(['cat-file', '-t', seed.baseCommit], { cwd: project.path, timeoutMs: 10_000 })
+      if (actual === 'commit') return seed.baseCommit
+    } catch { /* Missing or unavailable object. */ }
+    throw new TaskBranchError(400, 'The starting commit is not available in this repository.')
+  }
+  if (!seed.baseBranch || !isValidBranch(seed.baseBranch)) throw new TaskBranchError(400, 'Invalid base branch name.')
   try {
     return await gitText(['rev-parse', '--verify', `refs/heads/${seed.baseBranch}^{commit}`], { cwd: project.path, timeoutMs: 10_000 })
   } catch {
@@ -46,12 +101,13 @@ async function baseCommit(project: ProjectRow, seed: TaskBranchSeed): Promise<st
 
 export async function taskBranchAvailability(db: AppDatabase, project: ProjectRow, seed: TaskBranchSeed): Promise<WorktreeAvailability> {
   await baseCommit(project, seed)
-  return availableTaskBranch(db, project, seed)
+  const available = await availableTaskBranch(db, project, seed)
+  return seed.baseCommit ? { ...available, targetIdentity: await projectTargetIdentity(project) } : available
 }
 
 async function availableTaskBranch(db: AppDatabase, project: ProjectRow, seed: TaskBranchSeed, excluded: ReadonlySet<string> = new Set()): Promise<WorktreeAvailability> {
   if (project.vcs !== 'git' || !seed.branch) return { available: true }
-  const existing = seed.baseBranch !== undefined ? new Set((await localBranches(project.path!)).map((branch) => branch.name)) : new Set<string>()
+  const existing = seed.baseBranch !== undefined || seed.baseCommit !== undefined ? new Set((await localBranches(project.path!)).map((branch) => branch.name)) : new Set<string>()
   const rejected = new Set(excluded)
   let branch = dedupeBranch(seed.branch, rejected)
   for (;;) {
@@ -68,6 +124,9 @@ async function availableTaskBranch(db: AppDatabase, project: ProjectRow, seed: T
 // worktree remains lazy. Git's exclusive branch creation also catches changes made outside Acorn.
 export async function saveTaskBranch<T>(db: AppDatabase, project: ProjectRow, seed: TaskBranchSeed, save: (branch: string | null) => T): Promise<T> {
   const commit = await baseCommit(project, seed)
+  if (seed.baseCommit && (!seed.targetIdentity || await projectTargetIdentity(project) !== seed.targetIdentity)) {
+    throw new TaskBranchError(409, 'The project repository changed. Reopen the task draft.')
+  }
   if (project.vcs !== 'git' || !seed.branch) return save(null)
   const rejected = new Set<string>()
   for (;;) {

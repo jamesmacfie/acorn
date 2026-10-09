@@ -63,13 +63,11 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     if (!node || !token) return
     broker.upsert({ ...toNodeRecord(node), token, ...(node.certPem ? { certPem: node.certPem } : {}) })
   }
-  connect(opened.nodeId)
-  // …and again when a node this run started announces itself. The row the line above used is the one
-  // last time's handshake wrote, so its endpoint names a port nothing is listening on yet — the broker
-  // reports `offline` and retries, which is the state the footer already draws. Connecting to the old
-  // row rather than waiting is deliberate: a broker with no record at all answers every request with
-  // "Unknown node", which is a hard error rather than a node that is not there yet, and the queries
-  // the shell fires while the child boots would fail as bugs instead of as reconnects.
+  // Restore all saved connections, including paired remote nodes. The local row may still name
+  // last run's port until the child announces its new endpoint; the broker retries it as offline.
+  // Without a broker record, selecting a saved node fails as "Unknown node".
+  for (const node of fleet.list()) connect(node.nodeId)
+  // Connect the local node again when this run's child announces its current endpoint.
   if (opened.starting) void opened.starting.then((handshake) => connect(handshake.nodeId), () => {})
 
   const subscribe = <T,>(list: T[], handler: T): (() => void) => {

@@ -672,6 +672,11 @@
                 "minLength": 1,
                 "maxLength": 256
               },
+              "search": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
               "tree": {
                 "type": "object",
                 "properties": {

@@ -1,14 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   acceptCommandSearchItems,
-  MAX_COMMAND_SEARCH_QUERY,
   commandInputResultSchema,
   commandSearchItemSchema,
   commandSettingOptionSchema,
   commandSettingValueSchema,
-  COMMAND_KINDS,
-  COMMAND_SCOPES,
-  DEFAULT_COMMAND_SCOPE,
   MAX_COMMAND_SEARCH_ITEMS,
 } from './commands'
 
@@ -17,21 +13,6 @@ import {
 // to do is choose what happens when a row is picked.
 
 const item = (over: Record<string, unknown> = {}) => ({ id: 'i-1', title: 'Issue one', ...over })
-
-describe('the command vocabulary', () => {
-  it('names the five kinds and the six scopes, and defaults scope to the active node', () => {
-    expect([...COMMAND_KINDS]).toEqual(['action', 'group', 'search', 'input', 'setting'])
-    expect([...COMMAND_SCOPES]).toEqual(['none', 'task', 'project', 'workspace', 'node', 'fleet'])
-    expect(DEFAULT_COMMAND_SCOPE).toBe('node')
-  })
-
-  it('bounds what travels as a query, because a palette field has no length of its own', () => {
-    expect(MAX_COMMAND_SEARCH_QUERY).toBe(200)
-    // Truncated by whoever sends it, not refused: a reader who pasted too much wants the first part
-    // searched (client-core/host/registries/commands/sessionStore.ts).
-    expect('x'.repeat(1_000).slice(0, MAX_COMMAND_SEARCH_QUERY)).toHaveLength(200)
-  })
-})
 
 describe('a search result row', () => {
   it('keeps display and identity facts', () => {

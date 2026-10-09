@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
@@ -24,13 +25,15 @@ import { emptyLocalStatus } from '../shared/api'
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 
 const remote = vi.fn()
+const [observedStatus, setObservedStatus] = createSignal<Partial<LocalStatus>>({})
 
 const model = (status: Partial<LocalStatus>, busy = false): ChangesModel => ({
   task: { id: 't1', projectId: 'p1' },
   isGit: () => true,
-  status: () => ({ ...emptyLocalStatus(), ...status }),
+  status: () => ({ ...emptyLocalStatus(), ...status, ...observedStatus() }),
   project: () => ({ name: 'widget', path: '/src/widget' }),
   remoteBusy: () => busy,
+  forceObservation: () => ({ nodeId: 'node-a', branch: status.branch ?? null, upstreamId: observedStatus().upstreamId ?? status.upstreamId ?? null }),
   remote,
 } as unknown as ChangesModel)
 
@@ -50,6 +53,7 @@ afterEach(() => {
   host.remove()
   for (const surface of document.querySelectorAll('.ui-menu')) surface.remove()
   remote.mockClear()
+  setObservedStatus({})
 })
 
 // Built before the render, not inside it: a JSX prop is a getter, so `model={model(...)}` would mint
@@ -129,7 +133,7 @@ describe('the remote menu', () => {
   it('offers fetch, both pulls and both pushes', () => {
     draw({ upstream: 'origin/main', ahead: 0, behind: 0 })
     expect(openMenu().map((item) => item.textContent?.trim()))
-      .toEqual(['Fetch', 'Pull', 'Pull with rebase', 'Push', 'Force push'])
+      .toEqual(['Fetch', 'Pull fast-forward only', 'Pull with rebase', 'Push', 'Force push'])
   })
 
   it('is shut while a verb is already running, and so is the primary button', () => {
@@ -154,7 +158,15 @@ describe('the remote menu', () => {
     expect(document.querySelector('.ui-menu')?.textContent).toContain('Force push?')
 
     document.querySelector<HTMLButtonElement>('.ui-menu .ui-menu-item[data-armed]')!.click()
-    expect(remote).toHaveBeenCalledWith('force')
+    expect(remote).toHaveBeenCalledWith('force', { nodeId: 'node-a', branch: null, upstreamId: null })
+  })
+
+  it('retains the upstream observed when force push was armed after a status refresh', () => {
+    draw({ branch: 'main', upstream: 'origin/main', upstreamId: 'a'.repeat(40) })
+    openMenu().find((item) => item.textContent?.trim() === 'Force push')!.click()
+    setObservedStatus({ upstreamId: 'b'.repeat(40) })
+    document.querySelector<HTMLButtonElement>('.ui-menu .ui-menu-item[data-armed]')!.click()
+    expect(remote).toHaveBeenCalledWith('force', { nodeId: 'node-a', branch: 'main', upstreamId: 'a'.repeat(40) })
   })
 })
 

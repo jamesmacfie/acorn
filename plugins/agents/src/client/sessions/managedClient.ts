@@ -21,6 +21,7 @@ import type {
 } from '../../shared/schemas'
 import type { AgentSessionMcp } from '../../shared/mcpServers'
 import { MAX_INLINE_IMAGE_BYTES } from './inlineImage'
+import { SUMMARY_TIMEOUT_MS, type SessionSummary, type SessionSummaryInput } from '../../shared/sessionSummary'
 
 export type AgentOrigin = { nodeId?: string | null; signal?: AbortSignal }
 
@@ -132,6 +133,8 @@ export const managedAgentApi = {
     ),
   cancel: (sessionId: string, turnId?: string) =>
     jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/cancel'), 'POST', turnId ? { turnId } : {}),
+  cancelSubagent: (sessionId: string, subagentId: string) =>
+    jsonWrite<{ ok: true }>(sessionRoute(sessionId, `/subagents/${encodeURIComponent(subagentId)}/cancel`), 'POST', {}),
   resolve: (sessionId: string, requestId: string, resolution: unknown) =>
     jsonWrite<AgentRequest>(
       sessionRoute(sessionId, `/requests/${encodeURIComponent(requestId)}/resolve`),
@@ -151,6 +154,11 @@ export const managedAgentApi = {
     jsonWrite<AgentSessionMcp>(sessionRoute(sessionId, '/mcp'), 'PUT', { enabled }),
   regenerateTitle: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/regenerate-title'), 'POST'),
+  summarize: (sessionId: string, input: SessionSummaryInput, options: AgentOrigin = {}) =>
+    writeJson<SessionSummary>(sessionRoute(sessionId, '/summarize'), {
+      ...options, method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input), timeoutMs: SUMMARY_TIMEOUT_MS + 10_000,
+    }),
   setGoal: (sessionId: string, objective: string | null, options: AgentOrigin = {}) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal'), 'PUT', { objective }, false, options),
   resumeGoal: (sessionId: string, options: AgentOrigin = {}) =>

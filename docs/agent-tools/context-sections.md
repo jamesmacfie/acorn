@@ -46,6 +46,13 @@ adds a section whose `defaultIncluded` is false, such as `plugin-authoring`.
 The `task-scripts` section gives the setup and teardown states and how to find the
 [task script tools](./browser-and-scripts.md#task-script-tools), without script bodies or logs.
 
+The `issues` section ends with a line that names the [tracker tools](./tracker-tools.md) for the
+providers linked to the task, and tells the agent it doesn't need a separate MCP server for them. An
+agent sees only tool names until it searches, so without the line a Linear MCP server looks like the
+way in. `trackerToolsHint` builds the line from the hooks each linked provider declares: `detail` for
+`issue_detail`, `comment` for `issue_comment`, and `image` for `issue_image`. A new provider plugin
+gets an accurate line without a change to core. A provider without `detail` isn't named at all.
+
 ## Drawing inside a section
 
 A section the Node assembles is data. What the Context pane draws under it comes from the

@@ -2,8 +2,10 @@ import { measureWork } from '../../lib/telemetry/workTelemetry'
 import { createEffect, createMemo, For, on, onCleanup, createSignal, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { createCollection, type CollectionItem, type ItemProps } from '../../keys/collection'
+import { collectionState, setCollectionOffset } from '../../keys/collectionState'
 import { watchAppearance } from '../../tokens/appearance'
 import { railRowHeight, rowHeight } from '../../lib/layout/metrics'
+import { retainScroll } from '../../lib/layout/retainScroll'
 
 // Rows: the run of `Row`s or `TreeRow`s, as a node.
 //
@@ -195,7 +197,12 @@ export function Rows<T extends CollectionItem>(props: {
   })
 
   return (
-    <div class="ui-rows-scroll" ref={publish} onScroll={(event) => {
+    // The offset goes in the collection's stored state beside `active` and `selected`, so a sidebar
+    // that is left and opened again comes back where the reader was rather than at the top.
+    <div class="ui-rows-scroll" ref={(element) => {
+      retainScroll(element, { key: () => props.id, read: (id) => collectionState(id).offset, write: setCollectionOffset })
+      publish(element)
+    }} onScroll={(event) => {
       setScrollOffset(event.currentTarget.scrollTop)
       setViewportHeight(event.currentTarget.clientHeight)
     }}>

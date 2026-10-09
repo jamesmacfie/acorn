@@ -29,6 +29,9 @@ import { copyToTerminal } from './copy'
 export async function copyText(text: string): Promise<boolean> { return copyToTerminal(text) }
 // The canvas, as the indented list. Its own file because it reaches into two of the three above.
 export { Graph } from './graph'
+export { HistoryMark } from './historyMark'
+export { historyLayout } from '@acorn/client-core/kit/components/content'
+export type { HistoryNode, HistorySlot } from '@acorn/client-core/kit/components/content'
 export type { GraphCard } from '@acorn/client-core/kit/components/content'
 export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib'
 // The other half of a `pty` rectangle: the caller says what the channel is and the host draws the

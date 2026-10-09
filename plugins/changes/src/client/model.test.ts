@@ -6,7 +6,7 @@ import {
   remoteReason, sortRows, stackFor, stageableRows, stagedState, documentFile, unstagedPathsOf,
   viewNodes, visibleNodes, type ChangeView, type TreeNode,
 } from './model'
-import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_MAX, PUSH_ACTIONS_POINT } from './extensionPoints'
+import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_POINT } from './extensionPoints'
 
 const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modified'): LocalChange => ({
   path,
@@ -331,12 +331,6 @@ describe('the push-actions point', () => {
   it('is addressed under this plugin\'s own name, which the host mints', () => {
     expect(PUSH_ACTIONS_POINT).toBe('changes:push-actions')
   })
-
-  // Two, because a third contributor would be a toolbar in somebody else's footer. The ceiling is the
-  // owner's because the footer is.
-  it('holds a couple of contributors, not a strip', () => {
-    expect(PUSH_ACTIONS_MAX).toBe(2)
-  })
 })
 
 // Where the branch stands, as the bar reads it. `null` and `0` are different answers: a branch with
@@ -401,7 +395,7 @@ describe('remoteReason', () => {
   // The lease refusing is not a case for pressing harder: somebody else pushed.
   it('sends a failed lease to a fetch rather than to another force', () => {
     const said = remoteReason('force', 'stale info: remote ref is at a commit you do not have')
-    expect(said).toContain('Fetch first')
+    expect(said).toContain('Inspect the remote history')
     expect(said).not.toContain('Force push')
   })
 

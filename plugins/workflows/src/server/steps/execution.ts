@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
+import { MAX_AGENT_GOAL_CHARS, type AgentExecuteGoalSummary, type AgentSessionExecuteResult } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { declaredOutputSchema } from '../../shared/gateForm'
@@ -14,7 +15,7 @@ import { intersectToolCeilings } from './tools'
 import { intersectWorkflowBudgets, parseEffectiveBudget, parseEffectiveTools, WorkflowSafetyRailError, type WorkflowTreeSafety } from '../validation/treeSafety'
 import { retryRecord, unreachableSteps } from '../runs/graph'
 import { Semaphore } from '../runs/semaphore'
-import type { RunnerDeps, StepRunRequest } from '../runs/deps'
+import type { RunnerDeps, RunStepOptions, StepRunRequest } from '../runs/deps'
 import type { WorkflowRunState } from '../runs/state'
 
 export const MAX_CONCURRENT_HEADLESS = 4
@@ -106,13 +107,23 @@ export class WorkflowStepExecution {
     const promptRows = rows.map(row => ({ ...row, name: rowIdentity(workflow, row) }))
     let renderedPrompt: string
     let renderedWith: Record<string, unknown> | undefined
+    // An earlier attempt's goal stands: a retry keeps the condition it was judged against.
+    const frozenGoal = retryRecord(step).goal as string | undefined
+    let renderedGoal: string | undefined
     try {
       renderedPrompt = renderWorkflowPrompt(def.prompt, promptRows, inputs)
       // A contributed handler never sees a template: it gets the substituted command, URL or SQL.
       renderedWith = renderWith(def.with, promptRows, inputs)
+      renderedGoal = frozenGoal ?? (def.goal === undefined ? undefined : renderWorkflowPrompt(def.goal, promptRows, inputs).trim())
     } catch (error) {
       await this.services.state.setStep(step.id, { status: 'failed', error: error instanceof Error ? error.message : 'Template rendering failed.' })
       await this.services.finishRun(run, 'failed', `Step '${def.name}' has an invalid template reference.`, step.id)
+      return
+    }
+    if (renderedGoal !== undefined && (!renderedGoal || renderedGoal.length > MAX_AGENT_GOAL_CHARS)) {
+      const detail = `Step '${def.name}' goal must be 1 to ${MAX_AGENT_GOAL_CHARS} characters once its references are filled in.`
+      await this.services.state.setStep(step.id, { status: 'failed', error: detail })
+      await this.services.finishRun(run, 'failed', detail, step.id)
       return
     }
     const upstream = (edges.get(stepIdentity(def)) ?? []).flatMap((name) => {
@@ -184,6 +195,7 @@ export class WorkflowStepExecution {
       step,
       def: renderedWith ? { ...def, with: renderedWith } : def,
       renderedPrompt,
+      ...(renderedGoal !== undefined ? { renderedGoal } : {}),
       tools,
       budget,
       signal: controller.signal,
@@ -194,8 +206,8 @@ export class WorkflowStepExecution {
         this.services.deps.emitStepEvent?.(run.id, step.id, event)
       },
     }
-    // Preserve retry and child-task metadata when a handler replaces its input record.
-    const carried = { ...retryRecord(step), ...(childTaskId ? { childTaskId } : {}) }
+    // Preserve retry and child-task metadata, and the frozen goal, when a handler replaces its input record.
+    const carried = { ...retryRecord(step), ...(renderedGoal !== undefined ? { goal: renderedGoal } : {}), ...(childTaskId ? { childTaskId } : {}) }
     await this.services.state.setStep(step.id, {
       status: 'running',
       inputsJson: JSON.stringify({ ...(step.inputsJson ? JSON.parse(step.inputsJson) : {}), prompt: renderedPrompt, tools, budget, ...carried }),
@@ -341,10 +353,29 @@ export class WorkflowStepExecution {
       const turnBudget = intersectWorkflowBudgets(ctx.budget, def.budget)
       const admissionId = this.services.treeSafety.reserveTurn(ctx.run, ctx.step, turnBudget)
       await opts.onStart?.()
-      let result: HeadlessResult | undefined
+      // The turns and checks the session queues by itself are admitted against the same budgets. A
+      // refusal ends the step as a safety rail once the session has stopped.
+      let refusal: string | null = null
+      const admitAutomatic: RunStepOptions['admitAutomatic'] = async ({ kind, usage }) => {
+        refusal = this.services.treeSafety.admitAutomatic(admissionId, ctx.run, ctx.step, turnBudget, kind, {
+          costUsd: usage.costUsd ?? 0,
+          inputTokens: usage.usage?.inputTokens ?? 0,
+          outputTokens: usage.usage?.outputTokens ?? 0,
+        })
+        return refusal
+      }
+      // Goal state goes on the step row in order, for the run pane to show while the step works.
+      let goalWrites: Promise<unknown> = Promise.resolve()
+      const writeGoal = (summary: AgentExecuteGoalSummary) => {
+        goalWrites = goalWrites.then(() => this.services.state.setStep(ctx.step.id, { goalJson: JSON.stringify(summary) })).catch(() => undefined)
+        return goalWrites
+      }
+      let result: AgentSessionExecuteResult | undefined
       try {
         result = await this.services.deps.runStep(taskId, def, {
           ...opts,
+          admitAutomatic,
+          ...(opts.goal !== undefined ? { onGoal: (summary) => void writeGoal(summary) } : {}),
           // A dispatched child row can carry its parent's profile. Use the frozen definition.
           profileId: def.profileId ?? DEFAULT_PROFILE_ID,
           workflowRunId: ctx.run.id,
@@ -363,11 +394,13 @@ export class WorkflowStepExecution {
           },
           timeoutMs: opts.timeoutMs ?? ctx.budget.maxWallTimeMs,
         })
+        if (result.goal) await writeGoal(result.goal)
         const violation = await this.services.treeSafety.settleTurn(admissionId, {
           costUsd: result.capture.costUsd ?? 0,
           inputTokens: result.capture.usage?.inputTokens ?? 0,
           outputTokens: result.capture.usage?.outputTokens ?? 0,
         }, result.status === 'ok' ? undefined : result.stderrTail, turnBudget)
+        if (refusal) throw new WorkflowSafetyRailError(refusal)
         if (violation) throw new WorkflowSafetyRailError(`Safety rail: ${violation}.`)
         return result
       } catch (error) {

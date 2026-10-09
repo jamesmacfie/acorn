@@ -21,6 +21,8 @@ export type WorkflowChildRunSummary = {
   taskMode?: 'child' | 'parent'
   agentSessionId?: string | null
   result?: import('@acorn/protocol/dataValues.ts').DataValue | null
+  /** An agent item's completion condition, as its last check left it. */
+  goal?: { status: string; continuations: number; reason: string | null }
   outputs?: Record<string, import('@acorn/protocol/dataValues.ts').DataValue>
   parentTaskId: string
   parentRunId: string

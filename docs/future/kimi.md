@@ -1,6 +1,7 @@
 # Kimi Code as a contributed harness
 
-Status: proposal, 2026-09-18. Nothing here has started, and nothing here needs a change inside acorn.
+Date: October 8, 2026. Status: external harness package proposed; no Kimi implementation in this checkout.
+Recheck the September 18 CLI and API research before building.
 
 Kimi Code CLI ships `kimi acp`, an official Agent Client Protocol server over stdin and stdout, which
 makes it a tier 1 harness: one manifest, no driver, no branch in `plugins/agents`. This file records
@@ -16,17 +17,17 @@ restated here.
 
 The interesting part is not Kimi. The harness seam has a single acceptance test,
 `apps/node/test/integration/harnessContribution.test.ts`, and that test writes its own fixture
-manifest into a temporary directory. No package has ever contributed a harness from outside the
-repository. Kimi would be the first, so anything the seam cannot express turns into a bug report
-against the seam instead of a special case inside the agents plugin.
+manifest into a temporary directory. External harness packages use this contract.
+Build Kimi as another external contributor.
+Report a missing contract against its owner rather than adding a Kimi-specific branch inside Agents.
 
 Kimi advertises session loading, resume, close, delete, fork, model and mode configuration, images,
 embedded context, permission requests, and form elicitation. That is close to the set acorn's generic
 driver already consumes, which is what makes it a fair test rather than a lucky one.
 
 The package is a standalone folder installed by local path, the same shape the machine-stats plugin
-uses. A first outside installation is the thing under test, so putting it in `plugins/` would prove
-nothing.
+uses. Acceptance must install the package from outside the workspace so local imports cannot hide
+missing files or dependencies.
 
 ## The manifest
 

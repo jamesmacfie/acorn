@@ -91,7 +91,20 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // shims at the commit, push, export, and dispatch points. measure:service-graph confirms the
 // detector, gate, Git checks, and the agents admission module load on first use. Move the ceiling
 // by 5 KB, leaving 1,278 B.
-const limits = { ceiling: 3_215_000, floor: 1_000_000 }
+// 2026-10-08: command restart recovery adds event attribution checks, client read projection calls,
+// and lifecycle settlement calls. The command policy and reconciliation queries load on first use.
+// No dependency is added. Static graph: 3,179,747 B. Add 4 KB for the owning runtime's call sites.
+// 2026-10-08: the Git plugin registers at boot. Its worktree route loads after activation through a
+// dynamic import; the built static graph is 3,185,838 B. Keep about 1 KB for bundler variation.
+// 2026-10-09: history and revision routes remain dynamically loaded; the measured boot graph is
+// 3,186,368 B, 632 B below the same ceiling.
+// 2026-10-09: checkout admission must be present before owner plugins initialize and register their
+// activity readers. Stash routes remain lazy. The measured static graph is 3,194,672 B; leave about
+// 5 KB for bundler variation while keeping the admission coordinator in the boot graph.
+// 2026-10-09: merging security with the Git checkout admission and repository metadata coordinator
+// produces a 3,244,622 B static graph. measure:service-graph traces checkoutAdmission through core/index;
+// security detectors, MCP installation, and review collectors remain lazy. Keep 1,378 B of margin.
+const limits = { ceiling: 3_246_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

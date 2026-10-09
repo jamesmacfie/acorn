@@ -113,6 +113,9 @@ export async function startCodexSession(
   let threadId = options.session.providerSessionRef
   const resuming = threadId != null
   let currentTurnId: string | null = null
+  let managedTurnId: string | null = null
+  const managedTurns = new Map<string, string>()
+  const commandTurns = new Map<string, string | null>()
   // Codex reports a failed turn twice: an `error` notification it will not retry, then
   // `turn/completed` carrying the same error. The transcript shows it once.
   let shownTurnFailure: string | null = null
@@ -199,8 +202,15 @@ export async function startCodexSession(
       // states the hazards and the capture they came from).
       const routed = childRouter.route(notification)
       if (routed.to === 'subagent') {
-        for (const event of routed.events) emit(event)
+        for (const event of routed.events) emit(event.type === 'tool'
+          ? { ...event, acornTurnId: null } : event)
         return
+      }
+      const providerTurnId = stringValue(notification.params.turnId)
+        ?? stringValue(asObject(notification.params.turn)?.id)
+      if (notification.method === 'turn/started' && providerTurnId && managedTurnId) {
+        managedTurns.set(providerTurnId, managedTurnId)
+        if (managedTurns.size > 64) managedTurns.delete(managedTurns.keys().next().value!)
       }
       if (notification.method === 'thread/settings/updated') {
         const settings = codexThreadSettings(notification.params.threadSettings)
@@ -231,7 +241,17 @@ export async function startCodexSession(
           if (event.message === shownTurnFailure) continue
           shownTurnFailure = event.message
         }
-        emit(event)
+        if (event.type === 'tool' && event.tool.kind === 'execute') {
+          const commandKey = `${providerTurnId ?? ''}:${event.tool.id}`
+          const owner = commandTurns.has(commandKey) ? commandTurns.get(commandKey)!
+            : providerTurnId ? managedTurns.get(providerTurnId) ?? null : managedTurnId
+          if (notification.method === 'item/started') {
+            commandTurns.set(commandKey, owner)
+            if (commandTurns.size > 512) commandTurns.delete(commandTurns.keys().next().value!)
+          }
+          emit({ ...event, acornTurnId: owner })
+        } else emit(event)
+        if (event.type === 'turn_completed' || event.type === 'error') managedTurnId = null
       }
       const generatedArtifact = codexGeneratedArtifact(notification)
       if (generatedArtifact) emit(generatedArtifact)
@@ -382,6 +402,7 @@ export async function startCodexSession(
       if (!ready || currentTurnId) throw new Error('Codex session is not ready for another turn.')
       ready = false
       shownTurnFailure = null
+      managedTurnId = turnOptions.turn.id
       const policy = turnOptions.turn.effectivePolicy
       const collaborationMode = codexCollaborationModeForTurn(
         collaborationModes,
@@ -404,11 +425,29 @@ export async function startCodexSession(
       })
       const turn = asObject(result.turn)
       currentTurnId = stringValue(turn?.id)
+      if (currentTurnId) managedTurns.set(currentTurnId, turnOptions.turn.id)
       return { providerTurnRef: currentTurnId ?? undefined }
     },
     async cancel() {
       if (!threadId || !currentTurnId) return
       await rpc.request('turn/interrupt', { threadId, turnId: currentTurnId }).catch(() => undefined)
+    },
+    async cancelSubagent(subagentId) {
+      if (subagentId === threadId) throw new Error('Subagent not found.')
+      let turnId = childRouter.activeTurnId(subagentId)
+      // A resumed connection can miss the child's turn/started notification. Read the provider's
+      // turn rather than borrowing the parent's currentTurnId or restarting the child.
+      if (!turnId) {
+        const response = await rpc.request<Record<string, unknown>>('thread/read', {
+          threadId: subagentId, includeTurns: true,
+        })
+        const turns = asObject(response.thread)?.turns
+        if (!Array.isArray(turns)) throw new Error('Codex did not return the subagent turns.')
+        const active = turns.map(asObject).find((turn) => turn?.status === 'inProgress')
+        turnId = stringValue(active?.id)
+      }
+      if (turnId) await rpc.request('turn/interrupt', { threadId: subagentId, turnId })
+      else await options.onEvent({ type: 'subagent', subagent: { id: subagentId, status: 'idle' } })
     },
     async resolveRequest(providerRequestId, resolution) {
       answer(providerRequestId, resolution)

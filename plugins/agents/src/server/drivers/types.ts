@@ -50,7 +50,10 @@ export type AgentDriverInputRequest = {
   respond(resolution: unknown): void
 }
 
-export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest | AgentDriverInputRequest
+export type AgentDriverEvent = (AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest | AgentDriverInputRequest) & {
+  /** Driver-owned attribution. Null explicitly means no managed turn; absent uses the live turn. */
+  acornTurnId?: string | null
+}
 
 /**
  * An MCP server acorn asks the agent to connect to, for the session it is starting.
@@ -119,6 +122,8 @@ export interface AgentDriverSession {
   readonly pid?: number
   sendTurn(options: AgentDriverTurnOptions): Promise<{ providerTurnRef?: string }>
   cancel(): Promise<void>
+  /** Interrupts one provider-native child without cancelling the session's own turn. */
+  cancelSubagent?(subagentId: string): Promise<void>
   resolveRequest(providerRequestId: string, resolution: unknown): Promise<void>
   setConfig?(optionId: string, value: string): Promise<AgentConfigOption[] | void>
   fork?(): Promise<string>

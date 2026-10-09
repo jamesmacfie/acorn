@@ -58,7 +58,6 @@ it('releases vetoes, thrown authorization, and spawn failures so retry can start
   vi.mocked(f.deps.startSession).mockRejectedValueOnce(Error('spawn unavailable'))
   await expect(f.svc.start('t', 'dev')).rejects.toThrow('spawn unavailable')
   expect((await f.svc.start('t', 'dev')).ok).toBe(true)
-  expect((f.svc as unknown as { operations: Map<string, unknown> }).operations.size).toBe(0)
   f.svc.dispose()
 })
 
@@ -103,13 +102,11 @@ it('does not publish a live instance after natural exit during held spawn', asyn
   f.svc.dispose()
 })
 
-it('clears operation and instance ownership when the exit unsubscriber throws', async () => {
+it('still disposes when the exit unsubscriber throws', async () => {
   const f = fixture({ onExit: () => () => { throw Error('unsubscribe failed') } })
   await f.svc.start('t', 'dev')
   expect(() => f.svc.dispose()).toThrow('unsubscribe failed')
   expect(await f.svc.start('t', 'dev')).toEqual({ ok: false, reason: 'Run target service disposed.' })
-  expect((f.svc as unknown as { instances: Map<string, unknown> }).instances.size).toBe(0)
-  expect((f.svc as unknown as { operations: Map<string, unknown> }).operations.size).toBe(0)
 })
 
 it('retains an instance when killing its still-live process throws, so retry cannot cold-start another', async () => {

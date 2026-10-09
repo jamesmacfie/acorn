@@ -123,11 +123,12 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'agent-defaults', label: 'Harnesses and defaults', category: 'agents', scope: 'node', icon: 'sliders-horizontal', order: 10, requires: { plugin: 'agents' },
       // A section per installed harness is drawn as well, and left out because it depends on the node.
-      keywords: ['harness', 'claude code', 'codex', 'model', 'effort', 'reasoning', 'usage limit', 'fold', 'collapse', 'idle', 'retention'],
+      keywords: ['harness', 'claude code', 'codex', 'model', 'effort', 'reasoning', 'usage limit', 'fold', 'collapse', 'idle', 'stuck', 'retention'],
       sections: [
         { id: 'harnesses', label: 'Harnesses', keywords: ['installed', 'cli'] },
         { id: 'usage', label: 'Usage limits', rows: ['Continue when usage resets'] },
         { id: 'idle', label: 'Idle agents', rows: ['Stop idle agents after'], keywords: ['memory', 'stop'] },
+        { id: 'repeated-calls', label: 'Stuck agents', rows: ['Warn when an agent repeats a tool call'], keywords: ['loop', 'repeat', 'stuck'] },
         { id: 'archived', label: 'Archived tasks', rows: ['Keep agent history for archived tasks'], keywords: ['retention', 'delete history', 'disk'] },
         { id: 'generate', label: 'Generating text', rows: ['Generate with'], keywords: ['default model', 'this device', 'commit message', 'sql generation', 'workflow drafts'] },
         // The switch's label reads "Send task context at startup", which a search for the words people

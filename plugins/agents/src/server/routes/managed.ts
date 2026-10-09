@@ -6,7 +6,7 @@ import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
-import { type AppEnv, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { type AppEnv, isProviderOperationError, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type {
   AgentEventPage,
   AgentAttachment,
@@ -34,6 +34,7 @@ import {
   type ImportAgentTranscriptInput,
 } from '../../shared/schemas'
 import { agentMcpSessionSelectionSchema, type AgentSessionMcp } from '../../shared/mcpServers'
+import type { SessionSummary, SessionSummaryInput } from '../../shared/sessionSummary'
 
 export type ManagedAgentsBridge = {
   // Ownership resolvers for the task-scope guard below. See docs/security/transport-and-auth.md § Transport and auth.
@@ -72,6 +73,7 @@ export type ManagedAgentsBridge = {
   implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
   patchQueuedTurn(sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }): Promise<AgentTurn>
   cancelTurn(sessionId: string, turnId?: string): Promise<void>
+  cancelSubagent(sessionId: string, subagentId: string): Promise<void>
   resolveRequest(sessionId: string, requestId: string, resolution: unknown, idempotencyKey: string): Promise<AgentRequest>
   patchSession(sessionId: string, patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> }): Promise<AgentSession>
   fork(sessionId: string, title?: string): Promise<AgentSession>
@@ -79,6 +81,7 @@ export type ManagedAgentsBridge = {
   sessionMcp(sessionId: string): Promise<AgentSessionMcp>
   setSessionMcp(sessionId: string, enabled: string[]): Promise<AgentSessionMcp>
   regenerateTitle(sessionId: string): Promise<AgentSession>
+  summarizeSession(sessionId: string, userId: string, input: SessionSummaryInput, signal: AbortSignal): Promise<SessionSummary>
   deleteSession(sessionId: string): Promise<AgentDeleteResult>
   handoffToTerminal(sessionId: string): Promise<AgentSession>
   resumeManaged(sessionId: string): Promise<AgentSession>
@@ -162,6 +165,7 @@ export const managedAgents = new Hono<AppEnv>()
     '/sessions/:sessionId/implement-plan', '/sessions/:sessionId/requests/:requestId/resolve',
     '/sessions/:sessionId/fork', '/sessions/:sessionId/compact',
     '/sessions/:sessionId/regenerate-title', '/sessions/:sessionId/handoff-terminal',
+    '/sessions/:sessionId/summarize',
     '/sessions/:sessionId/resume-managed', '/sessions/:sessionId/verify-imported-resume', '/sessions/:sessionId/goal/resume',
   ], requireDevice)
   .on('PATCH', ['/sessions/:sessionId', '/sessions/:sessionId/turns/:turnId'], requireDevice)
@@ -367,6 +371,11 @@ export const managedAgents = new Hono<AppEnv>()
       return { ok: true }
     })
   })
+  .post('/sessions/:sessionId/subagents/:subagentId/cancel', (c) =>
+    viaBridge(c, MANAGED_AGENTS, async (bridge) => {
+      await bridge.cancelSubagent(c.req.param('sessionId'), c.req.param('subagentId'))
+      return { ok: true }
+    }))
   .post('/sessions/:sessionId/requests/:requestId/resolve', async (c) => {
     const key = idempotencyKey(c.req.raw.headers)
     if (!key) return respondError(c, 400, 'idempotency_key_required')
@@ -399,6 +408,19 @@ export const managedAgents = new Hono<AppEnv>()
   })
   .post('/sessions/:sessionId/regenerate-title', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.regenerateTitle(c.req.param('sessionId'))))
+  .post('/sessions/:sessionId/summarize', async (c) => {
+    const { sessionSummarySchema } = await import('../../shared/sessionSummary')
+    const parsed = sessionSummarySchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    try {
+      return await viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.summarizeSession(
+        c.req.param('sessionId'), c.get('principal')!.userId, parsed.data, c.req.raw.signal,
+      ))
+    } catch (error) {
+      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
+      return respondError(c, 502, 'provider_unavailable')
+    }
+  })
   .put('/sessions/:sessionId/goal', async (c) => {
     const parsed = sessionGoalSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')

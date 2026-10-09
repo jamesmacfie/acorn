@@ -27,7 +27,7 @@ import { tabLabels } from './tabLabels'
 import EditorStatus from './EditorStatus'
 import { EDITOR_ACTIONS, actionAvailable, runEditorAction } from './editorActions'
 import { forgetPresentation, inferIndentation, languageName, presentationFor, saveLabel, setPresentation, type Indentation } from './editorPresentation'
-import { readEditorIndentation, readEditorWordWrap, saveEditorIndentation, saveEditorWordWrap } from './editorPrefs'
+import { readEditorIndentation, readEditorWordWrap } from './editorPrefs'
 import { admitGraphicalEditor } from './editorAdmission'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
@@ -1133,6 +1133,7 @@ export default function EditorPane(props: { task: Task }) {
               <TabPanel idPrefix="editor-side" id="files" active={side()}>
                 <FileTree
                   taskId={taskId}
+                  taskTitle={props.task.title}
                   fileStatus={fileStatus.projection}
                   statusStale={fileStatus.stale}
                   onStatusChanged={fileStatus.refresh}
@@ -1181,13 +1182,13 @@ export default function EditorPane(props: { task: Task }) {
                 ><Icon name="square-terminal" /></ToggleButton>
                 <Show when={active() && !imagePath()}>
                   <Show when={activeTab()?.dirty} fallback={
-                    <Button size="sm" variant="bare" onPress={() => { const path = active(); if (path) void revalidate(path) }}>Reload from disk</Button>
+                    <IconButton icon="refresh-cw" label="Reload from disk" onPress={() => { const path = active(); if (path) void revalidate(path) }} />
                   }>
-                    <ConfirmButton size="sm" variant="bare" timeoutMs={10_000}
+                    <ConfirmButton iconOnly label="Reload from disk" tip="Reload from disk" size="sm" variant="bare" timeoutMs={10_000}
                       confirmLabel={`Discard ${armedDecision()?.path ?? active()} and reload?`}
                       onArm={() => armDecision('reload')}
                       onConfirm={() => { const decision = confirmDecision('reload'); if (decision) void reloadFromDisk(decision) }}
-                    >Reload from disk</ConfirmButton>
+                    ><Icon name="refresh-cw" /></ConfirmButton>
                   </Show>
                   <IconButton
                     icon="send"
@@ -1271,13 +1272,10 @@ export default function EditorPane(props: { task: Task }) {
             preview={!!imagePath()}
             external={!!ptyPath()}
             wrap={statusWrap()}
-            defaultWrap={readEditorWordWrap(prefs.data)}
             onToggleWrap={() => { if (statusCurrent(path)) toggleWrap() }}
-            onDefaultWrap={(value) => { if (statusCurrent(path) && graphicalView()) void saveEditorWordWrap(queryClient, value) }}
-            onCopy={() => { if (statusCurrent(path)) copyPath(false) }}
+            onCopy={(absolute) => { if (statusCurrent(path)) copyPath(absolute) }}
             onReveal={() => { if (statusCurrent(path)) revealActiveFile() }}
             onIndentation={(value) => { if (statusCurrent(path)) setIndentation(value) }}
-            onDefaultIndentation={(value) => { if (statusCurrent(path) && graphicalView()) void saveEditorIndentation(queryClient, value) }}
             onRetry={() => { if (statusCurrent(path)) void save(path) }}
           />}</Show>
         </ListDetail>

@@ -20,6 +20,7 @@ import type { WorkflowGateForm } from '../../shared/workflowContracts'
 import TypedValueField from '../editor/TypedValueField'
 import { formatCost, formatDuration, kindRunsAgent, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
+import GoalDetails from './GoalDetails'
 import { ChildRuns, RunLineage } from './RunRelationships'
 import { RunRecords } from './RunRecords'
 
@@ -348,6 +349,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                   </Match>
 
                   <Match when={shape() === 'agent'}>
+                    <GoalDetails step={current()} />
                     <AgentBody step={current()} structured={structured()} />
                   </Match>
 
@@ -400,6 +402,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
 
           <RunLineage run={model.selectedRun()} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
           {alerts(current)}
+          <GoalDetails step={current()} />
 
           {/* Folded, because the transcript below says most of it in more detail. What is worth
               keeping is the harness the step ran on, the structured value a schema step answered

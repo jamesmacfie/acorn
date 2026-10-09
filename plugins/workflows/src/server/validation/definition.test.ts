@@ -258,6 +258,29 @@ describe('the agent-only fields', () => {
   })
 })
 
+describe('completion conditions', () => {
+  const def = (steps: WorkflowDef['steps']): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', inputs: [{ name: 'issue', schema: { type: 'string' } }], steps })
+
+  it('accepts a goal on an agent step, with the references a prompt may use', () => {
+    expect(check(def([{ name: 'fix', prompt: 'Fix it.', goal: 'The tests for ${inputs.issue} pass.' }]))).toEqual([])
+  })
+
+  it('names the step and field for an empty, oversized, or misplaced goal', () => {
+    expect(check(def([{ name: 'fix', goal: '  ' }]))).toEqual(["step 'fix' goal must be text that says when the step is finished"])
+    expect(check(def([{ name: 'fix', goal: 'x'.repeat(2_001) }]))).toEqual(["step 'fix' goal is longer than 2000 characters"])
+    expect(check(def([{ name: 'pick', kind: 'decide', prompt: 'Pick.', goal: 'Picked.' }])).join('\n'))
+      .toContain("step 'pick' is a 'decide' step, which cannot take goal")
+    expect(check(def([{ name: 'fix', goal: 'Uses ${inputs.missing}.' }]))).toEqual(["step 'fix' references undeclared input 'missing'"])
+  })
+
+  it('refuses a harness that cannot run or check the goal', () => {
+    const headless = { ...catalog, profiles: new Set(['claude-code', 'plain', 'unjudged']), managedProfiles: new Set(['claude-code', 'unjudged']) }
+    const steps = (profileId: string): WorkflowDef => ({ ...def([{ id: 'fix', name: 'fix', profileId, goal: 'Done.' }]), baseline: 'acorn-1', formatVersion: 1 })
+    expect(validateWorkflow(steps('plain'), headless)).toEqual(["step 'fix' goal needs a managed harness, and 'plain' has no managed session driver"])
+    expect(validateWorkflow(steps('unjudged'), headless)).toEqual(["step 'fix' goal needs a harness with a one-shot mode to check it, and 'unjudged' has none"])
+  })
+})
+
 describe('decide and join under the graph rule', () => {
   it('accepts the plain list a file written before the graph used', () => {
     expect(check({ baseline: 'acorn-1' as const, formatVersion: 1 as const,

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { activeNodeId, queryOwner, debounce } from '@acorn/plugin-api/client'
-import { Alert, Button, CopyButton, EmptyState, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, CopyButton, EmptyState, IconButton, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 import { taskSearchState, updateTaskSearchState } from './searchState'
@@ -142,7 +142,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
       scrollOffset={state().scrollOffset} onChange={onScrollChange}>
       {/* Stacked, not a row: the sidebar is narrow, and an input sharing it with three toggles
           leaves about a hundred pixels to type a query into. Two sm strips, so both sit on the pane's
-          inset, and the count rides at the end of the toggles. */}
+          inset. The option buttons share one row; the result count sits below it. */}
       <Toolbar size="sm" ariaLabel="Search">
         <Input
           ref={input}
@@ -157,22 +157,23 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
         />
       </Toolbar>
       <Toolbar size="sm" ariaLabel="Search options">
-        {/* Three independent booleans, so three ToggleButtons, not a radiogroup, which would make
-            them mutually exclusive. The find bar's shape. */}
-        <ToggleButton variant="bare" size="sm" tip="Match case" pressed={!!state().opts.caseSensitive} onPressedChange={(value) => setOption('caseSensitive', value)}>Aa</ToggleButton>
-        <ToggleButton variant="bare" size="sm" tip="Whole word" pressed={!!state().opts.wholeWord} onPressedChange={(value) => setOption('wholeWord', value)}>\b</ToggleButton>
-        <ToggleButton variant="bare" size="sm" tip="Use regular expression" pressed={!!state().opts.regex} onPressedChange={(value) => setOption('regex', value)}>.*</ToggleButton>
-        <Show when={files().length}>
-          <Toolbar.Spacer />
-          <Text emphasis="muted">{status()}</Text>
+        <IconButton icon="case-sensitive" label="Match case" pressed={!!state().opts.caseSensitive}
+          onPress={() => setOption('caseSensitive', !state().opts.caseSensitive)} />
+        <IconButton icon="whole-word" label="Whole word" pressed={!!state().opts.wholeWord}
+          onPress={() => setOption('wholeWord', !state().opts.wholeWord)} />
+        <IconButton icon="regex" label="Use regular expression" pressed={!!state().opts.regex}
+          onPress={() => setOption('regex', !state().opts.regex)} />
+        <IconButton icon="sliders-horizontal" label="Search details" expanded={details()}
+          pressed={details()} onPress={() => setDetails(!details())} />
+        <Show when={state().opts.folder}>
+          <IconButton icon="folder-x" label="Clear folder scope"
+            onPress={() => change((old) => ({ ...old, opts: { ...old.opts, folder: undefined }, scopeChanged: false, error: '', results: undefined }))} />
         </Show>
       </Toolbar>
       <Show when={state().opts.folder}>
-        <Toolbar size="sm" ariaLabel="Folder scope"><Text>{state().opts.folder}</Text>
-          <Button onPress={() => change((old) => ({ ...old, opts: { ...old.opts, folder: undefined }, scopeChanged: false, error: '', results: undefined }))}>Clear folder scope</Button>
-        </Toolbar>
+        <Toolbar size="sm" ariaLabel="Folder scope"><Text>{state().opts.folder}</Text></Toolbar>
       </Show>
-      <Button expanded={details()} onPress={() => setDetails(!details())}>Search details</Button>
+      <Show when={files().length}><Text emphasis="muted">{status()}</Text></Show>
       <Show when={details()}>
         <Stack gap="none">
           <Input label="Files to include" placeholder="Files to include" value={state().includeText} onInput={(value) => setPatterns('include', value)} />

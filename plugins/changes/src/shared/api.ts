@@ -100,7 +100,7 @@ export type HeadCommit = { sha: string; message: string }
  *  strictly booleans on the wire, for the reason the commit flags are: a coerced `'yes'` would run
  *  the destructive half of a verb nobody chose. */
 export type PullOptions = { rebase?: boolean }
-export type PushOptions = { force?: boolean }
+export type PushOptions = { force?: boolean; expectedBranch?: string; expectedRemoteId?: string }
 
 // HEAD's hash and message. Read on demand rather than carried on the status record: the only thing
 // that wants it is an amend, which is a menu item nobody presses on most visits, and a message body

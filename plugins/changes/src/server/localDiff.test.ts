@@ -152,8 +152,10 @@ describe('the remote argv (pure)', () => {
   // and never a bare `--force` (docs/security/process-and-paths.md § Process, path, and configuration controls).
   it('pushes with an upstream always, and with a lease when forced', () => {
     expect(pushArgs()).toEqual(['push', '--set-upstream', 'origin', 'HEAD'])
-    expect(pushArgs({ force: true })).toEqual(['push', '--force-with-lease', '--set-upstream', 'origin', 'HEAD'])
-    expect(pushArgs({ force: true }).includes('--force')).toBe(false)
+    expect(pushArgs({ force: true, expectedBranch: 'main', expectedRemoteId: 'a'.repeat(40) })).toEqual([
+      'push', `--force-with-lease=refs/heads/main:${'a'.repeat(40)}`, '--set-upstream', 'origin', 'HEAD:refs/heads/main',
+    ])
+    expect(pushArgs({ force: true, expectedBranch: 'main', expectedRemoteId: 'a'.repeat(40) }).includes('--force')).toBe(false)
   })
 
   it('aborts whichever operation it is told about', () => {
@@ -700,8 +702,8 @@ describe('the remote verbs over a real origin', () => {
     expect(await commitStaged(dir, 'second, reworded', { amend: true })).toEqual({ ok: true })
     expect(await pushBranch(dir)).toMatchObject({ ok: false, reason: expect.stringMatching(/rejected|non-fast-forward/i) })
 
-    // The lease holds because this node's remote-tracking ref is what the remote actually has.
-    expect(await pushBranch(dir, { force: true })).toEqual({ ok: true })
+    const observed = (await localStatus(dir)).upstreamId!
+    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed })).toEqual({ ok: true })
     expect(await localStatus(dir)).toMatchObject({ ahead: 0, behind: 0 })
     expect(git('log', '-1', '--pretty=%s').trim()).toBe('second, reworded')
   })
@@ -715,7 +717,23 @@ describe('the remote verbs over a real origin', () => {
     writeFileSync(join(dir, 'a.txt'), 'mine\n', 'utf8')
     git('commit', '-q', '-am', 'mine')
 
-    expect(await pushBranch(dir, { force: true })).toMatchObject({ ok: false, reason: expect.stringMatching(/stale info|rejected/i) })
+    const observed = (await localStatus(dir)).upstreamId!
+    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed })).toMatchObject({ ok: false, reason: expect.stringMatching(/stale info|rejected/i) })
+    other.cleanup()
+  })
+
+  it('keeps the observed lease after background fetch advances the tracking ref', { timeout: 30_000 }, async () => {
+    await pushBranch(dir)
+    const observed = (await localStatus(dir)).upstreamId!
+    const other = otherClone()
+    other.commit('theirs\n')
+    writeFileSync(join(dir, 'a.txt'), 'mine\n', 'utf8')
+    git('commit', '-q', '-am', 'mine')
+    await fetchRemote(dir)
+    expect((await localStatus(dir)).upstreamId).not.toBe(observed)
+    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed }))
+      .toMatchObject({ ok: false, reason: expect.stringMatching(/stale info|rejected/i) })
+    expect(git('ls-remote', 'origin', 'refs/heads/main').split('\t')[0]).toBe((await localStatus(dir)).upstreamId)
     other.cleanup()
   })
 

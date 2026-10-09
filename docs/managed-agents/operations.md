@@ -82,6 +82,17 @@ The goal route is device-only: `PUT /v1/p/agents/sessions/:id/goal` accepts an o
 to clear it, and `POST /v1/p/agents/sessions/:id/goal/resume` resumes a paused goal. Workflow,
 delegated, imported, terminal-controlled, and archived sessions cannot accept a goal.
 
+A workflow step's completion condition uses the same judge, evidence limit, and continuation limits
+(`judgeGoal` in `plugins/agents/src/server/sessions/sessionGoal.ts`), but the step owns it, not the
+session. `agents.sessionExecute` checks it inside the step's operation and queues the continuations
+itself, so interactive goal scheduling never sees a workflow session. Each verdict is an
+`agent_operations` row keyed by the attempt's opening turn and the turns it read
+(`workflow.goal.evaluate`), and the attempt's final state is one more (`workflow.goal`). A retry
+opens a new turn, so its state starts clean. Startup doesn't restart a step's goal work. Only the
+workflow runner's recovery and retry do. The run's own **Stop** and **Retry** control a workflow
+session, which has no goal **Edit**, **Clear**, or **Resume**. For the step's side, see
+[agent steps](../workflows/agent-steps.md#completion-conditions).
+
 ## Plan usage limits
 
 A plan usage limit pauses the turn until the account resets. The runtime needs two facts: a provider

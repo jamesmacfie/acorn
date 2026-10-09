@@ -158,7 +158,7 @@ export type AgentActivityTool = {
   turnId: string | null
   kind: string | null
   title: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted' | 'unknown'
   paths: string[]
   subagentId: string | null
 }

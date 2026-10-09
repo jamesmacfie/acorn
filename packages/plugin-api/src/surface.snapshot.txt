@@ -211,6 +211,7 @@ client: localSearch
 client: markAttentionSeen
 client: markTargetsRead
 client: modelBackendsOptions
+client: modelPickLabel
 client: nodeReady
 client: nodeState
 client: nodes
@@ -220,6 +221,7 @@ client: onClosePaneWhen
 client: onClosePaneWithin
 client: onPluginFrame
 client: onScopeEvicted
+client: openActionPicker
 client: openInAppUrl
 client: openPane
 client: openRefPanel
@@ -273,6 +275,7 @@ client: registerWsChannel
 client: remotePreviewBlocked
 client: renderMarkdown
 client: replaceAttentionSource
+client: requestTaskLaunch
 client: requestTerminalFocusIntent
 client: requireClientCapability
 client: resolveDataBinding
@@ -650,6 +653,7 @@ testkit: SecretService
 testkit: TestDb
 testkit: TestNodeContext
 testkit: TestPluginDb
+testkit: beginTaskArchive
 testkit: catalogueSkills
 testkit: confineExistingFile
 testkit: connectProvider
@@ -658,6 +662,7 @@ testkit: createCoreServices
 testkit: createProjectService
 testkit: createTaskService
 testkit: decryptSecret
+testkit: finishTaskArchive
 testkit: harness
 testkit: isContainedPath
 testkit: isValidRepoIdent
@@ -767,6 +772,7 @@ ui/host: Drawer
 ui/host: IconPicker
 ui/host: IconPickerProps
 ui/host: InlineSlot
+ui/host: McpConfigFiles
 ui/host: ModelPickerPopover
 ui/host: PaletteSurface
 ui/host: PromoteTaskAction
@@ -956,6 +962,9 @@ ui: GraphEdgeRef
 ui: GraphPoint
 ui: Grid
 ui: Heading
+ui: HistoryMark
+ui: HistoryNode
+ui: HistorySlot
 ui: Icon
 ui: IconButton
 ui: Inline
@@ -1031,6 +1040,7 @@ ui: createArmedConfirm
 ui: createSplitDrag
 ui: createTimelineWindow
 ui: defaultModelIdFor
+ui: historyLayout
 ui: modelProviderFailure
 ui: paneCollapseKey
 ui: renderMarkdown

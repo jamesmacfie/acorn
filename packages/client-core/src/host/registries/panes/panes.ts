@@ -229,6 +229,7 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
         get hidden() { return entry.hidden?.(props.task) },
       collapsible: entry.collapsible === true,
       collapseContent: entry.collapseContent ?? 'rows',
+      get scrollScope() { return props.task.id },
       }) } })
     },
   }

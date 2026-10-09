@@ -3,7 +3,7 @@
 // It sits beside the routes, not in node/index.ts, because it is the error taxonomy that turns the
 // runtime's thrown messages into the status codes managed.ts promises. node/index.ts owns composition,
 // not HTTP semantics.
-import { BridgeError } from '@acorn/plugin-api/node'
+import { BridgeError, isProviderOperationError } from '@acorn/plugin-api/node'
 import type { AgentRuntimeState } from '../../contract/wire.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
 import { foldToolEvents } from '../../shared/toolFold'
@@ -20,6 +20,7 @@ function bridgeFailure(error: unknown): never {
   // shape so this bridge does not load the checker. Its message names rules and positions, never a value.
   if (error instanceof Error && 'refusal' in error) throw new BridgeError(409, 'secret_check_blocked', error.message)
   const message = error instanceof Error ? error.message : 'Managed agent operation failed.'
+  if (/before summarizing|empty summary/.test(message)) throw new BridgeError(422, 'agent_summary_unavailable', message)
   // A request naming a provider this Node never registered, as opposed to one that is unavailable now.
   if (/^Unknown agent provider/.test(message)) throw new BridgeError(400, 'bad_request', message)
   if (/not found/i.test(message)) throw new BridgeError(404, 'agent_not_found', message)
@@ -141,6 +142,7 @@ export function managedAgentsBridge(
     patchQueuedTurn: (sessionId, turnId, patch) =>
       guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
     cancelTurn: (sessionId, turnId) => guarded(() => runtime.cancelTurn(sessionId, turnId)),
+    cancelSubagent: (sessionId, subagentId) => guarded(() => runtime.cancelSubagent(sessionId, subagentId)),
     resolveRequest: (sessionId, requestId, resolution, idempotencyKey) =>
       guarded(() => runtime.resolveRequest(sessionId, requestId, resolution, idempotencyKey)),
     patchSession: (sessionId, patch) => guarded(() => runtime.patchSession(sessionId, patch)),
@@ -149,6 +151,14 @@ export function managedAgentsBridge(
     sessionMcp: (sessionId) => guarded(() => runtime.sessionMcp(sessionId)),
     setSessionMcp: (sessionId, enabled) => guarded(() => runtime.setSessionMcpServers(sessionId, enabled)),
     regenerateTitle: (sessionId) => guarded(() => runtime.regenerateTitle(sessionId)),
+    summarizeSession: async (sessionId, userId, input, signal) => {
+      try {
+        return await runtime.summarizeSession(sessionId, userId, input, signal)
+      } catch (error) {
+        if (isProviderOperationError(error)) throw error
+        return bridgeFailure(error)
+      }
+    },
     deleteSession: (sessionId) => guarded(() => runtime.deleteSession(sessionId)),
     handoffToTerminal: (sessionId) => guarded(() => runtime.handoffToTerminal(sessionId)),
     resumeManaged: (sessionId) => guarded(() => runtime.resumeManaged(sessionId)),

@@ -2,6 +2,10 @@
 
 Date: October 6, 2026. Status: proposal. Nothing in it is built.
 
+Implementation belongs to [Performance phase 06](./performance/06-selective-server-loading.md),
+planned October 9, 2026. That phase owns prerequisites, verification, and completion. This page
+retains the helper design and its dated measurements.
+
 This page proposes an opt-in helper that lets a plugin load a route's code on its first request
 instead of at node boot. Read it before you add a heavy route to a compiled plugin, or before you
 raise the service's size ceiling.

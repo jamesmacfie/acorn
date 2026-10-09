@@ -45,11 +45,25 @@ export const AGENT_ARCHIVED_HISTORY_CHOICES = [
   { days: 0, label: 'Forever' },
 ] as const
 
+/**
+ * "Warn when an agent repeats a tool call", as the number of identical calls in a row, where 0 is Off.
+ * Waiting tools such as `task_scripts_wait` repeat on purpose, which is why the warning stops nothing
+ * (../server/sessions/repeatedToolCalls.ts).
+ */
+export const AGENT_REPEATED_TOOL_CALL_CHOICES = [
+  { calls: 3, label: '3 times in a row' },
+  { calls: 5, label: '5 times in a row' },
+  { calls: 10, label: '10 times in a row' },
+  { calls: 0, label: 'Never' },
+] as const
+
 export type AgentSessionDefaults = {
   /** Resume a paused turn when its harness reports that the account usage window has reset. */
   continueAfterUsageLimit: boolean
   /** Minutes an idle provider process is kept before the runtime stops it. 0 keeps it until the node exits. */
   stopIdleAfterMinutes: number
+  /** Identical tool calls in a row before the transcript warns that the agent may be stuck. 0 is off. */
+  warnRepeatedToolCallsAfter: number
   /** Days an archived task keeps its agent history before the node removes it. 0 keeps it forever. */
   keepArchivedHistoryDays: number
   /** Refuse a turn while an instruction file or skill the harness reads holds hidden characters
@@ -77,6 +91,7 @@ export type AgentSessionDefaults = {
 export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   continueAfterUsageLimit: true,
   stopIdleAfterMinutes: 30,
+  warnRepeatedToolCallsAfter: 3,
   // Forever, because removing history cannot be undone and has to be the owner's choice.
   keepArchivedHistoryDays: 0,
   // Off, because it reads files before every turn and can stop work the owner didn't expect to stop.
@@ -160,6 +175,10 @@ export function validateAgentSessionDefaults(
     && !AGENT_IDLE_STOP_CHOICES.some((choice) => choice.minutes === record.stopIdleAfterMinutes)) {
     errors.push(`stopIdleAfterMinutes must be one of ${AGENT_IDLE_STOP_CHOICES.map((choice) => choice.minutes).join(', ')}.`)
   }
+  if (record.warnRepeatedToolCallsAfter != null
+    && !AGENT_REPEATED_TOOL_CALL_CHOICES.some((choice) => choice.calls === record.warnRepeatedToolCallsAfter)) {
+    errors.push(`warnRepeatedToolCallsAfter must be one of ${AGENT_REPEATED_TOOL_CALL_CHOICES.map((choice) => choice.calls).join(', ')}.`)
+  }
   if (record.keepArchivedHistoryDays != null
     && !AGENT_ARCHIVED_HISTORY_CHOICES.some((choice) => choice.days === record.keepArchivedHistoryDays)) {
     errors.push(`keepArchivedHistoryDays must be one of ${AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => choice.days).join(', ')}.`)
@@ -216,6 +235,9 @@ export function validateAgentSessionDefaults(
         ? { continueAfterUsageLimit: record.continueAfterUsageLimit }
         : {}),
       ...(typeof record.stopIdleAfterMinutes === 'number' ? { stopIdleAfterMinutes: record.stopIdleAfterMinutes } : {}),
+      ...(typeof record.warnRepeatedToolCallsAfter === 'number'
+        ? { warnRepeatedToolCallsAfter: record.warnRepeatedToolCallsAfter }
+        : {}),
       ...(typeof record.keepArchivedHistoryDays === 'number' ? { keepArchivedHistoryDays: record.keepArchivedHistoryDays } : {}),
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
       ...(typeof record.checkInstructionFiles === 'boolean' ? { checkInstructionFiles: record.checkInstructionFiles } : {}),

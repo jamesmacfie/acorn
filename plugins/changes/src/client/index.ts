@@ -13,7 +13,8 @@ export const changesClientPlugin: ClientPlugin = {
   name: 'changes',
   init: (ctx) => {
     ctx.panes.register(changesPaneContribution)
-    // A dot on the pane's rail button for which way the uncommitted lines lean (./railMarker.ts).
+    // A dot on each task row and on the pane's rail button for which way the uncommitted lines lean
+    // (./railMarker.ts).
     ctx.railMarkers.register(changesRailMarkerContribution)
     // How the list is drawn: one device preference, so it survives a relaunch and stays on this
     // machine (./changesPrefs.ts, docs/state-ownership/scope-rules.md § Scope rules).
