@@ -46,6 +46,16 @@ The modal is drawn in the shell's `overlay` slot, because the list the row sits 
 somebody else. The terminal client mounts no overlay slot and its descriptor source panel draws no row
 menu, so this flow is desktop-only for now ([tui.md](../tui/plugin-losses.md) § What a plugin loses here).
 
+## From Git history
+
+Git commit and local branch-tip menus capture the full commit ID before opening a launch form.
+Workflows provides the definition picker and typed required inputs through its client capability;
+Git holds only the pinned launch request. The form creates a task branch from that commit through
+Core, then starts the selected workflow through the normal start route. If start fails, Workflows
+retains the task ID and input values for retry on the same task. **Open task** leaves the failed
+run attempt without creating another task. Disabling Workflows removes the launch capability, and
+Git reports that the action is unavailable. Both desktop and terminal render the owner-provided form.
+
 ## From the command palette
 
 Three rows at the palette root, all registered by this plugin's client half

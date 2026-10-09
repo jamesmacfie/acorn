@@ -160,6 +160,7 @@ export type TaskSeed = {
   branch?: string
   branchSource?: 'derived' | 'exact'
   baseBranch?: string
+  baseCommit?: string
   // An existing linked worktree from projectWorktreesRoute. The node checks it against git and
   // takes the branch from it, so `branch` is ignored when this is set.
   worktreePath?: string
@@ -193,8 +194,8 @@ export type ProjectBranches = {
   tasks: Array<{ branch: string; taskId: string; title: string }>
   other: Array<{ name: string; committedAt: number }>
 }
-export const projectWorktreeAvailabilityRoute = (id: string, branch: string, options?: { branchSource?: 'derived' | 'exact'; baseBranch?: string }) =>
-  `${projectRoute(id)}/worktree-availability?branch=${encodeURIComponent(branch)}${options?.branchSource ? `&branchSource=${options.branchSource}` : ''}${options?.baseBranch ? `&baseBranch=${encodeURIComponent(options.baseBranch)}` : ''}`
+export const projectWorktreeAvailabilityRoute = (id: string, branch: string, options?: { branchSource?: 'derived' | 'exact'; baseBranch?: string; baseCommit?: string }) =>
+  `${projectRoute(id)}/worktree-availability?branch=${encodeURIComponent(branch)}${options?.branchSource ? `&branchSource=${options.branchSource}` : ''}${options?.baseBranch ? `&baseBranch=${encodeURIComponent(options.baseBranch)}` : ''}${options?.baseCommit ? `&baseCommit=${encodeURIComponent(options.baseCommit)}` : ''}`
 export type WorktreeAvailability = ({ available: true } | { available: false; reason: string }) & { branch?: string }
 // The MCP config files the agents in this project load, and the empty .mcp.json Settings can seed
 // (docs/mcp.md § Configuration).

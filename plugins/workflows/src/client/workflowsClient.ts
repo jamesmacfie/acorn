@@ -146,11 +146,15 @@ function workflowApiAt(nodeId?: string | null) {
     // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
     // `body` is either the whole definition or `{ defId }`; the node resolves the second itself, which
     // is what lets it apply the repo trust snapshot to a committed file.
-    start: async (taskId: string, body: { def: unknown } | { defId: string }, inputs?: Record<string, DataValue>): Promise<{ runId?: string; error?: string }> => {
+    start: async (taskId: string, body: { def: unknown } | { defId: string }, inputs?: Record<string, DataValue>, onTrusted?: (runId: string) => void): Promise<{ runId?: string; error?: string }> => {
       const execute = () => post<{ runId?: string; error?: string }>(workflowStartRoute(taskId), { ...body, ...(inputs ? { inputs } : {}) })
       try {
         const result = await execute()
-        if (result.error === 'needs-trust') openRepoConfigTrust(taskId, execute)
+        if (result.error === 'needs-trust') openRepoConfigTrust(taskId, async () => {
+          const trusted = await execute()
+          if (trusted.runId) onTrusted?.(trusted.runId)
+          return trusted
+        })
         return result
       } catch (e) {
         return { error: e instanceof Error ? e.message : 'Failed to start workflow.' }

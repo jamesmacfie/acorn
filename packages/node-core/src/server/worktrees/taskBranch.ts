@@ -7,7 +7,7 @@ import { branchExists } from './worktrees'
 import { worktreeAvailability, worktreeNameConflict } from './worktreeAvailability'
 import { localBranches } from './branches'
 
-export type TaskBranchSeed = { branch: string | null; branchSource?: 'derived' | 'exact'; baseBranch?: string }
+export type TaskBranchSeed = { branch: string | null; branchSource?: 'derived' | 'exact'; baseBranch?: string; baseCommit?: string }
 
 export class TaskBranchError extends Error {
   constructor(public readonly status: 400 | 409, message: string) { super(message) }
@@ -32,11 +32,20 @@ export async function withBranchReservation<T>(db: AppDatabase, action: () => Pr
 }
 
 async function baseCommit(project: ProjectRow, seed: TaskBranchSeed): Promise<string | undefined> {
-  if (seed.baseBranch === undefined) return undefined
+  if (seed.baseBranch !== undefined && seed.baseCommit !== undefined) throw new TaskBranchError(400, 'Choose one starting point.')
+  if (seed.baseBranch === undefined && seed.baseCommit === undefined) return undefined
   if (project.vcs !== 'git' || !project.path || !seed.branch) {
-    throw new TaskBranchError(400, 'A base branch requires a new Git worktree task.')
+    throw new TaskBranchError(400, 'A starting commit requires a new Git worktree task.')
   }
-  if (!isValidBranch(seed.baseBranch)) throw new TaskBranchError(400, 'Invalid base branch name.')
+  if (seed.baseCommit !== undefined) {
+    if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(seed.baseCommit)) throw new TaskBranchError(400, 'Use a full commit ID.')
+    try {
+      const actual = await gitText(['cat-file', '-t', seed.baseCommit], { cwd: project.path, timeoutMs: 10_000 })
+      if (actual === 'commit') return seed.baseCommit
+    } catch { /* Missing or unavailable object. */ }
+    throw new TaskBranchError(400, 'The starting commit is not available in this repository.')
+  }
+  if (!seed.baseBranch || !isValidBranch(seed.baseBranch)) throw new TaskBranchError(400, 'Invalid base branch name.')
   try {
     return await gitText(['rev-parse', '--verify', `refs/heads/${seed.baseBranch}^{commit}`], { cwd: project.path, timeoutMs: 10_000 })
   } catch {
@@ -51,7 +60,7 @@ export async function taskBranchAvailability(db: AppDatabase, project: ProjectRo
 
 async function availableTaskBranch(db: AppDatabase, project: ProjectRow, seed: TaskBranchSeed, excluded: ReadonlySet<string> = new Set()): Promise<WorktreeAvailability> {
   if (project.vcs !== 'git' || !seed.branch) return { available: true }
-  const existing = seed.baseBranch !== undefined ? new Set((await localBranches(project.path!)).map((branch) => branch.name)) : new Set<string>()
+  const existing = seed.baseBranch !== undefined || seed.baseCommit !== undefined ? new Set((await localBranches(project.path!)).map((branch) => branch.name)) : new Set<string>()
   const rejected = new Set(excluded)
   let branch = dedupeBranch(seed.branch, rejected)
   for (;;) {

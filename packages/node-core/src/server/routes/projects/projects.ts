@@ -148,9 +148,9 @@ export const projects = new Hono<AppEnv>()
     const branchSource = c.req.query('branchSource')
     if (branchSource !== undefined && branchSource !== 'derived' && branchSource !== 'exact') return respondError(c, 400, 'bad_request')
     try {
-      const result = await taskBranchAvailability(db, project, { branch, branchSource, baseBranch: c.req.query('baseBranch') })
+      const result = await taskBranchAvailability(db, project, { branch, branchSource, baseBranch: c.req.query('baseBranch'), baseCommit: c.req.query('baseCommit') })
       // Preserve the response for callers that do not request a preview.
-      if (!branchSource && c.req.query('baseBranch') === undefined) {
+      if (!branchSource && c.req.query('baseBranch') === undefined && c.req.query('baseCommit') === undefined) {
         const { branch: _branch, ...availability } = result
         return c.json(availability)
       }

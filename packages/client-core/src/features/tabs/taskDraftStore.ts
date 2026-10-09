@@ -10,26 +10,27 @@ import { randomIconName } from '../../kit/components/inputs/IconPicker'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 
 export type TaskDraft =
-  | { mode: 'new'; nodeId: string | null; projects: Project[]; projectId: string }
+  | { mode: 'new'; nodeId: string | null; projects: Project[]; projectId: string; title?: string; baseCommit?: string; worktreePath?: string }
   | { mode: 'rename'; nodeId: string | null; task: Task }
 
 type TaskSource = 'new' | 'folder' | 'worktree'
 
 // One owner for the dialog's edits and requests. The rail supplies a project snapshot and a live
 // task revision; changing workspace cannot silently replace the project's choices in an open form.
-export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | undefined>, close: () => void, navigate: (path: string) => void) {
+export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | undefined>, close: () => void, navigate: (path: string) => void, onCreated?: (task: Task) => Promise<void>, existingTask?: Task) {
   const queryClient = useQueryClient()
-  const [text, setText] = createSignal(draft.mode === 'rename' ? draft.task.title : '')
+  const [text, setText] = createSignal(draft.mode === 'rename' ? draft.task.title : draft.title ?? '')
   const [icon, setIcon] = createSignal<string | null>(draft.mode === 'rename' ? draft.task.icon : randomIconName())
   const [projectId, setProjectId] = createSignal(draft.mode === 'new' ? draft.projectId : '')
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
   const [baseChoice, setBaseChoice] = createSignal<{ projectId: string; branch: string } | null>(null)
-  const [source, setSource] = createSignal<TaskSource>('new')
-  const [pickedWorktree, setPickedWorktree] = createSignal('')
+  const [source, setSource] = createSignal<TaskSource>(draft.mode === 'new' && draft.worktreePath ? 'worktree' : 'new')
+  const [pickedWorktree, setPickedWorktree] = createSignal(draft.mode === 'new' ? draft.worktreePath ?? '' : '')
   const [skipSetup, setSkipSetup] = createSignal(false)
   const [error, setError] = createSignal('')
   const [saving, setSaving] = createSignal(false)
+  const [createdTask, setCreatedTask] = createSignal<Task | null>(existingTask ?? null)
   let alive = true
   onCleanup(() => { alive = false })
 
@@ -41,16 +42,17 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
     (id) => readJson<ProjectWorktree[]>(projectWorktreesRoute(id), { nodeId: draft.nodeId }).catch(() => null))
   const [branches] = createResource(() => gitProject() ? projectId() : undefined,
     (id) => readJson<ProjectBranches>(projectBranchesRoute(id), { nodeId: draft.nodeId }).catch(() => null))
-  const baseBranch = () => baseChoice()?.projectId === projectId() ? baseChoice()?.branch : branches()?.current ?? undefined
+  const baseCommit = () => draft.mode === 'new' && draft.projectId === projectId() && source() === 'new' ? draft.baseCommit : undefined
+  const baseBranch = () => baseCommit() ? undefined : baseChoice()?.projectId === projectId() ? baseChoice()?.branch : branches()?.current ?? undefined
   const chosenWorktree = () => {
     const list = worktrees() ?? []
-    return list.find((worktree) => worktree.path === pickedWorktree()) ?? list[0]
+    return list.find((worktree) => worktree.path === pickedWorktree()) ?? (draft.mode === 'new' && draft.worktreePath ? undefined : list[0])
   }
   const effectiveBranch = () => branchTouched() ? branchText() : withBranchPrefix(config()?.config.branchPrefix ?? null, slugifyBranch(text()))
   const request = createMemo(() => {
     if (!gitProject() || source() !== 'new' || !effectiveBranch()) return undefined
     tasks() // A task added or archived elsewhere requires a fresh availability answer.
-    return { nodeId: draft.nodeId, projectId: projectId(), branch: effectiveBranch(), baseBranch: baseBranch(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const }
+    return { nodeId: draft.nodeId, projectId: projectId(), branch: effectiveBranch(), baseBranch: baseBranch(), baseCommit: baseCommit(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const }
   })
   const [availability] = createResource(request, async (identity) => ({
     identity,
@@ -60,7 +62,7 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
   const checkedAvailability = () => {
     const checked = availability()
     const current = request()
-    return checked && current && checked.identity.nodeId === current.nodeId && checked.identity.projectId === current.projectId && checked.identity.branch === current.branch && checked.identity.baseBranch === current.baseBranch && checked.identity.branchSource === current.branchSource
+    return checked && current && checked.identity.nodeId === current.nodeId && checked.identity.projectId === current.projectId && checked.identity.branch === current.branch && checked.identity.baseBranch === current.baseBranch && checked.identity.baseCommit === current.baseCommit && checked.identity.branchSource === current.branchSource
       ? checked.result : undefined
   }
   const branchError = () => {
@@ -69,6 +71,7 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
   }
   const canSubmit = () => {
     if (saving() || activeNodeId() !== draft.nodeId || !text().trim()) return false
+    if (createdTask()) return true
     if (!gitProject()) return true
     if (source() === 'folder') return true
     if (source() === 'worktree') return !!chosenWorktree()
@@ -86,16 +89,17 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
         const git = project.vcs === 'git'
         const branch = git && source() === 'new' ? effectiveBranch() : undefined
         const worktreePath = git && source() === 'worktree' ? chosenWorktree()?.path : undefined
-        const task = await createTask({
-          ...(branch ? { baseBranch: baseBranch(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const } : {}),
+        const task = createdTask() ?? await createTask({
+          ...(branch ? { baseBranch: baseBranch(), baseCommit: baseCommit(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const } : {}),
           origin: 'local', projectId: project.id, branch, worktreePath, title: value, icon: icon() ?? undefined,
           skipSetup: !!branch && skipSetup(),
         }, draft.nodeId)
+        setCreatedTask(task)
+        if (onCreated) await onCreated(task)
         if (!alive || activeNodeId() !== draft.nodeId) return
         await queryClient.invalidateQueries({ queryKey: tasksKey })
         if (!alive || activeNodeId() !== draft.nodeId) return
-        activateTaskSignals(task, { pane: 'pr' })
-        navigate(pathForTask(task))
+        if (!onCreated) { activateTaskSignals(task, { pane: 'pr' }); navigate(pathForTask(task)) }
       } else {
         const body: { title?: string; icon?: string | null } = {}
         if (value !== draft.task.title) body.title = value
@@ -119,5 +123,10 @@ export function createTaskDraftStore(draft: TaskDraft, tasks: Accessor<Task[] | 
     baseBranch, setBaseBranch: (branch: string) => setBaseChoice({ projectId: projectId(), branch }),
     source, setSource, pickedWorktree, setPickedWorktree, skipSetup, setSkipSetup, error, canSubmit, submit,
     selectedProject, worktrees, branches, chosenWorktree, effectiveBranch, checkedAvailability, branchError, availability,
+    baseCommit, createdTask, saving, openCreatedTask: () => {
+      const task = createdTask()
+      if (!task || activeNodeId() !== draft.nodeId) return
+      activateTaskSignals(task, { pane: 'pr' }); navigate(pathForTask(task)); close()
+    },
   }
 }

@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activateTaskSignals, activeNodeId, nodeReady, pathForTask, projectsOptions, tasksOptions } from '@acorn/plugin-api/client'
+import { activateTaskSignals, activeNodeId, nodeReady, openActionPicker, pathForTask, projectsOptions, requestTaskLaunch, tasksOptions } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, ConfirmButton, EmptyState, Facts, IconButton, Menu, Row, RowActions, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
 import type { Worktree } from '../shared/api'
 import { removeWorktree, worktreesKey, worktreesOptions } from './worktreeClient'
@@ -40,7 +40,19 @@ export function WorktreeList() {
       <Show when={nodeReady() && !scope.inventory.isLoading && !entries().length && !scope.inventory.error}><EmptyState title="No worktrees" /></Show>
       <Rows id={`git-worktrees:${activeNodeId()}:${scope.projectId()}`} ariaLabel="Git worktrees" items={items()}
         selected={scope.params.worktreeId ?? null} onSelect={(key) => navigate(worktreePath(scope.projectId(), key))}
-        onActivate={(key) => navigate(worktreePath(scope.projectId(), key))}>
+        onActivate={(key) => navigate(worktreePath(scope.projectId(), key))} onMenu={(key) => {
+          const row = entries().find((entry) => entry.id === key)
+          if (!row) return
+          openActionPicker({ title: 'Worktree actions', detail: `${row.branch ?? 'Detached HEAD'} · ${row.path}`, actions: [
+            { id: 'view', label: 'View worktree', run: () => navigate(worktreePath(scope.projectId(), row.id)) },
+            ...(row.owners[0] ? [{ id: 'open', label: 'Open task', run: () => {
+              const task = tasks.data?.find((item) => item.id === row.owners[0]?.id)
+              if (task) { activateTaskSignals(task, { pane: 'git' }); navigate(pathForTask(task)) }
+            } }] : []),
+            ...(!row.owners.length && !row.main && !row.missing && !row.locked && row.branch
+              ? [{ id: 'attach', label: 'Attach to task', run: () => requestTaskLaunch({ nodeId: activeNodeId(), projectId: scope.projectId(), title: row.branch!, worktreePath: row.path }) }] : []),
+          ] })
+        }}>
         {(item, itemProps, selected) => {
           const entry = () => entries().find((row) => row.id === item.key)
           return <Show when={entry()}>{(row) =>
@@ -57,6 +69,9 @@ export function WorktreeList() {
                     const task = tasks.data?.find((item) => item.id === owner().id)
                     if (task) { activateTaskSignals(task, { pane: 'git' }); navigate(pathForTask(task)) }
                   }}>Open task</Menu.Item>}</Show>
+                  <Show when={!row().owners.length && !row().main && !row().missing && !row().locked && row().branch}>
+                    <Menu.Item context={menu} onSelect={() => requestTaskLaunch({ nodeId: activeNodeId(), projectId: scope.projectId(), title: row().branch!, worktreePath: row().path })}>Attach to task</Menu.Item>
+                  </Show>
                   <Menu.Item context={menu} onSelect={() => navigate(worktreePath(scope.projectId(), item.key))}>View worktree</Menu.Item>
                 </>}
               </RowActions>}>
@@ -132,6 +147,9 @@ export function WorktreeDetail() {
         <SectionHeader>Tasks</SectionHeader>
         <For each={row().owners}>{(owner) => <Button variant="ghost" onPress={() => openTask(owner.id)}>{owner.title} · Open task</Button>}</For>
         <Text emphasis="muted">Archive the owning task through Acorn to remove its checkout.</Text>
+      </Show>
+      <Show when={!row().owners.length && !row().main && !row().missing && !row().locked && row().branch}>
+        <Button onPress={() => requestTaskLaunch({ nodeId: activeNodeId(), projectId: scope.projectId(), title: row().branch!, worktreePath: row().path })}>Attach to task</Button>
       </Show>
       <Show when={failure()}><Alert>{failure()}</Alert></Show>
       <Show when={!row().main && !row().locked && !row().owners.length && (row().prunable || row().dirty === false)}>

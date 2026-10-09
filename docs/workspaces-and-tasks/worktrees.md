@@ -21,6 +21,12 @@ base's checkout don't carry over, and remote-only branches aren't accepted. With
 `git worktree add -b` starts from the project folder's `HEAD`. A remote-tracking ref such as
 `origin/main` doesn't take precedence over local commits.
 
+A Git history row can seed a task with a full commit ID, including a historical or root commit.
+The form shows the pinned ID and creates a branch from that object, even if the source branch moves
+while the form is open. Git verifies the object is a commit before reservation. An attachment must
+still be a registered, unclaimed worktree when the Node saves the task. Ownership includes tasks
+reached through another project mapping of the same checkout.
+
 If another worktree or the project checkout has the task's branch checked out, Git refuses. acorn
 reports the occupied branch and path from Git's worktree roster and leaves that checkout alone.
 Release the branch there, then reopen the task to retry. Setup runs only after creation succeeds.

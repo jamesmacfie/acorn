@@ -16,8 +16,9 @@ if (graph.entry !== 'main.js' || !graph.roots.includes(graph.entry) || !graph.ch
 // metric in October 2026; external runtime packages are reported separately, never hidden as bytes.
 // Phase 01's Git roster stays behind the first frame. Shared-chunk reshaping raised the measured
 // pre-render closure to 729,573 B on October 9, 2026, including the terminal project lookup but
-// without putting Git modules in that closure.
-const CEILING = 730_000
+// without putting Git modules in that closure. Phase 05's task-launch request adds a small
+// signal and terminal overlay dispatch before render; the form, Git rows, and Workflows stay lazy.
+const CEILING = 732_000
 const DENYLIST = ['shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes', 'drizzle-orm', 'RemoteTree-', 'TreeHost-', 'roster-']
 
 const closure = new Set()

@@ -151,13 +151,15 @@ Workspace and project routes are device-only. Task tokens reach only their own t
 gated: a task token gets its own task and nothing else.
 
 `POST /v1/core/tasks` takes `origin` and `projectId`, plus optional `title`, `icon`, `branch`,
-`branchSource`, `baseBranch`, `worktreePath`, `skipSetup`, `pullNumber`, and `links`. `branchSource`
-is `exact` by default, and `derived` lets the Node add a numeric suffix on a collision. `baseBranch`
-must name a local branch, needs a task branch, and can't be combined with `worktreePath`. The Node
-creates the branch from that base's last commit before saving the task, and removes it if the insert
-fails. Worktree creation stays lazy. With a base, every local branch name counts as taken. Without
-one, an unused local branch can be reused. A bad base returns 400, and an exact name conflict returns
-a `worktree-unavailable` 409.
+`branchSource`, `baseBranch`, `baseCommit`, `worktreePath`, `skipSetup`, `pullNumber`, and `links`.
+`branchSource` is `exact` by default; `derived` lets the Node add a numeric suffix on a collision.
+Choose at most one of `baseBranch`, `baseCommit`, and `worktreePath`. A base needs a task branch.
+`baseBranch` names a local branch. `baseCommit` is a full SHA-1 or SHA-256 object ID for a commit
+available in the target repository. The Node creates the task branch from the captured commit before
+saving the task, and removes it if the insert fails. Worktree creation stays lazy. With a base, every
+local branch name counts as taken. Without one, an unused local branch can be reused. A bad base
+returns 400, and an exact name conflict returns a `worktree-unavailable` 409. Attachment rechecks
+Git registration and active task ownership under the task reservation before saving.
 
 `GET /v1/core/projects/:id/branches` returns
 `{ current, tasks: [{ branch, taskId, title }], other: [{ name, committedAt }] }`. `current` is the
@@ -165,7 +167,7 @@ checkout branch, or `null` for a detached HEAD. `committedAt` is Unix time in mi
 project returns empty groups.
 
 `GET /v1/core/projects/:id/worktree-availability` takes `branch` and optional `branchSource` and
-`baseBranch` query parameters. It returns `{ available: true, branch }`, with the next free name for a
+`baseBranch` or `baseCommit` query parameters. It returns `{ available: true, branch }`, with the next free name for a
 derived request, or `{ available: false, branch, reason }`. The preview doesn't reserve the name.
 
 Executable repository configuration is hash-gated before use

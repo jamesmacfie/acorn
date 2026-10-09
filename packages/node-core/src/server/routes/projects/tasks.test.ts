@@ -312,6 +312,39 @@ describe('creating a task on an existing worktree', () => {
     expect((await create(join(dir, 'detached'))).status).toBe(409)
   })
 
+  it('refuses a linked checkout owned through another project mapping', async () => {
+    const originalProject = (await t.db.select().from(schema.projects))[0]!
+    expect(await unclaimedWorktrees(t.db, originalProject)).toHaveLength(1)
+    const now = Date.now()
+    await t.db.insert(schema.projects).values({
+      id: 'alias', name: 'alias', path: worktree, workspaceId: 'w1', sort: 1, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
+    await t.db.insert(schema.tasks).values({ id: 'owned-by-alias', title: 'Folder task', origin: 'local', projectId: 'alias',
+      branch: null, worktreePath: null, status: 'active', createdAt: now, updatedAt: now })
+    const project = (await t.db.select().from(schema.projects).where(eq(schema.projects.id, 'p')))[0]!
+    expect(await unclaimedWorktrees(t.db, project)).toEqual([])
+    expect((await create(worktree)).status).toBe(409)
+  })
+
+  it('serializes competing attachments to one registration', async () => {
+    expect(await unclaimedWorktrees(t.db, (await t.db.select().from(schema.projects))[0]!)).toHaveLength(1)
+    const responses = await Promise.all([create(worktree), create(worktree)])
+    expect(responses.map((response) => response.status).sort(), JSON.stringify(await Promise.all(responses.map((response) => response.clone().json())))).toEqual([200, 409])
+    expect(await t.db.select().from(schema.tasks)).toHaveLength(1)
+  })
+
+  it('rejects an attachment when the project points to a different repository after preview', async () => {
+    const project = (await t.db.select().from(schema.projects))[0]!
+    expect(await unclaimedWorktrees(t.db, project)).toHaveLength(1)
+    const other = join(dir, 'other-repository')
+    execFileSync('git', ['init', '-q', '-b', 'main', other])
+    await t.db.update(schema.projects).set({ path: other }).where(eq(schema.projects.id, 'p'))
+    expect((await create(worktree)).status).toBe(409)
+    expect(await t.db.select().from(schema.tasks)).toHaveLength(0)
+  })
+
   const createBranch = (branch: string) => app.request('http://acorn.test/api/tasks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -391,6 +424,39 @@ describe('creating a task on an existing worktree', () => {
     expect((await unclaimedWorktrees(t.db, (await t.db.select().from(schema.projects))[0]!)).map((tree) => tree.branch)).not.toContain('new-child')
   })
 
+  it('pins a historical commit even when its source branch moves, including the root', async () => {
+    const root = revision('main')
+    execFileSync('git', ['-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'new tip'], { cwd: join(dir, 'checkout') })
+    const tip = revision('main')
+    expect(tip).not.toBe(root)
+    const created = await createSeed({ branch: 'historical', baseCommit: root })
+    expect(created.status).toBe(200)
+    expect(revision('historical')).toBe(root)
+    expect(await created.json()).toMatchObject({ worktreePath: null })
+  })
+
+  it('validates full available commit objects and one starting mode before saving', async () => {
+    const root = revision('main')
+    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: join(dir, 'checkout'), input: 'not a commit', encoding: 'utf8' }).trim()
+    for (const baseCommit of ['abc', '0'.repeat(root.length), root.toUpperCase(), blob]) {
+      expect((await createSeed({ branch: 'invalid-commit', baseCommit })).status).toBe(400)
+    }
+    expect((await createSeed({ branch: 'both', baseBranch: 'main', baseCommit: root })).status).toBe(400)
+    expect((await createSeed({ branch: 'both', worktreePath: worktree, baseCommit: root })).status).toBe(400)
+    expect((await createSeed({ baseCommit: root })).status).toBe(400)
+    expect(await t.db.select().from(schema.tasks)).toEqual([])
+  })
+
+  it('deduplicates derived names and refuses exact names for a pinned commit', async () => {
+    const root = revision('main')
+    execFileSync('git', ['branch', '--', 'pinned'], { cwd: join(dir, 'checkout') })
+    expect((await createSeed({ branch: 'pinned', branchSource: 'exact', baseCommit: root })).status).toBe(409)
+    const created = await createSeed({ branch: 'pinned', branchSource: 'derived', baseCommit: root })
+    expect(created.status).toBe(200)
+    expect(await created.json()).toMatchObject({ branch: 'pinned-2' })
+    expect(revision('pinned-2')).toBe(root)
+  })
+
   it('keeps branch creation lazy when no base is supplied', async () => {
     expect((await createSeed({ branch: 'lazy-child' })).status).toBe(200)
     expect(() => revision('lazy-child')).toThrow()
@@ -461,6 +527,13 @@ describe('creating a task on an existing worktree', () => {
     expect(created.status).toBe(500)
     if (withBase) expect(() => revision('save-fails')).toThrow()
     else expect(revision('save-fails')).toBe(revision('main'))
+  })
+
+  it('rolls back a pinned branch when the task row cannot be saved', async () => {
+    vi.spyOn(t.db, 'insert').mockImplementation(() => { throw new Error('insert failed') })
+    const created = await createSeed({ branch: 'pinned-save-fails', baseCommit: revision('main') })
+    expect(created.status).toBe(500)
+    expect(() => revision('pinned-save-fails')).toThrow()
   })
 
   it('allows a branch that exists without a worktree and branchless tasks', async () => {

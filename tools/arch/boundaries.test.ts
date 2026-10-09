@@ -620,7 +620,7 @@ describe('architecture boundaries', () => {
       // `features/editor/documentCustody.ts`, merged in from perf. One more on 2026-10-06 for
       // `kit/lib/ansi`, so the terminal kit's CodeBlock strips escape codes without that barrel.
       // The address parser is a pure leaf for the terminal before its renderer host connects.
-      '@acorn/client-core': 173, // Includes the no-projects surface, workspace rail, and device preference reader.
+      '@acorn/client-core': 175, // Phase 05 exposes a lean task launch signal and lazy draft model to both hosts.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.

@@ -3,6 +3,7 @@ import { checkoutAdmissionFor } from '../../core/checkoutAdmission'
 import { taskScripts } from '../../taskScripts/service'
 import { taskArchiveTree } from '../../storage/archive'
 import { randomUUID } from 'node:crypto'
+import { realpathSync } from 'node:fs'
 import { z } from 'zod'
 import { and, desc, eq, inArray, max } from 'drizzle-orm'
 import { getDb, schema } from '../../db'
@@ -21,7 +22,6 @@ import { integrationProviderRegistry } from '../../integrations/registry'
 import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, type ProjectRow } from '../../projects'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
-import { resolve } from 'node:path'
 import { saveTaskBranch, TaskBranchError, withBranchReservation } from '../../worktrees/taskBranch'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
@@ -82,6 +82,7 @@ const taskSeedBody = z.object({
   branch: z.string().optional(),
   branchSource: z.enum(['derived', 'exact']).optional(),
   baseBranch: z.string().min(1).optional(),
+  baseCommit: z.string().min(1).optional(),
   worktreePath: z.string().min(1).optional(),
   skipSetup: z.boolean().optional(),
   pullNumber: z.int().positive().optional(),
@@ -192,15 +193,8 @@ export const tasks = new Hono<AppEnv>()
     // because resolveTaskCwd only runs it for a worktree it created.
     let worktreePath: string | null = null
     let attachedBranch: string | null = null
-    if (seed.worktreePath && seed.baseBranch !== undefined) return respondError(c, 400, 'bad_request', ['A base branch cannot be used with an existing worktree.'])
-    if (seed.worktreePath) {
-      if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
-      const wanted = resolve(seed.worktreePath)
-      const match = (await unclaimedWorktrees(db, project)).find((wt) => resolve(wt.path) === wanted)
-      if (!match) return respondError(c, 409, 'worktree-unavailable', ['That worktree is not a free worktree of this project.'])
-      worktreePath = match.path
-      attachedBranch = match.branch
-    }
+    if (Number(seed.baseBranch !== undefined) + Number(seed.baseCommit !== undefined) + Number(seed.worktreePath !== undefined) > 1) return respondError(c, 400, 'bad_request', ['Choose one starting point or existing worktree.'])
+    if (seed.worktreePath && isTaskConfined(c)) return respondError(c, 403, 'forbidden')
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
     const now = Date.now()
     const id = randomUUID()
@@ -229,9 +223,23 @@ export const tasks = new Hono<AppEnv>()
       return allocatedBranch
     }
     try {
-      branch = await withBranchReservation(db, async () => worktreePath
-        ? save(branch)
-        : saveTaskBranch(db, project, { branch, branchSource: seed.branchSource, baseBranch: seed.baseBranch }, save))
+      branch = await withBranchReservation(db, async () => {
+        const currentProject = await getProject(db, seed.projectId)
+        if (!currentProject || currentProject.path !== project.path || currentProject.vcs !== project.vcs) {
+          throw new TaskBranchError(409, 'The project mapping changed. Reopen the task draft.')
+        }
+        if (seed.worktreePath) {
+          let wanted: string
+          try { wanted = realpathSync(seed.worktreePath) }
+          catch { throw new TaskBranchError(409, 'That worktree is no longer registered on this project.') }
+          const match = (await unclaimedWorktrees(db, currentProject)).find((wt) => realpathSync(wt.path) === wanted)
+          if (!match) throw new TaskBranchError(409, 'That worktree is not a free worktree of this project.')
+          worktreePath = match.path
+          attachedBranch = match.branch
+          return save(attachedBranch)
+        }
+        return saveTaskBranch(db, currentProject, { branch, branchSource: seed.branchSource, baseBranch: seed.baseBranch, baseCommit: seed.baseCommit }, save)
+      })
     } catch (error) {
       if (error instanceof TaskBranchError) return respondError(c, error.status, error.status === 400 ? 'bad_request' : 'worktree-unavailable', [error.message])
       throw error
