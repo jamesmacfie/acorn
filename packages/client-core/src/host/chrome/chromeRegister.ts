@@ -164,6 +164,7 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
   // `openPane` allowlist from the same declaration.
   const surfaces = declaredSurfaces(contributions)
   const taskPanes = surfaces.panes
+  const refPanels = new Set(frames.filter((surface) => surface.target === 'refPanel').map((surface) => surface.id))
 
   // Which of the four kinds each one is, whether this device can honour it, and whether its parent is a
   // group of the same plugin's are all ./chromeCommands.ts: the same file builds the contribution, so
@@ -366,6 +367,13 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
     // nothing: none of the three names a surface, so there is nothing here to hold them to.
     if (descriptor.surface !== undefined && !surfaceIds.has(descriptor.surface)) {
       log.warn(`${pluginId} extension point '${descriptor.id}' names an undeclared surface '${descriptor.surface}'`, undefined, { 'plugin.id': pluginId })
+      continue
+    }
+    // A detail region mounts on one of this manifest's own project panes or reference panels, so a point
+    // can never place itself on another plugin's view (docs/plugins/detail-regions.md).
+    const strayMount = descriptor.mounts?.find((mount) => !surfaces.projectPanes.has(mount.surface) && !refPanels.has(mount.surface))
+    if (strayMount) {
+      log.warn(`${pluginId} extension point '${descriptor.id}' mounts on '${strayMount.surface}', which is not one of its project panes or reference panels`, undefined, { 'plugin.id': pluginId })
       continue
     }
     add('extension point', descriptor.id, () => registerPluginExtensionPoint(pluginId, descriptor, pointBinding))

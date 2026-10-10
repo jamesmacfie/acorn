@@ -172,5 +172,18 @@ export default {
       onSelect: { verb: 'navigate', surface: 'linear-issue' },
     }],
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+l', when: 'task' }],
+    // Room above the ticket for another plugin's badge or short section, on the project detail and the
+    // reference panel. The host draws it outside this plugin's tree and mounts it with the ticket's
+    // identifier, so a contributor reads its own data and never sees this plugin's
+    // (docs/plugins/detail-regions.md). Not on the task pane: which ticket that pane shows can change
+    // inside its tree, where the host cannot see it.
+    extensionPoints: [{
+      id: 'issue-summary',
+      label: 'Issue summary',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
+      mounts: [{ surface: 'linear-issue', region: 'header' }, { surface: 'linear-ref', region: 'header' }],
+    }],
   },
 }

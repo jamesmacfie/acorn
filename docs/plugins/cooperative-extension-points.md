@@ -113,7 +113,8 @@ as newly requested.
 
 Silence is right for a user and hard for an author, because a typo in `point` produces an empty pane.
 **Settings > Advanced > Extension points** lists every point on this Node with its kind, mode, and
-contributors. A `stack` point shows its cap, and a point with owner actions names them. Each
+contributors. A `stack` point shows its cap, a point with owner actions names them, and a point with
+[`mounts`](./detail-regions.md) says where the host draws it. Each
 contributor shows its `matches` patterns, and the reason its tree last failed this session, because
 a failed tree draws nothing. The page also lists every contribution whose point nobody declares,
 with a nearest-name suggestion, and the picker for a tied `replace` slot. It reads the same

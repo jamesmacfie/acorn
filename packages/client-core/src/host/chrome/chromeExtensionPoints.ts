@@ -9,11 +9,13 @@
 // cross. See docs/plugins/cooperative-extension-points.md § Cooperative extension points for what the host binds over what a
 // manifest can state, and for why no component, callback, or DOM crosses the seam.
 import {
+  DETAIL_REGIONS,
   isExtensionPointKind,
   isExtensionPointLocation,
   parseExtensionPointRef,
   qualifiedExtensionPointId,
   type ArbitrationMode,
+  type DetailRegion,
   type ExtensionPointKind,
 } from '@acorn/protocol/extensionPoints.ts'
 import type { PluginExtensionDescriptor, PluginExtensionPointDescriptor } from '@acorn/protocol/plugin/contract.ts'
@@ -71,6 +73,15 @@ export function pluginExtensionPoint(
   if (kind === 'annotation' && !descriptor.key) {
     throw new Error(`annotation point '${descriptor.id}' does not say what its items are keyed by`)
   }
+  // Which surface each mount names is checked where it is drawn: register.ts reads mounts only off the
+  // owner's own surfaces, so a point cannot reach another plugin's view.
+  if (descriptor.mounts && kind !== 'remote') {
+    throw new Error(`extension point '${descriptor.id}' is a '${kind}' point, and only a remote point mounts in a detail region`)
+  }
+  const unknownRegion = descriptor.mounts?.find((mount) => !(DETAIL_REGIONS as readonly string[]).includes(mount.region))
+  if (unknownRegion) {
+    throw new Error(`extension point '${descriptor.id}' names an unknown detail region '${unknownRegion.region}'`)
+  }
   return {
     id: qualifiedExtensionPointId(pluginId, descriptor.id),
     ownerId: pluginId,
@@ -89,6 +100,9 @@ export function pluginExtensionPoint(
     // one is the owner's business at draw time, and the host checks both before it forwards a request
     // (../tree/Slot.tsx).
     ...(descriptor.actions?.length ? { actions: [...descriptor.actions] } : {}),
+    ...(descriptor.mounts?.length
+      ? { mounts: descriptor.mounts.map(({ surface, region }) => ({ surface, region: region as DetailRegion })) }
+      : {}),
     when: () => binding.enabled(),
   }
 }

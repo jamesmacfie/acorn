@@ -4,6 +4,7 @@ import { regionScope } from '../../features/dashboards/region'
 import { taskById } from '../../features/tasks/taskLookup'
 import ExtensionPointHost from './ExtensionPointHost'
 import { InlineSlot } from '../frames/InlineSlot'
+import { DetailRegion } from './DetailRegion'
 import type { ExtendedPaneProps } from './extendedPane'
 import './extension-points.css'
 
@@ -21,6 +22,9 @@ export default function ExtendedPane(props: ExtendedPaneProps) {
   return (
     <div class="extended-pane" {...(props.aside ? { 'data-aside': '' } : {})}>
       <div class="extended-pane-main">
+        <Show when={props.detail?.headerPointId}>
+          {(pointId) => <DetailRegion point={pointId()} region="header" subject={props.detail!.subject} />}
+        </Show>
         {/* The owner's own rectangle and the one it reserved beside it, as siblings the host sits
             between. Neither can reach into the other. */}
         <div class="extended-pane-frame">
@@ -29,6 +33,9 @@ export default function ExtendedPane(props: ExtendedPaneProps) {
             {(pointId) => <InlineSlot point={pointId()} {...scope()} />}
           </Show>
         </div>
+        <Show when={props.detail?.footerPointId}>
+          {(pointId) => <DetailRegion point={pointId()} region="footer" subject={props.detail!.subject} />}
+        </Show>
         <Show when={props.inlineBelowPointId}>
           {(pointId) => <InlineSlot point={pointId()} {...scope()} />}
         </Show>

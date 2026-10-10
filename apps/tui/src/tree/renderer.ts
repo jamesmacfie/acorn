@@ -208,10 +208,13 @@ export function Dynamic<T extends Record<string, unknown>>(
   props: T & { component: ((props: T) => SolidJSX.Element) | undefined },
 ): SolidJSX.Element {
   const [own, rest] = splitProps(props, ['component'])
+  // The choice in a memo of its own, as `solid-js/web`'s `Dynamic` keeps it. Reading `own.component`
+  // can track a spread source's other props, so without it a prop change remounted the component.
+  const chosen = createMemo(() => own.component)
   return createMemo(() => {
-    const chosen = own.component
+    const component = chosen()
     // Untracked, so the chosen component's own reads belong to its own owner rather than to this memo.
-    return chosen ? untrack(() => createComponent(chosen as unknown as (props: T) => Node, rest as unknown as T)) : undefined
+    return component ? untrack(() => createComponent(component as unknown as (props: T) => Node, rest as unknown as T)) : undefined
   }) as unknown as SolidJSX.Element
 }
 

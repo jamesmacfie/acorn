@@ -1,7 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
-import type { ExtendedPaneProps } from '@acorn/client-core/host/chrome'
-import { ExtensionRows, InlineSlot } from '../kit/host'
+import { detailMountKey, type DetailRegions, type ExtendedPaneProps } from '@acorn/client-core/host/chrome'
+import { ExtensionRows, InlineSlot, Slot } from '../kit/host'
 import { Line } from '../kit/cells'
 
 // A plugin pane that reserved part of its rectangle for somebody else, in cells.
@@ -18,7 +18,9 @@ import { Line } from '../kit/cells'
 export function ExtendedPane(props: ExtendedPaneProps) {
   return (
     <box flexDirection="column" flexGrow={1}>
+      <Show when={props.detail?.headerPointId}>{(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}</Show>
       {props.children}
+      <Show when={props.detail?.footerPointId}>{(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}</Show>
       {/* Two rectangles that need pixels, each named on one line so a reader knows the box was
           reserved and why it is empty (../kit/host.tsx § InlineSlot, docs/tui/rectangles.md § Rectangles). */}
       <Show when={props.inlineBesidePointId}>{(pointId) => <InlineSlot point={pointId()} />}</Show>
@@ -32,5 +34,26 @@ export function ExtendedPane(props: ExtendedPaneProps) {
         {(aside) => <Line role="muted">{`${aside().pointId} is a dashboard, so it is not drawn here.`}</Line>}
       </Show>
     </box>
+  )
+}
+
+/** A region the owner mounted above or below its detail view, in cells. The same mount rule as the
+ *  desktop's (client-core/host/chrome/DetailRegion.tsx), and capped at a third of the pane so the
+ *  owner's view keeps its rows on a short terminal. Draws nothing when nobody fills it. */
+function DetailRegion(props: { point: string; detail: DetailRegions }) {
+  const subject = () => props.detail.subject()
+  return (
+    <Show when={detailMountKey(subject())} keyed>
+      {(_key) => (
+        <box flexDirection="column" flexShrink={0} maxHeight="30%" overflow="hidden">
+          <Slot
+            point={props.point}
+            props={subject}
+            {...(subject().taskId ? { taskId: subject().taskId } : {})}
+            {...(subject().projectId ? { projectId: subject().projectId } : {})}
+          />
+        </box>
+      )}
+    </Show>
   )
 }

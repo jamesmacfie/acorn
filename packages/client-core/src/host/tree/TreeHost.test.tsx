@@ -5,6 +5,7 @@ import { TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { TreeHost, type TreeTransport } from './TreeHost'
 import { mintSlotRef, NestedChromeSlot, WithNestedChromeSlots } from '../plugins/NestedChromeSlot'
+import { extensionPointRegistry, extensionRegistry } from '../registries/extensionPoints/extensionPoints'
 
 // The host half. Every test here is a stranger's message going in and the shell's own DOM coming out,
 // which is the only property the remote root has to have: a tree names components, and what it gets is
@@ -78,6 +79,30 @@ describe('a tree becomes the host’s own components', () => {
     h.apply([{ op: 'patch', id: 'slot', props: { slotRef: 'forged' } }])
     await frame()
     expect(host.querySelector('[data-task-list]')).toBeNull()
+  })
+
+  it('opens no cooperative point a tree names, so a detail region’s contributor cannot nest another', async () => {
+    // Detail regions are drawn by the host beside the owner's tree (docs/plugins/detail-regions.md).
+    // A tree that emits a `Slot` with a point, the way an owner's own code would, gets nothing.
+    const point = extensionPointRegistry.register({ id: 'tracker:issue-summary', ownerId: 'tracker', label: 'Summary', kind: 'remote', mode: 'stack', max: 2 })
+    const nested = extensionRegistry.register({
+      id: 'plugin:widgets:summary', pluginId: 'widgets', point: 'tracker:issue-summary', label: 'Widgets', order: 500,
+      carrier: 'component', component: () => <span data-nested>nested</span>,
+    })
+    try {
+      const h = harness()
+      h.mount()
+      h.apply([{ op: 'insert', parent: null, index: 0, node: node('card', 'Card', {}, [
+        node('slot', 'Slot', { point: 'tracker:issue-summary' }),
+        node('t', '#text', { value: 'owner' }),
+      ]) }])
+      await frame()
+      expect(host.textContent).toContain('owner')
+      expect(host.querySelector('[data-nested]')).toBeNull()
+    } finally {
+      nested.dispose()
+      point.dispose()
+    }
   })
 
   it('mounts the components a batch names', async () => {

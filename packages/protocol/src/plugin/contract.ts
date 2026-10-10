@@ -330,9 +330,11 @@ export type PluginContextMenuDescriptor = Omit<z.infer<typeof contextMenuDescrip
 // above: the client re-checks both against its own copy of the vocabulary before registering anything,
 // and a newer node's kind must not be coerced into one this shell has a host for.
 export type PluginExtensionPointDescriptor =
-  & Omit<z.infer<typeof extensionPointDescriptor>, 'kind' | 'location' | 'panels' | 'key' | 'mode' | 'allows' | 'order' | 'max' | 'timeoutMs' | 'onTimeout' | 'collect'>
+  & Omit<z.infer<typeof extensionPointDescriptor>, 'kind' | 'location' | 'panels' | 'key' | 'mode' | 'allows' | 'order' | 'max' | 'timeoutMs' | 'onTimeout' | 'collect' | 'mounts'>
   & {
     kind: string
+    // `region` is wider for the reason `kind` is: the client re-checks it before mounting anything.
+    mounts?: { surface: string; region: string }[]
     location?: string
     panels?: PluginPanelRegion
     key?: Record<string, string>

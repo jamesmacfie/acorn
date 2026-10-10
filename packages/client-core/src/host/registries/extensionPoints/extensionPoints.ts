@@ -7,6 +7,7 @@ import {
   parseExtensionPointRef,
   takesPluginExtensions,
   type ArbitrationMode,
+  type DetailRegion,
   type ExtensionPointKind,
   type ExtensionPointLocation,
   type PluginAnnotationKey,
@@ -48,6 +49,9 @@ export type ExtensionPointContribution = {
    *  owner). Names only. The owner binds a handler of the same name on each `Slot` it draws, and the
    *  host refuses a request missing from either list, so declaring one here grants nothing on its own. */
   actions?: readonly string[]
+  /** `remote` only: the owner's own detail views the host mounts this point above or below
+   *  (docs/plugins/detail-regions.md). Shown on the developer view. */
+  mounts?: readonly { surface: string; region: DetailRegion }[]
   /** The platform question, the same field every host-filtered contribution takes
    *  (../hostCapabilities.ts). */
   requires?: HostCapabilityRequirement

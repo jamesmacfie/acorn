@@ -7,6 +7,8 @@ import type { FrameBinding } from './broker'
 import { Toolbar } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import RefPanelTaskLink from '../components/RefPanelTaskLink'
+import { DetailRegion } from '../chrome/DetailRegion'
+import type { DetailRegions } from '../chrome/extendedPane'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { restoreFocusOnCleanup } from '../../kit/keys/trap'
 
@@ -35,6 +37,9 @@ export type PluginRefPanelProps = {
    *  components rather than the plugin's rectangle. The box around it does not change, which is the
    *  whole reason a panel could move paths without anything else moving with it. */
   tree?: RemoteContribution
+  /** The remote points this panel's owner mounted above and below its body (`mounts`). Their
+   *  contributors get the panel's own reference and no task or project. */
+  detail?: DetailRegions
 }
 
 export default function PluginRefPanel(props: PluginRefPanelProps) {
@@ -67,6 +72,9 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
           <Toolbar.Spacer />
           <IconButton icon="x" label="Close" onPress={props.onClose} />
         </header>
+        <Show when={props.detail?.headerPointId}>
+          {(pointId) => <DetailRegion point={pointId()} region="header" subject={props.detail!.subject} />}
+        </Show>
         <Show
           when={props.tree}
           fallback={<PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />}
@@ -78,6 +86,9 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
               scope={() => ({ item: props.displayId })}
             />
           )}
+        </Show>
+        <Show when={props.detail?.footerPointId}>
+          {(pointId) => <DetailRegion point={pointId()} region="footer" subject={props.detail!.subject} />}
         </Show>
         {/* Host-drawn, below the frame rather than inside it. Creating a task is a core write that makes a
             worktree, and a plugin that drew this itself would need `core.tasks:write` for its whole life

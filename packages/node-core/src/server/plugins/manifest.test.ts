@@ -1750,6 +1750,49 @@ describe('the five kinds', () => {
   })
 })
 
+describe('detail region mounts', () => {
+  const REF_PANEL = { target: 'refPanel', id: 'board-ref', label: 'Card', providerId: 'board', layout: 'single', regions: { body: 'frame' } }
+  const project = { frames: [{ ...PANE, id: 'board-tasks' }, PROJECT_PANE, REF_PANEL], routes: [PROJECT_ROUTE], sources: [PROJECT_SOURCE] }
+  const summary = (mounts: unknown, over: Record<string, unknown> = {}) =>
+    ({ id: 'summary', label: 'Summary', kind: 'remote', mode: 'stack', max: 2, mounts, ...over })
+
+  it('mounts a remote point above a project pane and a reference panel of its own', () => {
+    const parsed = manifest({ ...project, extensionPoints: [summary([
+      { surface: 'board-card', region: 'header' },
+      { surface: 'board-ref', region: 'header' },
+    ])] })
+    expect(messages(parsed)).toEqual([])
+    expect(parsed.success && parsed.data.contributions.extensionPoints[0]!.mounts).toHaveLength(2)
+  })
+
+  it('refuses a surface this manifest does not declare, which is how another plugin\u2019s view is refused', () => {
+    expect(messages(manifest({ ...project, extensionPoints: [summary([{ surface: 'linear-issue', region: 'header' }])] })))
+      .toContain("mounts names 'linear-issue', which this manifest does not declare as a pane or reference panel")
+  })
+
+  it('refuses a task pane until it has a selection contract', () => {
+    expect(messages(manifest({ ...project, extensionPoints: [summary([{ surface: 'board-tasks', region: 'footer' }])] })))
+      .toContain("'board-tasks' is a task pane; detail regions mount on project panes and reference panels")
+  })
+
+  it('refuses two points in one region of one surface', () => {
+    const mounts = [{ surface: 'board-card', region: 'header' }]
+    expect(messages(manifest({ ...project, extensionPoints: [summary(mounts), summary(mounts, { id: 'other' })] })))
+      .toContain("'board-card' already has an extension point mounted at 'header'")
+    // The other region of the same surface is a separate placement.
+    expect(manifest({ ...project, extensionPoints: [summary(mounts), summary([{ surface: 'board-card', region: 'footer' }], { id: 'other' })] }).success)
+      .toBe(true)
+  })
+
+  it('refuses mounts on any kind but remote, an unknown region, and more than eight', () => {
+    expect(messages(manifest({ ...project, extensionPoints: [{ id: 'rows', label: 'Rows', location: 'pane.footer', surface: 'board-tasks', mounts: [{ surface: 'board-card', region: 'header' }] }] })))
+      .toContain("mounts is not read on a 'rows' extension point")
+    expect(manifest({ ...project, extensionPoints: [summary([{ surface: 'board-card', region: 'aside' }])] }).success).toBe(false)
+    const nine = Array.from({ length: 9 }, () => ({ surface: 'board-card', region: 'header' }))
+    expect(manifest({ ...project, extensionPoints: [summary(nine)] }).success).toBe(false)
+  })
+})
+
 describe('the exclusive slot', () => {
   const coreSlot = (over: Record<string, unknown> = {}) =>
     ({ target: 'coreSlot', id: 'board-rail', label: 'Board task list', coreSlot: 'rail.taskList', ...over })

@@ -430,6 +430,12 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '  stepId, kind, status, inputs, inputsTruncated, output, outputTruncated, tail?, revision }`: the',
     '  stored JSON parsed, `null` past 64 KiB with its flag set, and up to 200 live lines. No actions; the',
     '  run pane keeps Retry, Stop, errors and gates. Read anything more from your own route.',
+    'A loaded owner can reserve a detail region: a `remote` point with `mounts: [{ surface, region }]`,',
+    '  `region` `header` or `footer`, `surface` one of YOUR `scope: "project"` panes or `refPanel`s, up to',
+    '  eight. The host draws the point above or below that view, outside your tree, so you write no `Slot`.',
+    '  Contributors get `{ projectId?, item?, refId?, surface }`, never your data. Linear opens',
+    '  `linear:issue-summary` (`linear-issue`, `linear-ref`) and Rollbar `rollbar:item-summary`',
+    '  (`rollbar-item`), both `stack` up to two.',
     '',
     `**Replacing a core surface.** A \`coreSlot\` frame offers to draw one of acorn's own: `
       + `${manifest.coreSlots.map((value) => `\`${value}\``).join(', ')}. Declare `

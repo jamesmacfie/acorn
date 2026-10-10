@@ -386,6 +386,72 @@ test('a pane that reserved a footer draws the rows delivered into it', async () 
   }
 }, 30_000)
 
+test('a project view’s detail regions draw above and below it, capped, and only with an item', async () => {
+  // The terminal half of docs/plugins/detail-regions.md: the same mount rule and the same arbitration
+  // as the desktop, in reading order around the owner's own view, at a narrow width.
+  const { createSignal } = await import('solid-js')
+  const { extensionPointRegistry, extensionRegistry } = await import('@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts')
+  const { ExtendedPane } = await import('./ExtendedPane')
+  const mounts: string[] = []
+  const point = (id: string) => extensionPointRegistry.register({ id, ownerId: 'tracker', label: id, kind: 'remote' as const, mode: 'stack' as const, max: 2 })
+  const contributor = (pluginId: string, pointId: string) => extensionRegistry.register({
+    id: `plugin:${pluginId}:${pointId}`,
+    pluginId,
+    point: pointId,
+    label: pluginId,
+    order: 500,
+    carrier: 'component' as const,
+    component: (props: { item?: string }) => {
+      mounts.push(pluginId)
+      return <Text>{`${pluginId} on ${props.item}`}</Text>
+    },
+  })
+  const registered = [
+    point('tracker:summary'), point('tracker:links'),
+    contributor('alpha', 'tracker:summary'), contributor('beta', 'tracker:summary'), contributor('gamma', 'tracker:summary'),
+    contributor('delta', 'tracker:links'),
+  ]
+  const [item, setItem] = createSignal<string | undefined>('ENG-1')
+  const detail = {
+    headerPointId: 'tracker:summary',
+    footerPointId: 'tracker:links',
+    subject: () => ({ projectId: 'p-1', surface: 'tracker-issue', ...(item() ? { item: item()! } : {}) }),
+  }
+
+  try {
+    const screen = await renderCells(() => (
+      <ExtendedPane detail={detail}>
+        <Text>the issue itself</Text>
+      </ExtendedPane>
+    ), { width: 40, height: 16 })
+    let lines = (await screen.frame()).text.split('\n')
+    const at = (text: string) => lines.findIndex((line) => line.includes(text))
+    expect(at('alpha on ENG-1')).toBeGreaterThanOrEqual(0)
+    expect(at('alpha on ENG-1')).toBeLessThan(at('the issue itself'))
+    expect(at('beta on ENG-1')).toBeLessThan(at('the issue itself'))
+    expect(at('gamma')).toBe(-1)
+    expect(at('1 more from other plugins')).toBeLessThan(at('the issue itself'))
+    expect(at('delta on ENG-1')).toBeGreaterThan(at('the issue itself'))
+
+    // A new item is a props update: nobody remounts.
+    const before = mounts.length
+    setItem('ENG-2')
+    lines = (await screen.frame()).text.split('\n')
+    expect(at('alpha on ENG-2')).toBeGreaterThanOrEqual(0)
+    expect(mounts).toHaveLength(before)
+
+    // No item, no regions, and the owner's view stays.
+    setItem(undefined)
+    lines = (await screen.frame()).text.split('\n')
+    expect(at('alpha')).toBe(-1)
+    expect(at('delta')).toBe(-1)
+    expect(at('the issue itself')).toBeGreaterThanOrEqual(0)
+    screen.done()
+  } finally {
+    for (const disposable of registered.reverse()) disposable.dispose()
+  }
+}, 30_000)
+
 // ── Two paths, one kit ────────────────────────────────────────────────────────────────────────────
 
 test('a tree drawn from a batch and the same tree written as JSX draw the same cells', async () => {

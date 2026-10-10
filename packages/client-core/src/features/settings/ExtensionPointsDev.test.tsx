@@ -127,4 +127,14 @@ describe('ExtensionPointsDev', () => {
     expect(text()).toContain('Docs button (docs) draws *.md, *.markdown.')
     expect(text()).toContain('Last failed: worker stopped answering')
   })
+
+  it('says where the host draws a point an owner mounted in a detail region', () => {
+    registered.push(extensionPointRegistry.register({
+      id: 'linear:issue-summary', ownerId: 'linear', label: 'Issue summary', kind: 'remote', mode: 'stack', max: 2,
+      mounts: [{ surface: 'linear-issue', region: 'header' }, { surface: 'linear-ref', region: 'header' }],
+    }))
+    dispose()
+    dispose = render(() => <ExtensionPointsDev />, host)
+    expect(text()).toContain('Drawn at the header of linear-issue, the header of linear-ref.')
+  })
 })

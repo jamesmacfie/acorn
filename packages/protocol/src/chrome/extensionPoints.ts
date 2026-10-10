@@ -371,6 +371,30 @@ export const CORE_SECURITY_POINT = 'core:security'
  *  and `nodeId`, the node it is shown for. */
 export const CORE_PLUGIN_PAGE_POINT = 'core:plugin-page'
 
+/**
+ * Where a loaded owner may mount one of its own `remote` points: above or below one of its own detail
+ * views, outside the owner's tree (docs/plugins/detail-regions.md). The host draws both, so a worker
+ * never opens a slot inside another worker's tree.
+ */
+export const DETAIL_REGIONS = ['header', 'footer'] as const
+
+export type DetailRegion = (typeof DETAIL_REGIONS)[number]
+
+/** How many placements one point's `mounts` may list. */
+export const MAX_DETAIL_MOUNTS = 8
+
+/** What a contributor in a detail region is mounted with. `item` is the resource the owning surface
+ *  is showing, and `refId` is set on a reference panel, where it is the same reference. No provider
+ *  facts and no grants: a contributor reads its own data through its own routes. */
+export type DetailRegionProps = {
+  taskId?: string
+  projectId?: string
+  item?: string
+  refId?: string
+  /** The owner's surface id, so one contributor can tell a project view from a reference panel. */
+  surface: string
+}
+
 /** What a contributor to `agents:tool-card` is handed. JSON, because the same props reach a compiled
  *  component in this realm and a worker's tree over a port, and the two must be handed the same thing.
  *  That is why there is no "the reader toggled me" callback here: `defaultOpen` seeds the disclosure

@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { CONTEXT_MENU_FACTS, CONTEXT_MENU_LOCATIONS } from '@acorn/protocol/contextMenus.ts'
-import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS } from '@acorn/protocol/extensionPoints.ts'
+import { CORE_EXCLUSIVE_SLOTS, DETAIL_REGIONS, EXTENSION_POINT_LOCATIONS } from '@acorn/protocol/extensionPoints.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import { NODE_CORE_FACETS, scopeCore } from '../plugins/permissions.ts'
@@ -70,6 +70,12 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     }
     expect(renderPluginAuthoring(v)).toContain('{ message: { taskId,')
     expect(renderPluginAuthoring(v)).toContain('{ turn: { taskId, projectId, sessionId, turnId, status, revision } }')
+    // Detail regions: the field, every region, what a contributor is mounted with, and the two points.
+    for (const region of DETAIL_REGIONS) expect(renderPluginAuthoring(v)).toContain(`\`${region}\``)
+    expect(renderPluginAuthoring(v)).toContain('`mounts: [{ surface, region }]`')
+    expect(renderPluginAuthoring(v)).toContain('`{ projectId?, item?, refId?, surface }`')
+    expect(renderPluginAuthoring(v)).toContain('`linear:issue-summary`')
+    expect(renderPluginAuthoring(v)).toContain('`rollbar:item-summary`')
   })
 
   it('carries every manifest key, split on what the schema actually requires', () => {

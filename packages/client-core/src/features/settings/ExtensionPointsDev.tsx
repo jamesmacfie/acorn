@@ -79,6 +79,9 @@ export default function ExtensionPointsDev() {
                       {sentence(KIND_HELP[point.kind] ?? point.label)}{' '}
                       {filled().length ? `Used by ${filled().map((entry) => pluginLabel(entry.pluginId)).join(', ')}.` : 'Not used.'}
                       <Show when={point.actions?.length}>{` Contributors can ask it to: ${point.actions!.join(', ')}.`}</Show>
+                      <Show when={point.mounts?.length}>
+                        {` Drawn at ${point.mounts!.map((mount) => `the ${mount.region} of ${mount.surface}`).join(', ')}.`}
+                      </Show>
                     </Text>
                     {/* What each contributor answers to, and why its box is empty if its tree failed:
                         the two things an author can't see from the owner's screen. */}

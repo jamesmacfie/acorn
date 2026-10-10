@@ -24,6 +24,22 @@
 .extended-pane-frame { flex: 1 1 auto; min-height: 0; display: flex; }
 .extended-pane-frame > * { flex: 1 1 auto; min-width: 0; }
 
+/* A region a loaded owner mounted above or below its detail view (plugins/chrome/DetailRegion.tsx).
+   Capped and scrolled on its own, like the footer strip, so the owner's view keeps its height and its
+   own scrolling. Empty draws nothing, so a region nobody fills costs the owner no pixels. */
+.detail-region {
+  flex: 0 0 auto;
+  max-height: 30%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  padding: var(--space-2) var(--pane-pad);
+}
+.detail-region:empty { display: none; }
+.detail-region[data-region='header'] { border-bottom: var(--divider); }
+.detail-region[data-region='footer'] { border-top: var(--divider); }
+
 /* Another plugin's rectangle, beside or below the owner's (plugins/frames/InlineSlot.tsx). A sibling
    of the owner's frame, never an overlay on it: the host draws both and sits between them, and the
    rule is what makes the seam visible to a person looking at two plugins' UI at once. Half the width

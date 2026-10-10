@@ -57,6 +57,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `core:security` | `stack`, up to four | `{ nodeId }`. A section on **Settings > Security and backup**. Agents draws its instruction file check |
 | `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |
 | `core:link-preview` | `replace`, keyed by the normalized HTTPS URL | `{ url, label?, taskId?, projectId?, ref? }`. See [link previews](#link-previews) |
+| `linear:issue-summary`, `rollbar:item-summary` | `stack`, up to two | `{ surface, item?, refId?, projectId? }`. Above a loaded owner's detail view, drawn by the host. See [detail regions](./detail-regions.md) |
 
 Read `changes:push-actions` before you open a point of your own. It sits under the Changes pane's
 branch bar, and its props are the five scalars the bar draws. The Changes plugin can't say "pull
@@ -71,9 +72,8 @@ own worker.
 
 `agents:request-card` draws inside a request card while it waits on the person, below the card's own
 buttons. It decorates the card and never replaces it, so no contributor draws or presses an answer.
-The `requestId` is the one `agents:before-permission` and `agents.requests` name, so a policy plugin
-can draw why it let a risky request through. The `acorn-permission-policy` plugin does. A flow that needs the person to type a code
-isn't a note: it waits on a hook verdict that asks.
+The `requestId` is the one `agents:before-permission` and `agents.requests` name, so a policy plugin such as
+`acorn-permission-policy` can draw why it let a risky request through. A code the person types waits on a hook verdict that asks.
 
 The host gives the contributor's tree the owner's `taskId` and `projectId` as its scope, read-only.
 Without them, `openPane`, in-app `openUrl`, and task-scoped key bindings would have no task. The scope

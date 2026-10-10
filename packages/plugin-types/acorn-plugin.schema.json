@@ -2768,6 +2768,32 @@
                   "pattern": "^[a-z][a-zA-Z0-9]*$"
                 }
               },
+              "mounts": {
+                "minItems": 1,
+                "maxItems": 8,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "surface": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "region": {
+                      "type": "string",
+                      "enum": [
+                        "header",
+                        "footer"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "surface",
+                    "region"
+                  ]
+                }
+              },
               "payload": {
                 "type": "object",
                 "propertyNames": {

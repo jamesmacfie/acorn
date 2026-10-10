@@ -245,6 +245,35 @@ describe('cooperative extension points', () => {
     expect(pointIds()).toEqual([])
   })
 
+  it('registers a detail region mount only on the owner’s own project pane or reference panel', () => {
+    // The client's re-check of what the node refused at parse: a roster row is bytes a node sent.
+    const frames: PluginContributions['frames'] = [
+      { target: 'pane', id: 'tracker-issue', label: 'Issue', order: 500, scope: 'project', formFactor: ['desktop'] },
+      { target: 'refPanel', id: 'tracker-ref', label: 'Issue', providerId: 'tracker', order: 500, formFactor: ['desktop'] },
+      { target: 'pane', id: 'tracker', label: 'Tracker', order: 500, formFactor: ['desktop'] },
+    ] as PluginContributions['frames']
+    const summary = (id: string, over: Record<string, unknown>) =>
+      ({ id, label: 'Summary', kind: 'remote', mode: 'stack', max: 2, ...over })
+    _seedPluginDistribution([['node-a', [row('tracker', {
+      frames,
+      extensionPoints: [
+        summary('summary', { mounts: [{ surface: 'tracker-issue', region: 'header' }, { surface: 'tracker-ref', region: 'footer' }] }),
+        // Another plugin's view, a task pane, a region this shell has no host for, and a kind that
+        // is not remote. Each costs only its own point.
+        summary('stranger', { mounts: [{ surface: 'linear-issue', region: 'header' }] }),
+        summary('task', { mounts: [{ surface: 'tracker', region: 'header' }] }),
+        summary('aside', { mounts: [{ surface: 'tracker-issue', region: 'aside' }] }),
+        { id: 'rows', label: 'Rows', kind: 'annotation', key: { id: 'string' }, max: 4, mounts: [{ surface: 'tracker-issue', region: 'footer' }] },
+      ],
+    })]]])
+    syncChromeContributions()
+    expect(pointIds()).toEqual(['tracker:summary'])
+    expect(extensionPointRegistry.get('tracker:summary')?.mounts).toEqual([
+      { surface: 'tracker-issue', region: 'header' },
+      { surface: 'tracker-ref', region: 'footer' },
+    ])
+  })
+
   it('drops an onSelect the device cannot honour rather than registering a row that can only fail', () => {
     _seedPluginDistribution([['node-a', [row('board', HOST_PLUGIN), row('tracker', {
       extensions: [{

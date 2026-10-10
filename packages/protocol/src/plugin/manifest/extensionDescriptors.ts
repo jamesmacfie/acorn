@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import {
-  ARBITRATION_MODES, DISCLOSED_NODE_POINTS, EXTENSION_POINT_KINDS, EXTENSION_POINT_LOCATIONS,
-  HOOK_MODES, HOOK_PAYLOAD_TYPES, parseExtensionPointRef,
+  ARBITRATION_MODES, DETAIL_REGIONS, DISCLOSED_NODE_POINTS, EXTENSION_POINT_KINDS, EXTENSION_POINT_LOCATIONS,
+  HOOK_MODES, HOOK_PAYLOAD_TYPES, MAX_DETAIL_MOUNTS, parseExtensionPointRef,
 } from '../../chrome/extensionPoints.ts'
 import { contextFreeAction, panelRegion, refresh } from './chromeDescriptors.ts'
 import { pluginRoute } from './manifestFields.ts'
@@ -62,6 +62,13 @@ export const extensionPointDescriptor = z.object({
   // refuses a request that is not in both lists. An empty declaration is the default and means a
   // contributor may draw and nothing else, which is what every point shipped before this field meant.
   actions: z.array(z.string().min(1).max(64).regex(/^[a-z][a-zA-Z0-9]*$/, 'an action name is lower camel case')).max(8).optional(),
+  // `remote` only: where the host mounts this point outside the owner's own tree, above or below one
+  // of this manifest's project panes or reference panels (docs/plugins/detail-regions.md). Absent
+  // means the owner draws the point itself, as a compiled owner does.
+  mounts: z.array(z.object({
+    surface: z.string().min(1).max(64),
+    region: z.enum(DETAIL_REGIONS),
+  })).min(1).max(MAX_DETAIL_MOUNTS).optional(),
   // ── The hook fields (docs/plugins/hooks.md § Hooks) ──
   // Required for `kind: 'hook'` and refused elsewhere.
   payload: hookPayloadShape.optional(),

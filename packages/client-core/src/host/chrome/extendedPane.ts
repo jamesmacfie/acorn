@@ -7,11 +7,29 @@
 // loaded plugin's pane that reserved a footer or an aside handed the cell reconciler a `div` and it
 // refused (docs/tui/host-switch.md § The host switch).
 //
-// Types only, so a bare-Node suite can import the frame registration pass without a Solid transform.
+// Types and one pure rule only, so a bare-Node suite can import the frame registration pass without a Solid transform.
 // The components themselves stay behind the caller's `lazy`.
 
 import type { Component, JSX } from 'solid-js'
+import type { DetailRegionProps } from '@acorn/protocol/extensionPoints.ts'
 import type { PanelRegion } from '../../features/dashboards/region'
+
+/** The remote points an owner mounted above and below one of its detail views (`mounts`), and what
+ *  each contributor's tree is mounted with (docs/plugins/detail-regions.md). */
+export type DetailRegions = {
+  headerPointId?: string
+  footerPointId?: string
+  subject: () => DetailRegionProps
+}
+
+/**
+ * What a detail region mounts its contributors under, or `undefined` while the owner shows no
+ * resource, when nothing mounts. Both hosts key a `Show` on it: a new surface, task or project
+ * remounts the contributors, because a tree's bridge binds its scope at mount, and a new item is a
+ * props update on the same workers.
+ */
+export const detailMountKey = (subject: DetailRegionProps): string | undefined =>
+  (subject.item ?? subject.refId) ? `${subject.surface}\0${subject.taskId ?? ''}\0${subject.projectId ?? ''}` : undefined
 
 /** What both hosts' `ExtendedPane` takes: the owner's own frame, and the point ids of the rectangles
  *  it reserved for somebody else (docs/plugins/cooperative-extension-points.md § Cooperative extension points). */
@@ -25,6 +43,8 @@ export type ExtendedPaneProps = {
    *  plugin's iframe. */
   inlineBelowPointId?: string
   inlineBesidePointId?: string
+  /** The detail regions a project pane's owner mounted, above and below its own view. */
+  detail?: DetailRegions
   taskId?: string
   projectId?: string | null
   children: JSX.Element

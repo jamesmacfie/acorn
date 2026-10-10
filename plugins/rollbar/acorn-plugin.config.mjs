@@ -110,5 +110,16 @@ export default {
       onSelect: { verb: 'navigate', surface: 'rollbar-item' },
     }],
     keybindings: [{ command: 'open', defaultChord: 'meta+shift+o', when: 'task' }],
+    // Room above an error's detail for another plugin's badge or short section, as linear's
+    // `issue-summary` is above a ticket (docs/plugins/detail-regions.md). Mounted with the rail row's
+    // `<connection>:<identifier>` item. Not on the task pane, for linear's reason.
+    extensionPoints: [{
+      id: 'item-summary',
+      label: 'Error summary',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
+      mounts: [{ surface: 'rollbar-item', region: 'header' }],
+    }],
   },
 }

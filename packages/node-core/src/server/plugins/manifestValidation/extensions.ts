@@ -7,13 +7,18 @@ export function validateExtensions(refs: ManifestReferences): void {
   // Extension points attach to pane surfaces with room for another plugin's contribution.
   const pointSurfaces = new Set(frames.filter((frame) => frame.target === 'pane').map((frame) => frame.id))
   const claimedPoints = new Set<string>()
+  // A detail region mounts on one of this manifest's own detail views, so a manifest can never claim
+  // another plugin's surface. A task pane is refused until it has a selection contract: what it shows
+  // can change inside its tree, where the host cannot see it (docs/plugins/detail-regions.md).
+  const detailSurfaces = new Map(frames.map((frame) => [frame.id, frame]))
+  const claimedMounts = new Set<string>()
   // Each kind lists fields it requires and fields the host would ignore.
   const kindFields: Record<ExtensionPointKind, { required: readonly string[]; refused: readonly string[] }> = {
-    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'actions', 'payload', 'allows'] },
-    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'actions', 'payload', 'allows'] },
+    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'actions', 'mounts', 'payload', 'allows'] },
+    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'actions', 'mounts', 'payload', 'allows'] },
     remote: { required: ['mode'], refused: ['location', 'surface', 'panels', 'key', 'payload', 'allows'] },
-    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'actions', 'payload', 'allows'] },
-    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts', 'actions'] },
+    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'actions', 'mounts', 'payload', 'allows'] },
+    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts', 'actions', 'mounts'] },
   }
   extensionPoints.forEach((entry, i) => {
     const at = ['contributions', 'extensionPoints', i] as (string | number)[]
@@ -29,6 +34,22 @@ export function validateExtensions(refs: ManifestReferences): void {
         ctx.addIssue({ code: 'custom', path: [...at, field], message: `${field} is not read on a '${entry.kind}' extension point` })
       }
     }
+    entry.mounts?.forEach((mount, j) => {
+      const mountAt = [...at, 'mounts', j]
+      const frame = detailSurfaces.get(mount.surface)
+      if (!frame || (frame.target !== 'refPanel' && frame.target !== 'pane')) {
+        ctx.addIssue({ code: 'custom', path: [...mountAt, 'surface'], message: `mounts names '${mount.surface}', which this manifest does not declare as a pane or reference panel` })
+        return
+      }
+      if (frame.target === 'pane' && frame.scope !== 'project') {
+        ctx.addIssue({ code: 'custom', path: [...mountAt, 'surface'], message: `'${mount.surface}' is a task pane; detail regions mount on project panes and reference panels` })
+      }
+      const claim = `${mount.surface}\0${mount.region}`
+      if (claimedMounts.has(claim)) {
+        ctx.addIssue({ code: 'custom', path: mountAt, message: `'${mount.surface}' already has an extension point mounted at '${mount.region}'` })
+      }
+      claimedMounts.add(claim)
+    })
     if (entry.location === undefined || entry.surface === undefined) return
     if (!pointSurfaces.has(entry.surface)) {
       ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `extension point names '${entry.surface}', which this manifest does not declare as a pane surface` })

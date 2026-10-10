@@ -8,7 +8,7 @@ import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import type { DocumentHandle } from '../../features/editor/documentModel'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
-import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
+import { isCoreExclusiveSlot, qualifiedExtensionPointId, type DetailRegion } from '@acorn/protocol/extensionPoints.ts'
 import { isPluginSettingsCategory, isSettingsScope } from '@acorn/protocol/settingsPages.ts'
 import { panelRegion } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
@@ -19,7 +19,7 @@ import { keybindingRegistry } from '../registries/commands/keybindings'
 import { paneRegistry } from '../registries/panes/panes'
 import { clientScheduleRegistry } from '../registries/shell/schedules'
 import { ownsRoute } from '../chrome/chromeData'
-import { suppliedExtendedPane } from '../chrome/extendedPane'
+import { suppliedExtendedPane, type DetailRegions } from '../chrome/extendedPane'
 import { suppliedLayout } from '../layouts/table'
 import { suppliedRemoteTree } from '../tree/table'
 import { projectImporterRegistry } from '../registries/sources/projectImporters'
@@ -371,6 +371,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           if (!route.path.split('/').includes(`:${route.item}`)) {
             throw new Error(`route '${route.path}' does not capture '${route.item}'`)
           }
+          const detail = detailPointsFor(pluginId, row, surface.id)
           return own(projectSurfaceRegistry, {
             id: surface.id,
             path: route.path,
@@ -382,7 +383,17 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             // A getter inside the scope, because the routed item is the project surface's selection and
             // the host updates it in place rather than remounting: `scope` is read per call, so a frame
             // region turns each change into a `select` message and a tree redraws.
-            component: (props) => drawLayout(() => ({ projectId: props.projectId, item: props.item })),
+            component: (props) => {
+              const scope = () => ({ projectId: props.projectId, item: props.item })
+              const frame = drawLayout(scope)
+              if (!detail) return frame
+              // The same routed item reaches the regions the owner mounted, so a new row is a props
+              // update for every contributor, as it is for the owner's own tree.
+              return createComponent(suppliedExtendedPane() ?? DomExtendedPane, {
+                detail: { ...detail, subject: () => ({ ...scope(), surface: surface.id }) },
+                children: frame,
+              })
+            },
           })
         }
         paneDraw = drawLayout
@@ -551,6 +562,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         throw new Error(`declared provider '${surface.providerId}' is not '${pluginId}'`)
       }
       const panelTree = singleRegionTree(surface)
+      const detail = detailPointsFor(pluginId, row, surface.id)
       return own(refPanelRegistry, {
         id: surface.id,
         providerId: pluginId,
@@ -565,6 +577,10 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode() }),
           hash,
           ...(panelTree ? { tree: panelTree } : {}),
+          // The panel's own reference and nothing else: a reference panel has no task or project.
+          ...(detail ? {
+            detail: { ...detail, subject: () => ({ item: props.target.displayId, refId: props.target.displayId, surface: surface.id }) },
+          } : {}),
           get displayId() {
             return props.target.displayId
           },
@@ -690,6 +706,27 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         }),
       })
   }
+}
+
+/**
+ * The remote points this plugin mounted above and below one of its own surfaces (`mounts`), or `null`
+ * when it mounted none (docs/plugins/detail-regions.md).
+ *
+ * Read off this plugin's own roster row, for the reason the footer point is: the chrome pass registers
+ * points on its own schedule. And only for this surface of this row, so another plugin's declaration
+ * can never place a region here. Whether a point is usable at all is the registry's answer: `Slot`
+ * draws nothing for a point that failed the client's re-check.
+ */
+function detailPointsFor(pluginId: string, row: NodePluginRow, surfaceId: string): Omit<DetailRegions, 'subject'> | null {
+  const points = (row.installed?.contributions.extensionPoints ?? []).filter((entry) => entry.kind === 'remote')
+  const at = (region: DetailRegion): string | undefined => {
+    const entry = points.find((point) => point.mounts?.some((mount) => mount.surface === surfaceId && mount.region === region))
+    return entry ? qualifiedExtensionPointId(pluginId, entry.id) : undefined
+  }
+  const headerPointId = at('header')
+  const footerPointId = at('footer')
+  if (!headerPointId && !footerPointId) return null
+  return { ...(headerPointId ? { headerPointId } : {}), ...(footerPointId ? { footerPointId } : {}) }
 }
 
 const ownRailSwitches = (ids: readonly string[] | undefined, row: NodePluginRow): { railSourceVisibility: string[] } | undefined => {
