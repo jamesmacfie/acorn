@@ -5,6 +5,7 @@ import { previewConfigured, previewConfiguredSchedule } from './configuredStore'
 import { previewPaneContribution } from './paneContribution'
 import type { PreviewUrlState } from '../contract/urls'
 import { previewRecipeUrlRoute, previewUrlRoute } from '../shared/api'
+import { PREVIEW_TOOLBAR_ACTIONS_MAX } from '../contract/toolbarActions'
 
 export const previewClientPlugin: ClientPlugin = {
   name: 'preview',
@@ -19,6 +20,12 @@ export const previewClientPlugin: ClientPlugin = {
       },
     })
     ctx.panes.register(previewPaneContribution)
+    // Other plugins' controls in the address bar (./PreviewPane.tsx). One action, Reload, and no
+    // navigation: a contributor never gets the page (docs/plugins/toolbar-actions.md).
+    ctx.extensionPoints.register({
+      id: 'toolbar-actions', label: 'Preview toolbar', kind: 'remote', mode: 'stack', max: PREVIEW_TOOLBAR_ACTIONS_MAX,
+      actions: ['reload'],
+    })
     ctx.contextMenus.register({
       id: 'preview.copy-url', location: 'rail.pane', surface: 'preview',
       label: 'Copy URL', icon: 'copy', order: 130,

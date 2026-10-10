@@ -8,7 +8,8 @@ import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/co
 import {
   Alert, Button, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
 } from '@acorn/plugin-api/ui'
-import { Drawer } from '@acorn/plugin-api/ui/host'
+import { Drawer, Slot } from '@acorn/plugin-api/ui/host'
+import { interruptRefusal, TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps, type TerminalToolbarResult } from '../contract/toolbarActions'
 import { resolveTerminalFontSize } from './preferences'
 
 const PROFILES_STALE_MS = 5 * 60_000
@@ -173,6 +174,22 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
 
   const activeSession = createMemo(() => sessions().find((s) => s.id === activeId()) ?? null)
   const activeRunning = createMemo(() => activeSession()?.status === 'running')
+
+  // Another plugin's Interrupt (docs/plugins/toolbar-actions.md). It names the session it drew beside,
+  // and the drawer checks that session is still the selected, running one of the task and Node the
+  // contributor was mounted for. Then it sends the same interrupt as the drawer's own Stop.
+  const interruptFor = (mountedTaskId: string) => async (payload: unknown, invocation: { byPerson: boolean }): Promise<TerminalToolbarResult> => {
+    const session = activeSession()
+    const refusal = interruptRefusal({
+      byPerson: invocation.byPerson,
+      payload,
+      mountedTaskId,
+      live: live() && taskId() === mountedTaskId,
+      selected: session && { id: session.id, taskId: session.taskId, running: session.status === 'running' },
+    })
+    if (refusal) return refusal
+    return await api.interrupt(session!.id) ? { ok: true } : { ok: false, reason: 'changed' }
+  }
 
   // Maximized (⌘⇧⏎) fills the pane region via CSS (top: --topbar-h); the partial drag-height is ignored.
   const maximized = () => isTerminalMax(ws()?.id)
@@ -358,6 +375,29 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                 tipKey={formatChord('ctrl+c')}
                 onPress={() => void api.interrupt(activeId()!)}
               />
+            </Show>
+            {/* Other plugins' controls, between the drawer's own and Hide, which stays last. Keyed on
+                the task, so a task switch remounts them and an action can't reach the next task's
+                sessions. */}
+            <Show when={taskId()} keyed>
+              {(mountedTaskId) => (
+                <Slot
+                  point={TERMINAL_TOOLBAR_ACTIONS_POINT}
+                  taskId={mountedTaskId}
+                  projectId={ws()?.projectId ?? null}
+                  props={(): TerminalToolbarProps => {
+                    const session = activeSession()
+                    return {
+                      taskId: mountedTaskId,
+                      ...(ws()?.projectId ? { projectId: ws()!.projectId } : {}),
+                      ...(session?.taskId === mountedTaskId
+                        ? { session: { id: session.id, title: session.title, running: session.status === 'running' } }
+                        : {}),
+                    }
+                  }}
+                  actions={{ interrupt: interruptFor(mountedTaskId) }}
+                />
+              )}
             </Show>
             <IconButton icon="x" onPress={props.onClose} label="Hide terminals" tipSub="They keep running." />
           </>

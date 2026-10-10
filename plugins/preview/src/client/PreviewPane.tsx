@@ -1,11 +1,14 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { elementRectKey, observeNativePage, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
+import { activeNodeId, elementRectKey, observeNativePage, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
 import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
+import { Slot } from '@acorn/plugin-api/ui/host'
+import { PREVIEW_TOOLBAR_ACTIONS_POINT, type PreviewReloadPayload, type PreviewToolbarProps, type PreviewToolbarResult } from '../contract/toolbarActions'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
 export default function PreviewPane(props: {
   taskId: string
+  projectId?: string
   url: string | null
   remoteBlocked: boolean
   resolving?: boolean
@@ -16,6 +19,9 @@ export default function PreviewPane(props: {
   const preview = previewViews()
   const [loading, setLoading] = createSignal(false)
   const [addr, setAddr] = createSignal('')
+  // The page the native view last reported. `addr` is the address box, which the person edits, so a
+  // contributor's `expectedUrl` is checked against this instead.
+  const [pageUrl, setPageUrl] = createSignal('')
   const [canBack, setCanBack] = createSignal(false)
   const [canFwd, setCanFwd] = createSignal(false)
   const [suppressed, setSuppressed] = createSignal(false)
@@ -51,6 +57,7 @@ export default function PreviewPane(props: {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
       setLoading(s.loading)
       setAddr(s.url)
+      setPageUrl(s.url)
       setCanBack(s.canGoBack)
       setCanFwd(s.canGoForward)
     })
@@ -65,6 +72,7 @@ export default function PreviewPane(props: {
   createEffect(() => {
     const taskId = props.taskId
     setAddr('')
+    setPageUrl('')
     setCanBack(false)
     setCanFwd(false)
     onCleanup(() => preview?.hide(taskId))
@@ -122,6 +130,18 @@ export default function PreviewPane(props: {
     if (preview && v) preview.load(props.taskId, withScheme(v))
   }
 
+  // Another plugin's Reload (docs/plugins/toolbar-actions.md). It asks for the page it drew beside, by
+  // address, and Preview checks that page is still the one on screen, in the task and on the Node the
+  // contributor was mounted for. Then it presses Preview's own reload, so a contributor can't navigate.
+  const reloadFor = (taskId: string, nodeId: string | null) => (payload: unknown, invocation: { byPerson: boolean }): PreviewToolbarResult => {
+    if (!invocation.byPerson) return { ok: false, reason: 'needs_person' }
+    if (!preview || props.remoteBlocked || !ready()) return { ok: false, reason: 'unsupported' }
+    const expected = (payload as Partial<PreviewReloadPayload> | null)?.expectedUrl
+    if (taskId !== props.taskId || nodeId !== activeNodeId() || !pageUrl() || expected !== pageUrl()) return { ok: false, reason: 'changed' }
+    preview.command(taskId, 'reload')
+    return { ok: true }
+  }
+
   const copyAddr = () => {
     void navigator.clipboard.writeText(addr())
     toast('Copied the page address')
@@ -172,6 +192,31 @@ export default function PreviewPane(props: {
           />
           <IconButton icon="copy" label="Copy page address" disabled={!addr()} onPress={copyAddr} />
           <IconButton icon="code-xml" label="Show developer tools" onPress={() => preview?.command(props.taskId, 'devtools')} />
+          {/* Other plugins' controls, after Preview's own and before the spinner, so the spinner
+              coming and going doesn't move them. Keyed on the task, so a task switch remounts them
+              and a contributor's action can't land on the next task's page. */}
+          <Show when={props.taskId} keyed>
+            {(taskId) => {
+              // Read once, at mount. Inside the JSX it would be read again at every call.
+              const reload = reloadFor(taskId, activeNodeId())
+              return (
+                <Slot
+                  point={PREVIEW_TOOLBAR_ACTIONS_POINT}
+                  taskId={taskId}
+                  projectId={props.projectId ?? null}
+                  props={(): PreviewToolbarProps => ({
+                    taskId,
+                    ...(props.projectId ? { projectId: props.projectId } : {}),
+                    ...(pageUrl() ? { url: pageUrl() } : {}),
+                    loading: loading(),
+                    canGoBack: canBack(),
+                    canGoForward: canFwd(),
+                  })}
+                  actions={{ reload }}
+                />
+              )
+            }}
+          </Show>
           <Show when={loading()}><Spinner label="Loading page" /></Show>
         </Toolbar>
       </Show>

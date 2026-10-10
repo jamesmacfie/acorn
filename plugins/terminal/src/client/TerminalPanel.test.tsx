@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { PrefKeys, savePref, type Task } from '@acorn/plugin-api/client'
+import { extensionPointRegistry, extensionRegistry, type Disposable, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
+import { TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps } from '../contract/toolbarActions'
 
 // What a terminal tab switch costs, in jsdom. This is the tier the drawer never had, and phase 6 of
 // the performance programme is the reason it needs one: the panel used to mount the active tab alone,
@@ -82,6 +84,7 @@ const detaches: string[] = []
 const attachSizes: ({ cols: number; rows: number } | undefined)[] = []
 const listeners = new Map<string, (m: ServerMsg) => void>()
 const resizes: string[] = []
+const interrupts: string[] = []
 vi.mock('./terminalClient', () => ({
   terminalApi: () => ({
     list: async () => {
@@ -96,7 +99,7 @@ vi.mock('./terminalClient', () => ({
       return true
     },
     write: () => {},
-    interrupt: async () => true,
+    interrupt: async (id: string) => { interrupts.push(id); return true },
     remove: async () => true,
     attach: (id: string, on: (m: ServerMsg) => void, size?: { cols: number; rows: number }) => {
       attaches.push(id)
@@ -501,4 +504,144 @@ it('numbers a new shell after the shells the task already has', async () => {
   ;([...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === 'Shell') as HTMLElement).click()
   await settle()
   expect(createdTitles).toEqual(['Shell 3'])
+})
+
+describe('the terminal:toolbar-actions point', () => {
+  // Compiled contributors, so no worker is involved: the worker path and its checks are client-core's
+  // (Slot.test.tsx, RemoteTree.grants.test.tsx). What this drawer owns is where they draw, what they
+  // are told, and when it agrees to interrupt.
+  type Host = { invoke(name: string, payload?: unknown): Promise<unknown> }
+  type Drawn = { pluginId: string; props: TerminalToolbarProps & { host: Host } }
+  const drawn: Drawn[] = []
+  const registered: Disposable[] = []
+  let listen: ReturnType<typeof vi.spyOn>
+
+  const contributor = (pluginId: string) => {
+    const registration = extensionRegistry.register({
+      id: `plugin:${pluginId}:interrupt`, pluginId, point: TERMINAL_TOOLBAR_ACTIONS_POINT, label: pluginId, order: 500,
+      carrier: 'component',
+      component: (props: Drawn['props']) => {
+        drawn.push({ pluginId, props })
+        return <button type="button" data-contributor={pluginId}>{pluginId}</button>
+      },
+    } as ExtensionContribution)
+    registered.push(registration)
+    return registration
+  }
+
+  /** A person's press inside one contributor. jsdom dispatches only untrusted events, so this calls the
+   *  capturing listener the slot registered on that contributor's element with the browser's bit. */
+  const press = (pluginId: string): void => {
+    const button = document.querySelector(`[data-contributor="${pluginId}"]`)!
+    const index = listen.mock.calls.findIndex(([type]: unknown[], call: number) => type === 'pointerdown'
+      && (listen.mock.contexts[call] as Element).tagName === 'SPAN' && (listen.mock.contexts[call] as Element).contains(button))
+    ;(listen.mock.calls[index]![1] as EventListener)({ isTrusted: true } as Event)
+  }
+  const latest = (pluginId: string): Drawn['props'] => drawn.filter((entry) => entry.pluginId === pluginId).at(-1)!.props
+
+  beforeEach(() => {
+    interrupts.length = 0
+    drawn.length = 0
+    registered.push(extensionPointRegistry.register({
+      id: TERMINAL_TOOLBAR_ACTIONS_POINT, ownerId: 'terminal', label: 'Terminal toolbar', kind: 'remote', mode: 'stack', max: 4,
+      actions: ['interrupt'],
+    }))
+    listen = vi.spyOn(HTMLElement.prototype, 'addEventListener')
+  })
+  afterEach(() => {
+    listen.mockRestore()
+    for (const registration of registered.splice(0).reverse()) registration.dispose()
+  })
+
+  it('draws four contributors and a count between the drawer’s own controls and Hide', async () => {
+    for (const id of ['a', 'b', 'c', 'd', 'e']) contributor(id)
+    mount()
+    await settle()
+
+    const actions = document.querySelector('.ui-doctabs-actions')!
+    const labels = [...actions.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)
+    expect(labels).toEqual(['New terminal', 'Stop', 'a', 'b', 'c', 'd', 'Hide terminals'])
+    expect(actions.textContent).toContain('1 more from other plugins')
+    expect(latest('a')).toMatchObject({ taskId: 't1', session: { id: A, title: 'first', running: true } })
+  })
+
+  it('interrupts only the selected running session, and only when a person pressed inside the contributor', async () => {
+    contributor('stopper')
+    contributor('other')
+    mount()
+    await settle()
+    const host = latest('stopper').host
+
+    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+    // A press in another plugin's control is not a press in this one.
+    press('other')
+    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+    press('stopper')
+    // A supplied ID that isn't the selected session is refused, even though that session is running.
+    await expect(host.invoke('interrupt', { expectedSessionId: B })).resolves.toEqual({ ok: false, reason: 'changed' })
+    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({ ok: true })
+    expect(interrupts).toEqual([A])
+    // Nothing but the declared action reaches the drawer.
+    await expect(host.invoke('write', { data: 'rm -rf /\n' })).rejects.toMatchObject({ code: 'unknown_action' })
+  })
+
+  it('follows the selected session with one mount, and refuses one that changed, stopped, or vanished', async () => {
+    contributor('stopper')
+    mount()
+    await settle()
+    const mounts = drawn.length
+    const host = latest('stopper').host
+    press('stopper')
+
+    tab(B)?.click()
+    await settle()
+    expect(latest('stopper').session).toEqual({ id: B, title: 'second', running: true })
+    expect(drawn).toHaveLength(mounts)
+    await expect(host.invoke('interrupt', { expectedSessionId: A })).resolves.toEqual({ ok: false, reason: 'changed' })
+
+    roster = [session(A, 'first'), { ...session(B, 'second'), status: 'exited' }]
+    await refreshSessions()
+    await settle()
+    expect(latest('stopper').session).toEqual({ id: B, title: 'second', running: false })
+    press('stopper')
+    await expect(host.invoke('interrupt', { expectedSessionId: B })).resolves.toEqual({ ok: false, reason: 'changed' })
+
+    roster = [session(A, 'first')]
+    await refreshSessions()
+    await settle()
+    press('stopper')
+    await expect(host.invoke('interrupt', { expectedSessionId: B })).resolves.toEqual({ ok: false, reason: 'changed' })
+    expect(interrupts).toEqual([])
+  })
+
+  it('remounts on a task switch, so the old mount cannot interrupt the new task’s session', async () => {
+    roster = [session(A, 'first'), session(B, 'second', 't2')]
+    contributor('stopper')
+    const [current, setCurrent] = createSignal(task)
+    mount({ task: current })
+    await settle()
+    const before = latest('stopper').host
+    // Pressed in the old task's mount, just before the switch, so only the identity check is left.
+    press('stopper')
+
+    setCurrent({ id: 't2', title: 'second task' } as Task)
+    await settle()
+    expect(latest('stopper')).toMatchObject({ taskId: 't2', session: { id: B } })
+    expect(latest('stopper').host).not.toBe(before)
+    await expect(before.invoke('interrupt', { expectedSessionId: B })).resolves.toEqual({ ok: false, reason: 'changed' })
+    expect(interrupts).toEqual([])
+  })
+
+  it('drops a contributor whose registration goes, and keeps the drawer’s own Stop', async () => {
+    const registration = contributor('stopper')
+    mount()
+    await settle()
+    expect(document.querySelector('[data-contributor="stopper"]')).not.toBeNull()
+
+    registration.dispose()
+    await settle()
+    expect(document.querySelector('[data-contributor="stopper"]')).toBeNull()
+    document.querySelector<HTMLButtonElement>('button[aria-label="Stop"]')!.click()
+    expect(interrupts).toEqual([A])
+  })
 })

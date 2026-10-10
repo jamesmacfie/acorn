@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, For, Show, untrack, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, type Component, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
@@ -10,11 +10,13 @@ import {
   extensionDeliveries, extensionPointRegistry, type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
-import { createSlotChoice, resolveSlot } from '@acorn/client-core/host/tree'
+import { answerOwnerInvoke, createSlotChoice, GESTURE_WINDOW_MS, resolveSlot, type OwnerActions } from '@acorn/client-core/host/tree'
 import type { OverlayPalette } from '@acorn/client-core/host/palette'
 import { contextMenuItems, runContextMenuItem, selectionTooLarge } from '@acorn/client-core/host/registries/panes'
 import type { SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 import { RemoteTree } from '../plugins/remoteTreeLoader'
+import type { Renderable } from '../tree/compat'
+import { pressedWithin } from '../keys/stops'
 import { CORE_MARKDOWN_FENCE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import type { MarkdownFenceAdapter } from '@acorn/client-core/kit/lib/markdown'
 import { createFenceViewers, type FenceScope, type FenceViewer } from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
@@ -220,7 +222,7 @@ export type SlotProps = {
   projectId?: string | null
   /** What this owner will do if a contributor asks (docs/plugins/remote-points.md § Asking the owner). Host-only:
    *  neither the handlers nor their names are sent to the worker. */
-  actions?: Record<string, (payload: unknown) => unknown | Promise<unknown>>
+  actions?: OwnerActions
   /** Whether a contributor is standing in for the owner's default right now, for an owner that has to
    *  keep drawing something a contributor must not be given. */
   occupied?: (occupied: boolean, pluginId?: string) => void
@@ -284,7 +286,19 @@ export function Slot(props: SlotProps) {
                 />
               }
             >
-              {(component) => <Dynamic component={component()} {...(props.props?.() as Record<string, unknown>)} />}
+              {(component) => (
+                <Show
+                  when={resolved()?.actions.length}
+                  fallback={<Dynamic component={component()} {...(props.props?.() as Record<string, unknown>)} />}
+                >
+                  <CompiledWithHost
+                    component={component()}
+                    props={() => props.props?.() as Record<string, unknown>}
+                    declared={() => resolved()?.actions ?? []}
+                    actions={() => props.actions ?? {}}
+                  />
+                </Show>
+              )}
             </Show>
           )}
         </For>
@@ -293,6 +307,32 @@ export function Slot(props: SlotProps) {
         </Show>
       </Show>
     </>
+  )
+}
+
+/** A compiled contributor at a point that declares owner actions: the same `host.invoke` and the same
+ *  check a loaded tree gets, with a box that hears the person's presses inside it, as on the desktop
+ *  (client-core host/tree/Slot.tsx § CompiledWithHost). */
+function CompiledWithHost(props: {
+  component: Component<Record<string, unknown>>
+  props: () => Record<string, unknown> | undefined
+  declared: () => readonly string[]
+  actions: () => OwnerActions
+}) {
+  let container: Renderable | undefined
+  const presses = pressedWithin(() => container, GESTURE_WINDOW_MS)
+  onCleanup(presses.dispose)
+  const host = {
+    invoke: async (name: string, payload?: unknown): Promise<unknown> => {
+      const result = await answerOwnerInvoke({ declared: props.declared(), actions: props.actions(), name, payload, byPerson: presses.recent() })
+      if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code })
+      return result.body
+    },
+  }
+  return (
+    <box flexShrink={0} ref={(element: Renderable) => { container = element }}>
+      <Dynamic component={props.component} {...props.props()} host={host} />
+    </box>
   )
 }
 

@@ -1,9 +1,10 @@
-import { For, Show, createEffect, createMemo, createSignal, type JSX } from 'solid-js'
+import { For, Show, createEffect, createMemo, createSignal, onCleanup, type Component, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { RemoteTree } from './RemoteTree'
 import { resolveSlot } from './arbitration'
 import { createSlotChoice } from './slotChoice'
+import { answerOwnerInvoke, createGestureClock, type OwnerActions } from './hostRequests'
 
 // A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins/cooperative-extension-points.md §
 // Cooperative extension points, the `remote` kind).
@@ -51,7 +52,7 @@ export type SlotProps = {
    * Bound per `Slot` rather than per point, because the handler closes over which item this instance
    * drew, which is the whole thing a point-level registration could not know.
    */
-  actions?: Record<string, (payload: unknown) => unknown | Promise<unknown>>
+  actions?: OwnerActions
   /** Drawn when nobody matches, and when two match a `replace` point and nobody has picked. The owner's
    *  own answer to "what if nothing is here", which is why it is children rather than a prop: it is
    *  ordinary tree. */
@@ -151,7 +152,19 @@ export function Slot(props: SlotProps) {
             >
               {/* Spread rather than one `props` object, so the contributor writes an ordinary component
                   with the owner's own prop names. Solid keeps a dynamic spread reactive. */}
-              {(component) => <Dynamic component={component()} {...(props.props?.() as Record<string, unknown>)} />}
+              {(component) => (
+                <Show
+                  when={resolved()?.actions.length}
+                  fallback={<Dynamic component={component()} {...(props.props?.() as Record<string, unknown>)} />}
+                >
+                  <CompiledWithHost
+                    component={component()}
+                    props={() => props.props?.() as Record<string, unknown>}
+                    declared={() => resolved()?.actions ?? []}
+                    actions={() => props.actions ?? {}}
+                  />
+                </Show>
+              )}
             </Show>
           )}
         </For>
@@ -163,5 +176,36 @@ export function Slot(props: SlotProps) {
         </Show>
       </Show>
     </>
+  )
+}
+
+/**
+ * A compiled contributor at a point that declares owner actions.
+ *
+ * It gets the same `host.invoke` a loaded tree gets, answered by the same check, so a first-party
+ * contributor can't skip the owner's rules (./hostRequests.ts). The element around it records the
+ * person's presses for `byPerson`, as `RemoteTree`'s does. `display: contents`, so the contributor's
+ * controls sit in the owner's layout as a loaded tree's do.
+ */
+function CompiledWithHost(props: {
+  component: Component<Record<string, unknown>>
+  props: () => Record<string, unknown> | undefined
+  declared: () => readonly string[]
+  actions: () => OwnerActions
+}) {
+  const gestures = createGestureClock()
+  let unwatch = (): void => {}
+  onCleanup(() => unwatch())
+  const host = {
+    invoke: async (name: string, payload?: unknown): Promise<unknown> => {
+      const result = await answerOwnerInvoke({ declared: props.declared(), actions: props.actions(), name, payload, byPerson: gestures.recent() })
+      if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code })
+      return result.body
+    },
+  }
+  return (
+    <span style={{ display: 'contents' }} ref={(element) => { unwatch = gestures.watch(element) }}>
+      <Dynamic component={props.component} {...props.props()} host={host} />
+    </span>
   )
 }

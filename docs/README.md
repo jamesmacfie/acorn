@@ -416,8 +416,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   points](./plugins/remote-points.md), [Remote trees](./plugins/remote-trees.md), [Replacing a core
   surface](./plugins/replacing-core-surfaces.md), [Rows and
   annotations](./plugins/rows-and-annotations.md), [Search providers](./plugins/search-providers.md),
-  [Task checks](./plugins/task-checks.md), [The tree contract](./plugins/tree-contract.md), [Choosing
-  how a plugin draws](./plugins/ui-tiers.md).
+  [Task checks](./plugins/task-checks.md), [Toolbar actions](./plugins/toolbar-actions.md), [The tree
+  contract](./plugins/tree-contract.md), [Choosing how a plugin draws](./plugins/ui-tiers.md).
 - [plugin-authoring.md](./plugin-authoring.md): [CLI command
   authoring](./plugin-authoring/cli-commands.md), [A complete
   example](./plugin-authoring/complete-example.md), [Contributions](./plugin-authoring/contributions.md),

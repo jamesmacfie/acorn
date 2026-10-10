@@ -7,6 +7,7 @@ import { activeTerminal, initSessions, refreshSessions, rememberActiveTerminal, 
 import { terminalApi } from './terminalClient'
 import { initPtyChannel } from './wsChannel'
 import { installTerminalHostClient } from '../contract/hostClient'
+import { TERMINAL_TOOLBAR_ACTIONS_MAX } from '../contract/toolbarActions'
 
 
 const TerminalSettings = lazy(() => import('./TerminalSettings'))
@@ -16,6 +17,12 @@ export const terminalClientPlugin: ClientPlugin = {
   required: true,
   init: (ctx) => {
     ctx.slots.register(terminalDrawerContribution)
+    // Other plugins' controls beside the terminal's own, drawn by the desktop drawer and the terminal
+    // client's sessions view. One action, Interrupt, and no PTY access (docs/plugins/toolbar-actions.md).
+    ctx.extensionPoints.register({
+      id: 'toolbar-actions', label: 'Terminal toolbar', kind: 'remote', mode: 'stack', max: TERMINAL_TOOLBAR_ACTIONS_MAX,
+      actions: ['interrupt'],
+    })
     // The task's run targets, layout recipes and live terminals, as three searches under one group
     // (./commands.ts). A `paletteRows` source until 2026-09-03.
     for (const contribution of terminalCommands) ctx.commands.register(contribution)

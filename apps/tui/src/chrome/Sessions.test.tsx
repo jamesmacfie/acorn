@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { TASK } from '../fixture'
 import { renderCells } from '../kit/render'
 import { focusedRenderable } from '../keys/regions'
+import { Button } from '../kit/asking/buttons'
+import {
+  extensionPointRegistry, extensionRegistry, type ExtensionContribution,
+} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import { TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps } from '@acorn/plugin-terminal/contract/toolbarActions.ts'
 
 const mock = vi.hoisted(() => {
   const write = vi.fn()
@@ -11,12 +16,13 @@ const mock = vi.hoisted(() => {
   const attach = vi.fn(() => detach)
   const setOpen = vi.fn()
   const resume = vi.fn(async () => {})
+  const interrupt = vi.fn(async () => true)
   const state: { status: 'running' | 'exited'; agentSessionId?: string } = { status: 'running' }
   const rows: { current: null | Array<{
     id: string; taskId: string; title: string; kind: 'shell'; profileId: string
     backend: 'node-pty'; createdAt: number; status: 'running'
   }> } = { current: null }
-  return { write, resize, attach, detach, setOpen, resume, state, rows }
+  return { write, resize, attach, detach, setOpen, resume, interrupt, state, rows }
 })
 
 vi.mock('@acorn/client-core/infra/node/activeNode.ts', () => ({ activeNodeId: () => 'node-1' }))
@@ -34,7 +40,7 @@ vi.mock('@acorn/plugin-terminal/contract/hostClient.ts', () => ({
   terminalApi: () => ({
     profiles: async () => [{ id: 'shell', label: 'Shell', kind: 'shell', available: true }],
     attach: mock.attach, write: mock.write, resize: mock.resize,
-    create: vi.fn(), interrupt: vi.fn(), kill: vi.fn(),
+    create: vi.fn(), interrupt: mock.interrupt, kill: vi.fn(),
   }),
 }))
 
@@ -128,6 +134,50 @@ describe('native terminal sessions', () => {
       expect(closed).toHaveBeenCalledOnce()
     } finally {
       screen.done()
+    }
+  }, 30_000)
+
+  // A plugin's control beside the view's own actions (docs/plugins/toolbar-actions.md). A compiled
+  // contributor, so no worker: its button asks through `host.invoke` exactly as a loaded tree's would.
+  it('draws a contributor’s control and interrupts only on a press inside it', async () => {
+    mock.state.status = 'running'
+    mock.state.agentSessionId = undefined
+    mock.interrupt.mockClear()
+    type Props = TerminalToolbarProps & { host: { invoke(name: string, payload?: unknown): Promise<unknown> } }
+    let drawn: Props | undefined
+    const answers: unknown[] = []
+    const registrations = [
+      extensionPointRegistry.register({
+        id: TERMINAL_TOOLBAR_ACTIONS_POINT, ownerId: 'terminal', label: 'Terminal toolbar', kind: 'remote', mode: 'stack', max: 4,
+        actions: ['interrupt'],
+      }),
+      extensionRegistry.register({
+        id: 'plugin:stopper:interrupt', pluginId: 'stopper', point: TERMINAL_TOOLBAR_ACTIONS_POINT, label: 'Stopper', order: 500,
+        carrier: 'component',
+        component: (props: Props) => {
+          drawn = props
+          return <Button onPress={() => { void props.host.invoke('interrupt', { expectedSessionId: props.session?.id }).then((answer) => answers.push(answer)) }}>Stop it</Button>
+        },
+      } as ExtensionContribution),
+    ]
+    const { Sessions } = await import('./Sessions')
+    const screen = await renderCells(() => <Sessions task={TASK} onClose={() => {}} />, { width: 80, height: 24 })
+    try {
+      expect(screen.text).toContain('[Stop it]')
+      expect(drawn).toMatchObject({ taskId: TASK.id, session: { id: 'terminal-1', title: 'Shell for task', running: true } })
+
+      // A tree asking on its own, with nobody pressing anything, is refused.
+      await expect(drawn!.host.invoke('interrupt', { expectedSessionId: 'terminal-1' })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+      expect(mock.interrupt).not.toHaveBeenCalled()
+
+      const lines = screen.text.split('\n')
+      const row = lines.findIndex((line) => line.includes('[Stop it]'))
+      await screen.click(lines[row]!.indexOf('[Stop it]') + 2, row)
+      await vi.waitFor(() => expect(answers).toEqual([{ ok: true }]))
+      expect(mock.interrupt).toHaveBeenCalledWith('terminal-1')
+    } finally {
+      screen.done()
+      for (const registration of registrations) registration.dispose()
     }
   }, 30_000)
 })

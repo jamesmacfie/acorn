@@ -58,6 +58,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |
 | `core:link-preview` | `replace`, keyed by the normalized HTTPS URL | `{ url, label?, taskId?, projectId?, ref? }`. See [link previews](#link-previews) |
 | `core:markdown-fence` | `replace`, keyed by a closed fence's lowercased language hint | `{ blockId, language, text, revision, taskId?, projectId? }`. See [Markdown fences](./markdown-fences.md) |
+| `preview:toolbar-actions`, `terminal:toolbar-actions` | `stack`, up to four | Page or selected-session facts, with `reload` or `interrupt`. See [toolbar actions](./toolbar-actions.md) |
 | `linear:issue-summary`, `rollbar:item-summary` | `stack`, up to two | `{ surface, item?, refId?, projectId? }`. Above a loaded owner's detail view, drawn by the host. See [detail regions](./detail-regions.md) |
 
 Read `changes:push-actions` before you open a point of your own. It sits under the Changes pane's
@@ -78,14 +79,12 @@ The `requestId` is the one `agents:before-permission` and `agents.requests` name
 The host gives the contributor's tree the owner's `taskId` and `projectId` as its scope, read-only.
 Without them, `openPane`, in-app `openUrl`, and task-scoped key bindings would have no task. The scope
 is the owner's, not the shell's, so a project pane or reference panel never pushes a pane into a
-background task. The scope reaches the bridge only. What the owner wants the contributor to know goes
-in the slot's props.
+background task. The scope reaches the bridge only. What the contributor should know goes in props.
 
 ## Link previews
 
 `core:link-preview` draws a preview of an HTTPS link in rendered content: Markdown, provider HTML such
-as a pull request body, and kit `Link` nodes in plugin trees. Declare a contributor with the sites it
-knows:
+as a pull request body, and kit `Link` nodes in plugin trees. Declare a contributor with its sites:
 
 ```json
 { "id": "docs-preview", "point": "core:link-preview", "label": "Documentation",
@@ -95,8 +94,7 @@ knows:
 The key is the URL as `URL` parses it. The host is lowercased, and the path, query, and fragment stay
 as written. A URL longer than 4,096 characters, or one carrying a user name or password, gets no
 preview. `ref` is `{ kind, id }` when an in-app link recognizer already claimed the URL, such as
-`{ kind: 'linear.issue', id: 'ENG-1' }`. The scope is the task or project of the content the link sits
-in.
+`{ kind: 'linear.issue', id: 'ENG-1' }`. The scope is the task or project of the link's content.
 
 Read your data from your own Node route with the URL, and check the allowed hosts, redirects,
 response size, and timeout there. The host fetches nothing. With no contributor, or while two are tied,
@@ -116,8 +114,8 @@ element that already holds the content. Task panes and the shell's project regio
 ## Asking the owner
 
 Props are data, so a contributor drawing a replacement for one of the owner's items can't change that
-item through them. An owner declares a closed list of actions on the point, and binds a handler for
-each `Slot` it draws:
+item through them. An owner declares a closed list of actions on the point, and binds handlers per
+`Slot`:
 
 ```json
 { "id": "attachment", "kind": "remote", "label": "Attachment", "mode": "replace", "actions": ["replace"] }
@@ -135,15 +133,17 @@ each `Slot` it draws:
 ```
 
 A contributor names one with `await mount.host.invoke('replace', { expectedAttachmentId, replacementAttachmentId })`.
-`solidTree` puts `host` on the component's props beside `bridge`, and both stay the same object across
-a props update.
+`solidTree` puts `host` on the component's props beside `bridge`, and a compiled contributor gets the
+same `host` prop. Each stays the same object across a props update.
 
 The host forwards a name only when both the point's `actions` and this `Slot`'s handler map contain
 it. Neither list is sent to the worker. It's a request, not a setter: the owner still decides. Payload
 and result are each under 64 KiB, eight may be outstanding per slot, and the owner has 10 seconds to
 answer. The action is scoped by the host-held slot id, so plugin code supplies no plugin, point,
 owner, or target id. These requests ride the tree channel, not the bridge, because one worker holds
-one bridge for every tree it draws and the slot is part of the address the host trusts.
+one bridge for every tree it draws and the slot is part of the address the host trusts. A handler's
+second argument is `{ byPerson }`, true only when a person pressed or typed inside that contributor in
+the last second. A person-only action refuses without it, as [toolbar actions](./toolbar-actions.md) do.
 
 ## Companion overlays
 

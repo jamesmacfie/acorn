@@ -30,5 +30,5 @@ export function PreviewTaskPane(props: { task: Task }) {
     onCleanup(() => closeTunnelsForTask(origin.taskId, origin.nodeId))
   })
 
-  return <PreviewPane taskId={props.task.id} url={loadable()} remoteBlocked={remotePreviewBlocked(owner().nodeId)} resolving={resolved.loading} resolutionFailed={!!resolved.error} retryResolution={() => void refetch()} />
+  return <PreviewPane taskId={props.task.id} projectId={props.task.projectId} url={loadable()} remoteBlocked={remotePreviewBlocked(owner().nodeId)} resolving={resolved.loading} resolutionFailed={!!resolved.error} retryResolution={() => void refetch()} />
 }

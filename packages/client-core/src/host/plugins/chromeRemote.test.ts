@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { RailProps, SlotRef, TopbarProps } from '@acorn/protocol/chrome.ts'
 import { railRemote, topbarRemote } from './chromeRemote'
 
+/** The second argument every owner action gets. These actions ignore it. */
+const person = { byPerson: true }
+
 const slot = 'host-minted' as SlotRef
 
 describe('chrome action boundary', () => {
@@ -17,15 +20,15 @@ describe('chrome action boundary', () => {
     }
     const remote = railRemote(props)
     expect(() => structuredClone(remote.data)).not.toThrow()
-    remote.actions.selectSource?.('home')
+    remote.actions.selectSource?.('home', person)
     expect(selectSource).toHaveBeenCalledWith('home')
-    expect(() => remote.actions.selectSource?.('hidden')).toThrow()
-    expect(() => remote.actions.reorderSources?.(['hidden'])).toThrow()
+    expect(() => remote.actions.selectSource?.('hidden', person)).toThrow()
+    expect(() => remote.actions.reorderSources?.(['hidden'], person)).toThrow()
     expect(reorderSources).not.toHaveBeenCalled()
-    remote.actions.openContextMenu?.({ id: 'home', at: { x: 40, y: 50 } })
+    remote.actions.openContextMenu?.({ id: 'home', at: { x: 40, y: 50 } }, person)
     expect(openContextMenu).toHaveBeenCalledWith('home', { x: 40, y: 50 })
-    expect(() => remote.actions.openContextMenu?.({ id: 'hidden', at: { x: 40, y: 50 } })).toThrow()
-    expect(() => remote.actions.openContextMenu?.({ id: 'home', at: { x: -1, y: 50 } })).toThrow()
+    expect(() => remote.actions.openContextMenu?.({ id: 'hidden', at: { x: 40, y: 50 } }, person)).toThrow()
+    expect(() => remote.actions.openContextMenu?.({ id: 'home', at: { x: -1, y: 50 } }, person)).toThrow()
   })
 
   it('rejects node and route choices the topbar did not offer', () => {
@@ -48,12 +51,12 @@ describe('chrome action boundary', () => {
     expect(remote.data.workspacePickerVisible).toBe(false)
     expect(() => structuredClone(remote.data)).not.toThrow()
     expect(remote.data.workspacesMode).toBe('on')
-    remote.actions.pickNode?.('n1')
+    remote.actions.pickNode?.('n1', person)
     expect(pickNode).toHaveBeenCalledWith('n1')
-    expect(() => remote.actions.pickNode?.('n2')).toThrow()
-    expect(() => remote.actions.navigate?.('/settings')).toThrow()
+    expect(() => remote.actions.pickNode?.('n2', person)).toThrow()
+    expect(() => remote.actions.navigate?.('/settings', person)).toThrow()
     expect(navigate).not.toHaveBeenCalled()
-    expect(() => remote.actions.addProject?.(undefined)).toThrow()
+    expect(() => remote.actions.addProject?.(undefined, person)).toThrow()
     expect(addProject).not.toHaveBeenCalled()
   })
 })

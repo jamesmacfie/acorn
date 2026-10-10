@@ -27,6 +27,10 @@ network. The pane says so, and evicts a view when its Node becomes remote. Only 
 identified local Node may create previews. In development, the preview's DevTools button targets the
 child webview and reapplies its bounds after WebKit opens the inspector.
 
+Other plugins can add up to four controls after the preview's address bar, and ask it to reload the
+page on screen. They never get the page or a way to navigate. See [toolbar
+actions](../plugins/toolbar-actions.md).
+
 A loaded plugin's webview page is checked against its manifest hosts by the renderer broker and again
 here. Two independent checks mean widening the grant in one layer can't widen the other.
 

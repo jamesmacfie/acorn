@@ -38,7 +38,7 @@ features. Implementation checkpoints are not separate public releases; phase 14 
 | 08 | [Add selected-content actions](./08-selection-actions.md) | Done |
 | 09 | [Add document hover and diagnostics](./09-document-intelligence.md) | Done |
 | 10 | [Add Markdown fence viewers](./10-markdown-fences.md) | Done |
-| 11 | [Add Preview and Terminal toolbar contributions](./11-toolbar-actions.md) | Planned |
+| 11 | [Add Preview and Terminal toolbar contributions](./11-toolbar-actions.md) | Done |
 | 12 | [Add source and pane status annotations](./12-rail-status.md) | Planned |
 | 13 | [Verify the combined programme](./13-acceptance.md) | Planned |
 | 14 | [Update documentation and authoring examples](./14-documentation.md) | Planned |

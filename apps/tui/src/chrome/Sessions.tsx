@@ -8,12 +8,16 @@ import {
   activeTerminal, refreshSessions, rememberActiveTerminal, sessionNode, sessions, terminalApi,
 } from '@acorn/plugin-terminal/contract/hostClient.ts'
 import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
+import {
+  interruptRefusal, TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps, type TerminalToolbarResult,
+} from '@acorn/plugin-terminal/contract/toolbarActions.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
 import { attachPty } from '../kit/pty'
 import { Rectangle } from '../kit/pixels'
 import { Line } from '../kit/cells'
 import { Alert, Row, Rows } from '../kit/showing'
+import { Slot } from '../kit/host'
 import type { Renderable } from '../tree/compat'
 import { pushScope } from '../keys/regions'
 import { trapKeys } from '../keys/trap'
@@ -129,6 +133,21 @@ export function Sessions(props: { task: Task; onClose: () => void }) {
     ]
   })
 
+  // Another plugin's Interrupt, checked the same way the desktop drawer checks it
+  // (@acorn/plugin-terminal/contract/toolbarActions.ts).
+  const interruptFor = (mountedTaskId: string) => async (payload: unknown, invocation: { byPerson: boolean }): Promise<TerminalToolbarResult> => {
+    const session = active()
+    const refusal = interruptRefusal({
+      byPerson: invocation.byPerson,
+      payload,
+      mountedTaskId,
+      live: taskId() === mountedTaskId,
+      selected: session && { id: session.id, taskId: session.taskId, running: session.status === 'running' },
+    })
+    if (refusal) return refusal
+    return await api.interrupt(session!.id) ? { ok: true } : { ok: false, reason: 'changed' }
+  }
+
   const act = (key: string): void => {
     const session = active()
     if (key === 'new') { setChoosingProfile(true); return }
@@ -176,6 +195,28 @@ export function Sessions(props: { task: Task; onClose: () => void }) {
             onSelect={(key) => { if (key !== 'end') endConfirm.disarm() }} onActivate={act}>
             {(entry, item) => <Row item={item}>{entry.label}</Row>}
           </Rows>
+          {/* Other plugins' controls, after the view's own actions. Keyed on the task, as on the
+              desktop, so an action can't reach the next task's sessions. */}
+          <Show when={taskId()} keyed>
+            {(mountedTaskId) => (
+              <box flexDirection="row" gap={1} flexShrink={0}>
+                <Slot
+                  point={TERMINAL_TOOLBAR_ACTIONS_POINT}
+                  taskId={mountedTaskId}
+                  projectId={props.task.projectId}
+                  props={(): TerminalToolbarProps => {
+                    const session = active()
+                    return {
+                      taskId: mountedTaskId,
+                      projectId: props.task.projectId,
+                      ...(session ? { session: { id: session.id, title: session.title, running: session.status === 'running' } } : {}),
+                    }
+                  }}
+                  actions={{ interrupt: interruptFor(mountedTaskId) }}
+                />
+              </box>
+            )}
+          </Show>
           <Show when={active()?.id} keyed fallback={<box flexGrow={1} />}>
             {(sessionId) => (
               <box flexDirection="column" flexGrow={1} minHeight={0}>

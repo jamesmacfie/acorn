@@ -119,6 +119,27 @@ describe('invoking an owner action', () => {
       .resolves.toMatchObject({ ok: false, error: { code: 'unknown_action' } })
   })
 
+  // An owner whose action is a person's act needs to know one pressed something in this tree. Focus
+  // doesn't count, because a timer can fire while focus sits there.
+  it('tells the owner whether a person pressed inside this tree just now', async () => {
+    const registered = vi.spyOn(HTMLElement.prototype, 'addEventListener')
+    const seen: boolean[] = []
+    mount({ actions: () => ({ replace: (_payload: unknown, invocation: { byPerson: boolean }) => { seen.push(invocation.byPerson); return null } }) })
+    const listener = registered.mock.calls.find(([type]) => type === 'pointerdown')?.[1] as EventListener
+    registered.mockRestore()
+
+    focusInside()
+    await ask({ op: 'owner.invoke', name: 'replace', payload: null })
+    pressInside()
+    await ask({ op: 'owner.invoke', name: 'replace', payload: null })
+    listener({ isTrusted: true } as Event)
+    await ask({ op: 'owner.invoke', name: 'replace', payload: null })
+    vi.useFakeTimers({ now: Date.now() + 1_001, toFake: ['Date'] })
+    await ask({ op: 'owner.invoke', name: 'replace', payload: null })
+    vi.useRealTimers()
+    expect(seen).toEqual([false, false, true, false])
+  })
+
   it('measures the owner’s answer too, so an action cannot become a data channel', async () => {
     mount({ actions: () => ({ replace: async () => 'x'.repeat(70_000) }) })
     await expect(ask({ op: 'owner.invoke', name: 'replace', payload: null }))
@@ -188,6 +209,18 @@ describe('opening a companion overlay', () => {
     const asked = ask({ op: 'overlay.open', name: 'editor', payload: null })
     await Promise.resolve()
     expect(pluginOverlayInvocation()).toMatchObject({ pluginId: 'markup', surface: 'markup.editor' })
+    closePluginOverlayWith(null)
+    await asked
+  })
+
+  // The extension and frame registries read the Node's roster row, which nothing rewrites, so the
+  // descriptor can carry the bare name, and the overlay frame is registered under that same name.
+  it('takes a descriptor that still spells the overlay bare, and opens it under that name', async () => {
+    mount({ contribution: { ...CONTRIBUTION, overlay: 'editor' } })
+    focusInside()
+    const asked = ask({ op: 'overlay.open', name: 'editor', payload: null })
+    await Promise.resolve()
+    expect(pluginOverlayInvocation()).toMatchObject({ pluginId: 'markup', surface: 'editor' })
     closePluginOverlayWith(null)
     await asked
   })

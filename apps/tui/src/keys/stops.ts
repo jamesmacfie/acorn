@@ -57,6 +57,34 @@ export const focusedCrosses = (): boolean => {
   return !!node && crossing.has(node)
 }
 
+// Every press of a stop, for a host that has to know a person pressed something inside one tree
+// (`pressedWithin` below). A press here is always the person's: keys and the mouse are the only
+// things that call it, and a worker can't reach a host control.
+const pressListeners = new Set<(box: Renderable) => void>()
+
+/**
+ * Whether a person pressed a stop inside `container` within the last `windowMs`.
+ *
+ * The terminal's answer to the desktop's trusted pointerdown and keydown on a tree's element
+ * (client-core host/tree/hostRequests.ts § createGestureClock). Call it once per mount; `dispose`
+ * stops listening.
+ */
+export function pressedWithin(container: () => Renderable | undefined, windowMs: number): { recent(): boolean; dispose(): void } {
+  let at = 0
+  const listener = (box: Renderable): void => {
+    for (let node: Renderable | null | undefined = box; node; node = node.parent as Renderable | null | undefined) {
+      if (node === container()) { at = Date.now(); return }
+    }
+  }
+  pressListeners.add(listener)
+  return {
+    recent: () => at > 0 && Date.now() - at <= windowMs,
+    dispose: () => { pressListeners.delete(listener) },
+  }
+}
+
+const notePress = (box: Renderable): void => { for (const listener of pressListeners) listener(box) }
+
 /** Make a renderable a stop: focusable, pressed by `activate`, and pressed by the mouse. */
 export function pressable(box: Renderable, options: StopOptions): void {
   const off = () => options.disabled?.() ?? false
@@ -81,7 +109,7 @@ export function pressable(box: Renderable, options: StopOptions): void {
   })
   const given = options.on ?? {}
   const runs: Partial<Record<Intent, () => boolean>> = {
-    ...(options.onPress ? { activate: () => { options.onPress!(); return true } } : {}),
+    ...(options.onPress ? { activate: () => { notePress(box); options.onPress!(); return true } } : {}),
     ...given,
     // Every stop moves to the next one beside it, after whatever the node wanted the arrows for.
     // `SegmentedControl` is a whole collection reached through `on` and answers them itself; a node
@@ -103,8 +131,9 @@ export function pressable(box: Renderable, options: StopOptions): void {
   // mouse-down on its way up to the root and focuses the nearest stop above it, which is this box
   // (./regions.ts § Clicks are hit tests).
   box.onMouseDown = () => {
-    if (off()) return
-    options.onPress?.()
+    if (off() || !options.onPress) return
+    notePress(box)
+    options.onPress()
   }
 }
 

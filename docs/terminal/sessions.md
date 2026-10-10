@@ -30,6 +30,10 @@ replay and reconnect both use the latest size, with one fresh snapshot after a r
 
 The Node batches PTY output into one `output` frame about every 16 ms, not one per PTY chunk.
 
+Other plugins can add up to four controls beside the terminal's own, and ask it to interrupt the
+selected session. They never get its input or output. See [toolbar
+actions](../plugins/toolbar-actions.md).
+
 ## Lifecycle
 
 An agent PTY exit emits `plugin:terminal:completed` with the task and session IDs, exit code, and time.

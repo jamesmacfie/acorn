@@ -4,7 +4,7 @@ import { useNavigate } from '@solidjs/router'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { TREE_LIMITS, batchBytes } from '@acorn/protocol/tree/messages.ts'
-import { answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions } from './hostRequests'
+import { answerOwnerInvoke, createGestureClock, unknownHostOp, unsupportedOverlay, type OwnerActions } from './hostRequests'
 import type { FrameBinding } from '../frames/broker'
 import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/overlays'
 import { createTreeBridgeFactory } from './bridgeFactory'
@@ -78,10 +78,6 @@ export type RemoteTreeProps = {
   markdownFences?: boolean
 }
 
-/** How long after a press a tree may still open its overlay. Long enough to cover the worker round
- *  trip the request makes, short enough that it cannot outlive the gesture a person made. */
-const GESTURE_WINDOW_MS = 1_000
-
 const treeRefusal = (contribution: RemoteContribution) => {
   const log = createLogger('plugins', contribution.pluginId)
   return (reason: string): void => log.warn(`${contribution.id}: ${reason}`, undefined, {
@@ -103,10 +99,10 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // `document.activeElement` was the original proof and is not enough on its own. WebKit does not move
   // focus to a button when it is clicked — that is the platform behaviour behind macOS's "Keyboard
   // navigation" setting, and the shell runs in a WKWebView — so a click on a kit `Button` leaves focus
-  // on `<body>` and a tree could never open its companion overlay from a click at all. Capturing,
-  // because the target is inside the host's own components and may stop the bubble.
-  let lastGestureAt = 0
-  const markGesture = (event: Event): void => { if (event.isTrusted) lastGestureAt = Date.now() }
+  // on `<body>` and a tree could never open its companion overlay from a click at all. The same
+  // record answers whether an owner action came from a person (./hostRequests.ts).
+  const gestures = createGestureClock()
+  let unwatchGestures = (): void => {}
 
   const contribution = componentProps.contribution
   const scope = (): TreeScope => componentProps.scope?.() ?? {}
@@ -165,7 +161,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     hash: contribution.hash,
     authority: treeAuthorityKey(contribution.hash, qc, bound, legacyContext, componentProps.document),
     context: legacyContext,
-    hasFocus: () => (container !== undefined && container.contains(document.activeElement)) || (lastGestureAt > 0 && Date.now() - lastGestureAt <= GESTURE_WINDOW_MS),
+    hasFocus: () => (container !== undefined && container.contains(document.activeElement)) || gestures.recent(),
     onRefused: refuse,
     connect: createTreeBridgeFactory(
       { binding: bound, hash: contribution.hash, ...(documentGrant ? { document: documentGrant } : {}) },
@@ -192,8 +188,12 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     // manifest's reference to it is rewritten with it (../plugins/contributionIds.ts) — but the string
     // a running tree passes is the one its author wrote in the manifest, and nothing rewrites that. So a
     // plugin declaring `editor` and asking for `editor` was refused for naming its own overlay.
+    //
+    // The descriptor's own reference is qualified too, and the overlay opens under that reference as
+    // written. The extension and frame registries are both built from the Node's roster row, which
+    // still spells ids as the manifest did, so that spelling is the one the overlay registered under.
     const wanted = qualifiedContributionId(contribution.pluginId, name)
-    if (!contribution.overlay || wanted !== contribution.overlay) {
+    if (!contribution.overlay || wanted !== qualifiedContributionId(contribution.pluginId, contribution.overlay)) {
       return fail('unknown_overlay', `'${name}' is not the overlay this contribution declares`)
     }
     // A host with no overlay frames answers so rather than hanging. The terminal is the case: it mounts
@@ -209,7 +209,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     // (../frames/broker.ts).
     const now = Date.now()
     const focused = container !== undefined && container.contains(document.activeElement)
-    if (!focused && now - lastGestureAt > GESTURE_WINDOW_MS) {
+    if (!focused && !gestures.recent()) {
       return fail('needs_focus', 'openOverlay works from a click or key handler: the tree must be focused')
     }
     if (now - lastOverlayAt < 1_000) return fail('throttled', 'openOverlay is limited to one overlay per second')
@@ -217,22 +217,13 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     if (batchBytes(input ?? null) > TREE_LIMITS.hostRequestBytes) return fail('too_large', `an overlay input is capped at ${TREE_LIMITS.hostRequestBytes} bytes`)
     const opened = openPluginOverlayInvocation({
       pluginId: contribution.pluginId,
-      surface: wanted,
+      surface: contribution.overlay,
       ...(input === undefined ? {} : { input }),
     })
     openOverlayId = opened.id
     const result = await opened.result
     if (openOverlayId === opened.id) openOverlayId = ''
     return { ok: true, body: result ?? null }
-  }
-
-  const attachGestures = (element: HTMLDivElement): void => {
-    element.addEventListener('pointerdown', markGesture, { capture: true })
-    element.addEventListener('keydown', markGesture, { capture: true })
-  }
-  const detachGestures = (): void => {
-    container?.removeEventListener('pointerdown', markGesture, { capture: true })
-    container?.removeEventListener('keydown', markGesture, { capture: true })
   }
 
   const detachHostRequests = worker.onHostRequest(slot, async (request) => {
@@ -242,6 +233,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
         actions: componentProps.actions?.() ?? {},
         name: request.name,
         payload: request.payload,
+        byPerson: gestures.recent(),
       })
     }
     if (request.op === 'overlay.open') return openOverlay(request.name, request.payload)
@@ -284,7 +276,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
 
   onCleanup(() => {
     unwatchAppearance()
-    detachGestures()
+    unwatchGestures()
     unaction()
     unselect()
     detachHostRequests()
@@ -298,7 +290,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
 
   const pluginId = createMemo(() => contribution.pluginId)
   return (
-    <div class="remote-tree" ref={(element) => { container = element; attachGestures(element) }}>
+    <div class="remote-tree" ref={(element) => { container = element; unwatchGestures = gestures.watch(element) }}>
       <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} onFailed={(reason) => {
         recordTreeFailure(contribution.id, reason)
         componentProps.onFailed?.(reason)

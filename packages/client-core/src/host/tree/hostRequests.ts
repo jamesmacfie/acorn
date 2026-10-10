@@ -13,7 +13,44 @@ import type { TreeHostResult } from './workerHost'
 // and `unsupportedOverlay` is the terminal's, because a terminal has no iframe to put a rectangle in
 // and inventing a cell-drawn canvas is not a thing this project should do.
 
-export type OwnerActions = Record<string, (payload: unknown) => unknown | Promise<unknown>>
+/**
+ * What the host knows about one request, beyond its payload.
+ *
+ * `byPerson` is true only when a person pressed something or typed a key inside the asking tree in
+ * the last second. Focus alone isn't enough, because a timer can fire while focus sits in a tree. An
+ * owner whose action is a person's act, such as reloading a page or interrupting a terminal, refuses
+ * without it (docs/plugins/toolbar-actions.md).
+ */
+export type OwnerInvocation = { byPerson: boolean }
+
+export type OwnerActions = Record<string, (payload: unknown, invocation: OwnerInvocation) => unknown | Promise<unknown>>
+
+/** How long after a press a request still counts as the person's. Long enough to cover the worker
+ *  round trip, short enough that it can't outlive the gesture. */
+export const GESTURE_WINDOW_MS = 1_000
+
+/**
+ * When a person last pressed or typed inside one mounted contribution, on the desktop.
+ *
+ * Capturing, because the target is inside the host's own components and may stop the bubble. Only
+ * trusted events count, so a script dispatching a synthetic press proves nothing. The terminal's
+ * equivalent watches its stops instead (apps/tui/src/keys/stops.ts).
+ */
+export function createGestureClock(): { watch(element: HTMLElement): () => void; recent(): boolean } {
+  let at = 0
+  const mark = (event: Event): void => { if (event.isTrusted) at = Date.now() }
+  return {
+    watch: (element) => {
+      element.addEventListener('pointerdown', mark, { capture: true })
+      element.addEventListener('keydown', mark, { capture: true })
+      return () => {
+        element.removeEventListener('pointerdown', mark, { capture: true })
+        element.removeEventListener('keydown', mark, { capture: true })
+      }
+    },
+    recent: () => at > 0 && Date.now() - at <= GESTURE_WINDOW_MS,
+  }
+}
 
 /** Refuse or run one owner action, and measure the answer. */
 export async function answerOwnerInvoke(input: {
@@ -23,6 +60,8 @@ export async function answerOwnerInvoke(input: {
   actions: OwnerActions
   name: string
   payload: unknown
+  /** Whether a person pressed something in this mount just now. The host measures it; the owner decides. */
+  byPerson: boolean
 }): Promise<TreeHostResult> {
   const refuse = (message: string): TreeHostResult => ({ ok: false, error: { code: 'unknown_action', message } })
   // Both lists, in this order. A name in one and not the other is a mistake on the owner's side, and
@@ -30,7 +69,7 @@ export async function answerOwnerInvoke(input: {
   if (!input.declared.includes(input.name)) return refuse(`'${input.name}' is not an action this extension point declares`)
   const handler = input.actions[input.name]
   if (!handler) return refuse(`'${input.name}' is not bound here`)
-  const body = await handler(input.payload)
+  const body = await handler(input.payload, { byPerson: input.byPerson })
   // Measured on the way out for the same reason the request was on the way in: this channel carries
   // identifiers and outcomes, and an owner handing back a whole record set would be using it as a data
   // path. Anything larger belongs on the plugin's own route.

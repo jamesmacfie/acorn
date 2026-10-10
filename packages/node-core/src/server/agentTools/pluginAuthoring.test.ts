@@ -85,6 +85,11 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(renderPluginAuthoring(v)).toContain('`{ projectId?, item?, refId?, surface }`')
     expect(renderPluginAuthoring(v)).toContain('`linear:issue-summary`')
     expect(renderPluginAuthoring(v)).toContain('`rollbar:item-summary`')
+    // Toolbar actions: both points, both actions with their payloads, and the person rule.
+    expect(renderPluginAuthoring(v)).toContain('`mount.host.invoke("reload", { expectedUrl })`')
+    expect(renderPluginAuthoring(v)).toContain('`invoke("interrupt", { expectedSessionId })`')
+    expect(renderPluginAuthoring(v)).toContain('`terminal:toolbar-actions`')
+    expect(renderPluginAuthoring(v)).toContain('`needs_person` unless called from a press in')
   })
 
   it('carries every manifest key, split on what the schema actually requires', () => {

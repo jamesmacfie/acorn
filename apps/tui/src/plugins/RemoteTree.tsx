@@ -11,12 +11,13 @@ import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientEvents, consumePaneIntent } from '@acorn/client-core/host/registries/commands'
 import { acquireTreeWorker, treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant } from '@acorn/client-core/host/tree/workerHost.ts'
 import {
-  createTreeBridgeFactory, answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions,
+  createTreeBridgeFactory, answerOwnerInvoke, GESTURE_WINDOW_MS, unknownHostOp, unsupportedOverlay, type OwnerActions,
 } from '@acorn/client-core/host/tree'
 import type { RemoteContribution } from '@acorn/client-core/host/tree'
 import { toast } from '@acorn/client-core/features/notifications'
 import { copyToTerminal } from '../kit/copy'
 import { focusedRenderable } from '../keys/regions'
+import { pressedWithin } from '../keys/stops'
 import { TreeHost } from './TreeHost'
 import { fenceScope } from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
 
@@ -73,6 +74,9 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const contribution = componentProps.contribution
   const scope = () => componentProps.scope?.() ?? {}
   const refuse = treeRefusal(contribution)
+  // Whether a person pressed a control inside this tree just now, for an owner action that is a
+  // person's act. Focus alone doesn't count, as on the desktop.
+  const presses = pressedWithin(() => container, GESTURE_WINDOW_MS)
 
   const holdsFocus = (): boolean => {
     let at: Renderable | null | undefined = focusedRenderable()
@@ -152,6 +156,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
         actions: componentProps.actions?.() ?? {},
         name: request.name,
         payload: request.payload,
+        byPerson: presses.recent(),
       })
     }
     if (request.op === 'overlay.open') return unsupportedOverlay()
@@ -180,6 +185,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   })
 
   onCleanup(() => {
+    presses.dispose()
     unaction()
     unselect()
     detachHostRequests()
