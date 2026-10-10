@@ -77,6 +77,8 @@
     "extensionPoints": [
       "agents:tool-card",
       "agents:attachment",
+      "agents:transcript-attachment",
+      "agents:artifact",
       "agents:composer-actions",
       "agents:session-header",
       "agents:request-card",
@@ -85,8 +87,13 @@
       "context:section",
       "docker:stats-beside",
       "docker:container",
+      "editor:document",
+      "editor:file",
       "github:diff-line",
-      "github:summary-badges"
+      "github:summary-badges",
+      "preview:toolbar-actions",
+      "terminal:toolbar-actions",
+      "workflows:step-body"
     ],
     "extensions": [
       "agents.storage",
@@ -94,7 +101,8 @@
       "agents.loop-coverage",
       "changes.tool-card",
       "github.push-actions",
-      "memory.tool-card"
+      "memory.tool-card",
+      "workflows.tool-card"
     ],
     "refPanels": [
       "github-pull"
@@ -241,6 +249,10 @@
       "settingsPages": [
         "editor"
       ],
+      "extensionPoints": [
+        "editor:document",
+        "editor:file"
+      ],
       "persistedStateSlices": [
         "editor.open-files"
       ]
@@ -303,6 +315,9 @@
       "commands": [
         "preview.open"
       ],
+      "extensionPoints": [
+        "preview:toolbar-actions"
+      ],
       "schedules": [
         "preview.configured"
       ]
@@ -325,6 +340,12 @@
       "slots": [
         "overlay/workflows.git-launch",
         "overlay/workflows.start-from-item"
+      ],
+      "extensionPoints": [
+        "workflows:step-body"
+      ],
+      "extensions": [
+        "workflows.tool-card"
       ],
       "schedules": [
         "workflows.task-runs"
