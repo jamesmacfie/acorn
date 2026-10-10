@@ -10,6 +10,7 @@ import {
   DIAGNOSTIC_SEVERITIES, MAX_DIAGNOSTICS, MAX_HOVER_BYTES, MAX_LANGUAGE_REQUEST_BYTES,
   type PluginDiagnosticSeverity, type PluginPosition, type PluginRange,
 } from '@acorn/protocol/documentSurface.ts'
+import { utf8Exceeds } from '@acorn/protocol/extensionPoints.ts'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import { writeJson } from '../../../infra/node/apiClient'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
@@ -67,9 +68,7 @@ export function resolveDocumentServices(nodeId: string, languageId: string, pref
 export const LANGUAGE_REQUEST_TOO_LARGE = 'Hover and diagnostics are off for this document: it is larger than 1 MiB.'
 
 /** Is this buffer over the 1 MiB of UTF-8 a hover or diagnostics request may carry? */
-export const languageRequestTooLarge = (text: string): boolean =>
-  text.length > MAX_LANGUAGE_REQUEST_BYTES
-  || (text.length * 3 > MAX_LANGUAGE_REQUEST_BYTES && new TextEncoder().encode(text).byteLength > MAX_LANGUAGE_REQUEST_BYTES)
+export const languageRequestTooLarge = (text: string): boolean => utf8Exceeds(text, MAX_LANGUAGE_REQUEST_BYTES)
 
 // POST a request to a provider's route on the bound Node. The answer is unchecked bytes.
 const postDocumentService = (route: string, nodeId: string, body: object, signal?: AbortSignal): Promise<unknown> =>
@@ -121,7 +120,7 @@ export function checkHover(body: unknown, sent: { text: string; revision: number
   if (revision !== sent.revision || !contents || typeof contents !== 'object') return undefined
   const { kind, value } = contents as Record<string, unknown>
   if ((kind !== 'plaintext' && kind !== 'markdown') || typeof value !== 'string' || !value.trim()) return undefined
-  if (value.length * 3 > MAX_HOVER_BYTES && new TextEncoder().encode(value).byteLength > MAX_HOVER_BYTES) return undefined
+  if (utf8Exceeds(value, MAX_HOVER_BYTES)) return undefined
   if (range === undefined) return { kind, value }
   const span = rangeIn(sent.text, lineStarts(sent.text), range)
   return span && { kind, value, ...span }

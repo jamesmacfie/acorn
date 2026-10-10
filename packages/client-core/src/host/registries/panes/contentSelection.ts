@@ -1,13 +1,11 @@
 // What an owner needs to turn a person's selection into a `content.selection` target. JSX-free and
 // DOM-free, so both hosts and every owner share it. See docs/plugins/menus-and-markers.md § Context menus.
 import { MAX_SELECTION_BYTES } from '@acorn/protocol/contextMenus.ts'
+import { utf8Exceeds } from '@acorn/protocol/extensionPoints.ts'
 import type { SelectionRange } from './contextMenus'
 
-/** Is this text over the 64 KiB of UTF-8 a selection action may be handed? Each UTF-16 unit is at
- *  least one byte and at most three, so only the middle band needs encoding. */
-export const selectionTooLarge = (text: string): boolean =>
-  text.length > MAX_SELECTION_BYTES
-  || (text.length * 3 > MAX_SELECTION_BYTES && new TextEncoder().encode(text).byteLength > MAX_SELECTION_BYTES)
+/** Is this text over the 64 KiB of UTF-8 a selection action may be handed? */
+export const selectionTooLarge = (text: string): boolean => utf8Exceeds(text, MAX_SELECTION_BYTES)
 
 // The part of CodeMirror's `EditorState` this reads, so this module imports no editor.
 type DocumentState = {
