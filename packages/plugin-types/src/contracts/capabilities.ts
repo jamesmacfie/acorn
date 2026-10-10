@@ -1,5 +1,6 @@
 import type { HostOwned } from './shared.js'
 import type { DraftAttachmentsCapability } from './attachments.js'
+import type { EditorFilesCapability } from './editorFiles.js'
 import type {
   AgentActivityCapability,
   AgentRequestsCapability,
@@ -77,6 +78,8 @@ export type CapabilityCatalogue = {
   'agents.harnessRegistry': HostOwned<'node-core/server/plugin/harnesses.HarnessRegistry'>
   /** The host-declared hook fired when a task's worktree first exists. */
   'core.taskWorktreeCreated': (taskId: string, worktreePath: string) => void | Promise<void>
+  /** Read one file of a task's worktree as bytes, confined to the worktree and capped at 12 MiB. */
+  'editor.files': EditorFilesCapability
   /** Read and steer this node's terminal sessions. */
   'terminal.sessions': HostOwned<'plugins/terminal/contract/sessions.TerminalSessions'>
   /** Push text into a running agent session's PTY. */

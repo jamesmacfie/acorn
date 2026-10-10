@@ -3,8 +3,8 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
-import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, featureUsable, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
-import { Alert, Button, ConfirmButton, copyText, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, featureUsable, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, slotFills, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
+import { Alert, Button, ConfirmButton, copyText, DetailColumn, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
 import { captureFileDecision, createEditorRefreshQueue, fileDecisionIsCurrent, reconcileEditorDisk, type FileDecision } from './editorDocumentLifecycle'
@@ -17,6 +17,8 @@ import { createFileActionModel } from './fileActionModel'
 import { persistCapturedEditorOpenFiles } from './openFilesSlice'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
+import { Slot } from '@acorn/plugin-api/ui/host'
+import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
 import SearchPanel from './search/SearchPanel'
 import { imageTypeForPath } from '../contract/imagePreview'
 import { markerRevision } from './markerRevision'
@@ -517,6 +519,53 @@ export default function EditorPane(props: { task: Task }) {
       view.dispatch({ effects: wrapCompartment!.reconfigure(defaultWrap ? engine!.EditorView.lineWrapping : []) })
   })
   const imagePath = createMemo(() => mode() === 'graphical' && imageTypeForPath(active() ?? '') ? active() : null)
+
+  // Another plugin's view of the open file, in the `editor:document` point (docs/editor/file-renderers.md).
+  // The pane's own view draws when nobody stands in, and a Source toggle per tab gets the reader back
+  // to it. A contributed view takes the box from CodeMirror the way terminal mode does: the view goes, and
+  // the pooled document, its undo history, and any unsaved edits stay for the way back.
+  const documentKey = createMemo(() => active()?.split('/').pop()?.toLowerCase())
+  const rendererOffered = () => mode() !== 'terminal' && !!documentKey() && slotFills(EDITOR_DOCUMENT_POINT, documentKey())
+  const [sourceVersion, setSourceVersion] = createSignal(0)
+  const renderedPath = createMemo(() => {
+    sourceVersion()
+    const path = active()
+    return path && rendererOffered() && !presentationFor(nodeId, taskId, path).source ? path : null
+  })
+  const [rendered, setRendered] = createSignal<EditorDocumentProps | null>(null)
+  const [occupied, setOccupied] = createSignal(false)
+  // True only while a contributor draws. A tie between two contributors draws the pane's own view.
+  const documentRendered = () => !!renderedPath() && !!rendered() && occupied()
+  const showSource = (source: boolean) => {
+    const path = active()
+    if (!path) return
+    setPresentation(nodeId, taskId, path, { ...presentationFor(nodeId, taskId, path), source })
+    setSourceVersion((value) => value + 1)
+  }
+  let renderedGeneration = 0
+  let documentRevision = 0
+  // The props a contributor draws from. The pooled buffer is the live one, unsaved edits included.
+  // Without a pooled document, or once the disk moved under a clean one, the disk is the answer.
+  async function readRendered(path: string): Promise<void> {
+    const generation = ++renderedGeneration
+    const entry = pool.files.get(path)
+    const warmed = warmedText.get(path)
+    warmedText.delete(path)
+    const text = entry && (!entry.stale || entry.custody.dirty) ? entry.custody.current.toString()
+      : imageTypeForPath(path) ? undefined
+      : await (warmed ?? api.read(taskId, path)).then((read) => read.text, () => undefined)
+    if (!live() || generation !== renderedGeneration || renderedPath() !== path) return
+    setRendered({ taskId, path, ...(text === undefined ? {} : { text }), revision: ++documentRevision })
+    featureUsable('editor', 'content')
+  }
+  createEffect(on(renderedPath, (path) => {
+    renderedGeneration++
+    setRendered(null)
+    // Assume the contributor that matched will draw, so CodeMirror isn't built and torn down in the
+    // same tick. The slot corrects this at once when a tie leaves the box to the pane.
+    setOccupied(!!path)
+    if (path) void readRendered(path)
+  }))
   createEffect(on(active, (path) => {
     if (!path || graphical && !imageTypeForPath(path)) return
     void api.entry(taskId, path).then(() => {
@@ -547,7 +596,7 @@ export default function EditorPane(props: { task: Task }) {
   }
   const statusIndentation = () => {
     statusVersion()
-    return mode() === 'graphical' && !imagePath() && !ptyPath() && active()
+    return mode() === 'graphical' && !imagePath() && !ptyPath() && !documentRendered() && active()
       ? pool.files.get(active()!)?.indentation
       : undefined
   }
@@ -1080,6 +1129,8 @@ export default function EditorPane(props: { task: Task }) {
     for (const entry of pool.files.values()) entry.stale = true
     const path = currentPath
     if (path) refreshQueue.request(path)
+    const shown = renderedPath()
+    if (shown) void readRendered(shown)
   }
   function onFocus() { invalidate(); fileStatus.refresh() }
 
@@ -1122,6 +1173,16 @@ export default function EditorPane(props: { task: Task }) {
         view.setState(emptyState())
       }
     }, { defer: true }),
+  )
+
+  // The pane's own view of a file, drawn whenever no contributor stands in for it.
+  const fileView = () => (
+    <Show when={imagePath()} fallback={<Rectangle kind="editor" label="Editor" mount={mountEditor} />} keyed>
+      {(path) => <>
+        <Only hosts={['dom']}><ImagePreview taskId={taskId} path={path} /></Only>
+        <Only hosts={['tui']}><EmptyState>Image preview is available in the desktop editor: {path}</EmptyState></Only>
+      </>}
+    </Show>
   )
 
   return (
@@ -1194,7 +1255,20 @@ export default function EditorPane(props: { task: Task }) {
                   pressed={mode() === 'terminal'}
                   onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
                 ><Icon name="square-terminal" /></ToggleButton>
-                <Show when={active() && !imagePath()}>
+                {/* Outside the slot, so a contributor can never take the way back to the text. */}
+                <Show when={renderedPath() ? occupied() : rendererOffered()}>
+                  <ToggleButton
+                    iconOnly
+                    variant="bare"
+                    size="sm"
+                    label="Preview"
+                    tip="Preview"
+                    tipSub="Drawn by a plugin. Turn off to edit the source."
+                    pressed={!!renderedPath()}
+                    onPressedChange={(pressed) => showSource(!pressed)}
+                  ><Icon name="eye" /></ToggleButton>
+                </Show>
+                <Show when={active() && !imagePath() && !documentRendered()}>
                   <Show when={activeTab()?.dirty} fallback={
                     <IconButton icon="refresh-cw" label="Reload from disk" onPress={() => { const path = active(); if (path) void revalidate(path) }} />
                   }>
@@ -1267,11 +1341,16 @@ export default function EditorPane(props: { task: Task }) {
               the host (ui/Rectangle.tsx). In terminal mode the same box holds the reader's own editor
               instead, keyed on the path so switching tabs starts a new one. */}
           <Show when={ptyPath()} fallback={
-            <Show when={imagePath()} fallback={<Rectangle kind="editor" label="Editor" mount={mountEditor} />} keyed>
-              {(path) => <>
-                <Only hosts={['dom']}><ImagePreview taskId={taskId} path={path} /></Only>
-                <Only hosts={['tui']}><EmptyState>Image preview is available in the desktop editor: {path}</EmptyState></Only>
-              </>}
+            <Show when={renderedPath()} fallback={fileView()}>
+              <Show when={rendered()} fallback={<EmptyState busy>Loading…</EmptyState>}>
+                {/* The pane's own view is beside the slot rather than its default, because a
+                    contributor's tree needs a scrolling column and CodeMirror needs the whole box.
+                    It draws when nobody stands in, which for a matched key means an unsettled tie. */}
+                <Show when={!occupied()}>{fileView()}</Show>
+                <DetailColumn scroll={occupied()}>
+                  <Slot point={EDITOR_DOCUMENT_POINT} key={documentKey()} taskId={taskId} props={() => rendered()} occupied={setOccupied} />
+                </DetailColumn>
+              </Show>
             </Show>
           } keyed>
             {(path) => <EditorTerminal taskId={taskId} path={path} onExit={(code) => onEditorExit(path, code)} />}
@@ -1283,7 +1362,7 @@ export default function EditorPane(props: { task: Task }) {
             language={languageName(languageIdForPath(path))}
             indentation={statusIndentation()}
             save={statusSave()}
-            preview={!!imagePath()}
+            preview={!!imagePath() || documentRendered()}
             external={!!ptyPath()}
             wrap={statusWrap()}
             onToggleWrap={() => { if (statusCurrent(path)) toggleWrap() }}

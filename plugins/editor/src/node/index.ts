@@ -6,6 +6,7 @@ import { editor, EDITOR } from '../server/routes/editor'
 import { search, SEARCH } from '../server/routes/search'
 import { EDITOR_LINE_MARKERS } from '../contract/lineMarkers'
 import { EDITOR_FILE_STATUS } from '../contract/fileStatus'
+import { EDITOR_FILES } from '../contract/files'
 
 export const editorPlugin = (): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
@@ -35,6 +36,11 @@ export const editorPlugin = (): NodePlugin => {
           () => ctx.extensionPoints.handlers(EDITOR_FILE_STATUS).map((entry) => entry.value),
         )),
         ctx.capabilities.provide(SEARCH, lazySearchBridge(ctx.core)),
+        // Read-only bytes for a plugin that draws a file in the editor (../contract/files.ts). Loaded on
+        // first use, like the route bridge above.
+        ctx.capabilities.provide(EDITOR_FILES, {
+          read: async (input) => (await import('../server/editor')).editorFiles(ctx.core).read(input),
+        }),
       ]
       // `$EDITOR` in a throwaway PTY, for a reader who edits in terminal mode. It rides the one
       // authenticated WebSocket, so it is part of this plugin's surface: drop it and the routes keep

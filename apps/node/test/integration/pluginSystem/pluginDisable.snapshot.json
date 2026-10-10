@@ -113,6 +113,7 @@
       "changes.staticDependencyPolicy",
       "core.scheduler",
       "docker.route",
+      "editor.files",
       "editor.route",
       "editor.searchRoute",
       "github.mirror",
@@ -197,6 +198,7 @@
         "editor/tasks"
       ],
       "capabilities": [
+        "editor.files",
         "editor.route",
         "editor.searchRoute"
       ]

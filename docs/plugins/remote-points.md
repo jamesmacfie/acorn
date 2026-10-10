@@ -46,6 +46,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `agents:composer-actions` | `stack`, up to four | `{ taskId, sessionId }` |
 | `agents:session-header` | `stack`, up to two | `{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }` |
 | `agents:request-card` | `stack`, up to two | `{ taskId, sessionId, requestId, kind, title }` |
+| `editor:document` | `replace`, keyed by lowercased file basename | `{ taskId, path, text?, revision }`. See [file renderers](../editor/file-renderers.md) |
 | `changes:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
 | `context:section` | `stack`, up to two, keyed by section id | `{ task, onChanged, onPendingChange }` |
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |

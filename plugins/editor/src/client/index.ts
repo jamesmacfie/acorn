@@ -18,6 +18,11 @@ export const editorClientPlugin: ClientPlugin = {
   name: 'editor',
   init: (ctx) => {
     ctx.panes.register(editorPaneContribution)
+    // Another plugin's view of the open file, such as a markdown preview (docs/editor/file-renderers.md).
+    // One view replaces the document, and the pane keeps its own text view one Source toggle away.
+    ctx.extensionPoints.register({
+      id: 'document', label: 'Editor document', kind: 'remote', mode: 'replace', max: 1,
+    })
     ctx.settingsPages.register({
       id: 'editor', label: 'Editor', category: 'features', scope: 'device', icon: 'file-code', order: 20,
       requires: { plugin: 'editor' },

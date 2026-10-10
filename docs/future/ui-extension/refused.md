@@ -57,7 +57,7 @@ command or menu and capture content only from supported owner adapters.
 ## More file viewer formats in this programme
 
 Editor viewers are a prerequisite. PDF, media streaming, rectangle replacement, and side-by-side
-rendering follow [that proposal](../editor-files.md). Do not make them hidden prerequisites of URL
+rendering are the [limits of that point](../../editor/file-renderers.md#limits). Do not make them hidden prerequisites of URL
 previews or transcript viewer points. The byte bridge's limit remains explicit.
 
 ## Verify before building

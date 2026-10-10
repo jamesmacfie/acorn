@@ -30,7 +30,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 | [bundle.md](./bundle.md) | Container coordination, platform archives, bundled runtime, Windows operation support, installer, desktop TUI embedding, and macOS signing. | Standalone CLI/TUI staging and certificate generation implemented. Release delivery remains proposed. |
 | [compiled-tier.md](./compiled-tier.md) | Assess plugin migration candidates, reproduce retained cleanup reports, and finish loaded-package acceptance. | Standing assessment refreshed October 8, 2026. No migration scheduled. |
 | [dashboards-gaps.md](./dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision. | Followups to the implemented studio and derived sources. Replaces the completed phase plans. |
-| [editor-files.md](./editor-files.md) | Plugin file viewers through an Editor replacement point and a confined read-only file capability. | Proposed. Implementation not started. |
 | [integration-ideas.md](./integration-ideas.md) | Research catalogue for selecting integrations and checking contribution coverage. | Research, not an implementation specification. Recheck each candidate before assigning work. |
 | [kimi.md](./kimi.md) | An external Kimi harness package and optional usage/auth probes. | Proposed. No Kimi implementation in this checkout. Other external harnesses already exercise the contribution contract. |
 | [lazy-plugin-code.md](./lazy-plugin-code.md) | A shared promise-caching `lazyFetch` helper and selective route conversion. | Implemented October 9, 2026. The page keeps the original design. |
@@ -58,6 +57,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 | --- | --- |
 | `group-projects-later.md` | [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project). |
 | `find-in-file.md` | [Find in a file](../editor.md#find-in-a-file). |
+| `editor-files.md` | [File renderers](../editor/file-renderers.md). The renderer catalogue and the rectangle design remain in Git history. |
 | `workspace-icons.md` | [Workspace icons](../workspaces-and-tasks/workspace-icons.md). |
 | `test-feedback.md` | [Testing](../testing.md). Broader excluded performance ideas remain in Git history, not assigned requirements. |
 | `dashboards/` | [Dashboard reference](../dashboards.md), [derived sources](../data-sources/derived-sources.md), and [remaining work](./dashboards-gaps.md). |

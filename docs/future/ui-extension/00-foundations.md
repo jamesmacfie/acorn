@@ -1,7 +1,7 @@
 # Phase 00: confirm prerequisites and contracts
 
 Status: planned, October 6, 2026. Baseline: `0ce874a15c856db07992cc5f7650b6730c6aadaf`.
-Depends on completed [Editor file viewers](../editor-files.md). Execute before phase 01.
+Depends on [Editor file renderers](../../editor/file-renderers.md), which shipped. Execute before phase 01.
 
 This phase records the post-Editor baseline and establishes the contracts and verification inventory
 for contextual UI. It does not introduce an unused extension framework.

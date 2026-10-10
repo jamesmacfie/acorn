@@ -2,7 +2,12 @@ import type { DocumentCustody } from '@acorn/plugin-api/ui/editor'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 
 export type Indentation = { mode: 'spaces' | 'tabs'; width: 2 | 4 | 8 }
-export type Presentation = { wrap?: boolean; indentation?: Indentation }
+export type Presentation = {
+  wrap?: boolean
+  indentation?: Indentation
+  /** The reader chose the editor's own text over a plugin's view of this file (docs/editor/file-renderers.md). */
+  source?: boolean
+}
 
 const overrides = new Map<string, Presentation>()
 const key = (nodeId: string | null, taskId: string, path: string) => JSON.stringify([nodeId, taskId, path])

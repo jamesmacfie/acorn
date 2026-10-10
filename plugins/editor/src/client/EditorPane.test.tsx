@@ -7,7 +7,8 @@ import { EditorSelection } from '@codemirror/state'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
-import { commandRegistry, setActiveNode, setActiveTaskId, setFocusedPane } from '@acorn/plugin-api/testkit/client'
+import { commandRegistry, extensionPointRegistry, extensionRegistry, setActiveNode, setActiveTaskId, setFocusedPane, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
+import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -1119,6 +1120,65 @@ describe('the editor pane', () => {
       unmount()
       URL.createObjectURL = oldCreate
       URL.revokeObjectURL = oldRevoke
+    }
+  })
+
+  // The `editor:document` point (docs/editor/file-renderers.md): a compiled contributor stands in for
+  // the text, the Source toggle brings CodeMirror back with the same buffer, and the contributor sees
+  // that buffer, unsaved edits included, when the reader returns to it.
+  it('lets another plugin draw a file and keeps the source one toggle away', async () => {
+    disk.set('README.md', '# Hello\n')
+    const drawn: EditorDocumentProps[] = []
+    const Preview = (props: EditorDocumentProps) => {
+      drawn.push({ ...props })
+      return <p data-testid="preview">{props.text}@{props.revision}</p>
+    }
+    const registrations = [
+      extensionPointRegistry.register({ id: EDITOR_DOCUMENT_POINT, ownerId: 'editor', label: 'Editor document', kind: 'remote', mode: 'replace', max: 1 }),
+      extensionRegistry.register({
+        id: 'plugin:markdown:document', pluginId: 'markdown', point: EDITOR_DOCUMENT_POINT, label: 'Markdown preview',
+        order: 500, carrier: 'component', component: Preview, matches: ['*.md'],
+      } as ExtensionContribution),
+    ]
+    try {
+      const { host } = mount()
+      await editor(host)
+      const toggle = () => host.querySelector<HTMLButtonElement>('button[aria-label="Preview"]')
+      expect(toggle()).toBeNull() // no file open, nothing to preview
+
+      editorOpen(taskId, 'README.md', false)
+      await vi.waitFor(() => expect(host.querySelector('[data-testid="preview"]')?.textContent).toBe('# Hello\n@1'))
+      expect(drawn.at(-1)).toMatchObject({ taskId, path: 'README.md' })
+      expect(host.querySelector('.cm-editor')).toBeNull()
+      expect(toggle()?.getAttribute('aria-pressed')).toBe('true')
+      expect(host.querySelector('[aria-label="File status"]')?.textContent).toContain('Read-only preview')
+
+      toggle()!.click()
+      const view = await editor(host)
+      await showing(() => view, '# Hello')
+      expect(host.querySelector('[data-testid="preview"]')).toBeNull()
+      write.mockImplementation(async () => new Promise(() => {})) // hold the save, so the buffer stays dirty
+      view.dispatch({ changes: { from: view.state.doc.length, insert: 'more\n' } })
+
+      toggle()!.click()
+      await vi.waitFor(() => expect(host.querySelector('[data-testid="preview"]')?.textContent).toBe('# Hello\nmore\n@2'))
+      expect(disk.get('README.md')).toBe('# Hello\n')
+
+      // Files the contributor didn't claim keep the pane's own view and no toggle.
+      editorOpen(taskId, 'a.ts', false)
+      await showing(() => EditorView.findFromDOM(host.querySelector<HTMLElement>('.cm-editor')!)!, 'const a = 1')
+      expect(toggle()).toBeNull()
+
+      // Two contributors for one key and no pick in settings: the pane's own view draws.
+      registrations.push(extensionRegistry.register({
+        id: 'plugin:other:document', pluginId: 'other', point: EDITOR_DOCUMENT_POINT, label: 'Other preview',
+        order: 500, carrier: 'component', component: Preview, matches: ['readme.md'],
+      } as ExtensionContribution))
+      editorActivate(taskId, 'README.md')
+      await showing(() => EditorView.findFromDOM(host.querySelector<HTMLElement>('.cm-editor')!)!, 'more')
+      expect(host.querySelector('[data-testid="preview"]')).toBeNull()
+    } finally {
+      for (const registration of registrations.reverse()) registration.dispose()
     }
   })
 

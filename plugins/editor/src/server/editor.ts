@@ -11,6 +11,7 @@ import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 import type { EditorLineMarkerProvider } from '../contract/lineMarkers'
 import type { EditorFileStatusProvider } from '../contract/fileStatus'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
+import { MAX_EDITOR_FILE_READ_BYTES, type EditorFilesCapability } from '../contract/files'
 import { markerSnapshot, readMarkerProviders } from './markerSnapshot'
 import { canonicalCheckoutKey, withFileWriteLock } from './fileWriteLock'
 import { createFileActions, entryIdentity, entryKind, stableEntryId } from './fileActions'
@@ -203,5 +204,24 @@ export const editorBridge = (
       return { ok: false as const, kind: 'failure' as const, reason: e instanceof Error ? e.message : String(e) }
     }
     })
+  },
+})
+
+/** `editor.files` (../contract/files.ts): the text read's confinement and the image read's size
+ *  check, for another plugin's node part. Every refusal is `missing`, so the answer never says
+ *  whether something exists outside the worktree. */
+export const editorFiles = (core: EditorCoreServices): EditorFilesCapability => ({
+  read: async ({ taskId, path }) => {
+    try {
+      const { abs } = await confinedFile(core, taskId, path)
+      const { size } = await stat(abs)
+      if (size > MAX_EDITOR_FILE_READ_BYTES) return { status: 'too_large', byteSize: size }
+      const bytes = new Uint8Array(await readFile(abs))
+      // The file can grow between the stat and the read.
+      if (bytes.byteLength > MAX_EDITOR_FILE_READ_BYTES) return { status: 'too_large', byteSize: bytes.byteLength }
+      return { status: 'ok', bytes, revision: revisionOf(bytes) }
+    } catch {
+      return { status: 'missing' }
+    }
   },
 })

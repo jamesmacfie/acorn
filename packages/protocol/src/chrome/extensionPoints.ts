@@ -450,3 +450,21 @@ export type AgentSessionHeaderProps = {
 /** How one attachment on an unsent turn is drawn, keyed by its media type. `replace`, because a chip
  *  is one thing and two plugins drawing the same file would be two chips for one attachment. */
 export const AGENT_ATTACHMENT_POINT = 'agents:attachment'
+
+/** Another plugin's view of the file open in the editor, keyed by the file's lowercased basename
+ *  (`readme.md`, `*.csv`, `dockerfile`). `replace`, because the document area holds one view; the
+ *  editor's own text or image view is the default and stays one Source toggle away
+ *  (docs/editor/file-renderers.md). */
+export const EDITOR_DOCUMENT_POINT = 'editor:document'
+
+export type EditorDocumentProps = {
+  taskId: string
+  /** The worktree-relative path the editor reads. Pass it back unchanged to `editor.files`. */
+  path: string
+  /** The editor's buffer when the file is UTF-8 text, which can include unsaved edits. Absent for a
+   *  binary file or a failed read. */
+  text?: string
+  /** Rises each time this document is handed over again: a disk change, a focus reread, or a return
+   *  from Source. Work started for a lower revision is stale. */
+  revision: number
+}

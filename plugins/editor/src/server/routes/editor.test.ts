@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { editorBridge, type EditorCoreServices } from '../editor'
+import { editorBridge, editorFiles, type EditorCoreServices } from '../editor'
 import { claimEditorPty } from '../editorPtyOwners'
 import { makeTestCoreServices, makeTestDb, schema, type TestDb } from '@acorn/plugin-api/testkit'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
@@ -15,6 +15,7 @@ import { createTaskService } from '@acorn/plugin-api/testkit'
 import { editor, setEditorBridge } from './editor'
 import type { Env } from '@acorn/plugin-api/testkit'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../../contract/imagePreview'
+import { MAX_EDITOR_FILE_READ_BYTES } from '../../contract/files'
 
 // Editor reads and writes inside the worktree, so this runs against a real one and exercises the
 // filesystem-containment contract end to end: path traversal, symlink escape, missing worktree.
@@ -102,6 +103,26 @@ describe('editor routes over a real worktree', () => {
   afterEach(() => {
     setEditorBridge(null)
     t.cleanup()
+  })
+
+  // editor.files, what a renderer's node part reads (../../contract/files.ts). The same confinement as
+  // the routes, with every refusal answered the same way.
+  it('gives another plugin disk bytes inside the worktree and nothing outside it', async () => {
+    const files = editorFiles({ tasks: createTaskService(t.db), fs: coreFs, proc: testProc })
+    const photo = await files.read({ taskId: 'task1', path: 'sub/photo.webp' })
+    expect(photo).toEqual({
+      status: 'ok',
+      bytes: Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0, 0xff]),
+      revision: createHash('sha256').update(Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0, 0xff])).digest('hex'),
+    })
+    for (const [taskId, path] of [['task1', 'escape/secret.txt'], ['task1', '../outside.txt'], ['task1', 'nope.txt'], ['task1', 'sub'], ['task2', 'hello.txt'], ['gone', 'hello.txt']]) {
+      expect(await files.read({ taskId, path })).toEqual({ status: 'missing' })
+    }
+    writeFileSync(join(work, 'huge.bin'), '')
+    truncateSync(join(work, 'huge.bin'), MAX_EDITOR_FILE_READ_BYTES + 1)
+    try {
+      expect(await files.read({ taskId: 'task1', path: 'huge.bin' })).toEqual({ status: 'too_large', byteSize: MAX_EDITOR_FILE_READ_BYTES + 1 })
+    } finally { rmSync(join(work, 'huge.bin')) }
   })
 
   it('reads, lists, files, and roots a real worktree', async () => {

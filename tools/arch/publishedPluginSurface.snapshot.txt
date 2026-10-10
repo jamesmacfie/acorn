@@ -412,6 +412,7 @@ acorn-plugin-types: member CapabilityCatalogue.'agents.sessions'
 acorn-plugin-types: member CapabilityCatalogue.'agents.turns'
 acorn-plugin-types: member CapabilityCatalogue.'browser.captures'
 acorn-plugin-types: member CapabilityCatalogue.'core.taskWorktreeCreated'
+acorn-plugin-types: member CapabilityCatalogue.'editor.files'
 acorn-plugin-types: member CapabilityCatalogue.'github.mirror'
 acorn-plugin-types: member CapabilityCatalogue.'memory.library'
 acorn-plugin-types: member CapabilityCatalogue.'notes.seedTask'
@@ -713,6 +714,7 @@ acorn-plugin-types: member DraftAttachment.mediaType
 acorn-plugin-types: member DraftAttachment.taskId
 acorn-plugin-types: member DraftAttachmentsCapability.createReplacement
 acorn-plugin-types: member DraftAttachmentsCapability.read
+acorn-plugin-types: member EditorFilesCapability.read
 acorn-plugin-types: member Extension.id
 acorn-plugin-types: member Extension.order
 acorn-plugin-types: member Extension.pluginId
@@ -1186,6 +1188,7 @@ acorn-plugin-types: type DbSchemaMode
 acorn-plugin-types: type Disposable
 acorn-plugin-types: type DraftAttachment
 acorn-plugin-types: type DraftAttachmentsCapability
+acorn-plugin-types: type EditorFilesCapability
 acorn-plugin-types: type Extension
 acorn-plugin-types: type ExtensionPointId
 acorn-plugin-types: type GenerateTextInput

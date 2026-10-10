@@ -4,7 +4,7 @@ Status: implementation plan, October 6, 2026. Implementation not started.
 Analysis baseline: `0ce874a15c856db07992cc5f7650b6730c6aadaf`, including an uncommitted working tree.
 
 This programme adds contextual plugin UI to Acorn's desktop and terminal clients. Execute the phases
-in numerical order after [Editor file viewers](../editor-files.md) ships. Each phase is a developer
+in numerical order. [Editor file renderers](../../editor/file-renderers.md) shipped first. Each phase is a developer
 handoff with its own contracts, owners, verification, and completion criteria.
 
 ## Outcome and scope

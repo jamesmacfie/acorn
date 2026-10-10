@@ -108,6 +108,9 @@ draws, surface actions, and the document API on the bridge.
 [The editor pane](./editor/editor-pane.md) covers the editor plugin's pane: opening files, image
 previews, the file tree, reloading on focus, editing in `$EDITOR`, and its palette commands.
 
+[File renderers](./editor/file-renderers.md) covers the `editor:document` point another plugin draws a
+file in, the **Preview** toggle, and the `editor.files` capability that reads a file's bytes.
+
 <a id="find-in-files"></a>
 
 [Find in files](./editor/find-in-files.md) covers the ripgrep search behind the editor's search panel.

@@ -116,6 +116,7 @@ export type {
   CoreIdentityService,
 } from './contracts/coreMisc.js'
 export type { DraftAttachment, DraftAttachmentsCapability } from './contracts/attachments.js'
+export type { EditorFilesCapability } from './contracts/editorFiles.js'
 export type {
   AgentPermissionSubject,
   AgentBeforePermissionPayload,
