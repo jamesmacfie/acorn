@@ -35,10 +35,16 @@ export type TreeHostProps = {
   transport: TreeTransport
   /** Called with a one-line reason whenever something was refused, for the roster row. */
   onRefused?: (reason: string) => void
+  /** Called with the reason when the whole tree fails and draws nothing. */
+  onFailed?: (reason: string) => void
 }
 
 export function TreeHost(props: TreeHostProps) {
   const reportExclusiveFailure = useExclusiveSlotFailure()
+  const reportFailure = (reason: string): void => {
+    reportExclusiveFailure?.(reason)
+    props.onFailed?.(reason)
+  }
   const state = createTreeState({
     pluginId: props.pluginId,
     transport: props.transport,
@@ -47,7 +53,7 @@ export function TreeHost(props: TreeHostProps) {
   onCleanup(() => state.dispose())
   createEffect(() => {
     const failed = state.failed()
-    if (failed) reportExclusiveFailure?.(failed)
+    if (failed) reportFailure(failed)
   })
 
   const NodeView = (own: { id: string }): JSX.Element => {
@@ -76,7 +82,7 @@ export function TreeHost(props: TreeHostProps) {
       {/* One boundary per tree, not per node: a kit component that throws on a stranger's props takes
           its own tree down and nothing else. A failed optional contribution stays out of the owner's
           UI rather than replacing it with an error. */}
-      <ErrorBoundary fallback={(error) => { reportExclusiveFailure?.(String(error)); return null }}>
+      <ErrorBoundary fallback={(error) => { reportFailure(String(error)); return null }}>
         {/* One boundary per root, not per node and not one for the whole slot. A heavy node is a
             loader (./kitEntry.ts), and a pending `lazy()` renders as an empty string — invisible on
             the DOM, refused by a cell host, so `fallback={null}` is the shape the pane registry

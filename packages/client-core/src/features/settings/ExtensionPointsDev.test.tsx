@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ExtensionPointsDev from './ExtensionPointsDev'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
+import { recordTreeFailure } from '../../host/tree/treeFailures'
 
 // The screen that exists because everything else is silent (docs/plugins/cooperative-extension-points.md § Seeing what matched).
 //
@@ -106,5 +107,24 @@ describe('ExtensionPointsDev', () => {
     dispose = render(() => <ExtensionPointsDev />, host)
     expect(text()).toContain('Which plugin draws this')
     expect(text()).toContain('agents’s own')
+  })
+
+  // What an author can't see from the owner's screen: how many fit, what the owner will do when asked,
+  // which keys a contributor answers to, and why a tree that should be there drew nothing.
+  it('shows a point’s cap and actions, and each contributor’s keys and last failure', () => {
+    registered.push(extensionPointRegistry.register({
+      id: 'preview:toolbar', ownerId: 'preview', label: 'Toolbar', kind: 'remote', mode: 'stack', max: 4, actions: ['reload'],
+    }))
+    registered.push(extensionRegistry.register({
+      id: 'plugin:docs:toolbar', pluginId: 'docs', point: 'preview:toolbar', label: 'Docs button', order: 500,
+      carrier: 'remote', entry: 'draw', hash: 'abc', matches: ['*.md', '*.markdown'],
+    }))
+    recordTreeFailure('plugin:docs:toolbar', 'worker stopped answering')
+    dispose()
+    dispose = render(() => <ExtensionPointsDev />, host)
+    expect(text()).toContain('up to 4')
+    expect(text()).toContain('Contributors can ask it to: reload.')
+    expect(text()).toContain('Docs button (docs) draws *.md, *.markdown.')
+    expect(text()).toContain('Last failed: worker stopped answering')
   })
 })

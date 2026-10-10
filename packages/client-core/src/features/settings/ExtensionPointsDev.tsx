@@ -15,6 +15,7 @@ import {
   unmatchedExtensions,
 } from '../../host/registries/extensionPoints/extensionPoints'
 import { slotChoices, withSlotChoice } from '../../host/tree/arbitration'
+import { treeFailure } from '../../host/tree/treeFailures'
 
 // Every extension point on this node, who fills it, and every contribution that fills nothing
 // (docs/plugins/cooperative-extension-points.md § Seeing what matched).
@@ -72,11 +73,24 @@ export default function ExtensionPointsDev() {
                       <span class="plugin-point-id">{point.id}</span>
                       <Badge>{point.kind}</Badge>
                       <Show when={point.mode}>{(mode) => <Badge>{mode()}</Badge>}</Show>
+                      <Show when={point.mode === 'stack'}><Badge>{`up to ${point.max}`}</Badge></Show>
                     </span>
                     <Text emphasis="muted" wrap>
                       {sentence(KIND_HELP[point.kind] ?? point.label)}{' '}
                       {filled().length ? `Used by ${filled().map((entry) => pluginLabel(entry.pluginId)).join(', ')}.` : 'Not used.'}
+                      <Show when={point.actions?.length}>{` Contributors can ask it to: ${point.actions!.join(', ')}.`}</Show>
                     </Text>
+                    {/* What each contributor answers to, and why its box is empty if its tree failed:
+                        the two things an author can't see from the owner's screen. */}
+                    <For each={filled().filter((entry) => entry.matches?.length || treeFailure(entry.id))}>
+                      {(entry) => (
+                        <Text emphasis="muted" wrap>
+                          {`${entry.label} (${entry.pluginId})`}
+                          <Show when={entry.matches?.length}>{` draws ${entry.matches!.join(', ')}.`}</Show>
+                          <Show when={treeFailure(entry.id)}>{(reason) => ` Last failed: ${reason()}`}</Show>
+                        </Text>
+                      )}
+                    </For>
                     <Show when={tied().length}>
                       <SettingRow label="Which plugin draws this" error={save.error()}>
                         <Select

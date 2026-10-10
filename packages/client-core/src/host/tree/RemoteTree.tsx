@@ -15,6 +15,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 import { watchAppearance } from '../../kit/tokens/appearance'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
+import { recordTreeFailure } from './treeFailures'
 import type { RemoteContribution } from './treeRegistry'
 import { acquireTreeWorker, treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant, type TreeHostResult } from './workerHost'
 
@@ -291,7 +292,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const pluginId = createMemo(() => contribution.pluginId)
   return (
     <div class="remote-tree" ref={(element) => { container = element; attachGestures(element) }}>
-      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} />
+      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} onFailed={(reason) => recordTreeFailure(contribution.id, reason)} />
     </div>
   )
 }

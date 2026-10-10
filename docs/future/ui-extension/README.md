@@ -27,7 +27,7 @@ features. Implementation checkpoints are not separate public releases; phase 14 
 
 | Phase | Handoff | Status |
 | --- | --- | --- |
-| 00 | [Confirm prerequisites and contracts](./00-foundations.md) | Planned |
+| 00 | [Confirm prerequisites and contracts](./00-foundations.md) | Done |
 | 01 | [Add URL and reference previews](./01-link-previews.md) | Planned |
 | 02 | [Add transcript media viewers](./02-transcript-media.md) | Planned |
 | 03 | [Add workflow step renderers](./03-workflow-step-ui.md) | Planned |

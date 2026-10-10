@@ -22,6 +22,7 @@ const harness = () => {
   const failed: ((message: string) => void)[] = []
   const sent: { handler: number; event: KitEvent; payload: unknown }[] = []
   const refused: string[] = []
+  const failures: string[] = []
   const transport: TreeTransport = {
     onBatch: (listener) => { batch.push(listener); return () => {} },
     onFailed: (listener) => { failed.push(listener); return () => {} },
@@ -30,11 +31,12 @@ const harness = () => {
   return {
     transport,
     refused,
+    failures,
     sent,
     apply: (ops: TreeMutation[]) => { for (const listener of batch) listener(ops) },
     fail: (message: string) => { for (const listener of failed) listener(message) },
     mount: () => {
-      dispose = render(() => <TreeHost pluginId="stranger" transport={transport} onRefused={(reason) => refused.push(reason)} />, host)
+      dispose = render(() => <TreeHost pluginId="stranger" transport={transport} onRefused={(reason) => refused.push(reason)} onFailed={(reason) => failures.push(reason)} />, host)
     },
   }
 }
@@ -292,5 +294,7 @@ describe('a failed tree stays out of the owner’s UI', () => {
     await frame()
     expect(host.querySelector('.ui-card')).toBeNull()
     expect(host.textContent).toBe('')
+    // Blank for the person, but not silent for the author's developer view.
+    expect(h.failures).toEqual(['the plugin worker threw'])
   })
 })

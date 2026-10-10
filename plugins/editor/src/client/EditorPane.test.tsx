@@ -1182,6 +1182,42 @@ describe('the editor pane', () => {
     }
   })
 
+  // A handover read that finishes after the reader switched nodes belongs to the old node's worktree.
+  it('drops a document handover that lands after a node switch', async () => {
+    disk.set('NOTES.md', '# Old node\n')
+    let release!: () => void
+    const held = new Promise<void>((resolve) => { release = resolve })
+    read.mockImplementation(async (_taskId, path) => {
+      if (path === 'NOTES.md') await held
+      return disk.get(path) ?? ''
+    })
+    const drawn: EditorDocumentProps[] = []
+    const Preview = (props: EditorDocumentProps) => {
+      drawn.push({ ...props })
+      return <p data-testid="preview">{props.text}</p>
+    }
+    const registrations = [
+      extensionPointRegistry.register({ id: EDITOR_DOCUMENT_POINT, ownerId: 'editor', label: 'Editor document', kind: 'remote', mode: 'replace', max: 1 }),
+      extensionRegistry.register({
+        id: 'plugin:markdown:document', pluginId: 'markdown', point: EDITOR_DOCUMENT_POINT, label: 'Markdown preview',
+        order: 500, carrier: 'component', component: Preview, matches: ['*.md'],
+      } as ExtensionContribution),
+    ]
+    try {
+      const { host } = mount()
+      await editor(host)
+      editorOpen(taskId, 'NOTES.md', false)
+      await vi.waitFor(() => expect(read).toHaveBeenCalledWith(taskId, 'NOTES.md'))
+      setActiveNode('other-node')
+      release()
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(drawn).toEqual([])
+      expect(host.querySelector('[data-testid="preview"]')).toBeNull()
+    } finally {
+      for (const registration of registrations.reverse()) registration.dispose()
+    }
+  })
+
   it('writes on the save chord, and the dirty marker clears', async () => {
     const { host } = mount()
     const view = await editor(host)
