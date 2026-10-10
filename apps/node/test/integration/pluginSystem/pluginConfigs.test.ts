@@ -1,8 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { pathToFileURL } from 'node:url'
 import { PLUGIN_CONFIG_FILE, validatePluginConfig } from '@acorn/node-core/testkit'
 import { PUBLIC_EXTENSION_POINTS } from '@acorn/protocol/publicExtensionPoints.ts'
 

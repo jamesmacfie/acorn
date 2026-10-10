@@ -572,7 +572,7 @@ export type MarkdownFenceProps = {
 export const MAX_MARKDOWN_FENCE_BYTES = 256 * 1024
 
 /** Is this text over `maxBytes` of UTF-8? Each UTF-16 unit is at least one byte and at most three, so
- *  only text between the two bounds is encoded. Every byte cap on a plugin's text uses it. */
+ *  only text between the two bounds is encoded. */
 export const utf8Exceeds = (text: string, maxBytes: number): boolean =>
   text.length > maxBytes || (text.length * 3 > maxBytes && new TextEncoder().encode(text).byteLength > maxBytes)
 

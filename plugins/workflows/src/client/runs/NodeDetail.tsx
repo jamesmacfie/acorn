@@ -12,7 +12,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
-import { WORKFLOW_STEP_BODY_POINT } from '../../contract/stepBody.ts'
+import { MAX_STEP_BODY_JSON_BYTES, WORKFLOW_STEP_BODY_POINT } from '../../contract/stepBody.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
@@ -294,7 +294,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     const output = bodyProps()?.outputTruncated
     if (!inputs && !output) return undefined
     const what = inputs && output ? 'inputs and output are' : inputs ? 'inputs are' : 'output is'
-    return `This step's ${what} over 64 KiB, so the plugin drawing it didn't get ${inputs ? 'them' : 'it'}.`
+    return `This step's ${what} over ${MAX_STEP_BODY_JSON_BYTES / 1024} KiB, so the plugin drawing it didn't get ${inputs ? 'them' : 'it'}.`
   }
 
   const stepBody = (current: () => WorkflowStepRow) => (

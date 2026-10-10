@@ -136,9 +136,9 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // capability, `agents.toolCaller`, and the start service's launch methods. The ceiling keeps about
 // 2 KB of margin.
 // 2026-10-10: 1,756,613 B with ui-extension phase 06's detail regions: the manifest check for a
-// remote point's `mounts`, which runs on every manifest parse at boot, and the `plugin_authoring`
-// brief's paragraph naming them. No module moved into the boot graph. The ceiling keeps about 2 KB of
-// margin.
+// remote point's `mounts`, which runs on every manifest parse at boot. The `plugin_authoring` brief
+// loads on first use, so its text isn't counted. No module moved into the boot graph. The ceiling
+// keeps about 2 KB of margin.
 const limits = { ceiling: 1_759_000, floor: 1_000_000 }
 
 const graph = readChunkGraph(dist)
