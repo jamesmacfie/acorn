@@ -15,10 +15,13 @@ import type { OverlayPalette } from '@acorn/client-core/host/palette'
 import { contextMenuItems, runContextMenuItem, selectionTooLarge } from '@acorn/client-core/host/registries/panes'
 import type { SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 import { RemoteTree } from '../plugins/remoteTreeLoader'
+import { CORE_MARKDOWN_FENCE_POINT } from '@acorn/protocol/extensionPoints.ts'
+import type { MarkdownFenceAdapter } from '@acorn/client-core/kit/lib/markdown'
+import { createFenceViewers, type FenceScope, type FenceViewer } from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
 import { Badge, Icon, Lines, Row, Rows } from './showing'
-import { IconButton, Input } from './asking'
+import { Button, CopyButton, IconButton, Input } from './asking'
 import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 
 // What `@acorn/plugin-api/ui/host` is on this host.
@@ -290,6 +293,55 @@ export function Slot(props: SlotProps) {
         </Show>
       </Show>
     </>
+  )
+}
+
+// ── Markdown fence viewers ───────────────────────────────────────────────────────────────────────
+
+/** Rows a fence viewer may take before the rest is clipped. The pane's own scroll still reaches past
+ *  the fence, so a tall viewer cannot push the conversation off the screen. */
+const FENCE_VIEW_ROWS = 20
+
+/**
+ * The terminal's fence viewers for one content owner (`core:markdown-fence`), as the adapter the kit's
+ * `Markdown` takes. The same rule as the desktop's (`client-core/host/markdownFences/`), including the
+ * cap of four. Preview and Copy sit on their own line above the fence, outside the viewer, so the
+ * source and copying it stay reachable whoever draws it.
+ */
+export function markdownFences(scope: FenceScope): MarkdownFenceAdapter<JSX.Element> {
+  const viewers = createFenceViewers(scope)
+  return (fence) => {
+    const viewer = viewers(fence)
+    return viewer && { preview: viewer.preview, view: <FenceView viewer={viewer} scope={scope} /> }
+  }
+}
+
+function FenceView(props: { viewer: FenceViewer; scope: FenceScope }) {
+  const viewer = props.viewer
+  return (
+    <Show when={viewer.pluginId()}>
+      {(pluginId) => (
+        <box flexDirection="column" flexShrink={0}>
+          <box flexDirection="row" gap={1} flexShrink={0}>
+            <Button label={viewer.preview() ? 'Source' : 'Preview'} onPress={viewer.toggle} />
+            <CopyButton text={() => viewer.props.text} />
+            <Line role="muted">{`${viewer.props.language} · ${pluginId()}`}</Line>
+          </box>
+          <Show when={viewer.preview()}>
+            <box flexDirection="column" flexShrink={0} maxHeight={FENCE_VIEW_ROWS} overflow="hidden">
+              <Slot
+                point={CORE_MARKDOWN_FENCE_POINT}
+                key={viewer.key}
+                props={() => viewer.props}
+                {...(props.scope.taskId ? { taskId: props.scope.taskId } : {})}
+                {...(props.scope.projectId ? { projectId: props.scope.projectId } : {})}
+                occupied={(occupied) => { if (!occupied && viewer.pluginId()) viewer.failed() }}
+              />
+            </box>
+          </Show>
+        </box>
+      )}
+    </Show>
   )
 }
 

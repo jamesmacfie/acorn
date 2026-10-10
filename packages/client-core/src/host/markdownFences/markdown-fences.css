@@ -1,0 +1,15 @@
+/* A fence another plugin can draw (host/markdownFences/MarkdownFences.tsx). The toggle sits in the
+   fence's top-right corner beside the copy button, which copy.css places at the corner itself. Both stay
+   on top of a viewer, so the viewer starts below them and scrolls inside a bounded box. */
+.markdown-fence-toggle {
+  position: absolute;
+  top: var(--space-2);
+  right: calc(var(--space-2) + var(--space-7));
+}
+.markdown-fence-view {
+  max-height: 480px;
+  overflow: auto;
+  padding: var(--space-8) var(--space-4) var(--space-4);
+  border: var(--surface-border);
+  border-radius: var(--radius);
+}

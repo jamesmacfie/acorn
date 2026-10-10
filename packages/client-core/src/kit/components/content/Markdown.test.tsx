@@ -1,7 +1,8 @@
-import { createSignal } from 'solid-js'
+import { createSignal, onCleanup, type JSX } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Markdown from './Markdown'
+import type { MarkdownFence, MarkdownFenceAdapter } from '../../lib/rendering/markdown'
 
 // What a streaming message costs to redraw.
 //
@@ -194,5 +195,47 @@ describe('a mermaid fence', () => {
     await Promise.resolve()
     expect(root.querySelector('.ui-mermaid')).toBeNull()
     expect(root.querySelector('pre')?.textContent).toBe('broken')
+  })
+})
+
+describe('a host’s fence adapter', () => {
+  // The kit's half only: it asks once per closed fence block, places the view in the fence's wrapper,
+  // hides the source while the view stands in, and disposes the view with its block. Who draws and how
+  // many may is the host's (host/markdownFences/MarkdownFences.test.tsx).
+  const adapt = () => {
+    const asked: MarkdownFence[] = []
+    let disposed = 0
+    const [preview, setPreview] = createSignal(true)
+    const fences: MarkdownFenceAdapter<JSX.Element> = (fence) => {
+      asked.push(fence)
+      onCleanup(() => disposed++)
+      return { preview, view: <aside>viewer for {fence.text}</aside> }
+    }
+    return { asked, disposed: () => disposed, setPreview, fences }
+  }
+
+  it('asks only for closed fences, once per block, and keeps the source and its copy button', () => {
+    const adapter = adapt()
+    const [text, setText] = createSignal('Para\n\n```json\n{"a": 1')
+    dispose = render(() => <Markdown text={text()} copy fences={adapter.fences} />, host)
+    expect(adapter.asked).toEqual([])
+    setText('Para\n\n```json\n{"a": 1}\n```')
+    setText('Para\n\n```json\n{"a": 1}\n```\n\nMore prose')
+    expect(adapter.asked).toEqual([{ language: 'json', text: '{"a": 1}', revision: 2 }])
+    const wrap = host.querySelector<HTMLElement>('.ui-code-wrap')!
+    expect(wrap.querySelector('aside')?.textContent).toBe('viewer for {"a": 1}')
+    expect(wrap.hasAttribute('data-preview')).toBe(true)
+    expect(wrap.querySelector('pre')?.textContent).toBe('{"a": 1}')
+    expect(wrap.querySelector('button')).not.toBeNull()
+    adapter.setPreview(false)
+    expect(wrap.hasAttribute('data-preview')).toBe(false)
+  })
+
+  it('disposes a view with its block', () => {
+    const adapter = adapt()
+    const [text, setText] = createSignal('```json\n1\n```')
+    dispose = render(() => <Markdown text={text()} fences={adapter.fences} />, host)
+    setText('Only prose now')
+    expect(adapter.disposed()).toBe(1)
   })
 })

@@ -8,6 +8,8 @@ import { createTreeState } from './treeState'
 import { NestedChromeSlot } from '../plugins/NestedChromeSlot'
 import type { SlotRef } from '@acorn/protocol/chrome.ts'
 import { useExclusiveSlotFailure } from '../plugins/ExclusiveSlotFailure'
+import { markdownFences } from '../markdownFences/MarkdownFences'
+import type { FenceScope } from '../markdownFences/fenceViewers'
 
 // The DOM host's end of the remote tree (docs/plugins/tree-contract.md § The tree contract).
 //
@@ -37,6 +39,12 @@ export type TreeHostProps = {
   onRefused?: (reason: string) => void
   /** Called with the reason when the whole tree fails and draws nothing. */
   onFailed?: (reason: string) => void
+  /**
+   * The scope this tree's `Markdown` nodes view their fences in (`core:markdown-fence`), for a tree that
+   * is a top-level owner surface such as a plugin's pane. Absent for a contributor drawn in another
+   * owner's slot, whose `Markdown` keeps plain fences: cooperative points stay one level deep.
+   */
+  markdownFences?: FenceScope
 }
 
 export function TreeHost(props: TreeHostProps) {
@@ -59,7 +67,15 @@ export function TreeHost(props: TreeHostProps) {
   const NodeView = (own: { id: string }): JSX.Element => {
     const stored = () => state.nodes[own.id]
     const type = () => stored()?.type ?? ''
-    const resolved = createMemo(() => state.resolveProps(stored()))
+    // A node keeps its type for life, so one fence adapter, and one viewer cap, per `Markdown` node.
+    const fences = type() === 'Markdown' && props.markdownFences ? markdownFences(props.markdownFences) : undefined
+    // Set on the object rather than spread after it: the host's answer replaces anything a worker sent
+    // under the same name, and a spread would let a worker's value through wherever the host's is
+    // `undefined`.
+    const resolved = createMemo(() => {
+      const own = state.resolveProps(stored())
+      return type() === 'Markdown' ? { ...own, fences } : own
+    })
     return (
       <Show when={stored()} keyed={false}>
         <Show when={type() !== TEXT_NODE} fallback={<>{String(stored()!.props.value ?? '')}</>}>

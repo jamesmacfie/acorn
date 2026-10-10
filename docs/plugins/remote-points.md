@@ -57,6 +57,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `core:security` | `stack`, up to four | `{ nodeId }`. A section on **Settings > Security and backup**. Agents draws its instruction file check |
 | `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |
 | `core:link-preview` | `replace`, keyed by the normalized HTTPS URL | `{ url, label?, taskId?, projectId?, ref? }`. See [link previews](#link-previews) |
+| `core:markdown-fence` | `replace`, keyed by a closed fence's lowercased language hint | `{ blockId, language, text, revision, taskId?, projectId? }`. See [Markdown fences](./markdown-fences.md) |
 | `linear:issue-summary`, `rollbar:item-summary` | `stack`, up to two | `{ surface, item?, refId?, projectId? }`. Above a loaded owner's detail view, drawn by the host. See [detail regions](./detail-regions.md) |
 
 Read `changes:push-actions` before you open a point of your own. It sits under the Changes pane's
@@ -65,10 +66,9 @@ request". The GitHub plugin fills the point with **Open pull request** and reads
 number from its own query. An owner that modeled its filler's job would have to import it. With
 nobody filling it, a slot draws nothing and takes no space.
 
-`agents:session-header` shows derived UI over owner-held facts. Agents folds its event ledger,
-resolves each turn's model against the reader's price preferences, and says whether a provider's
-counters replace or add. It doesn't calculate a cost. The `agent-cost` loaded plugin does that in its
-own worker.
+`agents:session-header` shows derived UI over owner-held facts. Agents folds its event ledger, prices
+each turn's model from the reader's preferences, and says whether a provider's counters replace or
+add. The `agent-cost` loaded plugin, not Agents, works out a cost, in its own worker.
 
 `agents:request-card` draws inside a request card while it waits on the person, below the card's own
 buttons. It decorates the card and never replaces it, so no contributor draws or presses an answer.

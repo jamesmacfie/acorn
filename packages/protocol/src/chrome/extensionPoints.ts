@@ -531,3 +531,35 @@ export function linkPreviewKey(href: string): string | null {
     return null
   }
 }
+
+/** A viewer for a completed code fence in host-owned Markdown: an agent's reply, or a loaded pane's own
+ *  `Markdown` node. Core owns it because the fences live in everybody's content. `replace`, keyed by
+ *  the fence's lowercased language hint (`json`, `csv`). The owner keeps Source, Preview and Copy
+ *  outside the viewer, and a fence with no hint, an unfinished one, or one over
+ *  `MAX_MARKDOWN_FENCE_BYTES` is drawn as source (docs/plugins/markdown-fences.md). */
+export const CORE_MARKDOWN_FENCE_POINT = 'core:markdown-fence'
+
+export type MarkdownFenceProps = {
+  /** This fence's identity in its owner. A fence whose text changes is a new block with a new id. */
+  blockId: string
+  /** The hint as written, case kept. The key is its lowercase. */
+  language: string
+  /** The fence's source, without its opening and closing lines. */
+  text: string
+  /** The owner's render count when this block appeared. A later block in the same owner has a higher one. */
+  revision: number
+  taskId?: string
+  projectId?: string
+}
+
+export const MAX_MARKDOWN_FENCE_BYTES = 256 * 1024
+
+/** The key a fence is viewed under, or `null` for a fence that gets no viewer: no hint, or text over
+ *  the cap in UTF-8. */
+export function markdownFenceKey(fence: { language: string; text: string }): string | null {
+  if (!fence.language) return null
+  // A UTF-16 unit is at most three UTF-8 bytes, so most fences skip the encoder.
+  if (fence.text.length * 3 > MAX_MARKDOWN_FENCE_BYTES
+    && new TextEncoder().encode(fence.text).length > MAX_MARKDOWN_FENCE_BYTES) return null
+  return fence.language.toLowerCase()
+}

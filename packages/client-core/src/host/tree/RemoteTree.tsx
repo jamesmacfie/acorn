@@ -15,6 +15,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 import { watchAppearance } from '../../kit/tokens/appearance'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
+import { fenceScope } from '../markdownFences/fenceViewers'
 import { recordTreeFailure } from './treeFailures'
 import type { RemoteContribution } from './treeRegistry'
 import { acquireTreeWorker, treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant, type TreeHostResult } from './workerHost'
@@ -71,6 +72,10 @@ export type RemoteTreeProps = {
   document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
   /** The tree failed and draws nothing, for an owner that draws something else in its place. */
   onFailed?: (reason: string) => void
+  /** This tree is a top-level owner surface, such as a plugin's pane, so its `Markdown` nodes may give
+   *  their closed fences another plugin's viewer (`core:markdown-fence`) in this tree's bound scope. A
+   *  tree in another owner's slot never sets it: cooperative points stay one level deep. */
+  markdownFences?: boolean
 }
 
 /** How long after a press a tree may still open its overlay. Long enough to cover the worker round
@@ -297,7 +302,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
       <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} onFailed={(reason) => {
         recordTreeFailure(contribution.id, reason)
         componentProps.onFailed?.(reason)
-      }} />
+      }} {...fenceScope(componentProps.markdownFences, boundScope)} />
     </div>
   )
 }

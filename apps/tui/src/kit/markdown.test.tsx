@@ -1,6 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
-import { Lines } from './showing'
+import { Lines, Markdown } from './showing'
+import { renderMarkdown } from '@acorn/client-core/kit/lib/markdown'
 import { htmlLines } from './markdown'
 import { renderCells } from './render'
 
@@ -67,6 +68,20 @@ describe('provider HTML in cells', () => {
       expect(prose).toContain('Shipping 93 edits on a hypothesis')
     } finally {
       frame.done()
+    }
+  })
+})
+
+describe('markdown source in cells', () => {
+  it('draws block by block exactly as the whole document drew, blank lines between blocks included', async () => {
+    const source = '# Title\n\nA paragraph.\n\n- one\n- two\n\n```ts\nconst a = 1\n```\n\n> quoted\n\nThe end.'
+    const whole = await renderCells(() => <Lines lines={htmlLines(renderMarkdown(source, { images: 'placeholder' }))} />, { width: 40, height: 20 })
+    const blocks = await renderCells(() => <Markdown text={source} />, { width: 40, height: 20 })
+    try {
+      expect(blocks.lines).toEqual(whole.lines)
+    } finally {
+      whole.done()
+      blocks.done()
     }
   })
 })

@@ -330,7 +330,8 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
                 // way: what makes the `document` verb answerable is standing beside a host editor, not
                 // which of the two runtimes the bundle happens to be in
                 // (docs/editor/composed-panes.md § Communication between regions).
-                regions[name] = () => createComponent(RemoteTree, { contribution, props: regionScope, scope: regionScope, document: documentGrant, openingItem })
+                // A pane is its own top-level owner, so a `Markdown` node in it may draw fence viewers.
+                regions[name] = () => createComponent(RemoteTree, { contribution, props: regionScope, scope: regionScope, document: documentGrant, openingItem, markdownFences: true })
                 continue
               }
               regions[name] = () => createComponent(DocumentSurface, {

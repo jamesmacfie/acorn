@@ -823,6 +823,7 @@ ui/host: SlotProps
 ui/host: Wizard
 ui/host: annotationsFor
 ui/host: confirmAction
+ui/host: markdownFences
 ui/host: registerWillHandler
 ui/host: requestAnnotations
 ui/host: selectPaneTab

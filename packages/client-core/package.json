@@ -101,6 +101,8 @@
     "./host/layouts/state.ts": "./src/host/layouts/state.ts",
     "./host/linkPreview/linkPreview.ts": "./src/host/linkPreview/linkPreview.ts",
     "./host/linkPreview/LinkPreviewHost.tsx": "./src/host/linkPreview/LinkPreviewHost.tsx",
+    "./host/markdownFences/fenceViewers.ts": "./src/host/markdownFences/fenceViewers.ts",
+    "./host/markdownFences/MarkdownFences.tsx": "./src/host/markdownFences/MarkdownFences.tsx",
     "./host/palette": "./src/host/palette/public.ts",
     "./host/palette/CommandPalette.tsx": "./src/host/palette/CommandPalette.tsx",
     "./host/palette/PaletteSurface.tsx": "./src/host/palette/PaletteSurface.tsx",

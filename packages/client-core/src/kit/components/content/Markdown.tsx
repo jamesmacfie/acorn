@@ -1,8 +1,8 @@
 import { measureWork } from '../../lib/telemetry/workTelemetry'
-import { createEffect, onCleanup } from 'solid-js'
-import { render } from 'solid-js/web'
+import { createEffect, createRenderEffect, createRoot, getOwner, onCleanup, type JSX } from 'solid-js'
+import { insert, render } from 'solid-js/web'
 import { isGrammar, langFor } from '../../../infra/highlight/langs'
-import { renderBlocks, type MarkdownOptions } from '../../lib/rendering/markdown'
+import { renderBlocks, type MarkdownFenceAdapter, type MarkdownOptions } from '../../lib/rendering/markdown'
 import { watchAppearance } from '../../tokens/appearance'
 import CopyButton from '../inputs/CopyButton'
 
@@ -77,10 +77,17 @@ export default function Markdown(props: {
    * started drawing this node (docs/tui.md).
    */
   onSelect?: (href: string) => boolean | void
+  /** A host's viewer for each closed fence (kit/lib/rendering/markdown.ts § MarkdownFenceAdapter).
+   *  Pass one value for the life of this node: its state is the content owner's. */
+  fences?: MarkdownFenceAdapter<JSX.Element>
 }) {
   let root: HTMLDivElement | undefined
   let rendered: string | undefined
+  let revision = 0
   let blocks: Block[] = []
+  // A fence's view is mounted under this node's owner rather than in a bare root, so it sees the
+  // contexts the Markdown sits in, and still lives as long as its block rather than one render.
+  const owner = getOwner()
   // Watching starts with the first diagram, because most messages never hold one.
   let stopWatchingAppearance: (() => void) | undefined
 
@@ -101,6 +108,7 @@ export default function Markdown(props: {
     // before writing — and then, below, write only the blocks that actually moved.
     if (!root || text === rendered) return
     rendered = text
+    revision++
     const next = measureWork('markdown.parse', () => renderBlocks(text, { images: props.images }), { characters: text.length })
 
     // Elements from the last render, queued per key so two identical blocks in one message each keep
@@ -115,7 +123,7 @@ export default function Markdown(props: {
     const fences: { code: HTMLElement; grammar: string; wrap: Element; block: Block }[] = []
     const diagrams: Diagram[] = []
     const placed: Block[] = []
-    for (const { key, html } of next) {
+    for (const { key, html, fence } of next) {
       const reused = spare.get(key)?.shift()
       if (reused) {
         placed.push(reused)
@@ -129,6 +137,21 @@ export default function Markdown(props: {
       if (!el) continue
       const block: Block = { key, el, live: true }
       placed.push(block)
+      const adapter = props.fences
+      if (fence && adapter) {
+        createRoot((dispose) => {
+          const viewer = adapter({ ...fence, revision })
+          if (viewer) {
+            // The source stays in the DOM, hidden, so its copy button and a later Source are free.
+            createRenderEffect(() => el.toggleAttribute('data-preview', viewer.preview()))
+            // After a marker, because `insert` with none clears the whole wrapper, source and copy button
+            // included, whenever the view becomes empty.
+            const marker = el.appendChild(document.createTextNode(''))
+            insert(el, viewer.view, marker)
+          }
+          block.dispose = dispose
+        }, owner ?? undefined)
+      }
 
       const wraps = [...el.querySelectorAll<HTMLElement>('.ui-code-wrap')]
       if (el.classList.contains('ui-code-wrap')) wraps.unshift(el as HTMLElement)

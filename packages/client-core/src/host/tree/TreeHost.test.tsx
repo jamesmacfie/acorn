@@ -5,7 +5,8 @@ import { TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { TreeHost, type TreeTransport } from './TreeHost'
 import { mintSlotRef, NestedChromeSlot, WithNestedChromeSlots } from '../plugins/NestedChromeSlot'
-import { extensionPointRegistry, extensionRegistry } from '../registries/extensionPoints/extensionPoints'
+import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
+import { CORE_MARKDOWN_FENCE_POINT } from '@acorn/protocol/extensionPoints.ts'
 
 // The host half. Every test here is a stranger's message going in and the shell's own DOM coming out,
 // which is the only property the remote root has to have: a tree names components, and what it gets is
@@ -36,8 +37,8 @@ const harness = () => {
     sent,
     apply: (ops: TreeMutation[]) => { for (const listener of batch) listener(ops) },
     fail: (message: string) => { for (const listener of failed) listener(message) },
-    mount: () => {
-      dispose = render(() => <TreeHost pluginId="stranger" transport={transport} onRefused={(reason) => refused.push(reason)} onFailed={(reason) => failures.push(reason)} />, host)
+    mount: (extra: { markdownFences?: { taskId?: string } } = {}) => {
+      dispose = render(() => <TreeHost pluginId="stranger" transport={transport} onRefused={(reason) => refused.push(reason)} onFailed={(reason) => failures.push(reason)} {...extra} />, host)
     },
   }
 }
@@ -264,6 +265,44 @@ describe('a heavy node arrives one frame late', () => {
     // Both, in the same frame. A table that wrapped its loader per mount would give each node its own
     // load state and each root its own wait.
     expect([...host.querySelectorAll('.ui-markdown')].map((n) => n.textContent?.trim())).toEqual(['first', 'second'])
+  })
+})
+
+describe('a Markdown node’s fences', () => {
+  // Only a top-level owner's tree lets its `Markdown` open `core:markdown-fence`. A contributor drawn in
+  // somebody else's slot gets no `markdownFences`, so a fence in it stays a fence: one level, and never
+  // a worker choosing for itself.
+  const fenceViewer = () => extensionRegistry.register({
+    id: 'plugin:tables:fence', pluginId: 'tables', point: CORE_MARKDOWN_FENCE_POINT, label: 'Tables',
+    order: 500, carrier: 'component', matches: ['json'],
+    component: (props: { text: string; taskId?: string }) => <output>{`table of ${props.text} in ${props.taskId}`}</output>,
+  } as ExtensionContribution)
+  const fenced = (extra: Record<string, unknown> = {}) =>
+    node('n1', 'Markdown', { text: '```json\n{"a": 1}\n```', ...extra })
+
+  it('draws a viewer in a tree that is a top-level owner, in that tree’s scope', async () => {
+    const registration = fenceViewer()
+    try {
+      const h = harness()
+      h.mount({ markdownFences: { taskId: 'task-1' } })
+      h.apply([{ op: 'insert', parent: null, index: 0, node: fenced() }])
+      expect(await settled(() => !!host.querySelector('output'))).toBe(true)
+      expect(host.querySelector('output')!.textContent).toBe('table of {"a": 1} in task-1')
+    } finally { registration.dispose() }
+  })
+
+  it('keeps plain fences in a contributor’s tree, whatever the worker sends as `fences`', async () => {
+    const registration = fenceViewer()
+    try {
+      const h = harness()
+      h.mount()
+      h.apply([{ op: 'insert', parent: null, index: 0, node: fenced({ fences: 'please' }) }])
+      expect(await settled(() => !!host.querySelector('.ui-code-wrap pre'))).toBe(true)
+      await frame()
+      expect(host.querySelector('output')).toBeNull()
+      expect(host.querySelector('.markdown-fence-toggle')).toBeNull()
+      expect(h.failures).toEqual([])
+    } finally { registration.dispose() }
   })
 })
 

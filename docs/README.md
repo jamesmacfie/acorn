@@ -407,7 +407,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
   webviews](./plugins/document-surfaces.md), [Events](./plugins/events.md), [Forward
   compatibility](./plugins/forward-compatibility.md), [Frames](./plugins/frames.md), [Keeping a
   descriptor fresh](./plugins/freshness.md), [Harnesses](./plugins/harnesses.md),
-  [Hooks](./plugins/hooks.md), [Loaded plugins](./plugins/loaded-plugins.md), [Context menus and rail
+  [Hooks](./plugins/hooks.md), [Loaded plugins](./plugins/loaded-plugins.md), [Markdown
+  fences](./plugins/markdown-fences.md), [Context menus and rail
   markers](./plugins/menus-and-markers.md), [More descriptors](./plugins/more-descriptors.md), [Node
   providers](./plugins/node-providers.md), [Node-side extension
   points](./plugins/node-side-extension-points.md), [Package shape](./plugins/package-shape.md), [The

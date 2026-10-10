@@ -46,3 +46,21 @@ it('keeps a fence’s language and a selection in it while the message streams o
     expect(document.getSelection()!.toString()).toBe('const kept = 1')
   } finally { document.getSelection()?.removeAllRanges(); dispose(); host.remove() }
 }, 20_000)
+
+// A fence's viewer lives as long as its block: the message streaming on below it must not restart it,
+// and the highlight that replaces its `<pre>` must not take the viewer out with it.
+it('keeps a fence’s viewer through the message streaming on and its highlight landing', async () => {
+  const [text, setText] = createSignal('```ts\nconst viewed = 1\n```')
+  const asked = vi.fn()
+  const host = document.createElement('div'); document.body.append(host)
+  const dispose = render(() => (
+    <Markdown text={text()} copy fences={(fence) => { asked(fence); return { preview: () => false, view: <aside>viewer</aside> } }} />
+  ), host)
+  try {
+    const view = host.querySelector('aside')!
+    for (let at = 0; at < 5; at++) setText(text() + `\n\nParagraph ${at}`)
+    await vi.waitFor(() => expect(host.querySelector('pre.shiki')).not.toBeNull(), { timeout: 10_000 })
+    expect(asked).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('aside')).toBe(view)
+  } finally { dispose(); host.remove() }
+}, 20_000)

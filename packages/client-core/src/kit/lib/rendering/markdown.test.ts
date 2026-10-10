@@ -154,4 +154,15 @@ describe('renderBlocks', () => {
     const [first, second] = keys('Same.\n\nSame.')
     expect(first).toBe(second)
   })
+
+  it('reports a closed fence’s hint and source from the Markdown, not from the escaped HTML', () => {
+    const [prose, fence, plain] = renderBlocks('Intro\n\n```JSON\n{"a": "<b>"}\n```\n\n```\nno hint\n```')
+    expect(prose.fence).toBeUndefined()
+    expect(fence.fence).toEqual({ language: 'JSON', text: '{"a": "<b>"}' })
+    expect(plain.fence).toEqual({ language: '', text: 'no hint' })
+  })
+
+  it('reports nothing for a fence that is still streaming', () => {
+    expect(renderBlocks('```json\n{"a": 1')[0].fence).toBeUndefined()
+  })
 })

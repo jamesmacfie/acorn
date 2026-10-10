@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { linkPreviewKey, MAX_LINK_PREVIEW_URL } from './extensionPoints'
+import { linkPreviewKey, markdownFenceKey, MAX_LINK_PREVIEW_URL, MAX_MARKDOWN_FENCE_BYTES } from './extensionPoints'
 
 describe('linkPreviewKey', () => {
   it('keeps the path, query and fragment as written and lowercases only the host', () => {
@@ -19,5 +19,21 @@ describe('linkPreviewKey', () => {
     const base = 'https://example.com/'
     expect(linkPreviewKey(base + 'a'.repeat(MAX_LINK_PREVIEW_URL - base.length))).not.toBeNull()
     expect(linkPreviewKey(base + 'a'.repeat(MAX_LINK_PREVIEW_URL - base.length + 1))).toBeNull()
+  })
+})
+
+describe('markdownFenceKey', () => {
+  it('lowercases the hint and gives a fence with none no key', () => {
+    expect(markdownFenceKey({ language: 'JSON', text: '{}' })).toBe('json')
+    expect(markdownFenceKey({ language: '', text: '{}' })).toBeNull()
+  })
+
+  it('caps the text in UTF-8 bytes, not characters', () => {
+    expect(markdownFenceKey({ language: 'csv', text: 'a'.repeat(MAX_MARKDOWN_FENCE_BYTES) })).toBe('csv')
+    expect(markdownFenceKey({ language: 'csv', text: 'a'.repeat(MAX_MARKDOWN_FENCE_BYTES + 1) })).toBeNull()
+    // Four bytes each, so a quarter of the cap in characters is the whole cap.
+    const emoji = '\u{1F600}'.repeat(MAX_MARKDOWN_FENCE_BYTES / 4)
+    expect(markdownFenceKey({ language: 'txt', text: emoji })).toBe('txt')
+    expect(markdownFenceKey({ language: 'txt', text: emoji + 'a' })).toBeNull()
   })
 })

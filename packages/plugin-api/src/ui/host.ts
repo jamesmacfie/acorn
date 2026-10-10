@@ -57,6 +57,10 @@ export { AnnotationMarks } from '@acorn/client-core/host/annotations'
 export { SelectionActions } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 export type { SelectedContent, SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
+// Other plugins' viewers for the closed code fences in Markdown this surface draws
+// (`core:markdown-fence`). Host-only: who draws, the cap and the Source/Preview control are the host's,
+// and the owner only passes the result to `Markdown`'s `fences` with its task or project.
+export { markdownFences } from '@acorn/client-core/host/markdownFences/MarkdownFences.tsx'
 
 // The `wizard` layout, for a surface that is a wizard but is not a pane. Host-only: a layout is the
 // host's arrangement, and a pane gets one by naming it on its contribution rather than by importing

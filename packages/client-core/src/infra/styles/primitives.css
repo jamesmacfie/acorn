@@ -1520,6 +1520,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   background: var(--bg-subtle);
   text-align: center;
 }
+/* A fence a host's viewer stands in for (kit/lib/rendering/markdown.ts § MarkdownFenceAdapter). The
+   source stays in the DOM, hidden, so Copy still reads it and Source shows it again at once. */
+.ui-markdown .ui-code-wrap[data-preview] > :is(pre, .ui-mermaid) { display: none; }
 .ui-markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }

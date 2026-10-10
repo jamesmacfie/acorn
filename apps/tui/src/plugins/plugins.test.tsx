@@ -489,3 +489,85 @@ test('a tree drawn from a batch and the same tree written as JSX draw the same c
 
   expect(drawn.lines).toEqual(written)
 }, 30_000)
+
+// ── Markdown fence viewers ────────────────────────────────────────────────────────────────────────
+
+test('a closed fence draws a viewer with Preview and Copy beside it, capped at four, and only for a top-level owner', async () => {
+  // The terminal half of `core:markdown-fence`: the same rule and cap as the desktop
+  // (client-core/host/markdownFences/), with the controls on a line of their own above the fence.
+  const { createSignal } = await import('solid-js')
+  const { CORE_MARKDOWN_FENCE_POINT } = await import('@acorn/protocol/extensionPoints.ts')
+  const { extensionRegistry } = await import('@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts')
+  const { Markdown } = await import('../kit/showing')
+  const { markdownFences } = await import('../kit/host')
+  const { TreeHost } = await import('./TreeHost')
+  const mounted: string[] = []
+  const viewer = extensionRegistry.register({
+    id: 'plugin:tables:fence',
+    pluginId: 'tables',
+    point: CORE_MARKDOWN_FENCE_POINT,
+    label: 'Tables',
+    order: 500,
+    carrier: 'component' as const,
+    matches: ['json'],
+    component: (props: { text: string; taskId?: string }) => {
+      mounted.push(props.text)
+      return <Text>{`table of ${props.text} in ${props.taskId}`}</Text>
+    },
+  })
+  const fence = (body: string) => `\`\`\`json\n${body}\n\`\`\``
+  try {
+    const [text, setText] = createSignal(`Intro\n\n${fence('{"a": 0}')}\n\n\`\`\`json\n{"streaming": `)
+    const screen = await renderCells(() => {
+      const fences = markdownFences({ taskId: 'task-1' })
+      return <Markdown text={text()} fences={fences} />
+    }, { width: 60, height: 40 })
+    let drawn = (await screen.frame()).text
+    expect(drawn).toContain('table of {"a": 0} in task-1')
+    expect(drawn).toContain('[Source]')
+    expect(drawn).toContain('Copy')
+    // The viewer stands in for the source; the unfinished fence is source and starts nothing.
+    expect(drawn.split('{"a": 0}')).toHaveLength(2)
+    expect(drawn).toContain('{"streaming":')
+    expect(mounted).toEqual(['{"a": 0}'])
+
+    setText(['Intro', ...[0, 1, 2, 3, 4].map((at) => fence(`{"a": ${at}}`))].join('\n\n'))
+    drawn = (await screen.frame()).text
+    expect(mounted).toEqual(['{"a": 0}', '{"a": 1}', '{"a": 2}', '{"a": 3}'])
+    expect(drawn).toContain('[Preview]')
+    expect(drawn).toContain('{"a": 4}')
+
+    // Preview, pressed where it is drawn, mounts the fifth and sends the first back to its source.
+    const lines = (await screen.frame()).lines
+    const row = lines.findIndex((line) => line.includes('[Preview]'))
+    drawn = (await screen.click(lines[row].indexOf('[Preview]') + 1, row)).text
+    expect(drawn).toContain('table of {"a": 4} in task-1')
+    expect(drawn).not.toContain('table of {"a": 0}')
+    expect(drawn).toContain('{"a": 0}')
+    screen.done()
+
+    // A tree that is not a top-level owner keeps plain fences, whatever its worker sends.
+    let send: ((batch: readonly TreeMutation[]) => void) | undefined
+    const transport = {
+      onBatch: (listener: (batch: readonly TreeMutation[]) => void) => { send = listener; return () => {} },
+      onFailed: () => () => {},
+      send: () => {},
+    }
+    const node: TreeMutation = { op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Markdown', props: { text: fence('{"tree": 1}'), fences: 'please' }, children: [] } }
+    const contributor = await renderCells(() => <TreeHost pluginId="probe" transport={transport} />, { width: 60, height: 10 })
+    send!([node])
+    await new Promise((done) => setTimeout(done, 100))
+    drawn = (await contributor.frame()).text
+    expect(drawn).toContain('{"tree": 1}')
+    expect(drawn).not.toContain('table of')
+    contributor.done()
+
+    const owner = await renderCells(() => <TreeHost pluginId="probe" transport={transport} markdownFences={{ taskId: 'task-2' }} />, { width: 60, height: 10 })
+    send!([node])
+    await new Promise((done) => setTimeout(done, 100))
+    expect((await owner.frame()).text).toContain('table of {"tree": 1} in task-2')
+    owner.done()
+  } finally {
+    viewer.dispose()
+  }
+}, 30_000)

@@ -2,7 +2,8 @@
 import { createMemo, For, Show, type JSX } from 'solid-js'
 import { stripAnsi } from '@acorn/client-core/kit/lib/ansi'
 import { flatten, Line, Run, slot } from '../cells'
-import { markdownLines, type Line as MarkdownLine } from '../markdown'
+import { renderBlocks, type MarkdownBlock, type MarkdownFenceAdapter } from '@acorn/client-core/kit/lib/markdown'
+import { htmlLines, type Line as MarkdownLine } from '../markdown'
 import { rule } from '../roles'
 import { ScrollViewport } from '../scrolling'
 
@@ -87,7 +88,39 @@ export function Markdown(props: {
   copy?: boolean
   onCopy?: (text: string) => void
   onSelect?: (href: string) => void
+  /** A host's viewer for each closed fence, as on the desktop. One value for the node's life. */
+  fences?: MarkdownFenceAdapter<JSX.Element>
 }) {
-  const lines = createMemo(() => markdownLines(props.text))
-  return <Lines lines={lines()} />
+  // Block by block, keeping the block object of every block whose source has not moved, as the DOM's
+  // Markdown keeps its elements. `<For>` then keeps each unchanged block's lines, and a fence's viewer
+  // lives as long as its block rather than restarting on every streamed chunk.
+  let previous: MarkdownBlock[] = []
+  let revision = 0
+  const blocks = createMemo(() => {
+    revision++
+    const spare = new Map<string, MarkdownBlock[]>()
+    for (const block of previous) spare.set(block.key, [...(spare.get(block.key) ?? []), block])
+    previous = renderBlocks(props.text, { images: 'placeholder' }).map((block) => spare.get(block.key)?.shift() ?? block)
+    return previous
+  })
+  return (
+    <box flexDirection="column" flexShrink={0}>
+      <For each={blocks()}>
+        {(block, at) => {
+          // The newline the joined render puts between blocks is what draws the blank line between
+          // them, so every block after the first keeps it.
+          const lines = createMemo(() => htmlLines(at() ? `\n${block.html}` : block.html))
+          const viewer = block.fence && props.fences ? props.fences({ ...block.fence, revision }) : undefined
+          return viewer
+            ? (
+              <box flexDirection="column" flexShrink={0}>
+                {viewer.view}
+                <Show when={!viewer.preview()}><Lines lines={lines()} /></Show>
+              </box>
+            )
+            : <Lines lines={lines()} />
+        }}
+      </For>
+    </box>
+  )
 }

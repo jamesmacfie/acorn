@@ -7,6 +7,7 @@ import { createTreeState } from '@acorn/client-core/host/tree'
 import type { TreeHostProps } from '@acorn/client-core/host/tree'
 import { KIT_COMPONENTS } from '../kit/components'
 import { nextTick } from '../kit/tick'
+import { markdownFences } from '../kit/host'
 
 // The terminal's end of the remote tree: the same mutations, applied to cells.
 //
@@ -34,7 +35,13 @@ export function TreeHost(props: TreeHostProps) {
   const NodeView = (own: { id: string }): JSX.Element => {
     const stored = () => state.nodes[own.id]
     const type = () => stored()?.type ?? ''
-    const resolved = createMemo(() => state.resolveProps(stored()))
+    // As on the desktop: one fence adapter per `Markdown` node in a tree that opted in, and the host's
+    // answer replaces anything a worker sent under the same name.
+    const fences = type() === 'Markdown' && props.markdownFences ? markdownFences(props.markdownFences) : undefined
+    const resolved = createMemo(() => {
+      const own = state.resolveProps(stored())
+      return type() === 'Markdown' ? { ...own, fences } : own
+    })
     return (
       <Show when={stored()} keyed={false}>
         {/* A bare string, as on the DOM, so the kit node above it flattens it into its own run of

@@ -99,8 +99,10 @@ const isTableSeparator = (l: string | undefined): boolean =>
 const startsTable = (lines: string[], i: number): boolean =>
   lines[i].includes('|') && isTableSeparator(lines[i + 1])
 
-/** One rendered block, with a key that changes only when the block's own source does. */
-export type MarkdownBlock = { key: string; html: string }
+/** One rendered block, with a key that changes only when the block's own source does. `fence` is set
+ *  only on a closed code fence: its hint as written (`''` for none) and its source, taken from the
+ *  Markdown rather than read back out of the HTML. A host may draw a viewer for it. */
+export type MarkdownBlock = { key: string; html: string; fence?: { language: string; text: string } }
 
 // FNV-1a, 32 bits, carried in the key beside the block's length. A block only has to be told apart
 // from its own previous version and from its neighbours, and this is cheap enough to run over a whole
@@ -129,9 +131,9 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
   // highlight cache must not share a block.
   const flavour = opts.images ?? 'inline'
   let i = 0
-  const emit = (html: string, from: number): void => {
+  const emit = (html: string, from: number, fence?: MarkdownBlock['fence']): void => {
     const source = lines.slice(from, i).join('\n')
-    out.push({ key: `${flavour}:${source.length}:${digest(source)}`, html })
+    out.push({ key: `${flavour}:${source.length}:${digest(source)}`, html, ...(fence ? { fence } : {}) })
   }
   while (i < lines.length) {
     const start = i
@@ -143,14 +145,20 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
       while (i < lines.length && !lines[i].trim().startsWith('```')) buf.push(lines[i++])
       // A fence with no closing line is still streaming, or was never finished. The Markdown component
       // draws a diagram only from a closed one, rather than retrying a half-written one every frame.
-      const open = i >= lines.length ? ' data-open=""' : ''
+      const closed = i < lines.length
+      const open = closed ? '' : ' data-open=""'
       i++ // closing fence
       // The language hint travels as an attribute rather than a class because nothing styles it: the
       // Markdown component reads it to pick a Shiki grammar, and a fence with no hint stays plain. The
       // wrapper carries it too, because highlighting replaces the `<pre>` and a selection action still
       // needs to know what language the selected code is in.
       const lang = esc(fence[1] || 'text')
-      emit(`<div class="ui-code-wrap" data-language="${lang}"><pre><code data-language="${lang}"${open}>${esc(buf.join('\n'))}</code></pre></div>`, start)
+      const text = buf.join('\n')
+      emit(
+        `<div class="ui-code-wrap" data-language="${lang}"><pre><code data-language="${lang}"${open}>${esc(text)}</code></pre></div>`,
+        start,
+        closed ? { language: fence[1], text } : undefined,
+      )
       continue
     }
     const h = /^(#{1,6})\s+(.*)$/.exec(line)
@@ -212,6 +220,21 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
   }
   return out
 }
+
+/** A closed fence, for a host that may draw a viewer for it. `revision` is how many texts the
+ *  Markdown node had rendered when the fence's block appeared. */
+export type MarkdownFence = { language: string; text: string; revision: number }
+
+/**
+ * What a host draws for one closed fence: a view placed in the fence's wrapper after its source, and
+ * whether that view stands in for the source right now. `View` is the host's element type.
+ *
+ * Presentation only. The Markdown node keeps the source, its highlight and its copy control, and hides
+ * the source while `preview` is true. Which plugin draws, how many may, and the Source/Preview control
+ * are the host's (host/markdownFences/). A remote tree cannot pass one, because it is a function; the
+ * host passes it to a tree's `Markdown` node only where it allows a viewer (host/tree/TreeHost.tsx).
+ */
+export type MarkdownFenceAdapter<View> = (fence: MarkdownFence) => { view: View; preview: () => boolean } | undefined
 
 /** Markdown source to sanitized HTML, as one string. */
 export const renderMarkdown = (src: string, opts: MarkdownOptions = {}): string =>

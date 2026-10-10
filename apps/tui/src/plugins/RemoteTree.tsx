@@ -18,6 +18,7 @@ import { toast } from '@acorn/client-core/features/notifications'
 import { copyToTerminal } from '../kit/copy'
 import { focusedRenderable } from '../keys/regions'
 import { TreeHost } from './TreeHost'
+import { fenceScope } from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
 
 // One tree from one plugin, drawn where the owner asked for it, in cells.
 //
@@ -35,6 +36,10 @@ export type RemoteTreeProps = {
   scope?: () => { taskId?: string; projectId?: string; item?: string }
   /** Immutable opening selection shared by this composed owner's regions. */
   openingItem?: string
+  /** This tree is a top-level owner surface, such as a plugin's pane, so its `Markdown` nodes may give
+   *  their closed fences another plugin's viewer (`core:markdown-fence`) in this tree's bound scope. A
+   *  tree in another owner's slot never sets it: cooperative points stay one level deep. */
+  markdownFences?: boolean
   /** The sibling host editor's document, for a tree that is one region of a composed pane. An accessor
    *  because the two regions mount independently; its absence is the whole permission check for the
    *  `document` verb, exactly as it is on the desktop. */
@@ -185,7 +190,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const pluginId = createMemo(() => contribution.pluginId)
   return (
     <box flexDirection="column" flexGrow={1} ref={(element: Renderable) => { container = element }}>
-      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} {...(componentProps.onFailed ? { onFailed: componentProps.onFailed } : {})} />
+      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} {...(componentProps.onFailed ? { onFailed: componentProps.onFailed } : {})} {...fenceScope(componentProps.markdownFences, boundScope)} />
     </box>
   )
 }

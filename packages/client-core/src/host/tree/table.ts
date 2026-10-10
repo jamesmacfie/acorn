@@ -21,6 +21,8 @@ export type RemoteTreeComponent = Component<{
    *  because the two regions mount independently; its absence is the whole permission check, exactly as
    *  it is for an iframe region (../frames/broker.ts). */
   document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
+  /** A top-level owner surface whose `Markdown` nodes may open `core:markdown-fence`. */
+  markdownFences?: boolean
 }>
 
 let supplied: RemoteTreeComponent | null = null
