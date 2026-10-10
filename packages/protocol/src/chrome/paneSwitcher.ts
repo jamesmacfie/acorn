@@ -1,3 +1,5 @@
+import type { RailMarkerData } from './surfaces.ts'
+
 // Data and host verbs for the task pane switcher. A sandbox receives the data through its tree
 // mount and invokes the verbs by name; only a compiled provider sees these functions directly.
 export type PaneSwitcherPane = {
@@ -8,6 +10,9 @@ export type PaneSwitcherPane = {
   shown: boolean
   pinned: boolean
   shortcut?: string
+  /** The button's status markers: owner and compiled markers plus accepted `core:pane` marks, in the
+   *  host's legend order. The same data core's switcher draws. */
+  markers: readonly RailMarkerData[]
 }
 
 export type PaneSwitcherData = {

@@ -16,7 +16,7 @@
 // scopeEviction.ts names: the rail is the only thing that imports this, so the point exists exactly
 // when there is a rail to draw it on.
 import { CORE_TASK_KEY, CORE_TASK_POINT, type AnnotationSeverity } from '@acorn/protocol/extensionPoints.ts'
-import { annotationsFor, requestAnnotations } from './annotations'
+import { annotationsFor, requestAnnotations, type StampedMark } from './annotations'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { railMarkerRegistry } from '../registries/rail/railMarkerFeed'
 import { RAIL_MARKER_CORNERS, type RailMarker, type RailMarkerDot, type RailTone } from '../../features/tabs/railMarkers'
@@ -37,7 +37,8 @@ const TONE: Record<AnnotationSeverity, RailTone> = { info: 'neutral', warn: 'war
 const DOT: Record<AnnotationSeverity, RailMarkerDot> = { info: 'ok', warn: 'warn', danger: 'bad' }
 
 /**
- * One task's marks as rail markers.
+ * Accepted marks as rail markers. `core:source` and `core:pane` draw through this too
+ * (./statusAnnotations.ts), so a mark reads the same on every rail control.
  *
  * The contributor is named in the label rather than beside the icon, because the legend is the only
  * place on this control with room for words, and a person reading "staging deploy failed" is entitled
@@ -47,8 +48,8 @@ const DOT: Record<AnnotationSeverity, RailMarkerDot> = { info: 'ok', warn: 'warn
  * whole thing with this contribution's id before the allocator sees it, and the allocator's own
  * tiebreak is on that id, so the order is stable whatever sequence the answers arrive in.
  */
-export const taskAnnotationMarkers = (taskId: string): RailMarker[] =>
-  annotationsFor(CORE_TASK_POINT, { task: taskId }).map((mark, index) => ({
+export const annotationRailMarkers = (marks: readonly StampedMark[]): RailMarker[] =>
+  marks.map((mark, index) => ({
     id: `${mark.pluginId}:${index}`,
     label: `${mark.text} — ${mark.pluginId}`,
     // Exactly one of the two, which is what `isValidRailMarker` insists on. A contributor that named
@@ -57,6 +58,10 @@ export const taskAnnotationMarkers = (taskId: string): RailMarker[] =>
     tone: TONE[mark.severity],
     placements: RAIL_MARKER_CORNERS,
   }))
+
+/** One task's marks as rail markers. */
+export const taskAnnotationMarkers = (taskId: string): RailMarker[] =>
+  annotationRailMarkers(annotationsFor(CORE_TASK_POINT, { task: taskId }))
 
 railMarkerRegistry.register({
   id: CORE_TASK_POINT,

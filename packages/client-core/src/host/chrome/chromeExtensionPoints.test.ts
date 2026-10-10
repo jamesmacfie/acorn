@@ -17,6 +17,7 @@ const { _resetPluginDistribution, _seedPluginDistribution } = await import('../p
 const { _resetChromeContributions, syncChromeContributions } = await import('./chromeRegister')
 const { clearAnnotations } = await import('../annotations/annotations')
 const { requestTaskAnnotations } = await import('../annotations/taskAnnotations')
+const { releasePaneAnnotations, requestPaneAnnotations } = await import('../annotations/statusAnnotations')
 const { markersFor } = await import('../registries/rail/railMarkerFeed')
 // The two carriers that run a plugin's own bytes register in the frames pass instead, where the
 // accepted bundle hash and the trust answer are both in scope. Only the five-kinds case below needs it.
@@ -146,6 +147,30 @@ describe('cooperative extension points', () => {
       dotTone: 'warn',
     })
     expect(markersFor({ kind: 'task', id: 'task-2' })).toEqual([])
+  })
+
+  it('posts one core:pane batch for many consenting buttons and keeps only well-formed marks for them', async () => {
+    _seedPluginDistribution([['node-a', [row('tracker', {
+      extensions: [{ id: 'pane-status', point: 'core:pane', label: 'Tracker status', order: 500, items: '/v1/p/tracker/pane-status' }],
+    })]]])
+    syncChromeContributions()
+    writeJson.mockResolvedValue({ items: [
+      { key: { paneId: 'pane-0', taskId: 'task-1' }, severity: 'info', text: 'Linked to ACO-1' },
+      { key: { paneId: 'pane-1', taskId: 'task-1' }, severity: 'purple', text: 'Malformed' },
+      { key: { paneId: 'pane-2', taskId: 'task-1' } },
+      { key: { paneId: 'notes', taskId: 'task-1' }, severity: 'warn', text: 'Not asked about' },
+    ] })
+
+    const panes = Array.from({ length: 40 }, (_, index) => ({ id: `pane-${index}`, statusAnnotations: true }))
+    requestPaneAnnotations('task-1', [...panes, { id: 'notes' }])
+    await vi.waitFor(() => expect(markersFor({ kind: 'pane', id: 'pane-0', taskId: 'task-1' })).toHaveLength(1))
+
+    expect(writeJson).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(writeJson.mock.calls[0]![1].body as string).keys).toHaveLength(40)
+    expect(markersFor({ kind: 'pane', id: 'pane-1', taskId: 'task-1' })).toEqual([])
+    expect(markersFor({ kind: 'pane', id: 'pane-2', taskId: 'task-1' })).toEqual([])
+    expect(markersFor({ kind: 'pane', id: 'notes', taskId: 'task-1' })).toEqual([])
+    releasePaneAnnotations('task-1')
   })
 
   it('delivers nothing when the point was never declared', () => {

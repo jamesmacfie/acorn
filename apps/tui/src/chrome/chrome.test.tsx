@@ -14,7 +14,9 @@ import { registerCommands } from '@acorn/client-core/host/registries/commands'
 import { railMarkerRegistry } from '@acorn/client-core/host/registries/rail'
 import { extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { clearAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
-import type { PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
+import { CORE_PANE_POINT, CORE_SOURCE_POINT, type PluginAnnotationKey, type PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
+import { paneRegistry, type PaneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { keyedRows } from '../kit/showing'
 import { recordedRequests, TASK } from '../fixture'
 import { renderFixture } from '../harness'
@@ -193,6 +195,70 @@ describe('the shell', () => {
     } finally {
       screen.done()
       registration.dispose()
+    }
+  }, 30_000)
+
+  it('counts a consenting source’s marks in the Menu and lists every label from its menu key', async () => {
+    const registrations = [
+      sourceRegistry.register({ id: 'status-fixture', order: 1, glyph: 'rocket', label: 'Deploys', statusAnnotations: true }),
+      extensionRegistry.register({
+        id: 'fixture:source-status', pluginId: 'fixture', point: CORE_SOURCE_POINT, label: 'Source status', order: 500, carrier: 'items',
+        marks: async (keys: PluginAnnotationKey[]) => keys.flatMap((key) => Array.from({ length: 5 }, (_, index) => ({
+          key, severity: 'warn' as const, text: `Deploy ${index + 1}`,
+        }))),
+      }),
+    ]
+    const screen = await renderFixture({ width: 120, height: 40 })
+    try {
+      const frame = await screen.until('5 marks')
+      expect(frame.split('\n').find((line) => line.includes('Deploys'))).toContain('5 marks')
+      await screen.press('F10', { shift: true })
+      expect(await screen.until('Source markers')).toContain('Deploy 1 — fixture')
+      await screen.press('END')
+      expect(await screen.until('Deploy 5')).toContain('Deploy 5 — fixture')
+    } finally {
+      screen.done()
+      for (const registration of registrations) registration.dispose()
+      clearAnnotations()
+    }
+  }, 30_000)
+
+  it('puts pane markers after the label, lists the shown pane’s, and asks only consenting panes', async () => {
+    const asked: PluginAnnotationKey[][] = []
+    const pane = (id: string, label: string, statusAnnotations?: boolean) =>
+      paneRegistry.register({ id, label, glyph: 'circle', order: 900, component: () => null, ...(statusAnnotations ? { statusAnnotations } : {}) } as PaneContribution)
+    const registrations = [
+      pane('status-pane', 'Checks', true),
+      pane('quiet-pane', 'Quiet'),
+      railMarkerRegistry.register({
+        id: 'fixture-notes-marker', order: 500,
+        markers: (target) => target.kind === 'pane' && target.id === 'notes'
+          ? [{ id: 'saved', label: 'Saved a minute ago', dotTone: 'ok' as const, placements: ['top-end'] as const }]
+          : [],
+      }),
+      extensionRegistry.register({
+        id: 'fixture:pane-status', pluginId: 'fixture', point: CORE_PANE_POINT, label: 'Pane status', order: 500, carrier: 'items',
+        marks: async (keys: PluginAnnotationKey[]) => {
+          asked.push(keys)
+          return [
+            ...keys.map((key) => ({ key, severity: 'danger' as const, text: 'Checks failing' })),
+            { key: { paneId: 'quiet-pane', taskId: TASK.id }, severity: 'warn' as const, text: 'Not asked' },
+          ]
+        },
+      }),
+    ]
+    const screen = await renderFixture({ width: 120, height: 40, pane: 'notes' })
+    try {
+      const frame = await screen.until('Checks +1')
+      expect(frame).toContain('[Notes +1]')
+      expect(frame).toContain('Saved a minute ago')
+      expect(frame).not.toContain('Quiet +')
+      // One batch: the shipped Changes pane consents too, and the quiet pane is never asked about.
+      expect(asked).toEqual([[{ paneId: 'changes', taskId: TASK.id }, { paneId: 'status-pane', taskId: TASK.id }]])
+    } finally {
+      screen.done()
+      for (const registration of registrations) registration.dispose()
+      clearAnnotations()
     }
   }, 30_000)
 

@@ -1,7 +1,6 @@
 import { For } from 'solid-js'
 import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import { RailTab } from '../tabs/RailTab'
-import { markersFor } from '../../host/registries/rail/railMarkerFeed'
 import { menuPoint } from '../../host/registries/panes/menuPoint'
 
 // Core's provider for the host-owned pane switcher contract. The host keeps layout state and
@@ -14,7 +13,7 @@ export default function PaneSwitcher(props: PaneSwitcherProps) {
           label={pane.label}
           glyph={pane.icon}
           active={pane.shown}
-          markers={markersFor({ kind: 'pane', id: pane.id, taskId: props.task.id })}
+          markers={[...pane.markers]}
           data-tip-key={pane.shortcut}
           data-tip-sub={pane.description ? `${pane.description}. ⌘-click to open beside.` : '⌘-click to open beside.'}
           aria-pressed={pane.shown}

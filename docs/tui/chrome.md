@@ -93,6 +93,10 @@ marker label. The plugin supplies no action or terminal UI. Loaded task marks ar
 `core:task` annotation point as on the desktop
 ([task annotations](../plugins/rows-and-annotations.md#task-annotations)).
 
+A Menu source row shows its count the same way, and its menu key opens **Source markers**. The pane
+strip puts `+N` after a pane's label and lists the shown pane's labels on a line under the strip
+([source and pane annotations](../plugins/rows-and-annotations.md#source-and-pane-annotations)).
+
 #### The palette and overlays
 
 The palette is a `Modal` over the same session the desktop's uses

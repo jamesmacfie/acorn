@@ -55,6 +55,9 @@ export type SourceContribution<Item = unknown> = {
   // Draw only while the active workspace has a git project. A workspace question rather than a `when`,
   // because the active workspace is the rail's to know and `SourceScope` already carries its facts.
   requiresGitProject?: boolean
+  // The owner's consent for other plugins to mark this source's rail icon through `core:source`
+  // (../../annotations/statusAnnotations.ts). Absent means the host never asks about it.
+  statusAnnotations?: boolean
   component?: Component
   /**
    * The surface as a list beside a detail, for a host that draws the two halves in different places.

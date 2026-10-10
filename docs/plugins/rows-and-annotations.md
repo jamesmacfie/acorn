@@ -112,11 +112,22 @@ stays in the ordered tooltip legend and the accessible description. The terminal
 legend ([rail controls and status markers](../ui-design.md#rail-controls-and-status-markers),
 [task markers](../tui/chrome.md#task-markers)).
 
-This path is task-only. A plugin that needs source or pane status needs an owner-declared annotation
-point for that surface first, not a rail-specific manifest key.
-
 Editor's `editor:file` point works the same way for tree rows and document tabs, keyed
 `{ taskId, path }` ([file annotations](../editor/file-annotations.md)).
+
+### Source and pane annotations
+
+`core:source`, keyed `{ sourceId, projectId }`, marks a rail source icon. `core:pane`, keyed
+`{ paneId, taskId }`, marks a task pane's switcher button. Unlike `core:task`, the owner consents: a
+source descriptor, task pane, or compiled contribution sets `statusAnnotations: true`, and the host
+asks only about consenting ones it draws. The Node refuses the flag on any other surface. A source's
+`projectId` is the routed project, or `""` for a source that isn't `projectScoped`. The Node is the
+host's batch identity, not a key field. Git's source and the Changes pane consent.
+
+The host sends one request per contributor and visible key set, reads marks back only for keys it
+asked about, and clears them at once when the project, task, Node, owner registration, or contributor
+changes (`client-core/host/annotations/statusAnnotations.ts`). Marks merge with compiled rail markers
+in the legend order. A rail or pane switcher replacement gets them in its data as `markers`.
 
 ### Storage and memory sections
 

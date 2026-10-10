@@ -627,7 +627,9 @@ describe('architecture boundaries', () => {
       // Phase 05 of the git-pane work exposes a lean task launch signal and lazy draft model to both hosts.
       // Two more on 2026-10-10 for link previews: `host/linkPreview/linkPreview.ts`, the JSX-free state
       // both hosts import, and `LinkPreviewHost.tsx`, the desktop's popover, which the terminal can't load.
-      '@acorn/client-core': 182, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, and the Markdown fence model and view.
+      // One more on 2026-10-10 for rail status: `host/annotations/statusAnnotations.ts`, which the
+      // terminal imports directly because the annotations barrel carries the DOM's AnnotationMarks.
+      '@acorn/client-core': 183, // Includes the no-projects surface, workspace rail, device preference reader, SelectionActions, and the Markdown fence model and view.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.

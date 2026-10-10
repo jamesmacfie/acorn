@@ -19,6 +19,7 @@ import { markersFor } from '../../host/registries/rail/railMarkerFeed'
 import { railStatusMarkers } from '../tasks/railStatus'
 import { createTaskScripts } from '../tasks/taskScripts'
 import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
+import { requestSourceAnnotations } from '../../host/annotations/statusAnnotations'
 import { unreadForTask } from '../notifications/notifications'
 import { toast } from '../notifications/toast'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
@@ -149,6 +150,9 @@ export default function TabRail() {
     const visibility = parseRailVisibility(prefs.data?.[PrefKeys.railVisibility])
     return openableSources().filter((source) => shownInRail(source.id, visibility))
   }
+  // `core:source`, for the icons drawn and the routed project (../../host/annotations/statusAnnotations.ts).
+  // Only sources whose owner consented are asked about, and the marks come back through `markersFor`.
+  createEffect(() => requestSourceAnnotations(sources().map((source) => source.id), activeProjectId()))
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)

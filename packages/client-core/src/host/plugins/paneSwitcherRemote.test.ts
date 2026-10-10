@@ -6,7 +6,10 @@ import { PANE_SWITCHER_ACTIONS, paneSwitcherRemote } from './paneSwitcherRemote'
 const person = { byPerson: true }
 
 const props = (): PaneSwitcherProps => ({
-  panes: [{ id: 'changes', label: 'Changes', icon: 'git-diff', shown: true, pinned: false }],
+  panes: [{
+    id: 'changes', label: 'Changes', icon: 'git-diff', shown: true, pinned: false,
+    markers: [{ id: 'core:pane:review:0', label: 'Two files flagged — review', dotTone: 'warn', tone: 'warn', placements: ['top-end', 'top-start'] }],
+  }],
   task: { id: 'task-1', title: 'Review', projectId: 'project-1' },
   maximized: null,
   show: vi.fn(), add: vi.fn(), close: vi.fn(), pin: vi.fn(), toggleMaximize: vi.fn(), equalize: vi.fn(), openContextMenu: vi.fn(),
@@ -17,6 +20,8 @@ describe('pane switcher worker contract', () => {
     const host = props()
     const remote = paneSwitcherRemote(host)
     expect(structuredClone(remote.data)).toEqual(remote.data)
+    // A replacement draws the same markers core's switcher does, `core:pane` marks included.
+    expect(remote.data.panes[0]!.markers).toEqual(host.panes[0]!.markers)
     expect(Object.keys(remote.actions).sort()).toEqual([...PANE_SWITCHER_ACTIONS].sort())
     remote.actions.show?.('changes', person)
     remote.actions.equalize?.(null, person)

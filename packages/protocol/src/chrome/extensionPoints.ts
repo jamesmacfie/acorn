@@ -325,6 +325,23 @@ export const CORE_TASK_POINT = 'core:task'
  *  the same reason every other point's is: the order is the contract. */
 export const CORE_TASK_KEY = ['task'] as const
 
+/**
+ * Core's annotation points for a rail source icon and a task pane button.
+ *
+ * Unlike `core:task`, these need the owner's consent: a source or task pane declares
+ * `statusAnnotations: true`, and the host asks only about the consenting ones it is drawing. A
+ * source's `projectId` is the routed project, or `''` for a source that is not project-scoped. The
+ * Node is part of the host's batch identity and never a key field, so the same ids on two Nodes stay
+ * apart. Drawn as rail markers, like `core:task` (client-core annotations/statusAnnotations.ts).
+ */
+export const CORE_SOURCE_POINT = 'core:source'
+
+export const CORE_SOURCE_KEY = ['sourceId', 'projectId'] as const
+
+export const CORE_PANE_POINT = 'core:pane'
+
+export const CORE_PANE_KEY = ['paneId', 'taskId'] as const
+
 // ── The exclusive half ────────────────────────────────────────────────────────────────────────────
 
 /**

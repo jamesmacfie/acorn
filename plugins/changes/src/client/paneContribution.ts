@@ -28,5 +28,8 @@ export const changesPaneContribution: PaneLayoutContribution<ChangesModel> = {
   collapseContent: 'empty',
   // The list region says when the pane is usable (./ChangesPane.tsx).
   reportsUsable: true,
+  // Other plugins may mark the Changes button (`core:pane`). A review, lint or CI plugin knows things
+  // about a task's uncommitted work, and this button is where a reader looks before committing.
+  statusAnnotations: true,
   regions: { 'list-header': ChangesHeader, list: ChangesList, 'list-footer': ChangesFooter, detail: ChangesDiff },
 }

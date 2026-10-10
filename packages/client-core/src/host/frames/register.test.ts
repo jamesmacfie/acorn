@@ -178,6 +178,16 @@ describe('syncFrameContributions', () => {
     expect(paneRegistry.get('board-history')?.readsArchived).toBe(true)
   })
 
+  it('carries a loaded task pane\'s status-mark consent into the pane registry', () => {
+    seedTrusted(row('board', {
+      frames: [surface({ target: 'pane', id: 'board-history', statusAnnotations: true }), surface({ target: 'pane', id: 'board-quiet' })],
+    }))
+    syncFrameContributions()
+
+    expect(paneRegistry.get('board-history')?.statusAnnotations).toBe(true)
+    expect(paneRegistry.get('board-quiet')?.statusAnnotations).toBeUndefined()
+  })
+
   it('a coreSlot surface registers an OFFER, and replaces nothing until the owner picks it', () => {
     // The exclusive slot (registries/exclusiveSlots.ts owns the arbitration and its own test). What this
     // one pins is the wiring: the target lands in its own registry rather than in `panes`, so a

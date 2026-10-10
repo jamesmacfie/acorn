@@ -312,6 +312,9 @@
               "readsArchived": {
                 "type": "boolean"
               },
+              "statusAnnotations": {
+                "type": "boolean"
+              },
               "availability": {
                 "type": "string",
                 "minLength": 1,
@@ -730,6 +733,9 @@
                 "type": "boolean"
               },
               "requiresGitProject": {
+                "type": "boolean"
+              },
+              "statusAnnotations": {
                 "type": "boolean"
               },
               "defaultPane": {

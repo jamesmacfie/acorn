@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createComponent, ErrorBoundary, Show, Suspense } from 'solid-js'
+import { createComponent, createEffect, ErrorBoundary, onCleanup, Show, Suspense } from 'solid-js'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 import { createTaskScripts, scriptLabel } from '@acorn/client-core/features/tasks'
 import { Tabs } from '../kit/grouping'
@@ -10,6 +10,9 @@ import { panesFor, showPane, shownPane } from './panes'
 import { LinkMenuContext, PaneIdContext, type LinkMenu } from '../kit/paneContext'
 import { openActionPicker } from '@acorn/client-core/host/registries/commands'
 import { linkLabel, openLinkPreview } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
+import { markersFor } from '@acorn/client-core/host/registries/rail'
+import { resolveRailMarkers } from '@acorn/client-core/features/tabs'
+import { releasePaneAnnotations, requestPaneAnnotations } from '@acorn/client-core/host/annotations/statusAnnotations.ts'
 
 // The pane row: one line of pane labels, and the pane under it.
 //
@@ -18,6 +21,9 @@ import { linkLabel, openLinkPreview } from '@acorn/client-core/host/linkPreview/
 // here it stays core's. It is one props object over kit nodes, which is the shape that contract asks
 // for.
 //
+// A pane's markers are the desktop button's (`core:pane` and compiled markers): a `+N` after its label,
+// and the shown pane's words on a line under the strip, as the rail lists a task's.
+//
 // Two components rather than one, because the shell puts the strip inside a focus region and the pane
 // outside it: the strip is a place the keys can be, and the pane's own layout registers its regions
 // for itself.
@@ -25,6 +31,17 @@ import { linkLabel, openLinkPreview } from '@acorn/client-core/host/linkPreview/
 export function PaneStrip(props: { task: Task; focused: boolean }) {
   const scripts = createTaskScripts(() => props.task.id)
   const panes = () => panesFor(props.task)
+  const legendFor = (paneId: string) => resolveRailMarkers(markersFor({ kind: 'pane', id: paneId, taskId: props.task.id })).legend
+  const shownLegend = () => {
+    const shown = shownPane(props.task)
+    return shown ? legendFor(shown.id).map((marker) => marker.l) : []
+  }
+  let annotatedTaskId = props.task.id
+  createEffect(() => {
+    annotatedTaskId = props.task.id
+    requestPaneAnnotations(annotatedTaskId, panes())
+  })
+  onCleanup(() => releasePaneAnnotations(annotatedTaskId))
   return (
     <box flexDirection="column" flexShrink={0}>
       <box flexDirection="row" gap={1}>
@@ -35,11 +52,15 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
       <Tabs
         idPrefix="chrome.panes"
         ariaLabel="Task panes"
-        tabs={panes().map((pane) => ({ id: pane.id, label: pane.label }))}
+        tabs={panes().map((pane) => {
+          const count = legendFor(pane.id).length
+          return { id: pane.id, label: count ? `${pane.label} +${count}` : pane.label }
+        })}
         active={shownPane(props.task)?.id ?? ''}
         onChange={(id) => showPane(props.task, id)}
       />
       </box>
+      <Show when={shownLegend().length}><Line role="muted">{shownLegend().join(' · ')}</Line></Show>
       <Show when={scripts.query.data}>{snapshot => <Line>{scriptLabel(snapshot().setup)} · {scriptLabel(snapshot().teardown)}{scripts.freshness() === 'live' ? '' : ` · ${scripts.freshness()} snapshot`}</Line>}</Show>
     </box>
   )

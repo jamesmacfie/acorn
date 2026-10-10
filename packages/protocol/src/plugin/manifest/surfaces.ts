@@ -114,6 +114,9 @@ export const frameSurface = z.object({
   // Absent is deliberately false: archived tasks have no worktree, and mounting an ordinary pane
   // may otherwise start work that the owner did not restore.
   readsArchived: z.boolean().optional(),
+  // Task `pane` only. The owner's consent for other plugins to put status marks on this pane's
+  // switcher button through `core:pane` (@acorn/protocol/extensionPoints.ts). Absent means no marks.
+  statusAnnotations: z.boolean().optional(),
   // Task `pane` only. A GET route that answers `{ [taskId]: boolean }` for the node's active tasks, so
   // the host can hide the pane on a task it has nothing to draw for. A task the answer leaves out is
   // hidden too. See docs/panes/contributions.md § Contributions.
@@ -207,6 +210,9 @@ export const frameSurface = z.object({
   }
   if (surface.readsArchived && (surface.target !== 'pane' || surface.scope !== 'task')) {
     ctx.addIssue({ code: 'custom', path: ['readsArchived'], message: 'readsArchived is only valid on a task pane' })
+  }
+  if (surface.statusAnnotations && (surface.target !== 'pane' || surface.scope !== 'task')) {
+    ctx.addIssue({ code: 'custom', path: ['statusAnnotations'], message: 'statusAnnotations is only valid on a task pane' })
   }
   if (surface.availability && (surface.target !== 'pane' || surface.scope !== 'task')) {
     ctx.addIssue({ code: 'custom', path: ['availability'], message: 'availability is only valid on a task pane' })

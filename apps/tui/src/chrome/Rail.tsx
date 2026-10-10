@@ -3,9 +3,10 @@ import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { markersFor } from '@acorn/client-core/host/registries/rail'
+import { markersFor, type RailMarkerTarget } from '@acorn/client-core/host/registries/rail'
 import { resolveRailMarkers } from '@acorn/client-core/features/tabs'
 import { requestTaskAnnotations } from '@acorn/client-core/host/annotations/taskAnnotations.ts'
+import { requestSourceAnnotations } from '@acorn/client-core/host/annotations/statusAnnotations.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { keyedRows, Row, Rows } from '../kit/showing'
 import { Line } from '../kit/cells'
@@ -17,6 +18,7 @@ import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/ex
 import { BROWSE, MENU, TASKS } from './topology'
 import type { ShellModel } from './model'
 import { setHighlightedTaskId } from './state'
+import { routedProjectId } from './routing'
 import { workflowTaskHierarchy } from '@acorn/client-core/features/tasks'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '@acorn/client-core/features/tasks'
 
@@ -37,8 +39,8 @@ import { expandedWorkflowRoots, toggleWorkflowRoot } from '@acorn/client-core/fe
 // component cannot have its list drawn anywhere but where the component puts it
 // (client-core/host/registries/sources/sources.ts § regions).
 //
-// The marks on a task row are the same ones the desktop draws around a rail control (`core:task`,
-// features/tabs/railMarkers.ts). A corner is a pixel idea, so in cells the placement is dropped and
+// The marks on a task or source row are the same ones the desktop draws around a rail control
+// (`core:task`, `core:source`, features/tabs/railMarkers.ts). A corner is a pixel idea, so in cells the placement is dropped and
 // the glyphs sit in the row's trailing slot in the order the allocator put them — same data, same
 // order, one dimension fewer.
 
@@ -81,19 +83,32 @@ function Marks(props: { markers: ReturnType<typeof markersFor>; cells: number })
   return <Show when={label()}>{(text) => <Line role="muted">{text()}</Line>}</Show>
 }
 
+/** Every marker's words for one row, opened from its menu key: the terminal's hover legend. */
+function MarkerLegend(props: { title: string; id: string; target: RailMarkerTarget; onDismiss: () => void }) {
+  const rows = createMemo(() => resolveRailMarkers(markersFor(props.target)).legend.map((marker, index) => ({
+    key: String(index),
+    label: marker.l,
+  })))
+  return (
+    <Modal onDismiss={props.onDismiss} title={props.title} size="sm">
+      <ModalBody>
+        <box height={3} flexShrink={0}>
+          <Rows virtual id={props.id} ariaLabel={props.title} items={rows()}>
+            {(marker, item) => <Row item={item}>{marker.label}</Row>}
+          </Rows>
+        </box>
+      </ModalBody>
+    </Modal>
+  )
+}
+
+const hasMarkers = (target: RailMarkerTarget): boolean => resolveRailMarkers(markersFor(target)).legend.length > 0
+
 function TaskList(props: { model: ShellModel; markerCells: number }) {
   // What other plugins have to say about the rows on screen: one request for the whole list, re-asked
   // when the list changes. Nothing here reads the answers — they come back as markers.
   createEffect(() => requestTaskAnnotations(props.model.tasks().map((task) => task.id)))
   const [inspecting, setInspecting] = createSignal<string | null>(null)
-  const inspectedMarkers = createMemo(() => {
-    const taskId = inspecting()
-    return taskId ? resolveRailMarkers(markersFor({ kind: 'task', id: taskId })).legend : []
-  })
-  const inspectedRows = createMemo(() => inspectedMarkers().map((marker, index) => ({
-    key: String(index),
-    label: marker.l,
-  })))
 
   // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
   // them (../kit/showing/collection.tsx § keyedRows).
@@ -123,7 +138,7 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
       items={rows()}
       onSelect={setHighlightedTaskId}
       onMenu={(id) => {
-        if (resolveRailMarkers(markersFor({ kind: 'task', id })).legend.length) setInspecting(id)
+        if (hasMarkers({ kind: 'task', id })) setInspecting(id)
       }}
       onActivate={(id) => {
         const task = props.model.tasks().find((row) => row.id === id)
@@ -150,15 +165,9 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
       )}
     </Rows>
     <Show when={inspecting()}>
-      <Modal onDismiss={() => setInspecting(null)} title="Task markers" size="sm">
-        <ModalBody>
-          <box height={3} flexShrink={0}>
-            <Rows virtual id="chrome.rail.task-markers" ariaLabel="Task markers" items={inspectedRows()}>
-              {(marker, item) => <Row item={item}>{marker.label}</Row>}
-            </Rows>
-          </box>
-        </ModalBody>
-      </Modal>
+      {(taskId) => (
+        <MarkerLegend title="Task markers" id="chrome.rail.task-markers" target={{ kind: 'task', id: taskId() }} onDismiss={() => setInspecting(null)} />
+      )}
     </Show>
     </>
   )
@@ -184,6 +193,10 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
   const sources = () => props.model.sources()
   const sourceRows = keyedRows(sources, (entry) => ({ key: entry.id, ...entry }))
   const source = () => sourceRegistry.get(selectedSource() ?? '')
+  // `core:source`, for the sources this Menu lists and the routed project. Only consenting owners are
+  // asked about (client-core host/annotations/statusAnnotations.ts).
+  createEffect(() => requestSourceAnnotations(sources().map((entry) => entry.id), routedProjectId()))
+  const [inspecting, setInspecting] = createSignal<string | null>(null)
 
   return (
     <box flexDirection="column" width={props.cells} flexShrink={0}>
@@ -211,11 +224,24 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
             selected={selectedSource()}
             onSelect={setSelectedSource}
             onActivate={setSelectedSource}
+            onMenu={(id) => { if (hasMarkers({ kind: 'source', id })) setInspecting(id) }}
           >
             {(entry, item) => (
-              <Row item={item} selected={selectedSource() === entry.id}>{entry.label}</Row>
+              <Row
+                item={item}
+                selected={selectedSource() === entry.id}
+                keepTrailing
+                trailing={<Marks markers={markersFor({ kind: 'source', id: entry.id })} cells={Math.max(2, props.cells - 14)} />}
+              >
+                {entry.label}
+              </Row>
             )}
           </Rows>
+        </Show>
+        <Show when={inspecting()}>
+          {(sourceId) => (
+            <MarkerLegend title="Source markers" id="chrome.rail.source-markers" target={{ kind: 'source', id: sourceId() }} onDismiss={() => setInspecting(null)} />
+          )}
         </Show>
       </Panel>
       {/* The chosen source's own list, drawn here rather than in the surface it belongs to. A source

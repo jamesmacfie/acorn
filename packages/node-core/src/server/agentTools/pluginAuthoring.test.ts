@@ -90,6 +90,10 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(renderPluginAuthoring(v)).toContain('`invoke("interrupt", { expectedSessionId })`')
     expect(renderPluginAuthoring(v)).toContain('`terminal:toolbar-actions`')
     expect(renderPluginAuthoring(v)).toContain('`needs_person` unless called from a press in')
+    // Rail status: both keys, and the owner's consent.
+    expect(renderPluginAuthoring(v)).toContain('`core:source` `{ sourceId, projectId }`')
+    expect(renderPluginAuthoring(v)).toContain('`core:pane` `{ paneId, taskId }`')
+    expect(renderPluginAuthoring(v)).toContain('`statusAnnotations: true`')
   })
 
   it('carries every manifest key, split on what the schema actually requires', () => {

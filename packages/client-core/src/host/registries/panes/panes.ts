@@ -51,6 +51,11 @@ type PaneCommon = {
    */
   readsArchived?: boolean
   /**
+   * Other plugins may mark this pane's switcher button through `core:pane`
+   * (../../annotations/statusAnnotations.ts). The owner's consent: absent, the host never asks.
+   */
+  statusAnnotations?: boolean
+  /**
    * This pane calls `featureUsable(id)` once its content can be used
    * (docs/telemetry/renderer.md § Feature openings). Without it the host closes the pane's opening
    * record when the pane mounts, and labels that measurement a proxy.

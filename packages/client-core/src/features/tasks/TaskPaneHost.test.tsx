@@ -5,6 +5,9 @@ import { paneRegistry, type PaneContribution } from '../../host/registries/panes
 import type { Disposable } from '../../kit/lib/state/registry'
 import TaskPaneHost from './TaskPaneHost'
 import { applyLayoutAction, type LayoutAction, type TaskLayout } from './taskLayout'
+import { CORE_PANE_POINT, type PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
+import { extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
+import { clearAnnotations } from '../../host/annotations/annotations'
 
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }) }))
 
@@ -25,8 +28,9 @@ vi.mock('../../infra/node/hostCapabilities', () => ({
       : capabilities[(requirement.plugin ?? requirement.seam) as keyof typeof capabilities] ?? true,
 }))
 
-// The layout store, the node's freshness, and the rail's markers are all read through modules of
-// their own. Stub them so a failure here means the host, not one of its neighbours.
+// The layout store and the node's freshness are read through modules of their own. Stub them so a
+// failure here means the host, not one of its neighbours. The marker feed is real, because the
+// switcher's `core:pane` marks travel through it.
 const layout = vi.hoisted(() => ({ panes: ['pr'] as string[], pinned: [] as string[], weights: {} as Record<string, number> }))
 const maximized = vi.hoisted(() => ({ pane: undefined as string | undefined }))
 const dispatched = vi.hoisted(() => [] as unknown[])
@@ -38,7 +42,6 @@ vi.mock('./tasks', () => ({
 vi.mock('../../infra/node/activeNode', () => ({ activeNodeId: () => 'node-1' }))
 vi.mock('../../infra/node/fleet', () => ({ nodeState: () => ({}) }))
 vi.mock('../../infra/node/freshness', () => ({ freshnessOf: () => 'live' }))
-vi.mock('../../host/registries/rail/railMarkerFeed', () => ({ markersFor: () => [] }))
 
 let host: HTMLElement
 let dispose: () => void
@@ -95,6 +98,7 @@ afterEach(() => {
   dispose?.()
   host?.remove()
   for (const handle of registered.splice(0)) handle.dispose()
+  clearAnnotations()
 })
 
 describe('TaskPaneHost', () => {
@@ -252,6 +256,38 @@ describe('TaskPaneHost', () => {
     expect(host.querySelector('.contribution-failed')).not.toBeNull()
     expect(host.querySelector('[data-mark="changes"]')).not.toBeNull()
     vi.restoreAllMocks()
+  })
+
+  it('marks consenting pane buttons only, keeps their menu, and drops the marks when the task closes', async () => {
+    pane({ id: 'pr', order: 0, statusAnnotations: true })
+    pane({ id: 'changes', order: 1 })
+    const marks = vi.fn(async (keys: PluginAnnotationKey[]) => keys.map((key) => ({ key, severity: 'danger' as const, text: 'Checks failing' })))
+    registered.push(extensionRegistry.register({
+      id: 'plugin:ci:pane-status', pluginId: 'ci', point: CORE_PANE_POINT, label: 'CI status', order: 500, carrier: 'items', marks,
+    } as ExtensionContribution))
+    mount()
+    const icon = (id: string) => [...host.querySelectorAll<HTMLElement>('.pane-switcher .tabrail-tab')]
+      .find((entry) => entry.getAttribute('aria-label') === id)!
+
+    await vi.waitFor(() => expect(icon('pr').querySelectorAll('.tabrail-marker')).toHaveLength(1))
+    expect(marks).toHaveBeenCalledOnce()
+    expect(marks.mock.calls[0]![0]).toEqual([{ paneId: 'pr', taskId: 'task-1' }])
+    expect(icon('pr').querySelector('.sr-only')?.textContent).toBe('Checks failing — ci')
+    expect(icon('changes').querySelectorAll('.tabrail-marker')).toHaveLength(0)
+
+    // The marked button still opens its menu without showing the pane.
+    icon('pr').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }))
+    expect(dispatched).toEqual([])
+    expect(document.querySelector('[role="menu"]')).not.toBeNull()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+
+    // Closing the task unmounts its host; the next switcher to draw that pane must not inherit the mark.
+    dispose()
+    host.remove()
+    marks.mockImplementation(async () => [])
+    mount(task({ id: 'task-2' }))
+    await vi.waitFor(() => expect(marks).toHaveBeenCalledTimes(2))
+    expect(icon('pr').querySelectorAll('.tabrail-marker')).toHaveLength(0)
   })
 
   it('routes a switcher click through the layout reducer, and a meta-click opens beside', () => {

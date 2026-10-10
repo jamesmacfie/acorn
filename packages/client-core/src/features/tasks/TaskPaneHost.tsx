@@ -26,6 +26,8 @@ import { registerContextMenuItems, type RailPaneTarget } from '../../host/regist
 import { ContextMenuHost, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 import { featureMounted, openFeature } from '../../infra/telemetry/featureOpening'
 import { createLinkPreviewBoundary } from '../../host/linkPreview/linkPreview'
+import { markersFor } from '../../host/registries/rail/railMarkerFeed'
+import { releasePaneAnnotations, requestPaneAnnotations } from '../../host/annotations/statusAnnotations'
 
 registerCoreExclusiveSlot('pane.switcher', (props) => <PaneSwitcher {...(props.value as PaneSwitcherProps)} />)
 
@@ -114,6 +116,14 @@ export default function TaskPaneHost(props: {
       (target.nodeId !== activeNodeId() || target.taskId !== props.task.id || !paneMenuTarget(target.id) ||
         paneRegistry.get(target.id) !== openedPane)) setPaneMenu(null)
   })
+  // `core:pane`, for the buttons this switcher draws (../../host/annotations/statusAnnotations.ts). A
+  // task change re-asks with the new task's keys, and a closed task drops its marks on unmount.
+  let annotatedTaskId = props.task.id
+  createEffect(() => {
+    annotatedTaskId = props.task.id
+    requestPaneAnnotations(annotatedTaskId, switcherPanes())
+  })
+  onCleanup(() => releasePaneAnnotations(annotatedTaskId))
   const switcherProps = (): PaneSwitcherProps => ({
     panes: switcherPanes().map((pane) => ({
       id: pane.id,
@@ -125,6 +135,7 @@ export default function TaskPaneHost(props: {
       shortcut: props.shortcutFor?.(`pane.show.${pane.id}`)
         ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!)
         : pane.defaultChord ? formatChord(pane.defaultChord) : undefined,
+      markers: markersFor({ kind: 'pane', id: pane.id, taskId: props.task.id }),
     })),
     task: { id: props.task.id, title: props.task.title, projectId: props.task.projectId },
     maximized: maximizedPane(props.task.id) ?? null,

@@ -429,6 +429,22 @@ describe('pane layouts', () => {
       .toContain('readsArchived is only valid on a task pane')
   })
 
+  it('takes status-mark consent from a source or a task pane, and from no other surface', () => {
+    const parsed = manifest({
+      frames: [{ ...PANE, statusAnnotations: true }],
+      sources: [{ id: 'cards', label: 'Cards', order: 1, items: '/v1/p/board/items', statusAnnotations: true }],
+    })
+    expect(parsed.success && parsed.data.contributions.frames[0].statusAnnotations).toBe(true)
+    expect(parsed.success && parsed.data.contributions.sources[0].statusAnnotations).toBe(true)
+    for (const frame of [
+      { target: 'settings', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' } },
+      { ...PANE, scope: 'project' },
+      { target: 'overlay', id: 'picker', label: 'Picker' },
+    ]) {
+      expect(messages(manifest({ frames: [{ ...frame, statusAnnotations: true }] }))).toContain('statusAnnotations is only valid on a task pane')
+    }
+  })
+
   it('refuses a layout name this build does not draw, and a region the layout does not have', () => {
     expect(manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v1/p/board/doc' }) } }] }).success).toBe(false)
     expect(messages(manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: 'frame', sidebar: 'frame' } }] })))

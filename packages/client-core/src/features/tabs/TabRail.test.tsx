@@ -7,7 +7,16 @@ import { paneRegistry, type PaneContribution } from '../../host/registries/panes
 import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import type { Disposable } from '../../kit/lib/state/registry'
-import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
+import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
+import { CORE_SOURCE_POINT, type PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
+import type { RailProps } from '@acorn/protocol/chrome.ts'
+import { sourceRegistry } from '../../host/registries/sources/sources'
+import { extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
+import { exclusiveSlotRegistry } from '../../host/registries/extensionPoints/exclusiveSlots'
+import { clearAnnotations } from '../../host/annotations/annotations'
+import { setActiveNode } from '../../infra/node/activeNode'
+import { PrefKeys } from '../../infra/persistence/prefKeys'
+import { writeDevicePref } from '../../infra/persistence/devicePrefs'
 
 const { archiveTaskMock, copyLinkMock, createTaskMock, navigateMock, readJsonMock } = vi.hoisted(() => ({
   archiveTaskMock: vi.fn(), copyLinkMock: vi.fn(), createTaskMock: vi.fn(), navigateMock: vi.fn(), readJsonMock: vi.fn(),
@@ -438,6 +447,75 @@ describe('a row whose markers are read again', () => {
 
     setLabel('2 agents working')
     expect(host.querySelector('.tabrail-task')?.getAttribute('data-tip-legend')).toContain('2 agents working')
+  })
+})
+
+describe('source status marks', () => {
+  // `core:source` (host/annotations/statusAnnotations.ts): a consenting source's icon takes other
+  // plugins' marks, and every rail — core's or a replacement — draws the same data.
+  const deploysSource = (count: number) => {
+    registered.push(sourceRegistry.register({ id: 'deploys-src', order: 10, glyph: 'rocket', label: 'Deploys', statusAnnotations: true }))
+    registered.push(sourceRegistry.register({ id: 'quiet-src', order: 11, glyph: 'box', label: 'Quiet' }))
+    const marks = vi.fn(async (keys: PluginAnnotationKey[]) => keys.flatMap((key) => Array.from({ length: count }, (_, index) => ({
+      key, severity: 'warn' as const, text: `Deploy ${index + 1}`,
+    }))))
+    registered.push(extensionRegistry.register({
+      id: 'plugin:deploys:source-status', pluginId: 'deploys', point: CORE_SOURCE_POINT, label: 'Deploy status', order: 500, carrier: 'items', marks,
+    } as ExtensionContribution))
+    return marks
+  }
+  const sourceButton = (id: string) => host.querySelector<HTMLElement>(`.tabrail-source[data-source-id="${id}"]`)
+  // A device preference: written locally, then the prefs query re-projects it.
+  const choose = (pluginId: string) => {
+    writeDevicePref(PrefKeys.exclusiveSlots, JSON.stringify({ rail: pluginId }))
+    queryClient.setQueryData(prefsKey, {})
+  }
+
+  afterEach(() => {
+    clearAnnotations()
+    setActiveNode(null)
+  })
+
+  it('draws four marks, legends all six, and leaves the source menu and selection alone', async () => {
+    setActiveNode('node-a')
+    const marks = deploysSource(6)
+    setSelectedSource('quiet-src')
+    mount()
+    await vi.waitFor(() => expect(sourceButton('deploys-src')!.querySelectorAll('.tabrail-marker')).toHaveLength(4))
+
+    expect(marks).toHaveBeenCalledOnce()
+    expect(marks.mock.calls[0]![0]).toEqual([{ sourceId: 'deploys-src', projectId: '' }])
+    expect(sourceButton('deploys-src')!.querySelector('.sr-only')?.textContent).toBe(
+      Array.from({ length: 6 }, (_, index) => `Deploy ${index + 1} — deploys`).join('. '),
+    )
+    expect(sourceButton('quiet-src')!.querySelectorAll('.tabrail-marker')).toHaveLength(0)
+
+    sourceButton('deploys-src')!.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))
+    expect(document.querySelector('[role="menu"]')?.getAttribute('aria-label')).toBe('Actions for Deploys')
+    expect(selectedSource()).toBe('quiet-src')
+  })
+
+  it('hands a replacement rail the same marks, and core draws them when it fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    deploysSource(1)
+    let replacement: { value?: unknown } | undefined
+    registered.push(exclusiveSlotRegistry.register({
+      id: 'plugin:alt:rail', pluginId: 'alt', slot: 'rail', label: 'Alt rail',
+      component: (props: { value?: unknown }) => { replacement = props; return <span data-alt-rail /> },
+    }))
+    mount()
+    choose('alt')
+    await vi.waitFor(() => expect((replacement?.value as RailProps | undefined)?.sources.find((entry) => entry.id === 'deploys-src')?.markers
+      .map((marker) => marker.label)).toEqual(['Deploy 1 — deploys']))
+    expect(host.querySelector('[data-alt-rail]')).not.toBeNull()
+
+    registered.push(exclusiveSlotRegistry.register({
+      id: 'plugin:broken:rail', pluginId: 'broken', slot: 'rail', label: 'Broken rail',
+      component: () => { throw new Error('rail exploded') },
+    }))
+    choose('broken')
+    await vi.waitFor(() => expect(sourceButton('deploys-src')?.querySelectorAll('.tabrail-marker')).toHaveLength(1))
+    expect(sourceButton('deploys-src')!.getAttribute('data-tip-legend')).toContain('Deploy 1 — deploys')
   })
 })
 

@@ -140,6 +140,9 @@ export const sourceDescriptor = z.object({
   // source about git itself, whose rail would sit empty in a workspace of plain folders. Absent means
   // the source draws whatever the workspace holds (client-core/features/tabs/railSources.ts).
   requiresGitProject: z.boolean().optional(),
+  // The owner's consent for other plugins to put status marks on this source's rail icon through
+  // `core:source` (@acorn/protocol/extensionPoints.ts). Absent means no marks.
+  statusAnnotations: z.boolean().optional(),
   // The pane a task this source tracks opens on the first time it is activated
   // (client-core/host/registries/sources/sources.ts). Has to be one of this plugin's own declared task
   // panes, re-checked on the device the way a content link's `openPane` is.

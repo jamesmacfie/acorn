@@ -179,6 +179,18 @@ describe('syncChromeContributions', () => {
     expect(sourceRegistry.get('board')?.promotion).toBeDefined()
   })
 
+  it('carries a loaded source\'s status-mark consent, and nothing for a source that did not give it', () => {
+    _seedPluginDistribution([['node-a', [row('board', {}, {
+      sources: [
+        { id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items', statusAnnotations: true },
+        { id: 'board-quiet', label: 'Quiet', glyph: 'kanban', order: 61, items: '/v1/p/board/rail-items' },
+      ],
+    })]]])
+    syncChromeContributions()
+    expect(sourceRegistry.get('board')?.statusAnnotations).toBe(true)
+    expect(sourceRegistry.get('board-quiet')?.statusAnnotations).toBeUndefined()
+  })
+
   it('registers host-owned promotion independently of the row selection action', () => {
     const promotable: Partial<PluginContributions> = {
       frames: [{ target: 'pane', id: 'board-pane', label: 'Board', glyph: 'kanban', order: 60, formFactor: ['desktop'] }],

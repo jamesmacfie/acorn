@@ -80,6 +80,7 @@
     "./host/annotations": "./src/host/annotations/public.ts",
     "./host/annotations/annotationKey.ts": "./src/host/annotations/annotationKey.ts",
     "./host/annotations/taskAnnotations.ts": "./src/host/annotations/taskAnnotations.ts",
+    "./host/annotations/statusAnnotations.ts": "./src/host/annotations/statusAnnotations.ts",
     "./host/annotations/annotations.ts": "./src/host/annotations/annotations.ts",
     "./host/chrome": "./src/host/chrome/public.ts",
     "./host/chrome/Topbar.tsx": "./src/host/chrome/Topbar.tsx",
