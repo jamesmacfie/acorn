@@ -497,7 +497,7 @@ export function SelectionActions(props: SelectionActionsProps) {
           {(menu) => {
             const opened = untrack(target)
             return (
-              <Show when={opened && !selectionTooLarge(opened.text)} fallback={<Menu.Label>This text is over 64 KiB, so no action can take it.</Menu.Label>}>
+              <Show when={opened && !selectionTooLarge(opened.text)} fallback={opened && <Menu.Label>This text is over 64 KiB, so no action can take it.</Menu.Label>}>
                 <For each={opened ? contextMenuItems('content.selection', opened) : []}>
                   {(row) => (
                     <Menu.Item context={menu} onSelect={() => { if (opened && props.isCurrent(opened)) runContextMenuItem(row, opened) }}>

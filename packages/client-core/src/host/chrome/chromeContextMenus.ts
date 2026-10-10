@@ -92,9 +92,13 @@ export function pluginContextMenuItem(
         // The owner checked that the file, message, turn or selected text is still the one the menu
         // opened on. What is checked here is the binding: the menu's Node is still the one being looked
         // at, and its task is still on it in the same project. A path or a session id alone never
-        // reaches another task. A selection in a project's own document has no task to check.
+        // reaches another task. A selection in a project's own document has no task to check. A task
+        // the client doesn't know is refused, even when the target carries no project to compare.
         if (target.location !== location || target.nodeId !== binding.nodeId()) return
-        if (target.taskId !== undefined && taskById(target.taskId)?.projectId !== target.projectId) return
+        if (target.taskId !== undefined) {
+          const task = taskById(target.taskId)
+          if (!task || task.projectId !== target.projectId) return
+        }
         void runChromeAction(descriptor.action, {
           pluginId,
           nodeId: binding.nodeId(),

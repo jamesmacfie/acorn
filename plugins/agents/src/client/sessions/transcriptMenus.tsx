@@ -4,6 +4,7 @@ import {
 } from '@acorn/plugin-api/client'
 import { Icon, IconButton, Menu } from '@acorn/plugin-api/ui'
 import { SelectionActions, type SelectedContent } from '@acorn/plugin-api/ui/host'
+import { MAX_SELECTION_BYTES } from '@acorn/protocol/contextMenus.ts'
 import type { AgentTurn } from '../../contract/wire.ts'
 import type { AgentConversationItem } from './conversationItems'
 import { asPlainText } from './copyFormats'
@@ -19,8 +20,9 @@ type TranscriptTarget = AgentMessageTarget | AgentTurnTarget
 /** The transcript a card sits in: the Node it was read from, and the task, project and session. */
 export type TranscriptScope = { nodeId: string; taskId: string; projectId: string; sessionId: string }
 
-/** The most of a message's text a row is handed, in UTF-8 bytes. */
-export const MAX_MESSAGE_ACTION_TEXT_BYTES = 64 * 1024
+/** The most of a message's text a row is handed, in UTF-8 bytes: the selection cap. A message is cut
+ *  to it, where a selection over it is refused. */
+export const MAX_MESSAGE_ACTION_TEXT_BYTES = MAX_SELECTION_BYTES
 
 // The statuses the Node calls settled. A queued, dispatching or active turn has no target, and that
 // includes one waiting on an answer.

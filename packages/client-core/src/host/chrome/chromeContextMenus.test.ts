@@ -306,6 +306,9 @@ describe('selection menus', () => {
     const entry = contextMenuItems('content.selection', selection())[0]!
     entry.run(selection({ nodeId: 'node-b' }))
     entry.run(selection({ taskId: 'task-gone' }))
+    // An owner that couldn't find the task leaves the project out. That is still a task gone.
+    const { projectId: _projectId, ...unknownTask } = selection({ taskId: 'task-gone' })
+    entry.run(unknownTask)
     entry.run(selection({ projectId: 'project-2' }))
     enabled = false
     entry.run(selection())
