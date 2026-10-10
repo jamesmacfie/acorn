@@ -98,6 +98,12 @@ what the drawn textarea produces. `auth` is not a field. It is an object with a 
 mode, and a field that needs a component is not a field, so a step that authenticates writes `auth`
 in the definition's JSON or puts the header in `headers`.
 
+In the run pane, the plugin draws the step's response through `workflows:step-body`
+([contributed step bodies](./workflows/routes-and-ui.md#contributed-step-bodies)): a status badge, the
+headers under a disclosure, and the body, laid out when it's JSON. The `stepBody` tree entry
+(`src/tree/StepBody.tsx`) reads only its props. With the plugin off, Workflows draws its own plain
+status, headers, and body.
+
 ## Other outbound consumers in the Node
 
 There is one more, and it is deliberately not built on anything shared: the plugin installer

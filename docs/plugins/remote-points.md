@@ -48,6 +48,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `agents:session-header` | `stack`, up to two | `{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }` |
 | `agents:request-card` | `stack`, up to two | `{ taskId, sessionId, requestId, kind, title }` |
 | `editor:document` | `replace`, keyed by lowercased file basename | `{ taskId, path, text?, revision }`. See [file renderers](../editor/file-renderers.md) |
+| `workflows:step-body` | `replace`, keyed by the step's exact kind | `{ taskId, projectId, runId, stepId, kind, status, inputs, output, revision, tail? }`. A step's result in the run pane. See [contributed step bodies](../workflows/routes-and-ui.md#contributed-step-bodies) |
 | `changes:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
 | `context:section` | `stack`, up to two, keyed by section id | `{ task, onChanged, onPendingChange }` |
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |
@@ -106,8 +107,7 @@ leaves both the link and the preview. One preview is open at a time. Moving to a
 contributor matches is a props update, so your tree stays mounted. Abort the read for the previous
 URL, and drop a late answer for it. Right-click a link, or press Shift+F10 on it, for **Preview**,
 **Open link**, and **Copy link**. **Preview** there moves focus into the preview, and Escape gives it
-back. In the terminal, pressing a link inside a pane offers **Preview** in a dialog. The terminal has
-no hover.
+back. The terminal has no hover. Pressing a link inside a pane there offers **Preview** in a dialog.
 
 A content owner opts its region in with `createLinkPreviewBoundary`, from
 `packages/client-core/src/host/linkPreview/linkPreview.ts`. It returns event handlers to spread on the

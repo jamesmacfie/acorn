@@ -10,7 +10,9 @@ import {
   Alert, Badge, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal,
   Stack, Table, TableCell, TableHead, TableRow, Text, Textarea, Toolbar,
 } from '@acorn/plugin-api/ui'
+import { Slot } from '@acorn/plugin-api/ui/host'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
+import { WORKFLOW_STEP_BODY_POINT } from '../../contract/stepBody.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
@@ -23,6 +25,7 @@ import type { RunPaneModel } from './runPaneModel'
 import GoalDetails from './GoalDetails'
 import { ChildRuns, RunLineage } from './RunRelationships'
 import { RunRecords } from './RunRecords'
+import { stepBodyProps } from './stepBodyProps'
 
 // The run pane's `detail` region: what one step is doing, and the controls that are legal for the
 // state it is in (docs/workflows/routes-and-ui.md § Routes and UI). The controls sit in the step's header bar for
@@ -32,7 +35,9 @@ import { RunRecords } from './RunRecords'
 // An agent node draws the conversation itself, through the capability plugins/agents publishes
 // (@acorn/plugin-agents/contract/conversation.ts): the same transcript, queue and composer the Agent
 // pane draws, because reading what a step is saying should not mean leaving the run. Every other kind
-// answers "what is it doing" the way it always has.
+// answers "what is it doing" the way it always has, and the plugin that runs a kind may draw that
+// answer through `workflows:step-body` (../../contract/stepBody.ts). The header, the controls, the
+// alerts and the gate's answer stay here whoever draws it.
 //
 // Two shapes, and the difference is not cosmetic. The conversation's timeline is the scroller and it
 // sizes against the region, so that branch is a fragment; a `Stack` around it, or a row of buttons
@@ -270,6 +275,82 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     </Show>
   )
 
+  // The step's result, which the plugin that runs its kind may draw instead (../../contract/stepBody.ts).
+  // Every built-in body stays as the default, so nobody matching, a tie, a failed tree, or a disabled
+  // plugin all draw what this pane always drew. A map's records are relationships, so they stay here.
+  //
+  // `revision` counts this memo's runs: each one is a change to what the provider sees.
+  let revision = 0
+  const bodyProps = createMemo(() => {
+    const current = step()
+    return current && stepBodyProps({
+      taskId: props.task.id, projectId: props.task.projectId, step: current, tail: model.tailFor(current.id), revision: ++revision,
+    })
+  })
+  const [contributed, setContributed] = createSignal(false)
+  // Said by this pane, because a provider that was given nothing may not say why.
+  const omitted = (): string | undefined => {
+    const inputs = bodyProps()?.inputsTruncated
+    const output = bodyProps()?.outputTruncated
+    if (!inputs && !output) return undefined
+    const what = inputs && output ? 'inputs and output are' : inputs ? 'inputs are' : 'output is'
+    return `This step's ${what} over 64 KiB, so the plugin drawing it didn't get ${inputs ? 'them' : 'it'}.`
+  }
+
+  const stepBody = (current: () => WorkflowStepRow) => (
+    <Show
+      when={current().kind === 'workflow-map' && model.selectedRunId()}
+      fallback={(
+        <>
+          <Slot
+            point={WORKFLOW_STEP_BODY_POINT}
+            key={current().kind}
+            taskId={props.task.id}
+            projectId={props.task.projectId}
+            props={bodyProps}
+            occupied={(occupied) => setContributed(occupied)}
+          >
+            <Switch>
+              <Match when={shape() === 'command'}>
+                <CommandBody step={current()} model={model} />
+              </Match>
+              <Match when={shape() === 'run-target'}>
+                <RunTargetBody step={current()} output={structured() as RunTargetOutput | null} />
+              </Match>
+              <Match when={shape() === 'data'}>
+                <DataBody output={structured() as RowsOutput | null} running={current().status === 'running'} />
+              </Match>
+              <Match when={shape() === 'http'}>
+                <HttpBody output={structured() as HttpOutput | null} />
+              </Match>
+              <Match when={shape() === 'agent'}>
+                <GoalDetails step={current()} />
+                <AgentBody step={current()} structured={structured()} />
+              </Match>
+              <Match when={shape() === 'other'}>
+                <Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>
+              </Match>
+            </Switch>
+          </Slot>
+          <Show when={contributed() && omitted()}>
+            {(explanation) => <Text emphasis="muted">{explanation()}</Text>}
+          </Show>
+        </>
+      )}
+    >
+      {(runId) => (
+        <RunRecords
+          runId={runId()}
+          stepId={current().id}
+          tasks={tasks.data ?? []}
+          initialRecordId={searchValue(search.workflowRecord)}
+          onOpen={openTaskTarget}
+          onOpenSession={openAgentPane}
+        />
+      )}
+    </Show>
+  )
+
   // What a turn sent from here actually does. The step waits on its own turn and nothing else, so a
   // turn typed now queues behind it and runs once the run has already recorded the step as done.
   const note = (current: () => WorkflowStepRow) => current().status === 'running'
@@ -319,62 +400,21 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                   <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
                 </Show>
 
-                <Switch>
-                  <Match when={shape() === 'gate'}>
-                    <Show
-                      when={model.gateForm(current() as WorkflowStepProjection)}
-                      fallback={(
-                        <Show when={current().status === 'waiting-gate'} fallback={<Text emphasis="muted">{gateOutcome(current().status)}</Text>}>
-                          <Stack gap="row">
-                            <Text>Waiting for you.</Text>
-                            <GateAnswer model={model} />
-                          </Stack>
-                        </Show>
-                      )}
-                    >
-                      {(form) => <GateFormBody step={current()} form={form()} model={model} />}
-                    </Show>
-                  </Match>
-
-                  <Match when={shape() === 'command'}>
-                    <CommandBody step={current()} model={model} />
-                  </Match>
-
-                  <Match when={shape() === 'run-target'}>
-                    <RunTargetBody step={current()} output={structured() as RunTargetOutput | null} />
-                  </Match>
-
-                  <Match when={shape() === 'data'}>
-                    <DataBody output={structured() as RowsOutput | null} running={current().status === 'running'} />
-                  </Match>
-
-                  <Match when={shape() === 'http'}>
-                    <HttpBody output={structured() as HttpOutput | null} />
-                  </Match>
-
-                  <Match when={shape() === 'agent'}>
-                    <GoalDetails step={current()} />
-                    <AgentBody step={current()} structured={structured()} />
-                  </Match>
-
-                  <Match when={shape() === 'other'}>
-                    <Show
-                      when={current().kind === 'workflow-map' && model.selectedRunId()}
-                      fallback={<Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>}
-                    >
-                      {(runId) => (
-                        <RunRecords
-                          runId={runId()}
-                          stepId={current().id}
-                          tasks={tasks.data ?? []}
-                          initialRecordId={searchValue(search.workflowRecord)}
-                          onOpen={openTaskTarget}
-                          onOpenSession={openAgentPane}
-                        />
-                      )}
-                    </Show>
-                  </Match>
-                </Switch>
+                <Show when={shape() === 'gate'} fallback={stepBody(current)}>
+                  <Show
+                    when={model.gateForm(current() as WorkflowStepProjection)}
+                    fallback={(
+                      <Show when={current().status === 'waiting-gate'} fallback={<Text emphasis="muted">{gateOutcome(current().status)}</Text>}>
+                        <Stack gap="row">
+                          <Text>Waiting for you.</Text>
+                          <GateAnswer model={model} />
+                        </Stack>
+                      </Show>
+                    )}
+                  >
+                    {(form) => <GateFormBody step={current()} form={form()} model={model} />}
+                  </Show>
+                </Show>
 
                 <Show when={(model.droppedEventsFor?.(current().id) ?? 0) > 0}>
                   <Text tone="muted">{model.droppedEventsFor(current().id)} earlier live events are outside the display window.</Text>

@@ -51,6 +51,11 @@ export const workflowsClientPlugin: ClientPlugin = {
       id: 'workflows.tool-card', point: AGENT_TOOL_CARD_POINT, label: 'Workflow drafts and runs',
       order: 10, matches: ['workflow_draft', 'workflow_run', 'workflow_read', 'workflow_wait', 'workflow_cancel'], component: WorkflowToolCard,
     })
+    // A selected step's result body, keyed by its exact kind (../contract/stepBody.ts). No actions:
+    // Retry, Stop, approvals and lineage stay outside the slot, and gates never open it.
+    ctx.extensionPoints.register({
+      id: 'step-body', label: 'Workflow step result', kind: 'remote', mode: 'replace', max: 1,
+    })
     // "Run a workflow" and "Find a run" (./commands.ts). A `paletteRows` source until 2026-09-03.
     for (const contribution of workflowsCommands) ctx.commands.register(contribution)
     // The Workflows rail source and the editor behind it (./sourceContribution.tsx). A local source:

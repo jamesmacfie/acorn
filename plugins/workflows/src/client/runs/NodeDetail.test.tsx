@@ -1,11 +1,16 @@
-import { createSignal } from 'solid-js'
+import { createRenderEffect, createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { consumePaneIntent } from '@acorn/plugin-api/client'
-import { provideClientCapability, type Disposable } from '@acorn/plugin-api/testkit/client'
+import {
+  extensionPointRegistry, extensionRegistry, provideClientCapability, type Disposable, type ExtensionContribution,
+} from '@acorn/plugin-api/testkit/client'
 import { AGENTS_CONVERSATION, type AgentConversationProps } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
+import {
+  MAX_STEP_BODY_JSON_BYTES, MAX_STEP_BODY_TAIL_LINES, WORKFLOW_STEP_BODY_POINT, type WorkflowStepBodyProps,
+} from '../../contract/stepBody.ts'
 import type { RunPaneModel } from './runPaneModel'
 import type { WorkflowGateForm } from '../../shared/workflowContracts'
 
@@ -83,6 +88,7 @@ const press = (label: string): void => {
 // Nothing provides the conversation unless a test says so, which is also the real answer on a node
 // with the agents plugin disabled.
 let provided: Disposable | undefined
+const registered: Disposable[] = []
 const provideConversation = (): Array<Partial<AgentConversationProps>> => {
   const drawn: Array<Partial<AgentConversationProps>> = []
   provided = provideClientCapability(AGENTS_CONVERSATION, {
@@ -247,5 +253,205 @@ describe('which shape a node draws', () => {
     mount(step({ kind: 'terminal:command', status: 'done', structuredJson: JSON.stringify({ exitCode: 3 }) }))
     expect(host.textContent).toContain('Exit code')
     expect(buttons()).toEqual([])
+  })
+})
+
+describe('the workflows:step-body point', () => {
+  // Compiled contributors, so no worker is involved: which render path answers is client-core's to
+  // test. What this pane owns is the key, the props, and what stays outside the slot.
+  const seen: WorkflowStepBodyProps[] = []
+  let mounts = 0
+  const point = () => registered.push(extensionPointRegistry.register({
+    id: WORKFLOW_STEP_BODY_POINT, ownerId: 'workflows', label: 'Workflow step result', kind: 'remote', mode: 'replace', max: 1,
+  }))
+  const contributor = (pluginId: string, matches: string[]) => {
+    const registration = extensionRegistry.register({
+      id: `plugin:${pluginId}:step-body`, pluginId, point: WORKFLOW_STEP_BODY_POINT, label: `${pluginId} body`, order: 500,
+      carrier: 'component', matches,
+      // A provider that knows only the contract: no Workflows client state, no run model.
+      component: (body: WorkflowStepBodyProps) => {
+        mounts++
+        createRenderEffect(() => seen.push({ ...body, ...(body.tail ? { tail: [...body.tail] } : {}) }))
+        return <span>drawn by {pluginId}: {JSON.stringify(body.output)}</span>
+      },
+    } as ExtensionContribution)
+    registered.push(registration)
+    return registration
+  }
+
+  // A model whose selected step and tail can move, as the real one's do on socket events.
+  const live = (first: WorkflowStepRow) => {
+    const [row, setRow] = createSignal(first)
+    const [tails, setTails] = createSignal<Record<string, readonly string[]>>({})
+    const model = { ...modelFor(first), selectedStep: row, selectedRunId: () => row().runId, tailFor: (id: string) => tails()[id] ?? [] } as unknown as RunPaneModel
+    return { model, setRow, setTails }
+  }
+  const mountModel = (model: RunPaneModel): void => {
+    host = document.createElement('div')
+    document.body.append(host)
+    dispose = render(() => (
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <NodeDetail task={{ id: 'task-1', projectId: 'project-1' } as never} model={model} />
+      </QueryClientProvider>
+    ), host)
+  }
+
+  const http = step({ id: 'st-http', kind: 'http:request', status: 'done', structuredJson: JSON.stringify({ status: 201, headers: {}, body: 'made' }) })
+
+  afterEach(() => {
+    for (const registration of registered.splice(0).reverse()) registration.dispose()
+    seen.length = 0
+    mounts = 0
+  })
+
+  it('hands the body to the plugin that runs the kind, and keeps Retry outside it', () => {
+    point()
+    contributor('http', ['http:request'])
+    mount({ ...http, status: 'failed', error: 'timed out' })
+    expect(host.textContent).toContain('drawn by http: {"status":201,"headers":{},"body":"made"}')
+    expect(host.textContent).not.toContain('Status')
+    expect(seen.at(-1)).toEqual({
+      taskId: 'task-1', runId: 'run-1', stepId: 'st-http', kind: 'http:request', status: 'failed',
+      inputs: null, inputsTruncated: false, output: { status: 201, headers: {}, body: 'made' }, outputTruncated: false,
+      revision: expect.any(Number),
+    })
+    // The header, the error and Retry are this pane's, whoever draws the body.
+    expect(host.textContent).toContain('timed out')
+    press('Retry')
+    expect(retry).toHaveBeenCalledWith('st-http')
+  })
+
+  it('lets a provider draw a kind this pane has never heard of', () => {
+    point()
+    contributor('acme', ['acme:deploy'])
+    mount(step({ kind: 'acme:deploy', status: 'done', structuredJson: JSON.stringify({ url: 'https://example.com' }) }))
+    expect(host.textContent).toContain('drawn by acme: {"url":"https://example.com"}')
+  })
+
+  it('draws its own body when nobody matches, when two tie, and once the provider is disabled', () => {
+    point()
+    contributor('acme', ['acme:deploy'])
+    mount(http)
+    expect(host.textContent).toContain('Status')
+    expect(host.textContent).not.toContain('drawn by')
+    dispose?.()
+    host.remove()
+
+    const provider = contributor('http', ['http:request'])
+    const rival = contributor('rival', ['http:*'])
+    mount(http)
+    expect(host.textContent).toContain('Status')
+    expect(host.textContent).not.toContain('drawn by')
+
+    rival.dispose()
+    expect(host.textContent).toContain('drawn by http')
+    provider.dispose()
+    expect(host.textContent).not.toContain('drawn by')
+    expect(host.textContent).toContain('Status')
+  })
+
+  it('hands over null for JSON that does not parse, and says so when output is too big', () => {
+    point()
+    contributor('http', ['http:request'])
+    mount({ ...http, structuredJson: '{"status": 2', inputsJson: JSON.stringify({ note: 'small' }) })
+    expect(seen.at(-1)).toMatchObject({ inputs: { note: 'small' }, output: null, outputTruncated: false })
+    expect(host.textContent).not.toContain('64 KiB')
+    dispose?.()
+    host.remove()
+
+    const huge = JSON.stringify({ status: 200, body: 'x'.repeat(MAX_STEP_BODY_JSON_BYTES) })
+    mount({ ...http, structuredJson: huge })
+    expect(seen.at(-1)).toMatchObject({ output: null, outputTruncated: true, inputsTruncated: false })
+    expect(host.textContent).toContain('This step\'s output is over 64 KiB, so the plugin drawing it didn\'t get it.')
+  })
+
+  it('updates a running step in place, with its tail and a rising revision', () => {
+    point()
+    contributor('acme', ['acme:deploy'])
+    const running = step({ id: 'st-deploy', kind: 'acme:deploy', status: 'running' })
+    const { model, setRow, setTails } = live(running)
+    mountModel(model)
+    const first = seen.at(-1)!
+    expect(first.tail).toBeUndefined()
+
+    setTails({ 'st-deploy': ['building', 'pushing'] })
+    expect(seen.at(-1)?.tail).toEqual(['building', 'pushing'])
+    setTails({ 'st-deploy': Array.from({ length: 250 }, (_, i) => `line ${i}`) })
+    expect(seen.at(-1)?.tail).toHaveLength(MAX_STEP_BODY_TAIL_LINES)
+    expect(seen.at(-1)?.tail?.at(-1)).toBe('line 249')
+
+    setRow({ ...running, status: 'done', structuredJson: JSON.stringify({ url: 'https://example.com' }) })
+    expect(seen.at(-1)).toMatchObject({ status: 'done', output: { url: 'https://example.com' } })
+    expect(seen.at(-1)!.revision).toBeGreaterThan(first.revision)
+    // One mount for all of it: an update is new props, not a new provider.
+    expect(mounts).toBe(1)
+    expect(buttons()).toEqual([])
+  })
+
+  it('follows the selection to another run and step, and ignores what arrives for the old one', () => {
+    point()
+    contributor('acme', ['acme:deploy'])
+    const first = step({ id: 'st-a', runId: 'run-1', kind: 'acme:deploy', status: 'running' })
+    const { model, setRow, setTails } = live(first)
+    mountModel(model)
+    setRow(step({ id: 'st-b', runId: 'run-2', kind: 'acme:deploy', status: 'done', structuredJson: '{"url":"b"}' }))
+    expect(seen.at(-1)).toMatchObject({ runId: 'run-2', stepId: 'st-b', output: { url: 'b' } })
+
+    // The old step's output, landing after the person moved on.
+    setTails({ 'st-a': ['late'] })
+    expect(seen.at(-1)).toMatchObject({ runId: 'run-2', stepId: 'st-b' })
+    expect(seen.at(-1)?.tail).toBeUndefined()
+    expect(host.textContent).toContain('drawn by acme: {"url":"b"}')
+  })
+
+  it('draws the new Node\'s step after a Node switch, and nothing from the old pane', () => {
+    point()
+    contributor('acme', ['acme:deploy'])
+    const before = live(step({ id: 'st-a', kind: 'acme:deploy', status: 'running' }))
+    mountModel(before.model)
+    // A Node switch retires the pane model and the pane mounts again with the new Node's.
+    dispose?.()
+    host.remove()
+    const after = live(step({ id: 'st-z', runId: 'run-z', kind: 'acme:deploy', status: 'done', structuredJson: '{"url":"z"}' }))
+    mountModel(after.model)
+    const count = seen.length
+    before.setTails({ 'st-a': ['from the old Node'] })
+    expect(seen.length).toBe(count)
+    expect(seen.at(-1)).toMatchObject({ runId: 'run-z', stepId: 'st-z', output: { url: 'z' } })
+  })
+
+  it('falls back to its own body when a loaded provider\'s tree fails, and moves nothing', async () => {
+    point()
+    // A loaded contribution whose bundle this client cannot load. The tree reports it failed.
+    registered.push(extensionRegistry.register({
+      id: 'plugin:broken:step-body', pluginId: 'broken', point: WORKFLOW_STEP_BODY_POINT, label: 'broken body', order: 500,
+      carrier: 'remote', entry: 'stepBody', hash: 'missing', matches: ['http:request'],
+    } as ExtensionContribution))
+    mount({ ...http, status: 'failed', error: 'timed out' })
+    await vi.waitFor(() => expect(host.textContent).toContain('Status'))
+    expect(host.textContent).toContain('Failed')
+    expect(gate).not.toHaveBeenCalled()
+    expect(retry).not.toHaveBeenCalled()
+    press('Retry')
+    expect(retry).toHaveBeenCalledWith('st-http')
+  })
+
+  it('never opens a waiting gate to a provider, and the gate still answers', () => {
+    point()
+    contributor('sneaky', ['gate-human'])
+    mount(step({ kind: 'gate-human', status: 'waiting-gate' }))
+    expect(mounts).toBe(0)
+    expect(host.textContent).not.toContain('drawn by')
+    press('Approve')
+    expect(gate).toHaveBeenCalledWith(true)
+  })
+
+  it('never hands an agent step\'s live conversation to a provider', () => {
+    point()
+    contributor('sneaky', ['agent'])
+    const drawn = provideConversation()
+    mount(step({ agentSessionId: 'sess-1' }))
+    expect(drawn).toHaveLength(1)
+    expect(mounts).toBe(0)
   })
 })

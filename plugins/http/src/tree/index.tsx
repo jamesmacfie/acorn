@@ -1,6 +1,7 @@
 import { mountTree } from '@acorn/plugin-api/ui/sdk'
 import { solidTree } from '@acorn/plugin-api/ui/tree'
 import { HttpDetailApp, HttpListApp, HttpSettingsApp } from './app'
+import { HttpStepBodyApp } from './StepBody'
 
 // The tree path (docs/plugin-authoring/the-client-half.md § The client half). This bundle runs in a worker with no
 // DOM: what it emits is a tree of acorn's own component names, and the shell mounts its own
@@ -13,8 +14,12 @@ import { HttpDetailApp, HttpListApp, HttpSettingsApp } from './app'
 // Both pane entries run in this one worker, which is what lets them share ./panelModel.ts. That is the
 // loaded-plugin half of the region seam: a compiled pane gets its shared model from the host, and a
 // loaded one already has module scope (docs/panes/layout.md § Layout model).
+//
+// `stepBody` is not a region. It fills `workflows:step-body` for this plugin's `http:request` step,
+// from its props alone, so it shares none of that module scope (./StepBody.tsx).
 mountTree({
   list: solidTree(HttpListApp),
   detail: solidTree(HttpDetailApp),
   settings: solidTree(HttpSettingsApp),
+  stepBody: solidTree(HttpStepBodyApp),
 })

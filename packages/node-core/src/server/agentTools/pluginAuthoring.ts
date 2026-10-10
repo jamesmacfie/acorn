@@ -414,6 +414,11 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '  For bytes, require `agents`, declare `agents.transcriptMedia` in `permissions.node.capabilities`,',
     '  call its `read({ taskId, sessionId, kind, id })` from your own route (`null` for any refusal, `bytes`',
     '  `null` over 12 MiB), and fetch that route with `bridge.api.getBytes`.',
+    'Workflows opens `workflows:step-body`, `replace`, keyed by a step\'s exact kind (`myplugin:deploy`),',
+    '  for the plugin that runs that kind to draw its result. The tree gets `{ taskId, projectId, runId,',
+    '  stepId, kind, status, inputs, inputsTruncated, output, outputTruncated, tail?, revision }`: the',
+    '  stored JSON parsed, `null` past 64 KiB with its flag set, and up to 200 live lines. No actions; the',
+    '  run pane keeps Retry, Stop, errors and gates. Read anything more from your own route.',
     '',
     `**Replacing a core surface.** A \`coreSlot\` frame offers to draw one of acorn's own: `
       + `${manifest.coreSlots.map((value) => `\`${value}\``).join(', ')}. Declare `

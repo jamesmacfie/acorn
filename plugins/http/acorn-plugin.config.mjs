@@ -117,6 +117,16 @@ export default {
         regions: { body: { kind: 'remote', entry: 'settings' } },
       },
     ],
+    // The response of this plugin's own `http:request` workflow step, drawn in the run pane
+    // (src/tree/StepBody.tsx). Workflows keeps the step's header, Retry and errors, and draws its own
+    // plain response when this plugin is off.
+    extensions: [{
+      id: 'step-body',
+      point: 'workflows:step-body',
+      label: 'HTTP response',
+      remote: 'stepBody',
+      matches: ['http:request'],
+    }],
     routes: [{
       id: 'http.request-route',
       path: '/p/:projectId/x/http/requests/:requestId',

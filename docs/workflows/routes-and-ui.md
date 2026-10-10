@@ -100,6 +100,27 @@ done. The composer carries that sentence above it rather than being disabled, be
 agent mid-step is a reasonable thing to want and being told what happens is better than being
 stopped.
 
+## Contributed step bodies
+
+The plugin that runs a step kind can draw that step's result through `workflows:step-body`, a
+`remote`, `replace` point keyed by the exact kind, such as `http:request`
+(`plugins/workflows/src/contract/stepBody.ts`). The HTTP plugin draws its own step this way. It's a
+loaded plugin, so the body is its `stepBody` tree entry, which keeps no state between mounts.
+
+The props are `{ taskId, projectId, runId, stepId, kind, status, inputs, inputsTruncated, output,
+outputTruncated, tail?, revision }`, built by `runs/stepBodyProps.ts`. `inputs` and `output` are the
+step's stored inputs and structured output, parsed. Each is `null` when the step has none, when it
+isn't JSON, or when it's over 64 KiB. Over 64 KiB also sets its flag, and the pane says under the
+body that the plugin didn't get it. `tail` is the newest 200 lines of live output the pane holds.
+`revision` rises on every change, and a status, output, or tail change is a props update to the same
+mounted tree.
+
+The pane keeps everything else outside the slot: the header and its controls, the error, the lineage
+and child runs, and the events. No actions are declared, so a body can't retry, stop, or approve. A
+gate's form and answer, an agent step's live conversation, and a map's records never open the slot.
+With nobody matching, two tied, a failed tree, or the plugin off, the pane draws its built-in body
+from the table above.
+
 ## What the pane listens to
 
 Four frames of its own, and each one costs what it should:

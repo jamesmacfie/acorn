@@ -14,7 +14,7 @@ import { decodeBody } from './httpClient'
 type ResponseTab = 'body' | 'headers' | 'timeline'
 type TabDef = { id: string; label: string; count?: number }
 
-const statusTone = (status: number): 'accent' | 'warn' | 'danger' | 'neutral' => {
+export const statusTone = (status: number): 'accent' | 'warn' | 'danger' | 'neutral' => {
   if (status >= 200 && status < 300) return 'accent'
   if (status >= 300 && status < 400) return 'neutral'
   if (status >= 400 && status < 500) return 'warn'
@@ -23,7 +23,7 @@ const statusTone = (status: number): 'accent' | 'warn' | 'danger' | 'neutral' =>
 
 // Pretty-print JSON when it is JSON; otherwise show it as it came. No syntax highlighting: the host's
 // editor is off-limits here, its one cross-plugin import is baselined, and the baseline is shrink-only.
-function formatBody(text: string, contentType: string): string {
+export function formatBody(text: string, contentType: string): string {
   if (!contentType.includes('json')) return text
   try {
     return JSON.stringify(JSON.parse(text), null, 2)
