@@ -40,7 +40,7 @@ features. Implementation checkpoints are not separate public releases; phase 14 
 | 10 | [Add Markdown fence viewers](./10-markdown-fences.md) | Done |
 | 11 | [Add Preview and Terminal toolbar contributions](./11-toolbar-actions.md) | Done |
 | 12 | [Add source and pane status annotations](./12-rail-status.md) | Done |
-| 13 | [Verify the combined programme](./13-acceptance.md) | Planned |
+| 13 | [Verify the combined programme](./13-acceptance.md) | Done, with open acceptance items |
 | 14 | [Update documentation and authoring examples](./14-documentation.md) | Planned |
 
 ## How to execute a phase
