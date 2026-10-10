@@ -22,9 +22,10 @@ export const FILE_MARK_TONE = { info: 'muted', warn: 'warn', danger: 'danger' } 
  * Call it from an effect: the host re-asks when a contributor, the Node or its freshness changes, and
  * a call with the same paths is a string compare. Paths are deduplicated, so a file shown in the tree
  * and in a tab is asked about once. No files asks nothing, because no row or tab could draw a mark.
+ *
+ * One batch per Editor pane, and one Editor pane per client. A second pane would replace this pane's
+ * batch; merging every mount's paths here is the fix if that ever happens.
  */
-// ponytail: one batch per Editor pane, and one Editor pane per client. A second pane would replace
-// this pane's batch; merging every mount's paths here is the fix if that ever happens.
 export function requestFileAnnotations(taskId: string, paths: readonly string[]): void {
   if (!paths.length) return
   requestAnnotations(EDITOR_FILE_POINT, [...new Set(paths)].map((path): EditorFileAnnotationKey => ({ taskId, path })))
