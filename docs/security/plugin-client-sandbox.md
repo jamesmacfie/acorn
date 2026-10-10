@@ -67,7 +67,8 @@ and notice kind form the update-diff key.
 a file path, a session, or an artifact id, and nothing they name. To read the bytes behind one, its
 Node half declares and calls the owner's read capability. `editor.files` rechecks the worktree and
 symlink rules on every call, and `agents.transcriptMedia` answers only for media that belongs to the
-named session and task. Both are read-only, and every refusal is `null`. A menu row's body carries
+named session and task. Both are read-only. `editor.files` answers `missing` for every refusal and
+`too_large` over its cap, and `agents.transcriptMedia` answers `null`. A menu row's body carries
 the same identities and a revision the owner checks before the row runs.
 
 **Owner actions can require a person.** An owner handler learns `byPerson`, true only when a person

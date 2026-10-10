@@ -48,7 +48,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `agents:session-header` | `stack`, up to two | `{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }` |
 | `agents:request-card` | `stack`, up to two | `{ taskId, sessionId, requestId, kind, title }` |
 | `editor:document` | `replace`, keyed by lowercased file basename | `{ taskId, path, text?, revision }`. See [file renderers](../editor/file-renderers.md) |
-| `workflows:step-body` | `replace`, keyed by the step's exact kind | `{ taskId, projectId, runId, stepId, kind, status, inputs, output, revision, tail? }`. A step's result in the run pane. See [contributed step bodies](../workflows/routes-and-ui.md#contributed-step-bodies) |
+| `workflows:step-body` | `replace`, keyed by the step's exact kind | `{ taskId, projectId, runId, stepId, kind, status, inputs, inputsTruncated, output, outputTruncated, tail?, revision }`. A step's result in the run pane. See [contributed step bodies](../workflows/routes-and-ui.md#contributed-step-bodies) |
 | `changes:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
 | `context:section` | `stack`, up to two, keyed by section id | `{ task, onChanged, onPendingChange }` |
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |

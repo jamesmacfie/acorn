@@ -111,7 +111,7 @@ the owner declared. The `plugin_authoring` tool lists every point's props and ke
 | A row on a message or a finished turn | `agent.message`, `agent.turn` | Menu descriptor | Agents' menus take any plugin | The same menus |
 | A row on selected text | `content.selection` | Menu descriptor | An owner wraps its content in `SelectionActions` | A message's whole text only |
 | A mark on a file | `editor:file` | `items` route | Registered by Editor | Dots and a legend |
-| A mark on a task, source, or task pane | `core:task`, `core:source`, `core:pane` | `items` route | A source or pane sets `statusAnnotations: true` | Counts and a legend |
+| A mark on a task, source, or task pane | `core:task`, `core:source`, `core:pane` | `items` route | None for `core:task`. A source or pane sets `statusAnnotations: true` | Counts and a legend |
 | A preview of an HTTPS link | `core:link-preview` | Tree | Core | From the link's menu |
 | A view of a code fence | `core:markdown-fence` | Tree | Transcripts and pane regions | Under a **Source** line |
 | A view of a file | `editor:document` | Tree | Editor | The same |

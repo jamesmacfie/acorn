@@ -27,7 +27,8 @@ These remain open, with evidence in the acceptance record:
 - The Linear detail region in a combined session, terminal key paths for link previews, message
   menus, and toolbar presses, and a heap-level leak check.
 
-These stay deferred, as [refused alternatives](./refused.md) records:
+These stay deferred. [Refused alternatives](./refused.md) records the first, and the reference pages'
+limits and the phase 00 note record the rest:
 
 - Plugin points around or inside agent-built Apps. Dynamic UI and its companion hook aren't shipped.
 - Detail regions on task panes, link previews in overlays and reference panels, and `matches`-aware
