@@ -24,6 +24,7 @@ import TerminalComposerShortcut from './TerminalComposerShortcut'
 import { addDraftFiles, pickDraftAttachments, removeDraftAttachment, replaceDraftAttachment } from './attachmentOperations'
 import { captureContext, contextBelongsTo, refreshAutomaticContext } from './contextOperations'
 import { submitTurn } from './submitOperation'
+import { unguardedCommandsWarning } from './unguardedCommands'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,
@@ -108,6 +109,7 @@ export default function AgentComposer(props: {
     { equals: sameAgentConfigOptions },
   )
   const terminalOptions = createMemo(() => configOptions().filter((option) => option.category !== 'permission'))
+  const unguardedWarning = createMemo(() => unguardedCommandsWarning(configOptions()))
   const commands = createMemo(() => {
     const value = props.session.config.commands
     const advertised = Array.isArray(value) ? value as Array<{ name: string; description?: string }> : []
@@ -446,9 +448,15 @@ export default function AgentComposer(props: {
         )}
       </Show>
 
+      <Only hosts={['tui']}>
+        <Show when={unguardedWarning()}>
+          {(warning) => <Text tone="danger" wrap>{warning().tip}. {warning().detail}</Text>}
+        </Show>
+      </Only>
       <MentionTextarea
         ref={(element) => { field = element }}
         label="Message agent"
+        tone={unguardedWarning() ? 'danger' : undefined}
         value={draft()}
         disabled={props.disabled}
         placeholder={disabledMessage() ?? 'Ask the agent…  @file  /command  $skill'}
@@ -463,6 +471,17 @@ export default function AgentComposer(props: {
         onToggleExpand={toggleExpanded}
         overlay={
           <Only hosts={['dom']}>
+            <Show when={unguardedWarning()}>
+              {(warning) => (
+                <IconButton
+                  icon="triangle-alert"
+                  tone="danger"
+                  label={warning().tip}
+                  tip={warning().tip}
+                  tipSub={warning().detail}
+                />
+              )}
+            </Show>
             <IconButton
               icon={expanded() ? 'minimize-2' : 'maximize-2'}
               label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
