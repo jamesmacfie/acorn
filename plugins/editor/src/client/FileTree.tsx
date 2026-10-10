@@ -15,6 +15,7 @@ import { pathContains } from './editorState'
 import { readEditorShowIgnored, saveEditorShowIgnored } from './editorPrefs'
 import type { FileStatusProjection } from './fileStatusModel'
 import { ContributedMenuRows, editorMenuTarget } from './contributedMenuRows'
+import { FileMarkGlyphs, fileMarkLegend, fileMarks } from './fileAnnotations'
 
 const badgeTone = (tone: 'muted' | 'ok' | 'accent' | 'danger'): 'neutral' | 'ok' | 'accent' | 'danger' =>
   tone === 'muted' ? 'neutral' : tone
@@ -32,6 +33,8 @@ export default function FileTree(props: {
   onRevealed: (revision: number) => void
   onRevealActive: () => void
   actions: ReturnType<typeof createFileActionModel>
+  /** The file rows in expanded folders, for the pane's one annotation batch. Folders are left out. */
+  onVisibleFiles: (paths: readonly string[]) => void
 }) {
   const queryClient = useQueryClient()
   const registeredNode = queryOwner(queryClient)
@@ -322,6 +325,12 @@ export default function FileTree(props: {
     return rows
   })
 
+  // Collapsing a folder drops its files from the batch. Virtual scrolling doesn't: the shared host
+  // clears a contributor's marks whenever the key set changes, so asking per scrolled row would blank
+  // every mark on each scroll step.
+  createEffect(() => props.onVisibleFiles(items().flatMap((item) => (item.dir ? [] : [item.key]))))
+  onCleanup(() => props.onVisibleFiles([]))
+
   createEffect(on(() => props.taskId, (task) => {
     onCleanup(registerEditorTreeFolders(task, nodeId, (path) => items().some((item) => item.key === path && item.dir)))
   }))
@@ -453,7 +462,8 @@ export default function FileTree(props: {
       {(item, itemProps, selected, place) => {
         const folderMark = () => item.dir ? props.fileStatus().folders.get(item.key) : undefined
         const fileMark = () => item.dir ? undefined : props.fileStatus().files.get(item.key)
-        const statusLabel = () => folderMark()?.label ?? fileMark()?.label
+        const marks = () => item.dir ? [] : fileMarks(props.taskId, item.key)
+        const statusLabel = () => [folderMark()?.label ?? fileMark()?.label, fileMarkLegend(marks())].filter(Boolean).join('; ')
         const parent = item.key.includes('/') ? item.key.slice(0, item.key.lastIndexOf('/')) : ''
         const ignored = () => ignoreByDir().get(parent)?.ignored.has(item.label) ?? false
         return <TreeRow
@@ -484,9 +494,11 @@ export default function FileTree(props: {
             ? folderMark() && <><Badge size="xs" tone={folderMark()!.tone === 'danger' ? 'danger' : 'neutral'}
                 tip={folderMark()!.label}>{folderMark()!.count}</Badge>
                 <Only hosts={['tui']}><Text emphasis="muted">{` ${folderMark()!.label}`}</Text></Only></>
-            : fileMark() && <><Badge size="xs" tone={badgeTone(fileMark()!.tone)}
+            : <>{fileMark() && <><Badge size="xs" tone={badgeTone(fileMark()!.tone)}
                 tip={fileMark()!.label}>{fileMark()!.letter}</Badge>
                 <Only hosts={['tui']}><Text emphasis="muted">{` ${fileMark()!.label}`}</Text></Only></>}
+              <FileMarkGlyphs marks={marks()} />
+              {marks().length > 0 && <Only hosts={['tui']}><Text emphasis="muted">{` ${fileMarkLegend(marks())}`}</Text></Only>}</>}
         >
           <Text tone={folderMark()?.tone ?? fileMark()?.tone} emphasis={ignored() ? 'muted' : undefined}>{item.label}</Text>
           {inlinePath() === item.key && <Input label={dialog() === 'rename' ? 'Rename entry' : 'New name'}

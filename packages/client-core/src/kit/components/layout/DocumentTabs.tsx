@@ -1,6 +1,7 @@
 import { createEffect, createSignal, For, Show, type JSX } from 'solid-js'
 import { IconButton } from '../inputs/IconButton'
 import { StatusDot } from '../content/StatusDot'
+import Icon from '../content/Icon'
 import { revealActiveTab, trackTabOverflow } from './tabScroll'
 
 export type DocTabDef = {
@@ -16,7 +17,14 @@ export type DocTabDef = {
   pending?: boolean
   title?: string
   fileStatus?: { letter: string; label: string; tone: 'muted' | 'ok' | 'accent' | 'danger' }
+  /** Facts another source pinned to the document, such as a review note. Up to three glyphs draw;
+   *  every label is read out with the tab. */
+  marks?: readonly DocTabMark[]
 }
+
+export type DocTabMark = { tone: 'muted' | 'warn' | 'danger'; label: string; icon?: string }
+
+const MAX_TAB_MARK_GLYPHS = 3
 
 // The closable tab strip: editor documents and terminal sessions. Distinct from `Tabs`, which
 // switches panels within one view; these tabs each own a document, can be closed, and carry state.
@@ -97,7 +105,7 @@ export function DocumentTabs(props: {
               type="button"
               role="tab"
               class="ui-doctab-label"
-              aria-label={`${tab.label}${tab.fileStatus ? `, ${tab.fileStatus.label}` : ''}${tab.dirty ? ', Unsaved changes' : ''}`}
+              aria-label={`${tab.label}${tab.fileStatus ? `, ${tab.fileStatus.label}` : ''}${(tab.marks ?? []).map((mark) => `, ${mark.label}`).join('')}${tab.dirty ? ', Unsaved changes' : ''}`}
               aria-selected={props.active === tab.id}
               aria-controls={`${props.idPrefix}-panel-${tab.id}`}
               tabindex={props.active === tab.id ? 0 : -1}
@@ -130,6 +138,9 @@ export function DocumentTabs(props: {
               <span class="ui-doctab-text" data-file-status-tone={tab.fileStatus?.tone}>{tab.label}</span>
               <Show when={tab.fileStatus}><span class="ui-doctab-file-status" data-tone={tab.fileStatus!.tone} title={tab.fileStatus!.label}
                 aria-label={tab.fileStatus!.label}>{tab.fileStatus!.letter}</span></Show>
+              <For each={tab.marks?.slice(0, MAX_TAB_MARK_GLYPHS)}>{(mark) => (
+                <Show when={mark.icon} fallback={<StatusDot tone={mark.tone} />}>{(name) => <Icon name={name()} tone={mark.tone} />}</Show>
+              )}</For>
               <Show when={tab.dirty}>
                 <StatusDot tone="accent" label="Unsaved changes" />
               </Show>

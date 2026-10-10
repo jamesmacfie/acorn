@@ -211,7 +211,7 @@ Each landing page in the tables above has topic pages in a folder of the same na
   [Diff review threads and marks](./diff-rendering/review.md).
 - [editor.md](./editor.md): [Composed panes](./editor/composed-panes.md),
   [The document surface](./editor/document-surface.md), [The editor pane](./editor/editor-pane.md),
-  [File navigation](./editor/file-navigation.md),
+  [File annotations](./editor/file-annotations.md), [File navigation](./editor/file-navigation.md),
   [Editing controls](./editor/editing-controls.md),
   [File renderers](./editor/file-renderers.md),
   [Find in files](./editor/find-in-files.md), [Line markers](./editor/line-markers.md),

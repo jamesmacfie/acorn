@@ -11,6 +11,7 @@ import { editorOpenFilesSlice } from './openFilesSlice'
 import './wsChannel'
 import { editorCommands } from './commands'
 import { editorPaneContribution } from './paneContribution'
+import { EDITOR_FILE_KEY, MAX_EDITOR_FILE_MARKS } from '../contract/fileAnnotations'
 
 const EditorSettings = lazy(() => import('./EditorSettings'))
 
@@ -22,6 +23,11 @@ export const editorClientPlugin: ClientPlugin = {
     // One view replaces the document, and the pane keeps its own text view one Source toggle away.
     ctx.extensionPoints.register({
       id: 'document', label: 'Editor document', kind: 'remote', mode: 'replace', max: 1,
+    })
+    // What another plugin knows about a file the tree or a tab is drawing: a review, coverage, a
+    // generated-file warning (docs/editor/file-annotations.md).
+    ctx.extensionPoints.register({
+      id: 'file', label: 'Editor file', kind: 'annotation', key: [...EDITOR_FILE_KEY], acceptedMarks: MAX_EDITOR_FILE_MARKS,
     })
     ctx.settingsPages.register({
       id: 'editor', label: 'Editor', category: 'features', scope: 'device', icon: 'file-code', order: 20,

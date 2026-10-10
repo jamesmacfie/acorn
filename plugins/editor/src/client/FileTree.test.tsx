@@ -10,7 +10,8 @@ import type { FileStatusProjection } from './fileStatusModel'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { saveEditorShowIgnored } from './editorPrefs'
 import { registerContextMenuItems } from '@acorn/plugin-api/client'
-import { setActiveNode } from '@acorn/plugin-api/testkit/client'
+import { extensionPointRegistry, extensionRegistry, setActiveNode, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
+import { EDITOR_FILE_KEY, EDITOR_FILE_POINT, MAX_EDITOR_FILE_MARKS, type EditorFileAnnotationKey } from '../contract/fileAnnotations'
 
 Element.prototype.scrollIntoView ??= () => {}
 
@@ -147,7 +148,7 @@ it('keeps the captured root target and uses an explicit destination folder', asy
   await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src', entryId: 'src' }, 'new.txt', 'file'))
 })
 
-const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void; fileStatus?: FileStatusProjection; openPath?: () => string | null; hideIgnored?: boolean }) => {
+const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void; fileStatus?: FileStatusProjection; openPath?: () => string | null; hideIgnored?: boolean; onVisibleFiles?: (paths: readonly string[]) => void }) => {
   host = document.createElement('div')
   document.body.append(host)
   const queryClient = new QueryClient()
@@ -169,6 +170,7 @@ const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () =>
       onRevealed={options?.onRevealed ?? (() => {})}
       onRevealActive={() => {}}
       actions={actions}
+      onVisibleFiles={options?.onVisibleFiles ?? (() => {})}
     /></QueryClientProvider>
   ), host)
   return onOpen
@@ -432,5 +434,81 @@ describe('other plugins’ file actions', () => {
       expect(inspect).not.toHaveBeenCalled()
     } finally { setActiveNode(null) }
     expect(inspect).not.toHaveBeenCalled()
+  })
+})
+
+describe('other plugins’ file marks', () => {
+  const registered: { dispose(): void }[] = []
+  afterEach(() => registered.splice(0).forEach((handle) => handle.dispose()))
+  // A loaded contributor as the chrome pass would bind it, with the transport stubbed out.
+  const contribute = (marks: ExtensionContribution['marks']) => {
+    registered.push(
+      extensionPointRegistry.register({ id: EDITOR_FILE_POINT, ownerId: 'editor', label: 'Editor file', kind: 'annotation', key: [...EDITOR_FILE_KEY], acceptedMarks: MAX_EDITOR_FILE_MARKS, max: 1 }),
+      extensionRegistry.register({ id: 'plugin:review:files', pluginId: 'review', point: EDITOR_FILE_POINT, label: 'Review', order: 500, carrier: 'items', marks, requestScope: () => 'local' } as ExtensionContribution),
+    )
+  }
+
+  it('asks once for a large tree and again only when expansion changes which files show', async () => {
+    const { requestFileAnnotations } = await import('./fileAnnotations')
+    listing.mockImplementation(async (_task, dir) => dir === ''
+      ? [{ name: 'src', dir: true }, ...Array.from({ length: 10_000 }, (_, index) => ({ name: `${index}.txt`, dir: false }))]
+      : [{ name: 'app.ts', dir: false }])
+    const marks = vi.fn(async (keys: Record<string, string | number>[]) =>
+      keys.filter((key) => key.path === '0.txt').map((key) => ({ key, severity: 'warn' as const, text: 'Needs review' })))
+    contribute(marks)
+    mount(vi.fn(), { onVisibleFiles: (paths) => requestFileAnnotations(taskId, paths) })
+
+    const row = await vi.waitFor(() => {
+      const element = host.querySelector<HTMLElement>('[title^="0.txt"]')
+      if (!element?.title.includes('Needs review')) throw new Error('mark not drawn yet')
+      return element
+    })
+    expect(row.title).toBe('0.txt — Needs review — review')
+    expect(row.querySelector('.ui-dot[data-tone="warn"]')).not.toBeNull()
+    expect(host.querySelectorAll('[role="treeitem"]').length).toBeLessThan(100)
+    expect(marks).toHaveBeenCalledTimes(1)
+    const asked = marks.mock.calls[0]![0] as EditorFileAnnotationKey[]
+    expect(asked).toHaveLength(10_000)
+    expect(asked.some((key) => key.path === 'src')).toBe(false)
+
+    // A refresh that lists the same files asks nothing new.
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(listing.mock.calls.length).toBeGreaterThan(1))
+    await Promise.resolve()
+    expect(marks).toHaveBeenCalledTimes(1)
+
+    setEditorTreeDirectoryOpen(taskId, 'src', true)
+    await vi.waitFor(() => expect(marks).toHaveBeenCalledTimes(2))
+    expect((marks.mock.calls[1]![0] as EditorFileAnnotationKey[]).some((key) => key.path === 'src/app.ts')).toBe(true)
+
+    setEditorTreeDirectoryOpen(taskId, 'src', false)
+    await vi.waitFor(() => expect(marks).toHaveBeenCalledTimes(3))
+    expect((marks.mock.calls[2]![0] as EditorFileAnnotationKey[]).some((key) => key.path === 'src/app.ts')).toBe(false)
+  })
+
+  it('draws a mark without opening, selecting or arming the file', async () => {
+    const { requestFileAnnotations } = await import('./fileAnnotations')
+    listing.mockResolvedValueOnce([{ name: 'gen.ts', dir: false }])
+    contribute(async (keys) => keys.map((key) => ({ key, severity: 'danger' as const, text: 'Generated file', icon: 'lock' })))
+    const onOpen = mount(vi.fn(), { onVisibleFiles: (paths) => requestFileAnnotations(taskId, paths) })
+    const row = await vi.waitFor(() => {
+      const element = host.querySelector<HTMLElement>('[title^="gen.ts"]')
+      if (!element?.querySelector('.ui-icon[data-tone="danger"]')) throw new Error('mark not drawn yet')
+      return element
+    })
+    expect(row.getAttribute('aria-label') ?? row.querySelector('[aria-label]')?.getAttribute('aria-label')).toContain('Generated file — review')
+    expect(row.getAttribute('aria-selected')).not.toBe('true')
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(actions.arm).not.toHaveBeenCalled()
+  })
+
+  it('reports no files once the tree is gone', async () => {
+    const onVisibleFiles = vi.fn()
+    mount(vi.fn(), { onVisibleFiles })
+    setEditorTreeDirectoryOpen(taskId, 'src', true)
+    await vi.waitFor(() => expect(onVisibleFiles).toHaveBeenLastCalledWith(['src/app.ts']))
+    dispose?.()
+    dispose = undefined
+    expect(onVisibleFiles).toHaveBeenLastCalledWith([])
   })
 })

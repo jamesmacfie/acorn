@@ -115,6 +115,9 @@ legend ([rail controls and status markers](../ui-design.md#rail-controls-and-sta
 This path is task-only. A plugin that needs source or pane status needs an owner-declared annotation
 point for that surface first, not a rail-specific manifest key.
 
+Editor's `editor:file` point works the same way for tree rows and document tabs, keyed
+`{ taskId, path }` ([file annotations](../editor/file-annotations.md)).
+
 ### Storage and memory sections
 
 `core:storage` is the core-owned `remote` point on **Settings > Storage and memory**, in `stack` mode

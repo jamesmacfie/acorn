@@ -111,7 +111,7 @@ export function TabPanel(props: {
 }
 /** One line of tab labels with a `×` on the current one. */
 export function DocumentTabs(props: {
-  tabs: readonly { id: string; label: string; dirty?: boolean; status?: 'ok' | 'warn' | 'muted'; ephemeral?: boolean; pending?: boolean; title?: string; fileStatus?: { letter: string; label: string; tone: 'muted' | 'ok' | 'accent' | 'danger' } }[]
+  tabs: readonly { id: string; label: string; dirty?: boolean; status?: 'ok' | 'warn' | 'muted'; ephemeral?: boolean; pending?: boolean; title?: string; fileStatus?: { letter: string; label: string; tone: 'muted' | 'ok' | 'accent' | 'danger' }; marks?: readonly { tone: 'muted' | 'warn' | 'danger'; label: string; icon?: string }[] }[]
   active: string
   onActivate: (id: string) => void
   onClose?: (id: string) => void
@@ -168,7 +168,7 @@ export function DocumentTabs(props: {
       <Line tone="accent">{control.focused() ? '\u203a' : ' '}</Line>
       <For each={props.tabs}>
         {(tab) => (<>
-          <box height={1} flexShrink={0} ref={(element: Renderable) => {
+          <box flexDirection="row" height={1} flexShrink={0} ref={(element: Renderable) => {
             // A normal click still opens the document. The separate action mark below targets an
             // inactive tab without opening it, matching the desktop's per-tab menu button.
             element.onMouseDown = () => { if (props.menu) keys.goTo(tab.id); props.onActivate(tab.id) }
@@ -178,8 +178,16 @@ export function DocumentTabs(props: {
               role={props.active === tab.id ? 'strong' : 'body'}
               tone={tab.dirty ? 'accent' : tab.status === 'warn' ? 'warn' : undefined}
             >
-              {props.menu && keys.active() === tab.id ? '›' : ''}{tab.label}{tab.fileStatus ? ` [${tab.fileStatus.letter}]` : ''}{tab.dirty ? ' ●' : ''}{props.active === tab.id && props.onClose ? ' ×' : ''}
+              {props.menu && keys.active() === tab.id ? '›' : ''}{tab.label}{tab.fileStatus ? ` [${tab.fileStatus.letter}]` : ''}
             </Line>
+            {/* Other sources' marks, as the desktop draws them: up to three, toned by severity, with
+                every label in the legend after the strip. Always dots, because a terminal has a glyph
+                for only some icon names. */}
+            <For each={tab.marks?.slice(0, 3)}>{(mark) => <Line tone={mark.tone}>{mark.tone === 'muted' ? ' ○' : ' ●'}</Line>}</For>
+            <Line
+              role={props.active === tab.id ? 'strong' : 'body'}
+              tone={tab.dirty ? 'accent' : tab.status === 'warn' ? 'warn' : undefined}
+            >{tab.dirty ? ' ●' : ''}{props.active === tab.id && props.onClose ? ' ×' : ''}</Line>
           </box>
           {props.menu && <box height={1} flexShrink={0} ref={(element: Renderable) => {
             element.onMouseDown = () => { keys.goTo(tab.id); setMenuOpen(true) }
@@ -187,7 +195,10 @@ export function DocumentTabs(props: {
           }}><Line tone="muted"> ⋯ </Line></box>}
         </>)}
       </For>
-      <Line role="muted">{props.tabs.find((tab) => tab.id === props.active)?.fileStatus?.label ?? ''}</Line>
+      <Line role="muted">{(() => {
+        const tab = props.tabs.find((candidate) => candidate.id === props.active)
+        return [tab?.fileStatus?.label, ...(tab?.marks ?? []).map((mark) => mark.label)].filter(Boolean).join(' · ')
+      })()}</Line>
       <box flexGrow={1} />
       {slot(props.actions)}
     </box>

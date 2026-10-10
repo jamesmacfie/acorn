@@ -7,9 +7,10 @@ import { EditorSelection } from '@codemirror/state'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
-import { registerContextMenuItems } from '@acorn/plugin-api/client'
+import { activeNodeId, registerContextMenuItems } from '@acorn/plugin-api/client'
 import { commandRegistry, extensionPointRegistry, extensionRegistry, setActiveNode, setActiveTaskId, setFocusedPane, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
 import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
+import { EDITOR_FILE_KEY, EDITOR_FILE_POINT, MAX_EDITOR_FILE_MARKS } from '../contract/fileAnnotations'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -66,8 +67,13 @@ vi.mock('./editorClient', async (importOriginal) => ({
   }),
 }))
 // The sidebar's two panels fetch a tree and run ripgrep. Neither is this file's subject.
+// The stand-in hands back the tree's file report, so a test can say which files its rows show.
+let reportTreeFiles: ((paths: readonly string[]) => void) | undefined
 vi.mock('./FileTree', () => ({
-  default: (props: { openPath: string | null }) => <div data-testid="file-tree-selection">{props.openPath}</div>,
+  default: (props: { openPath: string | null; onVisibleFiles: (paths: readonly string[]) => void }) => {
+    reportTreeFiles = props.onVisibleFiles
+    return <div data-testid="file-tree-selection">{props.openPath}</div>
+  },
 }))
 vi.mock('./search/SearchPanel', () => ({ default: () => null }))
 // Terminal mode's half. The real one is xterm over a websocket, which jsdom cannot give it; what this
@@ -1445,5 +1451,135 @@ describe('the editor pane', () => {
     // Without the flush this is a 1.5s debounce the test would have to sit through.
     view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
     await vi.waitFor(() => expect(disk.get('b.ts')).toContain('// blurred'))
+  })
+})
+
+describe('other plugins’ file marks', () => {
+  type Key = { taskId: string; path: string }
+  type Mark = { key: Key; severity: 'info' | 'warn' | 'danger'; text: string; icon?: string }
+  const registrations: { dispose(): void }[] = []
+  afterEach(() => registrations.splice(0).forEach((handle) => handle.dispose()))
+  const point = () => registrations.push(extensionPointRegistry.register({
+    id: EDITOR_FILE_POINT, ownerId: 'editor', label: 'Editor file', kind: 'annotation', key: [...EDITOR_FILE_KEY], acceptedMarks: MAX_EDITOR_FILE_MARKS, max: 1,
+  }))
+  // A loaded contributor as the chrome pass binds it: scoped to the Node in view, transport stubbed.
+  const contribute = (pluginId: string, marks: (keys: Key[]) => Promise<Mark[]>) => {
+    const registration = extensionRegistry.register({
+      id: `plugin:${pluginId}:files`, pluginId, point: EDITOR_FILE_POINT, label: pluginId, order: 500, carrier: 'items',
+      marks: vi.fn((keys: Key[]) => marks(keys)), requestScope: () => activeNodeId() ?? 'local',
+    } as unknown as ExtensionContribution)
+    registrations.push(registration)
+    return registration
+  }
+  const review = (keys: Key[]) => Promise.resolve(keys.filter((key) => key.path === 'a.ts').map((key) => ({ key, severity: 'warn' as const, text: 'Needs review' })))
+  const tab = (host: HTMLElement, path: string) => host.querySelector<HTMLElement>(`[id="editor-tab-${path}"]`)
+  const marked = (host: HTMLElement, path: string, text = 'Needs review — review') =>
+    vi.waitFor(() => expect(tab(host, path)?.getAttribute('aria-label')).toContain(text))
+
+  it('asks once for the open tabs and the tree’s files together and marks the tab', async () => {
+    point()
+    const asked: Key[][] = []
+    contribute('review', (keys) => { asked.push(keys); return review(keys) })
+    const { host } = mount()
+    await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    editorOpen(taskId, 'b.ts', false)
+    reportTreeFiles!(['a.ts', 'src/c.ts'])
+    await marked(host, 'a.ts')
+    expect(asked.at(-1)).toEqual([{ taskId, path: 'a.ts' }, { taskId, path: 'b.ts' }, { taskId, path: 'src/c.ts' }])
+    expect(tab(host, 'a.ts')!.querySelector('.ui-dot[data-tone="warn"]')).not.toBeNull()
+    expect(tab(host, 'a.ts')!.getAttribute('data-tip')).toBe('a.ts — Needs review — review')
+    expect(tab(host, 'b.ts')!.getAttribute('aria-label')).toBe('b.ts')
+    // The close control is still the tab's own.
+    expect(host.querySelector('button[aria-label="Close a.ts"]')).not.toBeNull()
+  })
+
+  it('keeps a tab’s mark while its buffer is dirty or a plugin draws it, and asks nothing new', async () => {
+    disk.set('a.ts', 'const a = 1\n')
+    point()
+    const Preview = () => <p data-testid="preview">preview</p>
+    registrations.push(
+      extensionPointRegistry.register({ id: EDITOR_DOCUMENT_POINT, ownerId: 'editor', label: 'Editor document', kind: 'remote', mode: 'replace', max: 1 }),
+      extensionRegistry.register({ id: 'plugin:viewer:document', pluginId: 'viewer', point: EDITOR_DOCUMENT_POINT, label: 'Viewer', order: 500, carrier: 'component', component: Preview, matches: ['a.ts'] } as ExtensionContribution),
+    )
+    const marks = vi.fn(review)
+    contribute('review', marks)
+    const { host } = mount()
+    editorOpen(taskId, 'a.ts', false)
+    await vi.waitFor(() => expect(host.querySelector('[data-testid="preview"]')).not.toBeNull())
+    await marked(host, 'a.ts')
+    const calls = marks.mock.calls.length
+
+    host.querySelector<HTMLButtonElement>('button[aria-label="Preview"]')!.click()
+    const view = await editor(host)
+    await showing(() => view, 'const a = 1')
+    write.mockImplementation(async () => new Promise(() => {})) // hold the save, so the buffer stays dirty
+    view.dispatch({ changes: { from: 0, insert: '// edited\n' } })
+    await vi.waitFor(() => expect(tab(host, 'a.ts')?.getAttribute('aria-label')).toContain('Unsaved changes'))
+    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toContain('Needs review — review')
+    expect(marks).toHaveBeenCalledTimes(calls)
+  })
+
+  it('draws only marks keyed to this task and this exact path', async () => {
+    point()
+    contribute('review', async (keys) => [
+      { key: { taskId: 'another-task', path: 'a.ts' }, severity: 'danger', text: 'Another task' },
+      { key: { taskId, path: 'A.ts' }, severity: 'danger', text: 'Other case' },
+      { key: { path: 'a.ts' } as Key, severity: 'danger', text: 'No task' },
+      ...keys.filter((key) => key.path === 'b.ts').map((key) => ({ key, severity: 'info' as const, text: 'Ours' })),
+    ])
+    const { host } = mount()
+    await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    editorOpen(taskId, 'b.ts', false)
+    await marked(host, 'b.ts', 'Ours — review')
+    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts')
+  })
+
+  it('clears marks on a Node switch and ignores the old Node’s late answer', async () => {
+    point()
+    const answers: { keys: Key[]; resolve: (marks: Mark[]) => void }[] = []
+    contribute('review', (keys) => new Promise((resolve) => answers.push({ keys, resolve })))
+    const { host } = mount()
+    await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await vi.waitFor(() => expect(answers).toHaveLength(1))
+    const first = answers[0]!
+    first.resolve([{ key: first.keys[0]!, severity: 'warn', text: 'Old node' }])
+    await marked(host, 'a.ts', 'Old node — review')
+
+    reportTreeFiles!(['b.ts'])
+    await vi.waitFor(() => expect(answers).toHaveLength(2))
+    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts')
+    setActiveNode('other-node')
+    await vi.waitFor(() => expect(answers).toHaveLength(3))
+    answers[1]!.resolve([{ key: { taskId, path: 'a.ts' }, severity: 'warn', text: 'Late' }])
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts')
+    answers[2]!.resolve([{ key: { taskId, path: 'a.ts' }, severity: 'info', text: 'New node' }])
+    await marked(host, 'a.ts', 'New node — review')
+  })
+
+  it('keeps 256 marks from one provider, draws three, and keeps another provider through a failure', async () => {
+    point()
+    contribute('flood', async (keys) => Array.from({ length: 300 }, (_, index) => ({ key: keys[0]!, severity: 'info' as const, text: `Note ${index}` })))
+    contribute('broken', async () => { throw new Error('provider down') })
+    const { host } = mount()
+    await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await marked(host, 'a.ts', 'Note 255 — flood')
+    expect(tab(host, 'a.ts')!.getAttribute('aria-label')).not.toContain('Note 256')
+    expect(tab(host, 'a.ts')!.querySelectorAll('.ui-dot').length).toBe(3)
+  })
+
+  it('removes a disabled provider’s marks', async () => {
+    point()
+    const registration = contribute('review', review)
+    const { host } = mount()
+    await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await marked(host, 'a.ts')
+    registration.dispose()
+    await vi.waitFor(() => expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts'))
   })
 })

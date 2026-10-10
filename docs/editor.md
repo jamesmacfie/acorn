@@ -111,6 +111,9 @@ previews, the file tree, reloading on focus, editing in `$EDITOR`, and its palet
 [File renderers](./editor/file-renderers.md) covers the `editor:document` point another plugin draws a
 file in, the **Preview** toggle, and the `editor.files` capability that reads a file's bytes.
 
+[File annotations](./editor/file-annotations.md) covers the `editor:file` point other plugins use to
+mark tree rows and tabs.
+
 <a id="find-in-files"></a>
 
 [Find in files](./editor/find-in-files.md) covers the ripgrep search behind the editor's search panel.

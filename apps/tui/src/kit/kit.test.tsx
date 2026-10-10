@@ -1739,6 +1739,22 @@ it('keeps terminal Git status text and the unsaved dot distinct in document tabs
   } finally { screen.done() }
 })
 
+it('draws up to three mark dots on a terminal document tab and every mark in the legend', async () => {
+  const marks = [
+    { tone: 'warn' as const, label: 'Needs review — review' },
+    { tone: 'danger' as const, label: 'Generated — codegen', icon: 'lock' },
+    { tone: 'muted' as const, label: 'Covered — coverage' },
+    { tone: 'warn' as const, label: 'Fourth — review' },
+  ]
+  const screen = await renderCells(() => <DocumentTabs idPrefix="marks" ariaLabel="Open files" active="a" onActivate={() => {}}
+    tabs={[{ id: 'a', label: 'a.ts', dirty: true, fileStatus: { letter: 'M', label: 'Modified', tone: 'muted' }, marks }]} />,
+  { width: 120, height: 4 })
+  try {
+    expect(screen.text).toContain('a.ts [M] ● ● ○ ●')
+    expect(screen.text).toContain('Modified · Needs review — review · Generated — codegen · Covered — coverage · Fourth — review')
+  } finally { screen.done() }
+})
+
 it('keeps terminal-session tab clicks and arrows activating once', async () => {
   const activated: string[] = []
   const [active, setActive] = createSignal('a')

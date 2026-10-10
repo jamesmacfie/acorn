@@ -13,6 +13,7 @@ import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorReopen, editorSetDirty, editorTabIdentity, openFiles, requestEditorReveal } from './editorState'
 import { editorViewState, forgetEditorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
+import { fileMarkLegend, fileMarks, requestFileAnnotations, tabMarks } from './fileAnnotations'
 import { createFileActionModel } from './fileActionModel'
 import { persistCapturedEditorOpenFiles } from './openFilesSlice'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
@@ -111,17 +112,28 @@ export default function EditorPane(props: { task: Task }) {
   // keyboard move even though the open files themselves had not changed.
   const documentTabs = createMemo(() => {
     const labels = tabLabels(files().map((file) => file.path))
-    return files().map((file) => ({
-    id: file.path,
-    label: labels.get(file.path) ?? file.path,
-    title: fileStatus.projection().files.get(file.path)
-      ? `${file.path} — ${fileStatus.projection().files.get(file.path)!.label}${fileStatus.stale() ? ' (Git status may be stale)' : ''}`
-      : file.path,
-    fileStatus: fileStatus.projection().files.get(file.path),
-    dirty: file.dirty,
-    ephemeral: file.ephemeral,
-    }))
+    return files().map((file) => {
+      const status = fileStatus.projection().files.get(file.path)
+      const marks = fileMarks(taskId, file.path)
+      return {
+        id: file.path,
+        label: labels.get(file.path) ?? file.path,
+        title: [
+          file.path,
+          status && `${status.label}${fileStatus.stale() ? ' (Git status may be stale)' : ''}`,
+          marks.length > 0 && fileMarkLegend(marks),
+        ].filter(Boolean).join(' — '),
+        fileStatus: status,
+        marks: tabMarks(marks),
+        dirty: file.dirty,
+        ephemeral: file.ephemeral,
+      }
+    })
   })
+  // Other plugins' marks: one batch for the tree's expanded files and the open tabs together. Keys
+  // are paths only, so typing in a tab or switching its preview never re-asks.
+  const [treeFiles, setTreeFiles] = createSignal<readonly string[]>([])
+  createEffect(() => requestFileAnnotations(taskId, [...files().map((file) => file.path), ...treeFiles()]))
   let disposed = false
   let applyingAcknowledgement = false
   let reloadGeneration = 0
@@ -1219,6 +1231,7 @@ export default function EditorPane(props: { task: Task }) {
                   onStatusChanged={fileStatus.refresh}
                   actions={fileActions}
                   onOpen={openPath}
+                  onVisibleFiles={setTreeFiles}
                   openPath={active()}
                   reveal={treeReveal()}
                   onRevealed={(revision) => {
