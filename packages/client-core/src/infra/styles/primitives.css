@@ -1682,6 +1682,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   border-radius: var(--radius-control);
 }
 .ui-mentionfield:focus-within { border-color: var(--accent); }
+/* Focus keeps the warning: the risk is greatest while someone is typing the turn. */
+.ui-mentionfield[data-tone='danger'],
+.ui-mentionfield[data-tone='danger']:focus-within { border-color: var(--danger); }
 .ui-mentionfield > .ui-input,
 .ui-mentionfield-mirror {
   display: block;
@@ -1717,7 +1720,14 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-mentionfield-token[data-tone='muted'] { color: var(--text-muted); }
 /* Anything drawn inside the box rather than above it, on the code block's rule: an expand toggle
    belongs over the text it grows, not on a line of its own that the mirror would then be offset by. */
-.ui-mentionfield > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); z-index: var(--z-base); }
+.ui-mentionfield-overlay {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: var(--z-base);
+  display: flex;
+  gap: var(--space-1);
+}
 /* The surface only: the rows inside are PickerRow, so this list and a Picker's are the same list.
    Anchored above the box rather than portalled, because it follows a caret in a field that is
    already the right width. */

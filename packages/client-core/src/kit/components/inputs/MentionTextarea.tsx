@@ -70,8 +70,11 @@ export type MentionTextareaProps = {
   onKeyDown?: (event: KeyboardEvent) => void
   /** The field took focus: the agents composer starts reading its `@` list here. */
   onFocus?: () => void
-  /** Drawn inside the field's box, before the text: the agents composer's expand toggle. */
+  /** Drawn inside the field's box, in its top-right corner: the agents composer's expand toggle. */
   overlay?: JSX.Element
+  /** Draws the box's border in the danger colour, for a field whose sends carry a risk the caller
+   *  explains in the overlay. */
+  tone?: Extract<Tone, 'danger'>
   ref?: HTMLTextAreaElement | ((element: HTMLTextAreaElement) => void)
 }
 
@@ -150,8 +153,8 @@ export default function MentionTextarea(props: MentionTextareaProps) {
   const overlay = children(() => props.overlay)
 
   return (
-    <div class="ui-mentionfield" data-mirrored={segments() ? '' : undefined}>
-      <Show when={overlay()}>{overlay()}</Show>
+    <div class="ui-mentionfield" data-mirrored={segments() ? '' : undefined} data-tone={props.tone}>
+      <Show when={overlay()}><div class="ui-mentionfield-overlay">{overlay()}</div></Show>
       <Show when={segments()}>
         {(runs) => (
           // Hidden from the accessibility tree: the textarea already carries this text, and a screen

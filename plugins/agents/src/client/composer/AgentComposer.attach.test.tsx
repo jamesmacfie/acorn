@@ -180,3 +180,23 @@ describe('the worktree file list', () => {
     expect(fileReads()).toEqual([['/v1/p/editor/tasks/t1/editor/files']])
   })
 })
+
+describe('unguarded commands warning', () => {
+  it('draws the danger border and warning mark only while the mode skips both sandbox and approval', async () => {
+    const withMode = (value: string) => ({ ...session, config: { configOptions: [{
+      id: 'mode', label: 'Mode', category: 'mode', currentValue: value,
+      values: [{ value: 'default', label: 'Default' }, { value: 'bypassPermissions', label: 'Bypass Permissions' }],
+    }] } }) as unknown as AgentSession
+    const [current, setCurrent] = createSignal(withMode('bypassPermissions'))
+    const host = mount({ session: current })
+    const box = host.querySelector<HTMLElement>('.ui-mentionfield')!
+    const mark = () => host.querySelector('button[aria-label="Commands run without a sandbox or approval"]')
+
+    expect(box.dataset.tone).toBe('danger')
+    expect(mark()?.getAttribute('data-tip-sub')).toContain('Set Mode to Auto or Default')
+
+    setCurrent(withMode('default'))
+    await vi.waitFor(() => expect(box.dataset.tone).toBeUndefined())
+    expect(mark()).toBeNull()
+  })
+})
