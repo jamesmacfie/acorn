@@ -5,8 +5,8 @@ import { extensionPointRegistry } from '../registries/extensionPoints/extensionP
 import { resolveSlot } from '../tree/arbitration'
 import { createSlotChoice } from '../tree/slotChoice'
 
-// Other plugins' viewers for code fences in host-owned Markdown (docs/plugins/remote-points.md §
-// Markdown fences).
+// Other plugins' viewers for code fences in host-owned Markdown (docs/plugins/markdown-fences.md §
+// How the host draws it).
 //
 // This module decides, for one content owner, which fences get a viewer: a block's identity, who would
 // draw it, the Source/Preview choice, and the cap. It draws nothing. The desktop draws the control and

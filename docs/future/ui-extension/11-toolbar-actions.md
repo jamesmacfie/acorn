@@ -79,7 +79,8 @@ Run with Node 26.8.1.
 - Suites: `@acorn/client-core` (2,718), `@acorn/plugin-preview` (36), `@acorn/plugin-terminal` (205),
   `@acorn/node-core` (1,760), `@acorn/plugin-api` (14), and `acorn-plugin-sdk` (12) pass. `@acorn/tui`
   fails only the two known `chrome.test.tsx` marker tests. `@acorn/arch-tests` fails the 15 known dead
-  links and one `docCitations` entry from phase 10 (see below). `tsc` is clean for preview, terminal,
+  links only, after a second commit pointed phase 10's `fenceViewers.ts` comment at
+  `markdown-fences.md`. `tsc` is clean for preview, terminal,
   client-core, and node-core. The terminal and desktop show only the known git and agents errors, and
   oxlint flags nothing in the changed files.
 - **Desktop, `pnpm dev:agent --fixture tui-navigation`,** with a local page as the project's preview
@@ -104,8 +105,6 @@ Run with Node 26.8.1.
 
 - An owner whose action is a person's act reads `invocation.byPerson` and refuses without it. Key the
   slot on whatever identity the action must not cross, and capture it in the handler.
-- `docCitations` fails on `fenceViewers.ts`, which cites `remote-points.md § Markdown fences`, a
-  heading that doesn't exist. It's from phase 10.
 - The frame and chrome registries read raw roster rows while `eligiblePlugins().installed` is
   namespaced. Anything that compares a declared surface id across the two needs both spellings.
 - The terminal startup closure is 689,582 of 700,000 bytes, and the Node service 1,757,365 of
