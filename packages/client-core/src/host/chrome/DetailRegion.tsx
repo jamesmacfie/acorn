@@ -15,7 +15,6 @@ export function DetailRegion(props: { point: string; region: 'header' | 'footer'
           <Slot
             point={props.point}
             props={props.subject}
-            {...(props.subject().taskId ? { taskId: props.subject().taskId } : {})}
             {...(props.subject().projectId ? { projectId: props.subject().projectId } : {})}
           />
         </div>

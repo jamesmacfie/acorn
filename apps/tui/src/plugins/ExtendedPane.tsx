@@ -49,7 +49,6 @@ function DetailRegion(props: { point: string; detail: DetailRegions }) {
           <Slot
             point={props.point}
             props={subject}
-            {...(subject().taskId ? { taskId: subject().taskId } : {})}
             {...(subject().projectId ? { projectId: subject().projectId } : {})}
           />
         </box>

@@ -24,12 +24,12 @@ export type DetailRegions = {
 
 /**
  * What a detail region mounts its contributors under, or `undefined` while the owner shows no
- * resource, when nothing mounts. Both hosts key a `Show` on it: a new surface, task or project
- * remounts the contributors, because a tree's bridge binds its scope at mount, and a new item is a
- * props update on the same workers.
+ * resource, when nothing mounts. Both hosts key a `Show` on it: a new surface or project remounts
+ * the contributors, because a tree's bridge binds its scope at mount, and a new item is a props
+ * update on the same workers.
  */
 export const detailMountKey = (subject: DetailRegionProps): string | undefined =>
-  (subject.item ?? subject.refId) ? `${subject.surface}\0${subject.taskId ?? ''}\0${subject.projectId ?? ''}` : undefined
+  (subject.item ?? subject.refId) ? `${subject.surface}\0${subject.projectId ?? ''}` : undefined
 
 /** What both hosts' `ExtendedPane` takes: the owner's own frame, and the point ids of the rectangles
  *  it reserved for somebody else (docs/plugins/cooperative-extension-points.md § Cooperative extension points). */

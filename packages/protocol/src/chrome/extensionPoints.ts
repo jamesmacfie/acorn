@@ -402,9 +402,9 @@ export const MAX_DETAIL_MOUNTS = 8
 
 /** What a contributor in a detail region is mounted with. `item` is the resource the owning surface
  *  is showing, and `refId` is set on a reference panel, where it is the same reference. No provider
- *  facts and no grants: a contributor reads its own data through its own routes. */
+ *  facts and no grants: a contributor reads its own data through its own routes. No task: no mount
+ *  site has one, because task panes take no mounts. */
 export type DetailRegionProps = {
-  taskId?: string
   projectId?: string
   item?: string
   refId?: string
