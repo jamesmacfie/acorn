@@ -10,7 +10,7 @@ import {
   extensionDeliveries, extensionPointRegistry, type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
-import { answerOwnerInvoke, createSlotChoice, GESTURE_WINDOW_MS, resolveSlot, type OwnerActions } from '@acorn/client-core/host/tree'
+import { compiledOwnerHost, createSlotChoice, GESTURE_WINDOW_MS, resolveSlot, type OwnerActions } from '@acorn/client-core/host/tree'
 import type { OverlayPalette } from '@acorn/client-core/host/palette'
 import { contextMenuItems, runContextMenuItem, selectionTooLarge } from '@acorn/client-core/host/registries/panes'
 import type { SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
@@ -322,13 +322,7 @@ function CompiledWithHost(props: {
   let container: Renderable | undefined
   const presses = pressedWithin(() => container, GESTURE_WINDOW_MS)
   onCleanup(presses.dispose)
-  const host = {
-    invoke: async (name: string, payload?: unknown): Promise<unknown> => {
-      const result = await answerOwnerInvoke({ declared: props.declared(), actions: props.actions(), name, payload, byPerson: presses.recent() })
-      if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code })
-      return result.body
-    },
-  }
+  const host = compiledOwnerHost({ declared: props.declared, actions: props.actions, byPerson: presses.recent })
   return (
     <box flexShrink={0} ref={(element: Renderable) => { container = element }}>
       <Dynamic component={props.component} {...props.props()} host={host} />

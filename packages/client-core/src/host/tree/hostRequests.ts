@@ -79,6 +79,21 @@ export async function answerOwnerInvoke(input: {
   return { ok: true, body: body ?? null }
 }
 
+/** The `host` a compiled contributor gets at a point that declares owner actions: the same check a
+ *  loaded tree's requests get, with a refusal thrown as an error that carries its code. Both hosts'
+ *  `Slot`s hand it over, each with its own way of hearing a person's press. */
+export const compiledOwnerHost = (input: {
+  declared: () => readonly string[]
+  actions: () => OwnerActions
+  byPerson: () => boolean
+}): { invoke: (name: string, payload?: unknown) => Promise<unknown> } => ({
+  invoke: async (name, payload) => {
+    const result = await answerOwnerInvoke({ declared: input.declared(), actions: input.actions(), name, payload, byPerson: input.byPerson() })
+    if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code })
+    return result.body
+  },
+})
+
 /** What a host with no overlay frames says. A plugin catches this and leaves its static preview up, so
  *  a terminal shows the owner's chip rather than a control that could never do anything. */
 export const unsupportedOverlay = (): TreeHostResult =>

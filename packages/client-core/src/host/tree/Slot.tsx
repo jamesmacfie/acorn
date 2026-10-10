@@ -4,7 +4,7 @@ import { extensionPointRegistry } from '../registries/extensionPoints/extensionP
 import { RemoteTree } from './RemoteTree'
 import { resolveSlot } from './arbitration'
 import { createSlotChoice } from './slotChoice'
-import { answerOwnerInvoke, createGestureClock, type OwnerActions } from './hostRequests'
+import { compiledOwnerHost, createGestureClock, type OwnerActions } from './hostRequests'
 
 // A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins/cooperative-extension-points.md §
 // Cooperative extension points, the `remote` kind).
@@ -196,13 +196,7 @@ function CompiledWithHost(props: {
   const gestures = createGestureClock()
   let unwatch = (): void => {}
   onCleanup(() => unwatch())
-  const host = {
-    invoke: async (name: string, payload?: unknown): Promise<unknown> => {
-      const result = await answerOwnerInvoke({ declared: props.declared(), actions: props.actions(), name, payload, byPerson: gestures.recent() })
-      if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code })
-      return result.body
-    },
-  }
+  const host = compiledOwnerHost({ declared: props.declared, actions: props.actions, byPerson: gestures.recent })
   return (
     <span style={{ display: 'contents' }} ref={(element) => { unwatch = gestures.watch(element) }}>
       <Dynamic component={props.component} {...props.props()} host={host} />
