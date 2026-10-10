@@ -2,7 +2,7 @@
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */
-export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane'] as const
+export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane', 'file.row', 'document.tab'] as const
 
 export type ContextMenuLocation = (typeof CONTEXT_MENU_LOCATIONS)[number]
 
@@ -28,6 +28,18 @@ export const CONTEXT_MENU_FACTS: Readonly<Record<ContextMenuLocation, readonly s
   'item.row': ['providerId', 'projectId'],
   'rail.source': ['projectId'],
   'rail.pane': ['projectId', 'pinned', 'shown'],
+  // A file or folder in a document owner's tree, and an open document's tab. The path, title and
+  // revision are payload: `extension` is what a manifest matches a file kind on.
+  'file.row': ['projectId', 'extension', 'directory', 'readOnly'],
+  'document.tab': ['projectId', 'extension', 'directory', 'readOnly'],
+}
+
+/** The `extension` fact for a worktree-relative path: the lowercased text after the basename's last
+ *  dot, or `''` for a folder, a name with no dot, and a dotfile such as `.gitignore`. */
+export const fileExtensionFact = (path: string, directory: boolean): string => {
+  const name = path.slice(path.lastIndexOf('/') + 1)
+  const dot = name.lastIndexOf('.')
+  return directory || dot <= 0 ? '' : name.slice(dot + 1).toLowerCase()
 }
 
 export const isRailMenuLocation = (location: ContextMenuLocation): location is 'rail.source' | 'rail.pane' =>

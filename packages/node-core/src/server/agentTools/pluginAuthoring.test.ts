@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
-import { CONTEXT_MENU_LOCATIONS } from '@acorn/protocol/contextMenus.ts'
+import { CONTEXT_MENU_FACTS, CONTEXT_MENU_LOCATIONS } from '@acorn/protocol/contextMenus.ts'
 import { CORE_EXCLUSIVE_SLOTS, EXTENSION_POINT_LOCATIONS } from '@acorn/protocol/extensionPoints.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
@@ -61,6 +61,9 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     ]) {
       expect(renderPluginAuthoring(v)).toContain(`\`${value}\``)
     }
+    // A file action's facts and body are what an author needs that the enum can't say.
+    for (const fact of CONTEXT_MENU_FACTS['file.row']) expect(renderPluginAuthoring(v)).toContain(`\`${fact}\``)
+    expect(renderPluginAuthoring(v)).toContain('{ resource: { kind: "file", taskId, projectId, path,')
   })
 
   it('carries every manifest key, split on what the schema actually requires', () => {

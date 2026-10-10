@@ -9,6 +9,8 @@ import { projectFileStatus } from './fileStatusModel'
 import type { FileStatusProjection } from './fileStatusModel'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { saveEditorShowIgnored } from './editorPrefs'
+import { registerContextMenuItems } from '@acorn/plugin-api/client'
+import { setActiveNode } from '@acorn/plugin-api/testkit/client'
 
 Element.prototype.scrollIntoView ??= () => {}
 
@@ -156,6 +158,7 @@ const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () =>
   dispose = render(() => (
     <QueryClientProvider client={queryClient}><FileTree
       taskId={options?.task?.() ?? taskId}
+      projectId="p1"
       taskTitle="Editor task"
       fileStatus={() => options?.fileStatus ?? { files: new Map(), folders: new Map() }}
       statusStale={() => false}
@@ -317,4 +320,117 @@ it('does not finish a cached-listing reveal after Collapse all', async () => {
   await Promise.resolve(); await Promise.resolve()
   expect(onRevealed).not.toHaveBeenCalled()
   expect(host.textContent).not.toContain('app.ts')
+})
+
+describe('other plugins’ file actions', () => {
+  const armed = () => {
+    const release = vi.fn()
+    vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), sourceCustodies: () => new Map(), savedRevisions: new Map(), tabs: { files: [], active: null } }))
+    return release
+  }
+  const file = (name: string, dir = false): EditorEntry => ({ name, dir, kind: dir ? 'folder' : 'file', identity: name, entryId: name, root: '/work' })
+  const rowFor = (title: string) => vi.waitFor(() => {
+    const element = host.querySelector<HTMLElement>(`[title="${title}"]`)
+    if (!element) throw new Error(`${title} not loaded`)
+    return element
+  })
+  const rightClick = (row: HTMLElement) => {
+    row.dispatchEvent(new PointerEvent('pointerdown', { button: 2, bubbles: true }))
+    row.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true }))
+  }
+  const menuLabels = () => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((item) => item.textContent)
+  const menuItem = (label: string) => vi.waitFor(() => {
+    const element = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === label)
+    if (!element) throw new Error(`${label} not in the menu`)
+    return element
+  })
+  const registered: { dispose(): void }[] = []
+  afterEach(() => registered.splice(0).forEach((handle) => handle.dispose()))
+
+  it('draws them after its own rows and runs them on the entry the menu opened on, without opening it', async () => {
+    listing.mockImplementation(async (_task, path) => path === '' ? [file('fixtures', true), file('Data.JSON')] : [])
+    const release = armed()
+    const inspect = vi.fn()
+    registered.push(registerContextMenuItems([
+      { id: 'inspect', location: 'file.row', label: 'Inspect JSON', order: 0, when: (target) => target.extension === 'json' && !target.directory, run: inspect },
+      { id: 'tab-only', location: 'document.tab', label: 'Tab only', order: 0, run: () => {} },
+    ]))
+    const onOpen = mount()
+    rightClick(await rowFor('Data.JSON'))
+    await menuItem('Inspect JSON')
+    expect(menuLabels().slice(-2)).toEqual(['Move to trash…', 'Inspect JSON'])
+    expect(menuLabels()).not.toContain('Tab only')
+    ;(await menuItem('Inspect JSON')).click()
+    expect(inspect).toHaveBeenCalledWith({
+      location: 'file.row', nodeId: '', ownerPluginId: 'editor', taskId, projectId: 'p1', path: 'Data.JSON',
+      title: 'Data.JSON', directory: false, readOnly: false, extension: 'json',
+    })
+    expect(onOpen).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
+  })
+
+  it('names a folder as a directory, so a file-only row stays off it', async () => {
+    listing.mockImplementation(async (_task, path) => path === '' ? [file('fixtures.json', true)] : [])
+    armed()
+    registered.push(registerContextMenuItems([
+      { id: 'inspect', location: 'file.row', label: 'Inspect JSON', order: 0, when: (target) => target.extension === 'json' && !target.directory, run: () => {} },
+      { id: 'folder', location: 'file.row', label: 'Folder action', order: 0, when: (target) => target.directory, run: () => {} },
+    ]))
+    mount()
+    rightClick(await rowFor('fixtures.json'))
+    await menuItem('Folder action')
+    expect(menuLabels()).not.toContain('Inspect JSON')
+  })
+
+  it('keeps the captured entry when a refresh moves rows under the open menu', async () => {
+    let names = ['data.json']
+    listing.mockImplementation(async (_task, path) => path === '' ? names.map((name) => file(name)) : [])
+    armed()
+    const inspect = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'inspect', location: 'file.row', label: 'Inspect', order: 0, run: inspect }]))
+    mount()
+    rightClick(await rowFor('data.json'))
+    await menuItem('Inspect')
+    // A new first row: the virtual slot that drew data.json now draws another entry.
+    names = ['a-new.json', 'data.json']
+    window.dispatchEvent(new Event('focus'))
+    await rowFor('a-new.json')
+    ;(await menuItem('Inspect')).click()
+    expect(inspect).toHaveBeenCalledOnce()
+    expect(inspect.mock.calls[0][0]).toMatchObject({ path: 'data.json' })
+  })
+
+  it('closes with an entry a refresh removed, and runs nothing on it', async () => {
+    // The desktop menu belongs to its row, so it goes with the row. The terminal's menu doesn't, which
+    // is what the tree's own visible-entry check before a contributed row runs is for.
+    let names = ['data.json', 'other.json']
+    listing.mockImplementation(async (_task, path) => path === '' ? names.map((name) => file(name)) : [])
+    armed()
+    const inspect = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'inspect', location: 'file.row', label: 'Inspect', order: 0, run: inspect }]))
+    mount()
+    rightClick(await rowFor('data.json'))
+    const row = await menuItem('Inspect')
+    names = ['other.json']
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.querySelector('[title="data.json"]')).toBeNull())
+    expect(row.isConnected).toBe(false)
+    expect(menuLabels()).not.toContain('Inspect')
+  })
+
+  it('runs nothing once the tree’s Node is no longer the one in view', async () => {
+    listing.mockImplementation(async (_task, path) => path === '' ? [file('data.json')] : [])
+    armed()
+    const inspect = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'inspect', location: 'file.row', label: 'Inspect', order: 0, run: inspect }]))
+    mount()
+    rightClick(await rowFor('data.json'))
+    const row = await menuItem('Inspect')
+    setActiveNode('another-node')
+    try {
+      row.click()
+      expect(inspect).not.toHaveBeenCalled()
+    } finally { setActiveNode(null) }
+    expect(inspect).not.toHaveBeenCalled()
+  })
 })

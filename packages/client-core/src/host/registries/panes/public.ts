@@ -4,10 +4,10 @@ export {
   splitRefTokens,
 } from './contentLinks.ts'
 export type { ContentLinkContribution, InAppTarget } from './contentLinks.ts'
-export { contextMenuItems, contextMenuRegistry, registerContextMenuItems, runContextMenuItem } from './contextMenus.ts'
+export { contextMenuItems, contextMenuRegistry, fileMenuTarget, registerContextMenuItems, runContextMenuItem } from './contextMenus.ts'
 export type {
-  ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, ItemRowTarget,
-  RailPaneTarget, RailSourceTarget, TaskRowTarget,
+  ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, DocumentTabTarget, FileMenuTarget, FileRowTarget,
+  ItemRowTarget, RailPaneTarget, RailSourceTarget, TaskRowTarget,
 } from './contextMenus.ts'
 export { paneModel } from './paneModels.ts'
 export { decodeProjectSurfaceItem, projectSurfaceRegistry, projectSurfaceRoutes } from './projectSurfaces.ts'

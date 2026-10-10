@@ -3,7 +3,7 @@
 //
 // This module holds no JSX import (docs/frontend/registries.md § Registries and plugins): the host that draws
 // these rows lives in `./contextMenuHost.tsx`, a `<For>` over `contextMenuItems()`.
-import { matchesWhen, type ContextMenuLocation } from '@acorn/protocol/contextMenus.ts'
+import { fileExtensionFact, matchesWhen, type ContextMenuLocation } from '@acorn/protocol/contextMenus.ts'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 import { sourceRegistry } from '../sources/sources'
@@ -70,7 +70,39 @@ export type RailPaneTarget = {
   shown: boolean
 }
 
-export type ContextMenuTarget = TaskRowTarget | ItemRowTarget | RailSourceTarget | RailPaneTarget
+/**
+ * A file or folder, from the plugin that draws it: a row in Editor's tree (`file.row`) or an open
+ * document's tab (`document.tab`). Any plugin may add a row here, so the owner and the bound Node and
+ * task travel with the target and the host rechecks them before a contributed action runs.
+ *
+ * `path` is the owner's own confined worktree-relative path, case kept, never a basename matched back
+ * to a file. `title` is what the owner shows. `revision` is the disk version the owner last saw, when
+ * it has one. None of the three is a fact.
+ */
+export type FileMenuTarget<L extends 'file.row' | 'document.tab' = 'file.row' | 'document.tab'> = {
+  location: L
+  nodeId: string
+  ownerPluginId: string
+  taskId: string
+  projectId: string
+  path: string
+  title: string
+  directory: boolean
+  readOnly: boolean
+  /** Derived from `path`, so a manifest can match a file kind. Built by `fileMenuTarget`. */
+  extension: string
+  revision?: string
+}
+export type FileRowTarget = FileMenuTarget<'file.row'>
+export type DocumentTabTarget = FileMenuTarget<'document.tab'>
+
+/** A file target with its `extension` fact derived from the path, so no owner computes it its own way. */
+export const fileMenuTarget = <L extends 'file.row' | 'document.tab'>(
+  location: L,
+  fields: Omit<FileMenuTarget<L>, 'location' | 'extension'>,
+): FileMenuTarget<L> => ({ location, ...fields, extension: fileExtensionFact(fields.path, fields.directory) })
+
+export type ContextMenuTarget = TaskRowTarget | ItemRowTarget | RailSourceTarget | RailPaneTarget | FileRowTarget | DocumentTabTarget
 
 /** The target one location hands its rows. */
 export type TargetAt<L extends ContextMenuLocation> = Extract<ContextMenuTarget, { location: L }>
@@ -138,7 +170,7 @@ export function runContextMenuItem<L extends ContextMenuLocation>(
     if (!ownsRailTarget(item as unknown as ContextMenuContribution, target)) return
     item.run(target)
   } catch (error) {
-    log.warn(`'${item.id}' failed on ${target.location} '${target.id}'`, error, { 'menu.item': item.id })
+    log.warn(`'${item.id}' failed on ${target.location} '${'path' in target ? target.path : target.id}'`, error, { 'menu.item': item.id })
   }
 }
 

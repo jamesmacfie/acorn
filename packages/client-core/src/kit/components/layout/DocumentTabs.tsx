@@ -1,4 +1,4 @@
-import { createEffect, For, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, Show, type JSX } from 'solid-js'
 import { IconButton } from '../inputs/IconButton'
 import { StatusDot } from '../content/StatusDot'
 import { revealActiveTab, trackTabOverflow } from './tabScroll'
@@ -33,7 +33,8 @@ export function DocumentTabs(props: {
   onClose?: (id: string) => void
   /** Double-click. The editor idiom: it promotes an ephemeral preview tab to a kept one. */
   onPromote?: (id: string) => void
-  /** Optional caller-owned actions for one tab; the kit does not interpret the id. */
+  /** Optional caller-owned actions for one tab; the kit does not interpret the id. The tab's own
+   *  button opens the same menu on right-click, Shift+F10 and the menu key, without activating it. */
   menu?: (id: string, control?: { open: () => boolean; onOpenChange: (open: boolean) => void }) => JSX.Element
   /** Right-pinned slot, after the strip. */
   actions?: JSX.Element
@@ -55,6 +56,22 @@ export function DocumentTabs(props: {
     props.onActivate(next.id)
     document.getElementById(`${props.idPrefix}-tab-${next.id}`)?.focus()
   }
+
+  // One open tab menu per strip. When the tab itself opened it, focus goes back to that tab on close,
+  // if the tab is still there; the menu's own dismissal would focus its ⋯ button instead.
+  const [menuTab, setMenuTab] = createSignal<string | null>(null)
+  let openedByTab: string | null = null
+  const openFromTab = (id: string) => { openedByTab = id; setMenuTab(id) }
+  const menuControl = (id: string) => ({
+    open: () => menuTab() === id,
+    onOpenChange: (open: boolean) => {
+      if (open) { setMenuTab(id); return }
+      if (menuTab() === id) setMenuTab(null)
+      if (openedByTab !== id) return
+      openedByTab = null
+      queueMicrotask(() => document.getElementById(`${props.idPrefix}-tab-${id}`)?.focus())
+    },
+  })
 
   return (
     <div class="ui-doctabs" data-level={props.level}>
@@ -88,6 +105,16 @@ export function DocumentTabs(props: {
               title={tab.title ? undefined : tab.label}
               data-tip={tab.title}
               onClick={() => props.onActivate(tab.id)}
+              // A right press would focus the tab and blur the document under it before the menu
+              // could hold its writes, so it doesn't move focus at all.
+              onMouseDown={(event) => { if (event.button === 2 && props.menu) event.preventDefault() }}
+              onContextMenu={props.menu ? (event) => { event.preventDefault(); openFromTab(tab.id) } : undefined}
+              onKeyDown={(event) => {
+                if (!props.menu || event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
+                event.preventDefault()
+                event.stopPropagation()
+                openFromTab(tab.id)
+              }}
               onDblClick={() => props.onPromote?.(tab.id)}
               // Middle-click closes, which is the convention every editor has and none of these had.
               onAuxClick={(event) => {
@@ -114,7 +141,7 @@ export function DocumentTabs(props: {
                 onPress={() => props.onClose?.(tab.id)}
               />
             </Show>
-            <Show when={props.menu}>{props.menu?.(tab.id)}</Show>
+            <Show when={props.menu}>{props.menu?.(tab.id, menuControl(tab.id))}</Show>
           </div>
         )}</For>
       </div>

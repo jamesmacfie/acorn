@@ -30,6 +30,9 @@ export type ChromeActionContext = {
   rail?:
     | { location: 'rail.source'; sourceId: string; projectId: string }
     | { location: 'rail.pane'; paneId: string; taskId: string; projectId: string }
+  /** Host-derived identity for a file row or document tab menu. The path is the owner's confined
+   *  worktree-relative one; no absolute path and no file bytes ever travel here. */
+  resource?: { kind: 'file'; taskId: string; projectId: string; path: string; directory: boolean; readOnly: boolean; revision?: string }
   promote?: (item: PluginRailItem) => void
   // The task this click is about, when the click site knows one and it is not the task on screen. Only a
   // dashboard record supplies it today from its task link: a panel is drawn outside every
@@ -170,7 +173,8 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
           method: 'POST',
           nodeId: context.nodeId,
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
+          body: JSON.stringify(context.resource ? { resource: context.resource }
+            : context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
         })
         // Success is silent. The node's status ping is what tells the chrome to re-read. Only a failure
         // needs saying, because nothing else on screen would show it.

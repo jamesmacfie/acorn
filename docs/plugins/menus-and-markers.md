@@ -16,12 +16,16 @@ An entry is `{ id, location, surface?, label, icon?, order?, when?, action }`:
   in the tab rail. `item.row` is a row in an integration's list, such as a Rollbar error, a Linear
   issue, or a GitHub pull request. `rail.source` and `rail.pane` are the desktop's left source icons
   and right task pane icons. The two rail locations require `surface`, the exact id of a source or
-  task pane the declaring plugin owns. The Node and the client both check it.
+  task pane the declaring plugin owns. The Node and the client both check it. `file.row` is a file or
+  folder in Editor's tree and `document.tab` an open document's tab. Any plugin may add rows to both,
+  and neither takes a `surface`.
 - **`when`** is a map of literals that must all equal the target's own facts, not an expression.
   `task.row` supplies `origin`, `projectId`, and `pinned`. `item.row` supplies `providerId` and
   `projectId`. `rail.source` supplies `projectId`, and `rail.pane` supplies `projectId`, `shown`, and
-  `pinned`. Naming any other fact is a parse error. Identity fields such as `id` and `title` aren't
-  facts.
+  `pinned`. `file.row` and `document.tab` supply `projectId`, `extension`, `directory`, and
+  `readOnly`. `extension` is lowercase without the dot, and `""` for a folder, a dotfile, or a name
+  with none. `readOnly` means Editor shows the file as an image. Naming any other fact is a parse
+  error. Identity fields such as `id`, `title`, `path`, and `revision` aren't facts.
 - **`action`** takes the narrow verb set a command takes. `createTask` and `navigate` aren't in it,
   because the thing under the cursor is a core resource.
 
@@ -47,9 +51,18 @@ a red row claims that an action destroys a core resource, and only core makes th
 
 For `runNodeAction` on a rail icon, the host sends `{ rail: { location, sourceId, projectId } }` or
 `{ rail: { location, paneId, taskId, projectId } }`. A source icon supplies no task. Row menus keep the
-`{ item: id }` body. Disposal and target, Node, and availability checks stop an open menu from
+`{ item: id }` body. A file row or tab sends `{ resource: { kind: 'file', taskId, projectId, path,
+directory, readOnly, revision? } }`. `path` is Editor's confined worktree-relative path, case kept, and
+`revision` is the SHA-256 of the disk version an open document last saw. No absolute path or file bytes
+travel: a route that needs the file declares and calls Editor's `editor.files` capability. Before the
+verb runs, the owner checks the menu's file is still the one it opened on, and the host checks its
+Node is the one in view and its task is still on that Node in the same project. Disposal and target, Node, and availability checks stop an open menu from
 invoking a replacement plugin after a reload. A manifest may declare at most 32 rows, because a
 plugin may own more than eight source and pane icons. Rail menus are desktop-only.
+
+A document owner opts in by building its target with `fileMenuTarget` and drawing
+`contextMenuItems(target.location, target)` after its own rows. Editor's adapter is
+`plugins/editor/src/client/contributedMenuRows.tsx`.
 
 Compiled plugins register rail rows through `ctx.contextMenus.register` after their source or pane,
 and the host stamps the owner. A replacement `rail` or `pane.switcher` provider may call the optional

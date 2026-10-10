@@ -47,7 +47,10 @@ client: DataSourceResult
 client: DataSourceScope
 client: DataType
 client: DataValue
+client: DocumentTabTarget
 client: FAILED_STATUSES
+client: FileMenuTarget
+client: FileRowTarget
 client: HostCapabilityRequirement
 client: HostRequirement
 client: InAppTarget
@@ -188,6 +191,7 @@ client: dispatchLayout
 client: effectiveModelPick
 client: elementRectKey
 client: featureUsable
+client: fileMenuTarget
 client: fileStatusMeta
 client: focusSession
 client: focusedPane

@@ -14,6 +14,8 @@ const { contextMenuItems, contextMenuRegistry } = await import('../registries/pa
 const { sourceRegistry } = await import('../registries/sources/sources')
 const { paneRegistry } = await import('../registries/panes/panes')
 const { pluginContextMenuId, pluginContextMenuItem, registerPluginContextMenu } = await import('./chromeContextMenus')
+const { fileMenuTarget } = await import('../registries/panes/contextMenus')
+const { setTaskLookup } = await import('../../features/tasks/taskLookup')
 
 // A plugin's menu row: what the host refuses, and what it binds over whatever the manifest said. The
 // node checked all of this at parse time; a roster row is bytes a node sent, so it is checked again.
@@ -55,8 +57,8 @@ describe('what the host refuses', () => {
     // The version-skew case, and the reason `location` is a plain string on the wire: a newer node can
     // describe a location this client cannot draw, and the answer is a named refusal rather than a row
     // registered against nothing.
-    expect(() => pluginContextMenuItem('board', descriptor({ location: 'file.row' }), binding()))
-      .toThrow(/unknown location 'file.row'/)
+    expect(() => pluginContextMenuItem('board', descriptor({ location: 'agent.message' }), binding()))
+      .toThrow(/unknown location 'agent.message'/)
     expect(() => pluginContextMenuItem('board', descriptor({ location: '' }), binding())).toThrow(/unknown location/)
   })
 
@@ -148,6 +150,68 @@ describe('rail menu ownership and execution', () => {
     expect(contextMenuItems('rail.source', sourceTarget)).toEqual([])
     const entry = contextMenuRegistry.get('plugin:board:open-card')!
     entry.run({ ...sourceTarget, nodeId: 'other-node' })
+    expect(sendRaw).not.toHaveBeenCalled()
+  })
+})
+
+describe('file and document menus', () => {
+  const inspect = descriptor({ id: 'inspect', location: 'file.row', when: { extension: 'json', directory: false }, action: { verb: 'runNodeAction', path: '/v1/p/inspector/inspect' } })
+  const fileTarget = (over: Partial<Parameters<typeof fileMenuTarget>[1]> = {}) => fileMenuTarget('file.row', {
+    nodeId: 'node-a', ownerPluginId: 'editor', taskId: 'task-1', projectId: 'project-1',
+    path: 'src/Data.json', title: 'Data.json', directory: false, readOnly: false, ...over,
+  })
+  afterEach(() => setTaskLookup(() => undefined))
+  const tasks = (rows: { id: string; projectId: string }[]) =>
+    setTaskLookup((id) => rows.find((row) => row.id === id) as never)
+
+  it('sends the confined resource and nothing else, through the contributor’s own route', async () => {
+    tasks([{ id: 'task-1', projectId: 'project-1' }])
+    disposables.push(registerPluginContextMenu('inspector', inspect, binding()))
+    const entry = contextMenuItems('file.row', fileTarget())[0]!
+    entry.run(fileTarget({ revision: 'sha-1' }))
+    await Promise.resolve()
+    expect(sendRaw).toHaveBeenCalledWith('/v1/p/inspector/inspect', expect.objectContaining({ method: 'POST', nodeId: 'node-a' }))
+    // No absolute path, no title, no owner, no bytes: the route reads through a capability if it
+    // needs the file.
+    expect(JSON.parse((sendRaw.mock.calls[0]![1] as { body: string }).body)).toEqual({
+      resource: { kind: 'file', taskId: 'task-1', projectId: 'project-1', path: 'src/Data.json', directory: false, readOnly: false, revision: 'sha-1' },
+    })
+  })
+
+  it('matches on the file facts, and accepts a row from any plugin with no surface', () => {
+    disposables.push(registerPluginContextMenu('inspector', inspect, binding()))
+    expect(contextMenuItems('file.row', fileTarget()).map((entry) => entry.id)).toEqual(['plugin:inspector:inspect'])
+    expect(contextMenuItems('file.row', fileTarget({ path: 'src/data.ts' }))).toEqual([])
+    expect(contextMenuItems('file.row', fileTarget({ path: 'fixtures.json', directory: true }))).toEqual([])
+    // Each location keeps its own rows.
+    expect(contextMenuItems('document.tab', { ...fileTarget(), location: 'document.tab' })).toEqual([])
+    expect(() => pluginContextMenuItem('inspector', { ...inspect, surface: 'files' }, binding())).toThrow(/gives a surface/)
+    expect(() => pluginContextMenuItem('inspector', { ...inspect, when: { path: 'a.json' } }, binding())).toThrow(/does not have: path/)
+  })
+
+  it('refuses a changed Node, a task no longer in its project, and an unloaded contributor', () => {
+    tasks([{ id: 'task-1', projectId: 'project-1' }])
+    let enabled = true
+    const handle = registerPluginContextMenu('inspector', inspect, binding({ enabled: () => enabled }))
+    const entry = contextMenuItems('file.row', fileTarget())[0]!
+    entry.run(fileTarget({ nodeId: 'node-b' }))
+    entry.run(fileTarget({ taskId: 'task-gone' }))
+    entry.run(fileTarget({ projectId: 'project-2' }))
+    enabled = false
+    entry.run(fileTarget())
+    enabled = true
+    handle.dispose()
+    entry.run(fileTarget())
+    expect(sendRaw).not.toHaveBeenCalled()
+  })
+
+  it('never runs a captured row after its registration was replaced', () => {
+    tasks([{ id: 'task-1', projectId: 'project-1' }])
+    const first = registerPluginContextMenu('inspector', inspect, binding())
+    const captured = contextMenuItems('file.row', fileTarget())[0]!
+    first.dispose()
+    disposables.push(registerPluginContextMenu('inspector', inspect, binding()))
+    captured.run(fileTarget())
     expect(sendRaw).not.toHaveBeenCalled()
   })
 })

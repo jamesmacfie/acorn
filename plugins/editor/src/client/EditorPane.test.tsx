@@ -7,6 +7,7 @@ import { EditorSelection } from '@codemirror/state'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
+import { registerContextMenuItems } from '@acorn/plugin-api/client'
 import { commandRegistry, extensionPointRegistry, extensionRegistry, setActiveNode, setActiveTaskId, setFocusedPane, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
 import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
 
@@ -89,7 +90,7 @@ const { editorViewState } = await import('./editorViewState')
 // mount on purpose, so two tests sharing a task id would share the first one's open documents.
 let tasks = 0
 let taskId = 't0'
-const task = (): Task => ({ id: taskId }) as unknown as Task
+const task = (): Task => ({ id: taskId, projectId: 'p1' }) as unknown as Task
 
 const cleanups: (() => void)[] = []
 let queryClient = new QueryClient()
@@ -366,6 +367,72 @@ describe('the editor pane', () => {
     close.click()
     await vi.waitFor(() => expect(openFiles(taskId)).toHaveLength(0))
     expect(disk.get('a.ts')).toContain('// menu draft')
+  })
+
+  describe('other plugins’ tab actions', () => {
+    const registered: { dispose(): void }[] = []
+    afterEach(() => registered.splice(0).forEach((handle) => handle.dispose()))
+    const menuItem = (label: string) => vi.waitFor(() => {
+      const element = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === label)
+      if (!element) throw new Error(`${label} not in the menu`)
+      return element
+    })
+
+    it('targets an inactive dirty tab without activating, saving, or changing it', async () => {
+      const inspect = vi.fn()
+      registered.push(registerContextMenuItems([
+        { id: 'inspect', location: 'document.tab', label: 'Inspect', order: 0, run: inspect },
+        { id: 'rows-only', location: 'file.row', label: 'Row only', order: 0, run: () => {} },
+      ]))
+      const { host } = mount()
+      const view = await editor(host)
+      editorOpen(taskId, 'a.ts', false)
+      await showing(() => view, 'const a = 1')
+      // A failed save keeps a.ts dirty while another tab is in front.
+      write.mockRejectedValue(new Error('formatter veto'))
+      view.dispatch({ changes: { from: 0, insert: '// draft\n' } })
+      editorOpen(taskId, 'b.ts', false)
+      await showing(() => view, 'const b = 2')
+      await vi.waitFor(() => expect(openFiles(taskId).find((file) => file.path === 'a.ts')?.dirty).toBe(true))
+      const writes = write.mock.calls.length
+      // Right-click, on the tab itself, not its ⋯ button.
+      document.getElementById('editor-tab-a.ts')!.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))
+      const row = await menuItem('Inspect')
+      expect([...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)).not.toContain('Row only')
+      // Opening the menu holds the document's writes; it doesn't save it.
+      expect(write.mock.calls.length).toBe(writes)
+      row.click()
+      expect(inspect).toHaveBeenCalledOnce()
+      expect(inspect.mock.calls[0][0]).toEqual({
+        location: 'document.tab', nodeId: '', ownerPluginId: 'editor', taskId, projectId: 'p1', path: 'a.ts', title: 'a.ts',
+        directory: false, readOnly: false, extension: 'ts',
+        revision: createHash('sha256').update('const a = 1\n').digest('hex'),
+      })
+      expect(activeFile(taskId)).toBe('b.ts')
+      expect(view.state.doc.toString()).toBe('const b = 2\n')
+      expect(openFiles(taskId).find((file) => file.path === 'a.ts')?.dirty).toBe(true)
+      expect(view.state.doc.toString()).not.toContain('// draft')
+    })
+
+    it('closes with its tab, and runs nothing for a pane whose Node is no longer the one in view', async () => {
+      const inspect = vi.fn()
+      registered.push(registerContextMenuItems([{ id: 'inspect', location: 'document.tab', label: 'Inspect', order: 0, run: inspect }]))
+      const { host } = mount()
+      const view = await editor(host)
+      editorOpen(taskId, 'a.ts', false)
+      editorOpen(taskId, 'b.ts', false)
+      await showing(() => view, 'const b = 2')
+      host.querySelector<HTMLButtonElement>('[aria-label="Actions for a.ts"]')!.click()
+      const row = await menuItem('Inspect')
+      editorClose(taskId, 'a.ts')
+      await vi.waitFor(() => expect(row.isConnected).toBe(false))
+
+      host.querySelector<HTMLButtonElement>('[aria-label="Actions for b.ts"]')!.click()
+      const live = await menuItem('Inspect')
+      setActiveNode('another-node')
+      live.click()
+      expect(inspect).not.toHaveBeenCalled()
+    })
   })
 
   it('keeps a later edit and its tab when close waits on an earlier revision', async () => {

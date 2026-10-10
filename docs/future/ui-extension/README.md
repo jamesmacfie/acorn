@@ -31,7 +31,7 @@ features. Implementation checkpoints are not separate public releases; phase 14 
 | 01 | [Add URL and reference previews](./01-link-previews.md) | Done |
 | 02 | [Add transcript media viewers](./02-transcript-media.md) | Done |
 | 03 | [Add workflow step renderers](./03-workflow-step-ui.md) | Done |
-| 04 | [Add file and document actions](./04-resource-actions.md) | Planned |
+| 04 | [Add file and document actions](./04-resource-actions.md) | Done |
 | 05 | [Add message and turn actions](./05-message-actions.md) | Planned |
 | 06 | [Add resource detail regions](./06-detail-regions.md) | Planned |
 | 07 | [Add file annotations](./07-file-annotations.md) | Planned |

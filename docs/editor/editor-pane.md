@@ -47,11 +47,11 @@ Tabs decide what's kept. Replacing a clean preview tab releases its text, saved 
 Promoted and dirty tabs keep their state when the pane is toggled on the same task. Archiving a scope
 evicts view state only for its own Node, so equal IDs on two Nodes keep separate positions.
 
-Duplicate basenames gain the shortest parent suffix that distinguishes the open paths. Each desktop
-tab has its own menu, including inactive tabs. In the terminal strip, arrows move a separate tab
-caret without activating it, and Shift+F10 opens that caret tab's menu below the strip. A normal
-terminal click activates the file; the adjacent `⋯` targets its menu without activation. The menu
-scrolls its focused action when the narrow detail column cannot show every item. Its write hold
+Duplicate basenames gain the shortest parent suffix; each tab has its own menu, inactive ones too.
+On the desktop, `⋯`, right-click, and Shift+F10 on the tab open it without activating the tab. In the
+terminal strip, arrows move a caret without activating, and Shift+F10 or the adjacent `⋯` opens the
+caret tab's menu below the strip. The menu scrolls when the column cannot show every item, and other
+plugins' [file actions](../plugins/menus-and-markers.md#context-menus) follow Editor's. Its write hold
 starts before focus leaves the document and ends before a selected guarded close begins.
 Close others, to the right, and all capture their ordered targets and ask the pane's guarded close
 for each one. A save failure, conflict, or intervening edit stops the run and reports how many closed.
@@ -122,8 +122,8 @@ focus refresh loaded directories, parents first. The worktree event carries no p
 directory refreshes, including collapsed ones, and unopened directories stay unloaded. A failed
 refresh keeps the last listing and shows **Retry**.
 
-The tree's ellipsis, right-click, and focused-row menu show file actions without opening a preview or
-saving a draft. F2 renames the focused row. On the terminal, Shift+F10 opens its menu and Ctrl+N
+The tree's ellipsis, right-click, and focused-row menu show file actions, other plugins' included,
+without opening a preview or saving a draft. F2 renames the focused row. On the terminal, Shift+F10 opens its menu and Ctrl+N
 opens the worktree root's New menu from a focused row. The terminal stacks a 12-line file list above
 the document at narrow widths and uses a name dialog; the desktop keeps name entry in an available
 row. Root creation has an optional relative destination folder, so it can create beside an open

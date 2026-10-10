@@ -31,6 +31,7 @@ import { EDITOR_ACTIONS, actionAvailable, runEditorAction } from './editorAction
 import { forgetPresentation, inferIndentation, languageName, presentationFor, saveLabel, setPresentation, type Indentation } from './editorPresentation'
 import { readEditorIndentation, readEditorWordWrap } from './editorPrefs'
 import { admitGraphicalEditor } from './editorAdmission'
+import { ContributedMenuRows, editorMenuTarget } from './contributedMenuRows'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -1059,6 +1060,9 @@ export default function EditorPane(props: { task: Task }) {
       <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => copyTabPath(path, false))}>Copy relative path</Menu.Item>
       <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => copyTabPath(path, true))}>Copy absolute path</Menu.Item>
       <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => revealTab(path))}>Reveal in file tree</Menu.Item>
+      <ContributedMenuRows context={menu} guard={(run) => withTabTarget(path, run)}
+        target={editorMenuTarget('document.tab', { nodeId, taskId, projectId: props.task.projectId, path, directory: false,
+          revision: pool.files.get(path)?.custody.savedRevision })} />
     </>}</Menu>
   }
   const menuHolds = new Map<string, { owner: object; target: { identity: object | undefined }; release: () => void }>()
@@ -1208,6 +1212,7 @@ export default function EditorPane(props: { task: Task }) {
               <TabPanel idPrefix="editor-side" id="files" active={side()}>
                 <FileTree
                   taskId={taskId}
+                  projectId={props.task.projectId}
                   taskTitle={props.task.title}
                   fileStatus={fileStatus.projection}
                   statusStale={fileStatus.stale}

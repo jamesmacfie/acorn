@@ -14,6 +14,7 @@ import type { Disposable } from '../../kit/lib/state/registry'
 import { runChromeAction } from './actions'
 import { sourceRegistry } from '../registries/sources/sources'
 import { paneRegistry } from '../registries/panes/panes'
+import { taskById } from '../../features/tasks/taskLookup'
 
 /** `plugin:<pluginId>:<id>`. No core contribution id contains a colon, so a plugin row can never
  *  take the place of one. */
@@ -71,7 +72,7 @@ export function pluginContextMenuItem(
     ...(descriptor.icon ? { icon: descriptor.icon } : {}),
     order: descriptor.order,
     when: (target) => binding.enabled() && (!isRailMenuLocation(location) ||
-      (target.id === descriptor.surface && target.location === location &&
+      ((target.location === 'rail.source' || target.location === 'rail.pane') && target.id === descriptor.surface && target.location === location &&
         (location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)) === pluginId)) && matches(target),
     // The action was already checked against this manifest's declared surfaces by the chrome pass, the
     // same check a command's gets. What is added here is the item, minted from the target the host
@@ -82,6 +83,24 @@ export function pluginContextMenuItem(
         if (target.location !== location || target.id !== descriptor.surface || target.nodeId !== binding.nodeId()) return
         const owner = location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)
         if (owner !== pluginId) return
+      }
+      if (target.location === 'file.row' || target.location === 'document.tab') {
+        // The owner checked that the file is still the one the menu opened on. What is checked here is
+        // the binding: the menu's Node is still the one being looked at, and its task is still on it
+        // in the same project. A path alone never reaches another task's worktree.
+        if (target.location !== location || target.nodeId !== binding.nodeId()) return
+        if (taskById(target.taskId)?.projectId !== target.projectId) return
+        void runChromeAction(descriptor.action, {
+          pluginId,
+          nodeId: binding.nodeId(),
+          taskId: target.taskId,
+          resource: {
+            kind: 'file', taskId: target.taskId, projectId: target.projectId, path: target.path,
+            directory: target.directory, readOnly: target.readOnly,
+            ...(target.revision === undefined ? {} : { revision: target.revision }),
+          },
+        })
+        return
       }
       void runChromeAction(descriptor.action, {
       pluginId,

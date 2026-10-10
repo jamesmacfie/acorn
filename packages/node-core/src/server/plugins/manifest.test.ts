@@ -1436,7 +1436,7 @@ describe('context menus', () => {
   })
 
   it('refuses a location the host does not draw', () => {
-    for (const location of ['file.row', 'task.footer', 'TASK.ROW', '']) {
+    for (const location of ['agent.message', 'task.footer', 'TASK.ROW', '']) {
       expect(manifest({ contextMenus: [menu({ location })] }).success, location).toBe(false)
     }
   })
@@ -1480,6 +1480,22 @@ describe('context menus', () => {
     }
     expect(messages(manifest({ ...contributions, contextMenus: [menu({ surface: 'feed' })] })))
       .toContain('task.row does not accept a surface')
+  })
+
+  it('takes file and document actions from any plugin, matched on file facts only', () => {
+    const inspect = menu({ id: 'inspect-file', location: 'file.row', label: 'Inspect JSON', when: { extension: 'json', directory: false },
+      action: { verb: 'runNodeAction', path: '/v1/p/board/inspect' } })
+    expect(manifest({ contextMenus: [inspect, { ...inspect, id: 'inspect-tab', location: 'document.tab', when: { readOnly: false, projectId: 'p1' } }] }).success).toBe(true)
+    // A file belongs to the plugin that draws it, so there is no owned surface to name.
+    expect(messages(manifest({ contextMenus: [{ ...inspect, surface: 'files' }] }))).toContain('file.row does not accept a surface')
+    // The path and revision are what the action receives, not something to match on.
+    expect(messages(manifest({ contextMenus: [{ ...inspect, when: { path: 'package.json' } }] })))
+      .toContain("'file.row' has no fact named 'path'")
+    expect(messages(manifest({ contextMenus: [{ ...inspect, location: 'document.tab', when: { revision: 'abc' } }] })))
+      .toContain("'document.tab' has no fact named 'revision'")
+    // The route is still confined to the declaring plugin's own namespace.
+    expect(messages(manifest({ contextMenus: [{ ...inspect, action: { verb: 'runNodeAction', path: '/v1/p/editor/tasks' } }] })))
+      .toContain('route must be inside /v1/p/board/')
   })
 })
 

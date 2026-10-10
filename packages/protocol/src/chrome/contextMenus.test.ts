@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   CONTEXT_MENU_FACTS,
   CONTEXT_MENU_LOCATIONS,
+  fileExtensionFact,
   isContextMenuLocation,
+  isRailMenuLocation,
   matchesWhen,
   unknownWhenFacts,
 } from './contextMenus.ts'
@@ -24,7 +26,9 @@ describe('the location vocabulary', () => {
 
   it('recognises only the locations it declares', () => {
     expect(isContextMenuLocation('task.row')).toBe(true)
-    for (const value of ['file.row', 'task.row ', 'TASK.ROW', '', null, undefined, 42, {}]) {
+    expect(isContextMenuLocation('file.row')).toBe(true)
+    expect(isContextMenuLocation('document.tab')).toBe(true)
+    for (const value of ['agent.message', 'task.row ', 'TASK.ROW', '', null, undefined, 42, {}]) {
       expect(isContextMenuLocation(value), String(value)).toBe(false)
     }
   })
@@ -35,6 +39,35 @@ describe('the location vocabulary', () => {
     for (const fact of ['id', 'title', 'location']) {
       expect(CONTEXT_MENU_FACTS['task.row'], fact).not.toContain(fact)
     }
+    // A file's identity is its path, and its revision changes on every save. Neither is something a
+    // manifest should match, and neither are the bound Node and task.
+    for (const location of ['file.row', 'document.tab'] as const) {
+      for (const fact of ['path', 'title', 'revision', 'nodeId', 'taskId', 'ownerPluginId']) {
+        expect(CONTEXT_MENU_FACTS[location], `${location} ${fact}`).not.toContain(fact)
+      }
+    }
+  })
+
+  it('keeps the file locations off the rail ownership rule', () => {
+    // A file action may come from any plugin, like an `item.row` one, so it names no owned surface.
+    expect(isRailMenuLocation('file.row')).toBe(false)
+    expect(isRailMenuLocation('document.tab')).toBe(false)
+    expect(isRailMenuLocation('rail.source')).toBe(true)
+    expect(isRailMenuLocation('rail.pane')).toBe(true)
+  })
+})
+
+describe('fileExtensionFact', () => {
+  it('is the lowercased text after the last dot of the basename', () => {
+    expect(fileExtensionFact('src/data.JSON', false)).toBe('json')
+    expect(fileExtensionFact('archive.tar.gz', false)).toBe('gz')
+    expect(fileExtensionFact('a.b/readme', false)).toBe('')
+  })
+
+  it('is empty for a folder, a dotfile, and a name with no dot', () => {
+    expect(fileExtensionFact('fixtures.json', true)).toBe('')
+    expect(fileExtensionFact('.gitignore', false)).toBe('')
+    expect(fileExtensionFact('Makefile', false)).toBe('')
   })
 })
 
@@ -45,6 +78,8 @@ describe('unknownWhenFacts', () => {
     // Reported rather than ignored: a predicate naming a fact the host never supplies can never match,
     // so the contribution would install and silently do nothing.
     expect(unknownWhenFacts('task.row', { branch: 'main', title: 'x' })).toEqual(['branch', 'title'])
+    expect(unknownWhenFacts('file.row', { extension: 'json', directory: false, readOnly: false, projectId: 'p1' })).toEqual([])
+    expect(unknownWhenFacts('document.tab', { path: 'a.json', revision: 'abc' })).toEqual(['path', 'revision'])
   })
 })
 

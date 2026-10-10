@@ -14,12 +14,14 @@ import { findInFolder, searchScopePathChanged } from './search/searchState'
 import { pathContains } from './editorState'
 import { readEditorShowIgnored, saveEditorShowIgnored } from './editorPrefs'
 import type { FileStatusProjection } from './fileStatusModel'
+import { ContributedMenuRows, editorMenuTarget } from './contributedMenuRows'
 
 const badgeTone = (tone: 'muted' | 'ok' | 'accent' | 'danger'): 'neutral' | 'ok' | 'accent' | 'danger' =>
   tone === 'muted' ? 'neutral' : tone
 
 export default function FileTree(props: {
   taskId: string
+  projectId: string
   taskTitle: string
   fileStatus: () => FileStatusProjection
   statusStale: () => boolean
@@ -269,8 +271,16 @@ export default function FileTree(props: {
         <Menu.Separator />
         <Menu.Item context={menu} tone="danger" disabled={!trashSupport().available} title={trashSupport().reason}
           onSelect={() => begin('trash')}>Move to trash…</Menu.Item>
+        <ContributedMenuRows context={menu} guard={(run) => runContributed(target, run)}
+          target={editorMenuTarget('file.row', { nodeId, taskId, projectId: props.projectId, path: target.path, directory: target.kind === 'folder' })} />
       </>}
     </>
+  }
+  // Another plugin's row runs only while the menu still holds the entry it opened on, and only while
+  // that entry is still a visible row: a trash, rename or refresh that removed it ends the action.
+  const runContributed = (target: FileTarget, run: () => void) => {
+    if (armed()?.target !== target || !items().some((item) => item.key === target.path) || !live(generation, taskId)) return
+    run()
   }
   const setOpen = (path: string, open: boolean) => {
     setEditorTreeDirectoryOpen(props.taskId, path, open, nodeId)

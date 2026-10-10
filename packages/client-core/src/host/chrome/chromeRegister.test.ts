@@ -301,7 +301,7 @@ describe('syncChromeContributions', () => {
       const bad: Partial<PluginContributions> = {
         ...CHROME,
         contextMenus: [
-          { id: 'from-the-future', location: 'file.row', label: 'Open', order: 500, action: { verb: 'runNodeAction', path: '/v1/p/board/open' } },
+          { id: 'from-the-future', location: 'agent.message', label: 'Open', order: 500, action: { verb: 'runNodeAction', path: '/v1/p/board/open' } },
           { id: 'bad-when', location: 'task.row', label: 'Open', order: 500, when: { branch: 'main' }, action: { verb: 'runNodeAction', path: '/v1/p/board/open' } },
         ],
       }

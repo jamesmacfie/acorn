@@ -2467,7 +2467,9 @@
                   "task.row",
                   "item.row",
                   "rail.source",
-                  "rail.pane"
+                  "rail.pane",
+                  "file.row",
+                  "document.tab"
                 ]
               },
               "surface": {
