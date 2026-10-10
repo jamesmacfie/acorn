@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
 // Type-only, so it is erased and does not evaluate the module before the mock below is installed.
-import type { AgentMessageTarget, AgentTurnTarget, TaskRowTarget } from '../registries/panes/contextMenus'
+import type { AgentMessageTarget, AgentTurnTarget, ContentSelectionTarget, TaskRowTarget } from '../registries/panes/contextMenus'
 
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
 vi.mock('../../infra/node/apiClient', () => ({
@@ -263,6 +263,56 @@ describe('agent message and turn menus', () => {
     handle.dispose()
     disposables.push(registerPluginContextMenu('notes', note, binding()))
     runContextMenuItem(entry, message())
+    expect(sendRaw).not.toHaveBeenCalled()
+  })
+})
+
+describe('selection menus', () => {
+  const explain = descriptor({ id: 'explain', location: 'content.selection', when: { contentKind: 'document' }, action: { verb: 'runNodeAction', path: '/v1/p/explain/run' } })
+  const selection = (over: Partial<ContentSelectionTarget> = {}): ContentSelectionTarget => ({
+    location: 'content.selection', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', ownerId: 'editor',
+    contentKind: 'document', languageId: 'typescript', readOnly: false, text: 'const a = 1', revision: 4,
+    resource: { kind: 'file', path: 'src/a.ts' }, range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } }, ...over,
+  })
+  beforeEach(() => setTaskLookup((id) => (id === 'task-1' ? { id, projectId: 'project-1' } : undefined) as never))
+  afterEach(() => setTaskLookup(() => undefined))
+  const bodies = () => sendRaw.mock.calls.map((call) => JSON.parse((call[1] as { body: string }).body))
+
+  it('sends the selected text with its owner, revision, resource and range, and nothing else', async () => {
+    disposables.push(registerPluginContextMenu('explain', explain, binding()))
+    contextMenuItems('content.selection', selection())[0]!.run(selection())
+    // A plugin's own document in a project has no task, and still reaches its route.
+    const { taskId: _taskId, resource: _resource, ...projectDocument } = selection({ ownerId: 'database' })
+    contextMenuItems('content.selection', projectDocument)[0]!.run(projectDocument)
+    await Promise.resolve()
+    expect(bodies()).toEqual([
+      { selection: { taskId: 'task-1', projectId: 'project-1', ownerId: 'editor', contentKind: 'document', languageId: 'typescript',
+        readOnly: false, text: 'const a = 1', revision: 4, resource: { kind: 'file', path: 'src/a.ts' },
+        range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } } } },
+      { selection: { projectId: 'project-1', ownerId: 'database', contentKind: 'document', languageId: 'typescript',
+        readOnly: false, text: 'const a = 1', revision: 4, range: { start: { line: 2, column: 1 }, end: { line: 2, column: 12 } } } },
+    ])
+  })
+
+  it('matches on the kind of content', () => {
+    disposables.push(registerPluginContextMenu('explain', explain, binding()))
+    expect(contextMenuItems('content.selection', selection())).toHaveLength(1)
+    expect(contextMenuItems('content.selection', selection({ contentKind: 'markdown' }))).toEqual([])
+  })
+
+  it('refuses a changed Node, a task gone or moved, an unloaded contributor, and a replaced registration', () => {
+    let enabled = true
+    const handle = registerPluginContextMenu('explain', explain, binding({ enabled: () => enabled }))
+    const entry = contextMenuItems('content.selection', selection())[0]!
+    entry.run(selection({ nodeId: 'node-b' }))
+    entry.run(selection({ taskId: 'task-gone' }))
+    entry.run(selection({ projectId: 'project-2' }))
+    enabled = false
+    entry.run(selection())
+    enabled = true
+    handle.dispose()
+    disposables.push(registerPluginContextMenu('explain', explain, binding()))
+    runContextMenuItem(entry, selection())
     expect(sendRaw).not.toHaveBeenCalled()
   })
 })

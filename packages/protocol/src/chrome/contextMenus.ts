@@ -2,7 +2,7 @@
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */
-export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane', 'file.row', 'document.tab', 'agent.message', 'agent.turn'] as const
+export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane', 'file.row', 'document.tab', 'agent.message', 'agent.turn', 'content.selection'] as const
 
 export type ContextMenuLocation = (typeof CONTEXT_MENU_LOCATIONS)[number]
 
@@ -36,7 +36,19 @@ export const CONTEXT_MENU_FACTS: Readonly<Record<ContextMenuLocation, readonly s
   // `assistant`; `status` is the turn's. The ids, the text and the revision are payload.
   'agent.message': ['projectId', 'role', 'status'],
   'agent.turn': ['projectId', 'status'],
+  // Text a person selected in host-drawn content and then asked for actions on. `contentKind` is
+  // `markdown` (rendered, so the text is plain), `code`, or `document` (an editor's live buffer).
+  // The text, its owner and its range are payload.
+  'content.selection': ['contentKind', 'languageId', 'readOnly'],
 }
+
+/** The kinds of content a `content.selection` target can come from. */
+export const SELECTION_CONTENT_KINDS = ['markdown', 'code', 'document'] as const
+export type SelectionContentKind = (typeof SELECTION_CONTENT_KINDS)[number]
+
+/** The most selected text an action is handed, in UTF-8 bytes. A larger selection is refused whole,
+ *  never cut. */
+export const MAX_SELECTION_BYTES = 64 * 1024
 
 /** The `extension` fact for a worktree-relative path: the lowercased text after the basename's last
  *  dot, or `''` for a folder, a name with no dot, and a dotfile such as `.gitignore`. */

@@ -33,6 +33,8 @@ vi.mock('../../infra/node/apiClient', () => ({
 
 const { default: DocumentSurface } = await import('./DocumentSurface')
 const { registerCommands } = await import('../../host/registries/commands/commands')
+const { registerContextMenuItems } = await import('../../host/registries/panes/contextMenus')
+const { setTaskLookup } = await import('../tasks/taskLookup')
 const { registerKeybindings } = await import('../../host/registries/commands/keybindings')
 
 const region = (extra?: Partial<PluginDocumentRegion>): PluginDocumentRegion => ({
@@ -78,6 +80,34 @@ const editor = async (host: HTMLElement): Promise<EditorView> =>
   })
 
 describe('the host-owned document surface', () => {
+  it('hands a selection action the selected text of the live buffer, and refuses it after an edit', async () => {
+    const explain = vi.fn()
+    const rows = registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run: explain }])
+    setTaskLookup((id) => ({ id, projectId: 'project-1' }) as never)
+    cleanups.push(() => { rows.dispose(); setTaskLookup(() => undefined) })
+    const host = mount(region(), undefined, 'task-1')
+    const view = await editor(host)
+    view.dispatch({ changes: { from: 0, insert: '-- unsaved\n' }, selection: { anchor: 11, head: 17 } })
+    const menuItem = () => vi.waitFor(() => {
+      const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((element) => element.textContent === 'Explain')
+      if (!item) throw new Error('no Explain row')
+      return item
+    })
+    const rightClick = () => view.contentDOM.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+    rightClick()
+    ;(await menuItem()).click()
+    expect(explain).toHaveBeenCalledWith({
+      location: 'content.selection', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', ownerId: 'database',
+      contentKind: 'document', languageId: 'sql', readOnly: false, text: 'select', revision: expect.any(Number),
+      range: { start: { line: 2, column: 1 }, end: { line: 2, column: 7 } },
+    })
+    rightClick()
+    const row = await menuItem()
+    view.dispatch({ changes: { from: 0, insert: '-- more\n' } })
+    row.click()
+    expect(explain).toHaveBeenCalledOnce()
+  })
+
   it('keeps both flushes pending and prevents a command from running after persistence fails', async () => {
     let handle: DocumentHandle | null = null
     const host = mount(region(), (value) => { handle = value })

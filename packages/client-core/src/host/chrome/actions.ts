@@ -11,7 +11,7 @@ import { taskById } from '../../features/tasks/taskLookup'
 import { activeTaskId, selectedSource } from '../../features/tasks/tasks'
 import { openPluginOverlay } from '../frames/overlays'
 import { ownsRoute } from './chromeData'
-import type { AgentMessageTarget, AgentTurnTarget } from '../registries/panes/contextMenus'
+import type { AgentMessageTarget, AgentTurnTarget, ContentSelectionTarget } from '../registries/panes/contextMenus'
 
 // The closed verb set the host executes on a descriptor's behalf. See docs/plugins.md.
 //
@@ -39,6 +39,9 @@ export type ChromeActionContext = {
   message?: Omit<AgentMessageTarget, 'location' | 'nodeId'>
   /** Host-derived identity for a finished agent turn. No text: each message offers its own on `agent.message`. */
   turn?: Omit<AgentTurnTarget, 'location' | 'nodeId'>
+  /** Text a person selected and asked for actions on, at most 64 KiB, with its owner's identity and
+   *  revision. Read-only: nothing here can replace the text or reach the rest of the document. */
+  selection?: Omit<ContentSelectionTarget, 'location' | 'nodeId'>
   promote?: (item: PluginRailItem) => void
   // The task this click is about, when the click site knows one and it is not the task on screen. Only a
   // dashboard record supplies it today from its task link: a panel is drawn outside every
@@ -182,7 +185,8 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
           body: JSON.stringify(context.resource ? { resource: context.resource }
             : context.message ? { message: context.message }
               : context.turn ? { turn: context.turn }
-                : context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
+                : context.selection ? { selection: context.selection }
+                  : context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
         })
         // Success is silent. The node's status ping is what tells the chrome to re-read. Only a failure
         // needs saying, because nothing else on screen would show it.

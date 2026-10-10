@@ -3,7 +3,7 @@
 //
 // This module holds no JSX import (docs/frontend/registries.md § Registries and plugins): the host that draws
 // these rows lives in `./contextMenuHost.tsx`, a `<For>` over `contextMenuItems()`.
-import { fileExtensionFact, matchesWhen, type ContextMenuLocation } from '@acorn/protocol/contextMenus.ts'
+import { fileExtensionFact, matchesWhen, type ContextMenuLocation, type SelectionContentKind } from '@acorn/protocol/contextMenus.ts'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 import { sourceRegistry } from '../sources/sources'
@@ -140,9 +140,40 @@ export type AgentTurnTarget = {
   revision: number
 }
 
+/** Where a selection's line and column are in its document: one-based, with an exclusive end, the way
+ *  the owner counts them. Only an editor's document selection has one. */
+export type SelectionRange = { start: { line: number; column: number }; end: { line: number; column: number } }
+
+/**
+ * Text a person selected in host-drawn content and asked for actions on (`content.selection`). Taken
+ * once, when the menu opens, never as the selection changes. See docs/plugins/menus-and-markers.md §
+ * Context menus.
+ *
+ * `ownerId` is the plugin that draws the content. `revision` is the owner's version of it: the newest
+ * event behind a transcript message, or an editor's live-buffer edit counter. The owner refuses a row
+ * once it has moved on. `resource` names what the text came from when the owner knows: a file in the
+ * task's worktree, or a transcript message. Rendered Markdown carries the plain text selected and no
+ * source offsets, so `range` is only ever a document's. Only `contentKind`, `languageId` and
+ * `readOnly` are facts.
+ */
+export type ContentSelectionTarget = {
+  location: 'content.selection'
+  nodeId: string
+  taskId?: string
+  projectId?: string
+  ownerId: string
+  contentKind: SelectionContentKind
+  languageId?: string
+  readOnly: boolean
+  text: string
+  revision: number
+  resource?: { kind: 'file'; path: string } | { kind: 'message'; sessionId: string; itemId: string }
+  range?: SelectionRange
+}
+
 export type ContextMenuTarget =
   | TaskRowTarget | ItemRowTarget | RailSourceTarget | RailPaneTarget | FileRowTarget | DocumentTabTarget
-  | AgentMessageTarget | AgentTurnTarget
+  | AgentMessageTarget | AgentTurnTarget | ContentSelectionTarget
 
 /** The target one location hands its rows. */
 export type TargetAt<L extends ContextMenuLocation> = Extract<ContextMenuTarget, { location: L }>
@@ -196,9 +227,11 @@ export function registerContextMenuItems<L extends ContextMenuLocation>(
   return { dispose: () => disposables.forEach((entry) => entry.dispose()) }
 }
 
-/** What the menu log calls a target: a file by its path, a message or turn by its own id. */
+/** What the menu log calls a target: a file by its path, a message or turn by its own id, and a
+ *  selection by its owner and kind, never its text. */
 const targetName = (target: ContextMenuTarget): string =>
-  'path' in target ? target.path : 'itemId' in target ? target.itemId : 'id' in target ? target.id : target.turnId
+  target.location === 'content.selection' ? `${target.ownerId} ${target.contentKind}`
+    : 'path' in target ? target.path : 'itemId' in target ? target.itemId : 'id' in target ? target.id : target.turnId
 
 /** Run one row's action. A contribution's `run` is other people's code (core's own closures today, a
  *  plugin's verb dispatch tomorrow), and a menu row that throws must not take the shell's click

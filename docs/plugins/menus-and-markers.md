@@ -18,8 +18,9 @@ An entry is `{ id, location, surface?, label, icon?, order?, when?, action }`:
   and right task pane icons. The two rail locations require `surface`, the exact id of a source or
   task pane the declaring plugin owns. The Node and the client both check it. `file.row` is a file or
   folder in Editor's tree and `document.tab` an open document's tab. `agent.message` is a user or
-  assistant message in an agent transcript, and `agent.turn` a finished turn. Any plugin may add rows
-  to these four, and none takes a `surface`.
+  assistant message in an agent transcript, and `agent.turn` a finished turn. `content.selection` is
+  text a person selected and asked for actions on. Any plugin may add rows to these five, and none
+  takes a `surface`.
 - **`when`** is a map of literals that must all equal the target's own facts, not an expression.
   `task.row` supplies `origin`, `projectId`, and `pinned`. `item.row` supplies `providerId` and
   `projectId`. `rail.source` supplies `projectId`, and `rail.pane` supplies `projectId`, `shown`, and
@@ -27,7 +28,8 @@ An entry is `{ id, location, surface?, label, icon?, order?, when?, action }`:
   `readOnly`. `extension` is lowercase without the dot, and `""` for a folder, a dotfile, or a name
   with none. `readOnly` means Editor shows the file as an image. `agent.message` supplies
   `projectId`, `role` (`user` or `assistant`), and `status`, the status of its turn. `agent.turn`
-  supplies `projectId` and `status`. Naming any other fact is a parse error. Identity fields such as
+  supplies `projectId` and `status`. `content.selection` supplies `contentKind` (`markdown`, `code`, or
+  `document`), `languageId`, and `readOnly`. Naming any other fact is a parse error. Identity fields such as
   `id`, `title`, `path`, `text`, and `revision` aren't facts.
 - **`action`** takes the narrow verb set a command takes. `createTask` and `navigate` aren't in it,
   because the thing under the cursor is a core resource.
@@ -70,6 +72,27 @@ turn's other messages. A turn has a target only once it's completed, failed, can
 interrupted. The owner takes the target as the menu opens and refuses a row once the message, its
 turn's status, or the session on the card has changed. The host then makes the same Node and task
 checks as for a file. A row can't send, answer, retry, or edit anything in the session.
+
+A selection sends `{ selection: { taskId?, projectId?, ownerId, contentKind, languageId?, readOnly,
+text, revision, resource?, range? } }`. `ownerId` is the plugin that draws the content. `resource` is
+`{ kind: 'file', path }` in Editor and `{ kind: 'message', sessionId, itemId }` in a transcript.
+`revision` is a transcript message's newest event or an editor's live-buffer edit counter, so it
+covers unsaved text. A `document` selection carries `range`, one-based lines and columns with an
+exclusive end. Rendered Markdown sends the plain text selected and no `range`. A selection inside one
+code fence is `code`, with the fence's language in the same ids an editor uses. Text over 64 KiB of
+UTF-8 is refused whole: the menu says why and offers no row. The row can't replace the text, save,
+send, or read the rest of the document.
+
+Nothing watches the selection as it changes. The owner wraps its content in the host's
+`SelectionActions` (`@acorn/plugin-api/ui/host`), which reads the selection only when the person asks
+and calls the owner's `select` for the target. On the desktop the person right-clicks the selection,
+or presses Shift+F10 or the menu key while focus is inside the owner. The menu has **Copy** and the
+rows. With no row to offer, a link under the pointer, Option held, or a selection that crosses into
+another owner, the platform's menu opens instead. The terminal has no text selection, so it offers an
+owner's whole block from an explicit **Actions for the whole text** menu. A transcript message offers
+its text there; Editor and plugin document editors offer nothing. Before a row runs, the owner's
+`isCurrent` checks the content hasn't changed, and the host makes the Node and task checks. The
+owners are `transcriptMenus.tsx`, `EditorPane.tsx`, and `DocumentSurface.tsx`.
 
 Disposal and target, Node, and availability checks stop an open menu from
 invoking a replacement plugin after a reload. A manifest may declare at most 32 rows, because a

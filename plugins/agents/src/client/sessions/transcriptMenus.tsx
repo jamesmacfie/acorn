@@ -1,8 +1,12 @@
-import { For, Show, untrack } from 'solid-js'
-import { contextMenuItems, runContextMenuItem, type AgentMessageTarget, type AgentTurnTarget } from '@acorn/plugin-api/client'
+import { For, Show, untrack, type JSX } from 'solid-js'
+import {
+  contextMenuItems, runContextMenuItem, type AgentMessageTarget, type AgentTurnTarget, type ContentSelectionTarget,
+} from '@acorn/plugin-api/client'
 import { Icon, IconButton, Menu } from '@acorn/plugin-api/ui'
+import { SelectionActions, type SelectedContent } from '@acorn/plugin-api/ui/host'
 import type { AgentTurn } from '../../contract/wire.ts'
 import type { AgentConversationItem } from './conversationItems'
+import { asPlainText } from './copyFormats'
 import { shownMessageText } from './messageText'
 
 // Other plugins' rows on a transcript message (`agent.message`) and on a finished turn (`agent.turn`).
@@ -112,5 +116,44 @@ export function TurnActionsMenu(props: { target: () => AgentTurnTarget | undefin
         {(menu) => <ContributedTranscriptRows context={menu} target={props.target} />}
       </Menu>
     </Show>
+  )
+}
+
+/** The target for text selected in a message card. It takes the message's own identity and revision,
+ *  so a message that streams on after the menu opened refuses the row. */
+export const messageSelectionTarget = (
+  message: AgentMessageTarget | undefined,
+  selected: SelectedContent | undefined,
+): ContentSelectionTarget | undefined =>
+  message && selected && {
+    location: 'content.selection', nodeId: message.nodeId, taskId: message.taskId, projectId: message.projectId,
+    ownerId: 'agents', contentKind: selected.contentKind,
+    ...(selected.languageId === undefined ? {} : { languageId: selected.languageId }),
+    readOnly: true, text: selected.text, revision: message.revision,
+    resource: { kind: 'message', sessionId: message.sessionId, itemId: message.itemId },
+  }
+
+/** Does the card still show the message this selection came from, at the same revision? */
+export const messageSelectionIsCurrent = (selection: ContentSelectionTarget, message: AgentMessageTarget | undefined): boolean =>
+  !!message && selection.resource?.kind === 'message' && selection.nodeId === message.nodeId && selection.taskId === message.taskId
+  && selection.projectId === message.projectId && selection.resource.sessionId === message.sessionId
+  && selection.resource.itemId === message.itemId && selection.revision === message.revision
+
+/** A message's text, open to other plugins' actions on what the person selects in it. A host with no
+ *  selection offers the message's whole text, as plain text the way a rendered selection is. */
+export function MessageSelectionActions(props: {
+  target: () => AgentMessageTarget | undefined
+  /** The text the card shows, uncut, so a whole message over the limit is refused rather than cut. */
+  text: () => string
+  children: JSX.Element
+}) {
+  return (
+    <SelectionActions
+      select={(selected) => messageSelectionTarget(props.target(), selected)}
+      isCurrent={(selection) => messageSelectionIsCurrent(selection, props.target())}
+      whole={() => ({ text: asPlainText(props.text()), contentKind: 'markdown' })}
+    >
+      {props.children}
+    </SelectionActions>
   )
 }

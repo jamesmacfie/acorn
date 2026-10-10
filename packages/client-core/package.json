@@ -120,6 +120,7 @@
     "./host/registries/panes": "./src/host/registries/panes/public.ts",
     "./host/registries/panes/panes.ts": "./src/host/registries/panes/panes.ts",
     "./host/registries/panes/refPanelHost.tsx": "./src/host/registries/panes/refPanelHost.tsx",
+    "./host/registries/panes/SelectionActions.tsx": "./src/host/registries/panes/SelectionActions.tsx",
     "./host/registries/rail": "./src/host/registries/rail/public.ts",
     "./host/registries/shell": "./src/host/registries/shell/public.ts",
     "./host/registries/shell/willPhase.tsx": "./src/host/registries/shell/willPhase.tsx",

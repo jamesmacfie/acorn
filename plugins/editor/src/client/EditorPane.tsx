@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
-import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, featureUsable, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, slotFills, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, documentSelection, featureUsable, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, slotFills, telemetryFor, toast, type ContentSelectionTarget, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, copyText, DetailColumn, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
@@ -18,7 +18,7 @@ import { createFileActionModel } from './fileActionModel'
 import { persistCapturedEditorOpenFiles } from './openFilesSlice'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
-import { Slot } from '@acorn/plugin-api/ui/host'
+import { SelectionActions, Slot } from '@acorn/plugin-api/ui/host'
 import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
 import SearchPanel from './search/SearchPanel'
 import { imageTypeForPath } from '../contract/imagePreview'
@@ -1191,9 +1191,32 @@ export default function EditorPane(props: { task: Task }) {
     }, { defer: true }),
   )
 
+  // Text selected in the open file, for other plugins' actions on it (`content.selection`). Read from the
+  // live buffer, saved or not, and only when the person asks. `revision` is the buffer's edit counter,
+  // so an edit or a reload after the menu opened refuses the row.
+  const selectionTarget = (): ContentSelectionTarget | undefined => {
+    const admitted = graphicalView()
+    const path = currentPath
+    const custody = path ? pool.files.get(path)?.custody : undefined
+    const selected = admitted && documentSelection(admitted.state)
+    if (!admitted || !path || !custody || !selected) return undefined
+    return {
+      location: 'content.selection', nodeId: nodeId ?? '', taskId, projectId: props.task.projectId, ownerId: 'editor',
+      contentKind: 'document', languageId: languageIdForPath(path), readOnly: admitted.state.readOnly,
+      text: selected.text, revision: custody.revision, resource: { kind: 'file', path }, range: selected.range,
+    }
+  }
+  const selectionIsCurrent = (target: ContentSelectionTarget): boolean =>
+    !!graphicalView() && target.nodeId === (nodeId ?? '') && target.resource?.kind === 'file' && target.resource.path === currentPath
+    && pool.files.get(currentPath)?.custody.revision === target.revision
+
   // The pane's own view of a file, drawn whenever no contributor stands in for it.
   const fileView = () => (
-    <Show when={imagePath()} fallback={<Rectangle kind="editor" label="Editor" mount={mountEditor} />} keyed>
+    <Show when={imagePath()} fallback={
+      <SelectionActions select={selectionTarget} isCurrent={selectionIsCurrent}>
+        <Rectangle kind="editor" label="Editor" mount={mountEditor} />
+      </SelectionActions>
+    } keyed>
       {(path) => <>
         <Only hosts={['dom']}><ImagePreview taskId={taskId} path={path} /></Only>
         <Only hosts={['tui']}><EmptyState>Image preview is available in the desktop editor: {path}</EmptyState></Only>

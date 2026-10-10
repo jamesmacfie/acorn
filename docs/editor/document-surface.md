@@ -106,6 +106,11 @@ out, never as code running inside the editor. Hover and diagnostics can follow t
 real consumer needs them. Custom widgets, decorations, and inline UI can't. To judge a proposed
 capability, ask whether it's an LSP method.
 
+Another plugin can act on text a person selects in the document, through the `content.selection`
+menu. The surface hands the row the selected text of the live buffer, saved or not, with its range
+and the buffer's edit counter, and refuses the row after an edit. Never the whole document. Editor's
+pane does the same. See [context menus](../plugins/menus-and-markers.md#context-menus).
+
 ## A code box that is not a document
 
 Some fields hold code that the plugin already has, with the plugin's own buttons below. The

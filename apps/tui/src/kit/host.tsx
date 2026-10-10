@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, For, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show, untrack, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
@@ -12,12 +12,14 @@ import {
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
 import { createSlotChoice, resolveSlot } from '@acorn/client-core/host/tree'
 import type { OverlayPalette } from '@acorn/client-core/host/palette'
+import { contextMenuItems, runContextMenuItem, selectionTooLarge } from '@acorn/client-core/host/registries/panes'
+import type { SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 import { RemoteTree } from '../plugins/remoteTreeLoader'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
 import { Badge, Icon, Lines, Row, Rows } from './showing'
-import { Input } from './asking'
-import { Modal, ModalBody, SectionHeader } from './grouping'
+import { IconButton, Input } from './asking'
+import { Menu, Modal, ModalBody, SectionHeader } from './grouping'
 
 // What `@acorn/plugin-api/ui/host` is on this host.
 //
@@ -371,4 +373,51 @@ function ExtensionGroupRows(props: { contribution: ExtensionContribution }) {
  *  named on one line so a reader knows the box was reserved and why it is empty. */
 export function InlineSlot(props: { point: string; key?: string; taskId?: string; projectId?: string | null }) {
   return <Line role="muted">{`${props.point} needs pixels, so it is not drawn here.`}</Line>
+}
+
+// ── Selection actions ────────────────────────────────────────────────────────────────────────────
+
+export type { SelectedContent, SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
+
+/**
+ * Other plugins' actions on selected text (`content.selection`), in cells.
+ *
+ * This host has no text selection to read: nothing here sets one or gets one out (./field.ts). So an
+ * owner that names a `whole` block gets an explicit menu after its content that offers that block
+ * whole, and says so. An owner with no such block, such as an editor, offers nothing here. The
+ * target is taken when the menu opens, and a row runs only while the owner still shows it.
+ */
+export function SelectionActions(props: SelectionActionsProps) {
+  const target = () => (props.whole ? props.select(props.whole()) : undefined)
+  const rows = () => {
+    const current = target()
+    return current ? contextMenuItems('content.selection', current) : []
+  }
+  return (
+    <>
+      {props.children}
+      <Show when={rows().length}>
+        <Menu ariaLabel="Actions for the whole text"
+          trigger={({ toggle, open }) => (
+            <IconButton icon="ellipsis" label="Actions for the whole text" opens="menu" expanded={open()} onPress={toggle} />
+          )}
+        >
+          {(menu) => {
+            const opened = untrack(target)
+            return (
+              <Show when={opened && !selectionTooLarge(opened.text)} fallback={<Menu.Label>This text is over 64 KiB, so no action can take it.</Menu.Label>}>
+                <For each={opened ? contextMenuItems('content.selection', opened) : []}>
+                  {(row) => (
+                    <Menu.Item context={menu} onSelect={() => { if (opened && props.isCurrent(opened)) runContextMenuItem(row, opened) }}>
+                      {row.label}
+                    </Menu.Item>
+                  )}
+                </For>
+              </Show>
+            )
+          }}
+        </Menu>
+      </Show>
+    </>
+  )
 }

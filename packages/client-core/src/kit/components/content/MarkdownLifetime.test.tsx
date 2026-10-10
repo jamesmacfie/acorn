@@ -26,3 +26,23 @@ it('skips obsolete and disposed fences while retaining duplicate live copy contr
     expect(highlight).not.toHaveBeenCalled()
   } finally { dispose(); host.remove(); highlight.mockRestore(); resetHighlightHtmlCache() }
 }, 20_000)
+
+// What a selection action reads off a fence: the language survives the highlight that replaces its
+// `<pre>`, and a selection in it survives the message streaming on below.
+it('keeps a fence’s language and a selection in it while the message streams on', async () => {
+  const [text, setText] = createSignal('```ts\nconst kept = 1\n```')
+  const host = document.createElement('div'); document.body.append(host)
+  const dispose = render(() => <Markdown text={text()} copy />, host)
+  try {
+    await vi.waitFor(() => expect(host.querySelector('pre.shiki')).not.toBeNull(), { timeout: 10_000 })
+    const wrap = host.querySelector<HTMLElement>('.ui-code-wrap')!
+    expect(wrap.dataset.language).toBe('ts')
+    const range = document.createRange()
+    range.selectNodeContents(wrap.querySelector('pre.shiki code')!)
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(range)
+    setText(text() + '\n\nAnd a paragraph that streamed in after.')
+    expect(host.querySelector('.ui-code-wrap')).toBe(wrap)
+    expect(document.getSelection()!.toString()).toBe('const kept = 1')
+  } finally { document.getSelection()?.removeAllRanges(); dispose(); host.remove() }
+}, 20_000)

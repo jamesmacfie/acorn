@@ -136,7 +136,11 @@ it through the `agent.message` menu location. The menu's label then reads "Copy 
 on it". Your own message gets the same menu only when a plugin offers a row on it, so with none it has
 no menu. A finished turn's `Turn complete` line gets an actions menu the same way, through
 `agent.turn`. The rows are the same in the desktop and the terminal. The text a row receives is the
-text the card shows, from `messageText.ts`. For the contract, see
+text the card shows, from `messageText.ts`.
+
+Words selected in a message open to other plugins too, through `content.selection`. On the desktop,
+right-click the selection. In the terminal, which has no text selection, a message offers its whole
+text from **Actions for the whole text**. For the contract, see
 [context menus](../plugins/menus-and-markers.md#context-menus).
 
 ## Subagent views

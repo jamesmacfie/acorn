@@ -1583,3 +1583,46 @@ describe('other plugins’ file marks', () => {
     await vi.waitFor(() => expect(tab(host, 'a.ts')!.getAttribute('aria-label')).toBe('a.ts'))
   })
 })
+
+describe('other plugins’ actions on selected text', () => {
+  const registered: { dispose(): void }[] = []
+  afterEach(() => registered.splice(0).forEach((handle) => handle.dispose()))
+  const menuItem = (label: string) => vi.waitFor(() => {
+    const element = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === label)
+    if (!element) throw new Error(`${label} not in the menu`)
+    return element
+  })
+  const rightClick = (view: EditorView) => view.contentDOM.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
+
+  it('hands a row an unsaved range from the live buffer, and refuses it after an edit while open', async () => {
+    const explain = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run: explain }]))
+    setActiveTaskId(taskId)
+    // A refused save keeps the draft unsaved.
+    write.mockRejectedValue(new Error('formatter veto'))
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// draft\n' } })
+    // Nothing selected: the platform's menu stays.
+    expect(rightClick(view)).toBe(true)
+    view.dispatch({ selection: { anchor: 9, head: 14 } })
+    expect(rightClick(view)).toBe(false)
+    ;(await menuItem('Explain')).click()
+    expect(explain).toHaveBeenCalledOnce()
+    const target = explain.mock.calls[0][0]
+    expect(target).toEqual({
+      location: 'content.selection', nodeId: '', taskId, projectId: 'p1', ownerId: 'editor', contentKind: 'document',
+      languageId: 'typescript', readOnly: false, text: 'const', revision: expect.any(Number),
+      resource: { kind: 'file', path: 'a.ts' }, range: { start: { line: 2, column: 1 }, end: { line: 2, column: 6 } },
+    })
+    expect(disk.get('a.ts')).toBe('const a = 1\n')
+
+    rightClick(view)
+    const row = await menuItem('Explain')
+    view.dispatch({ changes: { from: 0, insert: '// more\n' } })
+    row.click()
+    expect(explain).toHaveBeenCalledOnce()
+  })
+})

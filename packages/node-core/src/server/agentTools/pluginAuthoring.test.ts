@@ -70,6 +70,10 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     }
     expect(renderPluginAuthoring(v)).toContain('{ message: { taskId,')
     expect(renderPluginAuthoring(v)).toContain('{ turn: { taskId, projectId, sessionId, turnId, status, revision } }')
+    // A selection's facts, its body, and where each host can invoke it.
+    for (const fact of CONTEXT_MENU_FACTS['content.selection']) expect(renderPluginAuthoring(v)).toContain(`\`${fact}\``)
+    expect(renderPluginAuthoring(v)).toContain('`{ selection: { taskId?, projectId?, ownerId, contentKind, languageId?, readOnly,')
+    expect(renderPluginAuthoring(v)).toContain('the terminal has no text selection')
     // Detail regions: the field, every region, what a contributor is mounted with, and the two points.
     for (const region of DETAIL_REGIONS) expect(renderPluginAuthoring(v)).toContain(`\`${region}\``)
     expect(renderPluginAuthoring(v)).toContain('`mounts: [{ surface, region }]`')

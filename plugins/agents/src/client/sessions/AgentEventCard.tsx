@@ -14,7 +14,8 @@ import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
 import { messageAttachments, shownMessageText } from './messageText'
 import {
-  ContributedTranscriptRows, messageMenuTarget, transcriptMenuRows, turnMenuTarget, TurnActionsMenu, type TranscriptScope,
+  ContributedTranscriptRows, MessageSelectionActions, messageMenuTarget, transcriptMenuRows, turnMenuTarget, TurnActionsMenu,
+  type TranscriptScope,
 } from './transcriptMenus'
 import type { AgentMessageTarget } from '@acorn/plugin-api/client'
 import AgentRequestCard from './AgentRequestCard'
@@ -110,7 +111,9 @@ function AssistantMessageCard(props: {
           </Inline>
           <CopyOutputMenu text={() => props.text} event={props.event} noun="response" target={props.target} />
         </Inline>
-        <AgentMarkdown text={props.text} taskId={props.taskId} />
+        <MessageSelectionActions target={() => props.target?.()} text={() => props.text}>
+          <AgentMarkdown text={props.text} taskId={props.taskId} />
+        </MessageSelectionActions>
       </Stack>
     </Card>
   )
@@ -189,10 +192,12 @@ export default function AgentEventCard(props: {
                     <CopyOutputMenu text={() => shownMessageText(message(), props.turn)} event={message} noun="message" target={messageTarget} />
                   </Show>
                 </Inline>
-                <AgentMarkdown
-                  text={shownMessageText(message(), props.turn)}
-                  taskId={props.taskId}
-                />
+                <MessageSelectionActions target={messageTarget} text={() => shownMessageText(message(), props.turn)}>
+                  <AgentMarkdown
+                    text={shownMessageText(message(), props.turn)}
+                    taskId={props.taskId}
+                  />
+                </MessageSelectionActions>
                 <Show when={props.turn?.source === 'delegation_report' ? props.turn.effectivePolicy.checkResults as CheckResults | undefined : undefined}>
                   {(results) => (
                     <Stack gap="row">

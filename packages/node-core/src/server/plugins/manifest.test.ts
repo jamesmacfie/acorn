@@ -1509,6 +1509,15 @@ describe('context menus', () => {
     expect(messages(manifest({ contextMenus: [{ ...note, location: 'agent.turn', when: { role: 'user' } }] })))
       .toContain("'agent.turn' has no fact named 'role'")
   })
+
+  it('takes selection actions from any plugin, matched on the kind of content only', () => {
+    const explain = menu({ id: 'explain', location: 'content.selection', label: 'Explain selection',
+      when: { contentKind: 'code', languageId: 'typescript', readOnly: false }, action: { verb: 'runNodeAction', path: '/v1/p/board/explain' } })
+    expect(manifest({ contextMenus: [explain] }).success).toBe(true)
+    expect(messages(manifest({ contextMenus: [{ ...explain, surface: 'editor' }] }))).toContain('content.selection does not accept a surface')
+    expect(messages(manifest({ contextMenus: [{ ...explain, when: { text: 'TODO' } }] })))
+      .toContain("'content.selection' has no fact named 'text'")
+  })
 })
 
 // ── Cooperative cross-plugin extension, and the exclusive slot ─────────────────────────────────────

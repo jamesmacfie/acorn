@@ -14,6 +14,7 @@ client: CommandContribution
 client: CommandExecutionContext
 client: CommandOutcome
 client: ContentLinkContribution
+client: ContentSelectionTarget
 client: ContextMenuContribution
 client: ContextMenuLocation
 client: ContextMenuTarget
@@ -111,6 +112,7 @@ client: RenderTransitionHandle
 client: ResolvedQuery
 client: SaveRequest
 client: SearchCommand
+client: SelectionRange
 client: SessionSubmit
 client: SessionSummary
 client: SettingCommand
@@ -190,6 +192,7 @@ client: describeError
 client: deviceStorage
 client: dispatchActiveLayout
 client: dispatchLayout
+client: documentSelection
 client: effectiveModelPick
 client: elementRectKey
 client: featureUsable
@@ -300,6 +303,7 @@ client: saveGeneratePick
 client: saveJsonPref
 client: savePref
 client: scanContentRefs
+client: selectionTooLarge
 client: sendForm
 client: sendReferenceToAgent
 client: sendToSession
@@ -797,6 +801,9 @@ ui/host: RefPanelBox
 ui/host: RefPanelTaskLink
 ui/host: RemoteTree
 ui/host: RemoteTreeProps
+ui/host: SelectedContent
+ui/host: SelectionActions
+ui/host: SelectionActionsProps
 ui/host: Slot
 ui/host: SlotProps
 ui/host: Wizard

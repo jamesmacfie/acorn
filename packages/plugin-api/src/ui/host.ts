@@ -51,6 +51,11 @@ export type { RemoteTreeProps } from '@acorn/client-core/host/tree'
 // the fetch, the batching, the provenance stamp and the drawing are all the host's, and a plugin only
 // says where its items are and what they are keyed by.
 export { AnnotationMarks } from '@acorn/client-core/host/annotations'
+// Other plugins' actions on text a person selected in what this surface draws (`content.selection`).
+// Host-only: reading the selection and drawing the menu are the host's, and the owner only says what
+// the selection is and whether it is still current.
+export { SelectionActions } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
+export type { SelectedContent, SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 
 // The `wizard` layout, for a surface that is a wizard but is not a pane. Host-only: a layout is the

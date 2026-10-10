@@ -5,10 +5,11 @@ export {
 } from './contentLinks.ts'
 export type { ContentLinkContribution, InAppTarget } from './contentLinks.ts'
 export { contextMenuItems, contextMenuRegistry, fileMenuTarget, registerContextMenuItems, runContextMenuItem } from './contextMenus.ts'
+export { documentSelection, selectionTooLarge } from './contentSelection.ts'
 export type {
-  AgentMessageTarget, AgentTurnTarget, ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, DocumentTabTarget,
+  AgentMessageTarget, AgentTurnTarget, ContentSelectionTarget, ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, DocumentTabTarget,
   FileMenuTarget, FileRowTarget,
-  ItemRowTarget, RailPaneTarget, RailSourceTarget, TaskRowTarget,
+  ItemRowTarget, RailPaneTarget, RailSourceTarget, SelectionRange, TaskRowTarget,
 } from './contextMenus.ts'
 export { paneModel } from './paneModels.ts'
 export { decodeProjectSurfaceItem, projectSurfaceRegistry, projectSurfaceRoutes } from './projectSurfaces.ts'

@@ -491,3 +491,80 @@ describe('other plugins’ rows on a message and a turn', () => {
     expect(host.textContent).toContain('Done.')
   })
 })
+
+describe('other plugins’ actions on text selected in a message', () => {
+  const menuScope = { nodeId: 'node-a', projectId: 'project-1' }
+  const turn = { id: 'turn-1', status: 'completed', input: [] } as unknown as AgentTurn
+  const said = (type: 'user_message' | 'assistant_message', text: string, lastSeq = 3): AgentConversationItem =>
+    ({ key: `${type}-card`, firstSeq: 1, lastSeq, createdAt: 1, turnId: 'turn-1', event: { type, text } })
+  const registered: { dispose(): void }[] = []
+  afterEach(() => {
+    while (registered.length) registered.pop()!.dispose()
+    document.getSelection()?.removeAllRanges()
+    document.body.replaceChildren()
+  })
+
+  const draw = (initial: AgentConversationItem, scope: typeof menuScope | null = menuScope) => {
+    const [item, setItem] = createSignal(initial)
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentEventCard item={item()} taskId="task" sessionId="session" turn={turn} menuScope={scope ?? undefined} />, host)
+    registered.push({ dispose })
+    return { host, setItem }
+  }
+  // The mocked Markdown draws the text in one span, so select a word of it and right-click there.
+  const selectAndRightClick = (host: HTMLElement, text: string, word: string) => {
+    const node = [...host.querySelectorAll('span')].find((span) => span.textContent === text)!.firstChild!
+    const range = document.createRange()
+    range.setStart(node, text.indexOf(word))
+    range.setEnd(node, text.indexOf(word) + word.length)
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(range)
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    node.parentElement!.dispatchEvent(event)
+    return event
+  }
+  const row = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('.ui-menu .ui-menu-item')]
+    .find((item) => item.textContent?.trim() === label)
+  const explain = () => {
+    const run = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run }]))
+    return run
+  }
+
+  it('hands a row the selected words with the message’s identity and revision', () => {
+    const run = explain()
+    const { host } = draw(said('assistant_message', 'The fix is in parser.ts today'))
+    expect(selectAndRightClick(host, 'The fix is in parser.ts today', 'parser.ts').defaultPrevented).toBe(true)
+    row('Explain')!.click()
+    expect(run).toHaveBeenCalledWith({
+      location: 'content.selection', nodeId: 'node-a', taskId: 'task', projectId: 'project-1', ownerId: 'agents',
+      contentKind: 'markdown', readOnly: true, text: 'parser.ts', revision: 3,
+      resource: { kind: 'message', sessionId: 'session', itemId: 'assistant_message-card' },
+    })
+  })
+
+  it('does the same on the reader’s own message', () => {
+    const run = explain()
+    const { host } = draw(said('user_message', 'Please fix the parser'))
+    selectAndRightClick(host, 'Please fix the parser', 'parser')
+    row('Explain')!.click()
+    expect(run.mock.calls[0]![0]).toMatchObject({ text: 'parser', resource: { itemId: 'user_message-card' } })
+  })
+
+  it('refuses a row once the message streamed on while the menu was open', () => {
+    const run = explain()
+    const { host, setItem } = draw(said('assistant_message', 'Partial answer', 3))
+    selectAndRightClick(host, 'Partial answer', 'Partial')
+    setItem(said('assistant_message', 'Partial answer', 4))
+    row('Explain')!.click()
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  it('offers nothing in a transcript with no bound Node and project', () => {
+    explain()
+    const { host } = draw(said('assistant_message', 'Unbound text'), null)
+    expect(selectAndRightClick(host, 'Unbound text', 'Unbound').defaultPrevented).toBe(false)
+    expect(row('Explain')).toBeUndefined()
+  })
+})

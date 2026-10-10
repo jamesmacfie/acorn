@@ -76,7 +76,7 @@ describe('renderMarkdown', () => {
 
   it('wraps a fence and carries its language for the highlighter', () => {
     expect(renderMarkdown('```ts\nconst n = 1\n```')).toBe(
-      '<div class="ui-code-wrap"><pre><code data-language="ts">const n = 1</code></pre></div>',
+      '<div class="ui-code-wrap" data-language="ts"><pre><code data-language="ts">const n = 1</code></pre></div>',
     )
     expect(renderMarkdown('```\nplain\n```')).toContain('data-language="text"')
   })

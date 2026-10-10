@@ -2471,7 +2471,8 @@
                   "file.row",
                   "document.tab",
                   "agent.message",
-                  "agent.turn"
+                  "agent.turn",
+                  "content.selection"
                 ]
               },
               "surface": {

@@ -226,6 +226,32 @@ describe('other plugins’ rows on a transcript', () => {
     }
   }, 180_000)
 
+  // The terminal has no text selection, so a message offers its whole text, as plain text, from an
+  // explicit menu after it.
+  it('offers a message’s whole text to a selection action', async () => {
+    const explain = vi.fn()
+    const rows = registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run: explain }])
+    const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
+    try {
+      await openFirstSession(screen)
+      await enterDetail(screen)
+      await stopSaying(screen, 'Actions for the whole text')
+      await screen.press('RETURN')
+      await screen.until('Explain')
+      await stopSaying(screen, 'Explain')
+      await screen.press('RETURN')
+      expect(explain).toHaveBeenCalledWith(expect.objectContaining({
+        location: 'content.selection', taskId: 'task-1', projectId: 'project-1', ownerId: 'agents', contentKind: 'markdown',
+        readOnly: true, text: 'The reset writes a new hash but signIn still checks the one it was passed.',
+        resource: expect.objectContaining({ kind: 'message', sessionId: 'session-1' }),
+      }))
+      expect(posts()).toEqual([])
+    } finally {
+      rows.dispose()
+      screen.done()
+    }
+  }, 180_000)
+
   it('acts on a finished turn from its closing line', async () => {
     process.env.ACORN_FIXTURE_CODEX_PLAN = '1'
     const review = vi.fn()

@@ -35,6 +35,10 @@ import { saveFile } from '../../infra/platform'
 import { Button } from '../../kit/components/inputs/Button'
 import { Alert } from '../../kit/components/primitives'
 import { Rectangle } from '../../kit/components/content/Rectangle'
+import { SelectionActions } from '../../host/registries/panes/SelectionActions'
+import { documentSelection } from '../../host/registries/panes/contentSelection'
+import type { ContentSelectionTarget } from '../../host/registries/panes/contextMenus'
+import { taskById } from '../tasks/taskLookup'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('document-surface')
@@ -252,6 +256,26 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     }
   }
 
+  // Text selected in this document, for other plugins' actions on it (`content.selection`). Read from the
+  // live buffer, saved or not, and only when the person asks. `revision` is the buffer's edit counter,
+  // so an edit after the menu opened refuses the row. A task's document names the task's project too,
+  // which the host checks the task against before a row runs.
+  const selectionTarget = (): ContentSelectionTarget | undefined => {
+    const selected = view && documentSelection(view.state)
+    if (disposed || !view || !custody || !selected) return undefined
+    const { taskId } = props.scope
+    const projectId = taskId ? taskById(taskId)?.projectId : props.scope.projectId
+    return {
+      location: 'content.selection', nodeId,
+      ...(taskId ? { taskId } : {}), ...(projectId ? { projectId } : {}),
+      ownerId: props.pluginId, contentKind: 'document',
+      languageId: isLanguageId(props.region.languageId) ? props.region.languageId : 'plaintext',
+      readOnly: !writePath, text: selected.text, revision: custody.revision, range: selected.range,
+    }
+  }
+  const selectionIsCurrent = (target: ContentSelectionTarget): boolean =>
+    !disposed && !!view && target.nodeId === nodeId && custody?.revision === target.revision
+
   onMount(() => {
     onCleanup(() => {
       props.onHandle?.(null)
@@ -384,7 +408,9 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
           of it with the keyboard, which is what stops a reader who tabs into an editor region from
           being stuck there (ui/Rectangle.tsx). */}
       <Show when={ready()}>
-        <Rectangle kind="editor" label={`${props.surfaceId} document`} mount={(element) => { host = element }} />
+        <SelectionActions select={selectionTarget} isCurrent={selectionIsCurrent}>
+          <Rectangle kind="editor" label={`${props.surfaceId} document`} mount={(element) => { host = element }} />
+        </SelectionActions>
       </Show>
     </section>
   )

@@ -66,11 +66,13 @@ export type { SourceContribution, SourceRouteContribution } from '@acorn/client-
 // row menu, so github's pull-request list and core's rail list offer the same things. No component
 // crosses — the `<For>` over these rows is eight lines with each host's own `Menu.Item`.
 export {
-  contextMenuItems, contextMenuRegistry, fileMenuTarget, registerContextMenuItems, runContextMenuItem,
+  contextMenuItems, contextMenuRegistry, documentSelection, fileMenuTarget, registerContextMenuItems, runContextMenuItem,
+  selectionTooLarge,
 } from '@acorn/client-core/host/registries/panes'
 export type {
   ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, ItemRowTarget, TaskRowTarget,
   RailSourceTarget, RailPaneTarget, FileMenuTarget, FileRowTarget, DocumentTabTarget, AgentMessageTarget, AgentTurnTarget,
+  ContentSelectionTarget, SelectionRange,
 } from '@acorn/client-core/host/registries/panes'
 // Brand-mark registration. See docs/ui-design/icons.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.

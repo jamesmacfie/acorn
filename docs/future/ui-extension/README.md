@@ -35,7 +35,7 @@ features. Implementation checkpoints are not separate public releases; phase 14 
 | 05 | [Add message and turn actions](./05-message-actions.md) | Done |
 | 06 | [Add resource detail regions](./06-detail-regions.md) | Done |
 | 07 | [Add file annotations](./07-file-annotations.md) | Done |
-| 08 | [Add selected-content actions](./08-selection-actions.md) | Planned |
+| 08 | [Add selected-content actions](./08-selection-actions.md) | Done |
 | 09 | [Add document hover and diagnostics](./09-document-intelligence.md) | Planned |
 | 10 | [Add Markdown fence viewers](./10-markdown-fences.md) | Planned |
 | 11 | [Add Preview and Terminal toolbar contributions](./11-toolbar-actions.md) | Planned |

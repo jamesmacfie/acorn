@@ -10,7 +10,8 @@
 import { isContextMenuLocation, isRailMenuLocation, unknownWhenFacts } from '@acorn/protocol/contextMenus.ts'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import {
-  compileWhen, contextMenuRegistry, type AgentMessageTarget, type AgentTurnTarget, type ContextMenuContribution, type FileMenuTarget,
+  compileWhen, contextMenuRegistry, type AgentMessageTarget, type AgentTurnTarget, type ContentSelectionTarget, type ContextMenuContribution,
+  type FileMenuTarget,
 } from '../registries/panes/contextMenus'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { runChromeAction, type ChromeActionContext } from './actions'
@@ -87,16 +88,17 @@ export function pluginContextMenuItem(
         if (owner !== pluginId) return
       }
       if (target.location === 'file.row' || target.location === 'document.tab'
-        || target.location === 'agent.message' || target.location === 'agent.turn') {
-        // The owner checked that the file, message or turn is still the one the menu opened on. What is
-        // checked here is the binding: the menu's Node is still the one being looked at, and its task is
-        // still on it in the same project. A path or a session id alone never reaches another task.
+        || target.location === 'agent.message' || target.location === 'agent.turn' || target.location === 'content.selection') {
+        // The owner checked that the file, message, turn or selected text is still the one the menu
+        // opened on. What is checked here is the binding: the menu's Node is still the one being looked
+        // at, and its task is still on it in the same project. A path or a session id alone never
+        // reaches another task. A selection in a project's own document has no task to check.
         if (target.location !== location || target.nodeId !== binding.nodeId()) return
-        if (taskById(target.taskId)?.projectId !== target.projectId) return
+        if (target.taskId !== undefined && taskById(target.taskId)?.projectId !== target.projectId) return
         void runChromeAction(descriptor.action, {
           pluginId,
           nodeId: binding.nodeId(),
-          taskId: target.taskId,
+          ...(target.taskId === undefined ? {} : { taskId: target.taskId }),
           ...ownerTargetBody(target),
         })
         return
@@ -120,7 +122,14 @@ export function pluginContextMenuItem(
 
 // What a `runNodeAction` row on an owner's target sends. Every key is named here, so the location's
 // owner never chooses what leaves the client: no file bytes, and of a message only the text it shows.
-const ownerTargetBody = (target: FileMenuTarget | AgentMessageTarget | AgentTurnTarget): Pick<ChromeActionContext, 'resource' | 'message' | 'turn'> => {
+// A selection's keys are named by its type, which holds only what the person selected and where from.
+const ownerTargetBody = (
+  target: FileMenuTarget | AgentMessageTarget | AgentTurnTarget | ContentSelectionTarget,
+): Pick<ChromeActionContext, 'resource' | 'message' | 'turn' | 'selection'> => {
+  if (target.location === 'content.selection') {
+    const { location: _location, nodeId: _nodeId, ...selection } = target
+    return { selection }
+  }
   const { taskId, projectId } = target
   if (target.location === 'agent.message') {
     const { sessionId, itemId, turnId, role, status, text, revision } = target

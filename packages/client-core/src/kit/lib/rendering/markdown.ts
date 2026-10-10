@@ -146,9 +146,11 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
       const open = i >= lines.length ? ' data-open=""' : ''
       i++ // closing fence
       // The language hint travels as an attribute rather than a class because nothing styles it: the
-      // Markdown component reads it to pick a Shiki grammar, and a fence with no hint stays plain.
-      const lang = fence[1] || 'text'
-      emit(`<div class="ui-code-wrap"><pre><code data-language="${esc(lang)}"${open}>${esc(buf.join('\n'))}</code></pre></div>`, start)
+      // Markdown component reads it to pick a Shiki grammar, and a fence with no hint stays plain. The
+      // wrapper carries it too, because highlighting replaces the `<pre>` and a selection action still
+      // needs to know what language the selected code is in.
+      const lang = esc(fence[1] || 'text')
+      emit(`<div class="ui-code-wrap" data-language="${lang}"><pre><code data-language="${lang}"${open}>${esc(buf.join('\n'))}</code></pre></div>`, start)
       continue
     }
     const h = /^(#{1,6})\s+(.*)$/.exec(line)

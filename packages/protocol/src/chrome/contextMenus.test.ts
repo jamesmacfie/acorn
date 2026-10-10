@@ -30,6 +30,7 @@ describe('the location vocabulary', () => {
     expect(isContextMenuLocation('document.tab')).toBe(true)
     expect(isContextMenuLocation('agent.message')).toBe(true)
     expect(isContextMenuLocation('agent.turn')).toBe(true)
+    expect(isContextMenuLocation('content.selection')).toBe(true)
     for (const value of ['task.footer', 'task.row ', 'TASK.ROW', '', null, undefined, 42, {}]) {
       expect(isContextMenuLocation(value), String(value)).toBe(false)
     }
@@ -53,6 +54,10 @@ describe('the location vocabulary', () => {
       for (const fact of ['text', 'textTruncated', 'itemId', 'turnId', 'sessionId', 'revision', 'nodeId', 'taskId']) {
         expect(CONTEXT_MENU_FACTS[location], `${location} ${fact}`).not.toContain(fact)
       }
+    }
+    // A selection is matched on what kind of content it is, never on the text or where it came from.
+    for (const fact of ['text', 'ownerId', 'revision', 'range', 'resource', 'projectId', 'taskId', 'nodeId']) {
+      expect(CONTEXT_MENU_FACTS['content.selection'], fact).not.toContain(fact)
     }
   })
 
@@ -91,6 +96,8 @@ describe('unknownWhenFacts', () => {
     expect(unknownWhenFacts('document.tab', { path: 'a.json', revision: 'abc' })).toEqual(['path', 'revision'])
     expect(unknownWhenFacts('agent.message', { role: 'assistant', status: 'completed', projectId: 'p1' })).toEqual([])
     expect(unknownWhenFacts('agent.turn', { status: 'completed', role: 'user', text: 'hi' })).toEqual(['role', 'text'])
+    expect(unknownWhenFacts('content.selection', { contentKind: 'code', languageId: 'typescript', readOnly: true })).toEqual([])
+    expect(unknownWhenFacts('content.selection', { text: 'x', ownerId: 'editor' })).toEqual(['text', 'ownerId'])
   })
 })
 
