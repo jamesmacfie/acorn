@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo, type JSX } from 'solid-js'
+import { For, Show, createEffect, createMemo, createSignal, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { RemoteTree } from './RemoteTree'
@@ -86,8 +86,10 @@ export type SlotProps = {
    * inside the chip a contributor replaces, so an owner that did nothing would lose the ability to
    * remove the attachment for as long as a plugin drew it, and an owner that always drew a second one
    * would put two crosses next to every attachment when no plugin is installed.
+   *
+   * `pluginId` is who is standing in, for an owner that says so beside the contribution.
    */
-  occupied?: (occupied: boolean) => void
+  occupied?: (occupied: boolean, pluginId?: string) => void
 }
 
 export function Slot(props: SlotProps) {
@@ -111,9 +113,13 @@ export function Slot(props: SlotProps) {
   // `stack` is the owner's default PLUS everyone who matched; `replace` is one contributor instead of
   // it (docs/plugins/cooperative-extension-points.md § Arbitration). The difference is only visible here, which is why it lives
   // here and not in the arbitration rule: `resolveSlot` answers who draws, not what else is on screen.
-  const drawDefault = () => resolved()?.mode !== 'replace' || !outcome()?.occupants.length
+  // A tree that failed draws nothing, so in a `replace` slot the owner's default stands in for it rather
+  // than leaving the box blank. Remembered for this slot's life: a remount tries the tree again.
+  const [failed, setFailed] = createSignal<readonly string[]>([])
+  const standing = () => outcome()?.occupants.find((entry) => !failed().includes(entry.id))
+  const drawDefault = () => resolved()?.mode !== 'replace' || !standing()
 
-  createEffect(() => props.occupied?.(!drawDefault()))
+  createEffect(() => props.occupied?.(!drawDefault(), drawDefault() ? undefined : standing()?.pluginId))
 
   return (
     <>
@@ -139,6 +145,7 @@ export function Slot(props: SlotProps) {
                     ...(props.taskId ? { taskId: props.taskId } : {}),
                     ...(props.projectId ? { projectId: props.projectId } : {}),
                   })}
+                  onFailed={() => setFailed((ids) => [...ids, contribution.id])}
                 />
               }
             >

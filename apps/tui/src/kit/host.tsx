@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, For, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
@@ -218,7 +218,7 @@ export type SlotProps = {
   actions?: Record<string, (payload: unknown) => unknown | Promise<unknown>>
   /** Whether a contributor is standing in for the owner's default right now, for an owner that has to
    *  keep drawing something a contributor must not be given. */
-  occupied?: (occupied: boolean) => void
+  occupied?: (occupied: boolean, pluginId?: string) => void
 }
 
 /**
@@ -244,9 +244,12 @@ export function Slot(props: SlotProps) {
     }
   })
   const outcome = () => resolved()?.outcome
-  const drawDefault = () => resolved()?.mode !== 'replace' || !outcome()?.occupants.length
+  // A failed tree draws nothing, so the owner's default stands in for it, as on the desktop.
+  const [failed, setFailed] = createSignal<readonly string[]>([])
+  const standing = () => outcome()?.occupants.find((entry) => !failed().includes(entry.id))
+  const drawDefault = () => resolved()?.mode !== 'replace' || !standing()
 
-  createEffect(() => props.occupied?.(!drawDefault()))
+  createEffect(() => props.occupied?.(!drawDefault(), drawDefault() ? undefined : standing()?.pluginId))
 
   return (
     <>
@@ -272,6 +275,7 @@ export function Slot(props: SlotProps) {
                     ...(props.taskId ? { taskId: props.taskId } : {}),
                     ...(props.projectId ? { projectId: props.projectId } : {}),
                   })}
+                  onFailed={() => setFailed((ids) => [...ids, contribution.id])}
                 />
               }
             >

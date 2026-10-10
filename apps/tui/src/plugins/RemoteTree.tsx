@@ -44,6 +44,8 @@ export type RemoteTreeProps = {
    *  contributor may ask its owner to do is not a question about which host is drawing. */
   actions?: () => OwnerActions
   declaredActions?: () => readonly string[]
+  /** The tree failed and draws nothing, for an owner that draws something else in its place. */
+  onFailed?: (reason: string) => void
 }
 
 const treeRefusal = (contribution: RemoteContribution) => (reason: string): void => {
@@ -183,7 +185,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const pluginId = createMemo(() => contribution.pluginId)
   return (
     <box flexDirection="column" flexGrow={1} ref={(element: Renderable) => { container = element }}>
-      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} />
+      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} {...(componentProps.onFailed ? { onFailed: componentProps.onFailed } : {})} />
     </box>
   )
 }

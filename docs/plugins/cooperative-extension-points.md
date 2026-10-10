@@ -83,7 +83,8 @@ iframe. Past `max`, the host draws a count of what was left out, with no names.
 When two contributors match the same key in `replace` mode, the person picks in **Settings > Advanced
 > Extension points**, and the owner's default draws until they do. A pick naming a plugin that stopped
 matching falls back to the owner's default, not the runner-up, so a box never changes hands because
-somebody uninstalled something.
+somebody uninstalled something. A `replace` contributor whose tree fails draws nothing, so the owner's
+default draws in its place until the slot mounts again.
 
 ## What the host binds
 

@@ -625,7 +625,9 @@ describe('architecture boundaries', () => {
       // barrel doesn't load the tree host, and `ContributionBoundary.tsx`, for the desktop's lazy
       // promotion modal (docs/frontend/startup-budget.md).
       // Phase 05 of the git-pane work exposes a lean task launch signal and lazy draft model to both hosts.
-      '@acorn/client-core': 177, // Includes the no-projects surface, workspace rail, and device preference reader.
+      // Two more on 2026-10-10 for link previews: `host/linkPreview/linkPreview.ts`, the JSX-free state
+      // both hosts import, and `LinkPreviewHost.tsx`, the desktop's popover, which the terminal can't load.
+      '@acorn/client-core': 179, // Includes the no-projects surface, workspace rail, and device preference reader.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.

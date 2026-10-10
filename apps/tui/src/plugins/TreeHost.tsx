@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
+import { createEffect, createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { TEXT_NODE, isKitNode } from '@acorn/protocol/tree/nodes.ts'
 import { kitComponent } from '@acorn/client-core/host/tree'
@@ -26,6 +26,10 @@ export function TreeHost(props: TreeHostProps) {
     ...(props.onRefused ? { onRefused: props.onRefused } : {}),
   })
   onCleanup(() => state.dispose())
+  createEffect(() => {
+    const failed = state.failed()
+    if (failed) props.onFailed?.(failed)
+  })
 
   const NodeView = (own: { id: string }): JSX.Element => {
     const stored = () => state.nodes[own.id]
@@ -52,7 +56,7 @@ export function TreeHost(props: TreeHostProps) {
       {/* One boundary per tree, not per node: a kit component that throws on a stranger's props takes
           its own tree down and nothing else. A failed optional contribution stays out of the owner's
           UI rather than replacing it with an error. */}
-      <ErrorBoundary fallback={null}>
+      <ErrorBoundary fallback={(error) => { props.onFailed?.(String(error)); return null }}>
         {/* One boundary per root, the same shape client-core's TreeHost takes. Every entry in this
             host's table is a component today, so nothing suspends; the boundary is here because the
             table's type allows a loader and because the kit is drawn from one set of names on both

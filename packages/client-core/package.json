@@ -99,6 +99,8 @@
     "./host/layouts/RegionLoading.tsx": "./src/host/layouts/RegionLoading.tsx",
     "./host/layouts/table.ts": "./src/host/layouts/table.ts",
     "./host/layouts/state.ts": "./src/host/layouts/state.ts",
+    "./host/linkPreview/linkPreview.ts": "./src/host/linkPreview/linkPreview.ts",
+    "./host/linkPreview/LinkPreviewHost.tsx": "./src/host/linkPreview/LinkPreviewHost.tsx",
     "./host/palette": "./src/host/palette/public.ts",
     "./host/palette/CommandPalette.tsx": "./src/host/palette/CommandPalette.tsx",
     "./host/palette/PaletteSurface.tsx": "./src/host/palette/PaletteSurface.tsx",

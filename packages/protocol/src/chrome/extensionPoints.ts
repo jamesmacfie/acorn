@@ -468,3 +468,42 @@ export type EditorDocumentProps = {
    *  from Source. Work started for a lower revision is stale. */
   revision: number
 }
+
+/** A preview of an HTTPS link in rendered content: an agent's reply, a pull request body, a link in a
+ *  plugin's tree. Core owns it because the links live in everybody's content. `replace`, keyed by the
+ *  URL `linkPreviewKey` returns, so `matches: ["https://docs.example.com/*"]` claims one site. With no
+ *  contributor the host draws the label, the URL and Open, and fetches nothing
+ *  (docs/plugins/remote-points.md § Link previews). */
+export const CORE_LINK_PREVIEW_POINT = 'core:link-preview'
+
+export type LinkPreviewProps = {
+  /** The normalized URL, the same string the point is keyed by. */
+  url: string
+  /** The link's text, when it has any. */
+  label?: string
+  taskId?: string
+  projectId?: string
+  /** What an in-app recogniser already made of the URL, such as `{ kind: 'linear.issue', id: 'ENG-1' }`.
+   *  Never provider HTML. */
+  ref?: { kind: string; id: string }
+}
+
+export const MAX_LINK_PREVIEW_URL = 4_096
+
+/**
+ * The key a link previews under, or `null` for a link that gets no preview.
+ *
+ * `URL` parsing only: the host is lowercased and the path, query and fragment are kept as written.
+ * Removing tracking parameters or following redirects would be the host guessing what a site means.
+ * A URL carrying a user name or password never previews, so a contributor is never handed one.
+ */
+export function linkPreviewKey(href: string): string | null {
+  if (href.length > MAX_LINK_PREVIEW_URL) return null
+  try {
+    const url = new URL(href)
+    if (url.protocol !== 'https:' || !url.hostname || url.username || url.password) return null
+    return url.href.length > MAX_LINK_PREVIEW_URL ? null : url.href
+  } catch {
+    return null
+  }
+}

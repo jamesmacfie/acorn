@@ -1,10 +1,12 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, Show, type JSX } from 'solid-js'
+import { createSignal, Show, useContext, type JSX } from 'solid-js'
 import type { TextRole, Tone } from '@acorn/client-core/kit/tokens'
 import type { HeadingProps } from '@acorn/client-core/kit/components/content'
 import { flatten, Line, runStyle } from '../cells'
 import { borderCell } from '../roles'
 import { stop } from '../../keys/stops'
+import { linkPreviewKey } from '@acorn/protocol/extensionPoints.ts'
+import { LinkMenuContext } from '../paneContext'
 
 // The terminal form of these kit nodes follows docs/ui-design/every-node.md § Every node at 80 by 24.
 
@@ -18,10 +20,15 @@ export function Link(props: { href?: string; onPress?: () => void; tip?: string;
   // A link with a handler presses it. A link with only an `href` prints the URL on the line below,
   // which is what this host already does with anything it cannot open for you (../copy.ts) —
   // there is no browser to hand it to and a terminal's own OSC 8 support is not something to guess at.
+  // Inside a pane, an HTTPS link offers the host's link menu instead, which has Preview beside that.
   const [shown, setShown] = createSignal(false)
+  const linkMenu = useContext(LinkMenuContext)
   const control = stop({
     onPress: () => {
       if (props.onPress) return props.onPress()
+      const url = props.href ? linkPreviewKey(props.href) : null
+      const label = flatten(props.children).trim()
+      if (url && linkMenu) return linkMenu({ url, ...(label ? { label } : {}), showAddress: () => setShown(true) })
       if (props.href) setShown(true)
     },
   })

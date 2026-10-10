@@ -54,6 +54,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `core:storage` | `stack`, up to four | `{ nodeId }` |
 | `core:security` | `stack`, up to four | `{ nodeId }`. A section on **Settings > Security and backup**. Agents draws its instruction file check |
 | `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |
+| `core:link-preview` | `replace`, keyed by the normalized HTTPS URL | `{ url, label?, taskId?, projectId?, ref? }`. See [link previews](#link-previews) |
 
 Read `changes:push-actions` before you open a point of your own. It sits under the Changes pane's
 branch bar, and its props are the five scalars the bar draws. The Changes plugin can't say "pull
@@ -78,6 +79,39 @@ Without them, `openPane`, in-app `openUrl`, and task-scoped key bindings would h
 is the owner's, not the shell's, so a project pane or reference panel never pushes a pane into a
 background task. The scope reaches the bridge only. What the owner wants the contributor to know goes
 in the slot's props.
+
+## Link previews
+
+`core:link-preview` draws a preview of an HTTPS link in rendered content: Markdown, provider HTML such
+as a pull request body, and kit `Link` nodes in plugin trees. Declare a contributor with the sites it
+knows:
+
+```json
+{ "id": "docs-preview", "point": "core:link-preview", "label": "Documentation",
+  "matches": ["https://docs.example.com/*"], "remote": "docsPreview" }
+```
+
+The key is the URL as `URL` parses it. The host is lowercased, and the path, query, and fragment stay
+as written. A URL longer than 4,096 characters, or one carrying a user name or password, gets no
+preview. `ref` is `{ kind, id }` when an in-app link recognizer already claimed the URL, such as
+`{ kind: 'linear.issue', id: 'ENG-1' }`. The scope is the task or project of the content the link sits
+in.
+
+Read your data from your own Node route with the URL, and check the allowed hosts, redirects,
+response size, and timeout there. The host fetches nothing. With no contributor, or while two are tied,
+it draws the link's text, the URL, and **Open**. A tree that fails falls back to the same thing.
+
+On the desktop, a preview opens after the pointer rests on a link for 350 ms and closes 150 ms after it
+leaves both the link and the preview. One preview is open at a time. Moving to another link your
+contributor matches is a props update, so your tree stays mounted. Abort the read for the previous
+URL, and drop a late answer for it. Right-click a link, or press Shift+F10 on it, for **Preview**,
+**Open link**, and **Copy link**. **Preview** there moves focus into the preview, and Escape gives it
+back. In the terminal, pressing a link inside a pane offers **Preview** in a dialog. The terminal has
+no hover.
+
+A content owner opts its region in with `createLinkPreviewBoundary`, from
+`packages/client-core/src/host/linkPreview/linkPreview.ts`. It returns event handlers to spread on the
+element that already holds the content. Task panes and the shell's project region have one.
 
 ## Asking the owner
 

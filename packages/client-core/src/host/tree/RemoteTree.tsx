@@ -69,6 +69,8 @@ export type RemoteTreeProps = {
    * (../frames/broker.ts). The `frame` region of the same pane is handed the identical accessor.
    */
   document?: () => { read(): string; write(text: string): void; flush(): Promise<void> } | null
+  /** The tree failed and draws nothing, for an owner that draws something else in its place. */
+  onFailed?: (reason: string) => void
 }
 
 /** How long after a press a tree may still open its overlay. Long enough to cover the worker round
@@ -292,7 +294,10 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const pluginId = createMemo(() => contribution.pluginId)
   return (
     <div class="remote-tree" ref={(element) => { container = element; attachGestures(element) }}>
-      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} onFailed={(reason) => recordTreeFailure(contribution.id, reason)} />
+      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} onFailed={(reason) => {
+        recordTreeFailure(contribution.id, reason)
+        componentProps.onFailed?.(reason)
+      }} />
     </div>
   )
 }

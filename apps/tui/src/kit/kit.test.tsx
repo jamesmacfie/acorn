@@ -32,6 +32,7 @@ import { HistoryMark } from './historyMark'
 import { Line } from './cells'
 import { _resetCollections } from '../keys/collection'
 import { focusedRenderable } from '../keys/regions'
+import { LinkMenuContext } from './paneContext'
 
 // One case per kit node, asserting the sentence its row in docs/ui-design/every-node.md § Every node at 80 by 24
 // promises, against the cells it actually drew.
@@ -1234,6 +1235,19 @@ const BEHAVIOURS: Behaviour[] = [
     drive: async (screen) => {
       expect(screen.text).not.toContain('example.com')
       expect((await screen.press('RETURN')).text).toContain('https://example.com')
+    },
+  },
+  {
+    node: 'Link',
+    does: 'offers the pane’s link menu, with Preview, where it sits in a pane',
+    render: (record) => (
+      <LinkMenuContext.Provider value={(link) => record(`${link.label} ${link.url}`)}>
+        <Link href="https://Example.com/a">go there</Link>
+      </LinkMenuContext.Provider>
+    ),
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN')
+      expect(pressed).toEqual(['go there https://example.com/a'])
     },
   },
   {

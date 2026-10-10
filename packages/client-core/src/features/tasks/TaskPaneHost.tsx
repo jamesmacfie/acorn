@@ -25,6 +25,7 @@ import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints
 import { registerContextMenuItems, type RailPaneTarget } from '../../host/registries/panes/contextMenus'
 import { ContextMenuHost, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 import { featureMounted, openFeature } from '../../infra/telemetry/featureOpening'
+import { createLinkPreviewBoundary } from '../../host/linkPreview/linkPreview'
 
 registerCoreExclusiveSlot('pane.switcher', (props) => <PaneSwitcher {...(props.value as PaneSwitcherProps)} />)
 
@@ -37,6 +38,8 @@ export default function TaskPaneHost(props: {
   shortcutFor?: (id: string) => string | null | undefined
 }) {
   const menuId = createUniqueId()
+  // Links in any pane preview against this task, whichever task the rail has selected.
+  const linkPreviews = createLinkPreviewBoundary(() => ({ taskId: props.task.id, projectId: props.task.projectId }))
   const [paneMenu, setPaneMenu] = createSignal<ContextMenuOpening | null>(null)
   let paneMenuReturnFocus: HTMLElement | undefined
   let openedPane: unknown
@@ -202,6 +205,7 @@ export default function TaskPaneHost(props: {
                 style={{ 'flex-grow': weightFor(pane.id), 'min-width': `${minWidthFor(pane)}px` }}
                 tabindex="0"
                 data-pane-id={pane.id}
+                {...linkPreviews}
               >
                 <div class="pane-slot-actions">
                   {/* docs/ui-design/states.md § Connection and staleness vocabulary asks for offline and

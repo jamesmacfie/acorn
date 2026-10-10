@@ -402,6 +402,11 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '  and receives the clicked row\'s id. The host stamps your plugin id beside the rows, always.',
     'A contribution to a point that is not there — owner not installed, disabled, or it dropped the point —',
     'delivers nothing, silently. That is the designed outcome, not a failure to report.',
+    'Core opens one remote point a loaded plugin can fill without asking anyone: `core:link-preview`,',
+    '`replace`, keyed by the HTTPS URL as `URL` parses it. Declare `{ id, point: "core:link-preview",',
+    '  label, remote, matches: ["https://docs.example.com/*"] }`; the tree gets `{ url, label?, taskId?,',
+    '  projectId?, ref? }`. Read your data from your own route, aborting the read when `url` changes. The',
+    '  desktop shows it on hover and from the link menu, the terminal from the link menu.',
     '',
     `**Replacing a core surface.** A \`coreSlot\` frame offers to draw one of acorn's own: `
       + `${manifest.coreSlots.map((value) => `\`${value}\``).join(', ')}. Declare `

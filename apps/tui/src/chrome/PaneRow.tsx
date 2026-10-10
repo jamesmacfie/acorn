@@ -7,7 +7,9 @@ import { Line } from '../kit/cells'
 import { EmptyState } from '../kit/showing'
 import { PaneFailure } from '../panel'
 import { panesFor, showPane, shownPane } from './panes'
-import { PaneIdContext } from '../kit/paneContext'
+import { LinkMenuContext, PaneIdContext, type LinkMenu } from '../kit/paneContext'
+import { openActionPicker } from '@acorn/client-core/host/registries/commands'
+import { linkLabel, openLinkPreview } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
 
 // The pane row: one line of pane labels, and the pane under it.
 //
@@ -50,6 +52,21 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
 // trees). `ContributionBoundary` itself is not reused — its fallback is `<section>` and `<strong>`.
 export function PaneBody(props: { task: Task; nodeId: string }) {
   const shown = () => shownPane(props.task)
+  // The terminal's link menu. There is no hover here, so Preview is always something a person asked for.
+  const linkMenu: LinkMenu = (link) => {
+    const label = link.label ? linkLabel(link.label, link.url) : undefined
+    openActionPicker({
+      title: label ?? 'Link',
+      detail: link.url,
+      actions: [
+        { id: 'preview', label: 'Preview', run: () => openLinkPreview({
+          url: link.url, ...(label ? { label } : {}), focus: true,
+          scope: { taskId: props.task.id, projectId: props.task.projectId },
+        }) },
+        { id: 'address', label: 'Show address', run: link.showAddress },
+      ],
+    })
+  }
   return (
     // A pane component can keep task-scoped resources and capture its model on mount. Reuse the
     // chrome while changing tasks, but remount the pane tree when its task or contribution changes.
@@ -87,9 +104,11 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
                     text node nobody sees. A pending `lazy()` region is an empty string. The
                     layout mount path already has this guard; a component pane does not go through it. */}
                 <PaneIdContext.Provider value={pane.id}>
-                  <Suspense fallback={null}>
-                    {createComponent(pane.component, { get task() { return props.task } })}
-                  </Suspense>
+                  <LinkMenuContext.Provider value={linkMenu}>
+                    <Suspense fallback={null}>
+                      {createComponent(pane.component, { get task() { return props.task } })}
+                    </Suspense>
+                  </LinkMenuContext.Provider>
                 </PaneIdContext.Provider>
               </ErrorBoundary>
             </box>

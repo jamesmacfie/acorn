@@ -1,0 +1,18 @@
+/* A link's preview (host/linkPreview/LinkPreviewHost.tsx). The surface is a `.ui-popover`, so the native
+   overlay layer draws it above a live page like any other popover. Capped at 420 by 360 and never past
+   the window, and it scrolls inside rather than growing. Qualified with `.ui-popover`, because that rule
+   sets its own `max-width` and may load after this file. */
+.ui-popover.link-preview {
+  max-width: min(420px, calc(100vw - 8px));
+  max-height: min(360px, calc(100vh - 8px));
+  overflow: auto;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+.ui-popover.link-preview:focus { outline: none; }
+.link-preview-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

@@ -34,11 +34,20 @@ describe('a transcript with web activity in it', () => {
         const open = await screen.until('Comparing hashes')
         expect(open).toContain('docs.example')
 
-        // The link, pressed. There is nowhere to send it, so this host prints the address instead,
-        // which is what it does with every address it cannot open.
+        // The link, pressed. There is no browser to send it to, so the pane's link menu offers a
+        // preview and the address, which this host prints the way it prints every address it cannot
+        // open (kit.test.tsx). Preview opens the `core:link-preview` dialog, which with no
+        // contributor draws the address and Open.
         await stopSaying(screen, 'Comparing hashes')
         await screen.press('RETURN')
-        expect(await screen.until('https://docs.example/bcrypt')).toContain('https://docs.example/bcrypt')
+        const menu = await screen.until('Show address')
+        expect(menu).toContain('Preview')
+        expect(await screen.reach('Preview')).toBe(true)
+        await screen.press('RETURN')
+        const preview = await screen.until('[Open]')
+        expect(preview).toContain('https://docs.example/bcrypt')
+        await screen.press('ESCAPE')
+        expect(await screen.frame()).not.toContain('[Open]')
       } finally {
         screen.done()
       }

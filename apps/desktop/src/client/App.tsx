@@ -42,6 +42,8 @@ import { CheatSheet } from '@acorn/client-core/host/keys/CheatSheet.tsx'
 import { confirmWillEvent, registerWillHandler, WillConfirmationHost } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 import { taskBridge } from '@acorn/client-core/features/tasks'
 import { RefPanelHost } from '@acorn/client-core/host/registries/panes/refPanelHost.tsx'
+import { createLinkPreviewBoundary } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
+import { LinkPreviewHost } from '@acorn/client-core/host/linkPreview/LinkPreviewHost.tsx'
 import { startClientSchedules } from '@acorn/client-core/host/registries/shell'
 import { SlotHost, type UiSlotContext } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
 import { createAppStartupRestore } from '@acorn/client-core/infra/persistence'
@@ -391,6 +393,12 @@ export default function App() {
   // without the task fallback the workspace and project pickers went blank the moment you opened a
   // task, and the per-workspace view memory below never saw a workspace change.
   const contextProjectId = () => params.projectId ?? activeTask()?.projectId
+  // Links on a project's own surfaces preview against the project. A task's panes claim their links
+  // first, with the task's scope (features/tasks/TaskPaneHost.tsx).
+  const sourceLinkPreviews = createLinkPreviewBoundary(() => {
+    const projectId = contextProjectId()
+    return projectId ? { projectId } : {}
+  })
   // A memo, and one that holds its last answer, for two reasons that both belong to the transition
   // effect below.
   //
@@ -704,7 +712,7 @@ export default function App() {
       <Show when={workspaceRailShown(prefs.data)}><WorkspaceRail value={topbarProps()} /></Show>
       <TabRail />
     </Show>
-    <div class="app">
+    <div class="app" {...sourceLinkPreviews}>
       <Show when={showNoProjects()}><NoProjects beginAdd={beginProjectAdd} /></Show>
       <Show when={!showNoProjects()}>
       <Switch fallback={
@@ -742,6 +750,7 @@ export default function App() {
           (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
+      <LinkPreviewHost />
       {/* The modal snapshots eligible tasks and used branches when it mounts. Wait for both lists
           before mounting so a cold Node does not offer an empty attachment/branch context. */}
       <Show keyed when={linkPromotion() && params.projectId === linkPromotion()!.projectId
