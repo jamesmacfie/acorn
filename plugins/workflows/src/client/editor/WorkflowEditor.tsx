@@ -60,6 +60,8 @@ import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { mergeWorkflow } from '../../shared/workflowMerge'
 import { requestWorkflowSchedule } from '../schedules/scheduleRequest'
 import { openWorkflowRun } from '../runs/runStore'
+import type { WorkflowAgentOrigin } from '../../contract/wire'
+import InvocationDialog from './InvocationDialog'
 
 // The editor: one definition as a list of nodes with an inspector, on both hosts
 // (docs/workflows/authoring.md § Authoring).
@@ -195,6 +197,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   // has not arrived. The workspaces query resolves long before a description is typed.
   const canGenerate = () => !store.readOnly() && !!workspaceId() && (backends()?.length ?? 0) > 0
   const [authoringOpen, setAuthoringOpen] = createSignal(false)
+  const [invocationOpen, setInvocationOpen] = createSignal(false)
   // A row loaded from the node is saved even when its graph is empty. `dirty` also covers a future
   // editor-owned draft before it has a row: once there is work to preserve, authoring can propose an
   // edit without saving or publishing it.
@@ -311,6 +314,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   }
 
   const isDatabase = () => store.ref()?.source === 'database'
+  const isFile = () => store.ref()?.source === 'repo' || store.ref()?.source === 'user'
   const runDisabled = () => (isDatabase() && !store.publishedRevision()) || !!missingRunKind()
 
   // One bar: where you are and what this definition is on the left, what you can do to it on the
@@ -342,6 +346,11 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           {store.publishedRevision() ? 'Published' : 'Not published'}
         </Badge>
       </Show>
+      {/* Saved by an agent through workflow_draft. The text is the agent's, so it is reviewed before it
+          is published, and nothing here grants the agent anything. */}
+      <Show when={store.agentOrigin()}>
+        {(origin) => <Badge tone="warn" tip={agentDraftTip(origin())}>Agent draft</Badge>}
+      </Show>
       {/* A file, so Publish… writes the working tree rather than a version on the node. */}
       <Show when={store.ref()?.source === 'repo' || store.ref()?.source === 'user'}>
         <Badge>{store.ref()?.source === 'repo' ? 'File in the repository' : 'File on this computer'}</Badge>
@@ -371,7 +380,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       >
         Run…
       </Button>
-      <Show when={isDatabase() && !store.readOnly()}>
+      <Show when={(isDatabase() && !store.readOnly()) || isFile()}>
         <Menu
           ariaLabel="More workflow actions"
           placement="bottom-end"
@@ -382,16 +391,22 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           {/* A disabled item takes no hover, so a tip would never show. The reason rides in the label. */}
           {(menu) => (
             <>
-              <Menu.Item context={menu} disabled={!store.publishedRevision()} onSelect={schedule}>
-                {store.publishedRevision() ? 'Schedule…' : 'Schedule… (publish first)'}
+              {/* Published versions and files only: an agent can start only what would run. */}
+              <Menu.Item context={menu} disabled={isDatabase() && !store.publishedRevision()} onSelect={() => setInvocationOpen(true)}>
+                {isDatabase() && !store.publishedRevision() ? 'Agent invocation… (publish first)' : 'Agent invocation…'}
               </Menu.Item>
-              <Menu.Item context={menu} disabled={store.busy() || !store.publishedRevision()} onSelect={() => void openExport()}>
-                {store.publishedRevision() ? 'Export to repository…' : 'Export to repository… (publish first)'}
-              </Menu.Item>
-              <Menu.Separator />
-              <Menu.Item context={menu} tone="danger" confirm="Delete workflow?" disabled={store.busy()} onSelect={() => void remove()}>
-                Delete
-              </Menu.Item>
+              <Show when={isDatabase()}>
+                <Menu.Item context={menu} disabled={!store.publishedRevision()} onSelect={schedule}>
+                  {store.publishedRevision() ? 'Schedule…' : 'Schedule… (publish first)'}
+                </Menu.Item>
+                <Menu.Item context={menu} disabled={store.busy() || !store.publishedRevision()} onSelect={() => void openExport()}>
+                  {store.publishedRevision() ? 'Export to repository…' : 'Export to repository… (publish first)'}
+                </Menu.Item>
+                <Menu.Separator />
+                <Menu.Item context={menu} tone="danger" confirm="Delete workflow?" disabled={store.busy()} onSelect={() => void remove()}>
+                  Delete
+                </Menu.Item>
+              </Show>
             </>
           )}
         </Menu>
@@ -508,6 +523,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           </ModalActions>
         </Modal>
       )}</Show>
+      <Show when={invocationOpen() && store.ref()} keyed>{(ref) => (
+        <InvocationDialog projectId={props.projectId} definitionKey={defRefKey(ref)} name={draft().def.name} onClose={() => setInvocationOpen(false)} />
+      )}</Show>
       <Show when={authoringOpen() && !!workspaceId() && store.capture()} keyed>{address => <>
         {/* A dialog, not a strip over the editor: the conversation is a side trip from the draft, and
             drawn inline it pushed the outline half off the screen. It keeps its thread on the device,
@@ -590,6 +608,13 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     </Stack>
     </RevealFieldErrors.Provider>
   )
+}
+
+const agentDraftTip = (origin: WorkflowAgentOrigin): string => {
+  const source = origin.source
+    ? ` It proposes changes to ${origin.source.source === 'repo' ? origin.source.path : `${origin.source.source} workflow ${origin.source.id}`}${origin.baseRevision ? ` at revision ${origin.baseRevision}` : ''}.`
+    : ''
+  return `An agent saved this draft from a task conversation.${source} Review every step before you publish it.`
 }
 
 const SAVE_BADGE: Record<SaveState, { word: string; tone?: 'warn' | 'danger'; tip?: string }> = {

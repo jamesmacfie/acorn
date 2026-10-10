@@ -4,6 +4,7 @@ import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { QueryConsumer, QueryScope } from '@acorn/protocol/dataQueries.ts'
 import { workflowDefs, workflowDependencies, workflowRevisions } from '../../node/schema'
 import type { WorkflowDef } from '../../shared/workflowContracts'
+import type { WorkflowAgentOrigin } from '../../contract/wire.ts'
 import { createDef, getDef, removeDef, updateDef, type StoredWorkflowDef } from '../definitions/store'
 
 type QueryConsumerWriter = (scope: QueryScope, queryId: string, consumer: Omit<QueryConsumer, 'pluginId'>, remove?: boolean) => Promise<void>
@@ -55,21 +56,21 @@ export function workflowDraftQueries(db: PluginDatabase, writeConsumer: QueryCon
     }
   }
   return {
-    async create(input: { workspaceId: string; projectId?: string; def: WorkflowDef }) {
-      const id = randomUUID()
+    async create(input: { id?: string; workspaceId: string; projectId?: string; def: WorkflowDef; agentOrigin?: WorkflowAgentOrigin }) {
+      const id = input.id ?? randomUUID()
       return serial(id, async () => {
         await protect(id, { workspaceId: input.workspaceId, projectId: input.projectId }, input.def)
         const row = await createDef(db, { ...input, id })
         return row
       })
     },
-    async update(id: string, def: WorkflowDef, revision: number) {
+    async update(id: string, def: WorkflowDef, revision: number, agentCallId?: string) {
       return serial(id, async () => {
         const current = await getDef(db, id)
         if (!current) return null
         if (current.revision !== revision) return { conflict: current }
         await protect(id, scopeOf(current), def)
-        const answer = await updateDef(db, id, def, revision)
+        const answer = await updateDef(db, id, def, revision, agentCallId)
         await reconcileOne(id)
         return answer
       })

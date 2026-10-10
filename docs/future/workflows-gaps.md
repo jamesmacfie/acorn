@@ -39,10 +39,9 @@ without duplicating the external action. A manual retry must retain its authoriz
 
 ## Add dedicated agent control tools
 
-[Workflow agent tools](./workflow-agent-tools.md) owns the PRD and acceptance for discovery,
-agent-authored drafts, approved invocation, run inspection, waits, and cancellation. It preserves
-device-only publication, human gates, and retries, and defines scoped admission before root starts
-become available to agents. `agent_*` tools continue to control managed sessions.
+Implemented October 10, 2026 as the [workflow tools](../agent-tools/workflow-tools.md), from the
+[workflow agent tools](./workflow-agent-tools.md) PRD. Publication, human gates, and retries stay
+device actions. `agent_*` tools continue to control managed sessions.
 
 ## Define file-owned trigger consent
 

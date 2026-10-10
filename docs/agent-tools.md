@@ -38,10 +38,12 @@ The registry is the authority on this list. These tools ship:
 | `terminal` | `run_targets`, `run_status`, `run_start`, `run_stop`, `run_restart`, in tasks with run targets |
 | `agents` | `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`, `agent_cancel` |
 | `browser` | `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_fill`, `browser_screenshot`, `browser_console` |
+| `workflows` | `workflow_catalog`, `workflows_list`, `workflow_get`, `workflow_validate`, `workflow_draft`, `workflow_run`, `workflow_read`, `workflow_wait`, `workflow_cancel` |
 
 A loaded plugin adds tools named `<pluginId>_<id>` ([loaded tools](./agent-tools/loaded-tools.md)).
-No tool drives a workflow, opens a database, or talks to Docker. [MCP](./mcp.md#tool-surface) says
-why.
+No tool opens a database or talks to Docker. [MCP](./mcp.md#tool-surface) says why. An agent starts
+a workflow only one the owner approved for agents
+([workflow tools](./agent-tools/workflow-tools.md#invocation-authority)).
 
 The four data source tools are read-only. The Node derives their workspace and project scope from the
 task, and inputs can narrow the connection and source parameters but not substitute another task.
@@ -122,6 +124,9 @@ tool names; a stale preference key cannot introduce a tool into the report.
 <a id="pluginrequest"></a>
 
 - [Plugin tools](./agent-tools/plugin-tools.md) covers `plugin_authoring` and `plugin_request`.
+
+- [Workflow tools](./agent-tools/workflow-tools.md) covers discovery, agent drafts, the owner's
+  invocation approval, and run reads, waits, and cancellation.
 
 <a id="browser-tools"></a>
 <a id="task-script-tools"></a>

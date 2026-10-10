@@ -90,7 +90,7 @@ the whole plugin system in one page.
 | [workspaces-and-tasks.md](./workspaces-and-tasks.md) | The product model: workspaces, projects, tasks, and worktrees. |
 | [managed-agents.md](./managed-agents.md) | Agent sessions acorn drives: the ledger, harnesses, managed delegation, approvals, artifacts, and usage. |
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
-| [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
+| [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, managed-session orchestration, and workflow tools. |
 | [dashboards.md](./dashboards.md) | Published dashboard panels over typed data sources, placements, datasets, coverage, and measure history. |
 | [Dashboard followups](./future/dashboards-gaps.md) | Filter diagnostics, AI preview/review controls, and the GitHub branch-source decision after the implemented studio and derived sources. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
@@ -276,7 +276,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   sections](./agent-tools/context-sections.md), [Loaded tools and context
   sections](./agent-tools/loaded-tools.md), [Managed-session
   orchestration](./agent-tools/orchestration.md), [Plugin tools](./agent-tools/plugin-tools.md),
-  [Tracker and GitHub tools](./agent-tools/tracker-tools.md).
+  [Tracker and GitHub tools](./agent-tools/tracker-tools.md), [Workflow
+  tools](./agent-tools/workflow-tools.md).
 - [dashboards.md](./dashboards.md): [Mapping and the editor](./dashboards/mapping-and-editor.md),
   [Panels](./dashboards/panels.md), [Placements](./dashboards/placements.md), [Sampling and
   retention](./dashboards/sampling.md), [Views and trends](./dashboards/views.md).
@@ -320,8 +321,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   Shipped behavior belongs in an owning doc above.
 - [Workflow agent goals](./future/workflow-agent-goals.md): the implemented requirements for completion
   conditions, bounded continuations, run inspection, and budgets on workflow agent steps.
-- [Workflow agent tools](./future/workflow-agent-tools.md): proposed discovery, agent-authored drafts,
-  approved invocation, run inspection, and cancellation through dedicated tools.
+- [Workflow agent tools](./future/workflow-agent-tools.md): the implemented requirements for discovery,
+  agent-authored drafts, approved invocation, run inspection, and cancellation through dedicated tools.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): the original design for loading a plugin

@@ -1,7 +1,7 @@
 # Workflow routes
 
 This page lists the workflows plugin's routes under `/v1/p/workflows`: definitions, runs, processing
-history, and schedule bindings. It's part of the [API reference](../api-reference.md). The workflows
+history, schedule bindings, and agent invocation approvals. It's part of the [API reference](../api-reference.md). The workflows
 plugin owns durable definitions, runs, steps, gates, and reconciliation, and
 [workflows.md](../workflows.md) owns the model. Paths below are relative to `/v1/p/workflows`.
 
@@ -38,7 +38,8 @@ another answer landed first, and 400 `gate-invalid` with one line per refused fi
 waiting. Every run-scoped path treats a foreign or unknown run as a 404.
 
 Each run projection has explicit root and parent run IDs, the matching task IDs and names, depth, and
-usage. A root reports usage for its whole tree, and a child reports only its own turns. Each child
+usage. A run an agent started with `workflow_run` also carries `launchedBy`: the session, its title,
+and the limits the owner's approval set. A root reports usage for its whole tree, and a child reports only its own turns. Each child
 summary on a dispatch step carries its task and run IDs, item key, dispatch and run status, a bounded
 result or error, and usage. These are durable reads, not rebuilt from event payloads.
 
@@ -125,3 +126,18 @@ A draft binding names a project, a published workflow, typed input, a timezone, 
 core cadence row separately, with target `{ "scheduleId": "…" }` and kind `workflow`. The workflows
 plugin owns approval and occurrences. Core owns cadence, pause, deletion, **Run now**, and the
 recent-run ring ([schedules](../schedules.md)).
+
+## Agent invocation
+
+These routes are device-only. They hold the owner's approval for agents to start a workflow
+([workflow tools](../agent-tools/workflow-tools.md#invocation-authority)).
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/workflows/invocation/review?projectId=&definition=` | The resolved graph, input contract, the fields inputs reach, default limits, and the current approval |
+| `POST` | `/workflows/invocation/approve` | Approve the reviewed graph digest with agent inputs, fixed inputs, limits, and starts per session |
+| `POST` | `/workflows/invocation/revoke` | Block fresh agent starts. Admitted runs continue |
+
+`definition` is the editor's key: `db:<id>`, `repo:<fileId>`, or `user:<fileId>`. Approval answers 409
+`invocation_refused` when the graph changed after review, an input name isn't declared, or a fixed
+value fails its schema. Turn and time limits are required.

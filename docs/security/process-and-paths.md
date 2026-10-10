@@ -104,6 +104,12 @@ only. Task listing and cleanup work out association without those hints.
   the parent's. Its tool ceiling, turn, token, and cost limits, and deadline can only narrow the
   root's. The resolved graph and limits are persisted, so restart recovery can't gain authority from
   an edited definition. Cancellation closes admission before it stops descendants.
+- An agent starts a root only through `workflow_run`. That needs the execute tier, a signed managed
+  session that neither a workflow nor another agent started, and your invocation policy for the exact
+  graph digest in that project. A launch waiting for its caller's turn checks the policy again.
+  The policy routes are device-only. The run's limits and tools only narrow the definition's, and
+  they're persisted with the frozen graph before dispatch. An agent's draft never runs until you
+  publish it ([workflow tools](../agent-tools/workflow-tools.md#invocation-authority)).
 
 [workflows.md](../workflows/definitions.md#database-definitions) owns the definition model.
 

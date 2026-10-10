@@ -18,7 +18,9 @@ const outputSchemas = (
   return (def.outputs ?? []).map(output => ({ name: output.name, schema: structuredClone(output.schema) }))
 }
 
-const target = (
+/** A definition's reference and input and output contract. Input defaults stay on the Node; the
+ *  signature says only whether one exists. */
+export const workflowCatalogTarget = (
   ref: WorkflowDefinitionRef,
   def: WorkflowDef,
   published = true,
@@ -60,9 +62,9 @@ export async function scopedWorkflowCatalog(args: {
   const user = loadWorkflowFiles(null, args.userDir, args.validation).workflows
     .filter((def) => canBeChild(def, args.validation))
   const workflows = [
-    ...rows.map((row) => target({ source: 'database', id: row.id }, row.def, !!row.publishedRevision)),
-    ...repo.map((def) => target({ source: 'repo', path: `.acorn/workflows/${def.id}.toml` }, def)),
-    ...user.map((def) => target({ source: 'user', id: def.id }, def)),
+    ...rows.map((row) => workflowCatalogTarget({ source: 'database', id: row.id }, row.def, !!row.publishedRevision)),
+    ...repo.map((def) => workflowCatalogTarget({ source: 'repo', path: `.acorn/workflows/${def.id}.toml` }, def)),
+    ...user.map((def) => workflowCatalogTarget({ source: 'user', id: def.id }, def)),
   ].sort((left, right) => left.name.localeCompare(right.name))
   return { ...args.base, workflows }
 }

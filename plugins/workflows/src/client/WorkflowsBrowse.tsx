@@ -243,6 +243,7 @@ export function WorkflowsBrowseList() {
                     trailing={(
                       <>
                         <Show when={definition().problems?.length}><Badge tone="warn" size="xs">Can't read</Badge></Show>
+                        <Show when={definition().agentAuthored}><Badge size="xs">Agent draft</Badge></Show>
                         <Icon name={SOURCE_GLYPH[definition().source].icon} title={definition().source === 'database' ? `Saved in this ${words().singular}` : SOURCE_GLYPH[definition().source].title} />
                       </>
                     )}

@@ -2,7 +2,8 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { homedir } from 'node:os'
 import type { NodePlugin, PluginDatabase } from '@acorn/plugin-api/node'
 import { loadWorkflowFiles } from './files'
-import { getDef, listDefs, mergedList } from './store'
+import { getDef, listDefs, mergedList, type StoredWorkflowDef } from './store'
+import type { WorkflowAgentOrigin } from '../../contract/wire.ts'
 import { workflowDraftQueries } from '../publication/draftQueries'
 import { workflowPublication } from '../publication/service'
 import { publishedWorkflow } from '../publication/store'
@@ -20,7 +21,7 @@ export const workflowDefinitions = (
   ctx: DefinitionContext,
   runner: WorkflowRunner,
   starts: WorkflowStartService,
-): { bridge: WorkflowDefsBridge; reconcileDraftQueries: () => Promise<void> } => {
+): { bridge: WorkflowDefsBridge; reconcileDraftQueries: () => Promise<void>; drafts: WorkflowDraftWriter } => {
   const core = ctx.core
   // `plugin:workflows:defs-changed` (docs/plugins/events.md § Hearing another plugin): the rail list and
   // the editor re-read on it. The workspace, not the row, because the list is workspace-scoped.
@@ -185,5 +186,23 @@ export const workflowDefinitions = (
     modelBackends: (userId) => core.models.available(userId),
     saveToRepo: async () => ({ error: 'Use Export to repository to review the published dependency graph before writing files.' }),
   }
-  return { bridge, reconcileDraftQueries: () => draftQueries.reconcile() }
+  // The same writes the editor's Save makes, for `workflow_draft` (../agentTools/drafts.ts).
+  const drafts: WorkflowDraftWriter = {
+    create: async (input) => {
+      const row = await draftQueries.create(input)
+      defsChanged(row.workspaceId)
+      return row
+    },
+    update: async (id, def, revision, agentCallId) => {
+      const answer = await draftQueries.update(id, def, revision, agentCallId)
+      if (answer && 'row' in answer && answer.row) defsChanged(answer.row.workspaceId)
+      return answer
+    },
+  }
+  return { bridge, reconcileDraftQueries: () => draftQueries.reconcile(), drafts }
+}
+
+export type WorkflowDraftWriter = {
+  create(input: { id: string; workspaceId: string; projectId: string; def: WorkflowDef; agentOrigin: WorkflowAgentOrigin }): Promise<StoredWorkflowDef>
+  update(id: string, def: WorkflowDef, revision: number, agentCallId: string): Promise<{ row: StoredWorkflowDef } | { conflict: StoredWorkflowDef } | null>
 }

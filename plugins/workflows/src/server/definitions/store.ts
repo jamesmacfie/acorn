@@ -10,7 +10,7 @@
 import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
-import type { WorkflowDefRow, WorkflowDefSummary } from '../../contract/wire.ts'
+import type { WorkflowAgentOrigin, WorkflowDefRow, WorkflowDefSummary } from '../../contract/wire.ts'
 import { workflowDefs, workflowDependencies } from '../../node/schema'
 import { publicationStore } from '../publication/store'
 import type { WorkflowDef } from '../../shared/workflowContracts'
@@ -44,6 +44,7 @@ const toRow = (row: Row): StoredWorkflowDef => ({
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
   def: JSON.parse(row.defJson) as WorkflowDef,
+  agentOrigin: row.agentOriginJson ? JSON.parse(row.agentOriginJson) as WorkflowAgentOrigin : null,
 })
 
 const summariseDef = (id: string, source: WorkflowDefSummary['source'], def: WorkflowDef, extra: Partial<WorkflowDefSummary> = {}): WorkflowDefSummary => ({
@@ -81,7 +82,7 @@ export async function getDef(db: PluginDatabase, id: string): Promise<StoredWork
 
 export async function createDef(
   db: PluginDatabase,
-  input: { id?: string; workspaceId: string; projectId?: string | null; def: WorkflowDef },
+  input: { id?: string; workspaceId: string; projectId?: string | null; def: WorkflowDef; agentOrigin?: WorkflowAgentOrigin },
 ): Promise<StoredWorkflowDef> {
   const at = now()
   const row: typeof workflowDefs.$inferInsert = {
@@ -91,6 +92,7 @@ export async function createDef(
     name: input.def.name,
     defJson: JSON.stringify(cleanDef(input.def)),
     revision: 1,
+    agentOriginJson: input.agentOrigin ? JSON.stringify(input.agentOrigin) : null,
     createdAt: at,
     updatedAt: at,
   }
@@ -99,27 +101,35 @@ export async function createDef(
 }
 
 /** A save. `revision` is the one the editor read; a stale one is a conflict carrying the row that
- *  won, so the caller can show what changed underneath it rather than overwriting it. */
+ *  won, so the caller can show what changed underneath it rather than overwriting it.
+ *
+ *  `agentCallId` is set by an agent's save. It lands in the same statement as the definition, which is
+ *  how a retried call can tell that its write already happened (../agentTools/drafts.ts). */
 export async function updateDef(
   db: PluginDatabase,
   id: string,
   def: WorkflowDef,
   revision: number,
+  agentCallId?: string,
 ): Promise<{ row: StoredWorkflowDef } | { conflict: StoredWorkflowDef } | null> {
   const current = await getDef(db, id)
   if (!current) return null
   if (current.revision !== revision) return { conflict: current }
   const at = now()
+  const agentOrigin = agentCallId && current.agentOrigin ? { ...current.agentOrigin, lastCallId: agentCallId } : current.agentOrigin
   const changed = await db
     .update(workflowDefs)
-    .set({ name: def.name, defJson: JSON.stringify(cleanDef(def)), revision: revision + 1, updatedAt: at })
+    .set({
+      name: def.name, defJson: JSON.stringify(cleanDef(def)), revision: revision + 1, updatedAt: at,
+      ...(agentOrigin !== current.agentOrigin ? { agentOriginJson: JSON.stringify(agentOrigin) } : {}),
+    })
     .where(and(eq(workflowDefs.id, id), eq(workflowDefs.revision, revision)))
     .returning({ id: workflowDefs.id })
   if (changed.length !== 1) {
     const winner = await getDef(db, id)
     return winner ? { conflict: winner } : null
   }
-  return { row: { ...current, name: def.name, def: cleanDef(def), revision: revision + 1, updatedAt: at } }
+  return { row: { ...current, name: def.name, def: cleanDef(def), revision: revision + 1, updatedAt: at, agentOrigin } }
 }
 
 export async function removeDef(db: PluginDatabase, id: string): Promise<void> {
@@ -150,6 +160,7 @@ export async function mergedList(
     byId.set(row.id, summariseDef(row.id, 'database', row.def, {
       projectId: row.projectId,
       publishedRevision: row.publishedRevision,
+      ...(row.agentOrigin ? { agentAuthored: true } : {}),
       ...(dangling ? { problems: ['The project this workflow was bound to has been removed.'] } : {}),
     }))
   }

@@ -29,6 +29,24 @@ export type WorkflowDefSummary = {
   projectId?: string | null
   // Why this one cannot be run as it stands, when the merged read already knows.
   problems?: string[]
+  // True for a draft an agent created through `workflow_draft`, so the list can mark it.
+  agentAuthored?: boolean
+}
+
+// Where an agent-authored draft came from (docs/agent-tools/workflow-tools.md § Drafts). Recorded when
+// the draft is created and shown in the editor beside it. The session is the signed caller identity,
+// not anything the agent typed, and the draft text stays untrusted whatever this says.
+export type WorkflowAgentOrigin = {
+  taskId: string
+  sessionId: string
+  /** The `workflow_draft` call that created the draft, and the last one that saved it. */
+  callId: string
+  lastCallId: string
+  /** The definition this draft proposes changes to, and its revision or digest at the time. */
+  source?: { source: 'database'; id: string } | { source: 'repo'; path: string } | { source: 'user'; id: string }
+  baseRevision?: number
+  baseDigest?: string
+  createdAt: number
 }
 
 // A definition stored as a row (docs/workflows/definitions.md § Database definitions). `def` is the plugin's own
@@ -47,6 +65,8 @@ export type WorkflowDefRow = {
   def: unknown
   /** The immutable revision Run will start. Omitted when this draft has never been published. */
   publishedDef?: unknown
+  /** Present only on a draft an agent created. */
+  agentOrigin?: WorkflowAgentOrigin | null
 }
 
 // A value a run is started with. The palette asks for one before it starts a definition that declares

@@ -164,7 +164,7 @@ catches up a plugin that was disabled, slow, or restarting when the hook ran.
 | http | Ad-hoc requests. A request saved to the repo tree has no task id and stays |
 | notes | The `notes/task/<taskId>/` folder |
 | terminal | Saved session rows |
-| workflows | Settled runs on the task, with their steps, turn admissions, and dispatch rows. A running or cancelling run waits for the daily run. Processing history stays, so a scheduled workflow doesn't process the same records again |
+| workflows | Settled runs on the task, with their steps, turn admissions, dispatch rows, and agent launch receipts. A running or cancelling run waits for the daily run. Processing history stays, so a scheduled workflow doesn't process the same records again |
 
 Provider-side sessions, such as a Claude Code session file, stay, for the reason the archived-history
 prune leaves them ([retention](../data-layer/backup-and-retention.md#retention)). The database file

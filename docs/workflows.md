@@ -91,6 +91,8 @@ now** on Settings → Schedules ([schedules](./schedules.md)).
 - [Agent steps](./workflows/agent-steps.md): what an agent step sees, and a turn that ends early.
 - [Running child workflows](./workflows/child-runs.md): what a run reports, where a file comes from,
   child workflow tasks, and live output.
+- [Workflow tools](./agent-tools/workflow-tools.md): how an agent finds workflows, saves drafts, and
+  starts one you approved for agents.
 
 <a id="authoring"></a>
 

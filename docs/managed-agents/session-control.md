@@ -2,7 +2,8 @@
 
 `agents.sessionControl` lets another plugin stop a session's turn or change one of its options, such
 as the model or the reasoning effort. Workflows uses it to cancel a step, and a loaded plugin can use
-it to cycle effort from a command or move to a cheaper model past a budget. It's part of
+it to cycle effort from a command or move to a cheaper model past a budget. `agents.toolCaller`, at
+the end of this page, tells another plugin's agent tool which session called it. It's part of
 [managed agents](../managed-agents.md).
 
 The contract is `AgentSessionControl` in `plugins/agents/src/contract/sessionExecute.ts`. The
@@ -51,3 +52,20 @@ shows it in the host's words, marked high: "Stop your agent sessions’ turns, a
 reasoning effort, and other options, which changes what they spend". One grant covers both calls.
 
 The `acorn-session-meter` plugin, kept in its own repository, is the first loaded consumer.
+
+## Tool callers
+
+`agents.toolCaller` tells another plugin's agent tool which managed session made a signed call. The
+contract is `plugins/agents/src/contract/toolCaller.ts`, and the implementation is
+`plugins/agents/src/server/sessions/toolCaller.ts`. The workflows plugin uses it for its
+[workflow tools](../agent-tools/workflow-tools.md).
+
+- `resolve(taskId, sessionId)` answers the session's title, whether a workflow step or another agent
+  started it, the run that owns it, and its running turn. It answers `null` for a terminal session, an archived one,
+  and one in another task. Pass the session ID from the tool context, which the credential signs,
+  never from tool input.
+- `onTurnSettled(listener)` reports each turn that reaches `completed`, `cancelled`, `failed`, or
+  `interrupted`, after its write commits. It isn't durable. After a restart, read `agents.turns` for
+  anything missed.
+
+Both are reads. The session store stays with the agents plugin.

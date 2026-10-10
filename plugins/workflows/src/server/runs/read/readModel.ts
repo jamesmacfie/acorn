@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../../node/schema'
 import type { WorkflowRunProjection, WorkflowUsageSummary } from '../../../shared/api'
+import type { WorkflowBudget } from '../../../shared/workflowContracts'
 
 const admissionFields = {
   rootRunId: schema.workflowTurnAdmissions.rootRunId, runId: schema.workflowTurnAdmissions.runId,
@@ -51,6 +52,11 @@ export async function workflowRunsForTask(db: PluginDatabase, taskId: string, in
   const rootIds = [...new Set(rows.map((row) => row.rootRunId ?? row.id))]
   const admissions = await db.select(admissionFields).from(schema.workflowTurnAdmissions)
     .where(inArray(schema.workflowTurnAdmissions.rootRunId, rootIds))
+  // An agent-started root carries its receipt under the run's own ID (../../agentTools/launches.ts).
+  const launches = new Map((await db.select({
+    id: schema.workflowAgentLaunches.id, sessionId: schema.workflowAgentLaunches.sessionId,
+    title: schema.workflowAgentLaunches.callerTitle, effectiveJson: schema.workflowAgentLaunches.effectiveJson,
+  }).from(schema.workflowAgentLaunches).where(inArray(schema.workflowAgentLaunches.id, rows.map((row) => row.id)))).map((launch) => [launch.id, launch]))
   const treeAdmissions = new Map<string, Admission[]>()
   const ownAdmissions = new Map<string, Admission[]>()
   for (const admission of admissions) {
@@ -76,6 +82,9 @@ export async function workflowRunsForTask(db: PluginDatabase, taskId: string, in
       parentTaskId: parent?.taskId ?? null,
       parentRunName: parent?.name ?? null,
       usage: usageSummary(usageRows),
+      ...(launches.has(row.id) ? { launchedBy: (({ sessionId, title, effectiveJson }) => ({
+        sessionId, title, limits: (JSON.parse(effectiveJson) as { budget: WorkflowBudget }).budget,
+      }))(launches.get(row.id)!) } : {}),
     }
   })
 }
