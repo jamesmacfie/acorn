@@ -90,6 +90,15 @@ The node takes its two columns in two ways. A caller with an element to spare pa
 the detail alone and the second stacks its two children. The node has no keys of its own to switch
 with, and two 38-cell columns are too narrow to read.
 
+## Regions another plugin fills
+
+A loaded owner can't open a slot inside its own tree, so it asks the host for an outer one. A
+`remote` point with `mounts` names one of the owner's project panes or reference panels and `header`
+or `footer`. The host draws that point above or below the view, outside the owner's tree, with the
+view's project, item, and reference as props. A task pane can't take one. The region is capped at 30%
+of the view's height and takes no space when empty. Linear and Rollbar declare two
+([detail regions](../plugins/detail-regions.md)).
+
 ## The wizard
 
 A wizard is the one arrangement a surface that isn't a pane can use. Onboarding is a component in

@@ -37,8 +37,9 @@ pack may not set.
 ## Context menus
 
 A `contextMenus` entry is `{ id, location, surface?, label, icon?, order?, when?, action }`. `location`
-is a closed list: `task.row`, `item.row`, `rail.source`, and `rail.pane`. Call `plugin_authoring` for
-the current list. A location this Node doesn't have is a parse error.
+is a closed list: `task.row`, `item.row`, `rail.source`, `rail.pane`, `file.row`, `document.tab`,
+`agent.message`, `agent.turn`, and `content.selection`. Call `plugin_authoring` for the current list
+and each location's facts. A location this Node doesn't have is a parse error.
 
 `when` is a map, not an expression. Every named fact must equal the target's own, so
 `{ "origin": "github", "pinned": true }` means both, and `{ "pinned": "true" }` matches nothing,
@@ -54,6 +55,11 @@ pane layout actions, and your rows follow them. A `runNodeAction` receives
 empty project id means no routed project. `task.row` and `item.row` requests keep their
 `{ "item": "..." }` body. A source icon names no task, so use `runNodeAction`, `openUrl`, or
 `openOverlay` there.
+
+The last five take rows from any plugin and no `surface`. A file row sends the file's identity and no
+bytes, a message sends the text its card shows, and a selection sends the selected text, each with a
+revision the owner checks before your row runs. [An extension example](./extension-example.md) adds a
+`file.row` row.
 
 Rail menus are desktop-only, so use a command or a visible control when an action must also work in
 the terminal. These locations need a Node and desktop release that knows them. API major 3 alone

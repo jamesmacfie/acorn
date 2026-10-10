@@ -63,6 +63,18 @@ target and kind only when both match it, and otherwise falls back to the plugin'
 non-toast `plugin` kind. Each destination is an enforced trust line, and its surface, ID, target kind,
 and notice kind form the update-diff key.
 
+**An id in props is not a grant.** A contributor's tree gets the owner's identities, such as a task,
+a file path, a session, or an artifact id, and nothing they name. To read the bytes behind one, its
+Node half declares and calls the owner's read capability. `editor.files` rechecks the worktree and
+symlink rules on every call, and `agents.transcriptMedia` answers only for media that belongs to the
+named session and task. Both are read-only, and every refusal is `null`. A menu row's body carries
+the same identities and a revision the owner checks before the row runs.
+
+**Owner actions can require a person.** An owner handler learns `byPerson`, true only when a person
+pressed or typed inside that contributor's tree in the last second. Preview's `reload` and the
+terminal's `interrupt` refuse without it, so a timer or a mount can't act for a person. Sends, gate
+answers, trust, and destructive operations have no contributed action at all.
+
 **Going to a task rides the task read scope.** `ui.openTask` needs `core.tasks:read`, the scope that
 already lets a surface list tasks. Like `openUrl`, the surface must have focus, and the two share one
 navigation per second.

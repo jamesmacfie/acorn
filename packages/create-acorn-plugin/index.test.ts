@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { runInNewContext } from 'node:vm'
+import { MessageChannel } from 'node:worker_threads'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, it } from 'vitest'
@@ -100,6 +102,16 @@ it('keeps copyable manifest examples compatible with the host major', () => {
   }
   const typesExample = JSON.parse(fencedExample('packages/plugin-types/README.md', '## The manifest schema', 'json'))
   expect(speaksApiVersion(typesExample.apiVersion)).toBe(true)
+})
+
+it('points the README at the running host\'s extension discovery and the tested example', () => {
+  // The scaffold can't list points itself: they are registered in client code and change with the
+  // host. So it names the three places that read them live, and the path the example test checks.
+  const readme = (scaffoldFiles('my-widget') as Record<string, string>)['README.md']!
+  expect(readme).toContain('`plugin_authoring` agent tool lists every point')
+  expect(readme).toContain('**Settings → Advanced → Extension points**')
+  expect(readme).toContain('`docs/plugin-authoring/extension-example.md`')
+  expect(readFileSync(join(REPO, EXAMPLE), 'utf8')).toContain('## `acorn-plugin.json`')
 })
 
 it('emits a manifest the host parses, cross-field rules and all', () => {
@@ -377,6 +389,110 @@ it('type-checks the complete documented plugin example outside the workspace', (
     rmSync(dir, { recursive: true, force: true })
   }
 }, 20_000)
+
+// The extension example (docs/plugin-authoring/extension-example.md), from its pages, built the way
+// an author builds it: the packed SDK and types, Vite with the Solid preset, and strict tsc.
+const EXAMPLE = 'docs/plugin-authoring/extension-example.md'
+const exampleFiles = (): Record<string, string> => ({
+  'package.json': fencedExample(EXAMPLE, '## `package.json`', 'json'),
+  'vite.config.ts': fencedExample(EXAMPLE, '## `vite.config.ts`', 'ts'),
+  'tsconfig.json': fencedExample(EXAMPLE, '## `tsconfig.json`', 'json'),
+  'acorn-plugin.json': fencedExample(EXAMPLE, '## `acorn-plugin.json`', 'json'),
+  'node.js': fencedExample('docs/plugin-authoring/extension-example-node.md', '## `node.js`', 'js'),
+  'src/client.tsx': fencedExample('docs/plugin-authoring/extension-example-trees.md', '## `src/client.tsx`', 'tsx'),
+})
+
+it('builds, type-checks, and runs the documented extension example from the packed SDK outside the repository', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'extension-example-'))
+  try {
+    const files = exampleFiles()
+    for (const [path, contents] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true })
+      writeFileSync(join(dir, path), contents)
+    }
+    const manifest = JSON.parse(files['acorn-plugin.json']!) as {
+      contributions: { extensions: { remote?: string }[]; frames: { regions: { body: { entry: string } } }[] }
+    }
+    const parsed = parsePluginManifest(manifest)
+    expect(parsed.ok ? null : parsed.reason).toBe(null)
+
+    // The two packages under test are tarball bytes. The build tools and @types/node come from the
+    // workspace store, which is what npm install would fetch.
+    const modules = join(dir, 'node_modules')
+    unpackPublishedPackage('plugin-sdk', join(modules, 'acorn-plugin-sdk'))
+    unpackPublishedPackage('plugin-types', join(modules, 'acorn-plugin-types'))
+    cpSync(NODE_TYPES, modules, { recursive: true, dereference: true })
+    for (const [from, tool] of [['plugin-sdk', 'vite'], ['plugin-sdk', 'solid-js'], ['client-core', 'vite-plugin-solid']] as const) {
+      symlinkSync(realpathSync(join(PACKAGES, from, 'node_modules', tool)), join(modules, tool), 'dir')
+    }
+    const run = (command: string, args: string[]) => {
+      try {
+        return execFileSync(command, args, { cwd: dir, encoding: 'utf8', stdio: 'pipe' })
+      } catch (error) {
+        throw new Error(`${args.join(' ')}: ${String((error as { stdout?: string }).stdout ?? '')}${String((error as { stderr?: string }).stderr ?? error)}`)
+      }
+    }
+    run(process.execPath, [join(modules, 'vite', 'bin', 'vite.js'), 'build', '--logLevel', 'error'])
+    run(TSC, ['--noEmit'])
+
+    // One file with nothing left to import, that offers every entry the manifest names.
+    const bundle = readFileSync(join(dir, 'dist', 'client.js'), 'utf8')
+    expect(bundle).not.toMatch(/^\s*(import|export)\b/m)
+    let hello: ((event: { data: unknown; ports: unknown[] }) => void) | undefined
+    runInNewContext(bundle, {
+      addEventListener: (_kind: string, listener: typeof hello) => { hello = listener },
+      TextDecoder, URLSearchParams, queueMicrotask, setTimeout, clearTimeout,
+    })
+    const bridge = new MessageChannel()
+    const tree = new MessageChannel()
+    const ready = new Promise<{ entries?: string[] }>((resolve) => tree.port1.on('message', (message) => {
+      if (message.kind === 'tree:ready') resolve(message)
+    }))
+    try {
+      hello!({ data: { acornBridge: 1 }, ports: [bridge.port2, tree.port2] })
+      bridge.port1.postMessage({ kind: 'ready', context: {} })
+      const named = [manifest.contributions.frames[0]!.regions.body.entry, ...manifest.contributions.extensions.flatMap((entry) => entry.remote ?? [])]
+      expect([...(await ready).entries ?? []].sort()).toEqual(named.sort())
+    } finally {
+      bridge.port1.close(); tree.port1.close()
+    }
+
+    // The Node half, with the two ctx members it uses. Each call is a route the manifest names.
+    const sent: unknown[] = []
+    let handle: ((request: Request) => Promise<Response>) | undefined
+    const node = (await import(pathToFileURL(join(dir, 'node.js')).href)) as { default: { name: string; init(ctx: unknown): void } }
+    expect(node.default.name).toBe('acme-review')
+    node.default.init({
+      routes: { fetch: (handler: typeof handle) => { handle = handler } },
+      events: { send: (event: unknown) => void sent.push(event) },
+      capabilities: { get: () => ({ read: async () => ({ bytes: new TextEncoder().encode('a,b\n1,2\n') }) }) },
+    })
+    const call = async (path: string, body?: unknown) => {
+      const response = await handle!(new Request(`https://node.invalid${path}`, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) }))
+      return { status: response.status, text: await response.text() }
+    }
+    const file = { kind: 'file', taskId: 't1', projectId: 'p1', path: 'src/a.ts', directory: false, readOnly: false }
+    expect((await call('/add', { resource: file })).status).toBe(200)
+    expect(sent).toEqual([{ channel: 'plugin:acme-review:changed' }])
+    expect(JSON.parse((await call('/files?taskId=t1')).text)).toEqual({ files: ['src/a.ts'] })
+    expect(JSON.parse((await call('/tools/files', { arguments: {}, origin: { taskId: 't1' } })).text)).toEqual({ files: ['src/a.ts'] })
+    expect(JSON.parse((await call('/marks', { keys: [{ taskId: 't1', path: 'src/a.ts' }, { taskId: 't1', path: 'b.ts' }] })).text).items)
+      .toEqual([{ key: { taskId: 't1', path: 'src/a.ts' }, severity: 'warn', text: 'Under review', icon: 'eye' }])
+    expect((await call('/artifact?taskId=t1&sessionId=s1&id=a1')).text).toBe('a,b\n1,2\n')
+    expect(JSON.parse((await call(`/docs?url=${encodeURIComponent('https://docs.example.com/guide/review')}`)).text).title).toBe('Review guide')
+    expect((await call(`/docs?url=${encodeURIComponent('https://elsewhere.example.com/guide/review')}`)).status).toBe(404)
+    expect(JSON.parse((await call('/issue?item=ENG-1')).text)).toEqual({ status: 'Approved by Acme review' })
+    const todo = { start: { line: 2, column: 3 }, end: { line: 2, column: 7 } }
+    expect(JSON.parse((await call('/diagnostics', { text: '# Notes\n- TODO: check\n', revision: 4 })).text)).toEqual({
+      revision: 4, items: [{ range: todo, severity: 'warning', message: 'Unresolved TODO', source: 'acme' }],
+    })
+    expect(JSON.parse((await call('/hover', { text: '# Notes\n- TODO: check\n', position: { line: 2, column: 5 }, revision: 4 })).text))
+      .toMatchObject({ revision: 4, range: todo, contents: { kind: 'markdown' } })
+    expect((await call('/hover', { text: '# Notes\n', position: { line: 1, column: 1 }, revision: 4 })).text).toBe('null')
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}, 120_000)
 
 // The one flag the CLI has, exercised through the CLI. Every other test here calls `scaffoldFiles`
 // directly, which skips the argv reading entirely — so the flag could have stopped being read and

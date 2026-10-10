@@ -114,6 +114,11 @@ file in, the **Preview** toggle, and the `editor.files` capability that reads a 
 [File annotations](./editor/file-annotations.md) covers the `editor:file` point other plugins use to
 mark tree rows and tabs.
 
+Other plugins also add rows to a file's and a tab's menu, act on selected text, and answer hover and
+diagnostics for a language. Each gets the case-kept worktree-relative path or the live buffer with a
+revision, never a filesystem grant ([context menus](./plugins/menus-and-markers.md#context-menus),
+[hover and diagnostics](./editor/document-surface.md#hover-and-diagnostics)).
+
 <a id="find-in-files"></a>
 
 [Find in files](./editor/find-in-files.md) covers the ripgrep search behind the editor's search panel.

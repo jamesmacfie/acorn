@@ -9,17 +9,20 @@ the handshake, the verbs it carries, and telemetry from a frame. It's part of
 In-repo bundles import `connect()`, `mountFrame()`, and `mountTree()` from `@acorn/plugin-api/ui/sdk`,
 and the tree nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. `connect()` is for a frame. A
 tree uses the `bridge` its renderer is mounted with, because the host refuses requests on the bundle's
-shared port, which is what `connect()` returns in a worker.
+shared port, which is what `connect()` returns in a worker. Each mount's bridge carries that mount's
+task and project, so a tree in another plugin's slot acts in the owner's scope with your permissions.
 
 A hand-written `client.js` can't import those, because a bare specifier has no bundler to resolve it
 and the origin couldn't serve the resolved file. There are two answers, depending on whether you have
 a bundler:
 
-- **With a bundler,** run `npm install acorn-plugin-sdk` and import `connect`, `mountFrame`,
+- **With a bundler,** install `acorn-plugin-sdk` and import `connect`, `mountFrame`,
   `mountTree`, `openLinkOnClick`, and the `AcornBridge` type from it, plus `acorn-plugin-sdk/remote`
   for tree nodes and the Solid adapter. It's the same code in-repo bundles use, with no dependencies,
   and bundling it into your one `client.js` satisfies the single-file rule. You get abort signals,
-  key-claim narrowing, subscription bookkeeping, and `mountFrame`'s failure banner.
+  key-claim narrowing, subscription bookkeeping, and `mountFrame`'s failure banner. Neither SDK
+  package is on npm, so pack both from an acorn checkout
+  ([build the extension example](./extension-example.md#build-it)).
 - **Without one,** inline the handshake. It's about 30 lines, the protocol is versioned, and
   `npm create acorn-plugin` writes a working copy. Read the SDK's `connection.ts`, `bridgePort.ts`, and
   `treeChannel.ts` in `packages/client-core/src/host/frames/sdk/` for the semantics.

@@ -1,6 +1,7 @@
 # UI extension ownership and contracts
 
-Status: implementation design, October 6, 2026. Implementation not started.
+Status: implementation design, October 6, 2026. Shipped October 10, 2026. The reference pages own
+the shipped behavior ([places to fill](../../contribution-kinds.md#places-to-fill)).
 Baseline: `0ce874a15c856db07992cc5f7650b6730c6aadaf`. Editor file viewers land first.
 
 This design governs the [phased programme](./README.md). Each feature adds a named place that its

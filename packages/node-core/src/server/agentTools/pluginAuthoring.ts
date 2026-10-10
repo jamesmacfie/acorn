@@ -23,6 +23,8 @@ import {
   type PluginBridgeWebviewRequest,
 } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
+import { DETAIL_REGIONS } from '@acorn/protocol/extensionPoints.ts'
+import { PUBLIC_EXTENSION_POINTS, type PublicExtensionPoint } from '@acorn/protocol/publicExtensionPoints.ts'
 import { NODE_CORE_FACETS } from '../plugins/coreFacets.ts'
 
 // ── Derived from the manifest schema ──────────────────────────────────────────────────────────────
@@ -127,6 +129,8 @@ export type PluginAuthoringVocabulary = {
     themeTokens: string[]
   }
   actions: { railOnSelect: string[]; commandsAndBadges: string[] }
+  /** Every point another plugin can fill. Registered in client code, so read from protocol's list. */
+  points: readonly PublicExtensionPoint[]
   permissions: { node: string[]; core: string[]; note: string }
   bridge: {
     version: number
@@ -171,6 +175,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       railOnSelect: verbs(at(contributions, 'sources')?.items?.properties?.onSelect),
       commandsAndBadges: verbs(field(at(contributions, 'commands')?.items, 'action')),
     },
+    points: PUBLIC_EXTENSION_POINTS,
     permissions: {
       node: Object.keys(at(schema, 'permissions', 'node')?.properties ?? {}),
       core: [...NODE_CORE_FACETS],
@@ -322,14 +327,27 @@ bytes are a new origin and a new document.
   custom property on \`documentElement\`) or your frame renders unthemed.
 
 \`docs/plugin-authoring.md\` in the acorn repository is the long form, with a complete worked example
-including the inlined handshake. If you have that checkout, read it; if you do not, the above plus the
+including the inlined handshake, and \`docs/plugin-authoring/extension-example.md\` is a tested plugin
+that fills nine of the points listed below. If you have that checkout, read it; if you do not, the above plus the
 vocabulary below is the contract.`
 
 const table = (rows: [string, string][]): string => rows.map(([key, value]) => `- \`${key}\` — ${value}`).join('\n')
 
+/** One line per point: what to write in `matches`, what the tree or route gets, and any host gap. */
+const describePoint = (point: PublicExtensionPoint): string => {
+  const parts = point.kind === 'remote'
+    ? [
+      `\`${point.id}\` — remote, \`${point.mode}\`${point.mode === 'stack' ? ` up to ${point.max}` : ''}`
+        + `${point.matches ? `, keyed by ${point.matches}` : ''}. Props \`${point.props}\``,
+      ...(point.actions ? [`actions ${point.actions.map((action) => `\`${action}\``).join(', ')}`] : []),
+    ]
+    : [`\`${point.id}\` \`{ ${point.key.join(', ')} }\` — annotation${point.acceptedMarks ? `, ${point.acceptedMarks} marks kept` : ''}`]
+  return `- ${[...parts, point.note, point.terminal && `terminal: ${point.terminal}`].filter(Boolean).join('; ')}.`
+}
+
 /** The guide as one markdown document: the brief, then this node's own vocabulary underneath it. */
 export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()): string {
-  const { manifest, actions, permissions, bridge } = vocabulary
+  const { manifest, actions, points, permissions, bridge } = vocabulary
   return [
     BRIEF,
     '',
@@ -434,49 +452,33 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '  and receives the clicked row\'s id. The host stamps your plugin id beside the rows, always.',
     'A contribution to a point that is not there — owner not installed, disabled, or it dropped the point —',
     'delivers nothing, silently. That is the designed outcome, not a failure to report.',
-    'Core opens two remote points a loaded plugin can fill without asking anyone. `core:link-preview` is',
-    '`replace`, keyed by the HTTPS URL as `URL` parses it. Declare `{ id, point: "core:link-preview",',
-    '  label, remote, matches: ["https://docs.example.com/*"] }`; the tree gets `{ url, label?, taskId?,',
-    '  projectId?, ref? }`. Read your data from your own route, aborting the read when `url` changes. The',
-    '  desktop shows it on hover and from the link menu, the terminal from the link menu.',
-    '`core:markdown-fence` is `replace`, keyed by a closed code fence\'s lowercased language hint',
-    '  (`matches: ["json"]`). The tree gets `{ blockId, language, text, revision, taskId?, projectId? }`',
-    '  (text up to 256 KiB) and draws the fence; the owner keeps Source, Preview and Copy.',
-    'Agents opens two for transcript media: `agents:transcript-attachment` (a sent attachment) and',
-    '`agents:artifact`, both `replace`, keyed by lowercase media type without parameters',
-    '  (`application/octet-stream` when unknown). The tree gets `{ taskId, sessionId, media: { kind, id,',
-    '  filename, mediaType, byteSize? } }` and draws only the body; the card keeps the name and download.',
-    '  For bytes, require `agents`, declare `agents.transcriptMedia` in `permissions.node.capabilities`,',
-    '  call its `read({ taskId, sessionId, kind, id })` from your own route (`null` for any refusal, `bytes`',
-    '  `null` over 12 MiB), and fetch that route with `bridge.api.getBytes`.',
-    'Editor opens `editor:file`, an annotation point keyed `{ taskId, path }` (worktree-relative, case',
-    '  kept; never a folder). Declare `{ id, point: "editor:file", label, items }`; the host POSTs',
-    '  `{ keys: [{ taskId, path }] }` for the tree\'s expanded files and open tabs, and your route answers',
-    '  `{ items: [{ key, severity: "info" | "warn" | "danger", text, icon? }] }`, 256 kept. No file text',
-    '  is sent; read bytes with `editor.files`. To be asked again, `ctx.events.send({ channel:',
-    '  "plugin:<your-id>:<verb>" })`.',
-    'Core\'s rail takes the same marks at `core:task` `{ task }`, `core:source` `{ sourceId, projectId }`',
-    '  and `core:pane` `{ paneId, taskId }`. A source or task pane is asked about only if its owner sets',
-    '  `statusAnnotations: true` (Git and Changes do); `projectId` is `""` unless the source is `projectScoped`.',
-    'Workflows opens `workflows:step-body`, `replace`, keyed by a step\'s exact kind (`myplugin:deploy`),',
-    '  for the plugin that runs that kind to draw its result. The tree gets `{ taskId, projectId, runId,',
-    '  stepId, kind, status, inputs, inputsTruncated, output, outputTruncated, tail?, revision }`: the',
-    '  stored JSON parsed, `null` past 64 KiB with its flag set, and up to 200 live lines. No actions; the',
-    '  run pane keeps Retry, Stop, errors and gates. Read anything more from your own route.',
-    'Preview opens `preview:toolbar-actions` and Terminal `terminal:toolbar-actions`, both `stack` up to',
-    '  four, beside their own controls. Preview\'s tree gets `{ taskId, projectId?, url?, loading, canGoBack,',
-    '  canGoForward }` (`url` absent until a page loads; desktop only, as the terminal has no page) and may',
-    '  call `mount.host.invoke("reload", { expectedUrl })`. Terminal\'s gets `{ taskId, projectId?, session?:',
-    '  { id, title, running } }` on both hosts and may call `invoke("interrupt", { expectedSessionId })`.',
-    '  Each answers `{ ok: true }` or `{ ok: false, reason }`: `needs_person` unless called from a press in',
-    '  your tree, `changed` for a stale page, session, task or Node, `unsupported` with no live page. You',
-    '  get no page contents, navigation, PTY input or output.',
+    '',
+    '**Points you can fill.** A `remote` point takes `{ id, point, label, remote, matches?, overlay? }`:',
+    '`remote` names an entry your client bundle passed to `mountTree`, and `matches` takes exact keys,',
+    '`prefix*` and `*suffix`. A `replace` point draws one contributor, and on a tie the owner\'s default',
+    'until the person picks one; a `stack` point draws up to its cap. An `annotation` point takes',
+    '`{ id, point, label, items }`: the host POSTs `{ keys: [...] }` for what it draws, and your route',
+    'answers `{ items: [{ key, severity: "info" | "warn" | "danger", text, icon? }] }`, text cut at 200',
+    'characters. Unless a line says otherwise, the terminal draws a tree wherever it draws the owner\'s',
+    'view, and a companion overlay answers `unsupported_host` there. This node\'s list:',
+    '',
+    points.map(describePoint).join('\n'),
+    '',
+    'Read data for a tree from your own route, and abort the read when the props change. For transcript',
+    'media bytes, require `agents`, declare `agents.transcriptMedia` in `permissions.node.capabilities`,',
+    'call its `read({ taskId, sessionId, kind, id })` from your own route (`null` for any refusal, `bytes`',
+    '`null` over 12 MiB), and fetch that route with `bridge.api.getBytes`. `editor:file` sends no file',
+    'text; read bytes with `editor.files`. To be asked about marks again, `ctx.events.send({ channel:',
+    '"plugin:<your-id>:<verb>" })`. A step body gets stored JSON parsed, `null` past 64 KiB with its flag',
+    'set, and up to 200 live lines; the run pane keeps Retry, Stop, errors and gates.',
+    'Toolbar trees may call `mount.host.invoke("reload", { expectedUrl })` (Preview) or',
+    '`invoke("interrupt", { expectedSessionId })` (Terminal). Each answers `{ ok: true }` or `{ ok: false,',
+    'reason }`: `needs_person` unless called from a press in your tree, `changed` for a stale page, session,',
+    'task or Node, `unsupported` with no live page. You get no page contents, navigation, PTY input or output.',
     'A loaded owner can reserve a detail region: a `remote` point with `mounts: [{ surface, region }]`,',
-    '  `region` `header` or `footer`, `surface` one of YOUR `scope: "project"` panes or `refPanel`s, up to',
+    `  \`region\` ${DETAIL_REGIONS.map((value) => `\`${value}\``).join(' or ')}, \`surface\` one of YOUR \`scope: "project"\` panes or \`refPanel\`s, up to`,
     '  eight. The host draws the point above or below that view, outside your tree, so you write no `Slot`.',
-    '  Contributors get `{ projectId?, item?, refId?, surface }`, never your data. Linear opens',
-    '  `linear:issue-summary` (`linear-issue`, `linear-ref`) and Rollbar `rollbar:item-summary`',
-    '  (`rollbar-item`), both `stack` up to two.',
+    '  Contributors get the view\'s identity, never your data.',
     '',
     `**Replacing a core surface.** A \`coreSlot\` frame offers to draw one of acorn's own: `
       + `${manifest.coreSlots.map((value) => `\`${value}\``).join(', ')}. Declare `

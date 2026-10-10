@@ -4,7 +4,7 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { claimFor } from '../registries/panes/contentLinks'
 
-// One preview of one link at a time, for the whole client (docs/plugins/remote-points.md § Link previews).
+// One preview of one link at a time, for the whole client (docs/plugins/link-previews.md § Link previews).
 //
 // This module holds which link is being previewed and the hover timing. It draws nothing. The desktop
 // draws the preview in LinkPreviewHost.tsx and the terminal in a dialog. Content reaches it through a

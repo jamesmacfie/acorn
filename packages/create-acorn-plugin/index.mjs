@@ -366,6 +366,19 @@ edit → reload instead of edit → prompt → restart. Reload starts a fresh No
 - **\`apiVersion\` must cover the loading node's major.** \`"3"\` covers major 3; a tested plugin can
   declare a range such as \`"2 || 3"\`. A range that excludes the host is a \`failed\` roster row.
 
+## Extend another plugin's UI
+
+Add an \`extensions\` entry naming a point, such as \`editor:document\` for a file viewer or
+\`core:link-preview\` for a link preview, or a \`contextMenus\` row on \`file.row\`. Three places say what
+the running host accepts:
+
+- The \`plugin_authoring\` agent tool lists every point with its key, props, actions and terminal
+  differences, plus each menu location's facts and the language-service coordinates.
+- **Settings → Advanced → Extension points** shows each point's contributors, their \`matches\`, the
+  reason a tree last failed, and every extension whose point nobody declares.
+- \`docs/plugin-authoring/extension-example.md\` in the acorn repository is a tested plugin that fills
+  nine of them, built with the SDK.
+
 The full contract is \`docs/plugin-authoring.md\` in the acorn repository. An agent should call the
 \`plugin_authoring\` tool first — it answers with that guide plus the connected node's *current*
 manifest vocabulary read off its own schemas, which is the only way to be sure the answer is not from

@@ -76,6 +76,9 @@ for an exact record reference before a Node action runs.
   replacing a core surface.
 - [Extensions](./plugin-authoring/extensions.md): opening a point and filling another plugin's, with
   a task-annotation example.
+- [An extension example](./plugin-authoring/extension-example.md): a tested package that fills nine
+  places in other plugins' UI, with [its Node half](./plugin-authoring/extension-example-node.md) and
+  [its trees](./plugin-authoring/extension-example-trees.md).
 - [Harnesses](./plugin-authoring/harnesses.md) and [custom
   agents](./plugin-authoring/custom-agents.md): adding a managed agent with no code.
 - [CLI command authoring](./plugin-authoring/cli-commands.md): headless commands.

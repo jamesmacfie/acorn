@@ -94,6 +94,12 @@ its text there; Editor and plugin document editors offer nothing. Before a row r
 `isCurrent` checks the content hasn't changed, and the host makes the Node and task checks. The
 owners are `transcriptMenus.tsx`, `EditorPane.tsx`, and `DocumentSurface.tsx`.
 
+Plugin rows draw after the owner's own rows. A file row's menu opens on right-click or Shift+F10 in
+Editor's tree, and a tab's on right-click, Shift+F10, or the menu key without activating the tab.
+The terminal opens both from the tree's **Actions** button, the tab strip's `⋯`, or Shift+F10. A
+message's rows follow its three **Copy** rows, and a finished turn's are under **Actions for this
+turn** on its `Turn complete` line, on both hosts.
+
 Disposal and target, Node, and availability checks stop an open menu from
 invoking a replacement plugin after a reload. A manifest may declare at most 32 rows, because a
 plugin may own more than eight source and pane icons. Rail menus are desktop-only.

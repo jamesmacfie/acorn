@@ -57,14 +57,14 @@ or unaccepted runtime leaves nothing visible ([distribution](./plugins/distribut
 | Ref resolvers | Both | `ctx.contribute(refResolverRegistry)` / `contributions.refResolvers` | External-item label resolution |
 | Themes | Both | `ctx.contribute(themeRegistry)` / `contributions.themes` | The appearance picker |
 | Style packs | Loaded | `contributions.styles` | **Settings > Appearance**. The host validates token data and generates the CSS. **Direction: stays loaded, as validated data.** |
-| Context menus | Both | `ctx.contextMenus` (or `ctx.contribute(contextMenuRegistry)`) / `contributions.contextMenus` | Host-drawn context menus on task rows, item rows, and the plugin's own rail icons ([context menus](./plugins/menus-and-markers.md#context-menus)) |
+| Context menus | Both | `ctx.contextMenus` (or `ctx.contribute(contextMenuRegistry)`) / `contributions.contextMenus` | Host-drawn context menus on task rows, item rows, the plugin's own rail icons, Editor's files and tabs, transcript messages and turns, and selected text ([context menus](./plugins/menus-and-markers.md#context-menus)) |
 | Document services | Both | — / `contributions.documentServices` | Hover and diagnostics for Editor's files in one language, from the plugin's own routes. On a tie the person picks one per Node ([language smarts](./editor/document-surface.md#language-smarts)) |
-| Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds ([cooperative extension points](./plugins/cooperative-extension-points.md)). A `remote` point may declare `actions` a contributor's tree may ask for |
-| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into another plugin's point. A compiled carrier is a `component`, and a loaded one is `items`, `remote`, `frame`, or `route`. An `items` extension aimed at `core:task` publishes task status |
+| Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds ([cooperative extension points](./plugins/cooperative-extension-points.md)). A `remote` point may declare `actions` a contributor's tree may ask for, and a loaded owner's `mounts` places it above or below its own detail views ([detail regions](./plugins/detail-regions.md)) |
+| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into another plugin's point. A compiled carrier is a `component`, and a loaded one is `items`, `remote`, `frame`, or `route`. `matches` narrows a tree or rectangle to the keys it draws. See [places to fill](#places-to-fill) |
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
 | Client schedules | Compiled | `ctx.schedules` | The device-local scheduler. **Direction: stays compiled.** A loaded plugin's periodic work belongs on the Node, which runs with no client open |
 | Integration flows | Compiled | `ctx.integrationFlows` | The connect-a-provider wizard. **Direction: gains a manifest twin.** The flow is a sequence of steps, not a component ([compiled tier](./future/compiled-tier.md)) |
-| Rail markers | Compiled | `ctx.railMarkers` | A status marker on a task, source, or pane control. **Direction: stays compiled.** Loaded task status uses the `core:task` annotation point, and source and pane status need an owner-declared point first |
+| Rail markers | Compiled | `ctx.railMarkers` | A status marker on a task, source, or pane control. **Direction: stays compiled.** Loaded plugins mark tasks, sources, and task panes through the `core:task`, `core:source`, and `core:pane` annotation points |
 | Persisted state slices | Compiled | `ctx.persistedStateSlices` | Device-local persisted state. **Direction: stays compiled.** A loaded plugin has `plugin:<id>:*` preferences through `ctx.core.prefs` and its frame's `state` verbs |
 | Client capabilities | Compiled | `ctx.capabilities` | Plugin-to-plugin function calls in the renderer. **Direction: stays compiled, permanently.** A live function can't cross the iframe boundary, and the loaded equivalent is a route |
 
@@ -99,6 +99,31 @@ The Node runs these, with or without a client attached.
 | Broadcasts | Both | `ctx.events` | The WebSocket hub. A loaded plugin sends on `plugin:<id>:*` only, and hears events by manifest grant |
 | Telemetry | Both | `ctx.telemetry` | Spans, events, counts, gauges, and errors about the plugin's own work, with no permission ([telemetry](./telemetry.md)) |
 | Logging | Both | `ctx.log` | A line prefixed with the plugin id, and a log record when telemetry is on ([logging](./telemetry/logging.md)) |
+
+## Places to fill
+
+Each row is a shipped place a plugin can add UI to another plugin's surface. **Consent** says what
+the owner declared. The `plugin_authoring` tool lists every point's props and key on the running Node.
+
+| Need | Point or location | Carrier | Consent | Terminal |
+| --- | --- | --- | --- | --- |
+| A row on a file or a document tab | `file.row`, `document.tab` | Menu descriptor | Editor's menus take any plugin | **Actions** button or Shift+F10 |
+| A row on a message or a finished turn | `agent.message`, `agent.turn` | Menu descriptor | Agents' menus take any plugin | The same menus |
+| A row on selected text | `content.selection` | Menu descriptor | An owner wraps its content in `SelectionActions` | A message's whole text only |
+| A mark on a file | `editor:file` | `items` route | Registered by Editor | Dots and a legend |
+| A mark on a task, source, or task pane | `core:task`, `core:source`, `core:pane` | `items` route | A source or pane sets `statusAnnotations: true` | Counts and a legend |
+| A preview of an HTTPS link | `core:link-preview` | Tree | Core | From the link's menu |
+| A view of a code fence | `core:markdown-fence` | Tree | Transcripts and pane regions | Under a **Source** line |
+| A view of a file | `editor:document` | Tree | Editor | The same |
+| A view of transcript media | `agents:transcript-attachment`, `agents:artifact` | Tree | Agents | The same |
+| A view of a workflow step's result | `workflows:step-body` | Tree | Workflows | The same |
+| A tool call's card | `agents:tool-card` | Tree | Agents | The same |
+| A toolbar control | `preview:toolbar-actions`, `terminal:toolbar-actions` | Tree | The owner declares `reload` or `interrupt` | Terminal's only |
+| A section above a loaded owner's detail view | `linear:issue-summary`, `rollbar:item-summary` | Tree | The owner declares `mounts` | The same |
+| Hover and diagnostics for a language | `documentServices` | Routes | Editor; a tie needs the person's pick | **Diagnostics** checks the saved file |
+
+Every tree runs in the contributor's worker with its own permissions and reads through its own
+routes. [An extension example](./plugin-authoring/extension-example.md) declares nine of these.
 
 ## The slot vocabulary
 

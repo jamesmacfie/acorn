@@ -1,7 +1,38 @@
 # Plugin UI extensions
 
-Status: implementation plan, October 6, 2026. Implementation not started.
-Analysis baseline: `0ce874a15c856db07992cc5f7650b6730c6aadaf`, including an uncommitted working tree.
+Status: all fifteen phases done, October 10, 2026. Planned October 6, 2026, from
+`0ce874a15c856db07992cc5f7650b6730c6aadaf`. Retained until the open acceptance below is complete.
+
+## Where it shipped
+
+The reference pages own the behavior. Where this folder disagrees with them, they win:
+
+- [Places to fill](../../contribution-kinds.md#places-to-fill) lists every point and menu location,
+  with its carrier, the owner's consent, and terminal support.
+- [Remote points](../../plugins/remote-points.md), [link previews](../../plugins/link-previews.md),
+  [Markdown fences](../../plugins/markdown-fences.md), [toolbar actions](../../plugins/toolbar-actions.md),
+  [detail regions](../../plugins/detail-regions.md), [rows and annotations](../../plugins/rows-and-annotations.md),
+  and [context menus](../../plugins/menus-and-markers.md#context-menus) own the contracts.
+- [An extension example](../../plugin-authoring/extension-example.md) is the tested authoring path,
+  and `plugin_authoring` lists every point from `packages/protocol/src/chrome/publicExtensionPoints.ts`.
+- [UI extension acceptance](../../testing/ui-extension-acceptance-2026-10-10.md) holds the regression
+  commands and the host matrix.
+
+## Open acceptance and deferrals
+
+These remain open, with evidence in the acceptance record:
+
+- Native child-webview overlap and focus (native overlays A1 to A16), and a trusted desktop press on a
+  toolbar action.
+- The Linear detail region in a combined session, terminal key paths for link previews, message
+  menus, and toolbar presses, and a heap-level leak check.
+
+These stay deferred, as [refused alternatives](./refused.md) records:
+
+- Plugin points around or inside agent-built Apps. Dynamic UI and its companion hook aren't shipped.
+- Detail regions on task panes, link previews in overlays and reference panels, and `matches`-aware
+  tie pickers on the Extension points page.
+- Published prop types for each point. Authors declare their own, as the example does.
 
 This programme adds contextual plugin UI to Acorn's desktop and terminal clients. Execute the phases
 in numerical order. [Editor file renderers](../../editor/file-renderers.md) shipped first. Each phase is a developer
@@ -41,7 +72,7 @@ features. Implementation checkpoints are not separate public releases; phase 14 
 | 11 | [Add Preview and Terminal toolbar contributions](./11-toolbar-actions.md) | Done |
 | 12 | [Add source and pane status annotations](./12-rail-status.md) | Done |
 | 13 | [Verify the combined programme](./13-acceptance.md) | Done, with open acceptance items |
-| 14 | [Update documentation and authoring examples](./14-documentation.md) | Planned |
+| 14 | [Update documentation and authoring examples](./14-documentation.md) | Done |
 
 ## How to execute a phase
 

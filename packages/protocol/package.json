@@ -38,6 +38,7 @@
     "./enrollment.ts": "./src/device/enrollment.ts",
     "./errors.ts": "./src/transport/errors.ts",
     "./extensionPoints.ts": "./src/chrome/extensionPoints.ts",
+    "./publicExtensionPoints.ts": "./src/chrome/publicExtensionPoints.ts",
     "./externalUrl.ts": "./src/content/externalUrl.ts",
     "./fingerprintWords.ts": "./src/device/fingerprintWords.ts",
     "./integrations.ts": "./src/integrations/providers.ts",

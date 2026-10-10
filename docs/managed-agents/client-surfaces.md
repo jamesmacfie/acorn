@@ -54,6 +54,14 @@ shell and through the remote root ([the closed kit](../ui-design/closed-kit.md))
 and the per-session **Chats only** choice for the app lifetime. Pane registration reads those
 choices through the pane model; it does not own a second selection store.
 
+Other plugins draw in the pane only where Agents opened a place. In the transcript, those are tool
+cards, the bodies of sent attachments and artifacts ([transcript media
+viewers](./attachments.md#transcript-media-viewers)), closed code fences ([Markdown
+fences](../plugins/markdown-fences.md)), link previews, and rows on message, turn, and selection menus
+([message and turn menus](./transcript.md#message-and-turn-menus)). Around it, they're the session
+header, the composer's action bar, and request cards. Each keeps the card's own controls outside the
+contributor's tree.
+
 The header waits only for the module and the session list. The harness list is the shared
 `['agents', 'providers']` query, so a second task reads it from memory. Until it answers, the **New**
 menu and empty state say they're checking which agents this Node can run.

@@ -61,6 +61,7 @@ without the cap.
 | [Desktop and large-surface tests](./testing/desktop.md) | The desktop boot test, the Rust unit tests, the browser smoke test, and the large-surface fixture. |
 | [Continuous integration](./testing/ci.md) | What CI runs, the Turborepo cache, build checks, reading a red run, and historical failures. |
 | [The smoke checklist](./testing/smoke-checklist.md) | The release pass, the index of feature checks, and known gaps. |
+| [UI extension acceptance](./testing/ui-extension-acceptance-2026-10-10.md) | Regression commands, the host matrix, and open checks for the contextual extension points. |
 
 These old section names now live in the pages above:
 

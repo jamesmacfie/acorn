@@ -148,6 +148,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/preview-retention.md](./testing/preview-retention.md) | Native preview retention acceptance, process measurements, and platform recovery limits. |
 | [testing/desktop-and-plugins.md](./testing/desktop-and-plugins.md) | Packaged shell, plugin installation, host webviews, and loaded plugin lifecycle checks. |
 | [testing/native-overlays.md](./testing/native-overlays.md) | Native overlay acceptance scenarios, test evidence, performance targets, and outstanding graphical checks. |
+| [testing/ui-extension-acceptance-2026-10-10.md](./testing/ui-extension-acceptance-2026-10-10.md) | Dated UI extension acceptance: regression commands, the host matrix, the example's real-host check, and open checks. |
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
 | [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
 | [testing/editor-phase06-2026-10-08.md](./testing/editor-phase06-2026-10-08.md) | Dated Editor phase 06 fixture and acceptance evidence. |
@@ -339,7 +340,8 @@ long page, how to cite a doc from code, and the checks that enforce it.
 ## Editor acceptance handoff
 
 The six implementation phases are complete. Review the combined change and finish the full test gate
-and supported-platform acceptance. Plugin file viewers and UI extensions keep separate plans.
+and supported-platform acceptance. Plugin UI extensions shipped separately
+([places to fill](./contribution-kinds.md#places-to-fill)).
 
 | Document | What it holds |
 | --- | --- |
@@ -349,9 +351,11 @@ and supported-platform acceptance. Plugin file viewers and UI extensions keep se
 | [Phase six evidence](./testing/editor-phase06-2026-10-08.md) | Initial scoped-search and tree acceptance results. |
 | [Phase six followup](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected local flow, measurements, and unavailable checks. |
 
-## Future UI extension handoffs
+## UI extension programme records
 
-These planned handoffs follow Editor file viewers. They do not describe shipped behavior.
+All fifteen phases shipped by October 10, 2026. The reference pages own the behavior, starting at
+[places to fill](./contribution-kinds.md#places-to-fill). These records stay until the open acceptance
+in [UI extension acceptance](./testing/ui-extension-acceptance-2026-10-10.md) is complete.
 
 | Document | What it holds |
 | --- | --- |
@@ -407,7 +411,7 @@ Each plugin landing page above has topic pages in a folder of the same name:
   webviews](./plugins/document-surfaces.md), [Events](./plugins/events.md), [Forward
   compatibility](./plugins/forward-compatibility.md), [Frames](./plugins/frames.md), [Keeping a
   descriptor fresh](./plugins/freshness.md), [Harnesses](./plugins/harnesses.md),
-  [Hooks](./plugins/hooks.md), [Loaded plugins](./plugins/loaded-plugins.md), [Markdown
+  [Hooks](./plugins/hooks.md), [Link previews](./plugins/link-previews.md), [Loaded plugins](./plugins/loaded-plugins.md), [Markdown
   fences](./plugins/markdown-fences.md), [Context menus and rail
   markers](./plugins/menus-and-markers.md), [More descriptors](./plugins/more-descriptors.md), [Node
   providers](./plugins/node-providers.md), [Node-side extension
@@ -424,7 +428,10 @@ Each plugin landing page above has topic pages in a folder of the same name:
   [Custom agents](./plugin-authoring/custom-agents.md), [Derived
   sources](./plugin-authoring/derived-sources.md), [Events and
   capabilities](./plugin-authoring/events-and-capabilities.md),
-  [Extensions](./plugin-authoring/extensions.md), [Harnesses](./plugin-authoring/harnesses.md),
+  [Extensions](./plugin-authoring/extensions.md), [An extension
+  example](./plugin-authoring/extension-example.md), [its Node
+  half](./plugin-authoring/extension-example-node.md), [its
+  trees](./plugin-authoring/extension-example-trees.md), [Harnesses](./plugin-authoring/harnesses.md),
   [Install a hand-written package](./plugin-authoring/installing-a-hand-written-package.md),
   [Permissions](./plugin-authoring/permissions.md), [Settings
   pages](./plugin-authoring/settings-pages.md), [Start from the

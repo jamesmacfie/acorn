@@ -168,10 +168,9 @@ conditions that the user needs to resolve. For delivery and acknowledgment, see 
 Declare a source and the contributions it needs, such as routes, project surfaces, and content-link
 resolution. Keep IDs in the plugin's namespace. Use status invalidation when source data changes.
 For the complete source descriptor, see [Descriptors](./plugins/descriptors.md).
-On desktop, a plugin can add actions to its own source and task pane icons with `rail.source` and
-`rail.pane` context menu descriptors. A compiled client registers through `ctx.contextMenus`, and a loaded
-plugin declares the rows in its manifest. The host supplies the target and validates ownership.
-See [Context menus](./plugins/menus-and-markers.md#context-menus).
+A plugin adds actions to its own rail icons with `rail.source` and `rail.pane` menu rows, and to
+Editor's files, transcript messages, and selected text through those owners' menus. To add UI inside
+another plugin's view, pick a place from [places to fill](./contribution-kinds.md#places-to-fill).
 
 ## Example: a compiled plugin, both halves
 

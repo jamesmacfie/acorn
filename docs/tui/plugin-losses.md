@@ -57,3 +57,25 @@ in a terminal.
 The four plugins that register a settings page draw it in the Settings route, except the terminal
 plugin's drawer page, which the route lists and points at the desktop
 ([settings](./sources-and-settings.md#settings)).
+
+## Contextual points
+
+The terminal draws the same contributors for the points that open around files, messages, and links.
+It has no hover, no text selection, no iframe, and no Preview pane, so each point loses only what
+needs those:
+
+| Point | Terminal behavior |
+| --- | --- |
+| `core:link-preview` | Pressing a link in a pane offers **Preview**, which opens the tree in a dialog |
+| `core:markdown-fence` | A line with **Source**, **Preview**, **Copy**, the hint, and the plugin, and the viewer clipped at 20 rows |
+| `file.row`, `document.tab` | The tree's **Actions** button, the tab strip's `⋯`, or Shift+F10 |
+| `agent.message`, `agent.turn` | The same menus as the desktop |
+| `content.selection` | **Actions for the whole text** on a transcript message. Editor and plugin documents offer none |
+| `editor:file`, `core:source`, `core:pane` | Dots and a legend, or `+N` and a count |
+| Document services | **Inspect position** and **Diagnostics** in a document region. Editor's **Diagnostics** checks the saved file |
+| `preview:toolbar-actions` | Never drawn |
+| Companion overlays | `openOverlay` answers `unsupported_host` |
+
+Every other remote point, such as `agents:artifact`, `editor:document`, `workflows:step-body`,
+`terminal:toolbar-actions`, and detail regions, draws its tree in cells where the owner's view is.
+The `plugin_authoring` tool notes the differences that belong to a point.

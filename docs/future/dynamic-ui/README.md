@@ -78,6 +78,11 @@ Before changing code, read [descriptors, trees, rectangles](../../plugins/ui-tie
 [data sources](../../data-sources.md), [dashboards](../../dashboards.md), [panes](../../panes.md),
 [frontend](../../frontend.md), and [workspaces and tasks](../../workspaces-and-tasks.md).
 
+The UI extension programme shipped other plugins' contributions around files, messages, links, and
+detail views on October 10, 2026, and deliberately left apps out. Its
+[deferred app hooks](../ui-extension/refused.md#dynamic-app-contribution-points-in-the-first-cut)
+keep the retained path for a companion region around an app.
+
 ## Verify before building
 
 Recheck the shipped contracts named above before each phase, and each phase's own verify list. Do not

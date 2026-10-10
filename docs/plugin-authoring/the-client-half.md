@@ -111,6 +111,23 @@ only after a person's action and at most once a second. Keep payloads, inputs, a
 of JSON, and pass an id instead of bytes. Catch `unsupported_host`: the terminal draws trees but has no
 iframe for an overlay ([remote points](../plugins/remote-points.md#asking-the-owner)).
 
+### Filling another plugin's point
+
+A tree in another plugin's slot gets the owner's props, its own bridge, and the owner's task and
+project as its scope. Four rules keep it in its place:
+
+- **Read your own routes.** Props carry identity, not data. Fetch what you draw from `/v1/p/<your-id>/`,
+  and have your Node half call a capability such as `agents.transcriptMedia` or `editor.files` when it
+  needs the owner's bytes. Your bridge refuses the owner's routes.
+- **Expect a person check.** An owner handler gets `{ byPerson }` and may answer `needs_person`
+  unless someone pressed inside your tree in the last second. A timer or a mount can't stand in.
+- **Stay one level deep.** Your tree can't open a slot for a third plugin. A loaded owner reserves
+  host-drawn regions with `mounts` instead ([detail regions](../plugins/detail-regions.md)).
+- **Let the host dispose.** Leaving the view, a Node switch, or a disable unmounts the tree and runs
+  your cleanups. Keep no state between mounts that the next mount could mistake for its own.
+
+[An extension example](./extension-example.md) fills seven points from one bundle.
+
 ## The frame path
 
 A frame is a host-generated iframe document. The shell serves it from a content-addressed cache on

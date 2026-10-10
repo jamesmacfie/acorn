@@ -7,19 +7,19 @@ part of the [plugin reference](../plugins.md).
 
 ## Remote points
 
-An owner that draws through the tree declares a point as a node:
+A compiled owner opens a point by drawing a `Slot` from `@acorn/plugin-api/ui/host` in its own view,
+with its default as the child:
 
 ```tsx
-<Slot point="agents:attachment" key={selected?.mime}>
-  <AttachmentChip file={selected} />   {/* the default, drawn when nobody matches */}
+<Slot point="agents:attachment" key={attachment.mediaType} props={() => ({ attachment, taskId, sessionId })}>
+  <AttachmentChip file={attachment} />   {/* the default, drawn when nobody matches */}
 </Slot>
 ```
 
-It also declares the point in its manifest, so the trust prompt can name it:
-
-```json
-{ "id": "attachment", "kind": "remote", "label": "Attachment", "mode": "replace", "selector": "mime" }
-```
+It registers the point with `kind`, `mode`, and `max`, so the trust prompt and the Extension points
+page can name it. A loaded owner declares the same fields in its manifest, but its tree can't draw a
+`Slot`: the SDK's `Slot` takes only a host-minted `slotRef`. A loaded owner gets host-drawn regions
+above or below its own views instead ([detail regions](./detail-regions.md)).
 
 A contributor names the point, the entry its bundle registered with `mountTree`, and what it matches:
 
@@ -56,7 +56,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `core:storage` | `stack`, up to four | `{ nodeId }` |
 | `core:security` | `stack`, up to four | `{ nodeId }`. A section on **Settings > Security and backup**. Agents draws its instruction file check |
 | `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |
-| `core:link-preview` | `replace`, keyed by the normalized HTTPS URL | `{ url, label?, taskId?, projectId?, ref? }`. See [link previews](#link-previews) |
+| `core:link-preview` | `replace`, keyed by the normalized HTTPS URL | `{ url, label?, taskId?, projectId?, ref? }`. See [link previews](./link-previews.md) |
 | `core:markdown-fence` | `replace`, keyed by a closed fence's lowercased language hint | `{ blockId, language, text, revision, taskId?, projectId? }`. See [Markdown fences](./markdown-fences.md) |
 | `preview:toolbar-actions`, `terminal:toolbar-actions` | `stack`, up to four | Page or selected-session facts, with `reload` or `interrupt`. See [toolbar actions](./toolbar-actions.md) |
 | `linear:issue-summary`, `rollbar:item-summary` | `stack`, up to two | `{ surface, item?, refId?, projectId? }`. Above a loaded owner's detail view, drawn by the host. See [detail regions](./detail-regions.md) |
@@ -81,35 +81,8 @@ Without them, `openPane`, in-app `openUrl`, and task-scoped key bindings would h
 is the owner's, not the shell's, so a project pane or reference panel never pushes a pane into a
 background task. The scope reaches the bridge only. What the contributor should know goes in props.
 
-## Link previews
-
-`core:link-preview` draws a preview of an HTTPS link in rendered content: Markdown, provider HTML such
-as a pull request body, and kit `Link` nodes in plugin trees. Declare a contributor with its sites:
-
-```json
-{ "id": "docs-preview", "point": "core:link-preview", "label": "Documentation",
-  "matches": ["https://docs.example.com/*"], "remote": "docsPreview" }
-```
-
-The key is the URL as `URL` parses it. The host is lowercased, and the path, query, and fragment stay
-as written. A URL longer than 4,096 characters, or one carrying a user name or password, gets no
-preview. `ref` is `{ kind, id }` when an in-app link recognizer already claimed the URL, such as
-`{ kind: 'linear.issue', id: 'ENG-1' }`. The scope is the task or project of the link's content.
-
-Read your data from your own Node route with the URL, and check the allowed hosts, redirects,
-response size, and timeout there. The host fetches nothing. With no contributor, or while two are tied,
-it draws the link's text, the URL, and **Open**. A tree that fails falls back to the same thing.
-
-On the desktop, a preview opens after the pointer rests on a link for 350 ms and closes 150 ms after it
-leaves both the link and the preview. One preview is open at a time. Moving to another link your
-contributor matches is a props update, so your tree stays mounted. Abort the read for the previous
-URL, and drop a late answer for it. Right-click a link, or press Shift+F10 on it, for **Preview**,
-**Open link**, and **Copy link**. **Preview** there moves focus into the preview, and Escape gives it
-back. The terminal has no hover. Pressing a link inside a pane there offers **Preview** in a dialog.
-
-A content owner opts its region in with `createLinkPreviewBoundary`, from
-`packages/client-core/src/host/linkPreview/linkPreview.ts`. It returns event handlers to spread on the
-element that already holds the content. Task panes and the shell's project region have one.
+<a id="link-previews"></a>
+[Link previews](./link-previews.md) has `core:link-preview`, the point for previews of HTTPS links.
 
 ## Asking the owner
 

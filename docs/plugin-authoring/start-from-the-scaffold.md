@@ -59,7 +59,8 @@ manifest's inputs. This is the one template with dependencies and a build
 
 To extend another plugin's UI after your own pane works, add an `extensions` entry for one of its
 published points. For example, `agents:tool-card` accepts a tree, and `changes:diff-line` accepts
-route-backed annotations ([extensions](./extensions.md)).
+route-backed annotations ([extensions](./extensions.md)). The scaffold's `README.md` names where the
+running host lists points, and [an extension example](./extension-example.md) fills nine of them.
 
 ## The package
 
@@ -96,7 +97,8 @@ type-checks its node files outside the repository against the packed declaration
 catches dependencies that resolve only inside the workspace. It also type-checks the
 [complete example](./complete-example.md) and checks that the manifest examples on these pages speak
 the current API major. For `--data-source`, it installs the packed SDK into a generated package
-outside the repository, then runs its test, type-checks it, builds it, and loads it.
+outside the repository, then runs its test, type-checks it, builds it, and loads it. It builds the
+[extension example](./extension-example.md) the same way, from its pages.
 
 On October 4, 2026, running the scaffold with `node packages/create-acorn-plugin/index.mjs my-widget`
 produced the five files above with `"apiVersion": "3"`, and its manifest passed the Node's manifest

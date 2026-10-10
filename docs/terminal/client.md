@@ -17,6 +17,11 @@ and close in its actions slot, `SplitHandle` is the resize grip, and the session
 `Rectangle kind="pty"`. The kit owns the box and the keyboard contract, so Escape leaves a focused
 terminal.
 
+`terminal:toolbar-actions` draws up to four other plugins' controls after **Stop**. A contributor gets
+the selected session's id, title, and running state, and can ask for `interrupt`. The drawer sends the
+same interrupt as its own control, and only after a person's press inside that contributor's tree
+([toolbar actions](../plugins/toolbar-actions.md)).
+
 ## Terminals outlive their task view
 
 A terminal tab stays alive until it's closed. Its xterm and attachment last from the first frame the
@@ -74,7 +79,8 @@ The terminal client opens a task-scoped Sessions view from the task or the palet
 plugin's session store is the roster, and its HTTP routes and `term` channel are the transport. The
 host draws a session picker, profile choices, and one native `pty` rectangle. A new session starts in
 the task's worktree. Closing the view detaches and leaves the session running, and reopening restores
-the task's last session. Enter gives the PTY the keyboard and Escape returns.
+the task's last session. Enter gives the PTY the keyboard and Escape returns. The same toolbar
+contributors draw under the view's actions, with the same person rule.
 
 An agent handoff uses the same session row. The view can end the provider terminal after a second
 Enter, then return input to managed mode. Return is disabled while the linked PTY runs. The host calls

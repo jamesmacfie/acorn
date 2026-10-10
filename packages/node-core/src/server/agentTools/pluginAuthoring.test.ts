@@ -9,6 +9,7 @@ import { CORE_EXCLUSIVE_SLOTS, DETAIL_REGIONS, EXTENSION_POINT_LOCATIONS } from 
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import { DIAGNOSTIC_SEVERITIES } from '@acorn/protocol/documentSurface.ts'
+import { PUBLIC_EXTENSION_POINTS } from '@acorn/protocol/publicExtensionPoints.ts'
 import { NODE_CORE_FACETS, scopeCore } from '../plugins/permissions.ts'
 import { getContextSections } from './contextSections.ts'
 import {
@@ -82,7 +83,7 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     // Detail regions: the field, every region, what a contributor is mounted with, and the two points.
     for (const region of DETAIL_REGIONS) expect(renderPluginAuthoring(v)).toContain(`\`${region}\``)
     expect(renderPluginAuthoring(v)).toContain('`mounts: [{ surface, region }]`')
-    expect(renderPluginAuthoring(v)).toContain('`{ projectId?, item?, refId?, surface }`')
+    expect(renderPluginAuthoring(v)).toContain('`{ surface, item?, refId?, projectId? }`')
     expect(renderPluginAuthoring(v)).toContain('`linear:issue-summary`')
     expect(renderPluginAuthoring(v)).toContain('`rollbar:item-summary`')
     // Toolbar actions: both points, both actions with their payloads, and the person rule.
@@ -94,6 +95,19 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     expect(renderPluginAuthoring(v)).toContain('`core:source` `{ sourceId, projectId }`')
     expect(renderPluginAuthoring(v)).toContain('`core:pane` `{ paneId, taskId }`')
     expect(renderPluginAuthoring(v)).toContain('`statusAnnotations: true`')
+  })
+
+  it('lists every point another plugin can fill, with its props or key', () => {
+    // The list is protocol's; apps/desktop/test/client/publicExtensionPoints.test.ts holds it against
+    // the client registry. What this checks is that each entry reaches the text an agent reads.
+    const v = pluginAuthoringVocabulary()
+    expect(v.points).toBe(PUBLIC_EXTENSION_POINTS)
+    const guide = renderPluginAuthoring(v)
+    for (const point of v.points) {
+      expect(guide, point.id).toContain(point.kind === 'remote' ? `\`${point.id}\` — remote` : `\`${point.id}\` \`{ ${point.key.join(', ')} }\``)
+      if (point.kind === 'remote') expect(guide, point.id).toContain(`Props \`${point.props}\``)
+    }
+    expect(guide).toContain('`editor:document` — remote, `replace`, keyed by the file\'s lowercased basename')
   })
 
   it('carries every manifest key, split on what the schema actually requires', () => {

@@ -1,6 +1,7 @@
 # Deferred and refused UI extensions
 
-Status: design decisions, October 6, 2026. No implementation in this programme has shipped.
+Status: design decisions, October 6, 2026. The programme shipped on October 10, 2026, and these
+boundaries still hold.
 
 This page records boundaries for the [UI extension programme](./README.md) and when to revisit them.
 

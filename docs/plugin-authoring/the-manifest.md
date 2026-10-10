@@ -42,7 +42,10 @@ resolves each one inside the package directory with lexical and symbolic-link co
 hostile through a link fails at load time.
 
 Any other top-level key is stripped and reported as unrecognized, so a manifest written for a newer
-acorn still loads ([forward compatibility](../plugins/forward-compatibility.md)).
+acorn still loads ([forward compatibility](../plugins/forward-compatibility.md)). That doesn't cover
+closed lists inside a known key. A release older than a menu location, a point field such as `mounts`,
+or a `documentServices` language may refuse the entry or ignore the field. API major 3 alone doesn't
+promise that an older release draws it.
 
 ### Requiring another plugin
 
@@ -109,6 +112,11 @@ These rules catch a manifest that parses and then does nothing:
 - An extension point must hang off a `pane` this manifest declares, one per location.
 - An `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference. Its `items` or `route`
   must be your own, and either needs a `node` half.
+- A `remote` point's `mounts` names up to eight of your own project panes or reference panels, each at
+  `header` or `footer`, one point per region of a view. A task pane can't take one
+  ([detail regions](../plugins/detail-regions.md)).
+- `statusAnnotations: true` is accepted only on a source or a task pane
+  ([source and pane annotations](../plugins/rows-and-annotations.md#source-and-pane-annotations)).
 - A `taskChecks` entry and a `schedules` entry need a `node` half.
 - A `harnesses` entry's `spawn` names exactly one of `command` and `entry`, may carry `requires` only
   beside an `entry`, and needs a `node` half if it declares `probes`.

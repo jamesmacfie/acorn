@@ -514,7 +514,7 @@ export type EditorDocumentProps = {
  *  plugin's tree. Core owns it because the links live in everybody's content. `replace`, keyed by the
  *  URL `linkPreviewKey` returns, so `matches: ["https://docs.example.com/*"]` claims one site. With no
  *  contributor the host draws the label, the URL and Open, and fetches nothing
- *  (docs/plugins/remote-points.md § Link previews). */
+ *  (docs/plugins/link-previews.md § Link previews). */
 export const CORE_LINK_PREVIEW_POINT = 'core:link-preview'
 
 export type LinkPreviewProps = {

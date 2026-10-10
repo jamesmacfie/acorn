@@ -18,6 +18,14 @@ union in `@acorn/protocol/plugin/bridge.ts` through `satisfies`, so a new messag
 error. Only the process is hand-written. `pluginAuthoring.test.ts` derives every list again and
 checks it reached the text.
 
+Extension points are the one list it can't derive. Each owner registers its points in client code,
+which the Node can't import. So the guide and the `points` field read
+`packages/protocol/src/chrome/publicExtensionPoints.ts`: each point's kind, mode, cap, actions, key,
+props, and any terminal difference. `apps/desktop/test/client/publicExtensionPoints.test.ts` activates
+every client plugin and fails when a registered point is missing from that list or differs in kind,
+mode, cap, actions, or key. `pluginConfigs.test.ts` in `apps/node` does the same for points a bundled
+loaded plugin declares in its manifest. A point added without a list entry fails one of the two.
+
 It leaves two things out. The `@acorn/plugin-api` export list, because a hand-written plugin can't
 import that package and a packaged Node has no copy of the surface snapshot. And the grantable
 `permissions.api` scope names, because that allowlist is in the client, which the Node can't import.

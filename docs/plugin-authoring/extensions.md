@@ -51,7 +51,19 @@ receives the clicked row's id. A contribution to a point that isn't there, becau
 installed, is disabled, or dropped the point, delivers nothing. That's the designed outcome, not a
 failure to chase.
 
-Call the `plugin_authoring` agent tool for the current location list.
+`matches` takes an exact key, `prefix*`, or `*suffix`, with no ranking between them. Each owner says
+what its key is: a media type, a lowercased file basename, a step kind, a tool name, or an HTTPS URL.
+On a `replace` point, two matching contributors draw the owner's default until the person picks one
+under **Settings > Advanced > Extension points**. A contributor with no `matches` takes every key, so
+name the keys you draw.
+
+An owner can do more than open a place in its pane. A `remote` point with `mounts` asks the host to
+draw it above or below the owner's own detail views ([detail regions](../plugins/detail-regions.md)),
+and a source or task pane with `statusAnnotations: true` lets others mark its icon
+([source and pane annotations](../plugins/rows-and-annotations.md#source-and-pane-annotations)).
+
+Call the `plugin_authoring` agent tool for the current location list and every point you can fill,
+with its props or key. [An extension example](./extension-example.md) fills nine of them.
 
 ## Add task annotations
 

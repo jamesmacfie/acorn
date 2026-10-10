@@ -1,7 +1,80 @@
 # Phase 14: update documentation and authoring examples
 
-Status: planned, October 6, 2026. Baseline: `0ce874a15c856db07992cc5f7650b6730c6aadaf`.
-Depends on phase 13's completed acceptance evidence. This is the final phase.
+Status: done, October 10, 2026. Branch `phase-14-documentation`, from `dbe474439`. Planned October 6,
+2026, from `0ce874a15c856db07992cc5f7650b6730c6aadaf`. This is the final phase.
+
+## Completion note
+
+Every shipped point has an owning reference page, one list that `plugin_authoring` reads, and a tested
+example. The programme folder stays until its open acceptance is done
+([the programme's status](./README.md#open-acceptance-and-deferrals)).
+
+### What landed
+
+- **The point list for `plugin_authoring`.** `packages/protocol/src/chrome/publicExtensionPoints.ts`
+  lists all 29 public points with kind, mode, cap, actions, key, props, and terminal differences. The
+  guide renders it and the vocabulary returns it as `points`, so an agent can discover
+  `editor:document`. `apps/desktop/test/client/publicExtensionPoints.test.ts` activates every client
+  plugin and fails when a registered point is missing or differs. `pluginConfigs.test.ts` in
+  `apps/node` does the same for Linear's and Rollbar's manifest points. This closes phase 00's
+  open issue. The guide was 30,381 bytes, so its context-section ceiling went from 32,000 to 40,000.
+- **The extension example.** `docs/plugin-authoring/extension-example.md` and its Node and tree pages
+  are one package, `acme-review`, that fills the nine places the plan named. A
+  `create-acorn-plugin` test writes it from the pages, builds it with Vite against the packed SDK and
+  types, type-checks it under `strict`, runs the bundle and checks its `tree:ready` entries against
+  the manifest, and calls every route.
+- **Real host.** The built example was installed into `pnpm dev:agent`. The pane, the file menu row,
+  the file mark, the CSV viewer, hover, diagnostics, the link preview, and the terminal toolbar
+  control all drew ([acceptance record](../../testing/ui-extension-acceptance-2026-10-10.md)).
+- **Reference pages.** [Places to fill](../../contribution-kinds.md#places-to-fill) is the shipped
+  choice table, with carrier, consent, and terminal support. Link previews moved to
+  [their own page](../../plugins/link-previews.md), with an anchor left in remote points.
+  Context menus, manifest rules, extensions, the client half, the bridge, pane regions, the terminal
+  drawer, terminal losses, the client sandbox, Editor, and agent client surfaces each gained their
+  part. The scaffold's `README.md` names the three places a running host lists points.
+- **Closing out.** The phase 13 matrix and open checks moved to the dated acceptance record. The
+  programme README, the future index, `docs/README.md`, and the dynamic UI cross-link say what
+  shipped and what stays open or deferred.
+
+### Decisions and deviations
+
+- **A hand-kept list, checked against the registry.** The Node can't import client registrations, so
+  the list lives in protocol beside the other contracts both ends read. Kind, mode, cap, actions, and
+  key are tested against the registry. Props and terminal notes are prose an agent reads, so they
+  aren't. Protocol's entrypoint ceiling in `tools/arch/boundaries.test.ts` moves from 83 to 84.
+- **Examples as doc fences.** The repository's pattern is pages that a test extracts, as
+  `complete-example.md` does, so the code an author copies is the code that's built. A tree needs a
+  bundle, so the example has a Vite build and a plain JavaScript Node half.
+- **`context:section` is compiled-only.** Its props carry two callbacks, which can't cross to a
+  worker, so a loaded tree there fails to mount. The list says so. Nothing changed in the owner.
+- **The SDK isn't on npm.** Neither `acorn-plugin-sdk` nor `acorn-plugin-types` is published, so the
+  example installs both from packed tarballs. The bridge page no longer says to `npm install` the SDK.
+  `packages/plugin-sdk/README.md` and the data-source scaffold's dependencies still name the
+  registry. Publishing is outside this programme.
+- **Owner-tree example corrected.** Remote points showed a manifest-declared owner drawing
+  `<Slot point>`, which only a compiled owner can do, and used `selector`, which nothing reads.
+- **The real-host check overrode `document.hidden`.** The `dev:agent` window reports itself hidden,
+  and `bumpChrome` skips a plugin's push then, so marks didn't refresh until the override.
+- The tool card, CSV artifact, and Linear region weren't drawn in the real host. They need an agent
+  turn, a `text/csv` artifact, and a Linear connection. The example's terminal behavior wasn't driven.
+
+### Verification
+
+Run with Node 26.8.1.
+
+- `pnpm test`: the 23 failures are phase 13's known reds and nothing else. They are the 15 dead links
+  in `docPaths`, four `EditorPane.test.tsx` status-menu tests, the `generate.test.ts` kind fallback,
+  `managedBridge.test.ts`, two `chrome.test.tsx` marker tests, `persistedState.conformance.test.ts`,
+  and nine `@acorn/node` golden and loader tests. `create-acorn-plugin` (24),
+  `pluginAuthoring.test.ts` (17), `pluginConfigs.test.ts` (10), and
+  `publicExtensionPoints.test.ts` pass. Changing one cap in the list fails the registry test.
+- `pnpm --filter @acorn/arch-tests test`: only the known 15 dead links. Every page stays under 200
+  lines, and the citations moved with the link previews section.
+- `tsc` is clean for protocol and node-core, and the desktop and Node packages show only the known
+  agents, changes, git, and workflows errors. oxlint flags nothing in the changed files.
+- Budgets: service 1,757,602 of 1,759,000 B and terminal startup 692,304 of 700,000 B, unchanged.
+- The example was built the way an author builds it, with `npm install` from packed tarballs, in
+  `/tmp`. Nothing from that build, the scratch install, or the scratch files is committed.
 
 Move implemented contracts into their owning reference documents and provide executable examples
 that a plugin author can discover, build, install, and verify without this planning conversation.
