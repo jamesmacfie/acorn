@@ -126,7 +126,8 @@ project as its scope. Four rules keep it in its place:
 - **Let the host dispose.** Leaving the view, a Node switch, or a disable unmounts the tree and runs
   your cleanups. Keep no state between mounts that the next mount could mistake for its own.
 
-[An extension example](./extension-example.md) fills seven points from one bundle.
+[An extension example](./extension-example.md) draws seven trees from one bundle, six of them in
+other plugins' points.
 
 ## The frame path
 

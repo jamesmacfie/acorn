@@ -328,8 +328,8 @@ bytes are a new origin and a new document.
 
 \`docs/plugin-authoring.md\` in the acorn repository is the long form, with a complete worked example
 including the inlined handshake, and \`docs/plugin-authoring/extension-example.md\` is a tested plugin
-that fills nine of the points listed below. If you have that checkout, read it; if you do not, the above plus the
-vocabulary below is the contract.`
+that fills nine places in other plugins' UI, most of them points listed below. If you have that checkout, read it;
+if you do not, the above plus the vocabulary below is the contract.`
 
 const table = (rows: [string, string][]): string => rows.map(([key, value]) => `- \`${key}\` — ${value}`).join('\n')
 

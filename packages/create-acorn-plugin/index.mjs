@@ -377,7 +377,7 @@ the running host accepts:
 - **Settings → Advanced → Extension points** shows each point's contributors, their \`matches\`, the
   reason a tree last failed, and every extension whose point nobody declares.
 - \`docs/plugin-authoring/extension-example.md\` in the acorn repository is a tested plugin that fills
-  nine of them, built with the SDK.
+  nine places in other plugins' UI, built with the SDK.
 
 The full contract is \`docs/plugin-authoring.md\` in the acorn repository. An agent should call the
 \`plugin_authoring\` tool first — it answers with that guide plus the connected node's *current*
