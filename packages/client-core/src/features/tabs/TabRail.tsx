@@ -70,9 +70,9 @@ export default function TabRail() {
   const [menuId, setMenuId] = createSignal<string | null>(null)
   // The right-click door onto the same row actions. One menu for the whole list, with the row it
   // belongs to travelling in the signal.
-  const [rowMenu, setRowMenu] = createSignal<ContextMenuOpening | null>(null)
+  const [rowMenu, setRowMenu] = createSignal<ContextMenuOpening<'task.row'> | null>(null)
   let rowMenuReturnFocus: HTMLElement | undefined
-  const [sourceMenu, setSourceMenu] = createSignal<ContextMenuOpening | null>(null)
+  const [sourceMenu, setSourceMenu] = createSignal<ContextMenuOpening<'rail.source'> | null>(null)
   let sourceMenuReturnFocus: HTMLElement | undefined
   let openedSource: unknown
 

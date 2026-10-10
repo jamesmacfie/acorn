@@ -28,7 +28,9 @@ describe('the location vocabulary', () => {
     expect(isContextMenuLocation('task.row')).toBe(true)
     expect(isContextMenuLocation('file.row')).toBe(true)
     expect(isContextMenuLocation('document.tab')).toBe(true)
-    for (const value of ['agent.message', 'task.row ', 'TASK.ROW', '', null, undefined, 42, {}]) {
+    expect(isContextMenuLocation('agent.message')).toBe(true)
+    expect(isContextMenuLocation('agent.turn')).toBe(true)
+    for (const value of ['task.footer', 'task.row ', 'TASK.ROW', '', null, undefined, 42, {}]) {
       expect(isContextMenuLocation(value), String(value)).toBe(false)
     }
   })
@@ -46,12 +48,19 @@ describe('the location vocabulary', () => {
         expect(CONTEXT_MENU_FACTS[location], `${location} ${fact}`).not.toContain(fact)
       }
     }
+    // A message's text and ids are what the action receives; matching on text would be a trap.
+    for (const location of ['agent.message', 'agent.turn'] as const) {
+      for (const fact of ['text', 'textTruncated', 'itemId', 'turnId', 'sessionId', 'revision', 'nodeId', 'taskId']) {
+        expect(CONTEXT_MENU_FACTS[location], `${location} ${fact}`).not.toContain(fact)
+      }
+    }
   })
 
   it('keeps the file locations off the rail ownership rule', () => {
     // A file action may come from any plugin, like an `item.row` one, so it names no owned surface.
     expect(isRailMenuLocation('file.row')).toBe(false)
     expect(isRailMenuLocation('document.tab')).toBe(false)
+    expect(isRailMenuLocation('agent.message')).toBe(false)
     expect(isRailMenuLocation('rail.source')).toBe(true)
     expect(isRailMenuLocation('rail.pane')).toBe(true)
   })
@@ -80,6 +89,8 @@ describe('unknownWhenFacts', () => {
     expect(unknownWhenFacts('task.row', { branch: 'main', title: 'x' })).toEqual(['branch', 'title'])
     expect(unknownWhenFacts('file.row', { extension: 'json', directory: false, readOnly: false, projectId: 'p1' })).toEqual([])
     expect(unknownWhenFacts('document.tab', { path: 'a.json', revision: 'abc' })).toEqual(['path', 'revision'])
+    expect(unknownWhenFacts('agent.message', { role: 'assistant', status: 'completed', projectId: 'p1' })).toEqual([])
+    expect(unknownWhenFacts('agent.turn', { status: 'completed', role: 'user', text: 'hi' })).toEqual(['role', 'text'])
   })
 })
 

@@ -9,9 +9,11 @@
 // is no `tone`.
 import { isContextMenuLocation, isRailMenuLocation, unknownWhenFacts } from '@acorn/protocol/contextMenus.ts'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
-import { compileWhen, contextMenuRegistry, type ContextMenuContribution } from '../registries/panes/contextMenus'
+import {
+  compileWhen, contextMenuRegistry, type AgentMessageTarget, type AgentTurnTarget, type ContextMenuContribution, type FileMenuTarget,
+} from '../registries/panes/contextMenus'
 import type { Disposable } from '../../kit/lib/state/registry'
-import { runChromeAction } from './actions'
+import { runChromeAction, type ChromeActionContext } from './actions'
 import { sourceRegistry } from '../registries/sources/sources'
 import { paneRegistry } from '../registries/panes/panes'
 import { taskById } from '../../features/tasks/taskLookup'
@@ -84,21 +86,18 @@ export function pluginContextMenuItem(
         const owner = location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)
         if (owner !== pluginId) return
       }
-      if (target.location === 'file.row' || target.location === 'document.tab') {
-        // The owner checked that the file is still the one the menu opened on. What is checked here is
-        // the binding: the menu's Node is still the one being looked at, and its task is still on it
-        // in the same project. A path alone never reaches another task's worktree.
+      if (target.location === 'file.row' || target.location === 'document.tab'
+        || target.location === 'agent.message' || target.location === 'agent.turn') {
+        // The owner checked that the file, message or turn is still the one the menu opened on. What is
+        // checked here is the binding: the menu's Node is still the one being looked at, and its task is
+        // still on it in the same project. A path or a session id alone never reaches another task.
         if (target.location !== location || target.nodeId !== binding.nodeId()) return
         if (taskById(target.taskId)?.projectId !== target.projectId) return
         void runChromeAction(descriptor.action, {
           pluginId,
           nodeId: binding.nodeId(),
           taskId: target.taskId,
-          resource: {
-            kind: 'file', taskId: target.taskId, projectId: target.projectId, path: target.path,
-            directory: target.directory, readOnly: target.readOnly,
-            ...(target.revision === undefined ? {} : { revision: target.revision }),
-          },
+          ...ownerTargetBody(target),
         })
         return
       }
@@ -117,6 +116,26 @@ export function pluginContextMenuItem(
     },
   }
   return item
+}
+
+// What a `runNodeAction` row on an owner's target sends. Every key is named here, so the location's
+// owner never chooses what leaves the client: no file bytes, and of a message only the text it shows.
+const ownerTargetBody = (target: FileMenuTarget | AgentMessageTarget | AgentTurnTarget): Pick<ChromeActionContext, 'resource' | 'message' | 'turn'> => {
+  const { taskId, projectId } = target
+  if (target.location === 'agent.message') {
+    const { sessionId, itemId, turnId, role, status, text, revision } = target
+    return { message: { taskId, projectId, sessionId, itemId, turnId, role, status, text, ...(target.textTruncated ? { textTruncated: true } : {}), revision } }
+  }
+  if (target.location === 'agent.turn') {
+    const { sessionId, turnId, status, revision } = target
+    return { turn: { taskId, projectId, sessionId, turnId, status, revision } }
+  }
+  return {
+    resource: {
+      kind: 'file', taskId, projectId, path: target.path, directory: target.directory, readOnly: target.readOnly,
+      ...(target.revision === undefined ? {} : { revision: target.revision }),
+    },
+  }
 }
 
 /** Validate, bind and register one row. The returned disposable belongs to the chrome pass, which

@@ -12,6 +12,11 @@ import { subagentSummary } from './subagentDisplay'
 import { selectManagedSubagent } from './managedSelection'
 import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
+import { messageAttachments, shownMessageText } from './messageText'
+import {
+  ContributedTranscriptRows, messageMenuTarget, transcriptMenuRows, turnMenuTarget, TurnActionsMenu, type TranscriptScope,
+} from './transcriptMenus'
+import type { AgentMessageTarget } from '@acorn/plugin-api/client'
 import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
 import { appApprovalOf, approvalSentNote, approvalTarget, sentOptionId } from './appApproval'
@@ -35,20 +40,6 @@ const contextLine = (context: { used: number; size?: number }): string =>
     ? `${context.used.toLocaleString()} tokens`
     : `${context.used.toLocaleString()} / ${context.size.toLocaleString()} context`
 
-// The turn's text names each attachment as `[Attachment: <id>]`, which is what the harness is sent
-// (server/sessions/runtimeContext.ts). Once the cards below draw the attachments themselves, the
-// placeholder is the same fact twice, and the uglier of the two. Dropped only when there are cards to
-// draw: a truncated replay can reach a card with no turn behind it, and a reader who loses the line
-// entirely has no idea anything was attached.
-export const withoutAttachmentPlaceholders = (text: string): string =>
-  text.replace(/^\[Attachment: [^\]\n]+\]$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
-
-// The tags that mark another author's text for the model (a pull request body, a delegated agent's
-// report). They are for the model alone, and the reader never sees their ids.
-export const withoutPastedMarkers = (text: string): string => !text.includes('<pasted_content id=')
-  ? text
-  : text.replace(/^<\/?pasted_content id="[0-9a-f]+">$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
-
 const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> = {
   pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
   in_progress: { icon: 'circle-dot', tone: 'accent', label: 'In progress' },
@@ -59,14 +50,23 @@ const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted
 // place: prose in a chat or a ticket, markdown in a doc, and the raw event when somebody is debugging
 // what the harness actually sent. It mirrors the session's own export menu in the pane header, one
 // answer at a time instead of the whole history.
-function CopyOutputMenu(props: { text: () => string; event: () => AgentNormalizedEvent }) {
+//
+// Other plugins' rows on the message follow the three (./transcriptMenus.tsx), in this one menu, and
+// its label says there is more than copying in it.
+function CopyOutputMenu(props: {
+  text: () => string
+  event: () => AgentNormalizedEvent
+  noun: 'response' | 'message'
+  target?: () => AgentMessageTarget | undefined
+}) {
   const copy = (text: string) => void navigator.clipboard.writeText(text)
+  const label = () => transcriptMenuRows(props.target?.()).length ? `Copy this ${props.noun} or act on it` : `Copy this ${props.noun}`
   return (
-    <Menu ariaLabel="Copy this response" placement="bottom-end"
+    <Menu ariaLabel={label()} placement="bottom-end"
       trigger={({ toggle, open }) => (
         <IconButton
           icon="ellipsis"
-          label="Copy this response"
+          label={label()}
           opens="menu"
           expanded={open()}
           onPress={toggle}
@@ -78,6 +78,7 @@ function CopyOutputMenu(props: { text: () => string; event: () => AgentNormalize
           <Menu.Item context={menu} onSelect={() => copy(asPlainText(props.text()))}>Copy as text</Menu.Item>
           <Menu.Item context={menu} onSelect={() => copy(props.text())}>Copy as Markdown</Menu.Item>
           <Menu.Item context={menu} onSelect={() => copy(JSON.stringify(props.event(), null, 2))}>Copy as JSON</Menu.Item>
+          <ContributedTranscriptRows context={menu} target={() => props.target?.()} separated />
         </>
       )}
     </Menu>
@@ -96,6 +97,7 @@ function AssistantMessageCard(props: {
   event: () => AgentNormalizedEvent
   createdAt: number
   taskId: string
+  target?: () => AgentMessageTarget | undefined
 }) {
   const time = createMemo(() => eventTime(props.createdAt))
   return (
@@ -106,7 +108,7 @@ function AssistantMessageCard(props: {
             <Text emphasis="eyebrow">{props.label}</Text>
             <Text emphasis="eyebrow" tip={time().full} tipAt={props.createdAt}>{time().short}</Text>
           </Inline>
-          <CopyOutputMenu text={() => props.text} event={props.event} />
+          <CopyOutputMenu text={() => props.text} event={props.event} noun="response" target={props.target} />
         </Inline>
         <AgentMarkdown text={props.text} taskId={props.taskId} />
       </Stack>
@@ -128,8 +130,16 @@ export default function AgentEventCard(props: {
   onRequestResolved?: () => void
   planHandoffState?: CodexPlanHandoffState
   onPlanImplemented?: () => void
+  /** The Node and project the transcript was read for, which another plugin's menu row on a message or
+   *  turn is bound to. Without it the card offers no such rows. */
+  menuScope?: { nodeId: string; projectId: string }
 }) {
   const event = () => props.item.event
+  const scope = (): TranscriptScope | undefined =>
+    props.menuScope && { ...props.menuScope, taskId: props.taskId, sessionId: props.sessionId }
+  // Built only for a message card and a turn's closing line; every other card answers undefined.
+  const messageTarget = createMemo(() => { const bound = scope(); return bound && messageMenuTarget(bound, props.item, props.turn) })
+  const turnTarget = createMemo(() => { const bound = scope(); return bound && turnMenuTarget(bound, props.item, props.turn) })
   const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
   const [implementing, setImplementing] = createSignal(false)
   const [planError, setPlanError] = createSignal('')
@@ -162,23 +172,25 @@ export default function AgentEventCard(props: {
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'user_message' }>
           const time = createMemo(() => eventTime(props.item.createdAt))
-          // The turn's attachments belong to the reader's own turn. A subagent's brief sits inside that
-          // same turn, so left ungated it drew the parent's pictures and context manifest under a
-          // document the reader never wrote.
-          const attachments = () => message().subagentId || message().automatic
-            ? []
-            : props.turn?.input.filter((part) => part.type === 'attachment' || part.type === 'image') ?? []
+          const attachments = () => messageAttachments(message(), props.turn)
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
-                <Inline>
-                  <Text emphasis="eyebrow">
-                    {message().subagentId ? 'Subagent' : props.turn?.source === 'goal' ? 'Goal' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
-                  </Text>
-                  <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
+                <Inline spread>
+                  <Inline>
+                    <Text emphasis="eyebrow">
+                      {message().subagentId ? 'Subagent' : props.turn?.source === 'goal' ? 'Goal' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
+                    </Text>
+                    <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
+                  </Inline>
+                  {/* The reader's own message has no menu of its own. It gets the Copy menu only when
+                      another plugin offers a row on it, so with none the card is as it always was. */}
+                  <Show when={transcriptMenuRows(messageTarget()).length}>
+                    <CopyOutputMenu text={() => shownMessageText(message(), props.turn)} event={message} noun="message" target={messageTarget} />
+                  </Show>
                 </Inline>
                 <AgentMarkdown
-                  text={withoutPastedMarkers(attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text)}
+                  text={shownMessageText(message(), props.turn)}
                   taskId={props.taskId}
                 />
                 <Show when={props.turn?.source === 'delegation_report' ? props.turn.effectivePolicy.checkResults as CheckResults | undefined : undefined}>
@@ -247,6 +259,7 @@ export default function AgentEventCard(props: {
               event={message}
               createdAt={props.item.createdAt}
               taskId={props.taskId}
+              target={messageTarget}
             />
           )
         }}
@@ -315,6 +328,7 @@ export default function AgentEventCard(props: {
                       sessionId={props.sessionId}
                       sessionModel={props.sessionModel}
                       turn={props.turn}
+                      menuScope={props.menuScope}
                     />
                   )}
                 </Index>
@@ -546,9 +560,12 @@ export default function AgentEventCard(props: {
               ? ` · ${(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason}`
               : ''}
           </Text>
-          <Show when={props.item.context}>
-            {(context) => <Text emphasis="muted">{contextLine(context())}</Text>}
-          </Show>
+          <Inline>
+            <Show when={props.item.context}>
+              {(context) => <Text emphasis="muted">{contextLine(context())}</Text>}
+            </Show>
+            <TurnActionsMenu target={turnTarget} />
+          </Inline>
         </Inline>
       </Show>
     </>

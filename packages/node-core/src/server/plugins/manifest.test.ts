@@ -1436,7 +1436,7 @@ describe('context menus', () => {
   })
 
   it('refuses a location the host does not draw', () => {
-    for (const location of ['agent.message', 'task.footer', 'TASK.ROW', '']) {
+    for (const location of ['content.preview', 'task.footer', 'TASK.ROW', '']) {
       expect(manifest({ contextMenus: [menu({ location })] }).success, location).toBe(false)
     }
   })
@@ -1496,6 +1496,18 @@ describe('context menus', () => {
     // The route is still confined to the declaring plugin's own namespace.
     expect(messages(manifest({ contextMenus: [{ ...inspect, action: { verb: 'runNodeAction', path: '/v1/p/editor/tasks' } }] })))
       .toContain('route must be inside /v1/p/board/')
+  })
+
+  it('takes message and turn actions from any plugin, matched on role and status only', () => {
+    const note = menu({ id: 'file-note', location: 'agent.message', label: 'File as note', when: { role: 'assistant', status: 'completed' },
+      action: { verb: 'runNodeAction', path: '/v1/p/board/note' } })
+    expect(manifest({ contextMenus: [note, { ...note, id: 'turn-note', location: 'agent.turn', when: { status: 'failed', projectId: 'p1' } }] }).success).toBe(true)
+    expect(messages(manifest({ contextMenus: [{ ...note, surface: 'agent' }] }))).toContain('agent.message does not accept a surface')
+    // The text and ids are what the action receives, not something to match on.
+    expect(messages(manifest({ contextMenus: [{ ...note, when: { text: 'hello' } }] })))
+      .toContain("'agent.message' has no fact named 'text'")
+    expect(messages(manifest({ contextMenus: [{ ...note, location: 'agent.turn', when: { role: 'user' } }] })))
+      .toContain("'agent.turn' has no fact named 'role'")
   })
 })
 

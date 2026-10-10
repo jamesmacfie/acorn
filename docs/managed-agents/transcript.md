@@ -129,6 +129,16 @@ An answered permission goes, because its tool call has a card. Both read the req
 event. An answer to a question marked secret reads "Answer hidden". **Chats only** keeps questions and
 anything still blocking.
 
+## Message and turn menus
+
+An agent's message has a **Copy** menu with text, Markdown, and JSON. Another plugin can add rows to
+it through the `agent.message` menu location. The menu's label then reads "Copy this response or act
+on it". Your own message gets the same menu only when a plugin offers a row on it, so with none it has
+no menu. A finished turn's `Turn complete` line gets an actions menu the same way, through
+`agent.turn`. The rows are the same in the desktop and the terminal. The text a row receives is the
+text the card shows, from `messageText.ts`. For the contract, see
+[context menus](../plugins/menus-and-markers.md#context-menus).
+
 ## Subagent views
 
 A subagent shows as one card in its parent's transcript and one indented row in the sidebar. The card

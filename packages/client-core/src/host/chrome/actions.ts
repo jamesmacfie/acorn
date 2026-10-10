@@ -11,6 +11,7 @@ import { taskById } from '../../features/tasks/taskLookup'
 import { activeTaskId, selectedSource } from '../../features/tasks/tasks'
 import { openPluginOverlay } from '../frames/overlays'
 import { ownsRoute } from './chromeData'
+import type { AgentMessageTarget, AgentTurnTarget } from '../registries/panes/contextMenus'
 
 // The closed verb set the host executes on a descriptor's behalf. See docs/plugins.md.
 //
@@ -33,6 +34,11 @@ export type ChromeActionContext = {
   /** Host-derived identity for a file row or document tab menu. The path is the owner's confined
    *  worktree-relative one; no absolute path and no file bytes ever travel here. */
   resource?: { kind: 'file'; taskId: string; projectId: string; path: string; directory: boolean; readOnly: boolean; revision?: string }
+  /** Host-derived identity for an agent transcript message, with the text its card shows (at most
+   *  64 KiB). Never the raw event, hidden reasoning, or the turn's other messages. */
+  message?: Omit<AgentMessageTarget, 'location' | 'nodeId'>
+  /** Host-derived identity for a finished agent turn. No text: each message offers its own on `agent.message`. */
+  turn?: Omit<AgentTurnTarget, 'location' | 'nodeId'>
   promote?: (item: PluginRailItem) => void
   // The task this click is about, when the click site knows one and it is not the task on screen. Only a
   // dashboard record supplies it today from its task link: a panel is drawn outside every
@@ -174,7 +180,9 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
           nodeId: context.nodeId,
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(context.resource ? { resource: context.resource }
-            : context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
+            : context.message ? { message: context.message }
+              : context.turn ? { turn: context.turn }
+                : context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
         })
         // Success is silent. The node's status ping is what tells the chrome to re-read. Only a failure
         // needs saying, because nothing else on screen would show it.

@@ -2,7 +2,7 @@
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */
-export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane', 'file.row', 'document.tab'] as const
+export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane', 'file.row', 'document.tab', 'agent.message', 'agent.turn'] as const
 
 export type ContextMenuLocation = (typeof CONTEXT_MENU_LOCATIONS)[number]
 
@@ -32,6 +32,10 @@ export const CONTEXT_MENU_FACTS: Readonly<Record<ContextMenuLocation, readonly s
   // revision are payload: `extension` is what a manifest matches a file kind on.
   'file.row': ['projectId', 'extension', 'directory', 'readOnly'],
   'document.tab': ['projectId', 'extension', 'directory', 'readOnly'],
+  // A user or assistant message in an agent transcript, and a finished turn. `role` is `user` or
+  // `assistant`; `status` is the turn's. The ids, the text and the revision are payload.
+  'agent.message': ['projectId', 'role', 'status'],
+  'agent.turn': ['projectId', 'status'],
 }
 
 /** The `extension` fact for a worktree-relative path: the lowercased text after the basename's last

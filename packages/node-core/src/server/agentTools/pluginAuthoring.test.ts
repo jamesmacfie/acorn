@@ -64,6 +64,12 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     // A file action's facts and body are what an author needs that the enum can't say.
     for (const fact of CONTEXT_MENU_FACTS['file.row']) expect(renderPluginAuthoring(v)).toContain(`\`${fact}\``)
     expect(renderPluginAuthoring(v)).toContain('{ resource: { kind: "file", taskId, projectId, path,')
+    // The same for a transcript message and a turn.
+    for (const fact of [...CONTEXT_MENU_FACTS['agent.message'], ...CONTEXT_MENU_FACTS['agent.turn']]) {
+      expect(renderPluginAuthoring(v)).toContain(`\`${fact}\``)
+    }
+    expect(renderPluginAuthoring(v)).toContain('{ message: { taskId,')
+    expect(renderPluginAuthoring(v)).toContain('{ turn: { taskId, projectId, sessionId, turnId, status, revision } }')
   })
 
   it('carries every manifest key, split on what the schema actually requires', () => {

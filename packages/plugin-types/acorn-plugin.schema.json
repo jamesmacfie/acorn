@@ -2469,7 +2469,9 @@
                   "rail.source",
                   "rail.pane",
                   "file.row",
-                  "document.tab"
+                  "document.tab",
+                  "agent.message",
+                  "agent.turn"
                 ]
               },
               "surface": {

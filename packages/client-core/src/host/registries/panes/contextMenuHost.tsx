@@ -6,6 +6,7 @@ import {
   runContextMenuItem,
   type ContextMenuLocation,
   type ContextMenuTarget,
+  type TargetAt,
 } from './contextMenus'
 
 // The two hosts for the context-menu registry. The registry, the location vocabulary and the `when`
@@ -46,7 +47,7 @@ export function ContextMenuItems(props: {
 
 /** What a right-click opened: where the pointer was, and what was under it. Held by the surface that
  *  owns the rows, one menu per list, not one per row. */
-export type ContextMenuOpening = { at: { x: number; y: number }; target: ContextMenuTarget }
+export type ContextMenuOpening<L extends ContextMenuLocation = ContextMenuLocation> = { at: { x: number; y: number }; target: TargetAt<L> }
 
 let activeClose: (() => void) | undefined
 
@@ -59,10 +60,10 @@ let activeClose: (() => void) | undefined
  * takes arrow keys, closes on Escape, and returns focus to `returnFocus`, all of it from
  * `MenuSurface`, shared with the button-triggered menu rather than reimplemented.
  */
-export function ContextMenuHost(props: {
-  location: ContextMenuLocation
+export function ContextMenuHost<L extends ContextMenuLocation>(props: {
+  location: L
   ariaLabel: string
-  opening: () => ContextMenuOpening | null
+  opening: () => ContextMenuOpening<L> | null
   onClose: () => void
   returnFocus?: () => HTMLElement | undefined
 }) {

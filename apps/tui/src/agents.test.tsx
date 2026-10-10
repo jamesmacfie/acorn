@@ -1,7 +1,8 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { tasksKey } from '@acorn/protocol/api.ts'
 import { dispatchLayout } from '@acorn/client-core/features/tasks/tasks.ts'
+import { registerContextMenuItems } from '@acorn/client-core/host/registries/panes'
 import { recordedRequests, TASK } from './fixture'
 import { focusedRenderable } from './keys/regions'
 import { renderFixture } from './harness'
@@ -194,6 +195,56 @@ describe('running an agent from a terminal', () => {
       }
     } finally {
       screen.done()
+    }
+  }, 180_000)
+})
+
+// Another plugin's rows on a message and on a finished turn: the same rows the desktop draws, in the
+// same menus, reached by keys. When a row may run is the card's own test
+// (plugins/agents/src/client/sessions/AgentEventCard.test.tsx).
+describe('other plugins’ rows on a transcript', () => {
+  it('files a message from the response’s Copy menu', async () => {
+    const fileNote = vi.fn()
+    const rows = registerContextMenuItems([{ id: 'note', location: 'agent.message', label: 'File as note', order: 0, run: fileNote }])
+    const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
+    try {
+      await openFirstSession(screen)
+      await enterDetail(screen)
+      await stopSaying(screen, 'Copy this response or act on it')
+      await screen.press('RETURN')
+      expect(await screen.until('File as note')).toContain('Copy as JSON')
+      await stopSaying(screen, 'File as note')
+      await screen.press('RETURN')
+      expect(fileNote).toHaveBeenCalledWith(expect.objectContaining({
+        location: 'agent.message', sessionId: 'session-1', taskId: 'task-1', projectId: 'project-1', turnId: 'turn-1',
+        role: 'assistant', status: 'completed', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.',
+      }))
+      expect(posts()).toEqual([])
+    } finally {
+      rows.dispose()
+      screen.done()
+    }
+  }, 180_000)
+
+  it('acts on a finished turn from its closing line', async () => {
+    process.env.ACORN_FIXTURE_CODEX_PLAN = '1'
+    const review = vi.fn()
+    const rows = registerContextMenuItems([{ id: 'review', location: 'agent.turn', label: 'Review turn', order: 0, run: review }])
+    const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
+    try {
+      await screen.until('Implement plan')
+      await openFirstSession(screen)
+      await enterDetail(screen)
+      await stopSaying(screen, 'Actions for this turn')
+      await screen.press('RETURN')
+      await screen.until('Review turn')
+      await stopSaying(screen, 'Review turn')
+      await screen.press('RETURN')
+      expect(review).toHaveBeenCalledWith(expect.objectContaining({ location: 'agent.turn', turnId: 'turn-1', status: 'completed' }))
+    } finally {
+      rows.dispose()
+      screen.done()
+      delete process.env.ACORN_FIXTURE_CODEX_PLAN
     }
   }, 180_000)
 })

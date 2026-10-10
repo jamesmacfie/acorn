@@ -1,5 +1,6 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
-import { expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentTurn } from '../../contract/wire.ts'
 
@@ -25,7 +26,9 @@ vi.mock('./managedClient', () => ({
 const dispatchLayout = vi.fn()
 vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), dispatchLayout }))
 
-const { default: AgentEventCard, withoutAttachmentPlaceholders, withoutPastedMarkers } = await import('./AgentEventCard')
+const { default: AgentEventCard } = await import('./AgentEventCard')
+const { registerContextMenuItems } = await import('@acorn/plugin-api/client')
+const { withoutAttachmentPlaceholders, withoutPastedMarkers } = await import('./messageText')
 const { buildConversationItems, visibleConversationItems } = await import('./conversationItems')
 
 const fileChange = (event: Extract<AgentConversationItem['event'], { type: 'file_change' }>): AgentConversationItem =>
@@ -366,4 +369,125 @@ it('says in words that the model declined a refused turn', () => {
     expect(host.querySelector('[data-tone="warn"]')?.textContent).toContain('The model declined this request.')
     expect(host.textContent).toContain('Turn complete · refusal')
   } finally { dispose() }
+})
+
+describe('other plugins’ rows on a message and a turn', () => {
+  const menuScope = { nodeId: 'node-a', projectId: 'project-1' }
+  const turnRow = (over: Partial<AgentTurn> = {}) => ({ id: 'turn-1', status: 'completed', input: [], ...over }) as unknown as AgentTurn
+  const said = (type: 'user_message' | 'assistant_message', text: string, lastSeq = 3): AgentConversationItem =>
+    ({ key: `${type}-card`, firstSeq: 1, lastSeq, createdAt: 1, turnId: 'turn-1', event: { type, text } })
+  const closing: AgentConversationItem = {
+    key: 'closing', firstSeq: 9, lastSeq: 9, createdAt: 9, turnId: 'turn-1', event: { type: 'turn_completed', stopReason: 'end_turn' },
+  }
+  const registered: { dispose(): void }[] = []
+  afterEach(() => { while (registered.length) registered.pop()!.dispose(); document.body.replaceChildren() })
+
+  const draw = (initial: { item: AgentConversationItem; turn?: AgentTurn; sessionId?: string }) => {
+    const [item, setItem] = createSignal(initial.item)
+    const [turn, setTurn] = createSignal(initial.turn)
+    const [sessionId, setSessionId] = createSignal(initial.sessionId ?? 'session')
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => (
+      <AgentEventCard item={item()} taskId="task" sessionId={sessionId()} turn={turn()} menuScope={menuScope} />
+    ), host)
+    registered.push({ dispose })
+    return { host, setItem, setTurn, setSessionId }
+  }
+  const trigger = (host: HTMLElement) => host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')
+  const rows = () => [...document.querySelectorAll<HTMLButtonElement>('.ui-menu .ui-menu-item')]
+  const row = (label: string) => rows().find((item) => item.textContent?.trim() === label)!
+
+  it('adds the rows after all three Copy formats in the one menu, and says the menu does more', () => {
+    const fileNote = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'note', location: 'agent.message', label: 'File as note', order: 0, run: fileNote }]))
+    const { host } = draw({ item: said('assistant_message', 'The fix is **here**.'), turn: turnRow() })
+    expect(host.querySelectorAll('button[aria-haspopup="menu"]')).toHaveLength(1)
+    expect(trigger(host)!.getAttribute('aria-label')).toBe('Copy this response or act on it')
+    trigger(host)!.click()
+    expect(rows().map((item) => item.textContent?.trim())).toEqual(['Copy as text', 'Copy as Markdown', 'Copy as JSON', 'File as note'])
+    // Lined up with the Copy rows: a row with no icon reserves no icon slot.
+    expect(row('File as note').querySelector('.ui-menu-leading')).toBeNull()
+    row('File as note').click()
+    expect(fileNote).toHaveBeenCalledWith({
+      location: 'agent.message', nodeId: 'node-a', taskId: 'task', projectId: 'project-1', sessionId: 'session',
+      itemId: 'assistant_message-card', turnId: 'turn-1', role: 'assistant', status: 'completed', text: 'The fix is **here**.', revision: 3,
+    })
+  })
+
+  it('keeps the Copy menu as it was with no rows, and gives the reader’s message none at all', () => {
+    const response = draw({ item: said('assistant_message', 'Done.'), turn: turnRow() })
+    expect(trigger(response.host)!.getAttribute('aria-label')).toBe('Copy this response')
+    const message = draw({ item: said('user_message', 'Fix it.'), turn: turnRow() })
+    expect(trigger(message.host)).toBeNull()
+  })
+
+  it('matches a row on role, so a user-only row puts the menu on the reader’s message alone', () => {
+    const quote = vi.fn()
+    registered.push(registerContextMenuItems([{
+      id: 'quote', location: 'agent.message', label: 'Quote', order: 0, when: (target) => target.role === 'user', run: quote,
+    }]))
+    const response = draw({ item: said('assistant_message', 'Done.'), turn: turnRow() })
+    expect(trigger(response.host)!.getAttribute('aria-label')).toBe('Copy this response')
+    const message = draw({
+      item: said('user_message', 'Look\n\n[Attachment: a1]'),
+      turn: turnRow({ input: [{ type: 'attachment', attachmentId: 'a1' }] }),
+    })
+    expect(trigger(message.host)!.getAttribute('aria-label')).toBe('Copy this message or act on it')
+    trigger(message.host)!.click()
+    row('Quote').click()
+    expect(quote.mock.calls[0]![0]).toMatchObject({ role: 'user', text: 'Look' })
+  })
+
+  it('offers a turn’s menu on its closing line only once the turn has finished', () => {
+    const review = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'review', location: 'agent.turn', label: 'Review turn', order: 0, run: review }]))
+    const { host, setTurn } = draw({ item: closing, turn: turnRow({ status: 'active' }) })
+    expect(trigger(host)).toBeNull()
+    setTurn(turnRow({ status: 'failed' }))
+    expect(trigger(host)!.getAttribute('aria-label')).toBe('Actions for this turn')
+    trigger(host)!.click()
+    expect(rows().map((item) => item.textContent?.trim())).toEqual(['Review turn'])
+    row('Review turn').click()
+    expect(review).toHaveBeenCalledWith({
+      location: 'agent.turn', nodeId: 'node-a', taskId: 'task', projectId: 'project-1', sessionId: 'session',
+      turnId: 'turn-1', status: 'failed', revision: 9,
+    })
+  })
+
+  it('refuses a row once the message streamed on, its turn changed, or the card shows another session', () => {
+    const fileNote = vi.fn()
+    registered.push(registerContextMenuItems([{ id: 'note', location: 'agent.message', label: 'File as note', order: 0, run: fileNote }]))
+    const { host, setItem, setTurn, setSessionId } = draw({ item: said('assistant_message', 'Part', 3), turn: turnRow({ status: 'active' }) })
+    trigger(host)!.click()
+    setItem(said('assistant_message', 'Part one', 4))
+    row('File as note').click()
+
+    trigger(host)!.click()
+    setTurn(turnRow({ status: 'completed' }))
+    row('File as note').click()
+
+    trigger(host)!.click()
+    setSessionId('another-session')
+    row('File as note').click()
+    expect(fileNote).not.toHaveBeenCalled()
+
+    // Opened again on what is there now, it runs.
+    trigger(host)!.click()
+    row('File as note').click()
+    expect(fileNote).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'another-session', text: 'Part one', revision: 4 }))
+  })
+
+  it('keeps the transcript usable when a row throws', () => {
+    const copied = vi.fn(async () => undefined)
+    Object.assign(navigator, { clipboard: { writeText: copied } })
+    registered.push(registerContextMenuItems([{ id: 'broken', location: 'agent.message', label: 'Broken', order: 0, run: () => { throw new Error('boom') } }]))
+    const { host } = draw({ item: said('assistant_message', 'Done.'), turn: turnRow() })
+    trigger(host)!.click()
+    expect(() => row('Broken').click()).not.toThrow()
+    trigger(host)!.click()
+    row('Copy as Markdown').click()
+    expect(copied).toHaveBeenCalledWith('Done.')
+    expect(host.textContent).toContain('Done.')
+  })
 })

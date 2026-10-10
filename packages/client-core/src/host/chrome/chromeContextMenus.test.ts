@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
 // Type-only, so it is erased and does not evaluate the module before the mock below is installed.
-import type { TaskRowTarget } from '../registries/panes/contextMenus'
+import type { AgentMessageTarget, AgentTurnTarget, TaskRowTarget } from '../registries/panes/contextMenus'
 
 const sendRaw = vi.fn(async (..._args: unknown[]) => ({ ok: true, status: 200 }))
 vi.mock('../../infra/node/apiClient', () => ({
@@ -10,7 +10,7 @@ vi.mock('../../infra/node/apiClient', () => ({
   writeJson: vi.fn(),
 }))
 
-const { contextMenuItems, contextMenuRegistry } = await import('../registries/panes/contextMenus')
+const { contextMenuItems, contextMenuRegistry, runContextMenuItem } = await import('../registries/panes/contextMenus')
 const { sourceRegistry } = await import('../registries/sources/sources')
 const { paneRegistry } = await import('../registries/panes/panes')
 const { pluginContextMenuId, pluginContextMenuItem, registerPluginContextMenu } = await import('./chromeContextMenus')
@@ -57,8 +57,8 @@ describe('what the host refuses', () => {
     // The version-skew case, and the reason `location` is a plain string on the wire: a newer node can
     // describe a location this client cannot draw, and the answer is a named refusal rather than a row
     // registered against nothing.
-    expect(() => pluginContextMenuItem('board', descriptor({ location: 'agent.message' }), binding()))
-      .toThrow(/unknown location 'agent.message'/)
+    expect(() => pluginContextMenuItem('board', descriptor({ location: 'task.footer' }), binding()))
+      .toThrow(/unknown location 'task.footer'/)
     expect(() => pluginContextMenuItem('board', descriptor({ location: '' }), binding())).toThrow(/unknown location/)
   })
 
@@ -212,6 +212,57 @@ describe('file and document menus', () => {
     first.dispose()
     disposables.push(registerPluginContextMenu('inspector', inspect, binding()))
     captured.run(fileTarget())
+    expect(sendRaw).not.toHaveBeenCalled()
+  })
+})
+
+describe('agent message and turn menus', () => {
+  const note = descriptor({ id: 'note', location: 'agent.message', when: { role: 'assistant' }, action: { verb: 'runNodeAction', path: '/v1/p/notes/file' } })
+  const message = (over: Partial<AgentMessageTarget> = {}): AgentMessageTarget => ({
+    location: 'agent.message', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1',
+    itemId: 'event-7', turnId: 'turn-2', role: 'assistant', status: 'completed', text: 'Ship it.', revision: 9, ...over,
+  })
+  const turn: AgentTurnTarget = {
+    location: 'agent.turn', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1',
+    turnId: 'turn-2', status: 'failed', revision: 12,
+  }
+  beforeEach(() => setTaskLookup((id) => (id === 'task-1' ? { id, projectId: 'project-1' } : undefined) as never))
+  afterEach(() => setTaskLookup(() => undefined))
+  const bodies = () => sendRaw.mock.calls.map((call) => JSON.parse((call[1] as { body: string }).body))
+
+  it('sends the message’s identity and shown text, and the turn’s identity, and nothing else', async () => {
+    disposables.push(registerPluginContextMenu('notes', note, binding()))
+    disposables.push(registerPluginContextMenu('notes', { ...note, id: 'turn', location: 'agent.turn', when: { status: 'failed' } }, binding()))
+    contextMenuItems('agent.message', message())[0]!.run(message({ text: 'Ship', textTruncated: true }))
+    contextMenuItems('agent.turn', turn)[0]!.run(turn)
+    await Promise.resolve()
+    expect(bodies()).toEqual([
+      { message: { taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1', itemId: 'event-7', turnId: 'turn-2',
+        role: 'assistant', status: 'completed', text: 'Ship', textTruncated: true, revision: 9 } },
+      { turn: { taskId: 'task-1', projectId: 'project-1', sessionId: 'session-1', turnId: 'turn-2', status: 'failed', revision: 12 } },
+    ])
+  })
+
+  it('matches on role and status', () => {
+    disposables.push(registerPluginContextMenu('notes', note, binding()))
+    expect(contextMenuItems('agent.message', message())).toHaveLength(1)
+    expect(contextMenuItems('agent.message', message({ role: 'user' }))).toEqual([])
+    expect(contextMenuItems('agent.turn', turn)).toEqual([])
+  })
+
+  it('refuses a changed Node, a task gone or moved, an unloaded contributor, and a replaced registration', () => {
+    let enabled = true
+    const handle = registerPluginContextMenu('notes', note, binding({ enabled: () => enabled }))
+    const entry = contextMenuItems('agent.message', message())[0]!
+    entry.run(message({ nodeId: 'node-b' }))
+    entry.run(message({ taskId: 'task-gone' }))
+    entry.run(message({ projectId: 'project-2' }))
+    enabled = false
+    entry.run(message())
+    enabled = true
+    handle.dispose()
+    disposables.push(registerPluginContextMenu('notes', note, binding()))
+    runContextMenuItem(entry, message())
     expect(sendRaw).not.toHaveBeenCalled()
   })
 })

@@ -1,7 +1,7 @@
 import { agentTelemetry } from './agentTelemetry'
 import { createComputed, createMemo, createSignal, For, onCleanup, Show, untrack, type Setter } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions } from '@acorn/plugin-api/client'
+import { activeNodeId, prefsOptions, queryOwner, tasksOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/wire.ts'
 import AgentEventCard from './AgentEventCard'
 import {
@@ -47,6 +47,16 @@ export default function AgentTranscript(props: {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   const foldSetting = createAgentToolFoldSetting(() => prefs.data, queryClient, props.collapseSignal)
+  // What another plugin's menu row on a message or turn is bound to: the Node this transcript was read
+  // from, taken once as it mounts, and the task's project. A row the host sees after a Node switch is
+  // refused, because the Node it names is no longer the one in view.
+  const registeredNode = queryOwner(queryClient)
+  const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const tasks = createQuery(() => tasksOptions(true))
+  const menuScope = createMemo(() => {
+    const projectId = tasks.data?.find((task) => task.id === props.taskId)?.projectId
+    return nodeId && projectId ? { nodeId, projectId } : undefined
+  })
   // Kept open across events, so a streamed row costs the fold one record rather than the whole
   // session (createConversationProjection). An item no event touched keeps last time's object, so the
   // rows below can tell which card an event changed.
@@ -162,6 +172,7 @@ export default function AgentTranscript(props: {
           sessionId={sessionId()}
           sessionModel={sessionModel()}
           turn={turnsById().get(item().turnId ?? '')}
+          menuScope={menuScope()}
           request={item().event.type === 'request'
             ? requestsById().get((item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId)
             : undefined}

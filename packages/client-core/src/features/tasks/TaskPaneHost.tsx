@@ -40,7 +40,7 @@ export default function TaskPaneHost(props: {
   const menuId = createUniqueId()
   // Links in any pane preview against this task, whichever task the rail has selected.
   const linkPreviews = createLinkPreviewBoundary(() => ({ taskId: props.task.id, projectId: props.task.projectId }))
-  const [paneMenu, setPaneMenu] = createSignal<ContextMenuOpening | null>(null)
+  const [paneMenu, setPaneMenu] = createSignal<ContextMenuOpening<'rail.pane'> | null>(null)
   let paneMenuReturnFocus: HTMLElement | undefined
   let openedPane: unknown
   const stored = () => layoutForTask(props.task.id) ?? defaultLayout()

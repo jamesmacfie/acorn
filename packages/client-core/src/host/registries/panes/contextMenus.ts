@@ -102,7 +102,47 @@ export const fileMenuTarget = <L extends 'file.row' | 'document.tab'>(
   fields: Omit<FileMenuTarget<L>, 'location' | 'extension'>,
 ): FileMenuTarget<L> => ({ location, ...fields, extension: fileExtensionFact(fields.path, fields.directory) })
 
-export type ContextMenuTarget = TaskRowTarget | ItemRowTarget | RailSourceTarget | RailPaneTarget | FileRowTarget | DocumentTabTarget
+/**
+ * A user or assistant message in an agent transcript (`agent.message`). Any plugin may add a row, so the
+ * bound Node, task and session travel with it and the host rechecks them before a row runs.
+ *
+ * `itemId` is the transcript card's stable id, `status` the status of the turn the message belongs to,
+ * and `revision` the sequence number of the newest event behind the card, so a message that streamed on
+ * after the menu opened reads as changed. `text` is what the card shows, cut to 64 KiB, with
+ * `textTruncated` set when it was cut. Only `role`, `status` and `projectId` are facts.
+ */
+export type AgentMessageTarget = {
+  location: 'agent.message'
+  nodeId: string
+  taskId: string
+  projectId: string
+  sessionId: string
+  itemId: string
+  turnId: string
+  role: 'user' | 'assistant'
+  status: string
+  text: string
+  textTruncated?: true
+  revision: number
+}
+
+/** A finished turn in an agent transcript (`agent.turn`): completed, failed, cancelled or interrupted.
+ *  A turn still running, waiting on an answer or queued has no target. `revision` is the sequence number
+ *  of the event that closed it. */
+export type AgentTurnTarget = {
+  location: 'agent.turn'
+  nodeId: string
+  taskId: string
+  projectId: string
+  sessionId: string
+  turnId: string
+  status: string
+  revision: number
+}
+
+export type ContextMenuTarget =
+  | TaskRowTarget | ItemRowTarget | RailSourceTarget | RailPaneTarget | FileRowTarget | DocumentTabTarget
+  | AgentMessageTarget | AgentTurnTarget
 
 /** The target one location hands its rows. */
 export type TargetAt<L extends ContextMenuLocation> = Extract<ContextMenuTarget, { location: L }>
@@ -156,6 +196,10 @@ export function registerContextMenuItems<L extends ContextMenuLocation>(
   return { dispose: () => disposables.forEach((entry) => entry.dispose()) }
 }
 
+/** What the menu log calls a target: a file by its path, a message or turn by its own id. */
+const targetName = (target: ContextMenuTarget): string =>
+  'path' in target ? target.path : 'itemId' in target ? target.itemId : 'id' in target ? target.id : target.turnId
+
 /** Run one row's action. A contribution's `run` is other people's code (core's own closures today, a
  *  plugin's verb dispatch tomorrow), and a menu row that throws must not take the shell's click
  *  handler with it. The row has already closed by the time this runs, so there is nowhere to show the
@@ -170,7 +214,7 @@ export function runContextMenuItem<L extends ContextMenuLocation>(
     if (!ownsRailTarget(item as unknown as ContextMenuContribution, target)) return
     item.run(target)
   } catch (error) {
-    log.warn(`'${item.id}' failed on ${target.location} '${'path' in target ? target.path : target.id}'`, error, { 'menu.item': item.id })
+    log.warn(`'${item.id}' failed on ${target.location} '${targetName(target)}'`, error, { 'menu.item': item.id })
   }
 }
 

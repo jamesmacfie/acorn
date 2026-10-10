@@ -70,7 +70,7 @@ export {
 } from '@acorn/client-core/host/registries/panes'
 export type {
   ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, ItemRowTarget, TaskRowTarget,
-  RailSourceTarget, RailPaneTarget, FileMenuTarget, FileRowTarget, DocumentTabTarget,
+  RailSourceTarget, RailPaneTarget, FileMenuTarget, FileRowTarget, DocumentTabTarget, AgentMessageTarget, AgentTurnTarget,
 } from '@acorn/client-core/host/registries/panes'
 // Brand-mark registration. See docs/ui-design/icons.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.

@@ -1,4 +1,6 @@
 # private workspace facade
+client: AgentMessageTarget
+client: AgentTurnTarget
 client: AttentionItem
 client: AttentionSourceContribution
 client: BindingCandidate

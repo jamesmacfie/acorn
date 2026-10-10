@@ -17,15 +17,18 @@ An entry is `{ id, location, surface?, label, icon?, order?, when?, action }`:
   issue, or a GitHub pull request. `rail.source` and `rail.pane` are the desktop's left source icons
   and right task pane icons. The two rail locations require `surface`, the exact id of a source or
   task pane the declaring plugin owns. The Node and the client both check it. `file.row` is a file or
-  folder in Editor's tree and `document.tab` an open document's tab. Any plugin may add rows to both,
-  and neither takes a `surface`.
+  folder in Editor's tree and `document.tab` an open document's tab. `agent.message` is a user or
+  assistant message in an agent transcript, and `agent.turn` a finished turn. Any plugin may add rows
+  to these four, and none takes a `surface`.
 - **`when`** is a map of literals that must all equal the target's own facts, not an expression.
   `task.row` supplies `origin`, `projectId`, and `pinned`. `item.row` supplies `providerId` and
   `projectId`. `rail.source` supplies `projectId`, and `rail.pane` supplies `projectId`, `shown`, and
   `pinned`. `file.row` and `document.tab` supply `projectId`, `extension`, `directory`, and
   `readOnly`. `extension` is lowercase without the dot, and `""` for a folder, a dotfile, or a name
-  with none. `readOnly` means Editor shows the file as an image. Naming any other fact is a parse
-  error. Identity fields such as `id`, `title`, `path`, and `revision` aren't facts.
+  with none. `readOnly` means Editor shows the file as an image. `agent.message` supplies
+  `projectId`, `role` (`user` or `assistant`), and `status`, the status of its turn. `agent.turn`
+  supplies `projectId` and `status`. Naming any other fact is a parse error. Identity fields such as
+  `id`, `title`, `path`, `text`, and `revision` aren't facts.
 - **`action`** takes the narrow verb set a command takes. `createTask` and `navigate` aren't in it,
   because the thing under the cursor is a core resource.
 
@@ -56,13 +59,26 @@ directory, readOnly, revision? } }`. `path` is Editor's confined worktree-relati
 `revision` is the SHA-256 of the disk version an open document last saw. No absolute path or file bytes
 travel: a route that needs the file declares and calls Editor's `editor.files` capability. Before the
 verb runs, the owner checks the menu's file is still the one it opened on, and the host checks its
-Node is the one in view and its task is still on that Node in the same project. Disposal and target, Node, and availability checks stop an open menu from
+Node is the one in view and its task is still on that Node in the same project.
+
+A message sends `{ message: { taskId, projectId, sessionId, itemId, turnId, role, status, text,
+textTruncated?, revision } }`, and a turn sends `{ turn: { taskId, projectId, sessionId, turnId,
+status, revision } }`. `itemId` is the transcript card's stable ID. `revision` is the sequence number of
+the newest event behind the card. `text` is what the card shows, cut to 64 KiB of whole characters,
+and `textTruncated` is `true` when it was cut. Neither body carries the raw event, reasoning, or the
+turn's other messages. A turn has a target only once it's completed, failed, cancelled, or
+interrupted. The owner takes the target as the menu opens and refuses a row once the message, its
+turn's status, or the session on the card has changed. The host then makes the same Node and task
+checks as for a file. A row can't send, answer, retry, or edit anything in the session.
+
+Disposal and target, Node, and availability checks stop an open menu from
 invoking a replacement plugin after a reload. A manifest may declare at most 32 rows, because a
 plugin may own more than eight source and pane icons. Rail menus are desktop-only.
 
 A document owner opts in by building its target with `fileMenuTarget` and drawing
 `contextMenuItems(target.location, target)` after its own rows. Editor's adapter is
-`plugins/editor/src/client/contributedMenuRows.tsx`.
+`plugins/editor/src/client/contributedMenuRows.tsx`. The transcript's is
+`plugins/agents/src/client/sessions/transcriptMenus.tsx`.
 
 Compiled plugins register rail rows through `ctx.contextMenus.register` after their source or pane,
 and the host stamps the owner. A replacement `rail` or `pane.switcher` provider may call the optional

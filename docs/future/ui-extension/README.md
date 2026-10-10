@@ -32,7 +32,7 @@ features. Implementation checkpoints are not separate public releases; phase 14 
 | 02 | [Add transcript media viewers](./02-transcript-media.md) | Done |
 | 03 | [Add workflow step renderers](./03-workflow-step-ui.md) | Done |
 | 04 | [Add file and document actions](./04-resource-actions.md) | Done |
-| 05 | [Add message and turn actions](./05-message-actions.md) | Planned |
+| 05 | [Add message and turn actions](./05-message-actions.md) | Done |
 | 06 | [Add resource detail regions](./06-detail-regions.md) | Planned |
 | 07 | [Add file annotations](./07-file-annotations.md) | Planned |
 | 08 | [Add selected-content actions](./08-selection-actions.md) | Planned |
