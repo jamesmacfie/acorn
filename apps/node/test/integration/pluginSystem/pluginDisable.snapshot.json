@@ -106,6 +106,7 @@
       "agents.sessionExecute",
       "agents.sessions",
       "agents.standingContext.v1",
+      "agents.transcriptMedia",
       "agents.turns",
       "agents.usageRoute",
       "browser.captures",

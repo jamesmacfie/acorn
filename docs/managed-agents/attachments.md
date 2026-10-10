@@ -1,7 +1,8 @@
 # Context, files, and attachments
 
-This page covers how a turn carries task context, attachments, and artifacts, and how another plugin
-can draw or replace an attachment before the turn is sent.
+This page covers how a turn carries task context, attachments, and artifacts, how another plugin can
+draw a sent attachment or an artifact, and how it can draw or replace an attachment before the turn
+is sent.
 
 ## Context and artifacts
 
@@ -19,6 +20,42 @@ downloads on press. The turn's text names each attachment as `[Attachment: <id>]
 harness receives, and the transcript drops that line when it has a tile to draw. This read is wider
 than the draft read below, because a sent attachment is out of a plugin's reach and its sender wants
 to see it again.
+
+## Transcript media viewers
+
+Another plugin can draw the body of a sent attachment's tile or an artifact card. Agents opens two
+remote points, both `replace` and keyed by media type
+(`plugins/agents/src/contract/transcriptMedia.ts`):
+
+- `agents:transcript-attachment` draws inside the tile of an attachment a turn sent. The queue's
+  editable turns keep the plain tile.
+- `agents:artifact` draws above an artifact's download row.
+
+The key is the stored media type, lowercased and without parameters, so `text/plain; charset=utf-8`
+matches `text/plain`. An artifact with no media type is `application/octet-stream`. The tree gets
+`{ taskId, sessionId, media: { kind, id, filename, mediaType, byteSize? } }`. An artifact's
+`filename` is its title.
+
+The contributor draws only the body. The card keeps the filename, size, and download outside the
+slot, so they stay reachable whoever draws. With nobody drawing, or two contributors tied, or a tree
+that fails, the card draws its own body: a thumbnail, an inline image, an icon, or nothing. The
+owner's picture is fetched only while the owner's body is drawn. Bodies mount only for cards in the
+transcript's drawn window, so a long session starts no worker per hidden card.
+
+`agents.transcriptMedia` is the read behind the points. It has one method, `read({ taskId,
+sessionId, kind, id })`. It checks that the session belongs to the task, then that the media belongs
+to the session: an artifact the session produced, or an attachment of the task that one of the
+session's turns sent. It returns `{ media, bytes }`, with `bytes` set to `null` over 12 MiB, the
+binary bridge's cap. Larger content stays reachable through the card's own download. Every refusal
+is `null`: another task or session, the wrong kind, a deleted row, missing content, or an unknown ID.
+A session under an archived task still reads, because the read names its task. Nothing is written,
+and no path crosses.
+
+A media ID isn't access to `/v1/p/agents/`. A loaded viewer declares `requires.plugins: [{ id:
+"agents" }]` and the capability in `permissions.node.capabilities`, calls `read` from its own Node
+route, and fetches that route with `bridge.api.getBytes`. A viewer that needs a canvas declares a
+[companion overlay](../plugins/remote-points.md#companion-overlays). Neither point declares an
+action, so a viewer can't change the turn or the draft.
 
 ## Draft attachments
 

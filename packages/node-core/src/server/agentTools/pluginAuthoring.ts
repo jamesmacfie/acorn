@@ -407,6 +407,13 @@ export function renderPluginAuthoring(vocabulary = pluginAuthoringVocabulary()):
     '  label, remote, matches: ["https://docs.example.com/*"] }`; the tree gets `{ url, label?, taskId?,',
     '  projectId?, ref? }`. Read your data from your own route, aborting the read when `url` changes. The',
     '  desktop shows it on hover and from the link menu, the terminal from the link menu.',
+    'Agents opens two for transcript media: `agents:transcript-attachment` (a sent attachment) and',
+    '`agents:artifact`, both `replace`, keyed by lowercase media type without parameters',
+    '  (`application/octet-stream` when unknown). The tree gets `{ taskId, sessionId, media: { kind, id,',
+    '  filename, mediaType, byteSize? } }` and draws only the body; the card keeps the name and download.',
+    '  For bytes, require `agents`, declare `agents.transcriptMedia` in `permissions.node.capabilities`,',
+    '  call its `read({ taskId, sessionId, kind, id })` from your own route (`null` for any refusal, `bytes`',
+    '  `null` over 12 MiB), and fetch that route with `bridge.api.getBytes`.',
     '',
     `**Replacing a core surface.** A \`coreSlot\` frame offers to draw one of acorn's own: `
       + `${manifest.coreSlots.map((value) => `\`${value}\``).join(', ')}. Declare `

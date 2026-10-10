@@ -197,7 +197,12 @@ export default function AgentEventCard(props: {
                         and For keys by item identity, so a streaming session would remount these tiles
                         25 times a second and shut any open picture. A turn's parts never reorder. */}
                     <Index each={attachments()}>
-                      {(part) => <AgentAttachmentCard attachmentId={part().attachmentId} />}
+                      {(part) => (
+                        <AgentAttachmentCard
+                          attachmentId={part().attachmentId}
+                          transcript={{ taskId: props.taskId, sessionId: props.sessionId }}
+                        />
+                      )}
                     </Index>
                   </Inline>
                 </Show>
@@ -420,7 +425,7 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'artifact'}>
         {(_shown) => {
           const artifact = () => event() as Extract<ReturnType<typeof event>, { type: 'artifact' }>
-          return <AgentArtifactCard artifact={artifact()} />
+          return <AgentArtifactCard artifact={artifact()} taskId={props.taskId} sessionId={props.sessionId} />
         }}
       </Show>
       {/*

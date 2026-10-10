@@ -233,6 +233,18 @@ export class AgentAttachmentStore {
     return { attachment, bytes: new Uint8Array(bytes) }
   }
 
+  /** Did a turn of this session claim this attachment? An attachment belongs to a task, and this is
+   *  what ties it to one session's transcript (../../contract/transcriptMedia.ts). */
+  async sentIn(sessionId: string, id: string): Promise<boolean> {
+    const [reference] = await this.db
+      .select({ attachmentId: schema.agentAttachmentRefs.attachmentId })
+      .from(schema.agentAttachmentRefs)
+      .innerJoin(schema.agentTurns, eq(schema.agentTurns.id, schema.agentAttachmentRefs.turnId))
+      .where(and(eq(schema.agentAttachmentRefs.attachmentId, id), eq(schema.agentTurns.sessionId, sessionId)))
+      .limit(1)
+    return reference !== undefined
+  }
+
   /** Is this attachment claimed by a turn? Referenced content is the evidence of what was sent, so it is
    *  never readable as a draft, never replaced, and never deleted. */
   async #referenced(id: string): Promise<boolean> {

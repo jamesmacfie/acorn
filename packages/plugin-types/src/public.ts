@@ -117,6 +117,7 @@ export type {
 } from './contracts/coreMisc.js'
 export type { DraftAttachment, DraftAttachmentsCapability } from './contracts/attachments.js'
 export type { EditorFilesCapability } from './contracts/editorFiles.js'
+export type { TranscriptMedia, TranscriptMediaCapability } from './contracts/transcriptMedia.js'
 export type {
   AgentPermissionSubject,
   AgentBeforePermissionPayload,

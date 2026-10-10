@@ -1,6 +1,7 @@
 import type { HostOwned } from './shared.js'
 import type { DraftAttachmentsCapability } from './attachments.js'
 import type { EditorFilesCapability } from './editorFiles.js'
+import type { TranscriptMediaCapability } from './transcriptMedia.js'
 import type {
   AgentActivityCapability,
   AgentRequestsCapability,
@@ -74,6 +75,9 @@ export type CapabilityCatalogue = {
   /** Read one unsent PNG or JPEG turn attachment, and store an altered copy of it. Never a path, never
    *  a sent attachment, and never the draft itself: the composer decides what is in the turn. */
   'agents.draftAttachments': DraftAttachmentsCapability
+  /** Read one attachment a session's turn sent, or one artifact it produced, after the agents plugin
+   *  checks it belongs to that session and task. Read-only, capped at 12 MiB, never a path. */
+  'agents.transcriptMedia': TranscriptMediaCapability
   /** The host-declared slot whichever plugin owns agent sessions fills. */
   'agents.harnessRegistry': HostOwned<'node-core/server/plugin/harnesses.HarnessRegistry'>
   /** The host-declared hook fired when a task's worktree first exists. */

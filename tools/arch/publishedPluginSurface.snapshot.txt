@@ -409,6 +409,7 @@ acorn-plugin-types: member CapabilityCatalogue.'agents.runtime'.reconcile
 acorn-plugin-types: member CapabilityCatalogue.'agents.sessionControl'
 acorn-plugin-types: member CapabilityCatalogue.'agents.sessionExecute'
 acorn-plugin-types: member CapabilityCatalogue.'agents.sessions'
+acorn-plugin-types: member CapabilityCatalogue.'agents.transcriptMedia'
 acorn-plugin-types: member CapabilityCatalogue.'agents.turns'
 acorn-plugin-types: member CapabilityCatalogue.'browser.captures'
 acorn-plugin-types: member CapabilityCatalogue.'core.taskWorktreeCreated'
@@ -1097,6 +1098,12 @@ acorn-plugin-types: member TelemetryErrorInput.traceId
 acorn-plugin-types: member TelemetrySpanHandle.end
 acorn-plugin-types: member TelemetrySpanHandle.spanId
 acorn-plugin-types: member TelemetrySpanHandle.traceId
+acorn-plugin-types: member TranscriptMedia.byteSize
+acorn-plugin-types: member TranscriptMedia.filename
+acorn-plugin-types: member TranscriptMedia.id
+acorn-plugin-types: member TranscriptMedia.kind
+acorn-plugin-types: member TranscriptMedia.mediaType
+acorn-plugin-types: member TranscriptMediaCapability.read
 acorn-plugin-types: member TurnFollowUpContribution.review
 acorn-plugin-types: member TurnFollowUpWindow.deadline
 acorn-plugin-types: member TurnFollowUpWindow.owner
@@ -1274,6 +1281,8 @@ acorn-plugin-types: type TelemetryAttrs
 acorn-plugin-types: type TelemetryBatch
 acorn-plugin-types: type TelemetryErrorInput
 acorn-plugin-types: type TelemetrySpanHandle
+acorn-plugin-types: type TranscriptMedia
+acorn-plugin-types: type TranscriptMediaCapability
 acorn-plugin-types: type TurnFollowUpContribution
 acorn-plugin-types: type TurnFollowUpWindow
 acorn-plugin-types: type VersionedDataValue

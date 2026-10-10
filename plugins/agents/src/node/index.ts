@@ -22,6 +22,8 @@ import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import { AGENTS_ACTIVITY, AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
+import { AGENTS_TRANSCRIPT_MEDIA } from '../contract/transcriptMedia'
+import { createTranscriptMedia } from '../server/sessions/transcriptMedia'
 import { createSessionControl } from '../server/sessions/sessionControl'
 import { AGENTS_TOOL_CALLER } from '../contract/toolCaller'
 import { createToolCallers } from '../server/sessions/toolCaller'
@@ -132,6 +134,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let harnessRoute: { dispose(): void } | null = null
   let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
+  let transcriptMediaRoute: { dispose(): void } | null = null
   let lifecycleCapabilities: Array<{ dispose(): void }> = []
   let stopCheckoutActivity: (() => void) | null = null
   return {
@@ -531,6 +534,15 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // Read and write only, and only for a draft: the composer still owns which attachment is in the
       // turn, because the node cannot transact with an array in the client.
       draftAttachmentsRoute = ctx.capabilities.provide(AGENTS_DRAFT_ATTACHMENTS, createDraftAttachments(runtime.attachments))
+      // agents.transcriptMedia (contract/transcriptMedia.ts). What a plugin drawing a sent attachment or
+      // an artifact reads the bytes through. Read-only, and only after checking the media belongs to
+      // the session and the session to the task.
+      const sessions = runtime.store
+      transcriptMediaRoute = ctx.capabilities.provide(AGENTS_TRANSCRIPT_MEDIA, createTranscriptMedia({
+        taskIdForSession: async (sessionId) => (await sessions.getSession(sessionId))?.taskId ?? null,
+        attachments: runtime.attachments,
+        artifacts: runtime.artifacts,
+      }))
     },
     ready: async () => {
       await reconcileMessages?.()
@@ -554,6 +566,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       delegation = null
       managedRoute?.dispose()
       draftAttachmentsRoute?.dispose()
+      transcriptMediaRoute?.dispose()
       usageRoute?.dispose()
       instructionReviewRoute?.dispose()
       securityDiagnosticsRoute?.dispose()

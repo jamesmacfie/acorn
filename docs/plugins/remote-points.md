@@ -43,6 +43,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | --- | --- | --- |
 | `agents:tool-card` | `replace`, keyed by tool name | `{ tool, taskId, defaultOpen, fileChanges? }` |
 | `agents:attachment` | `replace`, keyed by media type | `{ attachment, taskId, sessionId }` |
+| `agents:transcript-attachment`, `agents:artifact` | `replace`, keyed by media type | `{ taskId, sessionId, media }`. The body of a sent attachment's tile or an artifact card. See [transcript media viewers](../managed-agents/attachments.md#transcript-media-viewers) |
 | `agents:composer-actions` | `stack`, up to four | `{ taskId, sessionId }` |
 | `agents:session-header` | `stack`, up to two | `{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }` |
 | `agents:request-card` | `stack`, up to two | `{ taskId, sessionId, requestId, kind, title }` |
@@ -70,8 +71,7 @@ own worker.
 `agents:request-card` draws inside a request card while it waits on the person, below the card's own
 buttons. It decorates the card and never replaces it, so no contributor draws or presses an answer.
 The `requestId` is the one `agents:before-permission` and `agents.requests` name, so a policy plugin
-can draw why it let a risky request through. The `acorn-permission-policy`
-plugin does. A flow that needs the person to type a code
+can draw why it let a risky request through. The `acorn-permission-policy` plugin does. A flow that needs the person to type a code
 isn't a note: it waits on a hook verdict that asks.
 
 The host gives the contributor's tree the owner's `taskId` and `projectId` as its scope, read-only.

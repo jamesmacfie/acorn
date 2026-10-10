@@ -86,6 +86,15 @@ export const agentsClientPlugin: ClientPlugin = {
       id: 'attachment', label: 'Agent turn attachment', kind: 'remote', mode: 'replace', max: 1,
       actions: ['replace'],
     })
+    // The body of a sent attachment's tile and of an artifact card, keyed by media type
+    // (../contract/transcriptMedia.ts). No actions: stored media is read-only, and the card keeps its
+    // name, size and download outside the slot.
+    ctx.extensionPoints.register({
+      id: 'transcript-attachment', label: 'Sent attachment', kind: 'remote', mode: 'replace', max: 1,
+    })
+    ctx.extensionPoints.register({
+      id: 'artifact', label: 'Agent artifact', kind: 'remote', mode: 'replace', max: 1,
+    })
     ctx.extensionPoints.register({
       id: 'composer-actions', label: 'Agent composer', kind: 'remote', mode: 'stack', max: 4,
     })
