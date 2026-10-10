@@ -33,7 +33,8 @@ export function ContributedMenuRows(props: {
   return <Show when={rows().length}>
     <Menu.Separator />
     <For each={rows()}>{(row) => <Menu.Item context={props.context}
-      leading={<Show when={row.icon}>{(name) => <Icon name={name()} />}</Show>}
+      // No icon, no slot: an empty one indents the label past Editor's own rows.
+      leading={row.icon ? <Icon name={row.icon} /> : undefined}
       onSelect={() => props.guard(() => runContextMenuItem(row, props.target))}>{row.label}</Menu.Item>}</For>
   </Show>
 }

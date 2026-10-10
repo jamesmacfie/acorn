@@ -57,8 +57,7 @@ send, answer, retry, or edit anything, and no stored event or message identity c
 - **Plan proposals and subagent messages.** A plan proposal keeps its Copy menu with no rows. A
   subagent's messages get rows like any other, with `role` from the event type.
 - **An icon-less row reserves no icon slot,** so its label lines up with the Copy rows. Editor's
-  `contributedMenuRows.tsx` still reserves one and draws a little indented. That's outside this
-  phase.
+  `contributedMenuRows.tsx` reserved one until the final check, which made it match.
 - **No committed fixture,** as in phases 01 to 04. The real-host plugin was a scratch build.
 
 ### Verification
