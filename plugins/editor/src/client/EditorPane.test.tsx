@@ -8,7 +8,7 @@ import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
 import { activeNodeId, registerContextMenuItems } from '@acorn/plugin-api/client'
-import { commandRegistry, extensionPointRegistry, extensionRegistry, setActiveNode, setActiveTaskId, setFocusedPane, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
+import { commandRegistry, documentServiceRegistry, extensionPointRegistry, extensionRegistry, setActiveNode, setActiveTaskId, setFocusedPane, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
 import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
 import { EDITOR_FILE_KEY, EDITOR_FILE_POINT, MAX_EDITOR_FILE_MARKS } from '../contract/fileAnnotations'
 
@@ -1624,5 +1624,76 @@ describe('other plugins’ actions on selected text', () => {
     view.dispatch({ changes: { from: 0, insert: '// more\n' } })
     row.click()
     expect(explain).toHaveBeenCalledOnce()
+  })
+})
+
+describe('other plugins’ hover and diagnostics', () => {
+  const registered: { dispose(): void }[] = []
+  // The providers are routes on the Node. With no Node bound in this file, the client reaches them
+  // over `fetch`, so that is the one thing stubbed: a JSON syntax check, as the loaded fixture does.
+  const checks: { path: string; body: { text: string; revision: number } }[] = []
+  beforeEach(() => {
+    disk.set('data.json', '{"a": 1,}')
+    vi.stubGlobal('fetch', vi.fn(async (path: string, init: { body: Uint8Array }) => {
+      const body = JSON.parse(new TextDecoder().decode(init.body)) as { text: string; revision: number }
+      checks.push({ path, body })
+      let items: unknown[] = []
+      try { JSON.parse(body.text) } catch {
+        items = [{ range: { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } }, severity: 'error', message: 'Not JSON' }]
+      }
+      return new Response(JSON.stringify({ revision: body.revision, items }), { headers: { 'content-type': 'application/json' } })
+    }))
+  })
+  afterEach(() => {
+    registered.splice(0).forEach((handle) => handle.dispose())
+    checks.length = 0
+    disk.delete('data.json')
+    disk.delete('tie.json')
+    vi.unstubAllGlobals()
+  })
+  // The underline the host draws for each mark.
+  const diagnosticCount = (view: EditorView) => view.contentDOM.querySelectorAll('.cm-lintRange').length
+  const provide = (pluginId: string) => registered.push(documentServiceRegistry.register({
+    id: `${pluginId}:json`, pluginId, label: `${pluginId} check`, languageId: 'json', diagnostics: `/v1/p/${pluginId}/check`, available: () => true,
+  }))
+
+  it('marks the unsaved buffer by its language, clears once the JSON is fixed, and leaves the file alone', async () => {
+    provide('json-lint')
+    write.mockRejectedValue(new Error('held'))
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'data.json', false)
+    await showing(() => view, '{"a": 1,}')
+    await vi.waitFor(() => expect(diagnosticCount(view)).toBe(1))
+    expect(checks[0]).toMatchObject({ path: '/v1/p/json-lint/check', body: { text: '{"a": 1,}' } })
+
+    view.dispatch({ changes: { from: 7, to: 8 } })
+    await vi.waitFor(() => expect(diagnosticCount(view)).toBe(0), { timeout: 3_000 })
+    expect(checks.at(-1)!.body.text).toBe('{"a": 1}')
+    expect(disk.get('data.json')).toBe('{"a": 1,}')
+    expect(view.state.doc.toString()).toBe('{"a": 1}')
+  })
+
+  it('asks nobody on a tie until the person picks one on this Node, and clears when none is left', async () => {
+    provide('json-lint')
+    provide('schema')
+    // Its own file: the draft the test above holds back is saved once its pane is gone.
+    disk.set('tie.json', '{"a": 1,}')
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'tie.json', false)
+    await showing(() => view, '{"a": 1,}')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(checks).toEqual([])
+
+    queryClient.setQueryData(prefsKey, { document_services: JSON.stringify({ 'json|diagnostics': 'schema' }) })
+    await vi.waitFor(() => expect(diagnosticCount(view)).toBe(1))
+    expect(checks.map((check) => check.path)).toEqual(['/v1/p/schema/check'])
+
+    // The pick leaves, so the other provider is the only one and serves on its own.
+    registered.splice(1).forEach((handle) => handle.dispose())
+    await vi.waitFor(() => expect(checks.at(-1)!.path).toBe('/v1/p/json-lint/check'))
+    registered.splice(0).forEach((handle) => handle.dispose())
+    await vi.waitFor(() => expect(diagnosticCount(view)).toBe(0))
   })
 })

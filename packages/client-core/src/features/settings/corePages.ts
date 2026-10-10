@@ -185,9 +185,10 @@ const clearCache: SearchDeclaration = {
   ],
 }
 const extensionPoints: SearchDeclaration = {
-  keywords: ['slots', 'contributions', 'unmatched', 'plugin author', 'debug'],
+  keywords: ['slots', 'contributions', 'unmatched', 'plugin author', 'debug', 'hover', 'diagnostics', 'language'],
   sections: [
     { id: 'points', label: 'Available points', rows: ['Which plugin draws this'] },
+    { id: 'language-services', label: 'Language services' },
     { id: 'unmatched', label: 'Contributions that match nothing' },
   ],
 }

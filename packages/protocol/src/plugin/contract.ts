@@ -22,7 +22,7 @@ import { extensionDescriptor, extensionPointDescriptor } from './manifest/extens
 import { brandMark, entry, ID_RE, nodePermissions } from './manifest/manifestFields.ts'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
 import { auditActionDescriptor, harnessDescriptor, scheduleDescriptor, skillDescriptor, taskCheckDescriptor } from './manifest/runtimeDescriptors.ts'
-import { documentCompletions, documentRegion, frameSurface, navigationDestination } from './manifest/surfaces.ts'
+import { documentCompletions, documentRegion, documentServiceDescriptor, frameSurface, navigationDestination } from './manifest/surfaces.ts'
 
 // A saved start for a managed session: a harness, the provider options it starts on, text for its
 // system prompt, and a ceiling on acorn's own tools (docs/managed-agents/custom-agents.md § Custom agents). Data
@@ -74,6 +74,8 @@ const contributionsShape = z.looseObject({
   // integration, not four, and the old caps were sized for rows alone.
   extensionPoints: z.array(extensionPointDescriptor).max(16).default([]),
   extensions: z.array(extensionDescriptor).max(16).default([]),
+  // Hover and diagnostics for Editor's files in one language (./manifest/surfaces.ts).
+  documentServices: z.array(documentServiceDescriptor).max(8).default([]),
   dataSources: z.array(dataSourceRegistrationSchema).max(32).optional(),
   dataSourceDiscoveries: z.array(dataSourceDiscoverySchema).max(8).optional(),
   schedules: z.array(scheduleDescriptor).max(4).default([]),
@@ -252,6 +254,8 @@ export type PluginDocumentRegion = Omit<z.infer<typeof documentRegion>, 'languag
   languageId: string
   completions?: PluginDocumentCompletions
 }
+/** A file-language provider as a roster row carries it. `languageId` is re-checked on arrival. */
+export type PluginDocumentService = Omit<z.infer<typeof documentServiceDescriptor>, 'languageId'> & { languageId: string }
 /** What one region holds. The two object kinds carry a `kind` tag so the union stays discriminated;
  *  `'frame'` is a bare string because it has nothing to say beyond its own name. */
 export type PluginPaneRegion =
@@ -383,6 +387,7 @@ export type PluginContributions = {
   contextMenus?: PluginContextMenuDescriptor[]
   extensionPoints?: PluginExtensionPointDescriptor[]
   extensions?: PluginExtensionDescriptor[]
+  documentServices?: PluginDocumentService[]
   dataSources?: import('../data/dataSources').DataSourceRegistration[]
   dataSourceDiscoveries?: import('../data/dataSources').DataSourceDiscovery[]
   schedules?: PluginScheduleDescriptor[]

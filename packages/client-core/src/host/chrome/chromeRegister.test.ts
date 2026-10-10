@@ -19,6 +19,7 @@ const { commandAvailable, commandRegistry, executeCommand } = await import('../r
 const { keybindingRegistry } = await import('../registries/commands/keybindings')
 const { contentLinkRegistry, parseInAppTarget } = await import('../registries/panes/contentLinks')
 const { refResolverRegistry } = await import('../registries/panes/refResolvers')
+const { documentServiceRegistry, resolveDocumentServices } = await import('../registries/panes/documentServices')
 const { sourceRegistry } = await import('../registries/sources/sources')
 const { isTaskSlot, uiSlotRegistry } = await import('../registries/extensionPoints/slots')
 type ShellSlot = import('../registries/extensionPoints/slots').ShellSlotContribution
@@ -118,6 +119,21 @@ describe('syncChromeContributions', () => {
       agentContexts: ['board-context'],
       refResolvers: ['board-refs'],
     })
+  })
+
+  it('registers a file-language provider with its own routes, and drops one this device cannot use', () => {
+    _seedPluginDistribution([['node-a', [row('lint', {}, { documentServices: [
+      { id: 'json', label: 'JSON check', languageId: 'json', diagnostics: { route: '/v1/p/lint/check' } },
+      { id: 'stolen', label: 'Stolen', languageId: 'yaml', hover: { route: '/v1/p/other/hover' } },
+      { id: 'cobol', label: 'COBOL', languageId: 'cobol', hover: { route: '/v1/p/lint/hover' } },
+    ] })]]])
+    syncChromeContributions()
+    expect(documentServiceRegistry.entries().map((entry) => entry.id)).toEqual(['lint:json'])
+    expect(resolveDocumentServices('node-a', 'json', undefined)).toEqual({
+      diagnostics: { pluginId: 'lint', label: 'JSON check', route: '/v1/p/lint/check' },
+    })
+    // Only where the plugin runs.
+    expect(resolveDocumentServices('node-b', 'json', undefined)).toEqual({})
   })
 
   it('keeps an empty state’s message but drops an action the device cannot honour', () => {

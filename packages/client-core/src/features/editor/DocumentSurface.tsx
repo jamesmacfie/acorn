@@ -29,6 +29,9 @@ import {
 import { documentCustody, recoverDocumentCustody, type DocumentCustody } from './documentCustody'
 import { languageFor, shouldHighlightDocument } from './language'
 import { editorSearch } from './search'
+import { languageServices } from './languageServices'
+import type { DocumentServiceRoute, DocumentServiceRoutes } from '../../host/registries/panes/documentServices'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { editorTheme, watchEditorTheme } from './theme'
 import { applyViewState, captureViewState, type EditorViewState } from './viewState'
 import { saveFile } from '../../infra/platform'
@@ -105,6 +108,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   const [error, setError] = createSignal('')
   const [ready, setReady] = createSignal(false)
   const [oversizedText, setOversizedText] = createSignal<string>()
+  const [servicesOff, setServicesOff] = createSignal<string | null>(null)
 
   // Read once at mount and held: a pane is rebuilt on a node switch (the shell keys on the node) and a
   // document surface serves one document per scope, so there is nothing here that can go stale underneath
@@ -256,6 +260,18 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     }
   }
 
+  // Hover and diagnostics, from this region's own routes and nobody else's: a file-language provider for
+  // the same language never sees this document, so two SQL panes can't swap answers.
+  const ownService = (declared: { route: string } | undefined): DocumentServiceRoute | undefined => {
+    const route = declared && resolveDocumentRoute(declared.route, props.scope)
+    return route ? { pluginId: props.pluginId, label: pluginLabel(props.pluginId), route } : undefined
+  }
+  const services: DocumentServiceRoutes = {}
+  const hover = ownService(props.region.hover)
+  const diagnostics = ownService(props.region.diagnostics)
+  if (hover) services.hover = hover
+  if (diagnostics) services.diagnostics = diagnostics
+
   // Text selected in this document, for other plugins' actions on it (`content.selection`). Read from the
   // live buffer, saved or not, and only when the person asks. `revision` is the buffer's edit counter,
   // so an edit after the menu opened refuses the row. A task's document names the task's project too,
@@ -333,6 +349,9 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
           // A read route with no write route is a real mode, not a degenerate one.
           ...(writePath ? [] : [EditorState.readOnly.of(true), EditorView.editable.of(false)]),
           ...(autocomplete ? [EditorState.languageData.of(() => [{ autocomplete }])] : []),
+          ...(hover || diagnostics
+            ? [languageServices({ nodeId, routes: () => services, revision: () => custody?.revision, onUnavailable: (reason) => { if (!disposed) setServicesOff(reason) } })]
+            : []),
           ...(writePath
             ? [
               // Autosave, with cmd+S as an explicit flush rather than the only way to persist, the same
@@ -395,6 +414,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
       <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={servicesOff()}>{(reason) => <Alert tone="muted">{reason()}</Alert>}</Show>
       <Show when={ready() || oversizedText() !== undefined}>
         <Button onPress={() => {
           const text = custody?.current.toString() ?? oversizedText()

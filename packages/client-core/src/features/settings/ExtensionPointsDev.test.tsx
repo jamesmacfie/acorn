@@ -4,6 +4,7 @@ import ExtensionPointsDev from './ExtensionPointsDev'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { recordTreeFailure } from '../../host/tree/treeFailures'
+import { documentServiceRegistry } from '../../host/registries/panes/documentServices'
 
 // The screen that exists because everything else is silent (docs/plugins/cooperative-extension-points.md § Seeing what matched).
 //
@@ -107,6 +108,22 @@ describe('ExtensionPointsDev', () => {
     dispose = render(() => <ExtensionPointsDev />, host)
     expect(text()).toContain('Which plugin draws this')
     expect(text()).toContain('agents’s own')
+  })
+
+  it('lists who answers a language, and offers a pick only on a tie', () => {
+    const provide = (pluginId: string) => registered.push(documentServiceRegistry.register({
+      id: `${pluginId}:json`, pluginId, label: `${pluginId} check`, languageId: 'json', diagnostics: `/v1/p/${pluginId}/check`, available: () => true,
+    }))
+    provide('lint')
+    dispose()
+    dispose = render(() => <ExtensionPointsDev />, host)
+    expect(text()).toContain('lint check (lint).')
+    expect(text()).not.toContain('Which plugin answers diagnostics for json')
+
+    provide('schema')
+    dispose()
+    dispose = render(() => <ExtensionPointsDev />, host)
+    expect(text()).toContain('Which plugin answers diagnostics for json')
   })
 
   // What an author can't see from the owner's screen: how many fit, what the owner will do when asked,

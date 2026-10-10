@@ -5,6 +5,13 @@ import type { ManifestReferences } from './references'
 
 export function validateFrames(refs: ManifestReferences): void {
   const { manifest, issues: ctx, route } = refs
+  // A file-language provider's routes are its own, like a region's: the host POSTs Editor's live
+  // buffer to them, so a route in another namespace would hand that text to another plugin.
+  manifest.contributions.documentServices.forEach((service, i) => {
+    const at = ['contributions', 'documentServices', i]
+    if (service.hover) route(service.hover.route, [...at, 'hover', 'route'])
+    if (service.diagnostics) route(service.diagnostics.route, [...at, 'diagnostics', 'route'])
+  })
   const { frames } = manifest.contributions
   frames.forEach((frame, i) => {
     const at = ['contributions', 'frames', i] as (string | number)[]
@@ -40,6 +47,8 @@ export function validateFrames(refs: ManifestReferences): void {
         route(region.read, [...where, 'read'])
         if (region.write) route(region.write, [...where, 'write'])
         if (region.completions) route(region.completions.route, [...where, 'completions', 'route'])
+        if (region.hover) route(region.hover.route, [...where, 'hover', 'route'])
+        if (region.diagnostics) route(region.diagnostics.route, [...where, 'diagnostics', 'route'])
       }
       // A tree sees keys through the shell; only a frame can claim keys from its own document.
       if (!hasFrameRegion(frame) && frame.claimsKeys.length) {

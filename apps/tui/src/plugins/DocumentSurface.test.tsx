@@ -138,3 +138,49 @@ test('an oversized stored terminal document exposes recovery instructions and ne
   } finally { screen.done() }
   expect(api.write).not.toHaveBeenCalled()
 })
+
+test('Inspect position and Diagnostics ask the region\'s own routes about the live buffer, and refuse a stale answer', async () => {
+  api.read.mockReset().mockResolvedValue({ text: 'select x' })
+  api.write.mockReset().mockResolvedValue({})
+  // The region's routes are reached over `fetch` here, because no Node transport is installed.
+  const asked: { path: string; body: { text: string; revision: number; position?: { line: number; column: number } } }[] = []
+  let answer = (path: string, body: { revision: number }): unknown => path.endsWith('/hover')
+    ? { revision: body.revision, contents: { kind: 'markdown', value: '**users**: a table' } }
+    : { revision: body.revision, items: [{ range: { start: { line: 1, column: 8 }, end: { line: 1, column: 9 } }, severity: 'error', message: 'No column x' }] }
+  vi.stubGlobal('fetch', vi.fn(async (path: string, init: { body: Uint8Array }) => {
+    const body = JSON.parse(new TextDecoder().decode(init.body))
+    asked.push({ path, body })
+    return new Response(JSON.stringify(answer(path, body)), { headers: { 'content-type': 'application/json' } })
+  }))
+  const region = {
+    ...props(() => {}).region,
+    hover: { route: '/v1/p/database/tasks/:taskId/hover' },
+    diagnostics: { route: '/v1/p/database/tasks/:taskId/check' },
+  }
+  const screen = await renderCells(() => <QueryClientProvider client={new QueryClient()}>
+    <DocumentSurface {...props(() => {})} scope={{ taskId: 'tui-services' }} region={region} />
+  </QueryClientProvider>)
+  const press = async (label: string) => {
+    const rows = (await screen.frame()).text.split('\n')
+    const y = rows.findIndex((row) => row.includes(label))
+    await screen.click(rows[y]!.indexOf(label) + 1, y)
+  }
+  try {
+    await vi.waitFor(async () => expect((await screen.frame()).text).toContain('Inspect position'))
+    await press('Diagnostics')
+    await vi.waitFor(async () => expect((await screen.frame()).text).toContain('1:8 error No column x'))
+    expect(asked[0]).toEqual({ path: '/v1/p/database/tasks/tui-services/check', body: { text: 'select x', revision: expect.any(Number) } })
+
+    await press('Inspect position')
+    await vi.waitFor(async () => expect((await screen.frame()).text).toContain('users: a table'))
+    expect(asked[1]!.path).toBe('/v1/p/database/tasks/tui-services/hover')
+    expect(asked[1]!.body.position).toEqual({ line: 1, column: expect.any(Number) })
+
+    answer = (_path, body) => ({ revision: body.revision + 1, items: [] })
+    await press('Diagnostics')
+    await vi.waitFor(async () => expect((await screen.frame()).text).toContain('did not answer'))
+  } finally {
+    screen.done()
+    vi.unstubAllGlobals()
+  }
+})

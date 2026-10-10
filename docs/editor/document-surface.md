@@ -102,9 +102,42 @@ statement that wasn't a plain read or write. CodeMirror attaches the completion 
 state, so a second document pane in the same language never gets another plugin's items.
 
 Capabilities grow as LSP-shaped request and response routes, position and text in and standard items
-out, never as code running inside the editor. Hover and diagnostics can follow the same shape when a
-real consumer needs them. Custom widgets, decorations, and inline UI can't. To judge a proposed
-capability, ask whether it's an LSP method.
+out, never as code running inside the editor. Custom widgets, decorations, and inline UI can't. To
+judge a proposed capability, ask whether it's an LSP method.
+
+### Hover and diagnostics
+
+A region may add `hover: { route }` and `diagnostics: { route }`. Editor's files have no plugin of
+their own, so a plugin offers them by language with `contributions.documentServices`:
+`{ id, label, languageId, hover?, diagnostics? }`. Database's SQL hover is the region consumer. The
+loaded fixture in `apps/node/test/__fixtures__/json-diagnostics` is the file-language one. The wire
+types are in `packages/protocol/src/content/documentSurface.ts`:
+
+- Hover POSTs `{ text, position, revision }` and takes `{ revision, contents, range? }` or `null`.
+  `contents` is `{ kind: 'plaintext' | 'markdown', value }`, at most 64 KiB, and Markdown is drawn
+  sanitized with images as placeholders.
+- Diagnostics POSTs `{ text, revision }` and takes `{ revision, items }`, 200 items kept. An item is
+  `{ range, severity, message, code?, source? }`, with LSP's four severities spelled as names.
+
+Positions are the completion convention: one-based lines and columns, columns in UTF-16 units, and
+an exclusive end. That's a subset of LSP's vocabulary, not LSP's zero-based coordinates. `text` is the
+live buffer, saved or not, and `revision` is the owner's edit counter. The host drops an answer for
+another revision, an answer that arrives after an edit, and an item whose range falls outside the
+text. A buffer over 1 MiB isn't sent, and the owner says why.
+
+A region's document goes only to its own routes, so a database scratch never reaches another
+plugin's SQL provider. For a file, the host picks one provider per language and service on the Node
+in view. One provider serves on its own. With two, neither runs until the person picks one under
+**Settings > Advanced > Extension points > Language services**. The pick is a Node preference,
+`document_services`. A pick for a plugin that's gone means no provider, never the runner-up.
+
+On the desktop, hover draws a tooltip credited to the plugin, and diagnostics draw underlines and
+the lint panel (⌘⇧M), asked again 500 ms after the last edit. An empty or failed answer clears that
+provider's marks and nothing else. The owner code is `features/editor/languageServices.ts` and
+`host/registries/panes/documentServices.ts` in client-core. The terminal has no pointer, so a
+document region offers **Inspect position**, which asks about the caret, and **Diagnostics**.
+Editor there offers **Diagnostics** on the file as saved, because the person edits in `$EDITOR`.
+Diagnostics are read-only: no fixes, commands, or language-server processes.
 
 Another plugin can act on text a person selects in the document, through the `content.selection`
 menu. The surface hands the row the selected text of the live buffer, saved or not, with its range

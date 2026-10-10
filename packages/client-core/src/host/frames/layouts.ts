@@ -67,6 +67,10 @@ export function paneLayoutFor(pluginId: string, surface: PluginFrameSurface): Re
     if (region.completions && !ownsRoute(pluginId, region.completions.route)) {
       throw new Error(`completions route '${region.completions.route}' is outside ${pluginId}'s namespace`)
     }
+    // Hover and diagnostics are POSTed the live buffer, so they are confined on the same terms.
+    for (const service of [region.hover, region.diagnostics]) {
+      if (service && !ownsRoute(pluginId, service.route)) throw new Error(`document route '${service.route}' is outside ${pluginId}'s namespace`)
+    }
   }
   return { layout: surface.layout, regions }
 }

@@ -362,6 +362,47 @@ describe('completions', () => {
   })
 })
 
+describe('hover', () => {
+  let f: Fixture
+  beforeEach(async () => {
+    f = fixture()
+    await seed(f)
+  })
+  afterEach(() => f.cleanup())
+
+  const catalog = fake({
+    catalog: async () => ({ tables: [
+      { schema: 'public', name: 'orders', columns: [{ name: 'id', dataType: 'uuid' }, { name: 'total', dataType: 'numeric' }] },
+      { schema: 'billing', name: 'invoices', columns: [{ name: 'id', dataType: 'bigint' }] },
+    ] }),
+  })
+  const hover = async (text: string, line: number, column: number, fakeBridge = catalog) =>
+    (await f.call('/tasks/task1/hover', json({ text, position: { line, column }, revision: 7 }), fakeBridge)).json()
+
+  it('describes a table, an aliased column, and a mentioned column, with the word as the range and the revision echoed', async () => {
+    const text = 'SELECT o.total, id\nFROM orders o'
+    expect(await hover(text, 2, 7)).toEqual({
+      revision: 7,
+      contents: { kind: 'markdown', value: '**orders**, 2 columns\n\n- `id` uuid\n- `total` numeric' },
+      range: { start: { line: 2, column: 6 }, end: { line: 2, column: 12 } },
+    })
+    expect(await hover(text, 1, 12)).toEqual({
+      revision: 7,
+      contents: { kind: 'markdown', value: '`total` numeric · **orders**' },
+      range: { start: { line: 1, column: 10 }, end: { line: 1, column: 15 } },
+    })
+    // A table outside `public` names its schema.
+    expect((await hover('SELECT * FROM billing.invoices', 1, 25)).contents.value).toContain('**billing.invoices**')
+  })
+
+  it('answers null off any known name, and before the pane has connected', async () => {
+    expect(await hover('SELECT nothing', 1, 10)).toBeNull()
+    expect(await hover('SELECT  ', 1, 8)).toBeNull()
+    expect(await hover('SELECT orders', 1, 9, fake({ catalog: async () => ({ error: 'Not connected.' }) }))).toBeNull()
+    expect((await f.call('/tasks/task1/hover', json({ text: 'x', position: { line: 1, column: 1 } }), catalog)).status).toBe(400)
+  })
+})
+
 // Saved queries are project-scoped rows addressed through a task, so these need both databases.
 describe('saved queries', () => {
   let f: Fixture

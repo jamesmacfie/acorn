@@ -110,10 +110,14 @@ describe('paneLayoutFor', () => {
     expect(paneLayoutFor('board', remote)).toEqual({ layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } })
   })
 
-  it('refuses an escaping COMPLETIONS route', () => {
+  it('refuses an escaping COMPLETIONS, HOVER, or DIAGNOSTICS route', () => {
     expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', completions: { route: '/v1/core/tasks', triggerCharacters: [] } })))
       .toThrow(/completions route/)
     expect(paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete', triggerCharacters: [] } })))
       .toMatchObject({ regions: { body: { completions: { route: '/v1/p/board/complete' } } } })
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', hover: { route: '/v1/p/other/hover' } })))
+      .toThrow(/outside board/)
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', diagnostics: { route: '/v1/core/tasks' } })))
+      .toThrow(/outside board/)
   })
 })

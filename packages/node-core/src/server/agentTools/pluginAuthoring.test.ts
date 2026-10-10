@@ -8,6 +8,7 @@ import { CONTEXT_MENU_FACTS, CONTEXT_MENU_LOCATIONS } from '@acorn/protocol/cont
 import { CORE_EXCLUSIVE_SLOTS, DETAIL_REGIONS, EXTENSION_POINT_LOCATIONS } from '@acorn/protocol/extensionPoints.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
+import { DIAGNOSTIC_SEVERITIES } from '@acorn/protocol/documentSurface.ts'
 import { NODE_CORE_FACETS, scopeCore } from '../plugins/permissions.ts'
 import { getContextSections } from './contextSections.ts'
 import {
@@ -74,6 +75,10 @@ describe('the derived vocabulary tracks the manifest schema', () => {
     for (const fact of CONTEXT_MENU_FACTS['content.selection']) expect(renderPluginAuthoring(v)).toContain(`\`${fact}\``)
     expect(renderPluginAuthoring(v)).toContain('`{ selection: { taskId?, projectId?, ownerId, contentKind, languageId?, readOnly,')
     expect(renderPluginAuthoring(v)).toContain('the terminal has no text selection')
+    // Hover and diagnostics: both declarations, both bodies, and every severity.
+    expect(renderPluginAuthoring(v)).toContain('`documentServices: [{ id, label, languageId, hover?, diagnostics? }]`')
+    for (const severity of DIAGNOSTIC_SEVERITIES) expect(renderPluginAuthoring(v)).toContain(`"${severity}"`)
+    expect(renderPluginAuthoring(v)).toContain('`{ revision, contents: { kind: "plaintext" | "markdown", value }, range? }`')
     // Detail regions: the field, every region, what a contributor is mounted with, and the two points.
     for (const region of DETAIL_REGIONS) expect(renderPluginAuthoring(v)).toContain(`\`${region}\``)
     expect(renderPluginAuthoring(v)).toContain('`mounts: [{ surface, region }]`')

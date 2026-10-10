@@ -22,6 +22,9 @@ export const documentCompletions = z.object({
   triggerCharacters: z.array(z.string().min(1).max(2)).max(8).default([]),
 })
 
+// One language capability: a route in the declaring plugin's namespace, POSTed position and text.
+export const documentService = z.object({ route: pluginRoute })
+
 export const documentRegion = z.object({
   // From the published vocabulary, so an unknown id is a parse error rather than a document that
   // quietly renders as plain text. LSP's spellings (@acorn/protocol/languageIds.ts).
@@ -33,7 +36,22 @@ export const documentRegion = z.object({
   // template in a highlighted viewer wants exactly that.
   write: pluginRoute.optional(),
   completions: documentCompletions.optional(),
+  // Hover and diagnostics, POSTed the live buffer (@acorn/protocol/documentSurface.ts). A region's own
+  // routes are the only ones its document is sent to: a file-language provider never reaches it.
+  hover: documentService.optional(),
+  diagnostics: documentService.optional(),
 })
+
+// Hover and diagnostics for Editor's files, by language rather than by region. Each route is the
+// declaring plugin's own. When two plugins serve one language, the person picks on the Node; until
+// then neither runs (docs/editor/document-surface.md § Language smarts).
+export const documentServiceDescriptor = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  languageId: z.enum(LANGUAGE_IDS),
+  hover: documentService.optional(),
+  diagnostics: documentService.optional(),
+}).refine((service) => service.hover || service.diagnostics, { message: 'a document service needs hover, diagnostics, or both' })
 
 // What fills one region of a layout. Three kinds, and the difference between them is who draws the
 // pixels.

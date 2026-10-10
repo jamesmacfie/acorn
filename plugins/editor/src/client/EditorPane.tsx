@@ -3,9 +3,9 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
-import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, documentSelection, featureUsable, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, slotFills, telemetryFor, toast, type ContentSelectionTarget, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, documentSelection, featureUsable, focusedPane, formatFileReference, resolveDocumentServices, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, slotFills, telemetryFor, toast, type ContentSelectionTarget, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, copyText, DetailColumn, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
-import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
+import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, languageServices, refreshEditorTheme, refreshLanguageServices, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
 import { captureFileDecision, createEditorRefreshQueue, fileDecisionIsCurrent, reconcileEditorDisk, type FileDecision } from './editorDocumentLifecycle'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
@@ -33,6 +33,7 @@ import { forgetPresentation, inferIndentation, languageName, presentationFor, sa
 import { readEditorIndentation, readEditorWordWrap } from './editorPrefs'
 import { admitGraphicalEditor } from './editorAdmission'
 import { ContributedMenuRows, editorMenuTarget } from './contributedMenuRows'
+import FileDiagnostics from './FileDiagnostics'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -66,6 +67,8 @@ export default function EditorPane(props: { task: Task }) {
   const fileStatus = createFileStatusReader(api, taskId, () => !disposed && activeNodeId() === nodeId)
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
+  // Why hover and diagnostics are off for the shown file, such as its size. Not an error.
+  const [servicesOff, setServicesOff] = createSignal<string | null>(null)
   const [statusVersion, setStatusVersion] = createSignal(0)
   const updateStatus = () => setStatusVersion((value) => value + 1)
   const [diskState, setDiskState] = createSignal<'changed' | 'deleted' | 'read-failed' | 'unknown' | 'recovered' | null>(null)
@@ -381,6 +384,14 @@ export default function EditorPane(props: { task: Task }) {
     editorSearch(),
     editorTheme(),
     engine!.lineMarkerExtension(),
+    // Hover and diagnostics from the file-language provider this Node chose. Read at each request, so
+    // a provider change needs only the refresh below, and the live buffer is sent, saved or not.
+    languageServices({
+      nodeId: nodeId ?? '',
+      routes: () => servicesFor(path),
+      revision: () => pool.files.get(path)?.custody.revision,
+      onUnavailable: (reason) => { if (currentPath === path && live()) setServicesOff(reason) },
+    }),
     language,
     wrapCompartment!.of(presentationFor(nodeId, taskId, path).wrap ?? readEditorWordWrap(prefs.data) ? engine!.EditorView.lineWrapping : []),
     indentationCompartment!.of([engine!.indentUnit.of(indentation.mode === 'tabs' ? '\t' : ' '.repeat(indentation.width)), engine!.EditorState.tabSize.of(indentation.width)]),
@@ -524,6 +535,16 @@ export default function EditorPane(props: { task: Task }) {
   // Which editor draws an open file, and the one it is drawing right now. `on` re-fires on identity
   // rather than value, so its source is a memo and not an inline getter.
   const prefs = createQuery(() => prefsOptions(true))
+  // Who answers hover and diagnostics for a file, by its language, on this pane's Node.
+  const servicesFor = (path: string) => resolveDocumentServices(nodeId ?? '', languageIdForPath(path), prefs.data)
+  // A provider that appears, goes, or is picked in settings asks the shown file again. A different
+  // file needs nothing: putting its state on screen asks by itself.
+  const shownServices = createMemo(() => {
+    const path = active()
+    const { hover, diagnostics } = path ? servicesFor(path) : {}
+    return `${hover?.pluginId}:${hover?.route}|${diagnostics?.pluginId}:${diagnostics?.route}`
+  })
+  createEffect(on(shownServices, () => { if (view && currentPath) view.dispatch({ effects: refreshLanguageServices.of(null) }) }, { defer: true }))
   const mode = createMemo(() => readEditorMode(prefs.data))
   createEffect(() => {
     const defaultWrap = readEditorWordWrap(prefs.data)
@@ -772,6 +793,7 @@ export default function EditorPane(props: { task: Task }) {
     scheduleSave.flush() // persist the outgoing file (pending arg is its path) before the swap
     saveViewState() // remember the outgoing file's scroll/cursor before we swap states
     setSaveErr('')
+    setServicesOff(null)
     setDiskState(null)
     setCompare(false)
     setComparisonDisk(null)
@@ -1213,9 +1235,16 @@ export default function EditorPane(props: { task: Task }) {
   // The pane's own view of a file, drawn whenever no contributor stands in for it.
   const fileView = () => (
     <Show when={imagePath()} fallback={
-      <SelectionActions select={selectionTarget} isCurrent={selectionIsCurrent}>
-        <Rectangle kind="editor" label="Editor" mount={mountEditor} />
-      </SelectionActions>
+      <>
+        <SelectionActions select={selectionTarget} isCurrent={selectionIsCurrent}>
+          <Rectangle kind="editor" label="Editor" mount={mountEditor} />
+        </SelectionActions>
+        <Only hosts={['tui']}>
+          <Show when={active()} keyed>
+            {(path) => <FileDiagnostics nodeId={nodeId ?? ''} route={() => servicesFor(path).diagnostics} read={async () => (await api.read(taskId, path)).text} />}
+          </Show>
+        </Only>
+      </>
     } keyed>
       {(path) => <>
         <Only hosts={['dom']}><ImagePreview taskId={taskId} path={path} /></Only>
@@ -1343,6 +1372,7 @@ export default function EditorPane(props: { task: Task }) {
           {/* A failure needs room for a sentence and its resolution actions. */}
           <Show when={bulkRun()}>{(run) => <Alert variant="banner" tone="warn">Closing files… <Button onPress={() => run().cancel()}>Cancel close</Button></Alert>}</Show>
           <Show when={saveErr()}><Alert variant="banner" tone="danger">{saveErr()}</Alert></Show>
+          <Show when={servicesOff()}>{(reason) => <Alert tone="muted">{reason()}</Alert>}</Show>
           <Show when={active() && diskState()}>
             <Alert variant="banner" tone="warn">
               {diskState() === 'deleted' ? 'Deleted on disk' : diskState() === 'read-failed' ? 'Could not read disk' : diskState() === 'recovered' ? 'Recovered draft' : 'Changed on disk'}

@@ -114,6 +114,8 @@ These rules catch a manifest that parses and then does nothing:
   beside an `entry`, and needs a `node` half if it declares `probes`.
 - A `dataSources` entry with `inputs` can't also declare `providerId`. It names at most eight
   inputs, each a `<pluginId>:<sourceId>` ([derived sources](../data-sources/derived-sources.md)).
+- A `documentServices` entry needs `hover`, `diagnostics`, or both, and a language from the published
+  vocabulary.
 - No id may repeat across contributions. Skills are their own namespace, so a skill id must differ
   only from the other skills.
 - A `skills` entry's `path` must be a folder inside the package holding a valid `SKILL.md`. The host

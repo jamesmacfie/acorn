@@ -16,6 +16,7 @@ export type {
   PluginContributions,
   PluginDocumentCompletions,
   PluginDocumentRegion,
+  PluginDocumentService,
   PluginFrameSurface,
   PluginKeybindingDescriptor,
   PluginNodeStatDescriptor,

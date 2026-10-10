@@ -16,6 +16,10 @@ import {
 } from '../../host/registries/extensionPoints/extensionPoints'
 import { slotChoices, withSlotChoice } from '../../host/tree/arbitration'
 import { treeFailure } from '../../host/tree/treeFailures'
+import { activeNodeId } from '../../infra/node/activeNode'
+import {
+  documentServiceCandidates, documentServiceChoiceKey, documentServiceRegistry, type DocumentServiceKind,
+} from '../../host/registries/panes/documentServices'
 
 // Every extension point on this node, who fills it, and every contribution that fills nothing
 // (docs/plugins/cooperative-extension-points.md § Seeing what matched).
@@ -46,6 +50,21 @@ export default function ExtensionPointsDev() {
   const points = createMemo(() =>
     [...extensionPointRegistry.entries()].sort((a, b) => a.id.localeCompare(b.id)))
   const unmatched = createMemo(() => unmatchedExtensions())
+  // Every language and service some plugin answers on the Node in view, with who answers it.
+  const languageServices = createMemo(() => {
+    const nodeId = activeNodeId() ?? ''
+    const keys = new Map<string, { languageId: string; service: DocumentServiceKind }>()
+    for (const entry of documentServiceRegistry.entries()) {
+      for (const service of ['hover', 'diagnostics'] as const) {
+        if (entry[service]) keys.set(documentServiceChoiceKey(entry.languageId, service), { languageId: entry.languageId, service })
+      }
+    }
+    return [...keys.entries()].sort(([a], [b]) => a.localeCompare(b)).flatMap(([key, { languageId, service }]) => {
+      const candidates = documentServiceCandidates(nodeId, languageId, service)
+      return candidates.length ? [{ key, languageId, service, candidates }] : []
+    })
+  })
+  const languageSave = createSettingSave()
 
   return (
     <>
@@ -114,6 +133,41 @@ export default function ExtensionPointsDev() {
                   </li>
                 )
               }}
+            </For>
+          </ul>
+        </Show>
+      </SettingsSection>
+
+      <SettingsSection
+        id="language-services"
+        label="Language services"
+        help="Plugins that answer hover or diagnostics for Editor's files on this Node. When two answer the same language, neither runs until you pick one."
+      >
+        <Show when={languageServices().length} fallback={<EmptyState align="start" size="sm">No plugin offers hover or diagnostics.</EmptyState>}>
+          <ul class="plugin-point-list">
+            <For each={languageServices()}>
+              {(row) => (
+                <li class="plugin-point">
+                  <span class="plugin-point-head">
+                    <span class="plugin-point-id">{row.languageId}</span>
+                    <Badge>{row.service}</Badge>
+                  </span>
+                  <Show when={row.candidates.length > 1} fallback={<Text emphasis="muted" wrap>{`${row.candidates[0]!.label} (${row.candidates[0]!.pluginId}).`}</Text>}>
+                    <SettingRow label={`Which plugin answers ${row.service} for ${row.languageId}`} error={languageSave.error()}>
+                      <Select
+                        label={`Which plugin answers ${row.service} for ${row.languageId}`}
+                        value={slotChoices(prefs.data?.[PrefKeys.documentServices])[row.key] ?? ''}
+                        options={[
+                          { value: '', label: 'None' },
+                          ...row.candidates.map((entry) => ({ value: entry.pluginId, label: `${entry.label} (${entry.pluginId})` })),
+                        ]}
+                        onChange={(value) => void languageSave.run(() =>
+                          savePref(qc, PrefKeys.documentServices, withSlotChoice(prefs.data?.[PrefKeys.documentServices], row.key, value), { throwOnFailure: true }))}
+                      />
+                    </SettingRow>
+                  </Show>
+                </li>
+              )}
             </For>
           </ul>
         </Show>

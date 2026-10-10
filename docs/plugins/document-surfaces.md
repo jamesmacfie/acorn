@@ -44,7 +44,8 @@ prompt. A composed pane that also has a frame or tree region needs an accepted b
 frame.
 
 [The document surface](../editor/document-surface.md) owns the contract, the view state, and
-[language smarts](../editor/document-surface.md#language-smarts), such as completion routes.
+[language smarts](../editor/document-surface.md#language-smarts): completion, hover, and diagnostics
+routes, and `documentServices` for Editor's files.
 [Composed panes](../editor/composed-panes.md) owns `document-over-frame`, the document API a frame
 uses, and surface actions.
 

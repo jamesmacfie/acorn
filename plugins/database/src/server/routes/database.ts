@@ -1,6 +1,6 @@
 // Routes for the Database pane, mounted at /v1/p/database by this plugin's init (node/index.ts):
 // per-task Postgres browse and edit, the project's saved queries, the task's scratch document, and
-// table/column completions.
+// table/column completions and hover.
 //
 // database ships as a loaded plugin (docs/plugins/loaded-plugins.md § Loaded plugins). The host gets `router.fetch`
 // (createDatabaseFetch at the bottom), and identity rides in through `c.env` rather than `ownerId(c)`
@@ -25,7 +25,7 @@ import {
 } from '@acorn/plugin-api/node'
 import type { CommandInputResult } from '@acorn/protocol/commands.ts'
 import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
-import { MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
+import { MAX_COMPLETION_ITEMS, type PluginHoverResponse } from '@acorn/protocol/documentSurface.ts'
 import type { PluginCompletionResponse, PluginDocumentBody } from '@acorn/protocol/documentSurface.ts'
 import { defaultModelIdFor } from '@acorn/protocol/modelProviders.ts'
 import { GENERATE_MAX_PROMPT_CHARS, SCRATCH_SELECT_ID } from '../../shared/database'
@@ -34,6 +34,7 @@ import { dbSavedQueries, dbScratch } from '../../node/schema'
 import type { DatabaseBridge } from '../database'
 import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '../generateSql'
 import { completeSql } from '../completions'
+import { hoverSql } from '../hover'
 import { savedQuerySearchItems } from '../paletteSearch'
 import { MAX_CONTEXT_QUERIES, savedQueryOption, savedQuerySnapshot } from '../agentContext'
 import { databaseQuery } from '../workflowSteps'
@@ -79,6 +80,8 @@ const completionsBody = z.object({
   text: documentText,
   position: z.object({ line: z.number().int().min(1), column: z.number().int().min(1) }),
 })
+// Hover sends the position too, and the host's edit counter, which the answer echoes.
+const hoverBody = completionsBody.extend({ revision: z.number().int() })
 const contextCaptureBody = z.object({ taskId: z.string().min(1), optionIds: z.array(z.string()).optional() })
 // The command palette's input body. `input` is the reader's typed prompt and `taskId` is the scope the
 // HOST derived from the session it captured — neither the manifest nor a previous answer writes it
@@ -234,6 +237,15 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       if ('error' in catalog) return c.json({ items: [] } satisfies PluginCompletionResponse)
       const items = completeSql(p.data.text, p.data.position, catalog.tables)
       return c.json({ items: items.slice(0, MAX_COMPLETION_ITEMS) } satisfies PluginCompletionResponse)
+    })
+    // Schema hover, from the same catalog the completions read. `null` when the position is on no
+    // known name, or before the pane has connected, so the host draws nothing.
+    .post('/tasks/:taskId/hover', async (c) => {
+      const p = hoverBody.safeParse(await c.req.json().catch(() => null))
+      if (!p.success) return respondError(c, 400, 'bad_request')
+      const catalog = await bridge.catalog(id(c))
+      const hover = 'error' in catalog ? null : hoverSql(p.data.text, p.data.position, catalog.tables)
+      return c.json(hover && ({ revision: p.data.revision, ...hover } satisfies PluginHoverResponse))
     })
 
     // --- saved queries (project-scoped, this plugin's own table, no database connection needed) ---

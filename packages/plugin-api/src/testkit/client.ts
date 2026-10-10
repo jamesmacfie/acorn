@@ -23,6 +23,9 @@ export type { Project } from '@acorn/client-core/infra/queries.ts'
 // which is exactly why they belong here rather than on ./client.
 export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+// Hover and diagnostics providers by language, for an owner's test that needs one present. The chrome
+// pass fills it from `contributions.documentServices` in production.
+export { documentServiceRegistry } from '@acorn/client-core/host/registries/panes'
 // What every registry hands back, so a suite can put its registrations away again.
 export type { Disposable } from '@acorn/client-core/kit/lib'
 

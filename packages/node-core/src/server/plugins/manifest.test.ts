@@ -464,6 +464,40 @@ describe('pane layouts', () => {
     expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/other/complete' } })] })))
       .toContain('route must be inside /v1/p/board/')
   })
+
+  it('confines a region\'s hover and diagnostics routes, and leaves completions as they were', () => {
+    const ok = manifest({ frames: [layout({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete' },
+      hover: { route: '/v1/p/board/hover' }, diagnostics: { route: '/v1/p/board/check' } })] })
+    expect(ok.success).toBe(true)
+    expect(region(ok, 'body')).toMatchObject({ hover: { route: '/v1/p/board/hover' }, diagnostics: { route: '/v1/p/board/check' },
+      completions: { route: '/v1/p/board/complete', triggerCharacters: [] } })
+    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', hover: { route: '/v1/p/other/hover' } })] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(messages(manifest({ frames: [layout({ read: '/v1/p/board/doc', diagnostics: { route: '/v1/p/board/../other/check' } })] })))
+      .toContain('route must be inside /v1/p/board/')
+  })
+})
+
+describe('document services', () => {
+  const service = (extra: Record<string, unknown>) => ({ id: 'json-check', label: 'JSON check', languageId: 'json', ...extra })
+
+  it('accepts a file-language provider with its own routes', () => {
+    const result = manifest({ documentServices: [service({ diagnostics: { route: '/v1/p/board/check' } })] })
+    expect(result.success && result.data.contributions.documentServices).toEqual([
+      { id: 'json-check', label: 'JSON check', languageId: 'json', diagnostics: { route: '/v1/p/board/check' } },
+    ])
+  })
+
+  it('refuses another plugin\'s route, an unknown language, no service, and a duplicate id', () => {
+    expect(messages(manifest({ documentServices: [service({ hover: { route: '/v1/p/other/hover' } })] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(manifest({ documentServices: [service({ languageId: 'cobol', hover: { route: '/v1/p/board/hover' } })] }).success).toBe(false)
+    expect(messages(manifest({ documentServices: [service({})] })))
+      .toContain('a document service needs hover, diagnostics, or both')
+    expect(messages(manifest({ documentServices: [service({ hover: { route: '/v1/p/board/hover' } }),
+      service({ languageId: 'yaml', hover: { route: '/v1/p/board/hover' } })] })))
+      .toContain("duplicate contribution id 'json-check'")
+  })
 })
 
 describe('surface actions', () => {

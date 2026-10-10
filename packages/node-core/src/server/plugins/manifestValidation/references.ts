@@ -79,7 +79,7 @@ export function validateContributionIds(refs: ManifestReferences): void {
   const {
     frames, sources, slots, commands, attention, nodeStats, contentLinks, agentContexts,
     refResolvers, routes, themes, contextMenus, extensionPoints, extensions, schedules,
-    taskChecks, harnesses, agentTools, contextSections,
+    taskChecks, harnesses, agentTools, contextSections, documentServices,
   } = manifest.contributions
   // The client uses ids for query keys and disposal across contribution registries.
   const seen = new Set<string>()
@@ -87,6 +87,7 @@ export function validateContributionIds(refs: ManifestReferences): void {
     ...frames, ...sources, ...slots, ...commands, ...attention, ...nodeStats, ...contentLinks,
     ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints,
     ...extensions, ...schedules, ...taskChecks, ...harnesses, ...agentTools, ...contextSections,
+    ...documentServices,
   ]) {
     if (seen.has(entry.id)) issues.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)

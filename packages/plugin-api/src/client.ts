@@ -69,6 +69,12 @@ export {
   contextMenuItems, contextMenuRegistry, documentSelection, fileMenuTarget, registerContextMenuItems, runContextMenuItem,
   selectionTooLarge,
 } from '@acorn/client-core/host/registries/panes'
+// Hover and diagnostics providers for a language on a Node, and the checks every owner applies to
+// what they answer (docs/editor/document-surface.md § Language smarts).
+export {
+  LANGUAGE_REQUEST_TOO_LARGE, languageRequestTooLarge, positionAt, requestDiagnostics, requestHover, resolveDocumentServices,
+} from '@acorn/client-core/host/registries/panes'
+export type { CheckedDiagnostic, CheckedHover, DocumentServiceRoute, DocumentServiceRoutes } from '@acorn/client-core/host/registries/panes'
 export type {
   ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, ItemRowTarget, TaskRowTarget,
   RailSourceTarget, RailPaneTarget, FileMenuTarget, FileRowTarget, DocumentTabTarget, AgentMessageTarget, AgentTurnTarget,

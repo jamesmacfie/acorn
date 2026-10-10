@@ -44,6 +44,8 @@ import { registerPluginStyle } from './chromeStyles'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../registries/panes/contentLinks'
 import { refResolverRegistry } from '../registries/panes/refResolvers'
+import { documentServiceRegistry } from '../registries/panes/documentServices'
+import { isLanguageId } from '@acorn/protocol/languageIds.ts'
 import { registerNoticeTargetHandler } from '../../features/notifications/notifications'
 import { setSelectedSource } from '../../features/tasks/tasks'
 import { createLogger } from '../../infra/telemetry/logger'
@@ -485,6 +487,24 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
       resolve: async (identifiers) => pluginEnabledOnNode(chromeNode(), pluginId)
         ? resolveRefs(pluginId, descriptor.resolve, chromeNode(), identifiers)
         : [],
+    }))
+  }
+
+  for (const descriptor of contributions.documentServices ?? []) {
+    // Re-checked, because a roster row is bytes a node sent: a language this build knows, and only
+    // this plugin's own routes, since the host POSTs Editor's live buffer to them.
+    const { hover, diagnostics, languageId } = descriptor
+    if (!isLanguageId(languageId) || (!hover && !diagnostics)
+      || (hover && !ownsRoute(pluginId, hover.route)) || (diagnostics && !ownsRoute(pluginId, diagnostics.route))) {
+      log.warn(`${pluginId} document service '${descriptor.id}' is not one this device can use`, undefined, { 'plugin.id': pluginId })
+      continue
+    }
+    const id = `${pluginId}:${descriptor.id}`
+    add('document service', id, () => own(documentServiceRegistry, {
+      id, pluginId, label: descriptor.label, languageId,
+      ...(hover ? { hover: hover.route } : {}),
+      ...(diagnostics ? { diagnostics: diagnostics.route } : {}),
+      available: (nodeId) => pluginEnabledOnNode(nodeId, pluginId),
     }))
   }
 

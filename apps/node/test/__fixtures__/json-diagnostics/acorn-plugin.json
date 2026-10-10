@@ -1,0 +1,18 @@
+{
+  "id": "json-diagnostics",
+  "name": "JSON syntax check",
+  "version": "1.0.0",
+  "apiVersion": "3",
+  "baseline": "acorn-1",
+  "node": "./node.js",
+  "contributions": {
+    "documentServices": [
+      {
+        "id": "json-syntax",
+        "label": "JSON syntax",
+        "languageId": "json",
+        "diagnostics": { "route": "/v1/p/json-diagnostics/check" }
+      }
+    ]
+  }
+}

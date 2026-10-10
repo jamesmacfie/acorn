@@ -8,6 +8,8 @@ client: BindingCompatibility
 client: BindingOrigin
 client: CHECK_TONE
 client: COMMAND_CLOSED
+client: CheckedDiagnostic
+client: CheckedHover
 client: ClientPlugin
 client: ClientScheduleContribution
 client: CommandContribution
@@ -50,6 +52,8 @@ client: DataSourceResult
 client: DataSourceScope
 client: DataType
 client: DataValue
+client: DocumentServiceRoute
+client: DocumentServiceRoutes
 client: DocumentTabTarget
 client: FAILED_STATUSES
 client: FileMenuTarget
@@ -60,6 +64,7 @@ client: InAppTarget
 client: InputCommand
 client: IntegrationFlowContribution
 client: ItemRowTarget
+client: LANGUAGE_REQUEST_TOO_LARGE
 client: Logger
 client: MISSING
 client: ModelPick
@@ -216,6 +221,7 @@ client: isArchiving
 client: isDarkColor
 client: isPaneId
 client: isTerminalMax
+client: languageRequestTooLarge
 client: latestOnly
 client: learnRefPrefixes
 client: linkifyRefs
@@ -255,6 +261,7 @@ client: persistDraft
 client: pickFiles
 client: pickFolder
 client: pluginLabel
+client: positionAt
 client: postJson
 client: prefsOptions
 client: previewUrlForClient
@@ -288,10 +295,13 @@ client: registerWsChannel
 client: remotePreviewBlocked
 client: renderMarkdown
 client: replaceAttentionSource
+client: requestDiagnostics
+client: requestHover
 client: requestTaskLaunch
 client: requestTerminalFocusIntent
 client: requireClientCapability
 client: resolveDataBinding
+client: resolveDocumentServices
 client: resolveQueryContent
 client: resolveQueryParameters
 client: revealCollectionItem
@@ -638,6 +648,7 @@ testkit/client: closeRefPanel
 testkit/client: commandRegistry
 testkit/client: contentLinkRegistry
 testkit/client: createRemoteRoot
+testkit/client: documentServiceRegistry
 testkit/client: evictScope
 testkit/client: extensionPointRegistry
 testkit/client: extensionRegistry
@@ -769,6 +780,7 @@ ui/diff: tokenizeDocument
 ui/editor: DocumentCustody
 ui/editor: EditorViewState
 ui/editor: EmbeddedEditor
+ui/editor: LanguageServiceSource
 ui/editor: applyViewState
 ui/editor: captureViewState
 ui/editor: documentCustody
@@ -776,10 +788,12 @@ ui/editor: editorSearch
 ui/editor: editorTheme
 ui/editor: fileDocumentCustodies
 ui/editor: languageForPath
+ui/editor: languageServices
 ui/editor: mountEmbeddedEditor
 ui/editor: openReplacePanel
 ui/editor: recoverDocumentCustody
 ui/editor: refreshEditorTheme
+ui/editor: refreshLanguageServices
 ui/editor: reserveDocumentDestinations
 ui/editor: reserveFileSourceCustodies
 ui/editor: shouldHighlightDocument

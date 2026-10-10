@@ -567,6 +567,32 @@
                           "required": [
                             "route"
                           ]
+                        },
+                        "hover": {
+                          "type": "object",
+                          "properties": {
+                            "route": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            }
+                          },
+                          "required": [
+                            "route"
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "object",
+                          "properties": {
+                            "route": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256
+                            }
+                          },
+                          "required": [
+                            "route"
+                          ]
                         }
                       },
                       "required": [
@@ -3055,6 +3081,86 @@
               "id",
               "point",
               "label"
+            ]
+          }
+        },
+        "documentServices": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "languageId": {
+                "type": "string",
+                "enum": [
+                  "plaintext",
+                  "typescript",
+                  "typescriptreact",
+                  "javascript",
+                  "javascriptreact",
+                  "json",
+                  "css",
+                  "scss",
+                  "less",
+                  "html",
+                  "xml",
+                  "markdown",
+                  "python",
+                  "ruby",
+                  "go",
+                  "rust",
+                  "java",
+                  "c",
+                  "cpp",
+                  "shellscript",
+                  "yaml",
+                  "sql",
+                  "ini",
+                  "toml"
+                ]
+              },
+              "hover": {
+                "type": "object",
+                "properties": {
+                  "route": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "route"
+                ]
+              },
+              "diagnostics": {
+                "type": "object",
+                "properties": {
+                  "route": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "route"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "languageId"
             ]
           }
         },

@@ -1,6 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { currentCompletions, startCompletion } from '@codemirror/autocomplete'
+import { diagnosticCount } from '@codemirror/lint'
 import { EditorView } from '@codemirror/view'
 import type { PluginDocumentRegion } from '@acorn/protocol/api.ts'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
@@ -26,6 +27,11 @@ vi.mock('../../infra/node/apiClient', () => ({
   readJson: async () => ({ text: loadedText }),
   writeJson: async (path: string, init: { body?: string }) => {
     posted(path, init.body)
+    // A diagnostics route that marks the first character, only for the task named `marked`.
+    if (path.endsWith('/check')) {
+      const { revision } = JSON.parse(String(init.body)) as { revision: number }
+      return { revision, items: path.includes('/marked/') ? [{ range: { start: { line: 1, column: 1 }, end: { line: 1, column: 2 } }, severity: 'warning', message: 'Marked' }] : [] }
+    }
     if (!path.endsWith('/complete')) return saveResponse()
     return { items: [{ label: 'user_id', kind: 'field', detail: 'integer' }, { label: 42 }, {}] }
   },
@@ -175,6 +181,23 @@ describe('the host-owned document surface', () => {
     // The route was told where the cursor is, in one-based line and column.
     const body = posted.mock.calls.find(([path]) => String(path).endsWith('/complete'))?.[1]
     expect(JSON.parse(String(body)).position).toEqual({ line: 1, column: 8 })
+  })
+
+  it('sends each document only to its own region\'s diagnostics route, and keeps completion and saving', async () => {
+    const withServices = region({ completions: { route: '/v1/p/db/tasks/:taskId/complete' }, diagnostics: { route: '/v1/p/db/tasks/:taskId/check' } })
+    const marked = await editor(mount(withServices, undefined, 'marked'))
+    const plain = await editor(mount(withServices, undefined, 'plain'))
+    await vi.waitFor(() => expect(diagnosticCount(marked.state)).toBe(1))
+    expect(diagnosticCount(plain.state)).toBe(0)
+    const checks = posted.mock.calls.filter(([path]) => String(path).endsWith('/check')).map(([path]) => String(path))
+    expect(checks.sort()).toEqual(['/v1/p/db/tasks/marked/check', '/v1/p/db/tasks/plain/check'])
+
+    plain.dispatch({ selection: { anchor: 7 } })
+    startCompletion(plain)
+    await vi.waitFor(() => expect(currentCompletions(plain.state).some((option) => option.label === 'user_id')).toBe(true))
+    marked.dispatch({ changes: { from: 0, insert: '-- saved\n' } })
+    marked.contentDOM.dispatchEvent(new FocusEvent('blur'))
+    await vi.waitFor(() => expect(posted.mock.calls.some(([path, body]) => path === '/v1/p/db/tasks/marked/doc' && String(body).includes('-- saved'))).toBe(true))
   })
 
   it('runs a pane-scoped host chord pressed inside the editor, after flushing the document', async () => {

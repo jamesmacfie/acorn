@@ -12,6 +12,8 @@ import type { Node } from '../../tree/node'
 export type FieldApi = {
   value: string
   plainText: string
+  /** Where the caret is, as a UTF-16 offset into `value`. Read-only. */
+  readonly cursor: number
   setText: (text: string) => void
   insertText: (text: string) => void
   handleKeyPress: (key: Press) => boolean
@@ -114,6 +116,7 @@ export function fieldRef(spec: {
   const api: FieldApi = {
     get value() { return model().text },
     get plainText() { return model().text },
+    get cursor() { return untrack(model).cursor },
     set value(text: string) { write(text) },
     setText: write,
     insertText: (text: string) => { apply(paste(untrack(model), text, spec.newline)) },

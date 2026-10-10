@@ -111,6 +111,8 @@ export default {
             route: '/v1/p/database/tasks/:taskId/completions',
             triggerCharacters: ['.'],
           },
+          // A table's columns or a column's type on hover, from the same schema reader.
+          hover: { route: '/v1/p/database/tasks/:taskId/hover' },
         },
         // This plugin's own bundle below the editor, as a tree in a worker rather than a rectangle in
         // an iframe. Same bytes, same trust prompt; what differs is that the host mounts its own

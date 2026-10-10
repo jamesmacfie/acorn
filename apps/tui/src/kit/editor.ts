@@ -43,6 +43,15 @@ export const editorSearch = (): Extension => []
 
 export const openReplacePanel = (_view: EditorView): boolean => false
 
+import type { LanguageServiceSource } from '@acorn/client-core/features/editor'
+export type { LanguageServiceSource }
+/** No tooltip or underline to draw in cells. The terminal asks the same routes through explicit
+ *  commands instead (../plugins/DocumentSurface.tsx, Editor's own Diagnostics button). */
+export const languageServices = (_source: LanguageServiceSource): Extension => []
+/** Never dispatched here, because this host builds no view to dispatch to. Typed as the real effect
+ *  so `EditorPane.tsx` compiles unchanged, with no CodeMirror byte behind it. */
+export const refreshLanguageServices = { of: () => ({}) } as unknown as typeof import('@acorn/client-core/features/editor').refreshLanguageServices
+
 export const refreshEditorTheme = (_view: EditorView): void => {}
 
 /** A watcher that has nothing to watch. It still returns the stop function, because the caller stores

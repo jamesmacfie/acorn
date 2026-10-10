@@ -58,6 +58,7 @@ or unaccepted runtime leaves nothing visible ([distribution](./plugins/distribut
 | Themes | Both | `ctx.contribute(themeRegistry)` / `contributions.themes` | The appearance picker |
 | Style packs | Loaded | `contributions.styles` | **Settings > Appearance**. The host validates token data and generates the CSS. **Direction: stays loaded, as validated data.** |
 | Context menus | Both | `ctx.contextMenus` (or `ctx.contribute(contextMenuRegistry)`) / `contributions.contextMenus` | Host-drawn context menus on task rows, item rows, and the plugin's own rail icons ([context menus](./plugins/menus-and-markers.md#context-menus)) |
+| Document services | Both | — / `contributions.documentServices` | Hover and diagnostics for Editor's files in one language, from the plugin's own routes. On a tie the person picks one per Node ([language smarts](./editor/document-surface.md#language-smarts)) |
 | Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds ([cooperative extension points](./plugins/cooperative-extension-points.md)). A `remote` point may declare `actions` a contributor's tree may ask for |
 | Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into another plugin's point. A compiled carrier is a `component`, and a loaded one is `items`, `remote`, `frame`, or `route`. An `items` extension aimed at `core:task` publishes task status |
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
