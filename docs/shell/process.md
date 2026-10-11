@@ -70,6 +70,12 @@ belong to the app, not the Node. Packaged, it's the application-data directory i
 root beneath it. In a checkout it's `apps/node/.acorn-shell`, or `<ACORN_DATA_DIR>-shell` when that
 variable is set.
 
+Only debug builds read `ACORN_DATA_DIR`. A release build always uses the application-data path, so a
+process that can set a packaged app's environment can't point it at a data root it prepared, with its
+own Node identity, plugins, and keys. No release path needs the variable: a packaged reset takes its
+root from the same application-data path, and fixture resets run only in debug builds.
+`a_release_build_ignores_the_data_dir_variable` in `apps/desktop/src-tauri/src/lib.rs` checks this.
+
 Secrets load from `.env` in two places, in order: the build's own file, then a `.env` inside the data
 directory, which wins. Without `SESSION_ENC_KEY` in either, the Node generates its own, before the
 listener accepts connections.

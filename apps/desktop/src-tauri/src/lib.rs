@@ -311,18 +311,11 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
     // The node's data root and the shell's custody root are separate on purpose: fleet.json and the
     // encrypted device tokens belong to this app, not the node. A dev build keeps the custody root
     // beside the checkout's Node root so a developer's fleet is not the installed app's.
-    let (data_dir, user_data_dir) = if packaged {
-        let base = path.app_data_dir().map_err(|e| format!("no application data directory: {e}"))?;
-        (base.join("node"), base)
-    } else {
-        let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../node/.acorn");
-        let checkout = development_data_root(
-            checkout,
-            std::env::var_os("ACORN_DATA_DIR").map(PathBuf::from),
-        );
-        let custody = development_custody_root(&checkout)?;
-        (checkout, custody)
-    };
+    let (data_dir, user_data_dir) = data_roots(
+        packaged,
+        || path.app_data_dir().map_err(|e| format!("no application data directory: {e}")),
+        || std::env::var_os("ACORN_DATA_DIR").map(PathBuf::from),
+    )?;
     for dir in [&data_dir, &user_data_dir] {
         std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     }
@@ -386,6 +379,26 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
         quit_pending: AtomicBool::new(false),
     });
     Ok((helper, frames))
+}
+
+/// The Node's data root and the shell's custody root. A release build never reads `ACORN_DATA_DIR`.
+/// Otherwise anyone who can set a packaged app's environment could point it at a root they prepared,
+/// with their own Node identity, plugins, and keys. A packaged reset takes its root from the app data
+/// directory as well, and fixture resets are debug-only (src/reset_stage.rs), so no release path
+/// needs the variable.
+fn data_roots(
+    packaged: bool,
+    app_data: impl FnOnce() -> Result<PathBuf, String>,
+    read_data_dir: impl FnOnce() -> Option<PathBuf>,
+) -> Result<(PathBuf, PathBuf), String> {
+    if packaged {
+        let base = app_data()?;
+        return Ok((base.join("node"), base));
+    }
+    let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../node/.acorn");
+    let checkout = development_data_root(checkout, read_data_dir());
+    let custody = development_custody_root(&checkout)?;
+    Ok((checkout, custody))
 }
 
 fn development_data_root(checkout: PathBuf, requested: Option<PathBuf>) -> PathBuf {
@@ -646,6 +659,15 @@ mod tests {
             development_data_root(checkout, Some(PathBuf::from("agent-data"))),
             PathBuf::from("agent-data")
         );
+    }
+
+    #[test]
+    fn a_release_build_ignores_the_data_dir_variable() {
+        let base = PathBuf::from("/Users/a/Library/Application Support/com.acorn.desktop");
+        let roots = data_roots(true, || Ok(base.clone()), || panic!("a release build must not read ACORN_DATA_DIR")).unwrap();
+        assert_eq!(roots, (base.join("node"), base.clone()));
+        let (node, custody) = data_roots(false, || panic!("a debug build has no app data root"), || Some(PathBuf::from("/tmp/agent/data"))).unwrap();
+        assert_eq!((node, custody), (PathBuf::from("/tmp/agent/data"), PathBuf::from("/tmp/agent/data-shell")));
     }
 
     #[test]
