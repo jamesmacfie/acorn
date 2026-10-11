@@ -156,8 +156,8 @@ The command checks Node locks and open files, exports each listed file to a priv
 verifies SHA-256 digests, and records each removal in `manifest.json`. Run the same command with the
 same recovery directory to resume an interrupted reset. Repository files, worktrees, `.env`, other
 files, and external databases aren't in the inventory. Restore the snapshot only into an isolated
-directory with the old acorn binary. Retained worktrees stay detached until you add them again. Name
-the private memory root with `--memory-root` to reset accepted memory.
+directory with the acorn build that wrote it. Retained worktrees stay detached until you add them
+again. Name the private memory root with `--memory-root` to reset accepted memory.
 
 For a desktop installation, quit the normal app, make an empty private recovery directory, and run
 the desktop binary's host stage first:

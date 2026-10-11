@@ -15,8 +15,9 @@ import { presentCommand } from './presenter'
 //
 // A command is a discriminated union, because not every contributor is a leaf: a group has children, a
 // search takes a query, an input is submitted, and a setting shows its current value. The leaf member
-// carries no `kind` at all, so a plain runnable registration stays a plain object, and a zero-argument
-// `run` is still assignable to one that is handed a context.
+// is the default, and its `kind` is optional: a registration with a `run` and no `kind` is an action,
+// so a plain runnable registration stays a plain object. A zero-argument `run` is still assignable to
+// one that is handed a context.
 //
 // The graph itself — parents, breadcrumbs, inherited availability, root search — is ./graph.ts. This
 // file holds the registry, the gates and the executor, and nothing that walks.

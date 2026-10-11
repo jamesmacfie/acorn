@@ -57,3 +57,6 @@ file.
 
 The recoverable reset command is in [local development](../local-development.md). It names each
 selected root, inventories the files it owns, and never removes `worktrees/` or a whole data root.
+It's the supported way to reset any data root, and the one the Node's old-schema error names. It was
+first built for the move to the `acorn-1` baseline, but it isn't tied to it. Moving a data root aside
+by hand loses the recovery copy, the digest check, and the custody stage, so the tool stays.

@@ -124,7 +124,7 @@ export function runReset(options, hooks = {}) {
     if (!existsSync(recoveryDir)) mkdirSync(recoveryDir, { mode: 0o700 })
     else if (!roots.desktopRoot || readdirSync(recoveryDir).some(name => !['desktop-stage.json', ...verifiedDesktopStage(recoveryDir, roots.desktopRoot, files).files.map(file => file.path)].includes(name))) throw new Error(`Recovery directory contains unlisted files: ${recoveryDir}`)
     chmodSync(recoveryDir, 0o700)
-    manifest = { version: VERSION, createdAt: new Date().toISOString(), roots, files: files.map((file, index) => ({ ...file, recoveryFile: `files/${String(index).padStart(6, '0')}`, status: 'pending' })), directories: directories.map(dir => ({ ...dir, status: 'pending' })), outstanding, complete: false, recovery: 'Restore these files into isolated roots with the old Acorn binary. Check SHA-256 hashes before restoring; do not import them into the new baseline.' }
+    manifest = { version: VERSION, createdAt: new Date().toISOString(), roots, files: files.map((file, index) => ({ ...file, recoveryFile: `files/${String(index).padStart(6, '0')}`, status: 'pending' })), directories: directories.map(dir => ({ ...dir, status: 'pending' })), outstanding, complete: false, recovery: 'Restore these files into isolated roots with the Acorn build that wrote them. Check SHA-256 hashes before restoring; do not copy them into a root a newer build opens.' }
     privateWrite(manifestPath, json(manifest))
     mkdirSync(join(recoveryDir, 'files'), { mode: 0o700 })
   }

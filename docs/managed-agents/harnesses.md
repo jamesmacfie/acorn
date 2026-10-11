@@ -114,6 +114,13 @@ and a workflow step stores `profile`. Renaming one breaks every stored row. The 
 `claude`, `codex`, and `claude-code` are bare names. The host namespaces a loaded plugin's harness ID
 as `<pluginId>:<harnessId>`. [Plugin authoring](../plugin-authoring.md) has the authoring contract.
 
+A harness's profile ID matches its harness ID, except for Claude Code: its harness is `claude` and
+its profile is `claude-code`. Both names predate the harness seam. The pair stays on purpose. Both
+spellings are stored in `acorn-1` session rows, and workflow files in other people's repositories
+name `claude-code` as a step's `profile`. Unifying them would need a data migration plus a period of
+accepting both spellings in workflow files. The Claude driver's one `profileId` line costs less than
+that. Don't copy the split for a new harness.
+
 ## Headless and one-shot modes
 
 A headless turn runs in `auto`, and a one-shot text turn in `dontAsk`. `dontAsk` denies anything not
