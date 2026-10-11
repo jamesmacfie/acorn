@@ -4,9 +4,9 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ROOT, anchors, slug } from './docAnchors'
 
-// Source comments cite the docs about 3,000 times, most as `docs/<page>.md § Heading`.
-// `docPaths.test.ts` reads only the docs, so a renamed page or a moved section broke those comments
-// with nothing to say so. On October 3, 2026, 64 comments named a doc file that no longer existed.
+// Source comments cite the docs thousands of times, most as `docs/<page>.md § Heading`.
+// `docPaths.test.ts` reads only the docs, so without this a renamed page or a moved section breaks
+// those comments with nothing to say so.
 //
 // Two things are checked: every `docs/….md` a source file names exists, and every `§ Heading` after
 // one names a heading or an explicit anchor in that file. The heading is matched as a prefix of the
@@ -30,9 +30,9 @@ const SECTION = /^\s*§\s*/
 const COMMENT = /^\s*(?:\/\/|\/\*+|\{\/\*|\*|#)\s?/
 const anchorCache = new Map<string, Set<string>>()
 
-// Section citations that failed when this check landed. Each is a comment naming a heading that was
-// renamed or moved. The phase that rewrites the cited doc fixes its entries. The list may only
-// shrink: an entry that passes fails the test until it is deleted.
+// Known-broken section citations, each a comment naming a heading that was renamed or moved. Whoever
+// rewrites the cited doc fixes its entries. The list may only shrink: an entry that passes fails the
+// test until it is deleted.
 const ALLOWLIST_FILE = join(ROOT, 'tools/arch/docCitations.allowlist.txt')
 const ALLOWLIST = readFileSync(ALLOWLIST_FILE, 'utf8').split('\n').filter(Boolean)
 
@@ -53,12 +53,20 @@ describe('source comments cite docs that exist', () => {
           missing.push(`${file}:${index + 1}: ${path}`)
           continue
         }
-        const after = line.slice(match.index + path.length)
+        // A comment can wrap between the path and its `§`, so a path that ends its line takes the `§`
+        // from the start of the next comment line.
+        let after = line.slice(match.index + path.length)
+        let rest = index + 1
+        const next = lines[index + 1] ?? ''
+        if (!after.trim() && COMMENT.test(next) && SECTION.test(next.replace(COMMENT, ''))) {
+          after = next.replace(COMMENT, '')
+          rest += 1
+        }
         if (!SECTION.test(after)) continue
         sectionsCited += 1
         // Join up to three wrapped comment lines, so a heading split across two lines still matches.
         let text = after.replace(SECTION, '')
-        for (const next of lines.slice(index + 1, index + 4)) {
+        for (const next of lines.slice(rest, rest + 3)) {
           if (!COMMENT.test(next)) break
           text += ` ${next.replace(COMMENT, '')}`
         }

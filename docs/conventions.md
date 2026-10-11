@@ -158,7 +158,8 @@ Two more tests check the docs. `tools/arch/docPaths.test.ts` checks that every r
 backticks and every relative link between docs resolves, and that a retired directory name appears
 only on a line that marks it gone. `tools/arch/docCitations.test.ts` checks that every
 `docs/<page>.md § Heading` in a source comment names a doc and a heading that exist.
-[Architecture rules](./testing/architecture-rules.md#doc-checks) covers both.
+`tools/arch/commentPaths.test.ts` checks that every other file path in a source comment exists.
+[Architecture rules](./testing/architecture-rules.md#doc-checks) covers all three.
 
 The other rules are review rules on purpose. A naming convention is a prompt for the reader. A test
 that matched filenames against a pattern would need an exception for every deliberate case: the two

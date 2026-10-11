@@ -49,6 +49,14 @@ and make and verify a routine change without tracing unrelated code or relying o
 Explain any complexity or workflow burden the change adds and why it is needed. Flag broader cleanup
 separately when it falls outside the task's scope.
 
+## Comments
+
+Keep a comment that explains why, or names a constraint, trap, or invariant the code can't show. Cut
+one that restates the code, tells history (what the code used to do or replaced), names a phase,
+programme, review finding, or date, or quotes a measurement nobody can rerun from the comment. Name a
+symbol rather than its file. To cite a doc, follow [writing-docs.md](./docs/writing-docs.md).
+`tools/arch/commentPaths.test.ts` checks that every file path in a comment exists.
+
 ## Scripts
 
 | Command | What it does |

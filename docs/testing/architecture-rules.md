@@ -80,14 +80,25 @@ The architecture suite's text checks are a fast first line. Neither keeps a file
 
 - Every `docs/<page>.md` they name has to exist, with no exceptions.
 - Every `§ Heading` after one has to start with a heading or an explicit anchor in that doc, after
-  wrapped comment lines are joined.
+  wrapped comment lines are joined. A `§` that starts the line after the path counts too.
 - Section citations that failed when the check landed sat in
   `tools/arch/docCitations.allowlist.txt`. The list is empty. An entry that starts passing fails
   the test until you delete it, so the list only shrinks.
 - The same file fails on any in-scope doc longer than 200 lines. `docs/README.md` is the one
   exception.
 
-The check reads tracked files only, so run `git add` on a new file before you trust a pass. Vitest
+`tools/arch/commentPaths.test.ts` reads every comment in the TypeScript and JavaScript source under
+the same folders and resolves each file path it names, apart from `docs/` paths, which the citation
+check covers:
+
+- A path resolves from the repository root, from the commenting file's folder, as a package folder
+  name followed by a path inside the package or its `src/` (`client-core/host/clientRuntime.ts`), as
+  the tail of a tracked file, or inside an installed dependency.
+- A path under a dot folder names a file in a person's project, such as `.acorn/config.toml`, and a
+  path under `dist/` names build output, so neither is checked.
+- The same "gone" markers as the doc path check skip a line. There's no allowlist.
+
+These checks read tracked files only, so run `git add` on a new file before you trust a pass. Vitest
 hides `console.info` from passing tests when it detects an agent. To see the citation counts, run
 `env -u CLAUDECODE -u AI_AGENT npx vitest run docCitations` in `tools/arch`. For the writing rules
 behind these checks, see [Write and maintain docs](../writing-docs.md).
