@@ -229,6 +229,12 @@ it('refuses unsupported event replay and starts a fresh quarantined connection a
     const replay = await fetch(initial.url, { headers: { ...initial.headers, 'Last-Event-ID': 'obsolete', Accept: 'text/event-stream' } })
     expect(replay.status).toBe(409)
     expect(await replay.text()).toContain('replay is unavailable')
+    const oversized = await fetch(initial.url, {
+      method: 'POST',
+      headers: { ...initial.headers, 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/message', params: { data: 'x'.repeat(1024 * 1024) } }),
+    })
+    expect(oversized.status).toBe(413)
   } finally {
     await client.close().catch(() => undefined)
     await first.close()

@@ -88,7 +88,7 @@ importers:
     dependencies:
       '@agentclientprotocol/claude-agent-acp':
         specifier: ^0.54.1
-        version: 0.54.1(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))
+        version: 0.54.1(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))
       '@agentclientprotocol/sdk':
         specifier: ^1.3.0
         version: 1.3.0(zod@4.4.3)
@@ -99,8 +99,8 @@ importers:
         specifier: '>=2.0.11'
         version: 2.0.11(hono@4.13.5)
       '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(zod@4.4.3)
+        specifier: ^1.31.0
+        version: 1.32.0(zod@4.4.3)
       '@solidjs/router':
         specifier: ^0.16.1
         version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
@@ -751,8 +751,8 @@ importers:
         specifier: '>=2.0.11'
         version: 2.0.11(hono@4.13.5)
       '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(zod@4.4.3)
+        specifier: ^1.31.0
+        version: 1.32.0(zod@4.4.3)
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
@@ -961,8 +961,8 @@ importers:
         specifier: ^1.3.0
         version: 1.3.0(zod@4.4.3)
       '@modelcontextprotocol/sdk':
-        specifier: ^1.29.0
-        version: 1.29.0(zod@4.4.3)
+        specifier: ^1.31.0
+        version: 1.32.0(zod@4.4.3)
       '@solidjs/router':
         specifier: ^0.16.1
         version: 0.16.1(solid-js@1.9.13(patch_hash=65eea923f4f776eef56b57c5a42dec9302a3bca00326a0b1bd5334b155da2169))
@@ -2843,8 +2843,8 @@ packages:
     resolution: {integrity: sha512-j37dj/h6p6pots1L7pLPPNuABEEu9WP4OYg9pW1g+nYG331j0+3canE9OagtYdytYvdSAMG+2fKU5cxep6LgjA==}
     engines: {node: '>=22.12.0'}
 
-  '@modelcontextprotocol/sdk@1.29.0':
-    resolution: {integrity: sha512-zo37mZA9hJWpULgkRpowewez1y6ML5GsXJPY8FI0tBBCd77HEvza4jDqRKOXgHNn867PVGCyTdzqpz0izu5ZjQ==}
+  '@modelcontextprotocol/sdk@1.32.0':
+    resolution: {integrity: sha512-8BviX/hK4Gd2eL1KdTwm0gfl4d3wdoErW0Jd00h6nomUAtk6IJk5vwQJc6kfWtJTzN5OEV/lgIiJKI8fiDGAlA==}
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
@@ -5230,10 +5230,10 @@ packages:
 
 snapshots:
 
-  '@agentclientprotocol/claude-agent-acp@0.54.1(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))':
+  '@agentclientprotocol/claude-agent-acp@0.54.1(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))':
     dependencies:
       '@agentclientprotocol/sdk': 1.1.0(zod@4.4.3)
-      '@anthropic-ai/claude-agent-sdk': 0.3.197(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(zod@4.4.3)
+      '@anthropic-ai/claude-agent-sdk': 0.3.197(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))(zod@4.4.3)
       zod: 4.4.3
     transitivePeerDependencies:
       - '@anthropic-ai/sdk'
@@ -5276,10 +5276,10 @@ snapshots:
   '@anthropic-ai/claude-agent-sdk-win32-x64@0.3.197':
     optional: true
 
-  '@anthropic-ai/claude-agent-sdk@0.3.197(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))(zod@4.4.3)':
+  '@anthropic-ai/claude-agent-sdk@0.3.197(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.32.0(zod@4.4.3))(zod@4.4.3)':
     dependencies:
       '@anthropic-ai/sdk': 0.113.0(zod@4.4.3)
-      '@modelcontextprotocol/sdk': 1.29.0(zod@4.4.3)
+      '@modelcontextprotocol/sdk': 1.32.0(zod@4.4.3)
       zod: 4.4.3
     optionalDependencies:
       '@anthropic-ai/claude-agent-sdk-darwin-arm64': 0.3.197
@@ -6046,7 +6046,7 @@ snapshots:
     dependencies:
       '@chevrotain/types': 13.2.0
 
-  '@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)':
+  '@modelcontextprotocol/sdk@1.32.0(zod@4.4.3)':
     dependencies:
       '@hono/node-server': 2.0.11(hono@4.13.5)
       ajv: 8.20.0

@@ -57,7 +57,9 @@ export class McpReviewProxy {
     this.#upstream = server.transport === 'stdio'
       ? new StdioClientTransport({ command: server.command, args: server.args, env: server.env, cwd: homedir(), stderr: 'pipe' })
       : new StreamableHTTPClientTransport(new URL(server.url), { requestInit: { headers: server.headers } })
-    this.#downstream = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() })
+    // The transport refuses a declared or streamed body over the cap with a 413. Reading the request
+    // here as well would start it flowing before the transport attaches its reader and lose the body.
+    this.#downstream = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID(), maxRequestBodySize: MAX_MESSAGE_BYTES })
     this.#upstream.onmessage = (message) => { void this.#fromUpstream(message as Rpc) }
     this.#upstream.onerror = () => { void this.close() }
     this.#upstream.onclose = () => { void this.close() }
@@ -72,10 +74,6 @@ export class McpReviewProxy {
         res.writeHead(401).end(); return
       }
       if (req.headers['last-event-id']) { res.writeHead(409).end('MCP event replay is unavailable on reviewed connections. Reconnect.'); return }
-      const length = Number(req.headers['content-length'] ?? 0)
-      if (length > MAX_MESSAGE_BYTES) { res.writeHead(413).end(); return }
-      let bytes = 0
-      req.on('data', (chunk: Buffer) => { bytes += chunk.length; if (bytes > MAX_MESSAGE_BYTES) req.destroy() })
       void this.#downstream.handleRequest(req, res).catch(() => { if (!res.headersSent) res.writeHead(502).end() })
     })
   }
