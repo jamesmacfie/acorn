@@ -3,6 +3,7 @@
 // callback.
 import type { TaskArchiveConcern } from '@acorn/protocol/task.ts'
 import type { TaskRef } from '../core'
+import type { Disposable } from './capabilities'
 import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('task-check')
@@ -68,14 +69,15 @@ export const qualifiedConcernId = (pluginId: string, checkId: string, concernId:
   `${pluginId}:${checkId}:${concernId}`
 
 // A module singleton, like the route, source and node-action registries beside it, with the same
-// lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (./host.ts § clearRegistrations).
+// lifecycle answer: each registration hands back its own undo, and the plugin host runs it on
+// teardown (./host.ts § clearRegistrations).
 const checks = new Map<string, RegisteredTaskCheck>()
 
-export function registerTaskCheck(check: RegisteredTaskCheck): void {
+export function registerTaskCheck(check: RegisteredTaskCheck): Disposable {
   const id = key(check.pluginId, check.id)
   if (checks.has(id)) throw new Error(`Duplicate task check '${id}'.`)
   checks.set(id, check)
+  return { dispose: () => { if (checks.get(id) === check) checks.delete(id) } }
 }
 
 export function clearTaskChecks(pluginId: string): void {

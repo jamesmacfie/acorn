@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm'
 import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
+import type { Disposable } from '../pluginHost/capabilities'
 import { runHook } from '../pluginHost/hooks'
 import { parseCached } from '../integrations/codec'
 import { integrationProviderRegistry } from '../integrations/registry'
@@ -190,10 +191,17 @@ type Registration = { owner: string; section: ContextSectionContribution }
 class ContextSectionRegistry {
   readonly #registrations: Registration[] = []
 
-  register(owner: string, section: ContextSectionContribution): void {
+  register(owner: string, section: ContextSectionContribution): Disposable {
     const clash = this.#registrations.find((r) => r.section.id === section.id)
     if (clash) throw new Error(`Duplicate context section '${section.id}': already registered by '${clash.owner}', now by '${owner}'.`)
-    this.#registrations.push({ owner, section })
+    const registration = { owner, section }
+    this.#registrations.push(registration)
+    return {
+      dispose: () => {
+        const index = this.#registrations.indexOf(registration)
+        if (index >= 0) this.#registrations.splice(index, 1)
+      },
+    }
   }
 
   remove(owner: string): void {
@@ -222,7 +230,7 @@ export const asContextSection = (section: PluginContextSection): ContextSectionC
   assemble: ({ db: _db, ...rest }) => section.assemble(rest),
 })
 
-export const registerContextSection = (owner: string, section: ContextSectionContribution): void =>
+export const registerContextSection = (owner: string, section: ContextSectionContribution): Disposable =>
   registry.register(owner, section)
 export const removeContextSections = (owner: string): void => registry.remove(owner)
 export const getContextSections = (): readonly ContextSectionContribution[] => registry.list()

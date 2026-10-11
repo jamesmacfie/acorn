@@ -37,7 +37,7 @@ export type Extension<T> = {
 }
 
 // Module singletons, like the route, tool, source and node-action registries beside them, with the
-// same lifecycle answer: the host clears a plugin's entries before re-registering them
+// same lifecycle answer: each registration hands back its own undo, and the host runs it on teardown
 // (./host.ts § clearRegistrations).
 const points = new Map<string, ExtensionPoint>()
 const extensions = new Map<string, Extension<unknown>[]>()

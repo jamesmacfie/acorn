@@ -33,8 +33,9 @@ const provider = (id: string, projects?: ProviderProjectSource) => publicConnect
   budgets: defaultBudgets,
 })
 
-const register = (id: string, projects?: ProviderProjectSource): void =>
+const register = (id: string, projects?: ProviderProjectSource): void => {
   connectionProviderRegistry.register(provider(id, projects), OWNER)
+}
 
 const seedConnection = async (
   testDb: TestDb,

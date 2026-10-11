@@ -2,6 +2,7 @@ import { SOURCE_INPUTS_WITH_PROVIDER, dataSourceDiscoverySchema, dataSourceRegis
 import { confinePluginPath } from '../pluginHost/dispatch'
 import { canonicalDataEncoding } from '@acorn/protocol/dataValues.ts'
 import type { DataSourceScope } from '@acorn/protocol/dataSources.ts'
+import type { Disposable } from '../pluginHost/capabilities'
 
 export type CoreDataSourceHandler = (request: DataSourceRequest, env: import('../bindings').Env, signal: AbortSignal) => Promise<unknown> | unknown
 /** `loaded` marks a source from a loaded plugin, whose input reads need the person's grant. */
@@ -12,14 +13,16 @@ const discoveries = new Map<string, RegisteredDiscovery>()
 const discoveryScopes = new Map<string, Set<string>>()
 const key = (pluginId: string, id: string) => `${pluginId}:${id}`
 
-export function registerDataSource(pluginId: string, input: DataSourceRegistration, options: { loaded?: boolean } = {}): void {
+export function registerDataSource(pluginId: string, input: DataSourceRegistration, options: { loaded?: boolean } = {}): Disposable {
   const source = dataSourceRegistrationSchema.parse(input)
   confinePluginPath(pluginId, source.handler)
   if (source.inputs && source.providerId) throw new Error(SOURCE_INPUTS_WITH_PROVIDER)
   const id = key(pluginId, source.sourceId)
   const old = sources.get(id)
   if (old && old.handler !== source.handler) throw new Error('Duplicate data source')
-  sources.set(id, { ...source, pluginId, ...(options.loaded ? { loaded: true } : {}) })
+  const registered: RegisteredDataSource = { ...source, pluginId, ...(options.loaded ? { loaded: true } : {}) }
+  sources.set(id, registered)
+  return { dispose: () => { if (sources.get(id) === registered) sources.delete(id) } }
 }
 
 /** Core-owned data uses the same runtime without pretending core is a plugin route namespace. */
@@ -28,12 +31,27 @@ export function registerCoreDataSource(input: Omit<DataSourceRegistration, 'hand
   sources.set(key('core', source.sourceId), { ...source, pluginId: 'core', coreHandler: handler })
 }
 
-export function registerDataSourceDiscovery(pluginId: string, input: DataSourceDiscovery): void {
+export function registerDataSourceDiscovery(pluginId: string, input: DataSourceDiscovery): Disposable {
   const discovery = dataSourceDiscoverySchema.parse(input)
   confinePluginPath(pluginId, discovery.handler)
   const id = key(pluginId, discovery.discoveryId)
   if (discoveries.has(id)) throw new Error('Duplicate data source discovery')
-  discoveries.set(id, { ...discovery, pluginId })
+  const registered: RegisteredDiscovery = { ...discovery, pluginId }
+  discoveries.set(id, registered)
+  return {
+    dispose: () => {
+      if (discoveries.get(id) !== registered) return
+      discoveries.delete(id)
+      // The sources this discovery found go with it. A discovered source carries its discovery's
+      // handler (./runtime.ts § discoverDataSources), and that is the only link between the two.
+      for (const [sourceId, source] of sources) {
+        if (source.pluginId === pluginId && discoveryScopes.has(sourceId) && source.handler === registered.handler) {
+          sources.delete(sourceId)
+          discoveryScopes.delete(sourceId)
+        }
+      }
+    },
+  }
 }
 
 export function clearDataSources(pluginId: string): void {

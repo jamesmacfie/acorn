@@ -1,5 +1,6 @@
 import type { Hono } from 'hono'
 import type { AppEnv } from '../middleware/auth'
+import type { Disposable } from '../pluginHost/capabilities'
 import type { PluginFetchHandler } from '../pluginHost/types'
 
 // The two current HTTP namespaces (docs/api-reference/transport.md § Transport). Core owns
@@ -34,7 +35,7 @@ export type RouteContribution = { plugin: string; prefix: string; note?: string 
 export class RouteRegistry {
   readonly #contributions: RouteContribution[] = []
 
-  register(contribution: RouteContribution): void {
+  register(contribution: RouteContribution): Disposable {
     if (!PLUGIN_ID_RE.test(contribution.plugin)) {
       throw new Error(`Plugin route id must match ${PLUGIN_ID_RE.source}: '${contribution.plugin}'.`)
     }
@@ -47,6 +48,12 @@ export class RouteRegistry {
       throw new Error(`Plugin route prefix is relative to ${PLUGIN_NAMESPACE}/<plugin>, so it must not repeat '/v1': '${contribution.prefix}'.`)
     }
     this.#contributions.push(contribution)
+    return {
+      dispose: () => {
+        const index = this.#contributions.indexOf(contribution)
+        if (index >= 0) this.#contributions.splice(index, 1)
+      },
+    }
   }
 
   list(): readonly RouteContribution[] {
@@ -72,8 +79,8 @@ export function routeMountPath(contribution: RouteContribution): string {
 
 const registry = new RouteRegistry()
 
-export function registerRoute(contribution: RouteContribution): void {
-  registry.register(contribution)
+export function registerRoute(contribution: RouteContribution): Disposable {
+  return registry.register(contribution)
 }
 
 export function pluginRouteContributions(): readonly RouteContribution[] {

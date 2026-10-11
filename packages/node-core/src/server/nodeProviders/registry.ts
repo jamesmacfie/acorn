@@ -1,4 +1,5 @@
 import { NODE_LIFECYCLE_VERBS, type NodeLifecycleVerb, type NodeProviderDescriptor, type ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
+import type { Disposable } from '../pluginHost/capabilities'
 
 // Node providers: a plugin that knows about nodes, and optionally can make and remove them
 // (docs/plugins/node-providers.md § Node providers). The second door into the fleet, beside probe-then-pair.
@@ -53,12 +54,12 @@ const verbsOf = (provider: NodeProviderContribution): NodeLifecycleVerb[] =>
   NODE_LIFECYCLE_VERBS.filter((verb) => typeof provider[verb] === 'function')
 
 // A module singleton, like the route, source, node-action and audit registries beside it, with the
-// same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (server/pluginHost/host.ts § clearRegistrations).
+// same lifecycle answer: each registration hands back its own undo, and the plugin host runs it on
+// teardown (server/pluginHost/host.ts § clearRegistrations).
 const providers = new Map<string, RegisteredNodeProvider>()
 
 /** Register one provider for a plugin. The host binds `pluginId`; a plugin never passes it. */
-export function registerNodeProvider(pluginId: string, provider: NodeProviderContribution): void {
+export function registerNodeProvider(pluginId: string, provider: NodeProviderContribution): Disposable {
   if (!provider.id.trim()) throw new Error(`Plugin '${pluginId}' registered a node provider with an empty id.`)
   if (provider.id.includes(':')) {
     throw new Error(`Node provider id '${provider.id}' must not contain ':': the host qualifies it with the plugin id.`)
@@ -71,7 +72,9 @@ export function registerNodeProvider(pluginId: string, provider: NodeProviderCon
   }
   const qualifiedId = `${pluginId}:${provider.id}`
   if (providers.has(qualifiedId)) throw new Error(`Duplicate node provider '${qualifiedId}'.`)
-  providers.set(qualifiedId, { ...provider, qualifiedId, pluginId })
+  const registered = { ...provider, qualifiedId, pluginId }
+  providers.set(qualifiedId, registered)
+  return { dispose: () => { if (providers.get(qualifiedId) === registered) providers.delete(qualifiedId) } }
 }
 
 export function clearNodeProviders(pluginId: string): void {

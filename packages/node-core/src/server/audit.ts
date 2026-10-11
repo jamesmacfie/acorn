@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { desc, lt } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
+import type { Disposable } from './pluginHost/capabilities'
 import { emitEvent } from './telemetry/collector'
 import { createLogger, describeError } from './telemetry/logger'
 
@@ -102,18 +103,20 @@ export type AuditAction = CoreAuditAction | PluginAuditAction
 export type DeclaredAuditAction = { action: PluginAuditAction; pluginId: string; label: string }
 
 // A module singleton, like the route, source, node-action and task-check registries beside it, with
-// the same lifecycle answer: the plugin host clears a plugin's entries before re-registering them
-// (server/pluginHost/host.ts § clearRegistrations).
+// the same lifecycle answer: each declaration hands back its own undo, and the plugin host runs it on
+// teardown (server/pluginHost/host.ts § clearRegistrations).
 const declared = new Map<string, DeclaredAuditAction>()
 
 /** Declare one verb for a plugin. The host binds `pluginId`; a plugin never passes it. */
-export function declareAuditAction(pluginId: string, action: { id: string; label: string }): void {
+export function declareAuditAction(pluginId: string, action: { id: string; label: string }): Disposable {
   const qualified = qualifiedAuditAction(pluginId, action.id)
   const clash = declared.get(qualified)
   if (clash && clash.label !== action.label) {
     throw new Error(`Duplicate audit action '${qualified}': already declared as '${clash.label}'.`)
   }
-  declared.set(qualified, { action: qualified, pluginId, label: action.label })
+  const entry = { action: qualified, pluginId, label: action.label }
+  declared.set(qualified, entry)
+  return { dispose: () => { if (declared.get(qualified) === entry) declared.delete(qualified) } }
 }
 
 export function clearAuditActions(pluginId: string): void {

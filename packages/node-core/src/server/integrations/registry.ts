@@ -1,12 +1,12 @@
+import type { Disposable } from '../pluginHost/capabilities'
 import type { IntegrationProviderContribution, ProviderRouteContribution } from './types'
 
 // A module singleton, like the HTTP route registry and unlike the capability registry, because a provider
 // contribution is a static descriptor rather than a per-boot object bound to a database handle. It
 // is written by plugin init rather than by a one-time side-effect import, and that matters because
 // `startServiceRuntime` can run several times in one process (its own test does it four times), so a
-// second boot would hit the duplicate-id guards below and fail the whole boot. Hence
-// `removePluginProviders`, the exact counterpart of `removePluginRoutes`, called by the plugin host
-// before each init.
+// second boot would hit the duplicate-id guards below and fail the whole boot. Hence the undo each
+// registration hands back, which the plugin host runs on teardown.
 //
 // Owner is tracked rather than inferred from the id: a plugin may contribute several providers
 // (model-providers registers two), and the ids are not derived from the plugin name.
@@ -15,7 +15,7 @@ class IntegrationProviderRegistry {
   readonly #owners = new Map<string, string>() // providerId → owning plugin
   readonly #routes: ProviderRouteContribution[] = []
 
-  register(provider: IntegrationProviderContribution, owner?: string): void {
+  register(provider: IntegrationProviderContribution, owner?: string): Disposable {
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate integration provider '${provider.id}'.`)
     if ((provider.capabilities.comments === 'write') !== !!provider.comment) {
       throw new Error(`Provider '${provider.id}' must declare both \`capabilities.comments: 'write'\` and \`comment\`, or neither.`)
@@ -40,6 +40,13 @@ class IntegrationProviderRegistry {
     if (provider.codec && !provider.conformance) throw new Error(`Provider '${provider.id}' has a codec without conformance fixtures.`)
     this.#providers.set(provider.id, provider)
     if (owner) this.#owners.set(provider.id, owner)
+    return {
+      dispose: () => {
+        if (this.#providers.get(provider.id) !== provider) return
+        this.#providers.delete(provider.id)
+        this.#owners.delete(provider.id)
+      },
+    }
   }
 
   // Drop everything `plugin` contributed on a previous boot, providers and their routers alike.
@@ -82,7 +89,7 @@ class IntegrationProviderRegistry {
     return [...this.#providers.values()]
   }
 
-  registerRoute(route: ProviderRouteContribution): void {
+  registerRoute(route: ProviderRouteContribution): Disposable {
     this.validateContribution(route.providerId, 'Provider route')
     // Keyed by (providerId, prefix): the prefix is namespace-relative now, so two providers may both
     // contribute the empty prefix. Only the same provider doing it twice is a collision.
@@ -90,6 +97,12 @@ class IntegrationProviderRegistry {
       throw new Error(`Duplicate provider route prefix '${route.prefix}' for provider '${route.providerId}'.`)
     }
     this.#routes.push(route)
+    return {
+      dispose: () => {
+        const index = this.#routes.indexOf(route)
+        if (index >= 0) this.#routes.splice(index, 1)
+      },
+    }
   }
 
   routes(): readonly ProviderRouteContribution[] {

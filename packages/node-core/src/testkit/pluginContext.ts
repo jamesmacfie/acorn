@@ -18,7 +18,7 @@ import { CapabilityRegistry } from '../server/pluginHost/capabilities'
 import { SCHEDULER } from '../server/schedules'
 import { Scheduler } from '../server/schedules/scheduler'
 import { buildPluginContext } from '../server/pluginHost/context'
-import { clearRegistrations } from '../server/pluginHost/host'
+import { clearRegistrations, recordRegistrationUndo } from '../server/pluginHost/host'
 import { flushTelemetry, onTelemetryBatch, setTelemetryPref } from '../server/telemetry/collector'
 import { pluginRequestContext } from '../server/pluginHost/requestContext'
 import type { CompiledNodePluginContext, NodePlugin, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
@@ -101,12 +101,6 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     },
   }
 
-  // What `clearRegistrations` cannot reach: the WS hub's two slots, which are module singletons with
-  // no duplicate guard, and any schedule the plugin declared, which lives in a scheduler the host owns
-  // (server/pluginHost/context.ts). Without this, a test whose plugin claims a channel prefix or registers
-  // a schedule leaves it claimed for the whole file.
-  const undos: (() => void)[] = []
-
   // The recorder, which is a sink like any other: nothing in the collector is test-specific
   // (../server/telemetry/collector.ts, docs/plugin-authoring/testing.md § In tests). The preference is
   // stated rather than read, because a test has no `telemetry.enabled` row and building nothing is
@@ -126,7 +120,9 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     capabilities,
     core: services,
     env,
-    onUndo: (undo) => void undos.push(undo),
+    // The host's own undo list, so `clearRegistrations(name)` in a test takes back what this context
+    // registered, exactly as it does for a booted plugin.
+    onUndo: (undo) => recordRegistrationUndo(name, undo),
     // Both tiers get storage passed the same way as in production: the caller derives the handle and
     // the binding carries the loader's raw one (server/pluginHost/context.ts).
     ...(permissions ? { loaded: { permissions, storage, ...(options.destinations ? { destinations: options.destinations } : {}) } } : {}),
@@ -151,9 +147,6 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     cleanup: () => {
       recorder.dispose()
       clearRegistrations(name)
-      // Newest first, like the host's own rollback: the last claim on a slot is the one currently held.
-      for (const undo of undos.reverse()) undo()
-      undos.length = 0
       try {
         opened?.close()
       } catch {

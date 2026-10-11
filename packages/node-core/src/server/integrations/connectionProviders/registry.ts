@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util'
 import type { CredentialField, PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
+import type { Disposable } from '../../pluginHost/capabilities'
 import type { ConnectionProviderContribution } from '../types'
 
 const publicCredentialField = (field: CredentialField): CredentialField => ({
@@ -40,7 +41,7 @@ export class ConnectionProviderRegistry {
   readonly #providers = new Map<string, ConnectionProviderContribution>()
   readonly #owners = new Map<string, string>() // providerId → owning plugin; see registry.ts's header
 
-  register(provider: ConnectionProviderContribution, owner?: string): void {
+  register(provider: ConnectionProviderContribution, owner?: string): Disposable {
     if (!provider.id.trim()) throw new Error('Connection provider id must not be empty.')
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate connection provider '${provider.id}'.`)
 
@@ -73,6 +74,13 @@ export class ConnectionProviderRegistry {
 
     this.#providers.set(provider.id, provider)
     if (owner) this.#owners.set(provider.id, owner)
+    return {
+      dispose: () => {
+        if (this.#providers.get(provider.id) !== provider) return
+        this.#providers.delete(provider.id)
+        this.#owners.delete(provider.id)
+      },
+    }
   }
 
   removeForPlugin(plugin: string): void {

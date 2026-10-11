@@ -37,10 +37,12 @@ instead: its registrations roll back, its roster row reads `failed`, and the oth
 `packages/node-core/src/server/pluginHost/host.ts` owns the boot passes, ready barrier, registration
 undo, storage handles, reload transaction, and reverse disposal. Manifest adapters in `manifestWork.ts`,
 `manifestCatalog.ts`, `manifestAgents.ts`, and `runtimeContributions.ts` translate declarations through
-the same owner-bound context methods that compiled plugins use. The host keeps per-plugin undo
-functions for schedules and subscriptions and clears the owner-bound registries on rollback. If a
-loaded manifest fails partway through registration, the host removes its
-earlier entries, closes its storage after disposal, and records an `init` failure.
+the same owner-bound context methods that compiled plugins use. Each registration a context makes
+records its own undo, and the host keeps those per plugin and runs them newest first on rollback,
+reload, and shutdown. `pluginHost/teardown.test.ts` makes one registration of every kind through both
+context types and checks that teardown empties every registry. If a loaded manifest fails partway
+through registration, the host removes its earlier entries, closes its storage after disposal, and
+records an `init` failure.
 
 ## What a plugin registers
 

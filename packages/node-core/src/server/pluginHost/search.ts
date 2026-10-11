@@ -3,6 +3,7 @@
 // rather than exposing tables.
 import type { SearchGroup, SearchHit } from '@acorn/protocol/search.ts'
 import { createLogger, describeError } from '../telemetry/logger'
+import type { Disposable } from './capabilities'
 
 const log = createLogger('search')
 
@@ -35,16 +36,17 @@ export type SearchProvider = {
 
 export type RegisteredSearchProvider = SearchProvider & { pluginId: string }
 
-// A module singleton with the same lifecycle as the task-check registry beside it: the plugin host
-// clears a plugin's entries before re-registering them (./host.ts § clearRegistrations).
+// A module singleton with the same lifecycle as the task-check registry beside it: each registration
+// hands back its own undo, and the plugin host runs it on teardown (./host.ts § clearRegistrations).
 const providers = new Map<string, RegisteredSearchProvider>()
 
 const key = (provider: Pick<RegisteredSearchProvider, 'pluginId' | 'id'>): string => `${provider.pluginId}:${provider.id}`
 
-export function registerSearchProvider(provider: RegisteredSearchProvider): void {
+export function registerSearchProvider(provider: RegisteredSearchProvider): Disposable {
   const id = key(provider)
   if (providers.has(id)) throw new Error(`Duplicate search provider '${id}'.`)
   providers.set(id, provider)
+  return { dispose: () => { if (providers.get(id) === provider) providers.delete(id) } }
 }
 
 export function clearSearchProviders(pluginId: string): void {

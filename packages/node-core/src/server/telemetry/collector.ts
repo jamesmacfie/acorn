@@ -430,7 +430,7 @@ export function ingestTelemetry(runtime: PostedTelemetryRuntime, records: readon
 export function onTelemetryBatch(sink: TelemetrySink, owner = 'core'): Disposable {
   // The owner is the host's to state, the same rule every record follows: a plugin subscribes
   // through `ctx.core.telemetry`, which closes over its id (../core/telemetry.ts). It is kept so
-  // Settings can say who is reading the stream and so a rollback can find this subscription again.
+  // Settings can say who is reading the stream.
   state.sinks.set(sink, owner)
   arm()
   return {
@@ -439,15 +439,6 @@ export function onTelemetryBatch(sink: TelemetrySink, owner = 'core'): Disposabl
       if (state.sinks.size === 0 && !PERF) disarm()
     },
   }
-}
-
-/** Drop every sink one plugin registered. Called when the host rolls a plugin's registrations back,
- *  so a reloaded plugin does not leave the previous instance reading the stream. */
-export function clearTelemetrySinks(owner: string): void {
-  for (const [sink, sinkOwner] of state.sinks) {
-    if (sinkOwner === owner) state.sinks.delete(sink)
-  }
-  if (state.sinks.size === 0 && !PERF) disarm()
 }
 
 /**

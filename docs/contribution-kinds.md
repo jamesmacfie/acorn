@@ -161,6 +161,10 @@ Answer these questions, in order, before adding a kind:
 4. **What does it cost a reader?** One row here, one schema entry, one registration site, and one more
    thing every author scans past.
 
+A Node kind's registry function returns a `Disposable`, and its `ctx` member passes that to `onUndo`
+in `server/pluginHost/context.ts`, so teardown takes it back with everything else.
+`server/pluginHost/teardown.test.ts` fails until the new member has a probe there.
+
 ## Related
 
 - [Extensibility](./extensibility.md): why two tiers, and where the line is.

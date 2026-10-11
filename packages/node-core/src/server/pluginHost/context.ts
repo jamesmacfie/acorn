@@ -4,7 +4,8 @@
 //
 // This function knows nothing about lifecycle. Ordering, containment, the ready pass, the roster and
 // the rollback of everything registered here all stay in host.ts, because they are decisions about a
-// set of plugins and this is one plugin's surface.
+// set of plugins and this is one plugin's surface. What it does own is the undo: every registration
+// below hands its disposer to `onUndo`, so teardown is one list (host.ts § clearRegistrations).
 import type { CompiledCoreServices, CoreServices } from '../core'
 import type { Env } from '../bindings'
 import type { NodePermissions, PluginAgentToolDescriptor, PluginAuditActionDescriptor, PluginCommandDescriptor, PluginContextSectionDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginCustomAgentDescriptor, PluginFrameSurface, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
@@ -122,11 +123,10 @@ export type PluginContextOptions = {
   // handle outlives the data-root lock release. The caller already keeps a loaded plugin away from its
   // own `migrationsModule`, so one source of truth is enough.
   storage?: PluginStorage
-  // Where an undo goes for a registration `clearRegistrations` cannot reach on its own. The WS hub's two
-  // slots are module singletons with no duplicate guard, and a schedule lives in the composition root's
-  // scheduler rather than in a module registry. For both, the host records the undo per plugin and takes
-  // it back on re-init or on a contained failure. A caller that passes nothing keeps no undo record.
-  onUndo?: (undo: () => void) => void
+  // Where every registration's undo goes. The host keeps them per plugin and runs them newest first on
+  // re-init, reload, a contained failure or shutdown. Required, because a context with nowhere to put
+  // an undo leaves registrations behind that nothing can take back.
+  onUndo: (undo: () => void) => void
   // The candidate registration set (server/pluginHost/host.ts § reload). When present, every registration
   // this context hands the plugin is buffered here as a thunk instead of reaching the module-singleton
   // registries, and the host replays it once it decides to commit.
@@ -156,16 +156,32 @@ export function revokePluginContext(ctx: NodePluginContext): void {
  * every sink would be filed under `core` and Settings could not say which plugin is reading the
  * stream. Absent for a plugin whose manifest never asked for the token, and absent means absent:
  * the whole point of gating by omission is that an ungranted facet is not there to call.
+ *
+ * A sink is a closure over the plugin instance, and the collector holds it on a timer, so its undo is
+ * recorded like any other registration's.
  */
-const withOwnedTelemetry = <T extends CoreServices>(core: T, plugin: string): T =>
-  core.telemetry ? { ...core, telemetry: telemetryServiceFor(plugin) } : core
+const withOwnedTelemetry = <T extends CoreServices>(core: T, plugin: string, recordUndo: (undo: () => void) => void): T => {
+  if (!core.telemetry) return core
+  const owned = telemetryServiceFor(plugin)
+  return {
+    ...core,
+    telemetry: {
+      enabled: owned.enabled,
+      onBatch: (sink) => {
+        const handle = owned.onBatch(sink)
+        recordUndo(handle.dispose)
+        return handle
+      },
+    },
+  }
+}
 
 export function buildPluginContext(options: PluginContextOptions): HostPluginContext {
   const plugin = options.plugin
   // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from disk.
   // Everything below that differs between the two tiers keys off this one value.
   const permissions = options.loaded?.permissions
-  const recordUndo = options.onUndo ?? (() => {})
+  const recordUndo = options.onUndo
   const pending = options.pending
   // A loaded plugin files into a disclosed node point only if its manifest named it, which is what put
   // the grant in front of the owner (@acorn/protocol/extensionPoints.ts § DISCLOSED_NODE_POINTS).
@@ -183,12 +199,12 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       // throwing stub, so the failure is the immediate "not a function" an author can act on.
       register: permissions
         ? (undefined as never)
-        : (router, opts) => registerRoute({ plugin, prefix: opts?.prefix ?? '', router, note: opts?.note }),
-      fetch: (handler, opts) => registerRoute({ plugin, prefix: opts?.prefix ?? '', fetch: handler, note: opts?.note }),
+        : (router, opts) => recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', router, note: opts?.note }).dispose),
+      fetch: (handler, opts) => recordUndo(registerRoute({ plugin, prefix: opts?.prefix ?? '', fetch: handler, note: opts?.note }).dispose),
     },
     // The owner is bound here, not passed by the plugin: a plugin cannot contribute a tool under another
     // plugin's name, and cannot remove another plugin's tools.
-    tools: { register: (tool) => registerAgentTool(plugin, tool) },
+    tools: { register: (tool) => recordUndo(registerAgentTool(plugin, tool).dispose) },
     // The scheduler resolves through the capability registry at call time rather than being threaded in:
     // the composition root builds it and owns its start and stop, and a context built before it exists
     // must still work.
@@ -243,8 +259,8 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         await authorizeQueryScope(options.env, scope, invocation)
         queryStore(options.env.DB).setConsumer(scope, queryId, { ...consumer, pluginId: plugin }, remove)
       },
-      register: (source) => registerDataSource(plugin, source, { loaded: !!permissions }),
-      discover: (discovery) => registerDataSourceDiscovery(plugin, discovery),
+      register: (source) => recordUndo(registerDataSource(plugin, source, { loaded: !!permissions }).dispose),
+      discover: (discovery) => recordUndo(registerDataSourceDiscovery(plugin, discovery).dispose),
       invoke: (request, invocation) => {
         if (!options.env) throw new Error('Source invocation requires host bindings')
         // Loaded code may invoke its own sources here. It reads another plugin's source only as a
@@ -269,21 +285,21 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // accepted at that moment. Filing one under a stranger's name borrows that plugin's reputation for
     // your own route.
     nodeActions: {
-      register: (action) => registerNodeAction({ ...action, pluginId: plugin }),
+      register: (action) => recordUndo(registerNodeAction({ ...action, pluginId: plugin }).dispose),
     },
     // Owner-bound like the three above, and the provenance the dialog draws: every concern this check
     // answers with renders beside the plugin's name.
     taskChecks: {
-      register: (check) => registerTaskCheck({ ...check, pluginId: plugin }),
+      register: (check) => recordUndo(registerTaskCheck({ ...check, pluginId: plugin }).dispose),
     },
     // Owner-bound like task checks, and compiled only (./types.ts § CompiledNodePluginContext).
     search: permissions
       ? (undefined as never)
-      : { register: (provider) => registerSearchProvider({ ...provider, pluginId: plugin }) },
+      : { register: (provider) => recordUndo(registerSearchProvider({ ...provider, pluginId: plugin }).dispose) },
     // Owner-bound like the rest: a plugin lists its own runs and cannot register a pointer at someone
     // else's route (../runs/registry.ts). The route is re-confined on every read.
     runs: {
-      register: (source) => registerRunSource({ ...source, pluginId: plugin }),
+      register: (source) => recordUndo(registerRunSource({ ...source, pluginId: plugin }).dispose),
     },
     // Owner-bound like the four above, and here the binding is the id itself: a harness id is persisted
     // into session rows and workflow steps, so minting it from `plugin` keeps one package's sessions out
@@ -373,7 +389,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // the plugin id so "which package wrote this" is answerable even though the qualified verb already
     // says so.
     audit: {
-      declare: (action) => declareAuditAction(plugin, action),
+      declare: (action) => recordUndo(declareAuditAction(plugin, action).dispose),
       record: (action, entry) => {
         if (!options.env) return // no host bindings — a context-shape unit test, with no table to write to
         recordAudit(options.env.DB, {
@@ -386,28 +402,31 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     },
     // asContextSection drops core's database handle rather than leaving it unused: core's own `issues`
     // section keeps it, a plugin-registered one can never see it, and neither side has to remember.
-    contextSections: { register: (section) => registerContextSection(plugin, asContextSection(section)) },
+    contextSections: { register: (section) => recordUndo(registerContextSection(plugin, asContextSection(section)).dispose) },
     // Owner-bound like routes and tools: a plugin cannot contribute a provider under another plugin's
     // name, and so cannot have its contributions cleared by another plugin's re-init.
     providers: {
+      // Three registrations, three undos, taken back newest first so the route goes before its provider.
       integration: (provider, route) => {
-        connectionProviderRegistry.register(provider, plugin)
-        integrationProviderRegistry.register(provider, plugin)
+        recordUndo(connectionProviderRegistry.register(provider, plugin).dispose)
+        recordUndo(integrationProviderRegistry.register(provider, plugin).dispose)
         if (!route) return
         if (permissions && typeof route !== 'function') {
           throw new Error(`Plugin '${plugin}' passed a Hono router to providers.integration; loaded plugins must pass a fetch handler.`)
         }
-        integrationProviderRegistry.registerRoute({
+        recordUndo(integrationProviderRegistry.registerRoute({
           providerId: provider.id,
           prefix: '',
           ...(typeof route === 'function'
             ? { fetch: route as PluginFetchHandler }
             : { router: route }),
-        })
+        }).dispose)
       },
-      connection: (provider) => connectionProviderRegistry.register(provider, plugin),
-      model: (adapter) => modelProviderRegistry.register(adapter, plugin),
-      nodes: (provider) => registerNodeProvider(plugin, provider),
+      connection: (provider) => recordUndo(connectionProviderRegistry.register(provider, plugin).dispose),
+      model: (adapter) => recordUndo(modelProviderRegistry.register(adapter, plugin).dispose),
+      // A node provider holds a closure over this plugin's context and, for a cloud one, its credential
+      // scope, so a survivor would keep listing nodes through an instance whose dispose already ran.
+      nodes: (provider) => recordUndo(registerNodeProvider(plugin, provider).dispose),
       withConnection: async (userId, providerId, visit) => {
         if (!options.env) throw new Error(`Plugin '${plugin}' requested a provider credential without host bindings.`)
         let visited = false
@@ -436,7 +455,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // The read facet is bound to this plugin too, wherever it is present: a sink registered through
     // it is filed under the plugin's id, so Settings can say who is reading the stream and a
     // rollback can drop this plugin's subscriptions (../core/telemetry.ts).
-    core: withOwnedTelemetry(permissions ? scopeCore(options.core, permissions, plugin) : options.core, plugin) as CompiledCoreServices,
+    core: withOwnedTelemetry(permissions ? scopeCore(options.core, permissions, plugin) : options.core, plugin, recordUndo) as CompiledCoreServices,
     // Owner-bound like every registration above, and here the binding is the whole feature: a record
     // this plugin emits says `owner: <plugin>` because the host closed over the id, not because the
     // plugin passed one. An `owner` attribute set by the emitter is dropped by the collector for the

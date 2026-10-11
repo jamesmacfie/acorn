@@ -1,5 +1,6 @@
 import { runsResponseSchema, type RunRow } from '@acorn/protocol/runs.ts'
 import type { Env } from '../bindings'
+import type { Disposable } from '../pluginHost/capabilities'
 import { dispatchPluginRoute } from '../pluginHost/dispatch'
 import { createLogger, describeError } from '../telemetry/logger'
 
@@ -25,15 +26,16 @@ export type RunSource = {
 export type RunSourceRegistration = Omit<RunSource, 'pluginId'>
 
 // A module singleton, like the route, source and node-action registries beside it, with the same
-// lifecycle answer: the host clears a plugin's entries before re-registering them.
+// lifecycle answer: each registration hands back its own undo, and the plugin host runs it on teardown.
 const sources = new Map<string, RunSource>()
 
-export function registerRunSource(source: RunSource): void {
+export function registerRunSource(source: RunSource): Disposable {
   const clash = sources.get(source.pluginId)
   if (clash && clash.runs !== source.runs) {
     throw new Error(`Duplicate run source for '${source.pluginId}': already registered for ${clash.runs}, now for ${source.runs}.`)
   }
   sources.set(source.pluginId, source)
+  return { dispose: () => { if (sources.get(source.pluginId) === source) sources.delete(source.pluginId) } }
 }
 
 export function clearRunSources(pluginId: string): void {

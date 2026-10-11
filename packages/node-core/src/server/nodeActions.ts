@@ -1,6 +1,7 @@
 import type { ToolRisk } from '@acorn/protocol/api.ts'
 import { dispatchPluginRoute } from './pluginHost/dispatch'
 import type { Env } from './bindings'
+import type { Disposable } from './pluginHost/capabilities'
 
 // Work a plugin will do when something asks, with no client attached and no request in sight, and the
 // registry that makes it askable.
@@ -46,20 +47,17 @@ export const riskOf = (action: Pick<NodeAction, 'risk'>): ToolRisk => action.ris
 const key = (pluginId: string, actionId: string): string => `${pluginId}:${actionId}`
 
 // A module singleton, like the route and source registries beside it, with the same lifecycle
-// answer: the plugin host clears a plugin's entries before re-registering them.
+// answer: each registration hands back its own undo, and the plugin host runs it on teardown.
 const actions = new Map<string, NodeAction>()
 
-export function registerNodeAction(action: NodeAction): void {
+export function registerNodeAction(action: NodeAction): Disposable {
   const id = key(action.pluginId, action.actionId)
   const clash = actions.get(id)
   if (clash && clash.path !== action.path) {
     throw new Error(`Duplicate node action '${id}': already registered for ${clash.path}, now for ${action.path}.`)
   }
   actions.set(id, action)
-}
-
-export function clearNodeActions(pluginId: string): void {
-  for (const [id, action] of actions) if (action.pluginId === pluginId) actions.delete(id)
+  return { dispose: () => { if (actions.get(id) === action) actions.delete(id) } }
 }
 
 export const nodeAction = (pluginId: string, actionId: string): NodeAction | undefined =>

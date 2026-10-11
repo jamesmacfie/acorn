@@ -8,29 +8,13 @@
 import type { Env } from '../bindings'
 import type { CompiledCoreServices } from '../core'
 import { builtinPluginStorage, type PluginDatabase } from '../plugins/storage'
-import { removeAgentTools } from '../agentTools/registry'
-import { removeContextSections } from '../agentTools/contextSections'
-import { removePluginRoutes } from '../routes/registry'
-import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
-import { integrationProviderRegistry } from '../integrations/registry'
-import { modelProviderRegistry } from '../modelProviders/registry'
 import type { CapabilityRegistry } from './capabilities'
 import { buildPluginContext, revokePluginContext, type LoadedPluginBinding } from './context'
-import { clearDataSources } from '../dataSources/registry'
-import { clearNodeActions } from '../nodeActions'
-import { clearNodeProviders } from '../nodeProviders/registry'
-import { clearRunSources } from '../runs/registry'
-import { clearExtensionPoints } from './extensionPoints'
-import { clearAuditActions } from '../audit'
 import { disposeUnstartedPlugin } from '../plugins/isolation'
-import { clearHooks } from './hooks'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
-import { clearTaskChecks } from './taskChecks'
-import { clearSearchProviders } from './search'
 import { declareEmits } from './emits'
 import type { HostPluginContext, NodePlugin, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
-import { clearTelemetrySinks } from '../telemetry/collector'
 import { registerManifestRuntimeContributions } from './runtimeContributions'
 import { registerManifestSchedules, registerManifestTaskChecks, registerManifestHooks } from './manifestWork'
 import { registerManifestHarnesses, registerManifestCustomAgents } from './manifestAgents'
@@ -39,9 +23,18 @@ import { registerManifestDataSources, registerManifestNodeActions, registerManif
 // One logger per plugin, minted where the name is known, so a line still reads `[plugin:<id>] …`.
 const pluginLog = (name: string) => createLogger(`plugin:${name}`, name)
 
-// Undos for what `clearRegistrations` can't reach on its own: the WS hub's two slots, which are module
-// singletons with no duplicate guard, and schedules, which live in the composition root's scheduler.
+// Every registration a plugin made through its context, as undos in registration order, keyed by plugin
+// name. Module-level like the registries they undo, so a second boot in one process can take back what
+// the first left behind. buildPluginContext records into it through `onUndo`.
 const undoRegistrations = new Map<string, (() => void)[]>()
+
+/** Keep one registration's undo until the plugin is torn down. The `onUndo` the host hands
+ *  buildPluginContext, exported for the testkit's context, which has to land in the same list. */
+export function recordRegistrationUndo(name: string, undo: () => void): void {
+  const undos = undoRegistrations.get(name)
+  if (undos) undos.push(undo)
+  else undoRegistrations.set(name, [undo])
+}
 
 // Re-exported so the loader and the composition root can import it from here. The context shape it
 // feeds lives in context.ts.
@@ -241,13 +234,13 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         env: options.env,
         loaded,
         ...(storage ? { storage } : {}),
-        onUndo: (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]),
+        onUndo: (undo) => recordRegistrationUndo(plugin.name, undo),
       })
       // Add the context before the first registration: any later adapter may throw after an earlier
       // descriptor registered, and the catch below must take that partial manifest back.
       running.push({ plugin, ctx, loaded })
       try {
-        registerEmits(plugin, loaded, (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]))
+        registerEmits(plugin, loaded, (undo) => recordRegistrationUndo(plugin.name, undo))
         registerManifestSchedules(ctx, plugin.name, loaded, requireEnv)
         registerManifestTaskChecks(ctx, plugin.name, loaded, requireEnv)
         registerManifestHooks(ctx, plugin.name, loaded, requireEnv)
@@ -480,8 +473,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       candidateStage = 'ready'
       await next.plugin.ready?.(candidateCtx)
     } catch (error) {
-      // Nothing to roll back. The buffer was never replayed, so the previous instance is still serving,
-      // and the candidate's database handle is the only thing it opened.
+      // The buffer was never replayed, so the previous instance is still serving. What the candidate did
+      // take is what never buffers: its event subscriptions and telemetry sinks, which are the only undos
+      // recorded so far, and its database handle.
+      for (const undo of candidateUndos.reverse()) undo()
       try {
         await next.plugin.dispose?.()
       } catch {
@@ -528,7 +523,8 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // validate-only pass in six registries.
       const message = error instanceof Error ? error.message : String(error)
       pluginLog(name).error(`reload could not register the new instance's contributions: ${describeError(error).message}`)
-      clearRegistrations(name)
+      // Every replayed registration recorded its undo here as it landed, so this takes back exactly the
+      // part that got in.
       for (const undo of candidateUndos.reverse()) undo()
       try {
         await next.plugin.dispose?.()
@@ -547,10 +543,11 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       return { ok: false, error: message, retained: false }
     }
 
-    // The committed instance's undos become the host's, or the next reload's clearRegistrations has
-    // nothing to take back and the scheduler refuses its own plugin's key as a duplicate.
-    // `clearRegistrations` above already dropped the previous instance's entry, so this is a set.
-    if (candidateUndos.length) undoRegistrations.set(name, [...candidateUndos])
+    // The committed instance's undos become the host's, or the next reload or shutdown has nothing to
+    // take back. The same array rather than a copy, because the committed context keeps recording into
+    // it, such as an `events.on` made long after init. `clearRegistrations` above already dropped the
+    // previous instance's entry, so this is a set.
+    undoRegistrations.set(name, candidateUndos)
 
     const index = started.findIndex((plugin) => plugin.name === name)
     if (index >= 0) started[index] = next.plugin
@@ -572,50 +569,26 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   return { enabled, skipped, failed, roster, reload, dispose: () => disposeStarted(started, closeStorage, contexts) }
 }
 
-// Everything one plugin contributed to the module-singleton registries, undone.
+// Everything one plugin registered through its context, undone newest first, so a route goes before the
+// provider it serves and a model adapter before the connection provider it was validated against.
 //
-// Called on two paths. At boot it is idempotency: a second startServiceRuntime in one process must
+// Called on three paths. At boot it is idempotency: a second startServiceRuntime in one process must
 // replace a plugin's contributions rather than append copies bound to the first boot's closed database.
-// On a contained failure it is the rollback.
+// On a contained failure or a reload it is the rollback, and at shutdown it follows each dispose.
 //
 // Exported for tests too: a test that inits a plugin against a real context leaves the same
 // registrations in the same process-wide registries, and its cleanup() calls this.
 export function clearRegistrations(name: string): void {
-  removePluginRoutes(name)
-  // A sink is a closure over the instance being rolled back, and the collector holds it by
-  // reference on a timer, so a survivor would keep feeding a disposed plugin every record this node
-  // collects (../telemetry/collector.ts).
-  clearTelemetrySinks(name)
-  // The WS hub's two module-singleton slots have no duplicate guard, so a stale handler closed over a
-  // disposed engine keeps claiming the prefix silently.
-  for (const undo of [...(undoRegistrations.get(name) ?? [])].reverse()) undo()
+  const undos = undoRegistrations.get(name) ?? []
   undoRegistrations.delete(name)
-  removeAgentTools(name)
-  clearDataSources(name)
-  clearNodeActions(name)
-  // A run source is a pointer at a route this call just removed, same as a data-source read.
-  clearRunSources(name)
-  // The declarations go; the rows they describe stay. A verb whose plugin is gone renders as its raw
-  // qualified string in the settings list, which is the honest answer — the row is still evidence of
-  // something that happened.
-  clearAuditActions(name)
-  // Both halves of the node's many-to-many seam: the points this plugin opened and the entries it
-  // filed into other plugins' points (./extensionPoints.ts).
-  clearExtensionPoints(name)
-  clearHooks(name)
-  // A task check is a live closure over this plugin's context, asked at archive time, long after a
-  // re-init has replaced the instance behind it.
-  clearTaskChecks(name)
-  clearSearchProviders(name)
-  removeContextSections(name)
-  // Model adapters first: an adapter is validated against a registered connection provider, so removing
-  // the provider first strands it.
-  modelProviderRegistry.removeForPlugin(name)
-  integrationProviderRegistry.removeForPlugin(name)
-  connectionProviderRegistry.removeForPlugin(name)
-  // A node provider holds a closure over this plugin's context and, for a cloud one, its credential
-  // scope. A survivor would keep listing nodes through an instance whose dispose has already run.
-  clearNodeProviders(name)
+  for (const undo of undos.reverse()) {
+    try {
+      undo()
+    } catch (error) {
+      // One undo failing must not strand the rest, or the survivors keep serving a retired instance.
+      pluginLog(name).warn(`undoing a registration failed: ${describeError(error).message}`)
+    }
+  }
 }
 
 // Reverse order, because a later plugin may depend on an earlier one's resources. Never rejects: one
