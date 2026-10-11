@@ -5,14 +5,18 @@ import type { Commit, HistoryFilter, HistoryPage } from '../shared/api'
 import { historyKey, historyOptions } from './historyClient'
 import { createGitViewSignal } from './viewState'
 
-export function createHistoryModel(projectId: Accessor<string>, initialRef: Accessor<string | null>, owner: Accessor<string | null> = () => null) {
+export function createHistoryModel(projectId: Accessor<string>, initialRef: Accessor<string | null>, owner: Accessor<string | null> = () => null,
+  shown: Accessor<boolean> = () => true) {
   const client = useQueryClient()
   const state = <T,>(name: string, initial: Accessor<T>) => createGitViewSignal(projectId, () => `history:${initialRef()}:${name}`, initial, owner)
   const [ref, setRef] = state<string | null>('ref', initialRef)
   const [field, setField] = state<HistoryFilter['field']>('field', () => 'message')
   const [query, setQuery] = state('query', () => '')
   const filter = createMemo<HistoryFilter>(() => ({ ref: ref(), field: field(), query: query().trim() }))
-  const first = createQuery(() => historyOptions(projectId(), filter()))
+  const first = createQuery(() => {
+    const options = historyOptions(projectId(), filter())
+    return { ...options, enabled: options.enabled && shown() }
+  })
   const pageKey = () => `history:${initialRef()}:pages:${JSON.stringify(filter())}`
   const [extra, setExtra] = createGitViewSignal<HistoryPage[]>(projectId, pageKey, () => [], owner)
   const [dropped, setDropped] = createGitViewSignal(projectId, () => `${pageKey()}:dropped`, () => false, owner)
