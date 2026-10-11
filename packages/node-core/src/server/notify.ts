@@ -174,8 +174,8 @@ export function broadcastAgentSessionChanged(event: AgentSessionChangedEvent): v
   wsBroadcast({ channel: 'agent-session:changed', ...event })
 }
 
-// A project row or its config moved (docs/api-reference/websocket.md § WebSocket). Preview reads browser
-// rules and the preview mode, terminal reads run targets, and changes reads the branch prefix.
+// A project row or its config moved (docs/api-reference/websocket.md § WebSocket). Preview reads its URL
+// mode, terminal reads run targets, and changes reads the branch prefix.
 export function broadcastProjectChanged(event: ProjectChangedEvent): void {
   wsBroadcast({ channel: 'project:changed', ...event })
 }

@@ -56,7 +56,6 @@ const CONFIG: ProjectConfigResponse['config'] = {
   dbSchemaNotes: null,
   previewMode: null,
   previewValue: null,
-  browserRules: [],
   branchPrefix: null,
 }
 const context: SettingsPageContext = {

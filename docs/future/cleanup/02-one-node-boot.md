@@ -115,8 +115,8 @@ differ, and each difference is a named option or a step the entry adds.
    | Telemetry release | The app version on both. Fall back to the protocol version only when there's no app version. |
    | Background or awaited reconcile | An option, because the standalone handshake waits for it on purpose. |
 
-3. Keep host-only work in the entries. The supervised entry keeps state reporting, installed-bytes
-   telemetry, and preview rules. The standalone entry keeps enrollment, the pairing banner, the
+3. Keep host-only work in the entries. The supervised entry keeps state reporting and installed-bytes
+   telemetry. The standalone entry keeps enrollment, the pairing banner, the
    handshake, and signal handling.
 4. Delete the duplicated sequence from both entries.
 5. Replace the parity test's step-name comparison with a test that boots through `bootNode()` with

@@ -135,7 +135,6 @@
       "memory.library",
       "notes.seedTask",
       "notes.store",
-      "preview.rules",
       "preview.urls",
       "terminal.route",
       "terminal.runRoute",
@@ -265,7 +264,6 @@
         "preview"
       ],
       "capabilities": [
-        "preview.rules",
         "preview.urls"
       ]
     },

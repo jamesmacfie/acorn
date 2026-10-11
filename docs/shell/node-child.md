@@ -56,7 +56,7 @@ graph and the same reconciliation and drain plan.
 ## Service protocol
 
 `packages/protocol/src/device/serviceProtocol.ts` defines the versioned lifecycle messages between the
-helper and its Node: `service.start`, `service.stop`, and `service.preview-rules`. Both ends validate
+helper and its Node: `service.start` and `service.stop`. Both ends validate
 messages with Zod, and pending calls reject on timeout or peer exit. Every method is one the helper
 calls on the Node, and the Node receives no window, webview, or shell object. Product requests use
 `/v1` over the broker.

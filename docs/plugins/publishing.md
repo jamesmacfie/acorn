@@ -30,7 +30,7 @@ bundler.
 The loaded-plugin promise covers the published SDK, the published declarations, and the manifest and
 runtime contract. A plugin tested against a supported major can declare it in its `apiVersion`
 range. A breaking removal or shape change needs a new major. Changes to the private facade alone
-don't. The npm package versions are independent of `PLUGIN_API_MAJOR`, which is `4`
+don't. The npm package versions are independent of `PLUGIN_API_MAJOR`, which is `5`
 (`packages/protocol/src/plugin/apiVersion.ts`).
 
 A manifest's `apiVersion` is a range over majors: `"3"`, `"2 || 3"`, or an inclusive span such as

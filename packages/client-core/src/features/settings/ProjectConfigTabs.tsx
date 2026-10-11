@@ -1,17 +1,15 @@
 import { createQuery } from '@tanstack/solid-query'
-import { createResource, createSignal, Index, Match, Show, Switch } from 'solid-js'
+import { createResource, Match, Show, Switch } from 'solid-js'
 import { taskBridge } from '../tasks/taskBridge'
 import { modelBackendsOptions } from '../../infra/queries'
 import type {
-  BrowserRule,
   DbSchemaMode,
   PreviewMode,
   ProjectConfigPatch,
   ProjectConfigResponse,
   SetupTrigger,
 } from '@acorn/protocol/api.ts'
-import { Button, Checkbox, Input, Select, Textarea } from '../../kit/components/primitives'
-import { IconButton } from '../../kit/components/inputs/IconButton'
+import { Input, Select, Textarea } from '../../kit/components/primitives'
 import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
@@ -226,18 +224,6 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
           </Match>
         </Switch>
       </SettingsSection>
-
-      <SettingsSection
-        id="page-rules"
-        label="Page rules"
-        description="Fills in a field when a preview page loads, such as a dev login. Values are saved as plain text, so use dev passwords only."
-        help="The pattern matches part of the URL. * matches anything, and $ at the end matches the end, so */$ matches only the home page."
-      >
-        <BrowserRulesEditor
-          rules={config(props.store)?.browserRules ?? []}
-          onSave={(rules) => props.store.save({ browserRules: rules })}
-        />
-      </SettingsSection>
     </>
   )
 }
@@ -394,94 +380,5 @@ function ConfigText(props: {
         )}
       </Show>
     </SettingRow>
-  )
-}
-
-// Preview-browser page rules: a row-per-rule editor over a repo's browserRules array, saved as a
-// whole array. A field saves on blur or Enter, a switch or a delete at once. A row missing a pattern
-// or selector is kept locally but not saved, so a half-typed rule never fails the route's validation.
-// The list here is what was typed, so a failed save keeps every rule on screen with the error beside
-// them.
-function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: BrowserRule[]) => Promise<unknown> }) {
-  const [rules, setRules] = createSignal<BrowserRule[]>(props.rules)
-  const saving = createSettingSave()
-
-  const save = () =>
-    void saving.run(() => props.onSave(rules().filter((r) => r.urlPattern.trim() && r.action.selector.trim())))
-
-  const update = (id: string, patch: (r: BrowserRule) => BrowserRule) =>
-    setRules((list) => list.map((r) => (r.id === id ? patch(r) : r)))
-  const add = () =>
-    setRules((list) => [
-      ...list,
-      {
-        id: crypto.randomUUID(),
-        enabled: true,
-        urlPattern: '',
-        trigger: 'load',
-        action: { type: 'fill', selector: '', value: '' },
-      },
-    ])
-  const remove = (id: string) => {
-    setRules((list) => list.filter((r) => r.id !== id))
-    save()
-  }
-
-  // The section is the editor's heading and says what it is for, so the rules sit straight in it.
-  return (
-    <>
-      {/* Index, not For: keying by position stops an edit remounting the row and defocusing it. */}
-      <Index each={rules()}>
-        {(rule) => (
-          <div class="integration-key-row">
-            <Checkbox
-              ariaLabel="Enabled"
-              title="Enabled"
-              checked={rule().enabled}
-              onChange={(checked) => {
-                update(rule().id, (r) => ({ ...r, enabled: checked }))
-                save()
-              }}
-            />
-            <Input
-              label="URL pattern"
-              title="URL pattern"
-              assist={false}
-              placeholder="localhost:3000/login"
-              value={rule().urlPattern}
-              onInput={(value) => update(rule().id, (r) => ({ ...r, urlPattern: value }))}
-              onChange={save}
-            />
-            <Input
-              label="CSS selector of the input to fill"
-              title="CSS selector of the input to fill"
-              assist={false}
-              placeholder="input[type=password]"
-              value={rule().action.selector}
-              onInput={(value) => update(rule().id, (r) => ({ ...r, action: { ...r.action, selector: value } }))}
-              onChange={save}
-            />
-            <Input
-              label="Text typed into the input"
-              title="Text typed into the input"
-              assist={false}
-              placeholder="value to type"
-              value={rule().action.value}
-              onInput={(value) => update(rule().id, (r) => ({ ...r, action: { ...r.action, value } }))}
-              onChange={save}
-            />
-            <IconButton icon="x" label="Delete rule" onPress={() => remove(rule().id)} />
-          </div>
-        )}
-      </Index>
-      <Show when={saving.error()}>
-        {(message) => (
-          <Text tone="danger" wrap>
-            {message()}
-          </Text>
-        )}
-      </Show>
-      <Button onPress={add}>Add rule</Button>
-    </>
   )
 }

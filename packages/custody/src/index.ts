@@ -1,10 +1,5 @@
 import { join } from 'node:path'
-import type {
-  PreviewBrowserRule,
-  ServiceStartConfig,
-  ServiceStartResult,
-  ServiceState,
-} from '@acorn/protocol/serviceProtocol.ts'
+import type { ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
 import { helperMark } from './bootMarks'
 import { trustBundledClientPlugins, trustsBundledClientPlugins } from './plugins/bundledPluginTrust'
 import { recordCrash } from './supervision/crashBudget'
@@ -93,8 +88,6 @@ export type Helper = {
   restartLocalNode(): Promise<void>
   // The owner's answer to the recovery screen: forgive the spent budget and try once more.
   retry(): Promise<void>
-  // Page rules for a task, as the preview pane needs them.
-  previewRules(taskId: string): Promise<PreviewBrowserRule[]>
   // The shell's answer to `requestFootprint`.
   footprint(sample: FootprintSample): void
   dispose(): Promise<void>
@@ -305,7 +298,6 @@ export function createHelper(options: HelperOptions): Helper {
       recovering = false
       await recover()
     },
-    previewRules: (taskId) => service.previewRules(taskId),
     footprint: (sample) => telemetry.footprint(sample),
     dispose: async () => {
       if (disposed) return

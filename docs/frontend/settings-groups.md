@@ -31,7 +31,7 @@ project's page (`features/settings/ProjectSettings.tsx`) has five tabs:
 - **Setup and scripts**: setup, its trigger, teardown, the dev script and restart command, and run
   targets. Run targets are a table with a small form under it (`features/settings/RunTargetsTable.tsx`),
   and the stored value is the JSON array the run-targets route checks.
-- **Preview**: the URL mode and page rules.
+- **Preview**: the URL mode and value.
 - **Database**: the connection script and the query-generation schema.
 - **Connections**: each connection's project map from this project's side
   (`features/settings/ConnectionProjectMap.tsx`), each linking to the connection's page.

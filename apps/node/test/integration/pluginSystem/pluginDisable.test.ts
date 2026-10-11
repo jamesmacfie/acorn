@@ -185,9 +185,6 @@ describe('disabling a node plugin', () => {
           .list()
           .map((a) => a.providerId)
           .sort(),
-        // The typed capability registry, which for some plugins is the whole contribution. `preview`
-        // provides its page rules here and registers nothing else, so without this key the
-        // anti-vacuity check below would call disabling it meaningless.
         capabilities: [...capabilities.ids()].sort(),
         // Proof the plugin actually opened its own file, which a stubbed init could not fake.
         databases: readdirSync(join(dataDir, 'plugins'), { withFileTypes: true })

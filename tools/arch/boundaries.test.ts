@@ -766,11 +766,8 @@ describe('architecture boundaries', () => {
       // `NoteLocation` addresses a task, workspace or global scope, which is core's own scheme.
       'notes.ts',
     ]
-    // Not in the baseline, because a baseline means "still to fix" and these aren't. All three are
-    // name collisions rather than dependencies: two with core vocabulary, and `browserRules.ts` with
-    // the `browser` plugin. Those rules are the preview pane's page-fill rules and belong to
-    // `preview`. Nothing in `plugins/browser` reads them.
-    const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts', 'contextTime.ts']
+    // These names use core vocabulary rather than naming plugin dependencies.
+    const NAME_COLLISIONS = ['agentContext.ts', 'contextMenus.ts', 'contextTime.ts']
     // Git is also core's VCS vocabulary. A `git` file name alone cannot imply plugin ownership.
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin' && p.name !== '@acorn/plugin-git').map((p) =>
       p.name.replace('@acorn/plugin-', ''),

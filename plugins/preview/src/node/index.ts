@@ -1,10 +1,8 @@
-// Node-owned page rules and preview home URL resolution. The shell owns the native webview;
+// Node-owned preview home URL resolution. The shell owns the native webview;
 // this plugin exposes capabilities, routes, and invalidation events through the plugin API.
 import type { NodePlugin, PluginFetchHandler } from '@acorn/plugin-api/node'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { PREVIEW_RULES } from '../contract/rules'
 import { PREVIEW_URLS } from '../contract/urls'
-import { previewRulesForTask } from '../server/previewRules'
 import { createPreviewUrlRuntime, type PreviewUrlRuntime } from '../server/previewUrls'
 
 export const previewPlugin = (): NodePlugin => {
@@ -16,7 +14,6 @@ export const previewPlugin = (): NodePlugin => {
     emits: [{ verb: 'url-changed', description: 'A task’s resolved preview home URL changed' }],
     init: (ctx) => {
       urls = createPreviewUrlRuntime(ctx.core, () => ctx.capabilities.get(TERMINAL_RUN_TARGETS), ctx.events.send)
-      ctx.capabilities.provide(PREVIEW_RULES, { forTask: (taskId) => previewRulesForTask(ctx.core, taskId) })
       ctx.capabilities.provide(PREVIEW_URLS, { forTask: (taskId) => urls!.forTask(taskId) })
 
       const serveUrl: PluginFetchHandler = async (request, context) => {

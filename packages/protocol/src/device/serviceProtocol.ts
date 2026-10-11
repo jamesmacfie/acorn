@@ -84,22 +84,9 @@ export const serviceStartResultSchema = z.strictObject({
 })
 export type ServiceStartResult = z.infer<typeof serviceStartResultSchema>
 
-export const previewBrowserRuleSchema = z.strictObject({
-  id: z.string(),
-  enabled: z.boolean(),
-  urlPattern: z.string(),
-  trigger: z.literal('load'),
-  action: z.strictObject({
-    type: z.literal('fill'),
-    selector: z.string(),
-    value: z.string(),
-  }),
-})
-export type PreviewBrowserRule = z.infer<typeof previewBrowserRuleSchema>
-
 // The peer is symmetric, but every method here is one the shell calls on the service. Nothing on the
 // node side calls back the other way (docs/shell/node-child.md § Service protocol).
-export const serviceRpcMethods = ['service.start', 'service.stop', 'service.preview-rules'] as const
+export const serviceRpcMethods = ['service.start', 'service.stop'] as const
 export const serviceRpcMethodSchema = z.enum(serviceRpcMethods)
 export type ServiceRpcMethod = z.infer<typeof serviceRpcMethodSchema>
 

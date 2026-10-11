@@ -65,7 +65,6 @@ export default function ProjectSettings(props: { project: Project; context: Sett
       <Stack gap="section">{children()}</Stack>
     </TabPanel>
   )
-  // The config tabs wait for the first read, because the page-rules editor takes its list once.
   const loaded = (children: () => JSX.Element) => (
     <Show
       when={store.response()}

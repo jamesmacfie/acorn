@@ -267,13 +267,12 @@ it('names every capability the first-party plugins publish', () => {
     'memory.library',
     'browser.captures',
     'github.mirror',
-    'preview.rules',
     'preview.urls',
     'workflows.runner',
     'workflows.gates',
     'workflows.notices',
   ]
-  expect(new Set(ids).size).toBe(26)
+  expect(new Set(ids).size).toBe(25)
 })
 
 it('keeps every published declaration module free of runtime statements', () => {

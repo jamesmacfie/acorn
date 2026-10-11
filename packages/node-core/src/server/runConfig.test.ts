@@ -176,15 +176,6 @@ value = "https://app.test"
     expect(cfg.errors).toEqual([])
     expect(cfg.dbUrlScript).toBe('bin/print-db-url')
     expect(cfg.preview).toEqual({ mode: 'url', value: 'https://app.test' })
-    // browserRules is DB-only, with no toml layer, so it passes through untouched.
-    const rule = {
-      id: 'r1',
-      enabled: true,
-      urlPattern: 'localhost/login',
-      trigger: 'load' as const,
-      action: { type: 'fill' as const, selector: '#u', value: 'dev' },
-    }
-    expect(loadRepoConfig(repoDir, userDir, { browserRules: [rule] }).browserRules).toEqual([rule])
   })
 
   it('dbUrlFromRepo reports url_script provenance — it decides whether the trust gate applies', () => {

@@ -100,8 +100,6 @@ export type CapabilityCatalogue = {
   'browser.captures': HostOwned<'plugins/browser/contract/captures.BrowserCapturesCapability'>
   /** The mirrored GitHub read model for a project. */
   'github.mirror': HostOwned<'plugins/github/contract/mirror.GithubMirrorCapability'>
-  /** The page rules that decide what a task's preview pane shows. */
-  'preview.rules': HostOwned<'plugins/preview/contract/rules.PreviewRulesCapability'>
   /** Read the node-owned preview home selected from recipe, run target, or project config. */
   'preview.urls': HostOwned<'plugins/preview/contract/urls.PreviewUrlsCapability'>
   /** Ask the workflow runner to reconcile after a restart. */

@@ -110,7 +110,6 @@ const projectDetail: SearchDeclaration = {
       label: 'Browser preview',
       rows: ['Browser preview URL', 'Preview script', 'Preview URL', 'Preview port'],
     },
-    { id: 'page-rules', label: 'Page rules', keywords: ['autofill login'] },
     {
       id: 'db-connection',
       label: 'Connection',

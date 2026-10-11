@@ -1,8 +1,6 @@
 import { z } from 'zod'
 import { normalizeBranchPrefix } from '@acorn/protocol/branch.ts'
-import { isValidBrowserRule, parseBrowserRules } from '@acorn/protocol/browserRules.ts'
 import type {
-  BrowserRule,
   DbSchemaMode,
   PreviewMode,
   ProjectConfigPatch,
@@ -46,7 +44,6 @@ export function projectConfigFromRow(row: typeof schema.projects.$inferSelect): 
       dbSchemaNotes: row.dbSchemaNotes,
       previewMode: (row.previewMode as PreviewMode | null) ?? null,
       previewValue: row.previewValue,
-      browserRules: parseBrowserRules(row.browserRules),
       branchPrefix: row.branchPrefix,
     },
   }
@@ -113,11 +110,6 @@ export async function setProjectConfig(
   }
 
   if (patch.branchPrefix !== undefined) set.branchPrefix = normalizeBranchPrefix(patch.branchPrefix) || null
-  if (patch.browserRules !== undefined) {
-    const rules: BrowserRule[] = patch.browserRules.filter(isValidBrowserRule)
-    set.browserRules = rules.length ? JSON.stringify(rules) : null
-  }
-
   if (Object.keys(set).length) {
     await db
       .update(schema.projects)

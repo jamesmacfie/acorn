@@ -37,21 +37,10 @@ describe('service process RPC', () => {
     // the transport, and this is the test that keeps it true in both directions. Every shipping
     // method runs shell -> service, so the return leg here borrows one of their names.
     main.register('service.stop', (payload) => `https://${String((payload as { taskId: unknown }).taskId)}.test`)
-    service.register('service.preview-rules', async (payload) => {
-      const taskId = (payload as { taskId: unknown }).taskId
-      return [
-        {
-          id: String(taskId),
-          enabled: true,
-          urlPattern: '*',
-          trigger: 'load',
-          action: { type: 'fill', selector: '#q', value: 'x' },
-        },
-      ]
-    })
+    service.register('service.start', () => ({ state: 'listening' }))
 
     await expect(service.request('service.stop', { taskId: 'task-1' })).resolves.toBe('https://task-1.test')
-    await expect(main.request<unknown[]>('service.preview-rules', { taskId: 'task-1' })).resolves.toHaveLength(1)
+    await expect(main.request('service.start', {})).resolves.toEqual({ state: 'listening' })
     main.close()
     service.close()
   })

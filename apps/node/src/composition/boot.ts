@@ -104,7 +104,7 @@ function bootTimer(): (label: string) => void {
 
 // The one boot sequence both Node hosts run (docs/node-distribution.md § Runtime). It takes no native
 // surface, so importing this module in a plain Node test loads no shell. Each host adds only its own
-// work around it: state reporting and preview rules for the supervised Node, enrollment, the pairing
+// work around it: state reporting for the supervised Node, enrollment, the pairing
 // banner, the handshake, and signals for the standalone one.
 export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
   const { root } = options

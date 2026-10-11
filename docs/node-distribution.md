@@ -24,8 +24,8 @@ drain. Each difference is a named option. The supervised Node passes the app ver
 desktop delivered, the start config's disabled-plugin override, and the staged MCP entry, and a packaged
 app turns on the login-shell `PATH` probe. The standalone Node passes none of these. Its telemetry
 release is the protocol version, because it has no app version. Work only one host does stays in its
-entry: `runtime.ts` reports service states, the installed-bytes report, and preview rules, and
-`standalone.ts` handles enrollment, the pairing banner, the handshake, and signals.
+entry: `runtime.ts` reports service states and installed bytes, and `standalone.ts` handles
+enrollment, the pairing banner, the handshake, and signals.
 
 After the handshake it prints a pairing banner: the address, the certificate fingerprint as six words,
 and a live pairing code. Compare those words with the ones acorn shows on its pairing screen, because

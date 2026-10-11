@@ -1,12 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { z } from 'zod'
 import {
   ServiceRpcPeer,
-  previewBrowserRuleSchema,
   serviceStartConfigSchema,
   serviceStartResultSchema,
   serviceStateEventSchema,
-  type PreviewBrowserRule,
   type ServiceMessage,
   type ServiceMessageTransport,
   type NodeKeys,
@@ -142,13 +139,6 @@ export class ServiceHost {
     // Parsed, not cast. A malformed handoff would otherwise surface much later as an unreachable node
     // with no explanation.
     return serviceStartResultSchema.parse(result)
-  }
-
-  async previewRules(taskId: string): Promise<PreviewBrowserRule[]> {
-    const peer = this.peer
-    if (!peer) return []
-    const value = await peer.request('service.preview-rules', { taskId })
-    return z.array(previewBrowserRuleSchema).parse(value)
   }
 
   async stop(): Promise<void> {

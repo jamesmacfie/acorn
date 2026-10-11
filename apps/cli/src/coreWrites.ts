@@ -41,7 +41,6 @@ const configKeys = new Set([
   'dbSchemaNotes',
   'previewMode',
   'previewValue',
-  'browserRules',
   'branchPrefix',
 ])
 const stringKeys = new Set([
@@ -72,27 +71,6 @@ function configPatch(value: unknown): Record<string, unknown> {
       throw new CliError('invalid_input', 'dbSchemaNotes exceeds 8000 characters.', 2)
     if (key === 'branchPrefix' && (input as string).length > 60)
       throw new CliError('invalid_input', 'branchPrefix exceeds 60 characters.', 2)
-    if (key === 'browserRules') {
-      if (
-        !Array.isArray(input) ||
-        !input.every(
-          (rule) =>
-            isObject(rule) &&
-            Object.keys(rule).every((field) => ['id', 'enabled', 'urlPattern', 'trigger', 'action'].includes(field)) &&
-            typeof rule.id === 'string' &&
-            typeof rule.enabled === 'boolean' &&
-            typeof rule.urlPattern === 'string' &&
-            rule.trigger === 'load' &&
-            isObject(rule.action) &&
-            Object.keys(rule.action).every((field) => ['type', 'selector', 'value'].includes(field)) &&
-            rule.action.type === 'fill' &&
-            typeof rule.action.selector === 'string' &&
-            typeof rule.action.value === 'string',
-        )
-      ) {
-        throw new CliError('invalid_input', 'browserRules must match the project configuration rule schema.', 2)
-      }
-    }
   }
   return value
 }

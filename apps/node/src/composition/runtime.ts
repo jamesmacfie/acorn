@@ -4,12 +4,9 @@ import type { ServiceStartConfig, ServiceStartResult, ServiceState } from '@acor
 import { resolveDeviceToken } from '@acorn/node-core/server/auth'
 import { openDataRoot } from '@acorn/node-core/server/storage'
 import { launcherSpec, serverName } from '@acorn/node-core/server/mcpRegister.ts'
-import type { PreviewBrowserRule } from '@acorn/protocol/serviceProtocol.ts'
-import { PREVIEW_RULES } from '@acorn/plugin-preview/contract/rules.ts'
 import { bootNode } from './boot'
 
 export type ServiceRuntime = {
-  previewRules(taskId: string): Promise<PreviewBrowserRule[]>
   stop(): Promise<void>
   // What the parent needs to reach this node: where it bound, who it is, and the bearer to use.
   // Reported rather than assumed, so a second node on the same machine is just another endpoint.
@@ -23,7 +20,7 @@ type RuntimeOptions = {
 
 // The Node the desktop helper supervises (docs/architecture-overview.md § Process ownership). The boot
 // itself is bootNode's (./boot.ts). What this adds is the supervised host's own work: state reports
-// over the service channel, the installed-bytes report, and the preview rules the helper asks for.
+// over the service channel and the installed-bytes report.
 export async function startServiceRuntime({ config, stateChanged }: RuntimeOptions): Promise<ServiceRuntime> {
   stateChanged('migrating')
   let node: Awaited<ReturnType<typeof bootNode>>
@@ -88,11 +85,6 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
 
   try {
     return {
-      // preview's one node-side read, resolved through its capability at call time rather than wired
-      // as a query. `[]` when the plugin is disabled is the right answer, not a degradation: with no
-      // preview plugin there are no page rules to report, and an empty list is already the "none
-      // configured" case the browser automation handles.
-      previewRules: async (taskId) => (await node.runtime.CAPABILITIES.get(PREVIEW_RULES)?.forTask(taskId)) ?? [],
       stop,
       started: {
         baseline: ACORN_BASELINE,

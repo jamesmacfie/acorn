@@ -144,7 +144,7 @@ export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegi
 //
 // `provide` is bound to the plugin's own namespace, the same binding the host already applies to its
 // routes, schedules, data sources, integration flows and extension points (docs/extensibility.md § The
-// host binds every namespace). Without it a package could publish `github.mirror` or `preview.rules`
+// host binds every namespace). Without it a package could publish `github.mirror` or `terminal.sessions`
 // while the real plugin is disabled, and the composition root would resolve the impostor: a
 // capability is a typed function another plugin calls, so squatting one is not a name clash, it is a
 // substitution nothing announces.

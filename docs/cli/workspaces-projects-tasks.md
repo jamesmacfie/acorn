@@ -36,8 +36,8 @@ workspace-filtered routes. Each conflicts with `--workspace`; the agent filter a
 `--task`.
 
 `project config set` takes a JSON object of exact project configuration fields. Unknown fields and
-malformed browser rules fail before a write. Script fields may run later under the Node's configuration
-trust rules.
+invalid values fail before a write. Script fields may run later under the Node's configuration trust
+rules.
 
 `workspace external-projects replace` takes a complete `{ "projects": [...] }` object, and an empty array
 clears the mapping. Each row needs `integrationId` and `externalId`, with an optional `projectId`. The

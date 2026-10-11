@@ -13,17 +13,6 @@ export type PreviewMode = 'url' | 'port' | 'script'
 // Where the Database pane's AI-generation schema text comes from: live introspection of the
 // connected Postgres, the stdout of a shell command, or a file in the worktree. null → 'auto'.
 export type DbSchemaMode = 'auto' | 'script' | 'file'
-// Preview-browser page rules (docs/panes.md), applied by the main process when a preview page loads.
-// Discriminated unions so future triggers and actions extend without a schema change. Stored as one
-// JSON column on workspaces.
-export type BrowserRuleAction = { type: 'fill'; selector: string; value: string }
-export type BrowserRule = {
-  id: string
-  enabled: boolean
-  urlPattern: string // substring match against the page URL; '*' = wildcard
-  trigger: 'load'
-  action: BrowserRuleAction
-}
 export type Workspace = {
   appearance?: WorkspaceAppearance | null
   id: string
@@ -85,7 +74,6 @@ export type ProjectConfig = {
   dbSchemaNotes: string | null
   previewMode: PreviewMode | null
   previewValue: string | null
-  browserRules: BrowserRule[]
   branchPrefix: string | null
 }
 export type ProjectConfigPatch = Partial<{
@@ -100,7 +88,6 @@ export type ProjectConfigPatch = Partial<{
   dbSchemaNotes: string
   previewMode: PreviewMode | ''
   previewValue: string
-  browserRules: BrowserRule[]
   branchPrefix: string
 }>
 // What the project checkout's committed `.acorn/config.toml` sets, which wins over the matching

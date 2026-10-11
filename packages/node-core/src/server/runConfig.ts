@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { readConfigFileSync } from './core/fs'
-import type { BrowserRule, PreviewMode, ProjectRepoConfig } from '@acorn/protocol/api.ts'
+import type { PreviewMode, ProjectRepoConfig } from '@acorn/protocol/api.ts'
 
 export type RunTarget = {
   id: string
@@ -28,15 +28,13 @@ export type RepoConfig = {
   runTargets: RunTarget[]
   copy: string[]
   layouts: LayoutRecipe[]
-  // Database-pane connection resolver + browser-preview URL config. db/preview may come from committed
-  // repo config; browserRules stays DB-only because autofill selectors are machine/personal.
+  // Database-pane connection resolver and browser-preview URL config can come from committed repo config.
   dbUrlScript: string | null
   // True when dbUrlScript's winning layer is the committed repo config, the same provenance signal
   // repoTargetIds carries for the same reason: dbUrlScript runs as a shell script, so the trust
   // gate must apply when the checkout authored it and must not apply when the user did.
   dbUrlFromRepo: boolean
   preview: { mode: PreviewMode | null; value: string | null }
-  browserRules: BrowserRule[]
   errors: ConfigError[]
   // Resolved target ids whose winning layer is the committed repo config. Execution uses this
   // provenance to apply the trust gate without penalising user/DB-authored targets.
@@ -53,7 +51,6 @@ export type DbConfigFallback = {
   dbUrlScript?: string | null // projects.db_url_script
   previewMode?: PreviewMode | null // projects.preview_mode
   previewValue?: string | null // projects.preview_value
-  browserRules?: BrowserRule[] // projects.browser_rules (parsed; DB-only, no toml layer)
 }
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -292,7 +289,6 @@ export function loadRepoConfig(
       mode: repo?.previewMode ?? user?.previewMode ?? db.previewMode ?? null,
       value: repo?.previewValue ?? user?.previewValue ?? (db.previewValue?.trim() || null),
     },
-    browserRules: db.browserRules ?? [],
     errors,
     repoTargetIds: [...(repo?.run.keys() ?? [])],
   }

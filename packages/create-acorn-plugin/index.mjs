@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url'
  * The plugin API major this scaffold writes into `apiVersion`. Hardcoded because this package is
  * published standalone and can't import the constant. The scaffold tests compare it with the host.
  */
-export const API_VERSION = '4'
+export const API_VERSION = '5'
 export const BASELINE = 'acorn-1'
 
 /**
@@ -363,8 +363,8 @@ edit → reload instead of edit → prompt → restart. Reload starts a fresh No
 - **Your routes are confined to \`/v1/p/${id}/\`**, at parse time and again at runtime.
 - **The id is permanent.** It is the route namespace, the renderer route prefix, the persisted layout
   key and the SQLite filename. Renaming is "new plugin, plus a data migration, plus a tombstone".
-- **\`apiVersion\` must cover the loading node's major.** \`"4"\` covers major 4; a tested plugin can
-  declare a range such as \`"3 || 4"\`. A range that excludes the host is a \`failed\` roster row.
+- **\`apiVersion\` must cover the loading node's major.** \`"5"\` covers major 5; a tested plugin can
+  declare a range such as \`"4 || 5"\`. A range that excludes the host is a \`failed\` roster row.
 
 ## Extend another plugin's UI
 

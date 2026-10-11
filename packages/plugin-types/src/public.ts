@@ -98,7 +98,6 @@ export type {
   SetupTrigger,
   PreviewMode,
   DbSchemaMode,
-  BrowserRule,
   ProjectConfig,
   ProjectConfigResponse,
   CoreProjectService,

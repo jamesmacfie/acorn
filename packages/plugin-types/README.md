@@ -42,7 +42,7 @@ your manifest at it and every contribution array is validated as you type:
   "name": "My widget",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "4"
+  "apiVersion": "5"
 }
 ```
 

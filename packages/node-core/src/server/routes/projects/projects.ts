@@ -33,13 +33,6 @@ const patchBody = z.object({
   sort: z.number().int().optional(),
   path: z.string().min(1).optional(),
 })
-const browserRuleBody = z.object({
-  id: z.string(),
-  enabled: z.boolean(),
-  urlPattern: z.string(),
-  trigger: z.literal('load'),
-  action: z.object({ type: z.literal('fill'), selector: z.string(), value: z.string() }),
-})
 const configBody = z.object({
   patch: z.object({
     setupScript: z.string().optional(),
@@ -53,7 +46,6 @@ const configBody = z.object({
     dbSchemaNotes: z.string().max(8000).optional(),
     previewMode: z.enum(['url', 'port', 'script']).or(z.literal('')).optional(),
     previewValue: z.string().optional(),
-    browserRules: z.array(browserRuleBody).optional(),
     branchPrefix: z.string().max(60).optional(),
   }),
 })

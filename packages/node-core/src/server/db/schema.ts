@@ -142,7 +142,6 @@ export const projects = sqliteTable(
     dbSchemaNotes: text('db_schema_notes'),
     previewMode: text('preview_mode'),
     previewValue: text('preview_value'),
-    browserRules: text('browser_rules'),
     branchPrefix: text('branch_prefix'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),

@@ -79,9 +79,6 @@
 >
 > Bugs and gaps that comments revealed. Nothing here changed code:
 >
-> - Preview-browser page rules are stored and served but never applied. `matchesUrlPattern` in
->   `packages/protocol/src/integrations/browserRules.ts` has no caller outside its test, and nothing in
->   `apps/desktop` calls custody's `previewRules`. It looks lost in the move from Electron to Tauri.
 > - A task check's manifest `timeout` is parsed but not applied. `registerManifestTaskChecks` drops it,
 >   and `runOne` in `pluginHost/taskChecks.ts` always uses `CHECK_TIMEOUT_MS`.
 > - After a local Node restart, the terminal client's `nodeRestartLocal` sends no `onNodeReplaced`
