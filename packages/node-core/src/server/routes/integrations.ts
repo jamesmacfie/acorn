@@ -38,7 +38,7 @@ const patchBody = z
 const credentialsSchema = z.record(z.string(), z.string())
 const credentialsBody = z.looseObject({ credentials: credentialsSchema })
   .refine((body) => !Object.hasOwn(body, 'token'))
-const connectBody = z.looseObject({ providerId: z.string().optional(), provider: z.string().optional(), credentials: credentialsSchema })
+const connectBody = z.looseObject({ providerId: z.string().optional(), credentials: credentialsSchema })
   .refine((body) => !Object.hasOwn(body, 'token'))
 // The whole map for one connection, replaced in a single write. Bounds match the workspace-side PUT
 // (routes/workspaces.ts) because both land in the same table.
@@ -62,11 +62,10 @@ export const integrations = new Hono<AppEnv>()
     } satisfies IntegrationsResponse)
   })
   .post('/', async (c) => {
-    // `provider` is the legacy field name for `providerId`, still accepted on the wire.
     const parsed = connectBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'provider_bad_config', ['Send provider credentials in the credentials object; top-level token is unsupported.'])
     const body = parsed.data
-    const providerId = body.providerId ?? body.provider ?? ''
+    const providerId = body.providerId ?? ''
     if (!providerId) return respondError(c, 400, 'provider_bad_config')
     const request: ConnectIntegrationRequest = { providerId, credentials: body.credentials }
     try {

@@ -4,6 +4,12 @@ This page lists what the current build contains and what changed for people who 
 plugins for it. The package version is 1.0.0, and no release has been tagged. The Node probe and
 pairing response report the `acorn-1` baseline.
 
+## Extension point aliases removed
+
+Changed on October 12, 2026. Plugin API major 4 removes `open`, `contribute`, and `entries` from
+`ctx.extensionPoints`. Call `declare`, `handle`, and `handlers` instead. A plugin that doesn't call
+the old names needs only a manifest range that covers major 4, such as `"3 || 4"`.
+
 ## Memory library and import
 
 Added on October 2, 2026. The Memory page lists, searches, edits, deletes, and restores memories, and

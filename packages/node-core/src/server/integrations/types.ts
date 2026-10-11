@@ -64,7 +64,7 @@ export type CachedExternalItem<TSummary = unknown, TDetail = unknown> = {
   truncated?: boolean
 }
 
-export type CodecResult<T> = { ok: true; value: T; migrated: boolean } | { ok: false; error: string }
+export type CodecResult<T> = { ok: true; value: T } | { ok: false; error: string }
 
 export type CachedItemCodec<TSummary = unknown, TDetail = unknown, TPublic = unknown> = {
   schemaVersion: number

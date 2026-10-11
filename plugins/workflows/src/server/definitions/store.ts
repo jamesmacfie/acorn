@@ -190,14 +190,3 @@ export async function mergedList(
 
   return { workflows: [...byId.values()], errors }
 }
-
-/** Compatibility for callers that have not adopted reviewed published-graph export. */
-export async function saveDefToRepo(
-  db: PluginDatabase,
-  id: string,
-  _options: { checkoutDir: string; keepRow: boolean; resolveInRoot: (root: string, relPath: string) => string | null },
-): Promise<{ path: string } | { error: string }> {
-  const row = await getDef(db, id)
-  if (!row) return { error: 'not_found' }
-  return { error: 'review_published_export_required' }
-}

@@ -8,7 +8,7 @@ import type { WorkflowDef } from '../../shared/workflowContracts'
 // (docs/workflows/child-runs.md § What a run reports). Core adds nothing workflow-shaped: a compiled plugin
 // with a context measures its own work.
 
-const noExtensions: WorkflowExtensions = { entries: <T>(_point: ExtensionPointId<T>) => [] }
+const noExtensions: WorkflowExtensions = { handlers: <T>(_point: ExtensionPointId<T>) => [] }
 
 const ok = {
   status: 'ok' as const,

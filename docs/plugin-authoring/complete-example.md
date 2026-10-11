@@ -13,7 +13,7 @@ bridge is visible. For a tree without a bundler, start from the default scaffold
   "name": "Hello Acorn",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "3",
+  "apiVersion": "4",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {

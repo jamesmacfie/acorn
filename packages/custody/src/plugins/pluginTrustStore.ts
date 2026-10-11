@@ -103,27 +103,15 @@ const ackSchema = z.strictObject({
   // Parsed, not cast. This is the disclosure the owner consents to, so it has to be provably the
   // same shape the node parsed off disk. See @acorn/protocol/plugin/contract.ts.
   permissions: pluginPermissionsSchema,
-  // Default keeps version-1 trust files written before webviews readable. An old acknowledgement
-  // says the accepted bundle had no recorded webview grant.
-  webviews: z.array(webviewGrantSchema).max(32).default([]),
-  // Default keeps acknowledgements written before frame key claims readable.
-  keyClaims: z.array(keyClaimGrantSchema).max(32).default([]),
-  // Default keeps acknowledgements written before cooperative destinations readable.
-  navigationDestinations: z.array(navigationDestinationGrantSchema).max(64).default([]),
-  // Default keeps acknowledgements written before the cooperative cross-plugin seam readable. An old
-  // acknowledgement says the accepted bundle reached into nothing outside itself, which was true.
-  extensions: z.array(pluginExtensionGrantSchema).max(32).default([]),
-  // Default keeps acknowledgements written before schedules existed readable. An old acknowledgement
-  // says the accepted bundle ran nothing on its own, which was true.
-  schedules: z.array(scheduleGrantSchema).max(4).default([]),
-  // Default keeps acknowledgements written before archive checks existed readable. An old
-  // acknowledgement says the accepted bundle had nothing to say on archive.
-  taskChecks: z.array(taskCheckGrantSchema).max(4).default([]),
-  // Default keeps acknowledgements written before harnesses existed readable. An old acknowledgement
-  // says the accepted bundle asked acorn to run nothing, which was true.
-  harnesses: z.array(harnessGrantSchema).max(4).default([]),
-  agentTools: z.array(agentToolGrantSchema).max(16).default([]),
-  contextSections: z.array(contextSectionGrantSchema).max(8).default([]),
+  webviews: z.array(webviewGrantSchema).max(32),
+  keyClaims: z.array(keyClaimGrantSchema).max(32),
+  navigationDestinations: z.array(navigationDestinationGrantSchema).max(64),
+  extensions: z.array(pluginExtensionGrantSchema).max(32),
+  schedules: z.array(scheduleGrantSchema).max(4),
+  taskChecks: z.array(taskCheckGrantSchema).max(4),
+  harnesses: z.array(harnessGrantSchema).max(4),
+  agentTools: z.array(agentToolGrantSchema).max(16),
+  contextSections: z.array(contextSectionGrantSchema).max(8),
   // Default keeps acknowledgements written before custom agents existed readable. An old
   // acknowledgement says the accepted bundle added no agent, which was true.
   customAgents: z.array(pluginCustomAgentGrantSchema).max(8).default([]),
@@ -160,9 +148,8 @@ const devGrantSchema = z.strictObject({
 export type PluginDevGrant = z.infer<typeof devGrantSchema>
 
 // Read loosely. The rows are validated one at a time below, so a single unreadable acknowledgement
-// cannot condemn the ones beside it. `devGrants` defaults, so a file written before dev mode existed
-// reads as "nothing is in development".
-const fileSchema = z.strictObject({ version: z.literal(1), acks: z.array(z.unknown()), devGrants: z.array(z.unknown()).default([]) })
+// cannot condemn the ones beside it.
+const fileSchema = z.strictObject({ version: z.literal(1), acks: z.array(z.unknown()), devGrants: z.array(z.unknown()) })
 
 export class PluginTrustStore {
   #acks: PluginAck[] | null = null

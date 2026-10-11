@@ -1,4 +1,4 @@
-# loaded plugin API major: 3
+# loaded plugin API major: 4
 acorn-plugin-sdk/data: member DerivedQueryArgs.evaluationTime
 acorn-plugin-sdk/data: member DerivedQueryArgs.inputs
 acorn-plugin-sdk/data: member DerivedQueryArgs.mode
@@ -832,12 +832,9 @@ acorn-plugin-types: member PluginContextSectionDescriptor.order
 acorn-plugin-types: member PluginContextSectionDescriptor.read
 acorn-plugin-types: member PluginContextSectionDescriptor.scope
 acorn-plugin-types: member PluginContextSectionDescriptor.timeoutMs
-acorn-plugin-types: member PluginExtensionPointRegistry.contribute
 acorn-plugin-types: member PluginExtensionPointRegistry.declare
-acorn-plugin-types: member PluginExtensionPointRegistry.entries
 acorn-plugin-types: member PluginExtensionPointRegistry.handle
 acorn-plugin-types: member PluginExtensionPointRegistry.handlers
-acorn-plugin-types: member PluginExtensionPointRegistry.open
 acorn-plugin-types: member PluginGenerateTextRequest.backendId
 acorn-plugin-types: member PluginGenerateTextRequest.input
 acorn-plugin-types: member PluginGenerateTextRequest.timeoutMs

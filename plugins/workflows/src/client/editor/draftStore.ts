@@ -400,16 +400,6 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     if (current && await guard(() => workflowApi.discardPublication(current.id)) && isCurrent(address)) setPublication(undefined)
   }
 
-  const saveToRepo = async (options: { taskId?: string; keepRow: boolean }): Promise<string | undefined> => {
-    const address = capture()
-    if (!address) return
-    const current = ref()
-    if (!current || current.source !== 'database' || !(await save()) || !isCurrent(address)) return undefined
-    const answer = await guard(() => workflowApi.saveDefToRepo(current.id, options))
-    if (answer && !options.keepRow) forgetLayout(defRefKey(current))
-    return isCurrent(address) ? answer?.path : undefined
-  }
-
   /** A committed file, as a row of the reader's own. The one write a read-only definition offers. */
   const copyToDatabase = async (workspaceId: string): Promise<string | undefined> => {
     const address = capture()
@@ -468,7 +458,6 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     loadError: () => loaded.error as unknown,
     revision,
     save,
-    saveToRepo,
     copyToDatabase,
     remove,
     applyText,

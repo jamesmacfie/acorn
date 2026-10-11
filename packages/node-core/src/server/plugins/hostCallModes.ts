@@ -18,8 +18,7 @@ const modes = {
   runs: { register: 'sync' },
   audit: { declare: 'sync', record: 'sync' },
   extensionPoints: {
-    declare: 'sync', handle: 'sync', handlers: 'sync', open: 'sync',
-    contribute: 'sync', entries: 'sync',
+    declare: 'sync', handle: 'sync', handlers: 'sync',
   },
   hooks: { declare: 'sync', handle: 'sync', run: 'async', handlers: 'async' },
   providers: { integration: 'sync', connection: 'sync', model: 'sync', nodes: 'sync', withConnection: 'async' },

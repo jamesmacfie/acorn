@@ -44,8 +44,8 @@ hostile through a link fails at load time.
 Any other top-level key is stripped and reported as unrecognized, so a manifest written for a newer
 acorn still loads ([forward compatibility](../plugins/forward-compatibility.md)). That doesn't cover
 closed lists inside a known key. A release older than a menu location, a point field such as `mounts`,
-or a `documentServices` language may refuse the entry or ignore the field. API major 3 alone doesn't
-promise that an older release draws it.
+or a `documentServices` language may refuse the entry or ignore the field. The API major alone
+doesn't promise that an older release draws it.
 
 ### Requiring another plugin
 

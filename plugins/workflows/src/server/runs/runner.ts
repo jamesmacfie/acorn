@@ -52,10 +52,10 @@ const now = () => Date.now()
 // Keep extension lookup structural so tests can provide a literal and loaded plugins do not copy a
 // host registry into their bundle.
 export type WorkflowExtensions = {
-  entries<T>(point: ExtensionPointId<T>): readonly Extension<T>[]
+  handlers<T>(point: ExtensionPointId<T>): readonly Extension<T>[]
 }
 
-const NO_EXTENSIONS: WorkflowExtensions = { entries: () => [] }
+const NO_EXTENSIONS: WorkflowExtensions = { handlers: () => [] }
 
 export class WorkflowRunner {
   // This plugin's own kinds and policies, addressed as bare words. Everything another plugin adds is
@@ -155,7 +155,7 @@ export class WorkflowRunner {
   }
 
   #validContributedKinds() {
-    const entries = this.#extensions.entries(WORKFLOW_STEP_KIND)
+    const entries = this.#extensions.handlers(WORKFLOW_STEP_KIND)
     const live = new Set(entries.map((entry) => entry.id))
     for (const id of this.#reportedInvalidKinds.keys()) if (!live.has(id)) this.#reportedInvalidKinds.delete(id)
     return entries.filter((entry) => {
@@ -175,7 +175,7 @@ export class WorkflowRunner {
 
   #policy(policy: string): PolicyEvaluator | undefined {
     return this.#builtins.policies.get(policy)
-      ?? this.#extensions.entries(WORKFLOW_POLICY).find((entry) => entry.id === policy)?.value
+      ?? this.#extensions.handlers(WORKFLOW_POLICY).find((entry) => entry.id === policy)?.value
   }
 
   /** Every kind this node can run, with the description the editor draws from. Resolved per call for
@@ -199,7 +199,7 @@ export class WorkflowRunner {
     const kinds = this.#kindEntries()
     return {
       stepKinds: new Set(kinds.map((kind) => kind.id)),
-      policies: new Set([...this.#builtins.policies.keys(), ...this.#extensions.entries(WORKFLOW_POLICY).map((entry) => entry.id)]),
+      policies: new Set([...this.#builtins.policies.keys(), ...this.#extensions.handlers(WORKFLOW_POLICY).map((entry) => entry.id)]),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
       structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
       managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.managedProvider).map((profile) => profile.id)),
@@ -217,7 +217,7 @@ export class WorkflowRunner {
       kinds: this.#kindEntries().map(({ id, pluginId, contribution }) => ({ id, pluginId, describe: contribution.describe ?? null })),
       policies: [
         ...[...this.#builtins.policies.keys()].map((id) => ({ id, pluginId: null })),
-        ...this.#extensions.entries(WORKFLOW_POLICY).map((entry) => ({ id: entry.id, pluginId: entry.pluginId })),
+        ...this.#extensions.handlers(WORKFLOW_POLICY).map((entry) => ({ id: entry.id, pluginId: entry.pluginId })),
       ],
       profiles: agentProfileRegistry.list().map((profile) => ({
         id: profile.id,
@@ -237,7 +237,7 @@ export class WorkflowRunner {
   async pollTriggers(): Promise<{ started: number; errors: string[] }> {
     let started = 0
     const errors: string[] = []
-    for (const trigger of this.#extensions.entries(WORKFLOW_TRIGGER)) {
+    for (const trigger of this.#extensions.handlers(WORKFLOW_TRIGGER)) {
       try {
         for (const match of await trigger.value.evaluate()) {
           await this.start(match.taskId, match.workflow, { trigger: trigger.id })

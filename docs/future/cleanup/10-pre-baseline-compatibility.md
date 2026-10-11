@@ -1,5 +1,60 @@
 # 10: Pre-baseline compatibility
 
+> **Completion note, October 12, 2026.** Every item below is gone, except the Home board adoption,
+> which turned out to serve a state that `acorn-1` still writes. `pnpm lint`, the arch tests, and the
+> `@acorn/node`, `@acorn/node-core`, `@acorn/client-core`, `@acorn/custody`, `@acorn/protocol`,
+> `@acorn/plugin-api`, `acorn-plugin-types`, `create-acorn-plugin`, `@acorn/tui`, `@acorn/desktop`
+> (TypeScript and Rust), and workflows, rollbar, linear, and github plugin suites pass on Node 26.8.1.
+>
+> What landed:
+>
+> - Workflows save-to-repo is gone: the route, `WorkflowDefsBridge.saveToRepo`, `saveDefToRepo`, the
+>   client's `workflowSaveToRepoRoute` and `saveDefToRepo`, the draft store's `saveToRepo`, their
+>   tests, the route registry snapshot entry, and the reference row. Two workflow pages no longer
+>   mention it.
+> - The Rollbar codec reads schema version 4 only, and the Linear codec version 1 only. `CodecResult`
+>   has no `migrated`. Each provider's conformance fixture is a current-version row, because the old
+>   fixtures were the legacy shapes the conformance test expected to migrate.
+> - The GitHub repos list reads freshness from the sync row alone. `/refresh` zeroes only the sync
+>   row, since nothing else reads a repo row's `fetchedAt`. The column stays, because dropping it
+>   needs a migration.
+> - `open`, `contribute`, and `entries` are gone from `ctx.extensionPoints`, both type files,
+>   `hostCallModes.ts`, the published surface snapshot, and `docs/plugins/plugin-api.md`. The
+>   workflows runner's `WorkflowExtensions` reads `handlers`.
+> - `POST /v1/core/integrations` takes `providerId` only. The Rollbar integration test sent
+>   `provider`, so it sends `providerId`.
+> - The prefs comment in `db/schema.ts` no longer describes installs from before boot-minting.
+>
+> Decisions and deviations:
+>
+> - **`PLUGIN_API_MAJOR` is `4`.** `tools/arch/publishedPluginSurface.test.ts` refuses to drop a
+>   published member under the same major, and `docs/plugins/publishing.md` says a breaking removal
+>   needs one. The scaffold, the three Node test fixtures, the manifest schema title, the plugin-types
+>   README, the authoring docs, and the release notes say `4`. No plugin outside this repository
+>   calls the aliases. I checked the 11 under `~/Source/acorn-*`. Six of them declare
+>   `"apiVersion": "3"` and stop loading until their manifests say `"3 || 4"` or `"4"`. That's a
+>   manifest edit and a rebuild, with no code change.
+> - **Home board adoption stays, renamed `adoptUnscopedHome`.** Home is the default source at `/`.
+>   With no project routed and no active task, `createActiveWorkspaceId()` answers `undefined`, so a
+>   board composed there is keyed `home`. Adoption is what carries it into the next workspace that
+>   opens Home. Deleting it would hide those panels, so requirement 3 isn't done. The comments, the
+>   test names, and `docs/dashboards/placements.md` describe the live case instead of boards from
+>   before August 24. Whether Home should let a person compose a board with no workspace is a
+>   product question, and the answer decides whether adoption can go.
+> - **The trust schema lost ten defaults, not two.** Every grant array except `customAgents`, and the
+>   file's `devGrants`, predates the baseline-named trust file, and the baseline commit's writer
+>   always wrote them. `customAgents` (September 29) and `nodeId` (September 27) postdate the cutoff,
+>   so they keep their defaults for proposal 11. The custody test that read a pre-webview file is
+>   deleted. Two tests that hand-wrote a file without `devGrants` now include it.
+> - **The GitHub repos fallback had a live producer.** `resolveRepo` in `repoMirror.ts` writes one
+>   repo row with no sync row when a person opens a repository before the list loads. The fallback
+>   then served that one-row list as fresh. Without it, the list reads as cold and fetches in full.
+>   A new test in `repos.test.ts` covers that.
+>
+> For later phases: proposal 11 owns the `customAgents` and `nodeId` trust defaults. The published
+> surface snapshot records major 4, so proposal 12 needs major 5 to remove any published name. Its
+> facade names in `@acorn/plugin-api` aren't published and don't need one.
+
 This proposal deletes code that only serves data or builds from before the `acorn-1` baseline on
 September 24, 2026. The baseline refuses that data and those builds, so none of this code can run.
 

@@ -26,21 +26,6 @@ describe('rollbar project source', () => {
 })
 
 describe('rollbar provider cache contract', () => {
-  it('migrates a legacy bare item into the current versioned summary', () => {
-    const parsed = rollbarProvider.codec!.parse({
-      integrationId: 'conn-1', identifier: '142', title: 'TypeError', level: 'error',
-      environment: 'prod', status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
-    }, ref)
-
-    expect(parsed).toMatchObject({ ok: true, migrated: true })
-    if (!parsed.ok) return
-    expect(parsed.value.schemaVersion).toBe(4)
-    expect(parsed.value.summary).toMatchObject({
-      integrationId: 'conn-1', identifier: '142', title: 'TypeError', itemId: '', url: null,
-      totalOccurrences: 3,
-    })
-  })
-
   it('rejects malformed cache values and preserves detail on summary refresh', () => {
     expect(rollbarProvider.codec!.parse({ nope: true }, ref)).toEqual({ ok: false, error: 'invalid_rollbar_cache' })
     const detail = { resolvedInVersion: 'abc', assignedTo: 'james' }

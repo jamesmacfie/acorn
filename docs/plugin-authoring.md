@@ -149,4 +149,4 @@ written for plugin API major 1 moves like this:
 - `hasLineExtra` and `lineExtraSignature` become `lineExtra: { anchors, render }`, which names every
   line you draw under, up front.
 
-Declare `"apiVersion": "3"`, or a range that covers it, once the source has moved.
+Declare `"apiVersion": "4"`, or a range that covers it, once the source has moved.

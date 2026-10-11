@@ -6,7 +6,7 @@ import { Button, EmptyState } from '../../kit/components/primitives'
 import DashboardPanelHost from '../dashboards/DashboardPanelHost'
 import DashboardTabs from '../dashboards/DashboardTabs'
 import { activeHomeTab, homeTabDomId, HOME_TAB_PANEL_ID, setActiveHomeTab } from '../dashboards/homeTab'
-import { adoptLegacyHomeDashboards, dashboards, homeTabs, homeTabScope, panelsAt } from '../dashboards/persist'
+import { adoptUnscopedHomeDashboards, dashboards, homeTabs, homeTabScope, panelsAt } from '../dashboards/persist'
 import PanelGrid from '../dashboards/PanelGrid'
 import { createActiveWorkspaceId } from './activeWorkspaceId'
 import './home.css'
@@ -34,12 +34,12 @@ export default function Home() {
   const activeTab = () => (tabs().some((tab) => tab.id === activeHomeTab()) ? activeHomeTab() : '')
   const bar = <DashboardTabs tabs={tabs()} workspaceId={workspaceId()} active={activeTab()} onSelect={setActiveHomeTab} />
 
-  // The one-shot adoption of a board written before Home was per-workspace. Idempotent and a no-op
-  // once there is nothing left to adopt, which is why it can live in a render effect rather than in
-  // boot: it needs a workspace, and Home is where one is first both known and about to be drawn.
+  // Adopts a board composed while no workspace was known. Idempotent and a no-op once there is
+  // nothing left to adopt, which is why it can live in a render effect rather than in boot: it needs
+  // a workspace, and Home is where one is first both known and about to be drawn.
   createEffect(() => {
     const ws = workspaceId()
-    if (ws) adoptLegacyHomeDashboards(ws)
+    if (ws) adoptUnscopedHomeDashboards(ws)
   })
 
   // Home owns its Add panel, in the title row once there are panels and in the empty state before,

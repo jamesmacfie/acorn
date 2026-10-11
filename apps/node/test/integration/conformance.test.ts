@@ -58,11 +58,10 @@ describe('integration provider conformance', () => {
       }
 
       if (provider.codec && provider.conformance) {
-        it('normalizes a cached provider item, rejects malformed cache, and preserves detail on list refresh', () => {
+        it('parses a current cached item, rejects malformed cache, and preserves detail on list refresh', () => {
           const cached = provider.codec!.parse(provider.conformance!.cachedItem, provider.conformance!.ref)
           expect(cached.ok).toBe(true)
           if (!cached.ok) return
-          expect(cached.migrated).toBe(true)
           expect(provider.codec!.parse({ obsolete: true }, provider.conformance!.ref).ok).toBe(false)
 
           const detailed = provider.conformance!.detail === undefined

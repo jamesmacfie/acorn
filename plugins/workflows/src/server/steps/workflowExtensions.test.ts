@@ -19,7 +19,7 @@ const deps: RunnerDeps = {
 // A stand-in for `ctx.extensionPoints`, holding one contributed step kind the way the http plugin's
 // would arrive: entry id already qualified by the host.
 const extensions = (entries: Extension<unknown>[]): WorkflowExtensions => ({
-  entries: <T>(point: ExtensionPointId<T>) => (point === WORKFLOW_STEP_KIND ? (entries as Extension<T>[]) : []),
+  handlers: <T>(point: ExtensionPointId<T>) => (point === WORKFLOW_STEP_KIND ? (entries as Extension<T>[]) : []),
 })
 
 const described = (over: Partial<StepKindContribution> = {}): StepKindContribution => ({

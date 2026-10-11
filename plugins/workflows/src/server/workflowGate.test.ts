@@ -7,7 +7,7 @@ import type { WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
 // The human gate over a real runner and a real plugin database (docs/workflows/execution.md § Execution model).
 // No step here runs an agent, so no profile or process is involved.
 
-const noExtensions: WorkflowExtensions = { entries: <T>(_point: ExtensionPointId<T>) => [] }
+const noExtensions: WorkflowExtensions = { handlers: <T>(_point: ExtensionPointId<T>) => [] }
 
 const deps = (over: Partial<RunnerDeps> = {}): RunnerDeps => ({
   runStep: async () => { throw new Error('No agent step runs in these tests.') },

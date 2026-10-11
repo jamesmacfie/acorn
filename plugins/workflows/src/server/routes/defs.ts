@@ -52,7 +52,6 @@ export type WorkflowDefsBridge = {
   update(id: string, def: unknown, revision: number): Promise<{ row?: unknown; conflict?: unknown } | null>
   remove(id: string): Promise<{ ok: boolean }>
   validate(def: unknown, projectId?: string): Promise<{ problems: string[] }>
-  saveToRepo(id: string, opts: { taskId?: string; keepRow: boolean }): Promise<{ path?: string; notFound?: boolean; error?: string }>
   // Writes a whole definition from a description or edits the current one through the picked backend
   // (docs/workflows/ai-authoring.md § Generating and editing with AI). `error` is a reply nothing could be read out of, which is the
   // one failure with no definition to apply. A provider failure throws ProviderOperationError,
@@ -87,7 +86,6 @@ const editableDefSchema = z.object({
 const createBody = z.object({ workspaceId: z.string().min(1), projectId: z.string().min(1).optional(), def: defSchema })
 const updateBody = z.object({ def: defSchema, revision: z.number().int().nonnegative() })
 const validateBody = z.object({ def: defSchema, projectId: z.string().min(1).optional() })
-const saveBody = z.object({ taskId: z.string().min(1).optional(), keepRow: z.boolean().optional() })
 const fileTarget = z.object({ projectId: z.string().min(1), source: z.enum(['repo', 'user']), path: z.string().min(1).max(256) }).strict()
 const fileBody = z.discriminatedUnion('action', [
   z.object({ action: z.literal('open'), target: fileTarget }),
@@ -272,15 +270,3 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
     })
   })
   .delete('/defs/:id', (c) => withBridge(c, async (bridge) => c.json(await bridge.remove(c.req.param('id')))))
-  // Turns a row into a committed file. From then on the trust snapshot covers it, so the next start
-  // from that file asks for the acknowledgement any repo-authored configuration asks for.
-  .post('/defs/:id/save-to-repo', async (c) => {
-    const parsed = await parseBody(c, saveBody)
-    if (!parsed) return respondError(c, 400, 'bad_request')
-    return withBridge(c, async (bridge) => {
-      const answer = await bridge.saveToRepo(c.req.param('id'), { taskId: parsed.taskId, keepRow: parsed.keepRow === true })
-      if (answer.notFound) return respondError(c, 404, 'not_found')
-      if (answer.error) return respondError(c, 400, 'bad_request', [answer.error])
-      return c.json({ path: answer.path })
-    })
-  })

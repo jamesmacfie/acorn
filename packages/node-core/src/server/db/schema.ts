@@ -19,9 +19,7 @@ export const syncState = sqliteTable(
 // ── App-state tables: data GitHub does not have, so acorn is the source of truth ────────────────
 //
 // `user_id` on `prefs` is the single canonical user id: the node's opaque owner id, minted at boot
-// (server/core/identity.ts). Installs that predate boot-minting carry their old GitHub login as
-// the value, same column, same semantics, never rewritten. Single-user app, so the column is not
-// multi-tenancy. Newer app-state tables (tasks, projects, and so on) are machine-scoped and drop it.
+// (server/core/identity.ts). Single-user app, so the column is not multi-tenancy. Newer app-state tables (tasks, projects, and so on) are machine-scoped and drop it.
 
 export const prefs = sqliteTable(
   'prefs',

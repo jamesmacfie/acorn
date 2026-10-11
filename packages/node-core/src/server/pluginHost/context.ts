@@ -334,7 +334,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     skills: {
       register: (skill) => recordUndo(registerSkill(plugin, skill).dispose),
     },
-    // Owner-bound on both halves: `open` refuses a point outside this plugin's namespace, and a
+    // Owner-bound on both halves: `declare` refuses a point outside this plugin's namespace, and a
     // contributed entry's id is minted from the plugin rather than taken from the entry. Both
     // registrations record an undo, because the maps behind them are module singletons and a reload's
     // candidate instance has to be able to take back what it filed.
@@ -342,12 +342,6 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       declare: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
       handle: (point, entry) => recordUndo(contributeExtension(plugin, assertDisclosedPoint(point), entry).dispose),
       handlers: (point) => extensionsFor(point),
-      // The names these three carried until 2026-08-31, kept for one major so a plugin outside this
-      // repository moves on its own schedule (docs/plugins/plugin-api.md § The plugin API). Aliases rather than
-      // wrappers, so the guard pass below wraps each of the six once and both spellings behave the same.
-      open: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
-      contribute: (point, entry) => recordUndo(contributeExtension(plugin, assertDisclosedPoint(point), entry).dispose),
-      entries: (point) => extensionsFor(point),
     },
     // Owner-bound on both halves, like the extension points above. `declare` mints the point id from
     // this plugin, `handle` mints the handler id from it, and `run` takes a bare id and qualifies it, so
@@ -587,11 +581,11 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // when it is called, while `audit.declare` beside it is an ordinary registration that buffers.
     const buffer = group !== 'events' && group !== 'storage'
     for (const [key, value] of Object.entries(members)) {
-      // `extensionPoints.handlers` reads (under both its spellings), `audit.record` writes, and
+      // `extensionPoints.handlers` reads, `audit.record` writes, and
       // `hooks.run` awaits a chain and answers the caller: all are guarded against a revoked context like
       // the rest and none is ever deferred, because a buffered call would return undefined to a caller
       // about to act on it.
-      const reads = key === 'handlers' || key === 'entries' || key === 'record' || key === 'run' || key === 'invoke'
+      const reads = key === 'handlers' || key === 'record' || key === 'run' || key === 'invoke'
       if (typeof value === 'function') {
         members[key] = guard(value as (...args: unknown[]) => unknown, buffer && !reads)
       }

@@ -149,7 +149,6 @@ function parseLinear(raw: unknown, ref: ExternalRef): CodecResult<LinearCached> 
     const detail = isRecord(detailRaw) && validSummary(detailRaw) && typeof (detailRaw as Record<string, unknown>).id === 'string' ? (detailRaw as LinearIssueDetail) : undefined
     return {
       ok: true,
-      migrated: false,
       value: {
         ref: isRecord(raw.ref) ? (raw.ref as ExternalRef) : ref,
         summary: raw.summary,
@@ -161,11 +160,6 @@ function parseLinear(raw: unknown, ref: ExternalRef): CodecResult<LinearCached> 
         truncated: raw.truncated === true,
       },
     }
-  }
-  // Phase-7 read migration: pre-descriptor rows stored the public detail object directly.
-  if (validSummary(raw)) {
-    const detail = isRecord(raw) && typeof (raw as Record<string, unknown>).id === 'string' ? (raw as LinearIssueDetail) : undefined
-    return { ok: true, migrated: true, value: { ref, summary: detail ? linearSummaryOf(detail) : raw, detail, schemaVersion: 1 } }
   }
   return { ok: false, error: 'invalid_linear_cache' }
 }
@@ -423,10 +417,13 @@ export const linearProvider = publicProvider({
   conformance: {
     ref: refForIdentifier('linear-test', 'ENG-42', 'https://linear.app/acme/issue/ENG-42'),
     cachedItem: {
-      id: 'issue-uuid', identifier: 'ENG-42', title: 'Detailed issue', url: 'https://linear.app/acme/issue/ENG-42',
-      state: { name: 'In Progress', type: 'started', color: '#55f' }, assignee: null,
-      description: 'Keep this description', comments: [], activity: [],
-    } satisfies LinearIssueDetail,
+      ref: refForIdentifier('linear-test', 'ENG-42', 'https://linear.app/acme/issue/ENG-42'),
+      summary: {
+        identifier: 'ENG-42', title: 'Detailed issue', url: 'https://linear.app/acme/issue/ENG-42',
+        state: { name: 'In Progress', type: 'started', color: '#55f' }, assignee: null,
+      },
+      schemaVersion: 1,
+    } satisfies LinearCached,
     summary: {
       identifier: 'ENG-42', title: 'Updated summary', url: 'https://linear.app/acme/issue/ENG-42',
       state: { name: 'In Progress', type: 'started', color: '#55f' }, assignee: null,

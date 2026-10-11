@@ -14,7 +14,7 @@ import type { WorkflowDef } from '../../shared/workflowContracts'
 // over, and a reader watching a step work had no way from the session back to the run. The session id
 // now rides along on the forwarded events, and the row takes the first one it sees.
 
-const noExtensions: WorkflowExtensions = { entries: <T>(_point: ExtensionPointId<T>) => [] }
+const noExtensions: WorkflowExtensions = { handlers: <T>(_point: ExtensionPointId<T>) => [] }
 
 const ok = {
   status: 'ok' as const,

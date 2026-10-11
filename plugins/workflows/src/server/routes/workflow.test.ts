@@ -351,7 +351,6 @@ describe('workflow definition routes', () => {
     update: async () => ({ row }),
     remove: async () => ({ ok: true }),
     validate: async () => ({ problems: [] }),
-    saveToRepo: async () => ({ path: '.acorn/workflows/ship-it.toml' }),
     generate: async () => ({ def: row.def, notes: [], problems: [], repaired: false, providerId: 'anthropic', modelId: 'm' }),
     modelBackends: async () => [],
     ...over,
@@ -414,7 +413,6 @@ describe('workflow definition routes', () => {
       req('/api/defs/validate', 'POST', { def }),
       req('/api/defs/generate', 'POST', { backendId: 'c1', description: 'two agents', workspaceId: 'w1' }),
       req('/api/defs/authoring/turn', 'POST', { target: 'workflow', scope: { workspaceId: 'w1' }, targetId: 'def1', baseRevision: 1, base: def, backendId: 'c1', instruction: 'Improve it.' }),
-      req('/api/defs/def1/save-to-repo', 'POST', {}),
     ]) {
       expect((await app.fetch(call, {} as Env)).status).toBe(403)
     }
@@ -517,12 +515,5 @@ describe('workflow definition routes', () => {
       expect(res.status).toBe(401)
       expect(await res.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
     })
-  })
-
-  it('reports a save-to-repo refusal rather than pretending it wrote', async () => {
-    setWorkflowDefsBridge(fakeDefs({ saveToRepo: async () => ({ error: 'That file would land outside the checkout.' }) }))
-    const res = await asDevice().fetch(req('/api/defs/def1/save-to-repo', 'POST', { keepRow: true }), {} as Env)
-    expect(res.status).toBe(400)
-    expect(await res.text()).toContain('outside the checkout')
   })
 })

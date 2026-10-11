@@ -18,7 +18,7 @@ describe('HTTP preparation errors in durable workflows', () => {
       runStep: async () => { throw new Error('No agent step expected') },
       writeHandoff: async () => {}, assembleContext: async () => '',
       evaluatePolicy: async () => ({ pass: true }), failingChecks: async () => null, notify: vi.fn(),
-    }, { entries: (point) => workflows.extensionPoints.handlers(point) })
+    }, { handlers: (point) => workflows.extensionPoints.handlers(point) })
     try {
       workflows.extensionPoints.declare(WORKFLOW_STEP_KIND, 'Workflow steps')
       await http.db.insert(schema.workspaces).values({ id: 'workspace', name: 'Fixture', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })

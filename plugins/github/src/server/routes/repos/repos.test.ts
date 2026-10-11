@@ -84,6 +84,17 @@ describe('repos list (serve-then-revalidate via the sync engine)', () => {
     expect(emit).toHaveBeenCalledWith('repos-changed')
   })
 
+  it('cold: a row left by opening one repository, with no sync row, still fetches the whole list', async () => {
+    await plugin.db.insert(reposTable).values({ userId: 'james', ...publicRepo, pushedAt: publicRepo.pushedAt, fetchedAt: Date.now() })
+    const other = { ...ghRepo, id: 20001, name: 'acorn' }
+    vi.mocked(gh).mockResolvedValueOnce(responseJson([ghRepo, other], { headers: { etag: '"repos-v1"' } }))
+
+    const res = await get()
+    expect(res.status).toBe(200)
+    expect(await res.json()).toHaveLength(2)
+    expect(gh).toHaveBeenCalledOnce()
+  })
+
   it('cold error surfaces the GitHub status', async () => {
     vi.mocked(gh).mockResolvedValueOnce(new Response('nope', { status: 401 }))
     const res = await get()

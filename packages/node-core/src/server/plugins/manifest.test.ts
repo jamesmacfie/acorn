@@ -1905,7 +1905,7 @@ describe('forward compatibility: unknown is retained and reported', () => {
   // docs/plugins/forward-compatibility.md § Forward compatibility. A manifest written for a later acorn still loads on this
   // one; what changed is that it no longer does so in silence.
   const parse = (extra: Record<string, unknown>) =>
-    parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '3', ...extra })
+    parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '4', ...extra })
 
   it('names an unknown top-level key, contribution kind and node facet', () => {
     const result = parse({
@@ -2019,7 +2019,7 @@ describe('declared dependencies', () => {
 
 it('reports cross-field errors in author-facing order with their descriptor paths', () => {
   const result = parsePluginManifest({
-    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '3',
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '4',
     requires: { plugins: [{ id: 'board' }] },
     contributions: {
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }],

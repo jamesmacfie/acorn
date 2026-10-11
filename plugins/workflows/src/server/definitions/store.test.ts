@@ -1,15 +1,14 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { createDef, defsForProject, getDef, mergedList, removeDef, saveDefToRepo, updateDef } from './store'
+import { createDef, defsForProject, getDef, mergedList, removeDef, updateDef } from './store'
 import type { WorkflowValidationCatalog } from '../validation/definition'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
 // The second store a definition can live in (docs/workflows/definitions.md § Database definitions). What matters
-// here is the merged read's precedence, the stale-revision refusal, and that save-to-repo writes
-// inside the folder and nowhere else.
+// here is the merged read's precedence and the stale-revision refusal.
 
 const catalog: WorkflowValidationCatalog = {
   stepKinds: new Set(['agent']),
@@ -19,10 +18,6 @@ const catalog: WorkflowValidationCatalog = {
 }
 
 const def = (name: string): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name, steps: [{ id: 'only', name: 'only', prompt: 'Do it.' }] })
-
-// Stands in for `ctx.core.fs.resolveInRoot`, the symlink-aware confinement the node wires in. What
-// the store owes is honouring the answer, which is what the last case here checks.
-const resolveInRoot = (root: string, relPath: string) => (relPath.includes('..') ? null : join(root, relPath))
 
 describe('workflow definitions stored as rows', () => {
   let store: TestPluginDb
@@ -118,38 +113,5 @@ describe('workflow definitions stored as rows', () => {
     await createDef(store.db, { workspaceId: 'w1', projectId: 'gone', def: def('orphan') })
     const merged = await mergedList(store.db, 'w1', [{ id: 'p1', path: null }], { userDir: null, catalog })
     expect(merged.workflows[0].problems).toEqual(['The project this workflow was bound to has been removed.'])
-  })
-
-  it('refuses the obsolete destructive export and preserves the draft', async () => {
-    const row = await createDef(store.db, { workspaceId: 'w1', def: def('Investigate an issue') })
-    const saved = await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: false, resolveInRoot })
-    expect(saved).toEqual({ error: 'review_published_export_required' })
-    expect(await getDef(store.db, row.id)).not.toBeNull()
-  })
-
-  it('keeps the row when asked, and never writes outside the folder', async () => {
-    const row = await createDef(store.db, { workspaceId: 'w1', def: def('../../etc/passwd') })
-    const saved = await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: true, resolveInRoot })
-    expect(saved).toEqual({ error: 'review_published_export_required' })
-    expect(await getDef(store.db, row.id)).not.toBeNull()
-  })
-
-  it('does not overwrite a file the repository already has', async () => {
-    writeFile(dir, 'ship-it', 'name = "the committed one"\n[[steps]]\nname = "a"\nprompt = "x"\n')
-    const row = await createDef(store.db, { workspaceId: 'w1', def: def('Ship it') })
-    expect(await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: true, resolveInRoot })).toEqual({
-      error: 'review_published_export_required',
-    })
-  })
-
-  it('writes nothing when the confinement check refuses the path', async () => {
-    const row = await createDef(store.db, { workspaceId: 'w1', def: def('Ship it') })
-    expect(await saveDefToRepo(store.db, row.id, { checkoutDir: dir, keepRow: true, resolveInRoot: () => null })).toEqual({ error: 'review_published_export_required' })
-    // Not even the folder: the check runs before `mkdir -p`, so a symlinked `.acorn` is not followed.
-    expect(existsSync(join(dir, '.acorn'))).toBe(false)
-  })
-
-  it('answers not_found for a row that is gone', async () => {
-    expect(await saveDefToRepo(store.db, 'nope', { checkoutDir: dir, keepRow: false, resolveInRoot })).toEqual({ error: 'not_found' })
   })
 })

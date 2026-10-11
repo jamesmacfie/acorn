@@ -10,7 +10,7 @@ import {
   type RollbarApiItem,
   type RollbarProject,
 } from './'
-import { composeItemDetail, normalizeItemMetadata, normalizeSummary, rollbarItemUrl } from './normalize'
+import { composeItemDetail, normalizeItemMetadata, normalizeSummary } from './normalize'
 import {
   type CachedExternalItem,
   type CachedItemCodec,
@@ -73,43 +73,10 @@ const metadataOf = (value: RollbarItemMetadata): RollbarItemMetadata => ({
   url: typeof value.url === 'string' ? value.url : null,
 })
 
-// Widen an old (pre-itemId) summary/legacy row into the v4 summary. itemId/label are unknown for
-// legacy rows, so they are left blank; a detail fetch resolves the real id via the counter, and the
-// list refresh restamps label. Migrated rows never carry the current listFetchedAt, so they stay out
-// of the list.
-function widen(o: Record<string, unknown>): RollbarItemSummary {
-  const itemId = typeof o.itemId === 'string' ? o.itemId : ''
-  return {
-    integrationId: String(o.integrationId ?? ''),
-    integrationLabel: typeof o.integrationLabel === 'string' ? o.integrationLabel : '',
-    identifier: String(o.identifier ?? ''),
-    itemId,
-    url: typeof o.url === 'string' ? o.url : rollbarItemUrl(itemId),
-    title: String(o.title ?? ''),
-    level: String(o.level ?? ''),
-    environment: String(o.environment ?? ''),
-    status: String(o.status ?? ''),
-    totalOccurrences: typeof o.totalOccurrences === 'number' ? o.totalOccurrences : 0,
-    firstOccurrenceAt: typeof o.firstOccurrenceAt === 'number' ? o.firstOccurrenceAt : null,
-    lastOccurrenceAt: typeof o.lastOccurrenceAt === 'number' ? o.lastOccurrenceAt : null,
-    ...(typeof o.framework === 'string' ? { framework: o.framework } : {}),
-  }
-}
-
-function widenMetadata(value: unknown): RollbarItemMetadata | undefined {
-  if (!isRecord(value) || !('resolvedInVersion' in value) || !('assignedTo' in value)) return undefined
-  return {
-    ...widen(value),
-    resolvedInVersion: typeof value.resolvedInVersion === 'string' ? value.resolvedInVersion : null,
-    assignedTo: typeof value.assignedTo === 'string' ? value.assignedTo : null,
-  }
-}
-
 function parseRollbar(raw: unknown, ref: ExternalRef): CodecResult<RollbarCached> {
   if (isRecord(raw) && raw.schemaVersion === 4 && isSummary(raw.summary)) {
     return {
       ok: true,
-      migrated: false,
       value: {
         ref: isRecord(raw.ref) ? (raw.ref as ExternalRef) : ref,
         summary: raw.summary,
@@ -121,51 +88,6 @@ function parseRollbar(raw: unknown, ref: ExternalRef): CodecResult<RollbarCached
         truncated: raw.truncated === true,
       },
     }
-  }
-  // v3 predates stable web links. Derive the item permalink from its system-wide item id while
-  // retaining independently cached metadata and list/detail freshness.
-  if (isRecord(raw) && raw.schemaVersion === 3 && isRecord(raw.summary)) {
-    return {
-      ok: true,
-      migrated: true,
-      value: {
-        ref: isRecord(raw.ref) ? (raw.ref as ExternalRef) : ref,
-        summary: widen(raw.summary),
-        detail: widenMetadata(raw.detail),
-        listFetchedAt: typeof raw.listFetchedAt === 'number' ? raw.listFetchedAt : undefined,
-        detailFetchedAt: typeof raw.detailFetchedAt === 'number' ? raw.detailFetchedAt : undefined,
-        schemaVersion: 4,
-        deletedAt: typeof raw.deletedAt === 'number' ? raw.deletedAt : undefined,
-        truncated: raw.truncated === true,
-      },
-    }
-  }
-  // v2 detail bundled latestOccurrence. Strip that child resource and keep the item metadata.
-  // Occurrence history has its own cache rows and freshness.
-  if (isRecord(raw) && raw.schemaVersion === 2 && isRecord(raw.summary)) {
-    return {
-      ok: true,
-      migrated: true,
-      value: {
-        ref: isRecord(raw.ref) ? (raw.ref as ExternalRef) : ref,
-        summary: widen(raw.summary),
-        detail: widenMetadata(raw.detail),
-        listFetchedAt: typeof raw.listFetchedAt === 'number' ? raw.listFetchedAt : undefined,
-        detailFetchedAt: typeof raw.detailFetchedAt === 'number' ? raw.detailFetchedAt : undefined,
-        schemaVersion: 4,
-        deletedAt: typeof raw.deletedAt === 'number' ? raw.deletedAt : undefined,
-        truncated: raw.truncated === true,
-      },
-    }
-  }
-  // Normalize the versioned envelope: keep list membership and repopulate detail on demand when it is
-  // absent from the summary payload.
-  if (isRecord(raw) && raw.schemaVersion === 1 && isRecord(raw.summary)) {
-    return { ok: true, migrated: true, value: { ref, summary: widen(raw.summary), listFetchedAt: typeof raw.listFetchedAt === 'number' ? raw.listFetchedAt : undefined, schemaVersion: 4 } }
-  }
-  // Legacy bare RollbarItem row.
-  if (isRecord(raw) && typeof raw.identifier === 'string' && typeof raw.title === 'string') {
-    return { ok: true, migrated: true, value: { ref, summary: widen(raw), schemaVersion: 4 } }
   }
   return { ok: false, error: 'invalid_rollbar_cache' }
 }
@@ -435,11 +357,11 @@ export const rollbarProvider = publicProvider({
   memory: { linkedItems: true, mutations: [], triggers: [], summarize: 'context-formatter', acceptedWrites: false },
   conformance: {
     ref: { providerId: 'rollbar', connectionId: 'rollbar-test', displayId: '142' },
-    // Legacy bare RollbarItem row (pre-itemId). Must migrate.
     cachedItem: {
-      integrationId: 'rollbar-test', identifier: '142', title: 'TypeError', level: 'error', environment: 'prod',
-      status: 'active', totalOccurrences: 3, firstOccurrenceAt: 1, lastOccurrenceAt: 2,
-    },
+      ref: { providerId: 'rollbar', connectionId: 'rollbar-test', displayId: '142' },
+      summary: CONFORMANCE_SUMMARY,
+      schemaVersion: 4,
+    } satisfies RollbarCached,
     summary: CONFORMANCE_SUMMARY,
     detail: {
       ...CONFORMANCE_SUMMARY, resolvedInVersion: null, assignedTo: null,

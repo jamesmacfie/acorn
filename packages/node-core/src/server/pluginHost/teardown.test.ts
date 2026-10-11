@@ -179,17 +179,9 @@ const PROBES: Record<string, Probe> = {
     register: (ctx) => ctx.extensionPoints.declare(extensionPointId<string>(`${PLUGIN}:declared`), 'Declared'),
     present: () => openExtensionPoints().some((point) => point.id === `${PLUGIN}:declared`),
   },
-  'extensionPoints.open': {
-    register: (ctx) => ctx.extensionPoints.open(extensionPointId<string>(`${PLUGIN}:opened`), 'Opened'),
-    present: () => openExtensionPoints().some((point) => point.id === `${PLUGIN}:opened`),
-  },
   'extensionPoints.handle': {
     register: (ctx) => ctx.extensionPoints.handle(OTHER_POINT, { id: 'handled', value: 'a' }),
     present: () => extensionsFor(OTHER_POINT).some((entry) => entry.id === `${PLUGIN}:handled`),
-  },
-  'extensionPoints.contribute': {
-    register: (ctx) => ctx.extensionPoints.contribute(OTHER_POINT, { id: 'contributed', value: 'b' }),
-    present: () => extensionsFor(OTHER_POINT).some((entry) => entry.id === `${PLUGIN}:contributed`),
   },
   'hooks.declare': {
     register: (ctx) => ctx.hooks.declare({ id: 'gate', label: 'Gate', payload: { id: 'string' }, allows: ['observe'] }),
@@ -258,7 +250,7 @@ const PROBES: Record<string, Probe> = {
 const NOT_REGISTRATIONS = new Set([
   // Reads.
   'dataSources.list', 'dataSources.discoverAvailable', 'dataSources.queryPublication', 'dataSources.resolveQuery', 'dataSources.invoke',
-  'extensionPoints.handlers', 'extensionPoints.entries', 'hooks.run', 'hooks.handlers', 'providers.withConnection',
+  'extensionPoints.handlers', 'hooks.run', 'hooks.handlers', 'providers.withConnection',
   'capabilities.get', 'capabilities.require', 'capabilities.ids', 'core.telemetry.enabled',
   // Writes to a table, which outlive the plugin on purpose.
   'dataSources.setQueryConsumer', 'datasets.writeForTask', 'audit.record',

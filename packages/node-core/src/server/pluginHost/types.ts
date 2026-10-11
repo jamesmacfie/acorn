@@ -271,12 +271,6 @@ export type PluginExtensionPointRegistry = {
   // What is in a point right now, in declared order. Resolve at call time: the plugin that fills your
   // point may init after you do.
   handlers<T>(point: ExtensionPointId<T>): Extension<T>[]
-  /** @deprecated Renamed to `declare`. Removed in the next PLUGIN_API_MAJOR. */
-  open<T>(point: ExtensionPointId<T>, label: string): void
-  /** @deprecated Renamed to `handle`. Removed in the next PLUGIN_API_MAJOR. */
-  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
-  /** @deprecated Renamed to `handlers`. Removed in the next PLUGIN_API_MAJOR. */
-  entries<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
 
 // What this plugin puts on the node's audit trail (docs/security/audit.md § Audit). Both tiers: a loaded

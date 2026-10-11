@@ -259,7 +259,7 @@ it('runs the packed scaffold and type-checks it against the packed declarations 
     expect(declarations.length).toBeGreaterThan(10)
     expect(declarations.every((name) => name.endsWith('.d.ts'))).toBe(true)
     expect(readdirSync(join(types, 'dist')).sort()).toEqual(['contracts', 'index.d.ts'])
-    expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toContain('"apiVersion": "3"')
+    expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toContain('"apiVersion": "4"')
 
     writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
       compilerOptions: {

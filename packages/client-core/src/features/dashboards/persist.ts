@@ -23,15 +23,14 @@ export type PlacementScope = {
   ownerId?: string
   /** Which workspace's board this is. Home carries one, because a panel's rows link to that
    *  workspace's work and a board composed in one has nothing to say in another; a plugin region
-   *  does not, being already pinned to the surface it hangs off. Absent is the pre-workspace board
-   *  (`adoptLegacyHome`). */
+   *  does not, being already pinned to the surface it hangs off. Absent is the unscoped board, drawn
+   *  while no workspace is known (`adoptUnscopedHome`). */
   workspaceId?: string
 }
 
 /** A Home tab is the scope `{ surface: 'home', ownerId: tabId, workspaceId }`, keyed `home/<tab>/<ws>`
  *  — the default tab's id is `''`, so its key is `home//<ws>`. With no workspace known the encoder
- *  drops both trailing segments and the key is the bare `home`, which is every blob written before
- *  tabs or workspaces existed: already a valid one-tab state. */
+ *  drops both trailing segments and the key is the bare `home`. */
 export const homeTabScope = (tabId: string, workspaceId?: string): PlacementScope =>
   ({ surface: 'home', ownerId: tabId, workspaceId })
 
@@ -69,7 +68,7 @@ export type DashboardState = {
 
 /** `id: ''` is the default tab (the workspace's bare `home//<ws>` scope). A tab belongs to one
  *  workspace, and identity is the pair: every workspace has its own default tab, all of them `''`.
- *  `workspaceId` absent is the pre-workspace board (`adoptLegacyHome`). */
+ *  `workspaceId` absent is the unscoped board (`adoptUnscopedHome`). */
 export type DashboardTab = { id: string; name: string; workspaceId?: string }
 
 export const emptyDashboards = (): DashboardState => ({ version: 1, panels: {}, placements: {}, layouts: {} })
@@ -126,7 +125,7 @@ const parseTabs = (raw: unknown): DashboardTab[] => {
 
 /** The tab id a placement key names within one workspace, or `undefined` for a key that is not that
  *  workspace's Home tab. `home//<ws>` is its default tab, `home/<id>/<ws>` a named one; the bare
- *  `home` and `home/<id>` are the pre-workspace board, which is the `workspaceId: undefined` case. */
+ *  `home` and `home/<id>` are the unscoped board, which is the `workspaceId: undefined` case. */
 export const homeTabIdOf = (key: string, workspaceId?: string): string | undefined => {
   const segments = key.split('/')
   if (segments[0] !== 'home' || segments.length > 3) return undefined
@@ -312,21 +311,21 @@ export const removeHomeTab = (tabId: string, workspaceId?: string): void =>
     return { ...rest, placements, layouts, ...(tabs.length ? { tabs } : {}) }
   })
 
-// ── Adopting the pre-workspace board ──────────────────────────────────────────────────────────
+// ── Adopting the unscoped board ───────────────────────────────────────────────────────────────
 
-/** Move a board written before Home was per-workspace into the workspace it is first opened in.
+/** Move a board composed while no workspace was known into the workspace Home is next opened in.
  *
- *  Boards used to be one composition shared by every workspace, which is how a panel came to link at
- *  work that lives somewhere you cannot get to from where the panel is drawn. The bare `home` and
- *  `home/<tab>` keys are what that era wrote; this re-keys them to `home//<ws>` and `home/<tab>/<ws>`
- *  and stamps the matching names, once, whichever workspace the person opens Home in first. There is
- *  no honest better guess: the old board named no workspace, so any other choice would be as
- *  arbitrary and would leave the panels invisible until they found them.
+ *  Home draws with no workspace at `/` with no project routed, and before the workspace mapping
+ *  loads (workspaces/activeWorkspaceId.ts). A board composed then is keyed by the bare `home` and
+ *  `home/<tab>`. This re-keys them to `home//<ws>` and `home/<tab>/<ws>` and stamps the matching
+ *  names, whichever workspace the person opens Home in next. There is no honest better guess: the
+ *  board named no workspace, so any other choice would be as arbitrary and would leave the panels
+ *  invisible until they found them.
  *
  *  Never overwrites: a key the workspace already has means the board it would land on is somebody's
- *  own, so the legacy one stays where it is rather than replacing it. Returns the same state when
+ *  own, so the unscoped one stays where it is rather than replacing it. Returns the same state when
  *  there is nothing to adopt, so the caller can run it on every render without writing anything. */
-export function adoptLegacyHome(state: DashboardState, workspaceId: string): DashboardState {
+export function adoptUnscopedHome(state: DashboardState, workspaceId: string): DashboardState {
   if (!workspaceId) return state
   const rekey = new Map<string, string>()
   for (const key of new Set([...Object.keys(state.placements), ...Object.keys(state.layouts)])) {
@@ -349,8 +348,8 @@ export function adoptLegacyHome(state: DashboardState, workspaceId: string): Das
   }
 }
 
-export const adoptLegacyHomeDashboards = (workspaceId: string): void =>
-  void setDashboards((state) => adoptLegacyHome(state, workspaceId))
+export const adoptUnscopedHomeDashboards = (workspaceId: string): void =>
+  void setDashboards((state) => adoptUnscopedHome(state, workspaceId))
 
 // ── Slice ─────────────────────────────────────────────────────────────────────────────────────
 

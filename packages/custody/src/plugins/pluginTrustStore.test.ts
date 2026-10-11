@@ -243,14 +243,6 @@ describe('custody', () => {
     expect(store().list()).toEqual([])
   })
 
-  it('reads pre-webview version-1 acknowledgements as having no webview grants', () => {
-    const { webviews: _webviews, keyClaims: _keyClaims, navigationDestinations: _navigationDestinations, ...legacy } = ack()
-    writeFileSync(join(dir, 'acorn-1-plugin-trust.json'), JSON.stringify({ version: 1, acks: [legacy] }))
-    expect(store().list()[0]?.webviews).toEqual([])
-    expect(store().list()[0]?.keyClaims).toEqual([])
-    expect(store().list()[0]?.navigationDestinations).toEqual([])
-  })
-
   it('refuses a malformed acknowledgement rather than storing one nothing can match', () => {
     expect(() => store().record(ack({ hash: 'not-a-hash' }))).toThrow()
   })
@@ -262,7 +254,7 @@ describe('custody', () => {
     const alsoGood = ack({ pluginId: 'board', hash: HASH_B, decision: 'rejected' })
     writeFileSync(
       join(dir, 'acorn-1-plugin-trust.json'),
-      JSON.stringify({ version: 1, acks: [good, { pluginId: 'future', hash: 12, whatever: true }, alsoGood] }),
+      JSON.stringify({ version: 1, acks: [good, { pluginId: 'future', hash: 12, whatever: true }, alsoGood], devGrants: [] }),
     )
     const kept = store().list()
     expect(kept.map((entry) => entry.pluginId).sort()).toEqual(['board', 'sparkline'])
@@ -272,7 +264,7 @@ describe('custody', () => {
     const remembered = ack({ pluginId: 'board', hash: HASH_B, decision: 'rejected' })
     writeFileSync(
       join(dir, 'acorn-1-plugin-trust.json'),
-      JSON.stringify({ version: 1, acks: [remembered, { pluginId: 'future', hash: 12 }] }),
+      JSON.stringify({ version: 1, acks: [remembered, { pluginId: 'future', hash: 12 }], devGrants: [] }),
     )
     // A rejection is the one that hurts most to lose: forget it and the plugin the owner turned away
     // asks again on every boot.

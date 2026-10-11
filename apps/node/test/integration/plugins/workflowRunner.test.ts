@@ -583,7 +583,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
         },
       }],
     }
-    const runner = new WorkflowRunner(wf.db, deps(), { entries: (point) => (contributed[point] ?? []) as never })
+    const runner = new WorkflowRunner(wf.db, deps(), { handlers: (point) => (contributed[point] ?? []) as never })
     expect(await runner.pollTriggers()).toEqual({ started: 1, errors: [] })
     const [run] = await wf.db.select().from(workflowRuns)
     expect(run.trigger).toBe('src:pr-opened')
@@ -604,7 +604,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       },
     } }
     kinds.push(contribution)
-    const runner = new WorkflowRunner(wf.db, deps(), { entries: (point) => (point === WORKFLOW_STEP_KIND ? kinds : []) as never })
+    const runner = new WorkflowRunner(wf.db, deps(), { handlers: (point) => (point === WORKFLOW_STEP_KIND ? kinds : []) as never })
     const definition: WorkflowDef = { baseline: 'acorn-1', formatVersion: 1, name: 'custom', steps: [
       { id: 'first', name: 'First', kind: 'src:custom' },
       { id: 'second', name: 'Second', kind: 'src:custom' },

@@ -65,7 +65,6 @@ export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
 // the Generate modal's picker. Device-only like the rest of `/defs`, and ids and labels only: no key
 // ever leaves the node. The path keeps its old spelling, which only this client reads.
 export const workflowModelBackendsRoute = `${workflowDefsRoute}/model-connections`
-export const workflowSaveToRepoRoute = (id: string) => `${workflowDefsRoute}/${id}/save-to-repo`
 // Every step kind, policy and profile this node can run, with the form each kind draws. The editor's
 // Add menu and its inspector are both built from it (../shared/workflowContracts.ts § WorkflowCatalog).
 export const workflowCatalogRoute = '/v1/p/workflows/catalog'
@@ -189,7 +188,6 @@ function workflowApiAt(nodeId?: string | null) {
     updateDef: (id: string, def: unknown, revision: number) => post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
     deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
     validateDef: (def: unknown, projectId?: string) => post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
-    saveDefToRepo: (id: string, opts: { taskId?: string; keepRow?: boolean }) => post<{ path: string }>(workflowSaveToRepoRoute(id), opts),
     authoringTurn: (request: AuthoringTurnRequest, signal: AbortSignal) =>
       writeJson<AuthoringTurnResult>(`${workflowDefsRoute}/authoring/turn`, {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),

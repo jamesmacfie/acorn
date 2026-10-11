@@ -100,7 +100,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
       new Request('http://acorn.test/api/integrations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ provider: 'rollbar', credentials: { token: 'read-token' } }),
+        body: JSON.stringify({ providerId: 'rollbar', credentials: { token: 'read-token' } }),
       }),
       env(),
     )
@@ -123,7 +123,7 @@ describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § 
     vi.mocked(rollbarFetch).mockResolvedValueOnce(new Response('nope', { status: 401 }))
     const res = await app.fetch(
       new Request('http://acorn.test/api/integrations', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ provider: 'rollbar', credentials: { token: 'bad' } }),
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ providerId: 'rollbar', credentials: { token: 'bad' } }),
       }),
       env(),
     )

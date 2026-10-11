@@ -302,7 +302,6 @@
   "POST /v1/p/terminal/tasks/:taskId/setup",
   "POST /v1/p/terminal/tasks/:taskId/setup",
   "POST /v1/p/workflows/defs",
-  "POST /v1/p/workflows/defs/:id/save-to-repo",
   "POST /v1/p/workflows/defs/authoring/turn",
   "POST /v1/p/workflows/defs/files",
   "POST /v1/p/workflows/defs/generate",

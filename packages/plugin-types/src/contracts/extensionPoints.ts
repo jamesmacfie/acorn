@@ -18,19 +18,13 @@ export type Extension<T> = {
  *  extension points). Reach for a capability when there is one right answer, and for a point when
  *  there are many: several plugins each adding a workflow step kind, an event sink, a run backend.
  *
- * A point you open must be named `<yourPluginId>:<pointId>`. Contributing to a point nobody has opened
- * is not an error and not a no-op forever: entries wait, and the owner sees them the moment it opens
- * the point, because init order is not a dependency contract. */
+ * A point you declare must be named `<yourPluginId>:<pointId>`. Handling a point nobody has declared
+ * is not an error and not a no-op forever: entries wait, and the owner sees them the moment it
+ * declares the point, because init order is not a dependency contract. */
 export type PluginExtensionPointRegistry = {
   declare<T>(point: ExtensionPointId<T>, label: string): void
   handle<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
   /** In declared order, ties broken by id. Resolve at call time, never at init. */
   handlers<T>(point: ExtensionPointId<T>): Extension<T>[]
-  /** @deprecated Renamed to `declare`. Removed in the next major of the plugin API. */
-  open<T>(point: ExtensionPointId<T>, label: string): void
-  /** @deprecated Renamed to `handle`. Removed in the next major of the plugin API. */
-  contribute<T>(point: ExtensionPointId<T>, entry: { id: string; order?: number; value: T }): void
-  /** @deprecated Renamed to `handlers`. Removed in the next major of the plugin API. */
-  entries<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
 

@@ -6,7 +6,7 @@ import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, s
 import { REPOS_STALE_AFTER_MS } from '../../syncPolicy'
 import { readCachedRepos, refreshRepos, toPublicRepo } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'
-import { repos as reposTable, syncState } from '../../../node/schema'
+import { syncState } from '../../../node/schema'
 import { type GithubEmit, NO_EMIT } from '../../events'
 
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
@@ -19,17 +19,14 @@ export const repos = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hon
     const userId = uid // The active owner is the mirror scope key for this request.
     const resource = reposResource()
 
-    // Freshness comes from sync_state (bumped on every 200/304). A pre-ETag mirror has repo rows but
-    // no sync row yet, fall back to the newest row's fetchedAt so it serves as stale (not cold) and
-    // self-heals on the first refresh. Cold only when nothing was ever fetched.
+    // Freshness comes from sync_state, bumped on every 200 and 304. With no sync row the list was
+    // never fetched, so it reads as cold even when opening one repository left a single row behind.
     const read = async (): Promise<Cached<Repo[]> | null> => {
       const [[sync], rows] = await Promise.all([
         db.select().from(syncState).where(and(eq(syncState.userId, userId), eq(syncState.resource, resource))),
         readCachedRepos(db, userId),
       ])
-      if (!sync && rows.length === 0) return null
-      const fetchedAt = sync?.fetchedAt ?? rows.reduce((max, r) => Math.max(max, r.fetchedAt), 0)
-      return { data: rows.map(toPublicRepo), fetchedAt }
+      return sync ? { data: rows.map(toPublicRepo), fetchedAt: sync.fetchedAt } : null
     }
 
     const result = await serveThenRevalidate({
@@ -45,11 +42,8 @@ export const repos = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hon
   .post('/refresh', async (c) => {
     const uid = ownerId(c)
 
-    // Force the next GET stale: zero both freshness sources (sync row + legacy row fetchedAt). The
-    // ETag stays, so the refetch can still 304 (nothing changed → cheap re-validate).
-    await db.batch([
-      db.update(reposTable).set({ fetchedAt: 0 }).where(eq(reposTable.userId, uid)),
-      db.update(syncState).set({ fetchedAt: 0 }).where(and(eq(syncState.userId, uid), eq(syncState.resource, reposResource()))),
-    ])
+    // Force the next GET stale. The ETag stays, so the refetch can still 304 (nothing changed → cheap
+    // re-validate).
+    await db.update(syncState).set({ fetchedAt: 0 }).where(and(eq(syncState.userId, uid), eq(syncState.resource, reposResource())))
     return c.body(null, 204)
   })

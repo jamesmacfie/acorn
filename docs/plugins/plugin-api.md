@@ -80,9 +80,6 @@ One shape means one verb, on both contexts:
 | One provider, resolved late | `provide`, `get`, `require` | `ctx.capabilities` and its client twin |
 | A registry with one action beside its registration | The action's own verb | `audit.record`, `hooks.run`, `events.send` |
 
-`ctx.extensionPoints` still accepts the deprecated `open`, `contribute`, and `entries`. They're
-aliases of the same implementation and leave at the next `PLUGIN_API_MAJOR`.
-
 `ctx.providers` keeps four separate names: `integration`, `connection`, `model`, and `nodes`. A
 single `register({ kind })` would need the four shapes to share a discriminant, and they don't. An
 integration takes a descriptor and an optional route carrier, a model adapter names a registered

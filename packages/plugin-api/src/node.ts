@@ -44,7 +44,7 @@ export { PLUGIN_API_MAJOR } from '@acorn/node-core/server/plugins'
 export { capabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 export type { Disposable } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 // The many-provider seam beside capabilities (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Only
-// the id minter and the entry type: `open`, `contribute` and `entries` arrive on
+// the id minter and the entry type: `declare`, `handle` and `handlers` arrive on
 // `ctx.extensionPoints`, and a plugin that imported the registry directly would get its own copy of
 // the maps, since a loaded bundle inlines every @acorn/* import it makes.
 export { extensionPointId } from '@acorn/node-core/server/pluginHost'

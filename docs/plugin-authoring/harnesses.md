@@ -21,7 +21,7 @@ This is the whole plugin that adds OpenCode:
   "name": "OpenCode",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "3",
+  "apiVersion": "4",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [

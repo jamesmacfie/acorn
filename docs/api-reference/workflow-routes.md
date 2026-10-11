@@ -91,7 +91,6 @@ Definitions stored as rows live under `/defs`, and the whole family is device-on
 | `GET /defs/publications?workspaceId=` | | Incomplete and completed publication operations, for recovery |
 | `POST /defs/publications/:operationId/publish` | `{}` | The publication state and the exact revisions that landed |
 | `POST /defs/publications/:operationId/discard` | `{}` | `{ ok }`, only while no write has landed |
-| `POST /defs/:id/save-to-repo` | `{ taskId?, keepRow? }` | Refused, with guidance to use **Export to repository**. Kept for older clients. |
 | `POST /defs/authoring/turn` | An authoring turn for a workflow | One AI authoring turn. No execution or publication. |
 | `POST /defs/generate` | `{ backendId, modelId?, description, workspaceId, defId?, name?, inputs? }` | `{ def, notes, problems, repaired, providerId, modelId }` |
 | `GET /defs/model-connections` | | The backends this owner can generate with, ids and labels only. An empty list is why the editor draws no **Generate** button. |

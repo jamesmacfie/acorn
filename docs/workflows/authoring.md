@@ -178,7 +178,7 @@ draft, then reports each problem beside the field and in validation. Saving the 
 it runnable. The start path validates and resolves every child before it creates a task.
 
 Renaming a step preserves map sources, structured bindings, graph edges, and prompt references.
-The JSON tab, TOML import and export, save-to-repository flow, undo, and redo use the same
+The JSON tab, TOML import and export, **Export to repository**, undo, and redo use the same
 child workflow contract.
 
 <a id="generating-and-editing-with-ai"></a>

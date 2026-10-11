@@ -184,7 +184,6 @@ export const workflowDefinitions = (
       })
     },
     modelBackends: (userId) => core.models.available(userId),
-    saveToRepo: async () => ({ error: 'Use Export to repository to review the published dependency graph before writing files.' }),
   }
   // The same writes the editor's Save makes, for `workflow_draft` (../agentTools/drafts.ts).
   const drafts: WorkflowDraftWriter = {
