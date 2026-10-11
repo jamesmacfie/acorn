@@ -57,7 +57,7 @@
     "hono": "catalog:",
     "idb-keyval": "^6.2.5",
     "pg": "^8.22.0",
-    "smol-toml": "^1.7.1",
+    "smol-toml": "^1.9.0",
     "solid-js": "catalog:",
     "ws": "^8.21.0",
     "yoga-layout": "3.2.1",

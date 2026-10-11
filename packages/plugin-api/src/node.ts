@@ -141,7 +141,7 @@ export type {
 export { SecretUnavailableError } from '@acorn/node-core/server/core/secrets.ts'
 export type { SecretService } from '@acorn/node-core/server/core/secrets.ts'
 export type { PrefService } from '@acorn/node-core/server/core'
-export { confineExistingFile, resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
+export { confineExistingFile, readConfigFileSync, resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 // The local secret detector, pure and bounded. The publication gate is `ctx.core.secretPublication`
 // (docs/security/secret-publication.md).
 export { decodeSecretInput, redactSecretText, scanSecretText, secretReport, SECRET_DETECTOR_VERSION } from '@acorn/node-core/server/secretChecks/detector.ts'

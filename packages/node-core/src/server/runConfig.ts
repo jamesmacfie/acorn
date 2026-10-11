@@ -1,6 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
+import { readConfigFileSync } from './core/fs'
 import type { BrowserRule, PreviewMode, ProjectRepoConfig } from '@acorn/protocol/api.ts'
 
 export type RunTarget = {
@@ -205,14 +206,15 @@ export function projectRunTargets(db: DbConfigFallback): RunTarget[] {
   }
 }
 
-// One `<dir>/.acorn/config.toml`, parsed. Missing is no layer; unreadable is no layer and an error.
+// One `<dir>/.acorn/config.toml`, parsed. Missing is no layer; unreadable or oversized is no layer
+// and an error.
 function readLayer(dir: string | null, label: string, errors: ConfigError[]): Layer | null {
   if (!dir) return null
   const file = join(dir, '.acorn', 'config.toml')
   if (!existsSync(file)) return null
   let text: string
   try {
-    text = readFileSync(file, 'utf8')
+    text = readConfigFileSync(file)
   } catch (e) {
     errors.push({ source: label, message: e instanceof Error ? e.message : 'unreadable config' })
     return null

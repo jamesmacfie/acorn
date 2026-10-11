@@ -20,7 +20,7 @@
     "@tanstack/solid-query": "^5.101.0",
     "hono": "catalog:",
     "node-pty": "^1.0.0",
-    "smol-toml": "^1.7.1",
+    "smol-toml": "^1.9.0",
     "solid-js": "catalog:",
     "zod": "catalog:"
   },

@@ -1,12 +1,12 @@
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 // Workflow files: declarative, committed `.acorn/workflows/*.toml`. Layering and sub-workflow
 // expansion are covered in docs/workflows/execution.md § Execution model.
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
 import { z } from 'zod'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
-import { agentProfileRegistry, resolveInRoot } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, readConfigFileSync, resolveInRoot } from '@acorn/plugin-api/node'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './builtinDefinitions'
 import type {
   ChildWorkflowConfig,
@@ -387,7 +387,7 @@ export function loadWorkflowFiles(
       try {
         const path = resolveInRoot(base, `.acorn/workflows/${entry}`)
         if (!path) throw new Error('Workflow file is outside the allowed root')
-        const parsed = parseWorkflowToml(readFileSync(path, 'utf8'), id, source, errors)
+        const parsed = parseWorkflowToml(readConfigFileSync(path), id, source, errors)
         // repo layer scans first and wins; the user layer only fills gaps.
         if (parsed && !raw.has(id)) raw.set(id, parsed)
       } catch (e) {

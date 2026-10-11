@@ -101,6 +101,13 @@ describe('file drafts and portable export', () => {
     await expect(service()({ action: 'open', target })).rejects.toThrow('text editor')
   })
 
+  it('loads no workflow from an oversized file and names it in one error', () => {
+    write(def()); writeFileSync(join(root, target.path), `${writeWorkflowToml(def())}\n${'#'.repeat(1024 * 1024)}\n`)
+    const loaded = loadWorkflowFiles(root, null, catalog)
+    expect(loaded.workflows).toEqual([])
+    expect(loaded.errors).toEqual([{ source: 'repo:example', message: expect.stringContaining('example.toml is larger than the 1048576-byte limit') }])
+  })
+
   it('round-trips nested typed values and constrained connection inputs through TOML', () => {
     const value = def(); value.inputs = [{ name: 'payload', schema: { type: 'object' }, default: { items: [1, true, null, { nested: 'value' }] } }, { name: 'connection', schema: { type: 'string' }, required: true, connection: { source: query.query.source } }]
     value.steps[0]!.query = { kind: 'inline', content: query, bindings: {} }

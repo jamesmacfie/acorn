@@ -1,7 +1,7 @@
 // Filesystem confinement: one canonical implementation (docs/security/process-and-paths.md § Process, path, and
 // configuration controls). resolveInRoot is lexical and symlink aware; a lexical-only check lets a
 // worktree symlink escape its root.
-import { lstatSync, realpathSync } from 'node:fs'
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve, sep } from 'node:path'
 
@@ -61,5 +61,36 @@ export async function confineExistingFile(root: string, relPath: string): Promis
     return { ok: true, path: abs }
   } catch {
     return { ok: false, reason: 'missing' }
+  }
+}
+
+// A repository can commit any bytes it likes into a TOML file Acorn parses on the event loop, so a
+// configuration read stops at this size rather than handing the parser an unbounded document.
+export const MAX_CONFIG_FILE_BYTES = 1024 * 1024
+
+// Read a configuration file of at most MAX_CONFIG_FILE_BYTES. O_NONBLOCK and the regular-file check
+// keep a FIFO from blocking the open. Symlinks are followed, as a plain read would follow them, so a
+// person's dotfile link keeps working; confining the path is the caller's job.
+export function readConfigFileSync(path: string): string {
+  const fd = openSync(path, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0))
+  try {
+    const stat = fstatSync(fd)
+    if (!stat.isFile()) throw new Error(`${path} is not a regular file.`)
+    const tooLarge = () => new Error(`${path} is larger than the ${MAX_CONFIG_FILE_BYTES}-byte limit for configuration files.`)
+    if (stat.size > MAX_CONFIG_FILE_BYTES) throw tooLarge()
+    // Count what is actually read too: the file can grow after the stat.
+    const chunks: Buffer[] = []
+    let total = 0
+    for (;;) {
+      const chunk = Buffer.alloc(Math.min(64 * 1024, MAX_CONFIG_FILE_BYTES - total + 1))
+      const count = readSync(fd, chunk, 0, chunk.length, null)
+      if (!count) break
+      total += count
+      if (total > MAX_CONFIG_FILE_BYTES) throw tooLarge()
+      chunks.push(chunk.subarray(0, count))
+    }
+    return Buffer.concat(chunks, total).toString('utf8')
+  } finally {
+    closeSync(fd)
   }
 }

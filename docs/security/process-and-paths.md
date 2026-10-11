@@ -83,6 +83,12 @@ capped at 1 MiB, the formatted snapshot at 8 MiB, and the snapshot at 256 files
 (`server/repoConfigSnapshot.ts`). Workflow directory scans stop after 1,024 entries. Unsafe or
 oversized input fails closed. These static checks don't remove a path swap between check and use.
 
+The parsers read the same files again on their own. Run-target resolution reads each
+`.acorn/config.toml` layer, and the workflow loader reads each `.acorn/workflows/*.toml` file,
+through `readConfigFileSync` (`server/core/fs.ts`). It refuses special files and anything over 1 MiB,
+so a repository can't hand the TOML parser an unbounded document on the event loop. An oversized file
+becomes one config error for its layer or workflow, and the Node keeps running.
+
 `.acorn/config.toml` reports `[scripts] setup` and `[scripts] archive` as unread. Wiring them would
 make a committed file run a command on worktree creation and on archive, and neither path asks this
 gate. The `[docker]` table is read without the gate, but its bounded read contributes summary hints

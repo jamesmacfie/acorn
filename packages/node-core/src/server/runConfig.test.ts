@@ -96,6 +96,14 @@ copy = [".env.local"]
     expect(stack?.url).toBe('http://localhost:8080')
   })
 
+  it('an oversized config file is one error and no layer, before the parser sees it', () => {
+    writeConfig(repoDir, `[scripts.run.dev]\ncommand = "repo-dev"\n${'#'.repeat(1024 * 1024)}\n`)
+    const cfg = loadRepoConfig(repoDir, null, {})
+    expect(cfg.errors).toHaveLength(1)
+    expect(cfg.errors[0]).toMatchObject({ source: 'repo', message: expect.stringContaining('config.toml is larger than the 1048576-byte limit') })
+    expect(cfg.runTargets).toEqual([])
+  })
+
   it('parses copy and layout recipes', () => {
     writeConfig(repoDir, `
 copy = [".env.local", ".env.development"]

@@ -604,6 +604,7 @@ node: publicProvider
 node: queryContentSchema
 node: queryReferenceSchema
 node: queryScopeSchema
+node: readConfigFileSync
 node: readDataPointer
 node: recordSkillDelivery
 node: redactSecretText
