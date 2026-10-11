@@ -146,6 +146,9 @@ const mount = (keepCache = false) => {
 
 const rectangle = (host: HTMLElement, kind: 'editor' | 'pty') => host.querySelector(`.ui-rect[data-kind="${kind}"]`)
 
+const openStatusDetails = (host: HTMLElement) =>
+  [...host.querySelectorAll<HTMLButtonElement>('[aria-label="File status"] button')].find((button) => button.textContent === 'Details')!.click()
+
 const editor = async (host: HTMLElement): Promise<EditorView> =>
   vi.waitFor(() => {
     const dom = host.querySelector<HTMLElement>('.cm-editor')
@@ -185,7 +188,7 @@ describe('the editor pane', () => {
     const view = await editor(host)
     editorOpen(taskId, 'a.ts', false)
     await showing(() => view, 'const a = 1')
-    host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    openStatusDetails(host)
     const oldWrap = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((item) => item.textContent?.includes('Word wrap'))!
     editorOpen(taskId, 'b.ts', false)
     await vi.waitFor(() => expect(view.state.doc.toString()).toBe('const b = 2\n'))
@@ -265,7 +268,7 @@ describe('the editor pane', () => {
     expect(view.scrollDOM.scrollTop).toBe(25)
     view.dispatch({ changes: { from: 0, insert: 'changed ' } })
     expect(editorCommand('editor.edit.undo').when?.()).toBe(true)
-    first.host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    openStatusDetails(first.host)
     const tabs4 = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find((item) => item.textContent?.includes('Tabs: 4'))!
     tabs4.click()
     expect(first.host.querySelector('[aria-label="File status"]')?.textContent).toContain('Tabs: 4')
@@ -297,7 +300,7 @@ describe('the editor pane', () => {
     await showing(() => view, 'second')
     setActiveTaskId(taskId)
     setFocusedPane(taskId, 'editor')
-    host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    openStatusDetails(host)
     const tabs4 = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')].find((item) => item.textContent?.includes('Tabs: 4'))!
     tabs4.click()
     expect(view.state.doc.toString()).toBe('first\r\n  second\r\n')
@@ -331,7 +334,7 @@ describe('the editor pane', () => {
     runEditorCommand('editor.toggle-word-wrap')
     expect(write).not.toHaveBeenCalled()
     setFocusedPane(taskId, 'agent')
-    host.querySelector<HTMLButtonElement>('[aria-label="File status"] button:last-child')!.click()
+    openStatusDetails(host)
     const wrap = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitemcheckbox"]')].find((item) => item.textContent?.includes('Word wrap'))!
     wrap.click()
     expect(view.contentDOM.classList.contains('cm-lineWrapping')).toBe(true)

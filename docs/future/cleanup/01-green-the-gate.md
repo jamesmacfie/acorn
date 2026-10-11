@@ -1,5 +1,73 @@
 # 01: Green the gate
 
+> **Completion note, October 11, 2026.** `pnpm lint` and `pnpm --filter @acorn/arch-tests test`
+> exit zero, and `pnpm test` passes on Node 26.8.1. `main` is not pushed, so requirement 7 and the CI
+> acceptance stay open for the coordinator.
+>
+> What landed:
+>
+> - The agents runtime, its `runtime.test.ts` and `sessionWait.test.ts` fixtures, and the agents
+>   testkit's `seedUnattendedPolicy` type `core` as `CompiledCoreServices`. The last two weren't
+>   in the list above. They broke once the runtime's type changed.
+> - The terminal kit accepts `widthKey` on `ListDetail` and `scrollKey` on `ListColumn` and ignores
+>   both. The terminal list has a fixed width and keeps no scroll position.
+> - `AgentPane.test.tsx` subagents carry `turnId: null`. The `workflowMapLifecycle.test.ts` profile
+>   returns a real `HeadlessArgv`.
+> - The 15 dead links are gone. The Git client screenshots weren't missing by accident: commit
+>   `473320135` deleted them on October 9, so the reference table went too. Git history keeps the
+>   images. The editor acceptance page went in the same commit, and no page took over its open
+>   checks. So the editor links point at the
+>   [phase six followup](../../testing/editor-phase06-follow-up-2026-10-08.md), which lists the
+>   checks that couldn't run, or at the dated completion records.
+> - The root `lint` script runs `turbo run lint --continue`.
+>
+> The test failures, and why each one was the stale side:
+>
+> - `EditorPane.test.tsx` opened the status menu with `button:last-child`. Since the October 8 icon
+>   change, that selector finds **Copy absolute path** first. A helper finds **Details** by its label.
+> - `chrome.test.tsx` counted markers without Git's uncommitted-changes dot, which the fixture task
+>   carries. Every expected count goes up by one.
+> - `managedBridge.test.ts` recorded a running tool under a turn it never started. Since October 8,
+>   the read projection reports that tool as `unknown`. The fixture starts the turn.
+> - `generate.test.ts` predates the agent step's `goal` input, added October 8.
+> - `persistedState.conformance.test.ts` was missing the agents `composerExpansionSlice`. The agents
+>   client testkit exports it.
+> - The desktop `parity.snapshot.json` golden predates "Changes as a Git tab". It's regenerated.
+>   `docs/panes.md` already matched.
+> - Three Node integration tests broke on October 10, when plugins started registering a
+>   deleted-task purge schedule and the testkit started providing a scheduler.
+>   `httpLoaded.test.ts` and `databaseLoaded.test.ts` give their registries a scheduler that never
+>   starts. `workflowActivation.test.ts` drops its second one.
+> - The `pluginDisable.test.ts` golden was already green on this checkout.
+>
+> Four tests passed alone and failed under the full run, so each got a fix:
+>
+> - `mcpReviewProxy.test.ts`: the reconnect case reused the change flag the case before it leaves
+>   on disk. Its fixture server then added a tool mid-read. It now uses a flag path that never exists.
+> - client-core's `Markdown.test.tsx`: a test that ends synchronously can leave the highlighter
+>   import running. At teardown, that import missed the mock and loaded the real module, and Vitest
+>   reported an unhandled error. `afterEach` now awaits `vi.dynamicImportSettled()`.
+> - client-core's `DiffPane.test.tsx` checked re-coloured segments after one fixed 150 ms pause.
+>   Under load, re-tokenizing takes longer. The check waits for the result instead.
+> - The `boundaries.test.ts` scan that parses every library file takes about a second alone and
+>   more than five under load. It has a 30-second timeout.
+>
+> Decisions and deviations:
+>
+> - I skipped the optional pre-push hook. Unchecked commits piled up because `main` wasn't pushed,
+>   and a hook doesn't change that. CI covers every push once `main` goes up.
+> - Requirement 7 is not done. This task wasn't allowed to push.
+>
+> What later phases need to know:
+>
+> - Run the gate on a Node inside the root `engines` range. On Node 24.11.0, 33 more tests fail.
+>   The loaded-plugin and worker tests refuse an unpatched runtime, and `instructionSnapshot.test.ts`
+>   hits a Node 24.11 `rmSync` bug that leaves a dangling symlink in place. Put
+>   `~/.nvm/versions/node/v26.8.1/bin` first on `PATH`, or install 24.18.1 or later.
+> - A test that fails only under the full run is a real red. Run it alone to find the cause, then fix
+>   it. Don't wave it through as a flake.
+> - Run the process and loopback tests outside the agent sandbox. Inside it, they fail.
+
 This proposal gets `pnpm lint`, the architecture tests, and `pnpm test` passing on `main`, and gets
 CI running on every push again. Every other cleanup proposal depends on it, because a refactor can't
 prove it changed nothing against a gate that's already red.

@@ -9,6 +9,7 @@ import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import { SCHEDULER, Scheduler } from '@acorn/node-core/server/schedules/index.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
@@ -60,6 +61,8 @@ describe('database as a host-mediated loaded plugin', () => {
     ])
 
     const capabilities = new CapabilityRegistry()
+    // A scheduler that never starts, for the deleted-task purge the plugin registers at init.
+    capabilities.provide(SCHEDULER, new Scheduler(core.db))
     plugins = await initPlugins([loaded[0].plugin], {
       capabilities,
       core: createCoreServices({

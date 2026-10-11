@@ -4,7 +4,6 @@ import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import { makeTestNodeContext } from '@acorn/node-core/testkit'
 import { schema as coreSchema } from '@acorn/node-core/server/db/index.ts'
-import { SCHEDULER, Scheduler } from '@acorn/node-core/server/schedules/index.ts'
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import { workflowsPlugin } from '@acorn/plugin-workflows/node/index.ts'
 import { AGENTS_SESSION_EXECUTE, type AgentSessionExecute, type AgentSessionExecuteRequest } from '@acorn/plugin-agents/contract/sessionExecute.ts'
@@ -61,7 +60,6 @@ it('activates route capabilities and runs managed execution through a late-bound
     createdAt: at, updatedAt: at,
   })
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })))
-  ctx.capabilities.provide(SCHEDULER, new Scheduler(ctx.db))
   ctx.capabilities.provide(NOTES_STORE, new NotesStore(join(root, 'notes')))
   await plugin.init?.(ctx)
   const route = ctx.capabilities.get(WORKFLOW_ROUTE)

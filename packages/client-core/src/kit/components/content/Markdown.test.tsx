@@ -35,10 +35,13 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.append(host)
 })
-afterEach(() => {
+afterEach(async () => {
   dispose?.()
   dispose = undefined
   host.remove()
+  // A fence starts loading the highlighter even when its test ends synchronously. A load still running
+  // at teardown misses the mock above and pulls in the real module.
+  await vi.dynamicImportSettled()
 })
 
 const mount = (initial: string) => {

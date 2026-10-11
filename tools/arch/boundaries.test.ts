@@ -710,7 +710,8 @@ describe('architecture boundaries', () => {
     }
     expect(scanned).toBeGreaterThan(300)
     expect(offenders.sort()).toEqual([])
-  })
+    // Parsing every library file takes about a second alone and more than five inside `pnpm test`.
+  }, 30_000)
 
   it('the reserved plugin route segment is spelled the same on both sides of the client/node boundary', () => {
     // Two spellings that must not drift (docs/architecture/packages.md § Package boundaries).

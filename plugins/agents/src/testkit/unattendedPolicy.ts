@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { agentProfileRegistry, type CoreServices, type PluginDatabase, type SecretService } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, type CompiledCoreServices, type PluginDatabase, type SecretService } from '@acorn/plugin-api/node'
 import type { AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverSession } from '../server/drivers/types'
 import { AgentDriverRegistry } from '../server/drivers/registry'
@@ -14,7 +14,7 @@ const provider: AgentProviderDescriptor = {
 
 /** Execute synthetic requests through the runtime, then leave its saved transcript for desktop inspection. */
 export async function seedUnattendedPolicy(options: {
-  db: PluginDatabase; core: CoreServices; secrets: SecretService; dataDir: string; taskId: string; taskRoot: string
+  db: PluginDatabase; core: CompiledCoreServices; secrets: SecretService; dataDir: string; taskId: string; taskRoot: string
 }): Promise<{ session: AgentSession; turns: number; events: number }> {
   const answers: unknown[] = []
   const registry = new AgentDriverRegistry()
@@ -57,7 +57,7 @@ export async function seedUnattendedPolicy(options: {
     id: provider.profileId, label: provider.label, kind: 'agent', command: 'fixture', backendPreference: 'tmux',
     transport: 'pty', managedProvider: provider.id,
   })
-  const core: CoreServices = { ...options.core, tasks: {
+  const core: CompiledCoreServices = { ...options.core, tasks: {
     ...options.core.tasks, requireRoot: async () => options.taskRoot, workspaceId: async () => 'fixture',
   } }
   const runtime = new ManagedAgentRuntime({

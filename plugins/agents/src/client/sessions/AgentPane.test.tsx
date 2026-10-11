@@ -90,7 +90,7 @@ describe('stopping the selected agent', () => {
 
   it('stops a running Codex child under a ready parent and restores parent controls on return', async () => {
     mount(session({ driverKind: 'codex-app-server', providerId: 'codex', subagents: [
-      { id: 'child-1', title: 'desktop_boundaries', status: 'running', startedAt: 1, updatedAt: 1 },
+      { id: 'child-1', title: 'desktop_boundaries', status: 'running', turnId: null, startedAt: 1, updatedAt: 1 },
     ] }))
     await settle()
     expect(stop().disabled).toBe(true)
@@ -109,7 +109,7 @@ describe('stopping the selected agent', () => {
   ])('disables child Stop for %s / %s even when the parent is working', async (driverKind, status) => {
     selectManagedSubagent('sess-1', 'child-1')
     mount(session({ driverKind, runtimeState: 'working', subagents: [
-      { id: 'child-1', title: 'Child', status: status as 'idle' | 'running', startedAt: 1, updatedAt: 1 },
+      { id: 'child-1', title: 'Child', status: status as 'idle' | 'running', turnId: null, startedAt: 1, updatedAt: 1 },
     ] }))
     await settle()
     expect(stop().disabled).toBe(true)

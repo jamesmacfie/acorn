@@ -40,26 +40,6 @@ The first release ends after phase 04. Later phases extend that release; do not 
 depend on completing every operation or conflict tool. [Refused alternatives](./refused.md) records
 the scope boundaries and their reasons.
 
-## Reference screenshots
-
-Copies of the supplied images are retained beside this plan so a future developer can inspect them
-without the original chat or the task's attachment directory. Treat them as interaction references,
-not Acorn mockups or evidence of another product's complete functionality.
-
-| Reference | What it shows | Acorn interpretation |
-| --- | --- | --- |
-| [1: light history](./screenshots/01-history.png) | Navigation, connected history, commit metadata, and changed files. | Repository source with history list and selected revision detail. |
-| [2: light stashes](./screenshots/02-stashes.png) | Named stashes, origin branch, metadata, and expanded diff. | Repository stash list; the same revision detail and diff components. |
-| [3: branch history](./screenshots/03-branch-history.png) | Grouped branch names and a branch-specific commit list. | Ref filter in the repository view; task branch is the pane's default filter. |
-| [4: Git identity](./screenshots/04-identity.png) | Author name and email confirmation. | Acorn Git settings with effective values, origins, and explicit write scope. |
-| [5: dark history](./screenshots/05-history.png) | Repository/branch selectors, WIP, graph lanes, and worktree/stash groups. | Keep Acorn's project selector; link working changes to the Changes pane. |
-| [6: dark diff](./screenshots/06-diff.png) | Selected file diff, revision description, and file tree. | Use Acorn's diff document/viewer; omit working-directory actions on historical files. |
-| [7: dark graph detail](./screenshots/07-graph-detail.png) | Connected graph, ref labels, selected commit, and changed files. | Compact lanes beside commit rows, with a shared selection and file detail. |
-| [8: dark stash detail](./screenshots/08-stash-detail.png) | Stash selected in history, named stash list, and explanation action. | Dedicated stash navigation and explicit **Explain stash** action. |
-
-Do not copy the reference clients' extra window chrome, trial notices, hosting features, or generic
-Undo/Redo toolbar. Use Acorn's three-dot row menus for actions such as starting a task or workflow.
-
 ## Two surfaces
 
 ### Repository source in the left rail

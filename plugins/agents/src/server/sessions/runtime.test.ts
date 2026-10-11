@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agentProfileRegistry, configureAcornMcp } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, configureAcornMcp, type CompiledCoreServices } from '@acorn/plugin-api/node'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
@@ -437,7 +437,7 @@ describe('managed agent runtime conformance', () => {
   // returned the wrong set, or fell back to unfiltered on an empty workspace, this is what fails.
   let testDb: TestDb
   let pluginDb: TestPluginDb
-  let core: CoreServices
+  let core: CompiledCoreServices
   let dataDir: string
   let runtime: ManagedAgentRuntime | null
   let disposeProfile: (() => void) | null

@@ -2,7 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
 import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION, type AgentLoopHookReply, type AgentLoopHookRequest } from '../../contract/loopHook.ts'
-import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
+import type { CompiledCoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
 import { acornFileGuard, acornLoopHook, agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
@@ -135,7 +135,7 @@ export type AgentRuntimeOptions = {
   // The three questions this engine has to ask about a task and can no longer answer itself: where its
   // worktree is, which workspace it belongs to (the pump's per-workspace concurrency limit), and
   // whether a webhook's task exists.
-  core: CoreServices
+  core: CompiledCoreServices
   internalEnv: InternalEnvFactory
   // acorn's own MCP server, read per session rather than captured, because the composition root sets it
   // and a test sets nothing. `null` means a session is offered no acorn tools, which is the honest
@@ -206,7 +206,7 @@ export class ManagedAgentEngine {
   readonly artifacts: AgentArtifactStore
   readonly webhooks: AgentWebhookService
   protected readonly db: PluginDatabase
-  protected readonly core: CoreServices
+  protected readonly core: CompiledCoreServices
   protected readonly internalEnv: InternalEnvFactory
   protected readonly mcp: () => { name: string; launcher: Launcher } | null
   // Every internal token this engine has handed to a provider child, so a leaked value can still be

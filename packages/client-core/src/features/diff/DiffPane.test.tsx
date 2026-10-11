@@ -266,13 +266,16 @@ describe('resident segments', () => {
     tokenizer.timedOut = false
     const again = mount(largeDiffSource(files), first.client)
     await vi.waitFor(() => expect(tokenizer.calls).toBeGreaterThan(stalled), { timeout: 5_000 })
-    await settle()
     const cache = segmentCacheFor(again.client)
-    const coloured = largeDiffSource(files).topology()!.files.flatMap((file) => file.segments
-      .map((_, ordinal) => cache.peek(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha)))
-      .filter((entry) => entry?.enriched))
-    expect(coloured.length).toBeGreaterThan(0)
-    expect(coloured.every((entry) => entry!.provisional === false)).toBe(true)
+    // Waited for rather than read after one settle: under a loaded test run, the segments the
+    // fallback coloured are still being re-tokenized when the first new call lands.
+    await vi.waitFor(() => {
+      const coloured = largeDiffSource(files).topology()!.files.flatMap((file) => file.segments
+        .map((_, ordinal) => cache.peek(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha)))
+        .filter((entry) => entry?.enriched))
+      expect(coloured.length).toBeGreaterThan(0)
+      expect(coloured.every((entry) => entry!.provisional === false)).toBe(true)
+    }, { timeout: 10_000 })
   }, 20_000)
 
   it('shares nothing between two nodes', async () => {

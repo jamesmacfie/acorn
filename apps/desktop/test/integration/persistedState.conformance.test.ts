@@ -10,7 +10,7 @@ import { contextSelectionSlice } from '@acorn/plugin-context/testkit/client'
 import { dockerPrefsSlice } from '@acorn/plugin-docker/testkit/client'
 import { editorOpenFilesSlice } from '@acorn/plugin-editor/testkit/client'
 import { prFiltersSlice } from '@acorn/plugin-github/testkit/client'
-import { agentToolFoldSlice, sessionOrderSlice } from '@acorn/plugin-agents/testkit/client'
+import { agentToolFoldSlice, composerExpansionSlice, sessionOrderSlice } from '@acorn/plugin-agents/testkit/client'
 import { changeViewSlice } from '@acorn/plugin-git/testkit/client'
 
 // The plugin slices are enumerated here rather than read from persistedStateRegistry because this
@@ -23,6 +23,7 @@ const pluginSlices: readonly PersistedStateSlice<unknown>[] = [
   dockerPrefsSlice,
   agentToolFoldSlice,
   sessionOrderSlice,
+  composerExpansionSlice,
   changeViewSlice,
 ] as readonly PersistedStateSlice<unknown>[]
 

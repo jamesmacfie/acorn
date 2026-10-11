@@ -216,7 +216,9 @@ it('holds tools on the connection the harness uses and admits the approved catal
 })
 
 it('refuses unsupported event replay and starts a fresh quarantined connection after disconnect', async () => {
-  const makeProxy = () => new McpReviewProxy({ transport: 'stdio', name: 'fixture', command: process.execPath, args: [entry], env: { REVIEW_FLAG: changeFlag } }, 'session-reconnect', 'revision-reconnect', {
+  // Not `changeFlag`: the test above leaves it on disk, and a server that sees it adds a tool 25 ms after
+  // starting, which can land in the middle of this proxy's first catalogue read.
+  const makeProxy = () => new McpReviewProxy({ transport: 'stdio', name: 'fixture', command: process.execPath, args: [entry], env: { REVIEW_FLAG: join(dir, 'reconnect-unchanged') } }, 'session-reconnect', 'revision-reconnect', {
     approved: async () => null, observed: () => undefined, closed: () => undefined,
   })
   const first = makeProxy()

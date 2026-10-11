@@ -207,7 +207,7 @@ describe('the kind section degrades rather than dropping a kind', () => {
   })
 
   it('falls back to one line a kind, and never fewer kinds', () => {
-    expect(oneLine).toContain('- `agent`, Ask an agent: prompt, schema')
+    expect(oneLine).toContain('- `agent`, Ask an agent: prompt, goal, schema')
     expect(oneLine).toContain('- `http:request`, HTTP request: with.method, with.url, with.region')
     for (const text of [full, noHints, noDescriptions, cappedOptions, oneLine]) expect(every(text)).toBe(true)
     // The last step is the last step: an impossible budget still lists every kind.

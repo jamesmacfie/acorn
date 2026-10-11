@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import type { CoreServices } from '@acorn/plugin-api/node'
+import type { CompiledCoreServices } from '@acorn/plugin-api/node'
 import type { AgentNormalizedEvent, AgentWaitFacts, AgentWsFrame } from '../../contract/wire'
 import { ManagedAgentRuntime } from './runtime'
 import { managedAgentsBridge } from '../routes/managedBridge'
@@ -18,7 +18,7 @@ describe('authoritative managed waits', () => {
     vi.useFakeTimers()
     fixture = makeTestPluginDb('agents')
     runtime = new WaitRuntime({ db: fixture.db, dataDir: fixture.dataDir,
-      core: {} as CoreServices, internalEnv: () => ({}), secrets: {} as never, currentUserId: () => null })
+      core: {} as CompiledCoreServices, internalEnv: () => ({}), secrets: {} as never, currentUserId: () => null })
     const insert = fixture.db.$client.prepare(`INSERT INTO agent_sessions (id,task_id,provider_id,profile_id,kind,driver_kind,driver_version,controller,runtime_state,attention,status_authority,title,config_json,created_at,updated_at) VALUES (?,'task','fake','fake','interactive','acp','test','acorn','ready','none','protocol','Synthetic','{}',0,0)`)
     insert.run('target'); insert.run('other')
   })

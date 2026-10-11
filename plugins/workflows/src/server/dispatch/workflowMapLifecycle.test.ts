@@ -219,7 +219,7 @@ describe('workflow map lifecycle', () => {
     unregisterProfile()
     unregisterProfile = agentProfileRegistry.register({
       id: DEFAULT_PROFILE_ID, label: 'Claude Code', kind: 'agent', command: 'claude', managedProvider: 'claude',
-      backendPreference: 'tmux', transport: 'pty', aiArgv: () => null,
+      backendPreference: 'tmux', transport: 'pty', aiArgv: (command) => ({ file: command, args: [] }),
     })
     const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
     const seen: { stepId: string; goal: string | undefined }[] = []

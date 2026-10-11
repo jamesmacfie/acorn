@@ -12,7 +12,6 @@ Dated delivery evidence belongs in `docs/testing/` or the dated security reviews
 
 | Folder | Developer handoff | Status |
 | --- | --- | --- |
-| [editor/](./editor/README.md) | Review the implemented editor and finish repository and supported-platform acceptance. | Six phases implemented. Final review and full test gate remain open. Completion notes moved to Testing. |
 | [git-client/](./git-client/README.md) | Eight phases for repository/worktree browsing, history, stashes, explanations, launches, refs, operations, and merge resolution. | Planned October 7, 2026. Phases 01 to 08 implemented by October 11, 2026. |
 | [cloud/](./cloud/README.md) | Eleven phases for hosted Nodes, accounts, relay, workers, archives, isolation, policy, teams, and billing. | Proposed. Enrollment and provider contracts are implemented foundations; hosted services remain unbuilt. |
 | [ecosystem/](./ecosystem/README.md) | Design package attestation, implement verification, then build discovery over verified packages. | Authoring, reload, and worker isolation implemented. Signing and discovery remain proposed. |
@@ -62,7 +61,7 @@ These plans remain in Git history. Use their reference owners for implemented be
 | `workspace-icons.md` | [Workspace icons](../workspaces-and-tasks/workspace-icons.md). |
 | `test-feedback.md` | [Testing](../testing.md). Broader excluded performance ideas remain in Git history, not assigned requirements. |
 | `dashboards/` | [Dashboard reference](../dashboards.md), [derived sources](../data-sources/derived-sources.md), and [remaining work](./dashboards-gaps.md). |
-| Six Editor phase plans | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [final acceptance](./editor/README.md). |
+| Six Editor phase plans | [Editor reference](../editor.md), [dated completion records](../testing/editor-delivery-2026-10-08.md), and [checks still to run](../testing/editor-phase06-follow-up-2026-10-08.md). |
 
 ## Retired folders
 

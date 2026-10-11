@@ -94,6 +94,8 @@ describe('the snapshot a client reads', () => {
       effectivePolicy: {},
       idempotencyKey: 'k1',
     })
+    // A running call under a turn that never started reads back as `unknown` (../sessions/commandLifecycle.ts).
+    await store.startTurn(turn.id)
     await store.recordEvent(session.id, turn.id, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } })
     await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Listing.' })
     for (let at = 1; at <= 5; at++) {

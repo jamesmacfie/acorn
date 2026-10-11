@@ -144,7 +144,8 @@ describe('the shell', () => {
       cache: (client) => client.setQueryData(tasksKey, [{ ...TASK, title: 'Annotation lifecycle smoke' }]),
     })
     try {
-      expect(await screen.frame()).toContain('+5')
+      // Five fixture markers plus Git's uncommitted-changes dot, which the fixture task carries.
+      expect(await screen.frame()).toContain('+6')
       await screen.press('F10', { shift: true })
       expect(await screen.until('Marker 1')).toContain('Marker 1')
       await screen.press('END')
@@ -168,13 +169,14 @@ describe('the shell', () => {
     })
     const screen = await renderFixture({ width: 80, height: 24, pane: 'notes' })
     try {
-      expect(await screen.frame()).not.toContain('+6')
+      // Each count includes Git's uncommitted-changes dot, which the fixture task carries.
+      expect(await screen.frame()).not.toContain('+7')
       answer(Array.from({ length: 6 }, (_, index) => ({
         key: { task: TASK.id },
         severity: 'warn' as const,
         text: `Late marker ${index + 1}`,
       })))
-      expect(await screen.until('+6')).toContain('+6')
+      expect(await screen.until('+7')).toContain('+7')
 
       clearAnnotations()
       registration.dispose()
@@ -191,7 +193,7 @@ describe('the shell', () => {
           text: `Replacement marker ${index + 1}`,
         })),
       })
-      expect(await screen.until('+10')).toContain('+10')
+      expect(await screen.until('+11')).toContain('+11')
     } finally {
       screen.done()
       registration.dispose()

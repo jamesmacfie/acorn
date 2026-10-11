@@ -22,6 +22,8 @@ export function ListDetail(props: {
   split?: boolean
   listLabel?: string
   listWidth?: 'narrow' | 'default' | 'wide'
+  /** The list here is a fixed 32 cells with no grip to resize it, so there is no width to keep. */
+  widthKey?: string
   scrollDetail?: boolean
   detailAs?: 'div' | 'main'
   collapseKey?: string
@@ -68,8 +70,10 @@ export function ListDetail(props: {
 }
 
 /** reduced: the left column, or the whole width when the split has collapsed. The width is the
- *  parent's; this node draws the label and the scroll. */
-export function ListColumn(props: { label?: string; scroll?: boolean; children: JSX.Element }) {
+ *  parent's; this node draws the label and the scroll.
+ *
+ *  `scrollKey` is ignored: this host keeps no scroll position for a column that is drawn again. */
+export function ListColumn(props: { label?: string; scroll?: boolean; scrollKey?: string; children: JSX.Element }) {
   return (
     <box flexDirection="column" flexGrow={1}>
       {/* In a box of its own so the deficit a taller-than-the-screen column creates cannot be taken out

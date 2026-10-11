@@ -11,6 +11,7 @@ import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
 import { pluginDbPath } from '@acorn/node-core/server/plugins'
 import { pluginDir } from '@acorn/node-core/server/plugins'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
+import { SCHEDULER, Scheduler } from '@acorn/node-core/server/schedules/index.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
 import { openSqlite } from '@acorn/node-core/server/storage'
@@ -36,6 +37,12 @@ describe('http as a loaded plugin with its own tables', () => {
 
   const coreServices = () =>
     createCoreServices({ secrets: secrets(), db: core.db, activeIdentity: memoryIdentityStore() })
+  // A scheduler that never starts, for the deleted-task purge the plugin registers at init.
+  const capabilities = () => {
+    const registry = new CapabilityRegistry()
+    registry.provide(SCHEDULER, new Scheduler(core.db))
+    return registry
+  }
 
   // One load-and-init cycle, standing in for a boot. Returns the route handler the plugin registered, so
   // a caller can drive real requests through the same door the host uses.
@@ -46,7 +53,7 @@ describe('http as a loaded plugin with its own tables', () => {
       const entry = loaded.find((row) => row.manifest.id === 'http')
       const plugins = entry
         ? await initPlugins([entry.plugin], {
-          capabilities: new CapabilityRegistry(),
+          capabilities: capabilities(),
           core: coreServices(),
           dataDir: dataRoot,
           loaded: new Map([['http', { permissions: entry.manifest.permissions.node, storage: entry.storage }]]),

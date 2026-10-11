@@ -349,8 +349,6 @@ and supported-platform acceptance. Plugin UI extensions shipped separately
 
 | Document | What it holds |
 | --- | --- |
-| [Final Editor acceptance](./future/editor/README.md) | Owners, final review, repository gate, connected host checks, and completion criteria. |
-| [Scope boundaries](./future/editor/refused.md) | Deferred functionality and its reasons. |
 | [Editor completion records](./testing/editor-delivery-2026-10-08.md) | Dated implementation and verification notes from the retired six phase plans. |
 | [Phase six evidence](./testing/editor-phase06-2026-10-08.md) | Initial scoped-search and tree acceptance results. |
 | [Phase six followup](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected local flow, measurements, and unavailable checks. |
