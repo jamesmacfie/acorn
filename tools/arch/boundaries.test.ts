@@ -1453,15 +1453,37 @@ describe('architecture boundaries', () => {
     // Scoped to registries/, where the props types that cross a registry call site are declared.
     const dir = join(ROOT, 'packages/client-core/src/host/registries')
     const files = walk(dir).filter((f) => !isTestCode(f))
+    // `(el) => void` and `((el) => void) | undefined` are both fine; a type is not.
+    const callback = (type: ts.TypeNode): boolean => {
+      if (ts.isParenthesizedTypeNode(type)) return callback(type.type)
+      if (ts.isUnionTypeNode(type)) return type.types.every(callback)
+      return ts.isFunctionTypeNode(type) || type.kind === ts.SyntaxKind.UndefinedKeyword
+    }
+    // A props type is a type or interface named `...Props`, or the `{ ... }` in `Component<{ ... }>`.
+    const propsType = (owner: ts.Node): boolean => {
+      if (ts.isInterfaceDeclaration(owner)) return owner.name.text.endsWith('Props')
+      const parent = owner.parent
+      if (ts.isTypeAliasDeclaration(parent)) return parent.name.text.endsWith('Props')
+      return ts.isTypeReferenceNode(parent) && parent.typeName.getText() === 'Component'
+    }
     const offenders: string[] = []
     for (const file of files) {
-      for (const [index, line] of readFileSync(file, 'utf8').split('\n').entries()) {
-        // An indented `ref:` or `ref?:` member declaration. A same-named function parameter never starts
-        // its line, and neither does an inline union member.
-        const declared = /^\s+ref\??:\s*(.+?)[,;]?\s*$/.exec(line)
-        // `(el) => void` and `((el) => void) | undefined` are both fine; a type is not.
-        if (declared && !/^\(+[^)]*\)\s*=>/.test(declared[1])) offenders.push(`${rel(file)}:${index + 1}`)
+      // Parsed rather than matched by line, because the formatter can put a parameter or a union
+      // member named `ref` on a line of its own.
+      const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+      const visit = (node: ts.Node): void => {
+        if (
+          ts.isPropertySignature(node) &&
+          node.name.getText() === 'ref' &&
+          node.type &&
+          !callback(node.type) &&
+          propsType(node.parent)
+        ) {
+          offenders.push(`${rel(file)}:${source.getLineAndCharacterOfPosition(node.getStart()).line + 1}`)
+        }
+        ts.forEachChild(node, visit)
       }
+      visit(source)
     }
     // Anti-vacuity: the registries are where the contribution contracts live, and there are many.
     expect(files.length).toBeGreaterThan(15)
