@@ -8,10 +8,10 @@ import type { AgentDriverReadBlock } from './types'
 
 const within = (path: string, root: string): boolean => path === root || path.startsWith(root + sep)
 
-/** The repository's shared git folder for a linked worktree, where a commit writes its objects and
- *  refs. A linked worktree's `.git` is a file naming its own git folder, whose `commondir` names the
- *  shared one. Null when `.git` is a folder inside the worktree, which the agent can write anyway. */
-export function sharedGitDir(worktree: string): string | null {
+/** A linked worktree's two git folders: its own, named by the worktree's `.git` file, and the
+ *  repository's shared one, named by the own folder's `commondir`. Null when `.git` is a folder inside
+ *  the worktree. */
+export function linkedGitDirs(worktree: string): { own: string; shared: string } | null {
   let text: string
   try {
     text = readFileSync(join(worktree, '.git'), 'utf8')
@@ -22,22 +22,41 @@ export function sharedGitDir(worktree: string): string | null {
   if (!gitdir) return null
   const own = resolve(worktree, gitdir)
   try {
-    return resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim())
+    return { own, shared: resolve(own, readFileSync(join(own, 'commondir'), 'utf8').trim()) }
   } catch {
-    return own
+    return { own, shared: own }
   }
 }
 
-/** Files in a writable git folder that make git run a program or read a different repository. The
- *  Node runs git in the worktree unsandboxed, for every status refresh, so a hook, an `fsmonitor` or
- *  `hooksPath` setting, or a repointed `.git` file written here would run as the person. Claude Code
- *  protects only `hooks` and `config` inside the working directory's own `.git` folder. */
-export function gitControlFiles(git: string): string[] {
-  return [
-    ...['config', 'config.worktree', 'hooks'].map((name) => join(git, name)),
-    ...['config.worktree', 'commondir', 'gitdir'].map((name) => join(git, 'worktrees', '*', name)),
-    ...['config', 'hooks'].map((name) => join(git, 'modules', '**', name)),
-  ]
+/** Where a sandboxed commit may write, and the git files it may not. The Node runs git in the worktree
+ *  unsandboxed for every status refresh, so a hook, an `fsmonitor` or `hooksPath` setting, a submodule's
+ *  config, or a repointed `.git` or `commondir` written by the agent would run as the person.
+ *
+ *  Concrete paths only, because on Linux the sandbox skips a write entry with a wildcard. Claude Code
+ *  grants a linked worktree's shared git folder itself and protects some of these files on its own,
+ *  but not a submodule's config or hooks, so the list names each one rather than relying on it. A
+ *  worktree created after this start is protected only by Claude Code's own rules. */
+export function gitWrites(worktree: string): { writable: string[]; writeDenied: string[] } {
+  const linked = linkedGitDirs(worktree)
+  if (!linked) {
+    const git = join(worktree, '.git')
+    return { writable: [], writeDenied: ['config', 'config.worktree', 'hooks', 'modules', 'worktrees'].map((name) => join(git, name)) }
+  }
+  const { own, shared } = linked
+  let worktrees: string[] = []
+  try {
+    worktrees = readdirSync(join(shared, 'worktrees')).map((name) => join(shared, 'worktrees', name))
+  } catch {
+    // No other worktrees.
+  }
+  return {
+    writable: [...['objects', 'refs', 'logs'].map((name) => join(shared, name)), own],
+    writeDenied: [
+      join(worktree, '.git'),
+      ...['config', 'config.worktree', 'hooks', 'modules'].map((name) => join(shared, name)),
+      ...[...new Set([own, ...worktrees])].flatMap((dir) => ['commondir', 'gitdir', 'config.worktree'].map((name) => join(dir, name))),
+    ],
+  }
 }
 
 /** Every path under `dir` that holds none of `kept`, at the shallowest level that does. An entry on
@@ -69,10 +88,11 @@ export function dataRootReadBlock(input: {
   skillPaths: readonly string[]
 }): AgentDriverReadBlock {
   const dataDir = resolve(input.dataDir)
-  const git = sharedGitDir(input.worktree)
+  const worktree = resolve(input.worktree)
+  const git = linkedGitDirs(worktree)?.shared
   // What the agent works in. Its token file and the Node's certificate are read by the task CLI, never
   // by the model, so they stay out of this list and their folders stay hidden from the file tools.
-  const workspace = [input.worktree, ...input.skillPaths, ...(git ? [git] : [])].map((path) => resolve(path))
+  const workspace = [worktree, ...input.skillPaths, ...(git ? [git] : [])].map((path) => resolve(path))
   const credentials = [input.env.ACORN_API_TOKEN_FILE, input.env.NODE_EXTRA_CA_CERTS].filter((path): path is string => !!path)
   let loopback: string | null = null
   try {
@@ -83,12 +103,7 @@ export function dataRootReadBlock(input: {
   return {
     dataDir,
     readable: [...new Set([...workspace, ...credentials])],
-    writable: git ? [git] : [],
-    // A linked worktree's `.git` file names the folder git reads, so it's denied too. A plain `.git`
-    // folder stays writable, because a commit writes inside it.
-    writeDenied: git
-      ? [join(resolve(input.worktree), '.git'), ...gitControlFiles(git)]
-      : gitControlFiles(join(resolve(input.worktree), '.git')),
+    ...gitWrites(worktree),
     hidden: hiddenBeside(dataDir, workspace),
     loopback,
   }

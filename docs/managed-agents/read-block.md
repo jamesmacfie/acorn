@@ -29,12 +29,14 @@ A blocked session's shell commands, and every process they start:
 - Can't read the data folder, except its own worktree, its own token file, the Node's certificate,
   and its own skill folders. The task CLI uses the token file and the certificate. A hard link from
   the data folder into the worktree fails too, because the sandbox checks the source path.
-- Can write only in its worktree, a temporary folder, and the repository's shared `.git` folder,
-  which a commit from a worktree writes to. Inside that folder, the files that make git run a program
-  or read a different repository stay unwritable: `config`, `config.worktree`, `hooks`, each
-  worktree's `commondir` and `gitdir`, submodule `config` and `hooks`, and the worktree's own `.git`
-  file. The Node runs git in the worktree unsandboxed for every status refresh, so a hook or an
-  `fsmonitor` setting written there would run as you.
+- Can write only in its worktree, a temporary folder, and the parts of the repository's `.git`
+  folder a commit from a worktree writes. The files that make git run a program or read a different
+  repository stay unwritable: `config`, `config.worktree`, `hooks`, `modules`, each worktree's
+  `commondir`, `gitdir`, and `config.worktree`, and the worktree's own `.git` file. The Node runs git
+  in the worktree unsandboxed for every status refresh, so a hook, an `fsmonitor` setting, or a
+  submodule's config written there would run as you. Every entry is a concrete path, because on Linux
+  the sandbox skips a write entry with a wildcard. A worktree created after the session starts is
+  covered only by Claude Code's own protection.
 - Reach the network through Claude Code's proxy. The Node's own address is allowed. In
   skip-permissions mode other hosts are allowed too. In other modes Claude Code decides per host, as
   its sandbox documentation describes.
@@ -52,7 +54,8 @@ start rather than running unconfined.
 ## What stops working
 
 - Installs that write outside the worktree, such as `pnpm install` writing to its package store.
-- Git commands that change the repository's settings, such as `git config` or `git push -u`.
+- Git commands that change the repository's settings or submodules, such as `git config`,
+  `git push -u`, and `git submodule update`.
 - `git push` over SSH, when the sandbox blocks the `ssh-agent` socket.
 - Any tool that writes to a folder in your home directory, such as a cache.
 

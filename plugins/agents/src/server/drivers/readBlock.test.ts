@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AgentSession } from '../../contract/wire.ts'
 import { claudeHarness } from './claudeHarness'
-import { dataRootReadBlock, sharedGitDir } from './readBlock'
+import { dataRootReadBlock, gitWrites, linkedGitDirs } from './readBlock'
 
 const roots: string[] = []
 afterEach(() => {
@@ -25,7 +25,8 @@ function fixture() {
   const worktree = join(dataDir, 'worktrees', 'task-1')
   mkdirSync(join(dataDir, 'worktrees'), { recursive: true })
   git('worktree', 'add', '-q', worktree)
-  for (const dir of ['internal-credentials', 'tls', 'agent-skills/session-1/1', 'worktrees/task-2', 'plugins/linear/skills/triage']) mkdirSync(join(dataDir, dir), { recursive: true })
+  git('worktree', 'add', '-q', join(dataDir, 'worktrees', 'task-2'))
+  for (const dir of ['internal-credentials', 'tls', 'agent-skills/session-1/1', 'plugins/linear/skills/triage']) mkdirSync(join(dataDir, dir), { recursive: true })
   for (const file of ['core.sqlite', 'node-keys.sealed', 'internal-credentials/own.token', 'tls/cert.pem', 'plugins/agents.sqlite']) writeFileSync(join(dataDir, file), '')
   const env = {
     ACORN_API_URL: 'https://127.0.0.1:43123',
@@ -36,10 +37,32 @@ function fixture() {
 }
 
 describe('the data root read block', () => {
-  it('finds the shared git folder a linked worktree commits into', () => {
+  it('finds the git folders a linked worktree commits into', () => {
     const { repo, worktree } = fixture()
-    expect(realpathSync(sharedGitDir(worktree)!)).toBe(realpathSync(join(repo, '.git')))
-    expect(sharedGitDir(repo)).toBeNull()
+    const dirs = linkedGitDirs(worktree)!
+    expect(realpathSync(dirs.shared)).toBe(realpathSync(join(repo, '.git')))
+    expect(realpathSync(dirs.own)).toBe(realpathSync(join(repo, '.git', 'worktrees', 'task-1')))
+    expect(linkedGitDirs(repo)).toBeNull()
+  })
+
+  it('lets a commit write only objects, refs, logs, and its own git folder, with no wildcards', () => {
+    const { repo, worktree } = fixture()
+    const { own, shared } = linkedGitDirs(worktree)!
+    const other = join(shared, 'worktrees', 'task-2')
+    expect(gitWrites(worktree)).toEqual({
+      writable: [join(shared, 'objects'), join(shared, 'refs'), join(shared, 'logs'), own],
+      writeDenied: [
+        join(worktree, '.git'),
+        ...['config', 'config.worktree', 'hooks', 'modules'].map((name) => join(shared, name)),
+        ...[own, other].flatMap((dir) => ['commondir', 'gitdir', 'config.worktree'].map((name) => join(dir, name))),
+      ],
+    })
+    // A checkout with a plain `.git` folder writes it as part of the worktree, so only the files git
+    // acts on are denied. Linux's sandbox skips a write entry with a wildcard.
+    const plain = gitWrites(repo)
+    expect(plain.writable).toEqual([])
+    expect(plain.writeDenied).toEqual(['config', 'config.worktree', 'hooks', 'modules', 'worktrees'].map((name) => join(repo, '.git', name)))
+    for (const path of [...plain.writeDenied, ...gitWrites(worktree).writeDenied]) expect(path).not.toMatch(/[*?[]/)
   })
 
   it('hides everything beside the worktree and skills, however deep they sit, and keeps its own token readable', () => {
@@ -50,14 +73,8 @@ describe('the data root read block', () => {
     expect(block.hidden.sort()).toEqual(['core.sqlite', 'internal-credentials', 'node-keys.sealed', 'plugins/agents.sqlite', 'tls', 'worktrees/task-2']
       .map((entry) => join(dataDir, entry)))
     expect(block.readable).toEqual(expect.arrayContaining([worktree, skills, env.ACORN_API_TOKEN_FILE, env.NODE_EXTRA_CA_CERTS]))
-    expect(block.writable.map((path) => realpathSync(path))).toEqual([realpathSync(join(repo, '.git'))])
-    // The git files that would make the Node's unsandboxed git run a program stay unwritable.
-    const git = block.writable[0]
-    expect(block.writeDenied).toEqual([
-      join(worktree, '.git'), join(git, 'config'), join(git, 'config.worktree'), join(git, 'hooks'),
-      join(git, 'worktrees', '*', 'config.worktree'), join(git, 'worktrees', '*', 'commondir'), join(git, 'worktrees', '*', 'gitdir'),
-      join(git, 'modules', '**', 'config'), join(git, 'modules', '**', 'hooks'),
-    ])
+    expect(block).toMatchObject(gitWrites(worktree))
+    expect(block.readable.map((path) => realpathSync(path))).toContain(realpathSync(join(repo, '.git')))
     expect(block.loopback).toBe('127.0.0.1:43123')
   })
 })
