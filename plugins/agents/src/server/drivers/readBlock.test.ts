@@ -34,14 +34,19 @@ function fixture() {
   mkdirSync(join(dataDir, 'worktrees'), { recursive: true })
   git('worktree', 'add', '-q', worktree)
   git('worktree', 'add', '-q', join(dataDir, 'worktrees', 'task-2'))
-  for (const dir of ['internal-credentials', 'tls', 'agent-skills/session-1/1', 'plugins/linear/skills/triage']) mkdirSync(join(dataDir, dir), { recursive: true })
+  for (const dir of ['internal-credentials', 'tls', 'agent-skills/session-1/1', 'plugins/linear/skills/triage', 'agent-objects', 'agent-session-files/session-1', 'agent-session-files/session-2']) mkdirSync(join(dataDir, dir), { recursive: true })
   for (const file of ['core.sqlite', 'node-keys.sealed', 'internal-credentials/own.token', 'tls/cert.pem', 'plugins/agents.sqlite']) writeFileSync(join(dataDir, file), '')
   const env = {
     ACORN_API_URL: 'https://127.0.0.1:43123',
     ACORN_API_TOKEN_FILE: join(dataDir, 'internal-credentials', 'own.token'),
     NODE_EXTRA_CA_CERTS: join(dataDir, 'tls', 'cert.pem'),
   }
-  return { dataDir, repo, worktree, env, skills: join(dataDir, 'agent-skills', 'session-1', '1'), pluginSkill: join(dataDir, 'plugins', 'linear', 'skills', 'triage') }
+  return {
+    dataDir, repo, worktree, env,
+    skills: join(dataDir, 'agent-skills', 'session-1', '1'),
+    pluginSkill: join(dataDir, 'plugins', 'linear', 'skills', 'triage'),
+    attachments: join(dataDir, 'agent-session-files', 'session-1'),
+  }
 }
 
 describe('the data root read block', () => {
@@ -72,14 +77,15 @@ describe('the data root read block', () => {
     for (const path of [...plain.writeDenied, ...gitWrites(worktree).writeDenied]) expect(path).not.toMatch(/[*?[]/)
   })
 
-  it('hides everything beside the worktree and skills, however deep they sit, and keeps its own token readable', () => {
-    const { dataDir, repo, worktree, env, skills, pluginSkill } = fixture()
-    const block = dataRootReadBlock({ dataDir, worktree, env, skillPaths: [skills, pluginSkill], fileGuard: GUARD })
+  it('hides everything beside the worktree, skills, and own attachments, however deep they sit, and keeps its own token readable', () => {
+    const { dataDir, repo, worktree, env, skills, pluginSkill, attachments } = fixture()
+    const block = dataRootReadBlock({ dataDir, worktree, env, skillPaths: [skills, pluginSkill], attachments, fileGuard: GUARD })
     expect(block).toMatchObject({ dataDir, worktree, fileGuard: GUARD })
-    // Another task's worktree and the plugin databases beside a plugin's skill folder are hidden too.
-    expect(block.hidden.sort()).toEqual(['core.sqlite', 'internal-credentials', 'node-keys.sealed', 'plugins/agents.sqlite', 'tls', 'worktrees/task-2']
+    // Another task's worktree, the plugin databases beside a plugin's skill folder, the attachment store,
+    // and another session's attachments are hidden too.
+    expect(block.hidden.sort()).toEqual(['agent-objects', 'agent-session-files/session-2', 'core.sqlite', 'internal-credentials', 'node-keys.sealed', 'plugins/agents.sqlite', 'tls', 'worktrees/task-2']
       .map((entry) => join(dataDir, entry)))
-    expect(block.readable).toEqual(expect.arrayContaining([worktree, skills, env.ACORN_API_TOKEN_FILE, env.NODE_EXTRA_CA_CERTS]))
+    expect(block.readable).toEqual(expect.arrayContaining([worktree, skills, attachments, env.ACORN_API_TOKEN_FILE, env.NODE_EXTRA_CA_CERTS]))
     expect(block).toMatchObject(gitWrites(worktree))
     expect(block.readable.map((path) => realpathSync(path))).toContain(realpathSync(join(repo, '.git')))
     expect(block.loopback).toBe('127.0.0.1:43123')
@@ -88,8 +94,8 @@ describe('the data root read block', () => {
   // A penetration review found that the deny rules, built from the entries present at the start, had
   // nothing for a file created later, and Claude's file tools run outside its sandbox.
   it('keeps the file tools out of a protected file created after the session started', () => {
-    const { dataDir, repo, worktree, env, skills, pluginSkill } = fixture()
-    const settings = claudeReadBlockSettings(dataRootReadBlock({ dataDir, worktree, env, skillPaths: [skills, pluginSkill], fileGuard: GUARD }))
+    const { dataDir, repo, worktree, env, skills, pluginSkill, attachments } = fixture()
+    const settings = claudeReadBlockSettings(dataRootReadBlock({ dataDir, worktree, env, skillPaths: [skills, pluginSkill], attachments, fileGuard: GUARD }))
     writeFileSync(join(dataDir, '.env'), 'SECRET=fake')
     expect(settings.deny.some((rule) => rule.includes('.env'))).toBe(false)
     const policy = guardPolicy(settings)
@@ -105,6 +111,10 @@ describe('the data root read block', () => {
     // What the session works in still works, and so does its own skill.
     expect(call('Write', { file_path: join(worktree, 'src', 'new.ts'), content: 'x' })).toBeNull()
     expect(call('Read', { file_path: join(skills, 'SKILL.md') })).toBeNull()
+    // An attachment copied in after the start, and not another session's.
+    writeFileSync(join(attachments, 'spec.pdf'), '%PDF-1.7')
+    expect(call('Read', { file_path: join(attachments, 'spec.pdf') })).toBeNull()
+    expect(call('Read', { file_path: join(dataDir, 'agent-session-files', 'session-2', 'spec.pdf') })).toMatch(/data folder/)
     expect(call('Grep', { pattern: 'x' })).toBeNull()
     expect(call('Read', { file_path: join(repo, 'README.md') })).toBeNull()
   })

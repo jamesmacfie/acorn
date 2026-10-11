@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { fileURLToPath } from 'node:url'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { AgentNormalizedEvent, AgentSession } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverPermissionRequest, AgentDriverStartOptions } from './types'
 import { AcpDriver } from './acpDriver'
-import { acpMcpServers, clientFor, type PendingRequest } from './acpSession'
+import { acpMcpServers, acpPrompt, clientFor, type PendingRequest } from './acpSession'
 import { harnessCapabilities } from './harness'
 import { makeTestNodeContext } from '@acorn/plugin-api/testkit'
 import { sessionStartupTelemetry } from '../sessions/startupTelemetry'
@@ -438,5 +441,34 @@ describe('a question the agent stopped waiting for is released with the turn', (
     } finally {
       await handle.stop()
     }
+  })
+})
+
+// A session under the read block can't open the attachment store, so whatever the agent takes inline
+// has to arrive with the turn.
+describe('the generic ACP driver sends attachments inline when the agent takes them', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'acp-prompt-'))
+  const stored = (id: string, filename: string, mediaType: string, body: string | Buffer) => {
+    const localPath = join(dir, id)
+    writeFileSync(localPath, body)
+    return { id, filename, mediaType, byteSize: Buffer.byteLength(body), localPath }
+  }
+  const attachments = {
+    png: stored('png', 'shot.png', 'image/png', Buffer.from([0x89, 0x50, 0x4e, 0x47])),
+    txt: stored('txt', 'notes.txt', 'text/plain', 'hello'),
+    pdf: stored('pdf', 'spec.pdf', 'application/pdf', '%PDF-1.7'),
+  }
+  const input = ['png', 'txt', 'pdf'].map((attachmentId) => ({ type: 'attachment' as const, attachmentId }))
+
+  it('inlines images and text, and links what it has no inline block for', async () => {
+    expect(await acpPrompt(input, attachments, { image: true, embeddedContext: true })).toEqual([
+      { type: 'image', data: 'iVBORw==', mimeType: 'image/png' },
+      { type: 'resource', resource: { uri: pathToFileURL(attachments.txt.localPath).href, mimeType: 'text/plain', text: 'hello' } },
+      { type: 'resource_link', uri: pathToFileURL(attachments.pdf.localPath).href, name: 'spec.pdf', mimeType: 'application/pdf', size: 8 },
+    ])
+  })
+
+  it('links every attachment for an agent that declared neither', async () => {
+    expect((await acpPrompt(input, attachments)).map((block) => block.type)).toEqual(['resource_link', 'resource_link', 'resource_link'])
   })
 })

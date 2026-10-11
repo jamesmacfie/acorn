@@ -3,6 +3,7 @@ import type {
   RequestPermissionResponse, SessionConfigOption,
 } from '@agentclientprotocol/sdk'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { brokerEnv, AGENT_TOOL_PASSTHROUGH, createLogger } from '@acorn/plugin-api/node'
@@ -48,11 +49,15 @@ const drain = (pending: Map<string, PendingRequest>): void => {
 }
 
 
-function acpPrompt(
+// An attachment goes inline when the agent said at `initialize` it takes that kind of block, so the agent
+// never has to open the file. A session under the read block can't: the store sits in the data root
+// (docs/managed-agents/read-block.md). Anything else goes as a link to the stored file.
+export async function acpPrompt(
   parts: AgentInputPart[],
   attachments: AgentDriverTurnOptions['attachments'],
-): ContentBlock[] {
-  return parts.map((part) => {
+  capabilities: { image?: boolean; embeddedContext?: boolean } = {},
+): Promise<ContentBlock[]> {
+  return Promise.all(parts.map(async (part): Promise<ContentBlock> => {
     switch (part.type) {
       case 'text':
         return { type: 'text', text: part.text }
@@ -70,16 +75,18 @@ function acpPrompt(
       case 'image': {
         const attachment = attachments[part.attachmentId]
         if (!attachment) throw new Error(`Attachment is unavailable: ${part.attachmentId}`)
-        return {
-          type: 'resource_link',
-          uri: pathToFileURL(attachment.localPath).href,
-          name: attachment.filename,
-          mimeType: attachment.mediaType,
-          size: attachment.byteSize,
+        const uri = pathToFileURL(attachment.localPath).href
+        if (capabilities.image && attachment.mediaType.startsWith('image/')) {
+          return { type: 'image', data: (await readFile(attachment.localPath)).toString('base64'), mimeType: attachment.mediaType }
         }
+        // The store decodes every text attachment to UTF-8 (attachmentStore.ts).
+        if (capabilities.embeddedContext && attachment.mediaType.startsWith('text/')) {
+          return { type: 'resource', resource: { uri, mimeType: attachment.mediaType, text: await readFile(attachment.localPath, 'utf8') } }
+        }
+        return { type: 'resource_link', uri, name: attachment.filename, mimeType: attachment.mediaType, size: attachment.byteSize }
       }
     }
-  })
+  }))
 }
 
 // Parked before the session hears about it, deliberately: announcing runs as far as SQLite and the
@@ -424,7 +431,7 @@ export async function startAcpSession(
     pid: child.pid,
     async sendTurn(turnOptions: AgentDriverTurnOptions) {
       try {
-        const blocks = acpPrompt(turnOptions.input, turnOptions.attachments)
+        const blocks = await acpPrompt(turnOptions.input, turnOptions.attachments, initialized.agentCapabilities?.promptCapabilities)
         if (instructionsOwed && fallbackInstructions) {
           blocks.unshift({ type: 'text', text: fallbackInstructions })
           instructionsOwed = false

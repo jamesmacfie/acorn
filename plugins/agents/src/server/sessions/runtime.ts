@@ -780,6 +780,7 @@ export class ManagedAgentRuntime {
     await Promise.all([
       this.attachments.collectNow(removed.attachmentIds),
       this.artifacts.collectRemoved(removed.artifactObjects),
+      this.attachments.removeSessionFolder(sessionId),
     ])
     this.engine.emit({ channel: 'agent:deleted', sessionId })
     return { local: 'deleted', provider, ...(detail ? { detail } : {}) }
@@ -822,6 +823,7 @@ export class ManagedAgentRuntime {
           await Promise.all([
             this.attachments.collectNow(finished.attachmentIds),
             this.artifacts.collectRemoved(finished.artifactObjects),
+            this.attachments.removeSessionFolder(sessionId),
           ])
           // For a window that has the session open: the note lands, and a reload reads only the note.
           this.engine.emit({ channel: 'agent:event', event: finished.event })

@@ -1,3 +1,4 @@
+import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
 import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION, type AgentLoopHookReply, type AgentLoopHookRequest } from '../../contract/loopHook.ts'
@@ -330,7 +331,11 @@ export class ManagedAgentEngine {
         // the guard that checks them.
         const fileGuard = acornFileGuard()
         if (!fileGuard) throw new Error("This Node can't keep an agent's file tools out of Acorn's data folder, because it has no file guard program.")
-        return (await import('../drivers/readBlock')).dataRootReadBlock({ dataDir: options.dataDir, fileGuard, ...input })
+        const { sessionId, ...start } = input
+        // Made now so the block keeps it open. A file copied in later is readable through the folder.
+        const attachments = this.attachments.sessionFolder(sessionId)
+        await mkdir(attachments, { recursive: true })
+        return (await import('../drivers/readBlock')).dataRootReadBlock({ dataDir: options.dataDir, fileGuard, attachments, ...start })
       },
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
@@ -994,10 +999,15 @@ export class ManagedAgentEngine {
         await admitAttachments(this.core.secretPublication, { sessionId: session.id, providerId: session.providerId, attachments: Object.values(attachments) })
         if (!this.processes.owns(generation)) return false
       }
+      // Copied only once admitted, because the session can read its folder: under the read block,
+      // the store itself is out of its reach (./attachmentStore.ts).
+      const sent = Object.fromEntries(await Promise.all(Object.entries(attachments).map(async ([id, attachment]) =>
+        [id, { ...attachment, localPath: await this.attachments.copyToSession(session.id, attachment) }] as const)))
+      if (!this.processes.owns(generation)) return false
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
-      this.processes.sendTurn(generation, { turn, input: driverInput, attachments },
+      this.processes.sendTurn(generation, { turn, input: driverInput, attachments: sent },
         async (result) => {
           if (!this.processes.owns(generation)) return
           if (result.providerTurnRef) await this.store.setTurnProviderRef(turn.id, result.providerTurnRef)

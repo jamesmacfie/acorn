@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
-import { lstat, mkdir, open, readFile, unlink } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, open, readFile, rm, unlink } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
@@ -77,6 +77,9 @@ function validatedMediaType(filename: string, supplied: string, bytes: Uint8Arra
 
 export class AgentAttachmentStore {
   readonly root: string
+  // Copies of what each session's turns sent, one folder per session. `root` is in the part of the data
+  // root the read block hides, and a session's own folder is not (docs/managed-agents/read-block.md).
+  private readonly sessionRoot: string
 
   // `tasks` is core's, so the "does this task exist" guard below dereferences the plain id through
   // CoreServices instead of joining. Only `upload` needs it; every other method here keys on an attachment
@@ -87,6 +90,30 @@ export class AgentAttachmentStore {
     private readonly core: CoreServices,
   ) {
     this.root = join(dataDir, 'agent-objects')
+    this.sessionRoot = join(dataDir, 'agent-session-files')
+  }
+
+  sessionFolder(sessionId: string): string {
+    return join(this.sessionRoot, sessionId)
+  }
+
+  /** Copies an attachment a turn is sending into its session's folder, and returns the copy's path. A
+   *  clone where the file system makes one, so on APFS the copy takes no space. */
+  async copyToSession(sessionId: string, attachment: { id: string; filename: string; localPath: string }): Promise<string> {
+    const dir = join(this.sessionFolder(sessionId), attachment.id)
+    await mkdir(dir, { recursive: true })
+    // `upload` keeps only a base name, and `..` is one.
+    const copy = join(dir, attachment.filename === '..' ? 'attachment' : attachment.filename)
+    // A retry sends it again. Removed first, so a link left in its place is replaced, not written through.
+    await rm(copy, { force: true })
+    await copyFile(attachment.localPath, copy, constants.COPYFILE_FICLONE | constants.COPYFILE_EXCL)
+    return copy
+  }
+
+  // Removed only with the session or its history, so a Node that dies mid-delete leaves the folder
+  // behind. Sweep against the session table at boot if that turns up.
+  removeSessionFolder(sessionId: string): Promise<void> {
+    return rm(this.sessionFolder(sessionId), { recursive: true, force: true })
   }
 
   async upload(taskId: string, filename: string, suppliedMediaType: string, bytes: Uint8Array): Promise<AgentAttachment> {

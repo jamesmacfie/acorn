@@ -94,3 +94,13 @@ and the original stays.
 
 The turn stores `{ type: 'attachment', attachmentId }`, and both drivers resolve the ID to a local path
 at dispatch, so swapping the ID before the turn is queued is all it takes.
+
+The stored object sits in a part of the data root that the [read block](./read-block.md) hides. At
+dispatch, after the secret check, the engine copies each attachment to
+`agent-session-files/<session id>/<attachment id>/<filename>`, and that copy's path is the one the driver
+gets. The block keeps the session's own folder readable and hides the others. The folder goes when the
+session or its history is deleted.
+
+An ACP harness gets an image's bytes, or a text file's text, inside the prompt when it declared image or
+embedded context support at `initialize`. Claude Code declares both. Anything else, a PDF for example,
+goes as a link to the copy. Codex reads images and files from their paths itself.

@@ -74,7 +74,7 @@ export type ProviderLifecyclePorts = {
   /** Whether the person switched the read block on, read at every start. */
   readBlockOn(): Promise<boolean>
   /** The read block for a start of a driver with `readBlock`, once `readBlockOn` said yes. */
-  readBlock(input: { worktree: string; env: Record<string, string>; skillPaths: readonly string[] }): Promise<AgentDriverReadBlock>
+  readBlock(input: { sessionId: string; worktree: string; env: Record<string, string>; skillPaths: readonly string[] }): Promise<AgentDriverReadBlock>
   event(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void>
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
@@ -274,7 +274,7 @@ export class ProviderSessionLifecycle {
       live.skillsOwed = true
       const loopHooks = live.driver.loopHooks ? await read(() => this.ports.loopHooks(session)) : null
       const readBlock = sandboxed
-        ? await read(() => this.ports.readBlock({ worktree: cwd, env, skillPaths: [...skills.folders, ...skills.plugins] }))
+        ? await read(() => this.ports.readBlock({ sessionId: session.id, worktree: cwd, env, skillPaths: [...skills.folders, ...skills.plugins] }))
         : null
       const { attendanceInstructions } = await import('./attendanceInstructions')
       const instructions = attendanceInstructions(sessionAttendance(session))

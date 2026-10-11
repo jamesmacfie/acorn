@@ -1,4 +1,4 @@
-import { mkdtemp, rm, symlink } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -69,5 +69,23 @@ describe('managed-agent attachment store', () => {
     await import('node:fs/promises').then((fs) => fs.mkdir(directory, { recursive: true }))
     await symlink('/etc/hosts', join(directory, hash))
     await expect(store.upload('task', 'safe.txt', 'text/plain', bytes)).rejects.toThrow('regular file')
+  })
+
+  it('copies a sent attachment into its session folder under its own name, and removes the folder with the session', async () => {
+    const sent = (await store.resolve((await store.upload('task', 'notes.md', 'text/markdown', new TextEncoder().encode('# hi'))).id))!
+    const elsewhere = join(dataDir, 'elsewhere.md')
+    await writeFile(elsewhere, 'untouched')
+    const folder = store.sessionFolder('session-1')
+    await store.copyToSession('session-1', sent)
+    // A link left where a retry copies again is replaced, not written through.
+    await rm(join(folder, sent.id, 'notes.md'))
+    await symlink(elsewhere, join(folder, sent.id, 'notes.md'))
+    const copy = await store.copyToSession('session-1', sent)
+    expect(copy).toBe(join(folder, sent.id, 'notes.md'))
+    expect(await readFile(copy, 'utf8')).toBe('# hi')
+    expect(await readFile(elsewhere, 'utf8')).toBe('untouched')
+    expect(await store.copyToSession('session-1', { ...sent, filename: '..' })).toBe(join(folder, sent.id, 'attachment'))
+    await store.removeSessionFolder('session-1')
+    await expect(stat(folder)).rejects.toThrow()
   })
 })

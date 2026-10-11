@@ -27,8 +27,9 @@ own Claude settings files.
 A blocked session's shell commands, and every process they start:
 
 - Can't read the data folder, except its own worktree, its own token file, the Node's certificate,
-  and its own skill folders. The task CLI uses the token file and the certificate. A hard link from
-  the data folder into the worktree fails too, because the sandbox checks the source path.
+  its own skill folders, and its own attachment folder. The task CLI uses the token file and the
+  certificate. A hard link from the data folder into the worktree fails too, because the sandbox
+  checks the source path.
 - Can write only in its worktree, a temporary folder, and the parts of the repository's `.git`
   folder a commit from a worktree writes. The files that make git run a program or read a different
   repository stay unwritable: `config`, `config.worktree`, `hooks`, `modules`, each worktree's
@@ -61,8 +62,8 @@ built as `file-guard.js` beside `mcp.js`). The guard resolves every link in the 
 file that doesn't exist yet through its folder, then checks that real path against the session's
 allowlist:
 
-- Inside the data folder, a read must fall within the session's worktree, its skill folders, its own
-  token file, or the Node's certificate. A write must fall within the worktree or the git folders a
+- Inside the data folder, a read must fall within the session's worktree, its skill folders, its
+  attachment folder, its own token file, or the Node's certificate. A write must fall within the worktree or the git folders a
   commit writes.
 - The git files listed above can't be written, inside the data folder or not.
 - A search can't start from a folder that holds the data folder.
