@@ -19,10 +19,19 @@ import { clientPlugins } from '../../src/client/plugins'
 // Declared in loaded manifests, not code. apps/node's pluginConfigs.test.ts checks them.
 const MANIFEST_DECLARED = ['linear:issue-summary', 'rollbar:item-summary']
 
-type Shape = { kind: string; mode?: string; max?: number; acceptedMarks?: number; actions?: readonly string[]; key?: readonly string[] }
+type Shape = {
+  kind: string
+  mode?: string
+  max?: number
+  acceptedMarks?: number
+  actions?: readonly string[]
+  key?: readonly string[]
+}
 const shape = (entry: Shape): Shape => {
   const { kind, mode, max, acceptedMarks, actions, key } = entry
-  return Object.fromEntries(Object.entries({ kind, mode, max, acceptedMarks, actions, key }).filter(([, value]) => value !== undefined)) as Shape
+  return Object.fromEntries(
+    Object.entries({ kind, mode, max, acceptedMarks, actions, key }).filter(([, value]) => value !== undefined),
+  ) as Shape
 }
 
 it('lists every registered extension point with the shape the registry holds', () => {
@@ -33,6 +42,8 @@ it('lists every registered extension point with the shape the registry holds', (
     const listed = PUBLIC_EXTENSION_POINTS.find((point) => point.id === entry.id)
     expect(listed && shape(listed), entry.id).toEqual(shape(entry))
   }
-  const unregistered = PUBLIC_EXTENSION_POINTS.map((point) => point.id).filter((id) => !registered.some((entry) => entry.id === id))
+  const unregistered = PUBLIC_EXTENSION_POINTS.map((point) => point.id).filter(
+    (id) => !registered.some((entry) => entry.id === id),
+  )
   expect(unregistered).toEqual(MANIFEST_DECLARED)
 })

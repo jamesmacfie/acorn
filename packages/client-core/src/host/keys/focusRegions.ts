@@ -31,9 +31,7 @@ export const focusedRegion = (): RegionRef | null => focused()
 /** Document order, so the chords walk the layout the way it is drawn rather than the order regions
  *  happened to mount in. Recomputed per call: the list is one entry per visible region. */
 const ordered = (): Group[] =>
-  [...groups].sort((a, b) =>
-    a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
-  )
+  [...groups].sort((a, b) => (a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
 
 export function registerRegion(element: HTMLElement, ref: RegionRef): () => void {
   const group: Group = { ...ref, element }
@@ -58,8 +56,9 @@ export function markRegionFocused(ref: RegionRef, node?: HTMLElement): void {
 
 /** The first thing inside a region a keyboard can reach, for a group with nothing remembered. */
 const firstStop = (element: HTMLElement): HTMLElement | undefined =>
-  element.querySelector<HTMLElement>('[tabindex]:not([tabindex="-1"]), button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
-  ?? undefined
+  element.querySelector<HTMLElement>(
+    '[tabindex]:not([tabindex="-1"]), button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])',
+  ) ?? undefined
 
 function enter(group: Group | undefined): boolean {
   if (!group) return false
@@ -77,7 +76,7 @@ export function moveRegion(delta: 1 | -1): boolean {
   const inPane = ordered().filter((group) => group.paneId === (current?.paneId ?? ordered()[0]?.paneId))
   if (inPane.length < 2) return false
   const at = inPane.findIndex((group) => group.regionId === current?.regionId)
-  return enter(inPane[(((at < 0 ? 0 : at) + delta) + inPane.length) % inPane.length])
+  return enter(inPane[((at < 0 ? 0 : at) + delta + inPane.length) % inPane.length])
 }
 
 /** Move to the next or previous pane in the task row, landing on whatever it last had focused. */
@@ -86,7 +85,7 @@ export function movePane(delta: 1 | -1): boolean {
   for (const group of ordered()) if (!panes.includes(group.paneId)) panes.push(group.paneId)
   if (panes.length < 2) return false
   const at = panes.indexOf(focused()?.paneId ?? '')
-  const paneId = panes[(((at < 0 ? 0 : at) + delta) + panes.length) % panes.length]
+  const paneId = panes[((at < 0 ? 0 : at) + delta + panes.length) % panes.length]
   return enter(ordered().find((group) => group.paneId === paneId))
 }
 

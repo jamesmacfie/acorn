@@ -36,7 +36,15 @@ export type ContextSectionResult = {
   absent?: { reason: 'missing-cache' | 'unavailable' | 'timeout' | 'invalid-response'; detail: string }
 }
 export type TaskContext = {
-  task: { id: string; title: string; projectId: string; repo?: string; branch: string | null; worktreePath: string | null; pullNumber: number | null }
+  task: {
+    id: string
+    title: string
+    projectId: string
+    repo?: string
+    branch: string | null
+    worktreePath: string | null
+    pullNumber: number | null
+  }
   sections: ContextSectionResult[]
 }
 export const taskContextRoute = (id: string, include?: TaskContextInclude[] | 'all') =>
@@ -50,11 +58,24 @@ export const AGENT_TOOLS_PERMS_PREF_KEY = 'agentTools.perms'
 export const agentToolsCatalogRoute = '/v1/core/agent-tools'
 // `owner` is the plugin id that contributed the tool, or `core`, so the page can group a plugin's tools
 // together. Optional because a node from before it reports none.
-export type AgentToolCatalogEntry = { name: string; description: string; risk: ToolRisk; availability?: string; owner?: string }
-export const rendererAgentToolRoute = (taskId: string, name: string) => `/v1/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
+export type AgentToolCatalogEntry = {
+  name: string
+  description: string
+  risk: ToolRisk
+  availability?: string
+  owner?: string
+}
+export const rendererAgentToolRoute = (taskId: string, name: string) =>
+  `/v1/core/tasks/${taskId}/renderer-tools/${encodeURIComponent(name)}`
 // A tool result the MCP server hands the agent as an image rather than as JSON text. `data` is base64.
 export type ToolImageResult = { type: 'image'; mimeType: string; data: string }
 export const isToolImageResult = (value: unknown): value is ToolImageResult => {
   const v = value as Partial<ToolImageResult> | null
-  return !!v && v.type === 'image' && typeof v.mimeType === 'string' && v.mimeType.startsWith('image/') && typeof v.data === 'string'
+  return (
+    !!v &&
+    v.type === 'image' &&
+    typeof v.mimeType === 'string' &&
+    v.mimeType.startsWith('image/') &&
+    typeof v.data === 'string'
+  )
 }

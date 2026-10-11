@@ -32,7 +32,11 @@ const timeouts = { testTimeout: 20_000, hookTimeout: 20_000 }
 
 // Some plugins (the profile shims) are a single declaration with nothing to test; an empty suite is
 // not a build failure. True on both projects, because most plugins have no `.test.tsx` at all.
-const common = { passWithNoTests: true, env: { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }, ...timeouts }
+const common = {
+  passWithNoTests: true,
+  env: { GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+  ...timeouts,
+}
 
 export default defineConfig({
   test: {

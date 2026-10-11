@@ -22,6 +22,8 @@ export function isSupportedNodeRuntime(version: string): boolean {
 /** Refuse permission-scoped plugin execution on unpatched or unsupported Node releases. */
 export function assertSupportedNodeRuntime(version: string): void {
   if (!isSupportedNodeRuntime(version)) {
-    throw new Error(`Loaded plugins require a patched Node runtime (${NODE_RUNTIME_RANGE}); found ${version}. Upgrade Node before loading plugins.`)
+    throw new Error(
+      `Loaded plugins require a patched Node runtime (${NODE_RUNTIME_RANGE}); found ${version}. Upgrade Node before loading plugins.`,
+    )
   }
 }

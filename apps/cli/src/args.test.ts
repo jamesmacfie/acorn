@@ -5,7 +5,10 @@ import { validateCommand } from './commands'
 describe('CLI argument contract', () => {
   it('accepts global options before or after the command', () => {
     expect(parseCliArgs(['--node', 'one', 'project', 'list', '--workspace', 'w', '--output', 'json'])).toMatchObject({
-      node: 'one', output: 'json', positionals: ['project', 'list'], options: { workspace: 'w' },
+      node: 'one',
+      output: 'json',
+      positionals: ['project', 'list'],
+      options: { workspace: 'w' },
     })
     expect(parseCliArgs(['task', 'list', '--status=archived']).options.status).toBe('archived')
   })

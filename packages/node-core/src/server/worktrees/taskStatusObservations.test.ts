@@ -12,8 +12,14 @@ import { worktreePorcelain } from './worktrees'
 import { beginTaskArchive, finishTaskArchive } from './archiveGate'
 import { retireTaskHead } from './taskHeadObserver'
 
-vi.mock('./worktrees', async (original) => ({ ...await original<typeof import('./worktrees')>(), worktreePorcelain: vi.fn() }))
-vi.mock('../notify', async (original) => ({ ...await original<typeof import('../notify')>(), broadcastHeadChanged: vi.fn() }))
+vi.mock('./worktrees', async (original) => ({
+  ...(await original<typeof import('./worktrees')>()),
+  worktreePorcelain: vi.fn(),
+}))
+vi.mock('../notify', async (original) => ({
+  ...(await original<typeof import('../notify')>()),
+  broadcastHeadChanged: vi.fn(),
+}))
 const status = vi.mocked(worktreePorcelain)
 const events = vi.mocked(broadcastHeadChanged)
 const value = (head: string | null) => ({ dirty: false, count: 0, branch: 'feature', head })
@@ -22,7 +28,9 @@ let rows: { id: string; projectId: string; worktreePath: string }[]
 const db = { select: () => ({ from: () => ({ where: async () => rows.slice() }) }) } as unknown as AppDatabase
 const heldStatus = () => {
   let resolve!: (v: ReturnType<typeof value>) => void
-  const promise = new Promise<ReturnType<typeof value>>((r) => { resolve = r })
+  const promise = new Promise<ReturnType<typeof value>>((r) => {
+    resolve = r
+  })
   status.mockReturnValueOnce(promise)
   return resolve
 }
@@ -70,33 +78,47 @@ it('authorizes before reads and lets disjoint authorized rosters publish indepen
   expect(events.mock.calls.map(([event]) => event.taskId).sort()).toEqual(['other', 'task'])
 })
 
-it.each(['archive', 'task retirement', 'roster retirement', 'data-root reset'] as const)('cannot seed a held observation after %s', async (retirement) => {
-  const release = heldStatus()
-  const old = computeTaskStatuses(db)
-  await vi.waitFor(() => expect(status).toHaveBeenCalledTimes(1))
-  if (retirement === 'archive') beginTaskArchive('task')
-  if (retirement === 'task retirement') retireTaskHead('task')
-  if (retirement === 'data-root reset') setWorktreesRoot(path)
-  if (retirement === 'roster retirement') {
-    rows = []
+it.each(['archive', 'task retirement', 'roster retirement', 'data-root reset'] as const)(
+  'cannot seed a held observation after %s',
+  async (retirement) => {
+    const release = heldStatus()
+    const old = computeTaskStatuses(db)
+    await vi.waitFor(() => expect(status).toHaveBeenCalledTimes(1))
+    if (retirement === 'archive') beginTaskArchive('task')
+    if (retirement === 'task retirement') retireTaskHead('task')
+    if (retirement === 'data-root reset') setWorktreesRoot(path)
+    if (retirement === 'roster retirement') {
+      rows = []
+      await computeTaskStatuses(db)
+    }
+    release(value('A'))
+    await old
+    finishTaskArchive('task')
+    rows = [{ id: 'task', projectId: 'project', worktreePath: path }]
+    status.mockResolvedValue(value('B'))
     await computeTaskStatuses(db)
-  }
-  release(value('A'))
-  await old
-  finishTaskArchive('task')
-  rows = [{ id: 'task', projectId: 'project', worktreePath: path }]
-  status.mockResolvedValue(value('B'))
-  await computeTaskStatuses(db)
-  expect(events).not.toHaveBeenCalled()
-})
+    expect(events).not.toHaveBeenCalled()
+  },
+)
 
 it('project deletion retires a held observation even though the folder remains', async () => {
   const t = makeTestDb()
   try {
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace', name: 'Fixture', createdAt: now, updatedAt: now })
-    await t.db.insert(schema.projects).values({ id: 'project', workspaceId: 'workspace', name: 'Fixture', path, createdAt: now, updatedAt: now })
-    await t.db.insert(schema.tasks).values({ id: 'task', projectId: 'project', title: 'Fixture', origin: 'local', status: 'active', worktreePath: path, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.projects)
+      .values({ id: 'project', workspaceId: 'workspace', name: 'Fixture', path, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.tasks).values({
+      id: 'task',
+      projectId: 'project',
+      title: 'Fixture',
+      origin: 'local',
+      status: 'active',
+      worktreePath: path,
+      createdAt: now,
+      updatedAt: now,
+    })
     const release = heldStatus()
     const old = computeTaskStatuses(t.db)
     await vi.waitFor(() => expect(status).toHaveBeenCalledTimes(1))
@@ -107,12 +129,16 @@ it('project deletion retires a held observation even though the folder remains',
     // Reusing the identity must seed silently rather than inheriting the deleted task's HEAD.
     await computeTaskStatuses(db)
     expect(events).not.toHaveBeenCalled()
-  } finally { t.cleanup() }
+  } finally {
+    t.cleanup()
+  }
 })
 
 it('a roster held across a data-root reset cannot seed the replacement observer', async () => {
   let release!: (value: typeof rows) => void
-  const held = new Promise<typeof rows>((r) => { release = r })
+  const held = new Promise<typeof rows>((r) => {
+    release = r
+  })
   const heldDb = { select: () => ({ from: () => ({ where: () => held }) }) } as unknown as AppDatabase
   const old = computeTaskStatuses(heldDb)
   setWorktreesRoot(path)

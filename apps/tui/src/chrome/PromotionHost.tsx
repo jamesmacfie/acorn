@@ -10,19 +10,28 @@ import { closePromotion, type PromotionRequest } from './promotionStore'
 export function PromotionHost(props: { request: PromotionRequest }) {
   const [component, { refetch }] = createResource(async () => (await import('./Promotion')).Promotion)
   return (
-    <Show when={component()} fallback={
-      <Modal onDismiss={closePromotion} title="Create or link task" size="wide">
-        <ModalBody>
-          <Show when={component.error} fallback={<Line role="muted">Opening task choices…</Line>}>
-            <Alert>{String(component.error)}</Alert>
-            <Rows id="promotion.load.actions" items={[{ key: 'retry', label: 'Retry' }, { key: 'close', label: 'Close' }]}
-              onActivate={(key) => key === 'retry' ? void refetch() : closePromotion()}>
-              {(entry, item) => <Row item={item}>{entry.label}</Row>}
-            </Rows>
-          </Show>
-        </ModalBody>
-      </Modal>
-    }>
+    <Show
+      when={component()}
+      fallback={
+        <Modal onDismiss={closePromotion} title="Create or link task" size="wide">
+          <ModalBody>
+            <Show when={component.error} fallback={<Line role="muted">Opening task choices…</Line>}>
+              <Alert>{String(component.error)}</Alert>
+              <Rows
+                id="promotion.load.actions"
+                items={[
+                  { key: 'retry', label: 'Retry' },
+                  { key: 'close', label: 'Close' },
+                ]}
+                onActivate={(key) => (key === 'retry' ? void refetch() : closePromotion())}
+              >
+                {(entry, item) => <Row item={item}>{entry.label}</Row>}
+              </Rows>
+            </Show>
+          </ModalBody>
+        </Modal>
+      }
+    >
       {(ready) => <Dynamic component={ready()} request={props.request} />}
     </Show>
   )

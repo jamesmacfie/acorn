@@ -9,7 +9,9 @@ it('retries a failed pane only after the node query refresh completes', async ()
 
   createRoot((stop) => {
     dispose = stop
-    resetPaneAfterRecovery(recovery, () => { resets += 1 })
+    resetPaneAfterRecovery(recovery, () => {
+      resets += 1
+    })
   })
   await Promise.resolve()
   expect(resets).toBe(0)

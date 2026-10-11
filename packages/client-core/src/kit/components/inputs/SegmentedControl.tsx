@@ -30,7 +30,9 @@ export function SegmentedControl<T extends string>(props: {
       class="ui-segments"
       data-size={props.size ?? 'md'}
       data-detail={props.options.some((option) => option.detail) ? '' : undefined}
-      aria-label={props.ariaLabel} {...collection.containerProps}>
+      aria-label={props.ariaLabel}
+      {...collection.containerProps}
+    >
       {/* Buttons, not Row: menus and segments are their own semantics (see Button's note). */}
       {props.options.map((option) => (
         <button
@@ -43,8 +45,13 @@ export function SegmentedControl<T extends string>(props: {
           onClick={() => props.onChange(option.value)}
         >
           <Show when={option.detail} fallback={option.label}>
-            <span class="ui-segment-head"><span class="ui-segment-radio" />{option.label}</span>
-            <span class="ui-segment-detail" aria-hidden="true">{option.detail}</span>
+            <span class="ui-segment-head">
+              <span class="ui-segment-radio" />
+              {option.label}
+            </span>
+            <span class="ui-segment-detail" aria-hidden="true">
+              {option.detail}
+            </span>
           </Show>
         </button>
       ))}

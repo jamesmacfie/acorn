@@ -18,7 +18,11 @@ import { createLogger, describeError } from '../telemetry/logger'
 import { registerManifestRuntimeContributions } from './runtimeContributions'
 import { registerManifestSchedules, registerManifestTaskChecks, registerManifestHooks } from './manifestWork'
 import { registerManifestHarnesses, registerManifestCustomAgents } from './manifestAgents'
-import { registerManifestDataSources, registerManifestNodeActions, registerManifestAuditActions } from './manifestCatalog'
+import {
+  registerManifestDataSources,
+  registerManifestNodeActions,
+  registerManifestAuditActions,
+} from './manifestCatalog'
 
 // One logger per plugin, minted where the name is known, so a line still reads `[plugin:<id>] …`.
 const pluginLog = (name: string) => createLogger(`plugin:${name}`, name)
@@ -123,7 +127,10 @@ export type PluginHostResult = {
   dispose(): Promise<void>
 }
 
-export async function initPlugins(plugins: readonly NodePlugin[], options: PluginHostOptions): Promise<PluginHostResult> {
+export async function initPlugins(
+  plugins: readonly NodePlugin[],
+  options: PluginHostOptions,
+): Promise<PluginHostResult> {
   const seen = new Set<string>()
   for (const plugin of plugins) {
     if (seen.has(plugin.name)) throw new Error(`Duplicate node plugin: ${plugin.name}`)
@@ -144,7 +151,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // A missing env is a composition-root wiring bug, not a plugin's fault, so it is raised here, before
   // anything starts and there is a graph to unwind.
   const requireEnv = (name: string): Env => {
-    if (!options.env) throw new Error(`Plugin '${name}' declares work the node runs on its own, but initPlugins was given no env to run it with.`)
+    if (!options.env)
+      throw new Error(
+        `Plugin '${name}' declares work the node runs on its own, but initPlugins was given no env to run it with.`,
+      )
     return options.env
   }
   for (const [name, binding] of loadedBindings) if (binding.schedules?.length) requireEnv(name)
@@ -158,8 +168,9 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   const storageFor = (plugin: NodePlugin, loaded?: LoadedPluginBinding): PluginStorage | undefined => {
     // The loaded binding first and unconditionally (server/pluginHost/context.ts says why).
     // `migrationsModule` is the compiled tier's declaration, read only for a plugin that isn't loaded.
-    const source = loaded?.storage
-      ?? (plugin.migrationsModule ? builtinPluginStorage(options.dataDir, plugin.name, plugin.migrationsModule) : null)
+    const source =
+      loaded?.storage ??
+      (plugin.migrationsModule ? builtinPluginStorage(options.dataDir, plugin.name, plugin.migrationsModule) : null)
     if (!source) return undefined
     return {
       open: () => {
@@ -188,15 +199,26 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
 
   // The host owns this undo alongside context registrations; declarations follow the binding
   // generation and are removed with that instance.
-  const registerEmits = (plugin: NodePlugin, binding: LoadedPluginBinding | undefined, onUndo: (undo: () => void) => void): void => {
+  const registerEmits = (
+    plugin: NodePlugin,
+    binding: LoadedPluginBinding | undefined,
+    onUndo: (undo: () => void) => void,
+  ): void => {
     onUndo(declareEmits(plugin.name, binding ? (binding.emits ?? []) : (plugin.emits ?? [])))
   }
 
   // Roll a contained plugin back to its pre-init state: undo everything it registered, let it release
   // what it opened, and record why. Boot continues, which is the difference between "one installed
   // plugin is broken" and "this node does not start".
-  const contain = async (plugin: NodePlugin, ctx: ReturnType<typeof buildPluginContext>, phase: 'init' | 'ready', error: unknown): Promise<void> => {
-    pluginLog(plugin.name).error(`${phase} failed; the plugin is disabled for this boot: ${describeError(error).message}`)
+  const contain = async (
+    plugin: NodePlugin,
+    ctx: ReturnType<typeof buildPluginContext>,
+    phase: 'init' | 'ready',
+    error: unknown,
+  ): Promise<void> => {
+    pluginLog(plugin.name).error(
+      `${phase} failed; the plugin is disabled for this boot: ${describeError(error).message}`,
+    )
     clearRegistrations(plugin.name)
     try {
       await plugin.dispose?.()
@@ -208,13 +230,22 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     closeStorage(plugin.name)
     revokePluginContext(ctx)
     contexts.delete(plugin.name)
-    failed.push({ name: plugin.name, error: error instanceof Error ? error.message : String(error), at: Date.now(), stage: phase })
+    failed.push({
+      name: plugin.name,
+      error: error instanceof Error ? error.message : String(error),
+      at: Date.now(),
+      stage: phase,
+    })
   }
 
   // Every plugin that is going to run, prepared in declaration order, before any of them starts. The
   // registrations here are synchronous and independent, so doing them all first is what lets the init
   // pass below be concurrent without a plugin racing a neighbour's manifest declarations.
-  const running: { plugin: NodePlugin; ctx: ReturnType<typeof buildPluginContext>; loaded: LoadedPluginBinding | undefined }[] = []
+  const running: {
+    plugin: NodePlugin
+    ctx: ReturnType<typeof buildPluginContext>
+    loaded: LoadedPluginBinding | undefined
+  }[] = []
   try {
     for (const plugin of plugins) {
       // Clearing happens before the disabled check. These registries are module singletons, so a
@@ -310,7 +341,11 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   if (fatal) {
     // A failed compiled init may already own a database, route, capability or process. Every init
     // settled, so dispose every non-contained instance, including the one that threw.
-    await disposeStarted(running.filter(({ plugin }) => !failed.some((entry) => entry.name === plugin.name)).map(({ plugin }) => plugin), closeStorage, contexts)
+    await disposeStarted(
+      running.filter(({ plugin }) => !failed.some((entry) => entry.name === plugin.name)).map(({ plugin }) => plugin),
+      closeStorage,
+      contexts,
+    )
     for (const { ctx } of running) revokePluginContext(ctx)
     throw fatal.error
   }
@@ -418,7 +453,10 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // boot is still in it, which makes "write broken code, reload, fix it, reload again" work.
     if (!loadedBindings.has(name)) {
       await disposeUnstartedPlugin(next.plugin)
-      return { ok: false, error: `'${name}' is not a plugin this node loaded from disk, so it cannot be reloaded. Built-ins need a restart.` }
+      return {
+        ok: false,
+        error: `'${name}' is not a plugin this node loaded from disk, so it cannot be reloaded. Built-ins need a restart.`,
+      }
     }
     if (disabled.has(name)) {
       await disposeUnstartedPlugin(next.plugin)
@@ -489,7 +527,9 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       }
       revokePluginContext(candidateCtx)
       const message = error instanceof Error ? error.message : String(error)
-      pluginLog(name).error(`reload ${candidateStage} failed; the previous instance is still serving: ${describeError(error).message}`)
+      pluginLog(name).error(
+        `reload ${candidateStage} failed; the previous instance is still serving: ${describeError(error).message}`,
+      )
       markFailed(name, candidateStage, message)
       return { ok: false, error: message, retained: true }
     }
@@ -522,7 +562,9 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       // throwing, the failure a dev loop produces. Narrowing this window further would mean a
       // validate-only pass in six registries.
       const message = error instanceof Error ? error.message : String(error)
-      pluginLog(name).error(`reload could not register the new instance's contributions: ${describeError(error).message}`)
+      pluginLog(name).error(
+        `reload could not register the new instance's contributions: ${describeError(error).message}`,
+      )
       // Every replayed registration recorded its undo here as it landed, so this takes back exactly the
       // part that got in.
       for (const undo of candidateUndos.reverse()) undo()

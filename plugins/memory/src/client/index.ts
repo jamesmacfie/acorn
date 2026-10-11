@@ -7,7 +7,9 @@ import { MEMORY_SOURCE_ID } from '../shared/api'
 // Two lazy chunks off one module, because a terminal draws the list and the detail in two panels
 // (client-core registries/sources.ts § regions).
 const MemoryList = lazy(() => import('./MemoryCenter').then((module) => ({ default: module.MemoryList })))
-const MemoryCenterDetail = lazy(() => import('./MemoryCenter').then((module) => ({ default: module.MemoryCenterDetail })))
+const MemoryCenterDetail = lazy(() =>
+  import('./MemoryCenter').then((module) => ({ default: module.MemoryCenterDetail })),
+)
 const MemoryToolCard = lazy(async () => ({ default: (await import('./MemoryToolCard')).MemoryToolCard }))
 
 export const memoryClientPlugin: ClientPlugin = {
@@ -17,8 +19,12 @@ export const memoryClientPlugin: ClientPlugin = {
     // Register Memory search commands (./commands.ts).
     for (const contribution of memoryCommands) ctx.commands.register(contribution)
     ctx.extensions.register({
-      id: 'memory.tool-card', point: AGENT_TOOL_CARD_POINT, label: 'Memory changes',
-      order: 10, matches: ['memory_write', 'memory_delete'], component: MemoryToolCard,
+      id: 'memory.tool-card',
+      point: AGENT_TOOL_CARD_POINT,
+      label: 'Memory changes',
+      order: 10,
+      matches: ['memory_write', 'memory_delete'],
+      component: MemoryToolCard,
     })
     // The project-scoped Memory library is a rail source.
     ctx.sources.register({

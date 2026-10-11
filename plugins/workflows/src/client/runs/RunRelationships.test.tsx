@@ -10,18 +10,42 @@ const tasks = [
 ] as Task[]
 
 const child = (over: Partial<WorkflowChildRunSummary> = {}): WorkflowChildRunSummary => ({
-  parentTaskId: 'root-task', parentRunId: 'root-run', parentStepId: 'map-step', itemKey: 'ticket-42',
-  taskId: 'child-task', runId: 'child-run', name: 'Review ticket', dispatchState: 'run-started',
-  runStatus: 'gated', resultSummary: null, error: null,
-  usage: { costUsd: 0.12, inputTokens: 1200, outputTokens: 340, turns: 1 }, updatedAt: 20,
+  parentTaskId: 'root-task',
+  parentRunId: 'root-run',
+  parentStepId: 'map-step',
+  itemKey: 'ticket-42',
+  taskId: 'child-task',
+  runId: 'child-run',
+  name: 'Review ticket',
+  dispatchState: 'run-started',
+  runStatus: 'gated',
+  resultSummary: null,
+  error: null,
+  usage: { costUsd: 0.12, inputTokens: 1200, outputTokens: 340, turns: 1 },
+  updatedAt: 20,
   ...over,
 })
 
 const step = (children: WorkflowChildRunSummary[]): WorkflowStepProjection => ({
-  id: 'map-step', runId: 'root-run', idx: 1, name: 'review', kind: 'workflow-map', mode: 'headless',
-  profileId: null, model: null, status: 'waiting-children', resultJson: null, structuredJson: null,
-  sessionId: null, agentSessionId: null, costUsd: null, iteration: 0, error: null,
-  createdAt: 10, updatedAt: 20, children,
+  id: 'map-step',
+  runId: 'root-run',
+  idx: 1,
+  name: 'review',
+  kind: 'workflow-map',
+  mode: 'headless',
+  profileId: null,
+  model: null,
+  status: 'waiting-children',
+  resultJson: null,
+  structuredJson: null,
+  sessionId: null,
+  agentSessionId: null,
+  costUsd: null,
+  iteration: 0,
+  error: null,
+  createdAt: 10,
+  updatedAt: 20,
+  children,
 })
 
 let host: HTMLDivElement
@@ -37,16 +61,26 @@ describe('workflow run relationships', () => {
     const open = vi.fn()
     host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => (
-      <ChildRuns
-        step={step([
-          child(),
-          child({ itemKey: 'ticket-43', taskId: 'missing-task', runId: 'failed-run', runStatus: 'failed', error: 'Review failed.', resultSummary: '{"reviewed":false}' }),
-        ])}
-        tasks={tasks}
-        onOpen={open}
-      />
-    ), host)
+    dispose = render(
+      () => (
+        <ChildRuns
+          step={step([
+            child(),
+            child({
+              itemKey: 'ticket-43',
+              taskId: 'missing-task',
+              runId: 'failed-run',
+              runStatus: 'failed',
+              error: 'Review failed.',
+              resultSummary: '{"reviewed":false}',
+            }),
+          ])}
+          tasks={tasks}
+          onOpen={open}
+        />
+      ),
+      host,
+    )
 
     expect(host.textContent).toContain('1 of 2 finished')
     expect(host.textContent).toContain('1 need approval')
@@ -69,10 +103,23 @@ describe('workflow run relationships', () => {
   it('links a child run to its explicit parent and root lineage', () => {
     const open = vi.fn()
     const run: WorkflowRunProjection = {
-      id: 'child-run', taskId: 'child-task', name: 'Review ticket', status: 'running', posture: 'gated',
-      error: null, createdAt: 10, updatedAt: 20, rootRunId: 'root-run', parentRunId: 'root-run',
-      parentStepId: 'map-step', rootTaskId: 'root-task', rootRunName: 'Ticket review batch',
-      parentTaskId: 'root-task', parentRunName: 'Ticket review batch', depth: 1, usage: null,
+      id: 'child-run',
+      taskId: 'child-task',
+      name: 'Review ticket',
+      status: 'running',
+      posture: 'gated',
+      error: null,
+      createdAt: 10,
+      updatedAt: 20,
+      rootRunId: 'root-run',
+      parentRunId: 'root-run',
+      parentStepId: 'map-step',
+      rootTaskId: 'root-task',
+      rootRunName: 'Ticket review batch',
+      parentTaskId: 'root-task',
+      parentRunName: 'Ticket review batch',
+      depth: 1,
+      usage: null,
     }
     host = document.createElement('div')
     document.body.append(host)
@@ -80,7 +127,9 @@ describe('workflow run relationships', () => {
 
     expect(host.textContent).toContain('Started by:')
     expect(host.textContent).not.toContain('Part of:')
-    const parentRun = [...host.querySelectorAll('button')].filter((button) => button.textContent === 'Ticket review batch').at(-1)
+    const parentRun = [...host.querySelectorAll('button')]
+      .filter((button) => button.textContent === 'Ticket review batch')
+      .at(-1)
     parentRun?.click()
     expect(open).toHaveBeenCalledWith('root-task', 'root-run')
   })

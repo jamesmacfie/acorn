@@ -18,9 +18,17 @@ const packageAt = (parent: string, version: string, marker = version): string =>
   const dir = join(parent, 'rollbar')
   rmSync(dir, { recursive: true, force: true })
   mkdirSync(join(dir, 'dist'), { recursive: true })
-  writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-    id: 'rollbar', name: 'Rollbar', version, baseline: ACORN_BASELINE, apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-  }))
+  writeFileSync(
+    join(dir, 'acorn-plugin.json'),
+    JSON.stringify({
+      id: 'rollbar',
+      name: 'Rollbar',
+      version,
+      baseline: ACORN_BASELINE,
+      apiVersion: PLUGIN_API_MAJOR,
+      node: './dist/node.js',
+    }),
+  )
   writeFileSync(join(dir, 'dist/node.js'), `export default ${JSON.stringify(marker)}\n`)
   return dir
 }
@@ -75,20 +83,39 @@ describe('bundled plugin reconciliation', () => {
     expect(readBundledPluginState(root, 'rollbar')).toMatchObject({ status: 'user' })
   })
 
-  it('updates only the app-owned package while preserving an old profile\'s Rollbar records', async () => {
+  it("updates only the app-owned package while preserving an old profile's Rollbar records", async () => {
     const db = openDb(join(root, 'core.sqlite'))
     const now = Date.now()
-    await db.insert(schema.workspaces).values({ id: 'workspace', name: 'Work', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
-    await db.insert(schema.projects).values({ id: 'project', name: 'App', workspaceId: 'workspace', createdAt: now, updatedAt: now })
+    await db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace', name: 'Work', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await db
+      .insert(schema.projects)
+      .values({ id: 'project', name: 'App', workspaceId: 'workspace', createdAt: now, updatedAt: now })
     await db.insert(schema.integrations).values({
-      id: 'rollbar-connection', userId: 'owner', provider: 'rollbar', label: 'Production', encryptedCredentials: 'encrypted-secret',
-      createdAt: now, updatedAt: now,
+      id: 'rollbar-connection',
+      userId: 'owner',
+      provider: 'rollbar',
+      label: 'Production',
+      encryptedCredentials: 'encrypted-secret',
+      createdAt: now,
+      updatedAt: now,
     })
     await db.insert(schema.tasks).values({
-      id: 'task', title: 'Checkout failed', origin: 'rollbar', projectId: 'project', status: 'active', createdAt: now, updatedAt: now,
+      id: 'task',
+      title: 'Checkout failed',
+      origin: 'rollbar',
+      projectId: 'project',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
     })
     await db.insert(schema.taskLinks).values({
-      taskId: 'task', integrationId: 'rollbar-connection', provider: 'rollbar', identifier: '142', createdAt: now,
+      taskId: 'task',
+      integrationId: 'rollbar-connection',
+      provider: 'rollbar',
+      identifier: '142',
+      createdAt: now,
     })
     db.close()
 
@@ -102,11 +129,20 @@ describe('bundled plugin reconciliation', () => {
     expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('2.0.0')
     expect(readFileSync(pluginDbPath(root, 'rollbar'), 'utf8')).toBe('plugin data')
     const reopened = openDb(join(root, 'core.sqlite'))
-    expect(await reopened.select({ provider: schema.integrations.provider, encryptedCredentials: schema.integrations.encryptedCredentials }).from(schema.integrations))
-      .toEqual([{ provider: 'rollbar', encryptedCredentials: 'encrypted-secret' }])
+    expect(
+      await reopened
+        .select({
+          provider: schema.integrations.provider,
+          encryptedCredentials: schema.integrations.encryptedCredentials,
+        })
+        .from(schema.integrations),
+    ).toEqual([{ provider: 'rollbar', encryptedCredentials: 'encrypted-secret' }])
     expect(await reopened.select({ origin: schema.tasks.origin }).from(schema.tasks)).toEqual([{ origin: 'rollbar' }])
-    expect(await reopened.select({ provider: schema.taskLinks.provider, identifier: schema.taskLinks.identifier }).from(schema.taskLinks))
-      .toEqual([{ provider: 'rollbar', identifier: '142' }])
+    expect(
+      await reopened
+        .select({ provider: schema.taskLinks.provider, identifier: schema.taskLinks.identifier })
+        .from(schema.taskLinks),
+    ).toEqual([{ provider: 'rollbar', identifier: '142' }])
     reopened.close()
   })
 

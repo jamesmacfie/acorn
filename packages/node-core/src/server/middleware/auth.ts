@@ -64,9 +64,9 @@ function internalPrincipal(c: { env: Env; req: { header(name: string): string | 
 // Device bearer: the client's connection broker authenticates with a paired device
 // token.
 //
-  // A comma in the merged Authorization value means the request carried more than one such header
-  // (fetch joins repeats with ", "), and a valid bearer contains no comma. That is ambiguous, so it is
-  // rejected rather than resolved by picking one.
+// A comma in the merged Authorization value means the request carried more than one such header
+// (fetch joins repeats with ", "), and a valid bearer contains no comma. That is ambiguous, so it is
+// rejected rather than resolved by picking one.
 async function devicePrincipal(c: { env: Env }, header: string): Promise<Principal | null> {
   if (!c.env.DEVICES || header.includes(',')) return null
   const authenticated = await c.env.DEVICES.authenticate(header.slice('Bearer '.length).trim())

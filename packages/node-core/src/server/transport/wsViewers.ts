@@ -20,15 +20,25 @@ export class WsViewers {
 
   remove(id: string): EventViewer | undefined {
     const held = this.viewers.get(id)
-    if (held) { held.active = false; this.viewers.delete(id) }
+    if (held) {
+      held.active = false
+      this.viewers.delete(id)
+    }
     return held
   }
 
-  all(): EventViewer[] { return [this.legacy, ...this.viewers.values()] }
-  hasStream(id: string): boolean { return this.all().some((owner) => owner.sinks.has(id)) }
+  all(): EventViewer[] {
+    return [this.legacy, ...this.viewers.values()]
+  }
+  hasStream(id: string): boolean {
+    return this.all().some((owner) => owner.sinks.has(id))
+  }
 
   clear(retire: (viewer: EventViewer) => void): void {
-    for (const owner of this.all()) { owner.active = false; retire(owner) }
+    for (const owner of this.all()) {
+      owner.active = false
+      retire(owner)
+    }
     this.viewers.clear()
   }
 }

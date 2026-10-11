@@ -18,8 +18,19 @@ import { type Clock, Scheduler } from './scheduler'
 // schedule.
 
 const PLUGIN = 'acme'
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
-const storage: PluginStorage = { open: () => { throw new Error('this suite never opens a plugin database') } }
+const NO_PERMISSIONS: NodePermissions = {
+  core: [],
+  capabilities: [],
+  secrets: false,
+  exec: false,
+  net: [],
+  sockets: false,
+}
+const storage: PluginStorage = {
+  open: () => {
+    throw new Error('this suite never opens a plugin database')
+  },
+}
 
 const flush = async (): Promise<void> => {
   for (let i = 0; i < 30; i++) await new Promise((resolve) => setImmediate(resolve))
@@ -69,16 +80,24 @@ async function world(
   const plugin: NodePlugin = {
     name: PLUGIN,
     init: (ctx) => {
-      ctx.routes.fetch(async (request) => {
-        await observe?.(request)
-        return onCall()
-      }, { prefix: '/actions' })
+      ctx.routes.fetch(
+        async (request) => {
+          await observe?.(request)
+          return onCall()
+        },
+        { prefix: '/actions' },
+      )
       register(ctx as HostPluginContext)
     },
   }
   await initPlugins([plugin], {
     capabilities,
-    core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
+    core: createCoreServices({
+      secrets: new SecretService('c'.repeat(64)),
+      db: core.db,
+      activeIdentity: memoryIdentityStore('owner-1'),
+      ...testCoreSeams(),
+    }),
     env,
     dataDir: '',
   })
@@ -87,14 +106,13 @@ async function world(
   return { core, time, scheduler, env }
 }
 
-const declare = (risk?: 'read' | 'write' | 'execute') =>
-  (ctx: HostPluginContext) =>
-    ctx.nodeActions.register({
-      actionId: 'prune-merged',
-      name: 'Prune merged worktrees',
-      path: `/v1/p/${PLUGIN}/actions/prune`,
-      ...(risk ? { risk } : {}),
-    })
+const declare = (risk?: 'read' | 'write' | 'execute') => (ctx: HostPluginContext) =>
+  ctx.nodeActions.register({
+    actionId: 'prune-merged',
+    name: 'Prune merged worktrees',
+    path: `/v1/p/${PLUGIN}/actions/prune`,
+    ...(risk ? { risk } : {}),
+  })
 
 describe('what the picker may offer', () => {
   it('reports an undeclared tier as `execute`, not as nothing', async () => {
@@ -102,7 +120,9 @@ describe('what the picker may offer', () => {
     try {
       // Fail in the safe direction: an undeclared tier means nobody has said what this does, and
       // arming the strongest confirmation for that cannot be wrong in a way that matters.
-      expect(nodeActions().map((a) => ({ id: a.actionId, risk: a.risk }))).toEqual([{ id: 'prune-merged', risk: undefined }])
+      expect(nodeActions().map((a) => ({ id: a.actionId, risk: a.risk }))).toEqual([
+        { id: 'prune-merged', risk: undefined },
+      ])
     } finally {
       await scheduler.stop()
       core.cleanup()
@@ -112,18 +132,43 @@ describe('what the picker may offer', () => {
   it('synthesises a LOADED plugin’s runNodeAction commands from its manifest', async () => {
     const core = makeTestDb()
     const commands: PluginCommandDescriptor[] = [
-      { id: 'prune', title: 'Prune merged worktrees', category: 'action', palette: true, action: { verb: 'runNodeAction', path: `/v1/p/${PLUGIN}/actions/prune` } },
+      {
+        id: 'prune',
+        title: 'Prune merged worktrees',
+        category: 'action',
+        palette: true,
+        action: { verb: 'runNodeAction', path: `/v1/p/${PLUGIN}/actions/prune` },
+      },
       // Every other verb needs a surface, and a schedule has none.
-      { id: 'show', title: 'Show the pane', category: 'action', palette: true, action: { verb: 'openOverlay', overlay: 'thing' } },
+      {
+        id: 'show',
+        title: 'Show the pane',
+        category: 'action',
+        palette: true,
+        action: { verb: 'openOverlay', overlay: 'thing' },
+      },
     ]
     try {
-      await initPlugins([{ name: PLUGIN, init: (ctx) => void ctx.routes.fetch(() => new Response(null, { status: 204 }), { prefix: '/actions' }) }], {
-        capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
-        env: testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore('owner-1') }),
-        dataDir: '',
-        loaded: new Map([[PLUGIN, { permissions: NO_PERMISSIONS, storage, commands }]]),
-      })
+      await initPlugins(
+        [
+          {
+            name: PLUGIN,
+            init: (ctx) => void ctx.routes.fetch(() => new Response(null, { status: 204 }), { prefix: '/actions' }),
+          },
+        ],
+        {
+          capabilities: new CapabilityRegistry(),
+          core: createCoreServices({
+            secrets: new SecretService('c'.repeat(64)),
+            db: core.db,
+            activeIdentity: memoryIdentityStore('owner-1'),
+            ...testCoreSeams(),
+          }),
+          env: testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore('owner-1') }),
+          dataDir: '',
+          loaded: new Map([[PLUGIN, { permissions: NO_PERMISSIONS, storage, commands }]]),
+        },
+      )
       expect(nodeActions().map((a) => a.actionId)).toEqual(['prune'])
     } finally {
       core.cleanup()
@@ -137,12 +182,14 @@ describe('creating and running one', () => {
     try {
       // The one non-tolerant edge in the scheduler, and the right place for it: a schedule pointing at
       // nothing is a typo, and the person is standing right there.
-      await expect(scheduler.create({
-        name: 'Nightly prune',
-        kind: 'node-action',
-        target: { pluginId: PLUGIN, actionId: 'no-such-action' },
-        cadence: { every: 3600 },
-      })).rejects.toThrow()
+      await expect(
+        scheduler.create({
+          name: 'Nightly prune',
+          kind: 'node-action',
+          target: { pluginId: PLUGIN, actionId: 'no-such-action' },
+          cadence: { every: 3600 },
+        }),
+      ).rejects.toThrow()
     } finally {
       await scheduler.stop()
       core.cleanup()
@@ -154,7 +201,8 @@ describe('creating and running one', () => {
     const { core, scheduler } = await world(
       declare('write'),
       () => new Response(null, { status: 204 }),
-      async (request) => void seen.push({ method: request.method, path: new URL(request.url).pathname, body: await request.text() }),
+      async (request) =>
+        void seen.push({ method: request.method, path: new URL(request.url).pathname, body: await request.text() }),
     )
     try {
       const row = await scheduler.create({
@@ -167,7 +215,10 @@ describe('creating and running one', () => {
       expect(row).toMatchObject({ owner: 'user', kind: 'node-action', registered: true, risk: 'write' })
 
       await scheduler.runNow(row.key)
-      expect((await scheduler.runs(row.key))[0]).toMatchObject({ status: 'ok', detail: 'ran acme: Prune merged worktrees' })
+      expect((await scheduler.runs(row.key))[0]).toMatchObject({
+        status: 'ok',
+        detail: 'ran acme: Prune merged worktrees',
+      })
       // A scheduled fire and a clicked one have to be indistinguishable to the handler, or the plugin
       // ends up with two code paths for one verb: same POST, same mount-relative path, params in the body.
       expect(seen).toEqual([{ method: 'POST', path: '/prune', body: '{"olderThanDays":"7"}' }])
@@ -185,15 +236,31 @@ describe('creating and running one', () => {
     let fired = 0
     const options = {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
+      core: createCoreServices({
+        secrets: new SecretService('c'.repeat(64)),
+        db: core.db,
+        activeIdentity: memoryIdentityStore('owner-1'),
+        ...testCoreSeams(),
+      }),
       env,
       dataDir: '',
     }
     const pluginWith = (risk: 'write' | 'execute'): NodePlugin => ({
       name: PLUGIN,
       init: (ctx) => {
-        ctx.routes.fetch(() => { fired += 1; return new Response(null, { status: 204 }) }, { prefix: '/actions' })
-        ;(ctx as HostPluginContext).nodeActions.register({ actionId: 'prune-merged', name: 'Prune merged worktrees', path: `/v1/p/${PLUGIN}/actions/prune`, risk })
+        ctx.routes.fetch(
+          () => {
+            fired += 1
+            return new Response(null, { status: 204 })
+          },
+          { prefix: '/actions' },
+        )
+        ;(ctx as HostPluginContext).nodeActions.register({
+          actionId: 'prune-merged',
+          name: 'Prune merged worktrees',
+          path: `/v1/p/${PLUGIN}/actions/prune`,
+          risk,
+        })
       },
     })
     try {
@@ -201,8 +268,10 @@ describe('creating and running one', () => {
       registerNodeActionTarget(scheduler, env)
       await scheduler.start()
       const row = await scheduler.create({
-        name: 'Nightly prune', kind: 'node-action',
-        target: { pluginId: PLUGIN, actionId: 'prune-merged' }, cadence: { every: 3600 },
+        name: 'Nightly prune',
+        kind: 'node-action',
+        target: { pluginId: PLUGIN, actionId: 'prune-merged' },
+        cadence: { every: 3600 },
       })
       expect(row.risk).toBe('write')
 
@@ -230,8 +299,10 @@ describe('creating and running one', () => {
     const { core, scheduler } = await world(declare('write'), () => new Response(null, { status: 204 }))
     try {
       const row = await scheduler.create({
-        name: 'Nightly prune', kind: 'node-action',
-        target: { pluginId: PLUGIN, actionId: 'prune-merged' }, cadence: { every: 3600 },
+        name: 'Nightly prune',
+        kind: 'node-action',
+        target: { pluginId: PLUGIN, actionId: 'prune-merged' },
+        cadence: { every: 3600 },
       })
       clearRegistrations(PLUGIN)
       await scheduler.runNow(row.key)

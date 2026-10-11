@@ -6,14 +6,21 @@ import { QueryClient } from '@tanstack/solid-query'
 import { expect, it, vi } from 'vitest'
 const held = vi.hoisted(() => ({ path: '', calls: [] as string[] }))
 vi.mock('./custody', () => ({ bundlePath: () => held.path }))
-import { acquireTreeWorker, _stopAllTreeWorkers, _setWorkerFactory, type TreeWorkerHandle } from '@acorn/client-core/host/tree/workerHost.ts'
+import {
+  acquireTreeWorker,
+  _stopAllTreeWorkers,
+  _setWorkerFactory,
+  type TreeWorkerHandle,
+} from '@acorn/client-core/host/tree/workerHost.ts'
 import { createFrameBridge, type FrameServices } from '@acorn/client-core/host/frames/broker.ts'
 import { installPluginWorkers } from './workerFactory'
 
 it('rotates held detection authority repeatedly without overlapping native replacements or replaying privileged calls', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'acorn-detection-rotation-'))
   held.path = join(directory, 'bundle.mjs')
-  writeFileSync(held.path, `
+  writeFileSync(
+    held.path,
+    `
     await new Promise(resolve => setTimeout(resolve, 200));
     let claimed = false;
     addEventListener('message', event => {
@@ -28,11 +35,17 @@ it('rotates held detection authority repeatedly without overlapping native repla
       };
       bridge.start();
     });
-  `)
-  const workers: Worker[] = [], leases: TreeWorkerHandle[] = [], qcs: QueryClient[] = []
-  const realPost = Worker.prototype.postMessage, realTerminate = Worker.prototype.terminate
+  `,
+  )
+  const workers: Worker[] = [],
+    leases: TreeWorkerHandle[] = [],
+    qcs: QueryClient[] = []
+  const realPost = Worker.prototype.postMessage,
+    realTerminate = Worker.prototype.terminate
   let release!: () => void
-  const gate = new Promise<void>((resolve) => { release = resolve })
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
   vi.stubGlobal('MessageChannel', MessageChannel)
   vi.spyOn(Worker.prototype, 'postMessage').mockImplementation(function (this: Worker, message, transfer) {
     if ((message as { acornBridge?: number })?.acornBridge && !workers.includes(this)) workers.push(this)
@@ -40,25 +53,67 @@ it('rotates held detection authority repeatedly without overlapping native repla
   })
   vi.spyOn(Worker.prototype, 'terminate').mockImplementation(function (this: Worker) {
     const termination = realTerminate.call(this)
-    return this === workers[0] ? termination.then(async (code) => { await gate; return code }) : termination
+    return this === workers[0]
+      ? termination.then(async (code) => {
+          await gate
+          return code
+        })
+      : termination
   })
   const wait = async (check: () => boolean) => {
     const until = Date.now() + 5000
-    while (!check()) { if (Date.now() >= until) throw new Error('native detector rotation deadline'); await new Promise((resolve) => setTimeout(resolve, 5)) }
+    while (!check()) {
+      if (Date.now() >= until) throw new Error('native detector rotation deadline')
+      await new Promise((resolve) => setTimeout(resolve, 5))
+    }
   }
   const acquire = (index: number) => {
-    const qc = new QueryClient(); qcs.push(qc)
-    const binding = { pluginId: 'audit', surface: 'panel', target: 'remote' as const, nodeId: `node-${index}`, api: [], events: [], panes: [], claimsKeys: [] }
-    const context = { surface: 'panel', target: 'remote' as const, nodeId: binding.nodeId, theme: 'terminal', style: 'terminal' }
+    const qc = new QueryClient()
+    qcs.push(qc)
+    const binding = {
+      pluginId: 'audit',
+      surface: 'panel',
+      target: 'remote' as const,
+      nodeId: `node-${index}`,
+      api: [],
+      events: [],
+      panes: [],
+      claimsKeys: [],
+    }
+    const context = {
+      surface: 'panel',
+      target: 'remote' as const,
+      nodeId: binding.nodeId,
+      theme: 'terminal',
+      style: 'terminal',
+    }
     const lease = acquireTreeWorker({
-      pluginId: 'audit', hash: 'held-native-detection', authority: `authority-${index}`, context,
+      pluginId: 'audit',
+      hash: 'held-native-detection',
+      authority: `authority-${index}`,
+      context,
       connect: (port, hasFocus, legacyContext = context) => {
-        const unavailable = () => { throw new Error('rotation fixture exposes API only') }
+        const unavailable = () => {
+          throw new Error('rotation fixture exposes API only')
+        }
         const services: FrameServices = {
-          fetch: async () => { held.calls.push(binding.nodeId); return { ok: true, status: 200, body: null } },
-          fetchBytes: unavailable, subscribe: unavailable, stateGet: unavailable, stateSet: unavailable,
-          toast: unavailable, copy: unavailable, openPane: unavailable, openTask: unavailable, openUrl: unavailable,
-          frameHasFocus: hasFocus, importerDone: unavailable, importerClose: unavailable, keydown: unavailable,
+          fetch: async () => {
+            held.calls.push(binding.nodeId)
+            return { ok: true, status: 200, body: null }
+          },
+          fetchBytes: unavailable,
+          subscribe: unavailable,
+          stateGet: unavailable,
+          stateSet: unavailable,
+          toast: unavailable,
+          copy: unavailable,
+          openPane: unavailable,
+          openTask: unavailable,
+          openUrl: unavailable,
+          frameHasFocus: hasFocus,
+          importerDone: unavailable,
+          importerClose: unavailable,
+          keydown: unavailable,
         }
         return createFrameBridge({ port, binding, context: legacyContext, services, onMisbehaving: unavailable })
       },
@@ -89,10 +144,13 @@ it('rotates held detection authority repeatedly without overlapping native repla
   } finally {
     release()
     for (const lease of leases) lease.release()
-    _stopAllTreeWorkers(); _setWorkerFactory(null)
+    _stopAllTreeWorkers()
+    _setWorkerFactory(null)
     await Promise.all(workers.map((worker) => realTerminate.call(worker)))
     for (const qc of qcs) qc.clear()
-    vi.restoreAllMocks(); vi.unstubAllGlobals(); held.calls.length = 0
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    held.calls.length = 0
     rmSync(directory, { recursive: true, force: true })
   }
 })

@@ -5,9 +5,7 @@ import { testGate } from '@acorn/plugin-api/testkit'
 import { taskPulls } from './taskPulls'
 
 const request = (principal: Principal, taskId: string, tasks: CoreServices['tasks']) => {
-  const app = new Hono<AppEnv>()
-    .use('/api/*', ...testGate(principal))
-    .route('/api/tasks', taskPulls({ tasks }))
+  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/tasks', taskPulls({ tasks }))
   return app.request(`/api/tasks/${taskId}/pulls`)
 }
 
@@ -32,10 +30,17 @@ describe('task pull relations', () => {
   it('returns durable relations for the principal own task', async () => {
     const tasks = {
       load: vi.fn().mockResolvedValue({ id: 'task-a' }),
-      pulls: vi.fn().mockResolvedValue([{
-        repoOwner: 'acme', repoName: 'widget', pullNumber: 42, role: 'related',
-        provenance: 'agent', sessionId: 'session-1', requestId: null,
-      }]),
+      pulls: vi.fn().mockResolvedValue([
+        {
+          repoOwner: 'acme',
+          repoName: 'widget',
+          pullNumber: 42,
+          role: 'related',
+          provenance: 'agent',
+          sessionId: 'session-1',
+          requestId: null,
+        },
+      ]),
     } as unknown as CoreServices['tasks']
 
     const response = await request(
@@ -45,9 +50,15 @@ describe('task pull relations', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ pulls: [{
-      pull: { owner: 'acme', repo: 'widget', number: '42' },
-      role: 'related', provenance: 'agent', sessionId: 'session-1',
-    }] })
+    expect(await response.json()).toEqual({
+      pulls: [
+        {
+          pull: { owner: 'acme', repo: 'widget', number: '42' },
+          role: 'related',
+          provenance: 'agent',
+          sessionId: 'session-1',
+        },
+      ],
+    })
   })
 })

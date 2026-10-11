@@ -23,15 +23,21 @@ vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined 
 const capabilities = vi.hoisted(() => ({ desktop: true, terminal: true, preview: true }))
 vi.mock('../../infra/node/hostCapabilities', () => ({
   hasHostCapability: (requirement: 'none' | 'desktop' | { plugin?: string; seam?: string } = 'none') =>
-    requirement === 'none' ? true
-      : requirement === 'desktop' ? capabilities.desktop
-      : capabilities[(requirement.plugin ?? requirement.seam) as keyof typeof capabilities] ?? true,
+    requirement === 'none'
+      ? true
+      : requirement === 'desktop'
+        ? capabilities.desktop
+        : (capabilities[(requirement.plugin ?? requirement.seam) as keyof typeof capabilities] ?? true),
 }))
 
 // The layout store and the node's freshness are read through modules of their own. Stub them so a
 // failure here means the host, not one of its neighbours. The marker feed is real, because the
 // switcher's `core:pane` marks travel through it.
-const layout = vi.hoisted(() => ({ panes: ['pr'] as string[], pinned: [] as string[], weights: {} as Record<string, number> }))
+const layout = vi.hoisted(() => ({
+  panes: ['pr'] as string[],
+  pinned: [] as string[],
+  weights: {} as Record<string, number>,
+}))
 const maximized = vi.hoisted(() => ({ pane: undefined as string | undefined }))
 const dispatched = vi.hoisted(() => [] as unknown[])
 vi.mock('./tasks', () => ({
@@ -106,17 +112,21 @@ describe('TaskPaneHost', () => {
     pane({ id: 'pr', order: 0 })
     pane({ id: 'changes', order: 1 })
     mount()
-    const icon = [...host.querySelectorAll<HTMLElement>('.pane-switcher .tabrail-tab')]
-      .find((entry) => entry.getAttribute('aria-label') === 'changes')!
+    const icon = [...host.querySelectorAll<HTMLElement>('.pane-switcher .tabrail-tab')].find(
+      (entry) => entry.getAttribute('aria-label') === 'changes',
+    )!
     icon.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }))
     expect(dispatched).toEqual([])
-    expect([...document.querySelectorAll('[role="menuitem"]')].map((entry) => entry.textContent?.trim()))
-      .toEqual(['Open', 'Open beside'])
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((entry) => entry.textContent?.trim())).toEqual([
+      'Open',
+      'Open beside',
+    ])
     ;[...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-      .find((entry) => entry.textContent?.trim() === 'Open beside')?.click()
+      .find((entry) => entry.textContent?.trim() === 'Open beside')
+      ?.click()
     expect(dispatched).toEqual([{ type: 'add', pane: 'changes' }])
   })
-  it('draws the layout\'s panes, in the layout\'s order', () => {
+  it("draws the layout's panes, in the layout's order", () => {
     pane({ id: 'pr', order: 0 })
     pane({ id: 'changes', order: 1 })
     pane({ id: 'notes', order: 2 })
@@ -149,17 +159,24 @@ describe('TaskPaneHost', () => {
     mount(task({ github: null }))
 
     const tabs = () => [...host.querySelectorAll<HTMLElement>('.pane-switcher [aria-pressed]')]
-    const pressed = () => tabs().filter((tab) => tab.getAttribute('aria-pressed') === 'true').map((tab) => tab.getAttribute('aria-label'))
+    const pressed = () =>
+      tabs()
+        .filter((tab) => tab.getAttribute('aria-pressed') === 'true')
+        .map((tab) => tab.getAttribute('aria-label'))
     expect(pressed()).toEqual(['Agent'])
     // One pane on screen, so there is nothing to close.
     expect(host.querySelector('[aria-label="Close Agent"]')).toBeNull()
 
-    tabs().find((tab) => tab.getAttribute('aria-label') === 'Changes')
+    tabs()
+      .find((tab) => tab.getAttribute('aria-label') === 'Changes')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }))
 
     // The layout as drawn is what the add applies to, so the person gets the pane they were looking
     // at and the one they asked for, rather than the PR pane nobody can see plus Changes.
-    const next = (dispatched as LayoutAction[]).reduce<TaskLayout>((current, action) => applyLayoutAction(current, action), { panes: ['pr'] })
+    const next = (dispatched as LayoutAction[]).reduce<TaskLayout>(
+      (current, action) => applyLayoutAction(current, action),
+      { panes: ['pr'] },
+    )
     expect(next.panes).toEqual(['agents', 'changes'])
   })
 
@@ -183,7 +200,9 @@ describe('TaskPaneHost', () => {
 
     mount()
 
-    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) => node.getAttribute('aria-label'))
+    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) =>
+      node.getAttribute('aria-label'),
+    )
     expect(tabs.some((label) => label?.includes('agent'))).toBe(false)
   })
 
@@ -197,7 +216,9 @@ describe('TaskPaneHost', () => {
     mount(task({ status: 'archived', worktreePath: null }))
 
     expect(drawn()).toEqual(['notes'])
-    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) => node.getAttribute('aria-label'))
+    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) =>
+      node.getAttribute('aria-label'),
+    )
     expect(tabs).toEqual(['Agent', 'Notes'])
   })
 
@@ -208,7 +229,9 @@ describe('TaskPaneHost', () => {
     mount()
 
     expect(drawn()).toEqual(['findings'])
-    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) => node.getAttribute('aria-label'))
+    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) =>
+      node.getAttribute('aria-label'),
+    )
     expect(tabs.some((label) => label?.includes('findings'))).toBe(false)
   })
 
@@ -261,13 +284,25 @@ describe('TaskPaneHost', () => {
   it('marks consenting pane buttons only, keeps their menu, and drops the marks when the task closes', async () => {
     pane({ id: 'pr', order: 0, statusAnnotations: true })
     pane({ id: 'changes', order: 1 })
-    const marks = vi.fn(async (keys: PluginAnnotationKey[]) => keys.map((key) => ({ key, severity: 'danger' as const, text: 'Checks failing' })))
-    registered.push(extensionRegistry.register({
-      id: 'plugin:ci:pane-status', pluginId: 'ci', point: CORE_PANE_POINT, label: 'CI status', order: 500, carrier: 'items', marks,
-    } as ExtensionContribution))
+    const marks = vi.fn(async (keys: PluginAnnotationKey[]) =>
+      keys.map((key) => ({ key, severity: 'danger' as const, text: 'Checks failing' })),
+    )
+    registered.push(
+      extensionRegistry.register({
+        id: 'plugin:ci:pane-status',
+        pluginId: 'ci',
+        point: CORE_PANE_POINT,
+        label: 'CI status',
+        order: 500,
+        carrier: 'items',
+        marks,
+      } as ExtensionContribution),
+    )
     mount()
-    const icon = (id: string) => [...host.querySelectorAll<HTMLElement>('.pane-switcher .tabrail-tab')]
-      .find((entry) => entry.getAttribute('aria-label') === id)!
+    const icon = (id: string) =>
+      [...host.querySelectorAll<HTMLElement>('.pane-switcher .tabrail-tab')].find(
+        (entry) => entry.getAttribute('aria-label') === id,
+      )!
 
     await vi.waitFor(() => expect(icon('pr').querySelectorAll('.tabrail-marker')).toHaveLength(1))
     expect(marks).toHaveBeenCalledOnce()
@@ -276,7 +311,9 @@ describe('TaskPaneHost', () => {
     expect(icon('changes').querySelectorAll('.tabrail-marker')).toHaveLength(0)
 
     // The marked button still opens its menu without showing the pane.
-    icon('pr').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }))
+    icon('pr').dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }),
+    )
     expect(dispatched).toEqual([])
     expect(document.querySelector('[role="menu"]')).not.toBeNull()
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -300,6 +337,9 @@ describe('TaskPaneHost', () => {
     tab?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }))
 
     // Every layout change goes through the one reducer; the host never writes the store itself.
-    expect(dispatched).toEqual([{ type: 'show', pane: 'changes' }, { type: 'add', pane: 'changes' }])
+    expect(dispatched).toEqual([
+      { type: 'show', pane: 'changes' },
+      { type: 'add', pane: 'changes' },
+    ])
   })
 })

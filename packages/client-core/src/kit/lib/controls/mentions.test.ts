@@ -5,10 +5,13 @@ const SIGILS = ['@', '/', '$']
 
 describe('activeMention', () => {
   it('reads the sigil at the caret, so one field serves files, commands and skills', () => {
-    expect(activeMention('run /rev', 'run /rev'.length, SIGILS))
-      .toEqual({ sigil: '/', start: 4, end: 8, query: 'rev' })
-    expect(activeMention('then $read', 'then $read'.length, SIGILS))
-      .toEqual({ sigil: '$', start: 5, end: 10, query: 'read' })
+    expect(activeMention('run /rev', 'run /rev'.length, SIGILS)).toEqual({ sigil: '/', start: 4, end: 8, query: 'rev' })
+    expect(activeMention('then $read', 'then $read'.length, SIGILS)).toEqual({
+      sigil: '$',
+      start: 5,
+      end: 10,
+      query: 'read',
+    })
   })
 
   it('only counts a sigil at a word boundary', () => {
@@ -22,14 +25,22 @@ describe('activeMention', () => {
   })
 
   it('takes the whole word the caret is inside, not just what is behind it', () => {
-    expect(activeMention('Check @src/comp before', 'Check @src/co'.length, SIGILS))
-      .toEqual({ sigil: '@', start: 6, end: 'Check @src/comp'.length, query: 'src/co' })
+    expect(activeMention('Check @src/comp before', 'Check @src/co'.length, SIGILS)).toEqual({
+      sigil: '@',
+      start: 6,
+      end: 'Check @src/comp'.length,
+      query: 'src/co',
+    })
   })
 
   it('keeps the spaces inside a quoted token', () => {
     const text = 'Review @"docs/product br'
-    expect(activeMention(text, text.length, SIGILS))
-      .toEqual({ sigil: '@', start: 7, end: text.length, query: 'docs/product br' })
+    expect(activeMention(text, text.length, SIGILS)).toEqual({
+      sigil: '@',
+      start: 7,
+      end: text.length,
+      query: 'docs/product br',
+    })
   })
 })
 

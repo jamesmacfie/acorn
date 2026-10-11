@@ -24,7 +24,8 @@ const OPENCODE = {
   id: 'opencode',
   name: 'OpenCode',
   version: '1.0.0',
-  baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
+  baseline: 'acorn-1',
+  apiVersion: PLUGIN_API_MAJOR,
   icon: { d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z' },
   contributions: {
     harnesses: [
@@ -83,7 +84,12 @@ describe('a data-only harness plugin', () => {
     capabilities.provide(SCHEDULER, new Scheduler(core.db))
     plugins = await initPlugins(graph.plugins, {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
+      core: createCoreServices({
+        secrets: new SecretService('0'.repeat(64)),
+        db: core.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir: dataRoot,
       loaded: graph.loaded,
     })
@@ -118,7 +124,12 @@ describe('a data-only harness plugin', () => {
     capabilities.provide(SCHEDULER, new Scheduler(core.db))
     plugins = await initPlugins(graph.plugins, {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
+      core: createCoreServices({
+        secrets: new SecretService('0'.repeat(64)),
+        db: core.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir: dataRoot,
       loaded: graph.loaded,
       disabled: ['opencode'],

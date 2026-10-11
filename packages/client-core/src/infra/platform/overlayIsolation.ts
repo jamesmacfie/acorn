@@ -5,8 +5,10 @@ let modal: HTMLElement | undefined
 
 export function modalInteractionRoot(backdrop: HTMLElement): HTMLElement {
   const panel = backdrop.matches('.integrations-panel-backdrop') ? backdrop.nextElementSibling : null
-  return backdrop.querySelector<HTMLElement>('[aria-modal="true"], [role="dialog"], [role="alertdialog"]')
-    ?? (panel instanceof HTMLElement && panel.matches('.integrations-panel') ? panel : backdrop)
+  return (
+    backdrop.querySelector<HTMLElement>('[aria-modal="true"], [role="dialog"], [role="alertdialog"]') ??
+    (panel instanceof HTMLElement && panel.matches('.integrations-panel') ? panel : backdrop)
+  )
 }
 
 /** Keep background DOM out of keyboard and accessibility navigation, including body-level portals. */
@@ -18,7 +20,8 @@ export function isolateModal(backdrops: readonly HTMLElement[]): void {
     if (!(branch instanceof HTMLElement)) continue
     const block = !!modal && !allowed.some((surface) => branch.contains(surface))
     if (block) {
-      if (!previous.has(branch)) previous.set(branch, { inert: branch.inert, hidden: branch.getAttribute('aria-hidden') })
+      if (!previous.has(branch))
+        previous.set(branch, { inert: branch.inert, hidden: branch.getAttribute('aria-hidden') })
       branch.inert = true
       if (branch.getAttribute('aria-hidden') !== 'true') branch.setAttribute('aria-hidden', 'true')
     } else restore(branch)

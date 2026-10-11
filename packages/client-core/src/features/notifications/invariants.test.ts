@@ -19,19 +19,32 @@ const FINISH_POLICIES = [true, false] as const
 const EVENTS = ['blocked', 'finished', 'error'] as const
 
 // A linear congruential generator, so a failure names a seed you can put back.
-const rng = (seed: number) => () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
+const rng = (seed: number) => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296
 const pick = <T>(random: () => number, from: readonly T[]): T => from[Math.floor(random() * from.length)]
 
-const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot =>
-  ({ nodeId: 'n1', sessionId: 's1', taskId: 't1', title: 'claude', state, sourceId: 'agents', notifyOnFinish: true, target: { kind: 'managed-agent', resourceId: 's1' }, ...over })
+const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot => ({
+  nodeId: 'n1',
+  sessionId: 's1',
+  taskId: 't1',
+  title: 'claude',
+  state,
+  sourceId: 'agents',
+  notifyOnFinish: true,
+  target: { kind: 'managed-agent', resourceId: 's1' },
+  ...over,
+})
 
 // The three edges, transcribed from docs/notifications/states-and-edges.md ยง Three edges rather than derived from the
 // code, so this is a second opinion and not an echo.
 const modelSays = (from: AttentionState, to: AttentionState, notifyOnFinish: boolean): EdgeKind | null =>
-  from === to ? null
-    : to === 'blocked' ? 'agent-needs-input'
-      : to === 'error' ? 'agent-error'
-        : to === 'finished' && from === 'working' && notifyOnFinish ? 'agent-completed'
+  from === to
+    ? null
+    : to === 'blocked'
+      ? 'agent-needs-input'
+      : to === 'error'
+        ? 'agent-error'
+        : to === 'finished' && from === 'working' && notifyOnFinish
+          ? 'agent-completed'
           : null
 
 let focused = false
@@ -131,7 +144,10 @@ describe('the model holds over generated sequences (docs/notifications/gate.md ย
     for (const from of STATES)
       for (const to of STATES) {
         if (!modelSays(from, to, true)) continue
-        const away = pick(random, STATES.filter((s) => s !== to))
+        const away = pick(
+          random,
+          STATES.filter((s) => s !== to),
+        )
         start()
         observe(snap(from))
         settle()
@@ -179,16 +195,23 @@ describe('the model holds over generated sequences (docs/notifications/gate.md ย
         const from = pick(random, STATES)
         const to = pick(random, STATES)
         const notifyOnFinish = pick(random, FINISH_POLICIES)
-        start({ settings: { ...DEFAULT_NOTIFICATION_SETTINGS, events: { ...DEFAULT_NOTIFICATION_SETTINGS.events, [off]: false } } })
+        start({
+          settings: {
+            ...DEFAULT_NOTIFICATION_SETTINGS,
+            events: { ...DEFAULT_NOTIFICATION_SETTINGS.events, [off]: false },
+          },
+        })
         observe(snap(from, { notifyOnFinish }))
         settle()
         observe(snap(to, { notifyOnFinish }))
         settle()
-        const silenced: Record<typeof off, EdgeKind> =
-          { blocked: 'agent-needs-input', finished: 'agent-completed', error: 'agent-error' }
+        const silenced: Record<typeof off, EdgeKind> = {
+          blocked: 'agent-needs-input',
+          finished: 'agent-completed',
+          error: 'agent-error',
+        }
         expect(notices().map((n) => n.kind)).not.toContain(silenced[off])
         expect(sunk.map((n) => n.kind)).not.toContain(silenced[off])
       }
   })
-
 })

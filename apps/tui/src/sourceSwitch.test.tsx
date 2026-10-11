@@ -10,14 +10,43 @@ it('replaces a resolved source when the next lazy source starts a resource', asy
   // Install the roster before the shell mounts, as production does. This test is about switching
   // lazy surfaces; registering after render let End run against the old Menu rows.
   const { sourceRegistry } = await import('@acorn/client-core/host/registries/sources')
-  const first = sourceRegistry.register({ id: 'first-probe', label: 'First probe', glyph: 'x', order: 9000,
-    component: lazy(async () => ({ default: () => <Stack><Heading>Previous source</Heading><Button>Previous action</Button></Stack> })),
+  const first = sourceRegistry.register({
+    id: 'first-probe',
+    label: 'First probe',
+    glyph: 'x',
+    order: 9000,
+    component: lazy(async () => ({
+      default: () => (
+        <Stack>
+          <Heading>Previous source</Heading>
+          <Button>Previous action</Button>
+        </Stack>
+      ),
+    })),
   })
-  const second = sourceRegistry.register({ id: 'second-probe', label: 'Second probe', glyph: 'x', order: 9001,
-    component: lazy(async () => ({ default: () => {
-      const [body] = createResource(async () => { await new Promise(resolve => setTimeout(resolve, 50)); return 'Loaded replacement' }, { initialValue: '' })
-      return <Stack><Heading>New source</Heading><Text>{body()}</Text><Button>Current action</Button></Stack>
-    } })),
+  const second = sourceRegistry.register({
+    id: 'second-probe',
+    label: 'Second probe',
+    glyph: 'x',
+    order: 9001,
+    component: lazy(async () => ({
+      default: () => {
+        const [body] = createResource(
+          async () => {
+            await new Promise((resolve) => setTimeout(resolve, 50))
+            return 'Loaded replacement'
+          },
+          { initialValue: '' },
+        )
+        return (
+          <Stack>
+            <Heading>New source</Heading>
+            <Text>{body()}</Text>
+            <Button>Current action</Button>
+          </Stack>
+        )
+      },
+    })),
   })
   let screen: Awaited<ReturnType<typeof renderFixture>> | undefined
   try {
@@ -31,5 +60,9 @@ it('replaces a resolved source when the next lazy source starts a resource', asy
     expect(frame).not.toContain('Previous action')
     await screen.press('RETURN')
     expect((await screen.caret()).text, await screen.frame()).toContain('Current action')
-  } finally { screen?.done(); first.dispose(); second.dispose() }
+  } finally {
+    screen?.done()
+    first.dispose()
+    second.dispose()
+  }
 }, 30_000)

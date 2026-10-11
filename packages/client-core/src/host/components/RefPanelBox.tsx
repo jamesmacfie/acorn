@@ -48,7 +48,9 @@ export default function RefPanelBox(props: {
         onKeyDown={dismiss.onKeyDown}
       >
         <header class="integrations-panel-head">
-          <span class="integrations-panel-title" id={titleId}>{props.title}</span>
+          <span class="integrations-panel-title" id={titleId}>
+            {props.title}
+          </span>
           <Toolbar.Spacer />
           <IconButton icon="x" label="Close" onPress={props.onClose} />
         </header>

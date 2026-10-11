@@ -22,9 +22,18 @@ export function sortLinearIssues<T extends LinearPriorityFields>(issues: readonl
 // Maps Linear's numeric priority to a stable level key (drives the bar glyph via a data attribute) and
 // a display label (prefers Linear's own priorityLabel when present).
 export type PriorityLevel = 'urgent' | 'high' | 'medium' | 'low' | 'none'
-const PRIORITY_FALLBACK: Record<PriorityLevel, string> = { urgent: 'Urgent', high: 'High', medium: 'Medium', low: 'Low', none: 'No priority' }
+const PRIORITY_FALLBACK: Record<PriorityLevel, string> = {
+  urgent: 'Urgent',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  none: 'No priority',
+}
 
-export function priorityMeta(priority: number | null | undefined, priorityLabel?: string | null): { level: PriorityLevel; label: string } {
+export function priorityMeta(
+  priority: number | null | undefined,
+  priorityLabel?: string | null,
+): { level: PriorityLevel; label: string } {
   const level: PriorityLevel =
     priority === 1 ? 'urgent' : priority === 2 ? 'high' : priority === 3 ? 'medium' : priority === 4 ? 'low' : 'none'
   return { level, label: priorityLabel || PRIORITY_FALLBACK[level] }

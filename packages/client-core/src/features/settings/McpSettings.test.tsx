@@ -6,13 +6,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 // the page asks the node about in each case.
 const mocks = vi.hoisted(() => ({
   activeTask: null as string | null,
-  inspect: vi.fn(async (_projectId: string) => [{ file: '/repo/.mcp.json', servers: [{ name: 'linear', transport: 'stdio', status: 'enabled' }] }]),
+  inspect: vi.fn(async (_projectId: string) => [
+    { file: '/repo/.mcp.json', servers: [{ name: 'linear', transport: 'stdio', status: 'enabled' }] },
+  ]),
 }))
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { of: string }) => ({
-    data: options().of === 'projects'
-      ? [{ id: 'p1', name: 'web', path: '/repo/web' }, { id: 'p2', name: 'api', path: '/repo/api' }]
-      : [{ id: 't1', projectId: 'p2' }],
+    data:
+      options().of === 'projects'
+        ? [
+            { id: 'p1', name: 'web', path: '/repo/web' },
+            { id: 'p2', name: 'api', path: '/repo/api' },
+          ]
+        : [{ id: 't1', projectId: 'p2' }],
   }),
 }))
 vi.mock('../../infra/queries', () => ({

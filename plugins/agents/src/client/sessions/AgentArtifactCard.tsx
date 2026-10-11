@@ -39,15 +39,13 @@ export function MediaDownloadRow(props: { title: string; byteSize?: number; onDo
 function ArtifactImage(props: { artifact: ArtifactEvent; media: MediaLease }) {
   const [image] = createResource(
     () => ({ media: props.media, descriptor: props.artifact }),
-    ({ media, descriptor }) => descriptor.byteSize === undefined || descriptor.byteSize <= MAX_INLINE_IMAGE_BYTES
-      ? media.preview(descriptor).catch(() => null) : Promise.resolve(null),
+    ({ media, descriptor }) =>
+      descriptor.byteSize === undefined || descriptor.byteSize <= MAX_INLINE_IMAGE_BYTES
+        ? media.preview(descriptor).catch(() => null)
+        : Promise.resolve(null),
   )
   const alt = () => imageAlt(props.artifact.title) || 'Generated image'
-  return (
-    <Show when={image()}>
-      {(source) => <Markdown text={`![${alt()}](${source()})`} images="inline" />}
-    </Show>
-  )
+  return <Show when={image()}>{(source) => <Markdown text={`![${alt()}](${source()})`} images="inline" />}</Show>
 }
 
 export default function AgentArtifactCard(props: { artifact: ArtifactEvent; taskId: string; sessionId: string }) {
@@ -83,7 +81,11 @@ export default function AgentArtifactCard(props: { artifact: ArtifactEvent; task
           <ArtifactImage artifact={props.artifact} media={media()} />
         </Show>
       </Slot>
-      <MediaDownloadRow title={props.artifact.title} byteSize={props.artifact.byteSize} onDownload={() => void download()} />
+      <MediaDownloadRow
+        title={props.artifact.title}
+        byteSize={props.artifact.byteSize}
+        onDownload={() => void download()}
+      />
     </Stack>
   )
 

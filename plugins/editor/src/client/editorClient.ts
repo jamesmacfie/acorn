@@ -12,8 +12,15 @@ import {
   editorReadRoute,
   editorRootRoute,
   editorWriteRoute,
-  editorEntryRoute, editorCreateRoute, editorRenameRoute, editorRenameAvailabilityRoute, editorTrashRoute, editorTrashAvailabilityRoute,
-  type FileTarget, type FileActionResult, type TrashAvailability,
+  editorEntryRoute,
+  editorCreateRoute,
+  editorRenameRoute,
+  editorRenameAvailabilityRoute,
+  editorTrashRoute,
+  editorTrashAvailabilityRoute,
+  type FileTarget,
+  type FileActionResult,
+  type TrashAvailability,
   type EditorEntry,
   type IgnoreEntries,
   type EditorReadResult,
@@ -55,47 +62,85 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
 export const editorApiForNode = (nodeId: string | null): EditorApi => ({
   root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId), { nodeId }).then((r) => r.root),
   list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath), { nodeId }),
-  ignored: (taskId, relPath, names) => writeJson<IgnoreEntries>(editorIgnoredRoute(taskId), {
-    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: relPath, names }),
-  }),
+  ignored: (taskId, relPath, names) =>
+    writeJson<IgnoreEntries>(editorIgnoredRoute(taskId), {
+      method: 'POST',
+      nodeId,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path: relPath, names }),
+    }),
   files: (taskId) => readJson<string[]>(editorFilesRoute(taskId), { nodeId }),
   fileStatus: (taskId) => readJson<EditorFileStatusSnapshot>(editorFileStatusRoute(taskId), { nodeId }),
-  read: (taskId, relPath) => readJson<EditorReadResult>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => {
-    if (typeof r.revision !== 'string' || !/^[a-f0-9]{64}$/.test(r.revision)) throw new Error('This Node does not support guarded document saves. Update the Node to edit this file.')
-    return r
-  }),
-  readImage: (taskId, relPath) => readBytes(editorImageRoute(taskId, relPath), 'Unable to read image.', { nodeId, maxResponseBytes: MAX_IMAGE_PREVIEW_BYTES }),
+  read: (taskId, relPath) =>
+    readJson<EditorReadResult>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => {
+      if (typeof r.revision !== 'string' || !/^[a-f0-9]{64}$/.test(r.revision))
+        throw new Error('This Node does not support guarded document saves. Update the Node to edit this file.')
+      return r
+    }),
+  readImage: (taskId, relPath) =>
+    readBytes(editorImageRoute(taskId, relPath), 'Unable to read image.', {
+      nodeId,
+      maxResponseBytes: MAX_IMAGE_PREVIEW_BYTES,
+    }),
   lineMarkers: async (taskId, relPath, revision) => {
-    const result = await readJson<EditorLineMarkerSnapshot | unknown[]>(editorLineMarkersRoute(taskId, relPath, revision), { nodeId })
+    const result = await readJson<EditorLineMarkerSnapshot | unknown[]>(
+      editorLineMarkersRoute(taskId, relPath, revision),
+      { nodeId },
+    )
     // An old Node ignores the added query parameter and returns an unverifiable array.
     return !Array.isArray(result) && result.revision === revision ? result : null
   },
   entry: (taskId, path) => readJson<FileTarget>(editorEntryRoute(taskId, path), { nodeId }),
   trashAvailability: (taskId) => readJson<TrashAvailability>(editorTrashAvailabilityRoute(taskId), { nodeId }),
   renameAvailability: (taskId) => readJson<TrashAvailability>(editorRenameAvailabilityRoute(taskId), { nodeId }),
-  create: (taskId, parent, name, kind) => writeJson<FileActionResult>(editorCreateRoute(taskId), {
-    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ parent, name, kind }),
-  }),
-  rename: (taskId, source, name) => writeJson<FileActionResult>(editorRenameRoute(taskId), {
-    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source, name }),
-  }),
-  trash: (taskId, source) => writeJson<FileActionResult>(editorTrashRoute(taskId), {
-    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source }),
-  }),
+  create: (taskId, parent, name, kind) =>
+    writeJson<FileActionResult>(editorCreateRoute(taskId), {
+      method: 'POST',
+      nodeId,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ parent, name, kind }),
+    }),
+  rename: (taskId, source, name) =>
+    writeJson<FileActionResult>(editorRenameRoute(taskId), {
+      method: 'POST',
+      nodeId,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source, name }),
+    }),
+  trash: (taskId, source) =>
+    writeJson<FileActionResult>(editorTrashRoute(taskId), {
+      method: 'POST',
+      nodeId,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ source }),
+    }),
   write: (taskId, relPath, content, expectedRevision) =>
     writeJson<EditorWriteResult>(editorWriteRoute(taskId), {
       method: 'PUT',
       nodeId,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ path: relPath, content, expectedRevision }),
-    }).then((result): EditorWriteResult => result.ok && (typeof result.text !== 'string' || !/^[a-f0-9]{64}$/.test(result.revision))
-      ? { ok: false, kind: 'failure', reason: 'The Node did not acknowledge the saved text and revision. Update the Node before closing this document.' }
-      : result).catch((cause: unknown) => {
-      if (typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 400) {
-        return { ok: false, kind: 'failure', reason: 'This Node does not support guarded document saves. Update the Node before closing this document.' }
-      }
-      throw cause
-    }),
+    })
+      .then((result): EditorWriteResult =>
+        result.ok && (typeof result.text !== 'string' || !/^[a-f0-9]{64}$/.test(result.revision))
+          ? {
+              ok: false,
+              kind: 'failure',
+              reason:
+                'The Node did not acknowledge the saved text and revision. Update the Node before closing this document.',
+            }
+          : result,
+      )
+      .catch((cause: unknown) => {
+        if (typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 400) {
+          return {
+            ok: false,
+            kind: 'failure',
+            reason: 'This Node does not support guarded document saves. Update the Node before closing this document.',
+          }
+        }
+        throw cause
+      }),
 })
 
 /** The task's checkout path, in the query cache so a hover can warm it and a remount can skip it. */
@@ -114,9 +159,11 @@ export const EDITOR_ROOT_STALE_MS = 60_000
 /** Warm the checkout path for a task the reader is pointing at. Best-effort, like every prefetch. */
 export const prefetchEditorRoot = (queryClient: QueryClient, taskId: string): void => {
   const api = editorApi(queryClient)
-  void queryClient.prefetchQuery({
-    queryKey: editorRootKey(taskId),
-    queryFn: () => api.root(taskId),
-    staleTime: EDITOR_ROOT_STALE_MS,
-  }).catch(() => {})
+  void queryClient
+    .prefetchQuery({
+      queryKey: editorRootKey(taskId),
+      queryFn: () => api.root(taskId),
+      staleTime: EDITOR_ROOT_STALE_MS,
+    })
+    .catch(() => {})
 }

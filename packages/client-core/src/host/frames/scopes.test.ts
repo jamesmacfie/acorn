@@ -174,7 +174,10 @@ describe('scope checking', () => {
   })
 
   it('denies the write half of a scope it only declared read for', () => {
-    expect(allowApi(board, 'POST', api.tasksRoute)).toEqual({ allowed: false, reason: 'missing scope core.tasks:write' })
+    expect(allowApi(board, 'POST', api.tasksRoute)).toEqual({
+      allowed: false,
+      reason: 'missing scope core.tasks:write',
+    })
   })
 
   it('allows adding a task link with task write, but never allows unlinking', () => {
@@ -214,7 +217,10 @@ describe('plugin namespaces', () => {
   })
 
   it('denies another plugin’s namespace', () => {
-    expect(allowApi(board, 'GET', '/v1/p/github/pulls')).toEqual({ allowed: false, reason: 'another plugin’s namespace' })
+    expect(allowApi(board, 'GET', '/v1/p/github/pulls')).toEqual({
+      allowed: false,
+      reason: 'another plugin’s namespace',
+    })
   })
 
   it('does not treat a prefix of its own id as its own', () => {

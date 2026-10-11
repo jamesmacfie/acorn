@@ -131,7 +131,7 @@ const SCHEDULE_SPAN = 'schedule.run'
 // exemplars. Acorn's collector still holds the full stream for local and other sinks.
 const REQUEST_SPANS = new Set(['api.request', 'http.request'])
 const SENTRY_INTERNAL_ROUTES = new Set(['/v1/core/telemetry', '/v1/core/prefs'])
-const slowRequestMs = (span: Span): number => span.name === 'api.request' ? 1_000 : 250
+const slowRequestMs = (span: Span): number => (span.name === 'api.request' ? 1_000 : 250)
 
 export function sentrySpans(spans: Span[]): Span[] {
   const meaningfulTraces = new Set(
@@ -194,47 +194,49 @@ function transactionEnvelope(
   return {
     category: 'transaction',
     header: { event_id: eventId },
-    items: [{
-      header: { type: 'transaction' },
-      payload: {
-        event_id: eventId,
-        type: 'transaction',
-        platform: platformFor(root.attrs),
-        transaction: root.name,
-        // `custom` says the name came from the code rather than from a URL. It is already a pattern:
-        // `http.request` with the route as an attribute, never a hundred URLs
-        // (docs/telemetry/model.md § The admission rule for a span).
-        transaction_info: { source: 'custom' },
-        start_timestamp: seconds(root.start),
-        timestamp: seconds(root.start + root.durationMs),
-        contexts: {
-          trace: {
-            trace_id: root.traceId,
-            span_id: root.spanId,
-            // Kept when the parent is not in this batch, so the two halves of a trace that crossed a
-            // flush window still join up in Sentry.
-            ...(root.parentSpanId ? { parent_span_id: root.parentSpanId } : {}),
-            op: root.name,
-            status: spanStatus(root.status),
+    items: [
+      {
+        header: { type: 'transaction' },
+        payload: {
+          event_id: eventId,
+          type: 'transaction',
+          platform: platformFor(root.attrs),
+          transaction: root.name,
+          // `custom` says the name came from the code rather than from a URL. It is already a pattern:
+          // `http.request` with the route as an attribute, never a hundred URLs
+          // (docs/telemetry/model.md § The admission rule for a span).
+          transaction_info: { source: 'custom' },
+          start_timestamp: seconds(root.start),
+          timestamp: seconds(root.start + root.durationMs),
+          contexts: {
+            trace: {
+              trace_id: root.traceId,
+              span_id: root.spanId,
+              // Kept when the parent is not in this batch, so the two halves of a trace that crossed a
+              // flush window still join up in Sentry.
+              ...(root.parentSpanId ? { parent_span_id: root.parentSpanId } : {}),
+              op: root.name,
+              status: spanStatus(root.status),
+            },
           },
+          spans: children.map((child) => ({
+            span_id: child.spanId,
+            trace_id: child.traceId,
+            ...(child.parentSpanId ? { parent_span_id: child.parentSpanId } : {}),
+            op: child.name,
+            description: child.name,
+            start_timestamp: seconds(child.start),
+            timestamp: seconds(child.start + child.durationMs),
+            status: spanStatus(child.status),
+            data: child.attrs,
+          })),
+          tags: tagsFrom(root.attrs),
+          server_name: batch.node,
+          ...(options.release ? { release: options.release } : {}),
+          ...(options.environment ? { environment: options.environment } : {}),
         },
-        spans: children.map((child) => ({
-          span_id: child.spanId,
-          trace_id: child.traceId,
-          ...(child.parentSpanId ? { parent_span_id: child.parentSpanId } : {}),
-          op: child.name,
-          description: child.name,
-          start_timestamp: seconds(child.start),
-          timestamp: seconds(child.start + child.durationMs),
-          status: spanStatus(child.status),
-          data: child.attrs,
-        })),
-        tags: tagsFrom(root.attrs),
-        server_name: batch.node,
-        ...(options.release ? { release: options.release } : {}),
-        ...(options.environment ? { environment: options.environment } : {}),
       },
-    }],
+    ],
   }
 }
 
@@ -243,7 +245,10 @@ function transactionEnvelope(
 /** Sentry truncates a slug at 50 characters and slugifies the rest server-side. Doing it here means
  *  the exporter knows what the monitor ended up called. */
 export function monitorSlug(key: string): string {
-  const slug = key.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
+  const slug = key
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
   return (slug || 'schedule').slice(0, 50)
 }
 
@@ -266,15 +271,16 @@ function checkInEnvelopes(span: Span, options: EnvelopeOptions): SentryEnvelope[
   const checkInId = options.newId()
   const period = span.attrs['schedule.period.ms']
   const timeout = span.attrs['schedule.timeout.ms']
-  const config = typeof period === 'number' && period > 0
-    ? {
-        monitor_config: {
-          schedule: { type: 'interval', value: minutes(period), unit: 'minute' },
-          checkin_margin: minutes(period),
-          ...(typeof timeout === 'number' && timeout > 0 ? { max_runtime: minutes(timeout) } : {}),
-        },
-      }
-    : {}
+  const config =
+    typeof period === 'number' && period > 0
+      ? {
+          monitor_config: {
+            schedule: { type: 'interval', value: minutes(period), unit: 'minute' },
+            checkin_margin: minutes(period),
+            ...(typeof timeout === 'number' && timeout > 0 ? { max_runtime: minutes(timeout) } : {}),
+          },
+        }
+      : {}
   const common = {
     check_in_id: checkInId,
     monitor_slug: monitorSlug(key),
@@ -310,57 +316,61 @@ function errorEnvelope(
   return {
     category: 'error',
     header: { event_id: eventId },
-    items: [{
-      header: { type: 'event' },
-      payload: {
-        event_id: eventId,
-        timestamp: seconds(failure.at),
-        platform: platformFor(failure.attrs),
-        level: failure.level,
-        // Which package wrote it, which is the question `owner` exists to answer.
-        logger: typeof failure.attrs.owner === 'string' ? failure.attrs.owner : 'core',
-        exception: {
-          values: [{
-            type: failure.name,
-            value: failure.message,
-            // Required, and it must not be `generic`: that spelling is reserved for a call the
-            // person made themselves. Every record here came from acorn's own instrumentation.
-            mechanism: { type: 'auto.telemetry.acorn', handled: failure.handled },
-            ...(frames.length ? { stacktrace: { frames } } : {}),
-          }],
-        },
-        ...(failure.traceId
-          ? {
-              contexts: {
-                trace: {
-                  trace_id: failure.traceId,
-                  // Sentry requires a span id beside a trace id. A failure raised outside any span
-                  // has none, so it names its own, which is what an SDK does for a bare capture.
-                  span_id: failure.spanId ?? options.newId().slice(0, 16),
+    items: [
+      {
+        header: { type: 'event' },
+        payload: {
+          event_id: eventId,
+          timestamp: seconds(failure.at),
+          platform: platformFor(failure.attrs),
+          level: failure.level,
+          // Which package wrote it, which is the question `owner` exists to answer.
+          logger: typeof failure.attrs.owner === 'string' ? failure.attrs.owner : 'core',
+          exception: {
+            values: [
+              {
+                type: failure.name,
+                value: failure.message,
+                // Required, and it must not be `generic`: that spelling is reserved for a call the
+                // person made themselves. Every record here came from acorn's own instrumentation.
+                mechanism: { type: 'auto.telemetry.acorn', handled: failure.handled },
+                ...(frames.length ? { stacktrace: { frames } } : {}),
+              },
+            ],
+          },
+          ...(failure.traceId
+            ? {
+                contexts: {
+                  trace: {
+                    trace_id: failure.traceId,
+                    // Sentry requires a span id beside a trace id. A failure raised outside any span
+                    // has none, so it names its own, which is what an SDK does for a bare capture.
+                    span_id: failure.spanId ?? options.newId().slice(0, 16),
+                  },
                 },
-              },
-            }
-          : {}),
-        // Oldest first: Sentry keeps the order it was given rather than sorting by timestamp.
-        ...(events.length
-          ? {
-              breadcrumbs: {
-                values: events.slice(-MAX_BREADCRUMBS).map((event) => ({
-                  timestamp: seconds(event.at),
-                  type: 'default',
-                  category: event.name,
-                  level: 'info',
-                  data: event.attrs,
-                })),
-              },
-            }
-          : {}),
-        tags: tagsFrom(failure.attrs),
-        server_name: batch.node,
-        ...(options.release ? { release: options.release } : {}),
-        ...(options.environment ? { environment: options.environment } : {}),
+              }
+            : {}),
+          // Oldest first: Sentry keeps the order it was given rather than sorting by timestamp.
+          ...(events.length
+            ? {
+                breadcrumbs: {
+                  values: events.slice(-MAX_BREADCRUMBS).map((event) => ({
+                    timestamp: seconds(event.at),
+                    type: 'default',
+                    category: event.name,
+                    level: 'info',
+                    data: event.attrs,
+                  })),
+                },
+              }
+            : {}),
+          tags: tagsFrom(failure.attrs),
+          server_name: batch.node,
+          ...(options.release ? { release: options.release } : {}),
+          ...(options.environment ? { environment: options.environment } : {}),
+        },
       },
-    }],
+    ],
   }
 }
 
@@ -377,31 +387,40 @@ function logEnvelope(entries: LogEntry[], options: EnvelopeOptions, fallbackTrac
     // No `trace` header. A batch mixes traces, and an envelope carrying a dynamic sampling context
     // has to be one trace's.
     header: {},
-    items: [{
-      header: {
-        type: 'log',
-        item_count: entries.length,
-        content_type: 'application/vnd.sentry.items.log+json',
+    items: [
+      {
+        header: {
+          type: 'log',
+          item_count: entries.length,
+          content_type: 'application/vnd.sentry.items.log+json',
+        },
+        payload: {
+          items: entries.map((entry) => ({
+            timestamp: seconds(entry.at),
+            // Required. A line written outside any trace borrows this flush's id rather than being
+            // dropped, which keeps one flush's traceless lines together.
+            trace_id: entry.traceId ?? fallbackTraceId,
+            level: entry.level,
+            body: entry.body,
+            severity_number: SEVERITY[entry.level],
+            attributes: typedAttrs(entry.attrs),
+          })),
+        },
       },
-      payload: {
-        items: entries.map((entry) => ({
-          timestamp: seconds(entry.at),
-          // Required. A line written outside any trace borrows this flush's id rather than being
-          // dropped, which keeps one flush's traceless lines together.
-          trace_id: entry.traceId ?? fallbackTraceId,
-          level: entry.level,
-          body: entry.body,
-          severity_number: SEVERITY[entry.level],
-          attributes: typedAttrs(entry.attrs),
-        })),
-      },
-    }],
+    ],
   }
 }
 
 // ── Metrics to trace metrics ──────────────────────────────────────────────────────────────────────
 
-type MetricEntry = { at: number; name: string; type: 'counter' | 'gauge' | 'distribution'; value: number; unit?: string; attrs: TelemetryAttrs }
+type MetricEntry = {
+  at: number
+  name: string
+  type: 'counter' | 'gauge' | 'distribution'
+  value: number
+  unit?: string
+  attrs: TelemetryAttrs
+}
 
 /**
  * One acorn metric, as one or four Sentry metrics.
@@ -435,28 +454,30 @@ function metricEnvelope(entries: MetricEntry[], fallbackTraceId: string): Sentry
   return {
     category: 'trace_metric',
     header: {},
-    items: [{
-      header: {
-        type: 'trace_metric',
-        item_count: entries.length,
-        // A hyphen here and an underscore in the type above. Sentry's, not a typo.
-        content_type: 'application/vnd.sentry.items.trace-metric+json',
+    items: [
+      {
+        header: {
+          type: 'trace_metric',
+          item_count: entries.length,
+          // A hyphen here and an underscore in the type above. Sentry's, not a typo.
+          content_type: 'application/vnd.sentry.items.trace-metric+json',
+        },
+        payload: {
+          items: entries.map((entry) => ({
+            timestamp: seconds(entry.at),
+            // Required, and a metric has no trace: a histogram is one row per label set per window,
+            // and putting a real trace id in one would mint a series per call
+            // (docs/telemetry/runtimes.md § Ambient attribution).
+            trace_id: fallbackTraceId,
+            name: entry.name,
+            type: entry.type,
+            value: entry.value,
+            ...(entry.unit ? { unit: entry.unit } : {}),
+            attributes: typedAttrs(entry.attrs),
+          })),
+        },
       },
-      payload: {
-        items: entries.map((entry) => ({
-          timestamp: seconds(entry.at),
-          // Required, and a metric has no trace: a histogram is one row per label set per window,
-          // and putting a real trace id in one would mint a series per call
-          // (docs/telemetry/runtimes.md § Ambient attribution).
-          trace_id: fallbackTraceId,
-          name: entry.name,
-          type: entry.type,
-          value: entry.value,
-          ...(entry.unit ? { unit: entry.unit } : {}),
-          attributes: typedAttrs(entry.attrs),
-        })),
-      },
-    }],
+    ],
   }
 }
 
@@ -505,8 +526,9 @@ export function buildEnvelopes(batch: TelemetryBatch, options: EnvelopeOptions):
 
   if (kinds.span) {
     const checkIns = spans.filter((span) => span.name === SCHEDULE_SPAN)
-    const traced = sentrySpans(spans)
-      .filter((span) => span.name !== SCHEDULE_SPAN && traceKept(span.traceId, options.settings.sampleRate))
+    const traced = sentrySpans(spans).filter(
+      (span) => span.name !== SCHEDULE_SPAN && traceKept(span.traceId, options.settings.sampleRate),
+    )
     for (const { root, children } of groupSpans(traced)) {
       envelopes.push(transactionEnvelope(root, children, batch, options))
     }
@@ -517,7 +539,13 @@ export function buildEnvelopes(batch: TelemetryBatch, options: EnvelopeOptions):
   const entries: LogEntry[] = []
   if (kinds.log) {
     for (const log of logs) {
-      entries.push({ at: log.at, level: log.level, body: log.body, attrs: { ...log.attrs, logger: log.logger }, ...(log.traceId ? { traceId: log.traceId } : {}) })
+      entries.push({
+        at: log.at,
+        level: log.level,
+        body: log.body,
+        attrs: { ...log.attrs, logger: log.logger },
+        ...(log.traceId ? { traceId: log.traceId } : {}),
+      })
     }
   }
   if (kinds.event) {

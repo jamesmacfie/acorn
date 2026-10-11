@@ -43,12 +43,19 @@ export type WsServerWireFrame = WsServerFrame & { seq: number }
 export const WS_VIEWERS_HEADER = 'x-acorn-viewers'
 export const WS_MAX_VIEWERS = 128
 export const wsViewerIdSchema = z.string().uuid()
-export const wsViewerFrameSchema = z.strictObject({ channel: z.literal('ws:viewer'), viewerId: wsViewerIdSchema, frame: wsFrameSchema })
+export const wsViewerFrameSchema = z.strictObject({
+  channel: z.literal('ws:viewer'),
+  viewerId: wsViewerIdSchema,
+  frame: wsFrameSchema,
+})
 export const wsViewerCloseSchema = z.strictObject({ channel: z.literal('ws:viewer-close'), viewerId: wsViewerIdSchema })
 
 // A channel owner declares disposable subscription state outside its opaque payload. Commands carry
 // no hint and form FIFO barriers. Custody never identifies a subscription by parsing plugin frames.
-export const wsSubscriptionIntentSchema = z.strictObject({ key: z.string().min(1).max(512), state: z.enum(['attached', 'detached']) })
+export const wsSubscriptionIntentSchema = z.strictObject({
+  key: z.string().min(1).max(512),
+  state: z.enum(['attached', 'detached']),
+})
 export type WsSubscriptionIntent = z.infer<typeof wsSubscriptionIntentSchema>
 export type WsSendOptions = { intent?: WsSubscriptionIntent; cleanup?: boolean }
 

@@ -6,7 +6,12 @@ import type { RunStatus, RunTargetInfo } from '@acorn/protocol/runTargets.ts'
 // `.acorn/config.toml` is an ordinary state the palette and the run pane render as a row, not an
 // exception.
 export type TerminalRunTargets = {
-  targets(taskId: string): Promise<{ targets: RunTargetInfo[]; errors: { source: string; message: string }[]; layouts: LayoutRecipe[] } | { error: string }>
+  targets(
+    taskId: string,
+  ): Promise<
+    | { targets: RunTargetInfo[]; errors: { source: string; message: string }[]; layouts: LayoutRecipe[] }
+    | { error: string }
+  >
   start(taskId: string, targetId: string): Promise<{ ok: boolean; reason?: string; sessionId?: string }>
   stop(taskId: string, targetId: string): Promise<{ ok: boolean; reason?: string }>
   restart(taskId: string, targetId: string): Promise<{ ok: boolean; reason?: string; sessionId?: string }>

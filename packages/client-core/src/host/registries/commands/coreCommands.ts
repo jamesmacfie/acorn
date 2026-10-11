@@ -78,7 +78,9 @@ export const goToGroup = (words?: () => WorkspaceWords): ContributedCommand => (
   id: CORE_GO_TO_GROUP,
   kind: 'group',
   title: 'Go to',
-  hint: words ? () => words().singular === 'project' ? 'tasks and projects' : 'tasks, workspaces, and projects' : 'tasks, workspaces, and projects',
+  hint: words
+    ? () => (words().singular === 'project' ? 'tasks and projects' : 'tasks, workspaces, and projects')
+    : 'tasks, workspaces, and projects',
   category: 'navigation',
   palette: true,
   scope: 'none',
@@ -106,7 +108,9 @@ export const goToGroup = (words?: () => WorkspaceWords): ContributedCommand => (
  * The registry is a signal, so the caller re-registers when it changes.
  */
 export function settingsPageCommands(open: (target: string) => void, mode?: WorkspacesMode): ContributedCommand[] {
-  const pages = settingsPagesInOrder().filter(isStandaloneSettingsPage).map((page) => settingsPageForMode(page, mode))
+  const pages = settingsPagesInOrder()
+    .filter(isStandaloneSettingsPage)
+    .map((page) => settingsPageForMode(page, mode))
   const groupLabel = (category: Parameters<typeof settingsCategoryLabel>[0]) => settingsCategoryLabel(category, mode)
   return [
     {
@@ -178,7 +182,9 @@ export function appearanceCommands(qc: QueryClient): ContributedCommand[] {
       read: () => Promise.resolve(appearanceStyle(devicePrefs())),
       // A function, not a snapshot: a plugin may contribute a style, and the registry behind this is a
       // signal (features/settings/uiStyles.ts).
-      get options() { return styleChoices() },
+      get options() {
+        return styleChoices()
+      },
       write: async (value) => {
         await saveAppearanceStyle(qc, value)
         return appearanceStyle(devicePrefs())
@@ -214,7 +220,9 @@ export function appearanceCommands(qc: QueryClient): ContributedCommand[] {
       order: 300,
       when: () => !following(),
       read: () => Promise.resolve(fixedTheme(devicePrefs())),
-      get options() { return themeChoices() },
+      get options() {
+        return themeChoices()
+      },
       write: async (value) => {
         await saveFixedTheme(qc, value)
         return fixedTheme(devicePrefs())
@@ -231,7 +239,9 @@ export function appearanceCommands(qc: QueryClient): ContributedCommand[] {
       order: 400,
       when: following,
       read: () => Promise.resolve(lightTheme(devicePrefs())),
-      get options() { return themeChoices() },
+      get options() {
+        return themeChoices()
+      },
       write: async (value) => {
         await saveLightTheme(qc, value)
         return lightTheme(devicePrefs())
@@ -248,7 +258,9 @@ export function appearanceCommands(qc: QueryClient): ContributedCommand[] {
       order: 500,
       when: following,
       read: () => Promise.resolve(darkTheme(devicePrefs())),
-      get options() { return themeChoices() },
+      get options() {
+        return themeChoices()
+      },
       write: async (value) => {
         await saveDarkTheme(qc, value)
         return darkTheme(devicePrefs())
@@ -322,13 +334,32 @@ export function notificationCommands(qc: QueryClient): ContributedCommand[] {
       scope: 'none',
       order: 820,
     },
-    channel('sound', 'Play a sound', 100, (settings) => settings.sound, (sound) => ({ sound })),
-    channel('system', 'Show a system notification', 200, (settings) => settings.system, (system) => ({ system })),
+    channel(
+      'sound',
+      'Play a sound',
+      100,
+      (settings) => settings.sound,
+      (sound) => ({ sound }),
+    ),
+    channel(
+      'system',
+      'Show a system notification',
+      200,
+      (settings) => settings.system,
+      (system) => ({ system }),
+    ),
     // Absent rather than greyed out where the host cannot draw a number on the app icon, which is the
     // same decision Settings → Notifications makes about the same row.
     // `app-icon` and not `badge` in the id: a bare `badge` is a Lucide name, and the icon census reads
     // string literals rather than call sites (kit/tokens/iconCensus.test.ts).
-    channel('app-icon', 'Show a count on the app icon', 300, (settings) => settings.badge, (badge) => ({ badge }), canSetBadge),
+    channel(
+      'app-icon',
+      'Show a count on the app icon',
+      300,
+      (settings) => settings.badge,
+      (badge) => ({ badge }),
+      canSetBadge,
+    ),
     event('event-blocked', 'Notify me when an agent needs me', 400, 'blocked'),
     event('event-finished', 'Notify me when an agent finishes', 500, 'finished'),
     event('event-error', 'Notify me when an agent fails', 600, 'error'),

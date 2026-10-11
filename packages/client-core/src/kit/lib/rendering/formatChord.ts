@@ -2,19 +2,33 @@
 // key. It reads both spellings a chord arrives in: the keybinding registry's `meta+shift+n` and the
 // keymap's `shift+super+n`. A space separates the steps of a sequence.
 const MODIFIERS: Record<string, string> = {
-  ctrl: '⌃', control: '⌃',
-  alt: '⌥', option: '⌥',
+  ctrl: '⌃',
+  control: '⌃',
+  alt: '⌥',
+  option: '⌥',
   shift: '⇧',
-  meta: '⌘', super: '⌘', cmd: '⌘',
+  meta: '⌘',
+  super: '⌘',
+  cmd: '⌘',
 }
 const ORDER = ['⌃', '⌥', '⇧', '⌘']
 const KEYS: Record<string, string> = {
-  enter: '↩', return: '↩',
-  escape: 'Esc', esc: 'Esc',
-  space: 'Space', tab: 'Tab',
-  backspace: '⌫', delete: '⌦',
-  arrowup: '↑', up: '↑', arrowdown: '↓', down: '↓',
-  arrowleft: '←', left: '←', arrowright: '→', right: '→',
+  enter: '↩',
+  return: '↩',
+  escape: 'Esc',
+  esc: 'Esc',
+  space: 'Space',
+  tab: 'Tab',
+  backspace: '⌫',
+  delete: '⌦',
+  arrowup: '↑',
+  up: '↑',
+  arrowdown: '↓',
+  down: '↓',
+  arrowleft: '←',
+  left: '←',
+  arrowright: '→',
+  right: '→',
 }
 
 function formatStep(step: string): string {
@@ -24,7 +38,9 @@ function formatStep(step: string): string {
   const key = plusKey ? '+' : (parts.pop() ?? '')
   const symbols = new Set(parts.map((part) => MODIFIERS[part.toLowerCase()]).filter(Boolean))
   const lower = key.toLowerCase()
-  return ORDER.filter((symbol) => symbols.has(symbol)).join('') + (KEYS[lower] ?? key.charAt(0).toUpperCase() + key.slice(1))
+  return (
+    ORDER.filter((symbol) => symbols.has(symbol)).join('') + (KEYS[lower] ?? key.charAt(0).toUpperCase() + key.slice(1))
+  )
 }
 
 export function formatChord(chord: string): string {

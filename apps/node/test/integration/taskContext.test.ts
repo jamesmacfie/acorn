@@ -47,15 +47,33 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
     removeContextSections('core')
     for (const owner of ['github', 'notes', 'memory']) removeContextSections(owner)
     registerContextSection('core', linkedIssuesSection)
-    registerContextSection('github', asContextSection(pullRequestSection((userId, owner, name, number) => mirroredPullRequest(gh.db, userId, owner, name, number))))
+    registerContextSection(
+      'github',
+      asContextSection(
+        pullRequestSection((userId, owner, name, number) => mirroredPullRequest(gh.db, userId, owner, name, number)),
+      ),
+    )
     registerContextSection('notes', asContextSection(notesSection((...args) => notesSource(...args))))
     vi.mocked(getDb).mockReturnValue(t.db)
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-api', name: 'api', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/api.git', githubOwner: 'acme', githubName: 'api', githubRepoId: 99,
-      createdAt: now, updatedAt: now,
+      id: 'project-api',
+      name: 'api',
+      path: null,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: 'https://github.com/acme/api.git',
+      githubOwner: 'acme',
+      githubName: 'api',
+      githubRepoId: 99,
+      createdAt: now,
+      updatedAt: now,
     })
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -107,8 +125,30 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
       fetchedAt: now,
     })
     await gh.db.insert(prFiles).values([
-      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/login.ts', status: 'modified', additions: 3, deletions: 1, sha: 's1', position: 0, patchState: 'unavailable' },
-      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/token.ts', status: 'modified', additions: 1, deletions: 0, sha: 's2', position: 1, patchState: 'unavailable' },
+      {
+        userId: 'james',
+        repoId: 99,
+        number: 813,
+        path: 'src/auth/login.ts',
+        status: 'modified',
+        additions: 3,
+        deletions: 1,
+        sha: 's1',
+        position: 0,
+        patchState: 'unavailable',
+      },
+      {
+        userId: 'james',
+        repoId: 99,
+        number: 813,
+        path: 'src/auth/token.ts',
+        status: 'modified',
+        additions: 1,
+        deletions: 0,
+        sha: 's2',
+        position: 1,
+        patchState: 'unavailable',
+      },
     ])
     await t.db.insert(schema.taskLinks).values([
       { taskId: 'task1', integrationId: 'lin1', provider: 'linear', identifier: 'ENG-42', createdAt: now },
@@ -158,12 +198,23 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
       pullNumber: 813,
     })
     expect(Object.keys(ctx).sort()).toEqual(['sections', 'task'])
-    expect(ctx.sections.find((section) => section.id === 'pr')?.items).toEqual([{
-      id: 'pr:813', kind: 'PR', label: '#813 fix: guard null token', body: '<p>Guards the token.</p>',
-      details: ['src/auth/login.ts', 'src/auth/token.ts'], jump: undefined,
-    }])
+    expect(ctx.sections.find((section) => section.id === 'pr')?.items).toEqual([
+      {
+        id: 'pr:813',
+        kind: 'PR',
+        label: '#813 fix: guard null token',
+        body: '<p>Guards the token.</p>',
+        details: ['src/auth/login.ts', 'src/auth/token.ts'],
+        jump: undefined,
+      },
+    ])
     expect(ctx.sections.find((section) => section.id === 'issues')?.items).toMatchObject([
-      { kind: 'Linear', providerId: 'linear', label: expect.stringContaining('ENG-42'), jump: { pane: 'linear', ref: { providerId: 'linear', displayId: 'ENG-42' } } },
+      {
+        kind: 'Linear',
+        providerId: 'linear',
+        label: expect.stringContaining('ENG-42'),
+        jump: { pane: 'linear', ref: { providerId: 'linear', displayId: 'ENG-42' } },
+      },
       { kind: 'Rollbar', providerId: 'rollbar', details: ['Cache: missing'] },
     ])
     expect(ctx.sections.map((section) => section.id)).toEqual(['pr', 'issues', 'notes'])
@@ -186,7 +237,8 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
 
   it('projects the same bounded items to agent tools', async () => {
     const tools = buildAgentTools({ db: t.db, secrets: t.secrets })
-    const call = async (name: string, input: unknown = {}) => tools.find((tool) => tool.name === name)!.handler(input, { userLogin: 'james', taskId: 'task1' } as never)
+    const call = async (name: string, input: unknown = {}) =>
+      tools.find((tool) => tool.name === name)!.handler(input, { userLogin: 'james', taskId: 'task1' } as never)
     const context = await fetchCtx()
     const issues = context.sections.find((section) => section.id === 'issues')!.items
     const pr = context.sections.find((section) => section.id === 'pr')!.items[0]
@@ -194,20 +246,40 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
     expect(await call('pr_current')).toEqual(pr)
     expect(await call('pr_changed_files')).toEqual(pr.details)
     expect(await call('linked_issues')).toEqual(issues)
-    expect(await call('linked_issues', { provider: 'linear' })).toEqual(issues.filter((item) => item.providerId === 'linear'))
+    expect(await call('linked_issues', { provider: 'linear' })).toEqual(
+      issues.filter((item) => item.providerId === 'linear'),
+    )
   })
 
   it('composes notes when its source is registered', async () => {
-    notesSource = async () => [{ slug: 'plan', scope: 'task', title: 'plan', kind: 'plan', body: 'do the thing', author: 'user' }]
+    notesSource = async () => [
+      { slug: 'plan', scope: 'task', title: 'plan', kind: 'plan', body: 'do the thing', author: 'user' },
+    ]
     const ctx = await fetchCtx()
-    expect(ctx.sections.find((section) => section.id === 'notes')?.items).toMatchObject([{ id: 'task:plan', label: 'plan', body: 'do the thing' }])
+    expect(ctx.sections.find((section) => section.id === 'notes')?.items).toMatchObject([
+      { id: 'task:plan', label: 'plan', body: 'do the thing' },
+    ])
   })
 
   it('gives workflow assembly only its own run-scoped handoff note', async () => {
     notesSource = async () => [
       { slug: 'human-plan', scope: 'task', title: 'human plan', kind: 'plan', body: 'keep me', author: 'user' },
-      { slug: 'workflow-handoffs-run-a', scope: 'task', title: 'run a', kind: 'handoff', body: 'current output', author: 'workflow' },
-      { slug: 'workflow-handoffs-run-b', scope: 'task', title: 'run b', kind: 'handoff', body: 'other run output', author: 'workflow' },
+      {
+        slug: 'workflow-handoffs-run-a',
+        scope: 'task',
+        title: 'run a',
+        kind: 'handoff',
+        body: 'current output',
+        author: 'workflow',
+      },
+      {
+        slug: 'workflow-handoffs-run-b',
+        scope: 'task',
+        title: 'run b',
+        kind: 'handoff',
+        body: 'other run output',
+        author: 'workflow',
+      },
     ]
     const ctx = await fetchCtx('?include=notes&workflowRunId=run-a')
     expect(ctx.sections[0].items.map((note) => note.id)).toEqual(['task:human-plan', 'task:workflow-handoffs-run-a'])
@@ -224,14 +296,25 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
       const store = new NotesStore(dir)
       const location = { scope: 'task' as const, taskId: 'task1' }
       await store.create(location, 'eng-42 plan', { kind: 'plan', body: 'Guard the null token first.\n' })
-      await store.create(location, 'handoff', { kind: 'handoff', author: 'agent', body: 'Left the redirect for next session.\n' })
+      await store.create(location, 'handoff', {
+        kind: 'handoff',
+        author: 'agent',
+        body: 'Left the redirect for next session.\n',
+      })
       // The same wiring shape terminal.ts registers: task → workspace → notes list + bodies.
       notesSource = async () => {
         const list = await store.list(location)
         const out: Awaited<ReturnType<ContextNotesSource>> = []
         for (const s of list) {
           const n = await store.read(location, s.slug)
-          out.push({ slug: s.slug, scope: 'task', title: `${n.title} (${n.kind})`, kind: n.kind, body: n.body, author: n.author })
+          out.push({
+            slug: s.slug,
+            scope: 'task',
+            title: `${n.title} (${n.kind})`,
+            kind: n.kind,
+            body: n.body,
+            author: n.author,
+          })
         }
         return out
       }
@@ -247,7 +330,15 @@ describe('GET /api/tasks/:id/context (docs/agent-tools/context-sections.md § Th
   })
 
   it('uses contribution defaults and enforces the declared note budget', async () => {
-    notesSource = async () => Array.from({ length: 12 }, (_, index) => ({ slug: `n-${index}`, scope: 'task', title: `N${index}`, kind: 'plan', body: 'x'.repeat(2_100), author: 'user' as const }))
+    notesSource = async () =>
+      Array.from({ length: 12 }, (_, index) => ({
+        slug: `n-${index}`,
+        scope: 'task',
+        title: `N${index}`,
+        kind: 'plan',
+        body: 'x'.repeat(2_100),
+        author: 'user' as const,
+      }))
     const ctx = await fetchCtx('')
     expect(ctx.sections.map((section) => section.id)).toEqual(['issues', 'notes'])
     const notes = ctx.sections.find((section) => section.id === 'notes')

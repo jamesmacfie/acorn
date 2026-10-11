@@ -16,4 +16,6 @@ export function takeInteractionWork(id: string): [string, number][] {
   interactions.delete(id)
   return [...(counts ?? [])].sort((a, b) => b[1] - a[1]).slice(0, 5)
 }
-export function clearInteractionWork(): void { interactions.clear() }
+export function clearInteractionWork(): void {
+  interactions.clear()
+}

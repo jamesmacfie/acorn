@@ -13,7 +13,12 @@ export const claudeCodeProfile: AgentProfileContribution = {
   // Terminal builds standing context before spawn; no first-turn recall tool call is needed.
   launchContextArgs: (context) => [
     '--append-system-prompt',
-    [context, 'This session runs inside acorn. Use task_context for the task, pull request and linked issues, and notes_read for task notes. Re-read notes when the task shifts; the user edits them while you work. Never ask the user for context you can pull yourself.'].filter(Boolean).join('\n\n'),
+    [
+      context,
+      'This session runs inside acorn. Use task_context for the task, pull request and linked issues, and notes_read for task notes. Re-read notes when the task shifts; the user edits them while you work. Never ask the user for context you can pull yourself.',
+    ]
+      .filter(Boolean)
+      .join('\n\n'),
   ],
   // `auto` rather than `dontAsk`, which is what this was until an agent tool got called and denied.
   // `dontAsk` does not mean "do not prompt", it means "deny anything not already in a `permissions.allow`

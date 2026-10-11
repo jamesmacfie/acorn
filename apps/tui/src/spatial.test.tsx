@@ -3,8 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { renderFixture } from './harness'
 import { focusedRegion } from './keys/regions'
 
-const caretLine = (frame: string): string =>
-  frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
+const caretLine = (frame: string): string => frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
 
 describe('spatial focus', () => {
   it('enters main from rail shortcuts, restores rail, and lets h/l walk detail tabs', async () => {

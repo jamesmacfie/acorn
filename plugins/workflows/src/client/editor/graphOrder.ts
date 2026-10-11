@@ -62,12 +62,16 @@ export function graphOrder(def: WorkflowDef): GraphRow[] {
     // Nothing ready means a cycle. The footer names it; the list still has to draw every node, so the
     // rest go out in declaration order rather than vanishing.
     if (!ready.length) {
-      for (const name of [...waiting].sort((a, b) => (declared.get(a) ?? 0) - (declared.get(b) ?? 0))) rows.push(row(name))
+      for (const name of [...waiting].sort((a, b) => (declared.get(a) ?? 0) - (declared.get(b) ?? 0)))
+        rows.push(row(name))
       break
     }
     const key = (name: string): [number, number] => {
       const parents = (graph.get(name) ?? []).filter((parent) => placedAt.has(parent))
-      return [parents.length ? Math.max(...parents.map((parent) => placedAt.get(parent) ?? -1)) : -1, declared.get(name) ?? 0]
+      return [
+        parents.length ? Math.max(...parents.map((parent) => placedAt.get(parent) ?? -1)) : -1,
+        declared.get(name) ?? 0,
+      ]
     }
     const next = ready.sort((a, b) => {
       const [aLast, aDecl] = key(a)

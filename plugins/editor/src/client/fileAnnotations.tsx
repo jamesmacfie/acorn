@@ -28,7 +28,10 @@ export const FILE_MARK_TONE = { info: 'muted', warn: 'warn', danger: 'danger' } 
  */
 export function requestFileAnnotations(taskId: string, paths: readonly string[]): void {
   if (!paths.length) return
-  requestAnnotations(EDITOR_FILE_POINT, [...new Set(paths)].map((path): EditorFileAnnotationKey => ({ taskId, path })))
+  requestAnnotations(
+    EDITOR_FILE_POINT,
+    [...new Set(paths)].map((path): EditorFileAnnotationKey => ({ taskId, path })),
+  )
 }
 
 export const fileMarks = (taskId: string, path: string): FileMark[] =>
@@ -40,7 +43,11 @@ export const fileMarkLegend = (marks: readonly FileMark[]): string =>
 
 /** The marks in the shape the kit's document tabs draw. */
 export const tabMarks = (marks: readonly FileMark[]) =>
-  marks.map((mark) => ({ tone: FILE_MARK_TONE[mark.severity], label: `${mark.text} — ${mark.pluginId}`, ...(mark.icon ? { icon: mark.icon } : {}) }))
+  marks.map((mark) => ({
+    tone: FILE_MARK_TONE[mark.severity],
+    label: `${mark.text} — ${mark.pluginId}`,
+    ...(mark.icon ? { icon: mark.icon } : {}),
+  }))
 
 /** A few glyphs beside a tree row's name. Not focusable and not labelled: the row carries the legend. */
 export function FileMarkGlyphs(props: { marks: readonly FileMark[] }) {

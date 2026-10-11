@@ -1,14 +1,19 @@
 import { PrefKeys } from './prefKeys'
 import type { PersistedStateSlice, RestorePhase } from './persistedState'
 
-const direct = (id: string, key: string, restore: RestorePhase = 'workspace', maxBytes = 8 * 1024): PersistedStateSlice<string> => ({
+const direct = (
+  id: string,
+  key: string,
+  restore: RestorePhase = 'workspace',
+  maxBytes = 8 * 1024,
+): PersistedStateSlice<string> => ({
   id,
   key,
   scope: 'app',
   restore,
   version: 1,
   codec: {
-    parse: (raw) => typeof raw === 'string' ? raw : '',
+    parse: (raw) => (typeof raw === 'string' ? raw : ''),
     serialize: (value) => value,
   },
   empty: () => '',
@@ -16,7 +21,12 @@ const direct = (id: string, key: string, restore: RestorePhase = 'workspace', ma
   maxBytes,
 })
 
-const jsonObject = (id: string, key: string, restore: RestorePhase = 'workspace', maxBytes = 32 * 1024): PersistedStateSlice<Record<string, unknown>> => ({
+const jsonObject = (
+  id: string,
+  key: string,
+  restore: RestorePhase = 'workspace',
+  maxBytes = 32 * 1024,
+): PersistedStateSlice<Record<string, unknown>> => ({
   id,
   key,
   scope: 'app',
@@ -25,8 +35,8 @@ const jsonObject = (id: string, key: string, restore: RestorePhase = 'workspace'
   codec: {
     parse: (raw) => {
       try {
-        const value = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw
-        return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+        const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
+        return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
       } catch {
         return {}
       }

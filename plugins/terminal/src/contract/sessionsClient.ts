@@ -30,7 +30,9 @@ export type TerminalSessionsClient = {
 const createdListeners = new Set<(session: TerminalSession, nodeId: string) => void>()
 export function onTerminalSessionCreated(listener: (session: TerminalSession, nodeId: string) => void): () => void {
   createdListeners.add(listener)
-  return () => { createdListeners.delete(listener) }
+  return () => {
+    createdListeners.delete(listener)
+  }
 }
 
 export const terminalSessions: TerminalSessionsClient = {

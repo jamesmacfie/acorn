@@ -4,13 +4,17 @@ import { join, relative } from 'node:path'
 import { resolveInRoot } from '../core/fs'
 import { pluginDir, pluginInstallRoot, sweepDebris } from './installer'
 import { PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type PluginManifest } from './manifest'
-import {
-  markBundledPluginInstalled,
-  markPluginUserManaged,
-  readBundledPluginState,
-} from './bundledState'
+import { markBundledPluginInstalled, markPluginUserManaged, readBundledPluginState } from './bundledState'
 import { createLogger } from '../telemetry/logger'
-import { MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES, MAX_PLUGIN_PACKAGE_DEPTH, MAX_PLUGIN_PACKAGE_ENTRIES, pluginDirectoryEntries, streamPluginFile, visitPluginFile } from './packageFiles'
+import {
+  MAX_PLUGIN_FILE_BYTES,
+  MAX_PLUGIN_PACKAGE_BYTES,
+  MAX_PLUGIN_PACKAGE_DEPTH,
+  MAX_PLUGIN_PACKAGE_ENTRIES,
+  pluginDirectoryEntries,
+  streamPluginFile,
+  visitPluginFile,
+} from './packageFiles'
 
 const log = createLogger('plugins')
 
@@ -28,7 +32,9 @@ const packageFingerprint = (root: string): string => {
   let bytes = 0
   const walk = (dir: string, depth: number): void => {
     if (depth > MAX_PLUGIN_PACKAGE_DEPTH) throw new Error('Bundled package exceeds its depth limit.')
-    for (const entry of pluginDirectoryEntries(dir, MAX_PLUGIN_PACKAGE_ENTRIES - entries).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of pluginDirectoryEntries(dir, MAX_PLUGIN_PACKAGE_ENTRIES - entries).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
       if (++entries > MAX_PLUGIN_PACKAGE_ENTRIES) throw new Error('Bundled package exceeds its entry limit.')
       const path = join(dir, entry.name)
       const rel = relative(root, path)
@@ -41,7 +47,12 @@ const packageFingerprint = (root: string): string => {
       if (!entry.isFile()) throw new Error(`bundled package contains an unsupported entry (${rel})`)
       visitPluginFile(root, path, Math.min(MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES - bytes), (fd, stats) => {
         hash.update(`f\0${rel}\0${stats.size}\0`)
-        bytes += streamPluginFile(fd, stats.size, Math.min(MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES - bytes), (chunk) => hash.update(chunk))
+        bytes += streamPluginFile(
+          fd,
+          stats.size,
+          Math.min(MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES - bytes),
+          (chunk) => hash.update(chunk),
+        )
       })
     }
   }
@@ -56,7 +67,8 @@ const packageManifest = (dir: string, expectedId: string): PluginManifest => {
   const read = readPluginManifestResult(dir)
   if (!read.ok) throw new Error(read.reason)
   const manifest = read.manifest
-  if (manifest.id !== expectedId) throw new Error(`manifest id '${manifest.id}' does not match directory '${expectedId}'`)
+  if (manifest.id !== expectedId)
+    throw new Error(`manifest id '${manifest.id}' does not match directory '${expectedId}'`)
   if (!speaksApiVersion(manifest.apiVersion)) {
     throw new Error(`built for plugin API ${manifest.apiVersion}; this app speaks ${PLUGIN_API_MAJOR}`)
   }
@@ -117,7 +129,11 @@ const bundledDirectories = (root: string): string[] => {
  * `build:plugin` output, get updated. */
 export function reconcileBundledPlugins(dataRoot: string, bundledRoot: string): BundledPluginReconcileResult {
   const result: BundledPluginReconcileResult = {
-    installed: [], updated: [], preserved: [], removed: [], failures: [],
+    installed: [],
+    updated: [],
+    preserved: [],
+    removed: [],
+    failures: [],
   }
   sweepDebris(dataRoot)
 

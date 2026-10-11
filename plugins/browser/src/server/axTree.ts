@@ -76,7 +76,12 @@ export function resolveRef(snapshot: AxSnapshot | null, ref: string): number {
 export function renderAxTree(tree: AxNode[], depth = 0): string {
   const lines: string[] = []
   for (const node of tree) {
-    const parts = [node.role, node.name ? JSON.stringify(node.name) : null, node.value ? `value=${JSON.stringify(node.value)}` : null, node.ref ? `[${node.ref}]` : null]
+    const parts = [
+      node.role,
+      node.name ? JSON.stringify(node.name) : null,
+      node.value ? `value=${JSON.stringify(node.value)}` : null,
+      node.ref ? `[${node.ref}]` : null,
+    ]
     lines.push(`${'  '.repeat(depth)}- ${parts.filter(Boolean).join(' ')}`)
     if (node.children) lines.push(renderAxTree(node.children, depth + 1))
   }

@@ -82,7 +82,8 @@ export function createLogger(tag: string, owner = 'core', tap?: (level: LogLevel
  * global handlers, and both build their error record directly.
  */
 export function describeError(error: unknown): { name: string; message: string } {
-  if (error instanceof Error) return { name: error.name || 'Error', message: scrub(error.message, error.name || 'Error') }
+  if (error instanceof Error)
+    return { name: error.name || 'Error', message: scrub(error.message, error.name || 'Error') }
   return { name: 'Error', message: scrub(error, 'unknown error') }
 }
 
@@ -119,9 +120,9 @@ export function installPerfSink(): void {
       if (record.kind !== 'metric' || typeof record.value === 'number') continue
       const value = record.value
       console.error(
-        `[perf] ${scrubLine(record.name, 'metric', ATTR_VALUE_MAX)} count=${value.count} total=${ms(value.sum)}ms`
-        + ` mean=${ms(value.sum / Math.max(value.count, 1))}ms p50=${ms(value.p50)}ms`
-        + ` p95=${ms(value.p95)}ms max=${ms(value.max)}ms`,
+        `[perf] ${scrubLine(record.name, 'metric', ATTR_VALUE_MAX)} count=${value.count} total=${ms(value.sum)}ms` +
+          ` mean=${ms(value.sum / Math.max(value.count, 1))}ms p50=${ms(value.p50)}ms` +
+          ` p95=${ms(value.p95)}ms max=${ms(value.max)}ms`,
       )
     }
   })

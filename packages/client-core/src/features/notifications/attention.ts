@@ -21,8 +21,15 @@ export function edgesBetween(prev: Map<string, Snapshot>, next: Snapshot[]): Edg
     // No predecessor is not news: a session that is already blocked when the roster first loads was
     // blocked before the app was open.
     if (!before || before.state === s.state) continue
-    const edge = (kind: EdgeKind, title: string): Edge =>
-      ({ nodeId: s.nodeId, sourceId: s.sourceId, sessionId: s.sessionId, taskId: s.taskId, kind, state: s.state, title })
+    const edge = (kind: EdgeKind, title: string): Edge => ({
+      nodeId: s.nodeId,
+      sourceId: s.sourceId,
+      sessionId: s.sessionId,
+      taskId: s.taskId,
+      kind,
+      state: s.state,
+      title,
+    })
     if (s.state === 'blocked') out.push(edge('agent-needs-input', `${s.title} needs you`))
     else if (s.state === 'error') out.push(edge('agent-error', `${s.title} failed`))
     // A workflow or automation turn is one step of a run, and the workflows plugin already sends

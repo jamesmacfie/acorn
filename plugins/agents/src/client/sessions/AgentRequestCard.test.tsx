@@ -34,12 +34,17 @@ const request = (multiple: boolean): AgentRequest => ({
   detail: null,
   payload: {
     options: [],
-    questions: [{
-      id: 'checks',
-      prompt: 'Which checks should run?',
-      multiple,
-      options: [{ id: 'lint', label: 'Lint' }, { id: 'test', label: 'Test' }],
-    }],
+    questions: [
+      {
+        id: 'checks',
+        prompt: 'Which checks should run?',
+        multiple,
+        options: [
+          { id: 'lint', label: 'Lint' },
+          { id: 'test', label: 'Test' },
+        ],
+      },
+    ],
   },
   resolution: null,
   expiresAt: null,
@@ -57,7 +62,10 @@ const drawRequest = (value: AgentRequest) => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <AgentRequestCard request={value} taskId="task-1" />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 
@@ -76,19 +84,51 @@ describe('another plugin’s note on a request', () => {
       seen.push({ ...props })
       return <p data-note>looks risky</p>
     }
-    const point = extensionPointRegistry.register({ id: AGENT_REQUEST_CARD_POINT, ownerId: 'agents', label: 'Agent request card', kind: 'remote', mode: 'stack', max: 2 })
+    const point = extensionPointRegistry.register({
+      id: AGENT_REQUEST_CARD_POINT,
+      ownerId: 'agents',
+      label: 'Agent request card',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
+    })
     const note = extensionRegistry.register({
-      id: 'plugin:policy:warn', pluginId: 'policy', point: AGENT_REQUEST_CARD_POINT, label: 'Warnings', order: 500, carrier: 'component', component: Note,
+      id: 'plugin:policy:warn',
+      pluginId: 'policy',
+      point: AGENT_REQUEST_CARD_POINT,
+      label: 'Warnings',
+      order: 500,
+      carrier: 'component',
+      component: Note,
     } as ExtensionContribution)
-    hosts.push(() => { note.dispose(); point.dispose() })
-    const permission = { ...request(false), kind: 'permission' as const, title: 'git push', payload: { options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny', kind: 'reject_once' }] } }
+    hosts.push(() => {
+      note.dispose()
+      point.dispose()
+    })
+    const permission = {
+      ...request(false),
+      kind: 'permission' as const,
+      title: 'git push',
+      payload: {
+        options: [
+          { id: 'allow', label: 'Allow' },
+          { id: 'deny', label: 'Deny', kind: 'reject_once' },
+        ],
+      },
+    }
 
     const host = drawRequest(permission)
     const drawn = host.querySelector('[data-note]')!
     const buttons = [...host.querySelectorAll('button')]
     expect(buttons.map((button) => button.textContent)).toEqual(['Allow', 'Deny'])
     expect(buttons.at(-1)!.compareDocumentPosition(drawn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(seen.at(-1)).toEqual({ taskId: 'task-1', sessionId: 'session-1', requestId: 'ask-1', kind: 'permission', title: 'git push' })
+    expect(seen.at(-1)).toEqual({
+      taskId: 'task-1',
+      sessionId: 'session-1',
+      requestId: 'ask-1',
+      kind: 'permission',
+      title: 'git push',
+    })
 
     expect(drawRequest({ ...permission, status: 'resolving' }).querySelector('[data-note]')).toBeNull()
   })
@@ -152,7 +192,13 @@ describe('answering an app-access approval', () => {
         { id: 'decline', label: 'Decline', kind: 'reject_once' },
       ],
       ...(withApproval
-        ? { approval: { connector: 'Computer Use', app: { id: 'com.acorn.desktop.agent-test', name: 'Acorn Agent Test' }, scopes } }
+        ? {
+            approval: {
+              connector: 'Computer Use',
+              app: { id: 'com.acorn.desktop.agent-test', name: 'Acorn Agent Test' },
+              scopes,
+            },
+          }
         : {}),
     },
   })
@@ -188,7 +234,9 @@ describe('answering an app-access approval', () => {
 // derives the card's `focus` from a row it rebuilds on every streamed event, so the reveal effect is
 // re-notified while the value stays true. It must land the reader once and then leave the caret alone.
 describe('revealing a request without stealing the caret', () => {
-  beforeEach(() => { Element.prototype.scrollIntoView = vi.fn() })
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn()
+  })
 
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -204,8 +252,14 @@ describe('revealing a request without stealing the caret', () => {
     const [tick, setTick] = createSignal(0)
     const host = document.createElement('div')
     document.body.append(host)
-    const dispose = render(() => <AgentRequestCard request={request(false)} taskId="task-1" focused={tick() >= 0} />, host)
-    hosts.push(() => { dispose(); host.remove() })
+    const dispose = render(
+      () => <AgentRequestCard request={request(false)} taskId="task-1" focused={tick() >= 0} />,
+      host,
+    )
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
     await flush()
     const card = host.querySelector<HTMLElement>('.ui-card')!
     expect(document.activeElement).toBe(card)
@@ -224,7 +278,10 @@ describe('revealing a request without stealing the caret', () => {
     const host = document.createElement('div')
     document.body.append(host)
     const dispose = render(() => <AgentRequestCard request={request(false)} taskId="task-1" focused={on()} />, host)
-    hosts.push(() => { dispose(); host.remove() })
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
     await flush()
     const card = host.querySelector<HTMLElement>('.ui-card')!
     expect(document.activeElement).toBe(card)

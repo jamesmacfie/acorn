@@ -49,7 +49,7 @@ describe('plugin RPC error marshalling', () => {
 // goes quiet and the broker stops getting heartbeats, which is why one wedged plugin used to read as
 // the entire node being unreachable.
 describe('plugin RPC synchronous replies', () => {
-  it('answers while one of the plugin\'s own handlers is still waiting on the host', async () => {
+  it("answers while one of the plugin's own handlers is still waiting on the host", async () => {
     const { port1, port2 } = new MessageChannel()
     const worker = new Worker(new URL('./__fixtures__/rpcWorker.ts', import.meta.url), {
       workerData: { port: port2 },
@@ -57,10 +57,11 @@ describe('plugin RPC synchronous replies', () => {
     })
     const host = new PluginRpcEndpoint(port1, () => 'async')
     try {
-      const plugin = host.decode(
-        await new Promise((resolve) => port1.once('message', resolve)),
-        'plugin',
-      ) as { slow(wait: () => Promise<void>): Promise<string>; pure(): string; quick(): Promise<string> }
+      const plugin = host.decode(await new Promise((resolve) => port1.once('message', resolve)), 'plugin') as {
+        slow(wait: () => Promise<void>): Promise<string>
+        pure(): string
+        quick(): Promise<string>
+      }
 
       // Park a handler inside the worker on a host call that cannot finish yet. That is the state
       // the deadlock needed: the worker owes the host an answer it can only give once the host runs
@@ -98,7 +99,9 @@ describe('plugin RPC synchronous reply buffers', () => {
     }
     const host = new PluginRpcEndpoint(port1, () => 'async')
     try {
-      const plugin = host.decode(await new Promise((resolve) => port1.once('message', resolve)), 'plugin') as { pure(): string }
+      const plugin = host.decode(await new Promise((resolve) => port1.once('message', resolve)), 'plugin') as {
+        pure(): string
+      }
       expect([plugin.pure(), plugin.pure(), plugin.pure()]).toEqual(['pure', 'pure', 'pure'])
       expect(replies.size).toBe(1)
     } finally {
@@ -119,13 +122,15 @@ describe('plugin RPC concurrency', () => {
     })
     const host = new PluginRpcEndpoint(port1, () => 'async')
     try {
-      const plugin = host.decode(
-        await new Promise((resolve) => port1.once('message', resolve)),
-        'plugin',
-      ) as { slow(wait: () => Promise<void>): Promise<string>; quick(): Promise<string> }
+      const plugin = host.decode(await new Promise((resolve) => port1.once('message', resolve)), 'plugin') as {
+        slow(wait: () => Promise<void>): Promise<string>
+        quick(): Promise<string>
+      }
 
       const order: string[] = []
-      const slow = plugin.slow(() => new Promise((resolve) => setTimeout(resolve, 1_000))).then(() => order.push('slow'))
+      const slow = plugin
+        .slow(() => new Promise((resolve) => setTimeout(resolve, 1_000)))
+        .then(() => order.push('slow'))
       await new Promise((resolve) => setTimeout(resolve, 100))
       await plugin.quick().then(() => order.push('quick'))
       await slow
@@ -150,20 +155,20 @@ describe('plugin RPC value shapes', () => {
   }
 
   it('keeps bytes usable as bytes', async () => {
-    const decoded = await roundTrip({ bytes: new Uint8Array([26, 80, 78, 71]) }) as { bytes: Uint8Array }
+    const decoded = (await roundTrip({ bytes: new Uint8Array([26, 80, 78, 71]) })) as { bytes: Uint8Array }
     expect(decoded.bytes).toBeInstanceOf(Uint8Array)
     expect([...decoded.bytes.slice(1)]).toEqual([80, 78, 71])
   })
 
   it('keeps a date a date', async () => {
-    const decoded = await roundTrip({ at: new Date('2026-09-19T00:00:00.000Z') }) as { at: Date }
+    const decoded = (await roundTrip({ at: new Date('2026-09-19T00:00:00.000Z') })) as { at: Date }
     expect(decoded.at).toBeInstanceOf(Date)
   })
 
   // A delete route answers 204. Rebuilding it with a body threw, and the host answered 500 for a
   // delete that had worked.
   it('rebuilds a response that has no body', async () => {
-    const decoded = await roundTrip(new Response(null, { status: 204 })) as Response
+    const decoded = (await roundTrip(new Response(null, { status: 204 }))) as Response
     expect(decoded.status).toBe(204)
     expect(await decoded.text()).toBe('')
   })
@@ -174,16 +179,20 @@ it('forwards an abort after an async callback has started', async () => {
   const host = new PluginRpcEndpoint(port1, () => 'async')
   const worker = new PluginRpcEndpoint(port2, () => 'async')
   let started!: () => void
-  const running = new Promise<void>((resolve) => { started = resolve })
+  const running = new Promise<void>((resolve) => {
+    started = resolve
+  })
   try {
-    const remote = host.decode(await worker.encode({
-      run: async ({ signal }: { signal: AbortSignal }) => {
-        started()
-        return new Promise((resolve) => {
-          signal.addEventListener('abort', () => resolve(signal.reason), { once: true })
-        })
-      },
-    })) as { run(args: { signal: AbortSignal }): Promise<string> }
+    const remote = host.decode(
+      await worker.encode({
+        run: async ({ signal }: { signal: AbortSignal }) => {
+          started()
+          return new Promise((resolve) => {
+            signal.addEventListener('abort', () => resolve(signal.reason), { once: true })
+          })
+        },
+      }),
+    ) as { run(args: { signal: AbortSignal }): Promise<string> }
     const controller = new AbortController()
     const result = remote.run({ signal: controller.signal })
     await running

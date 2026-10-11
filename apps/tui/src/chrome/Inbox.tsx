@@ -4,7 +4,11 @@ import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.
 import { createAttentionInbox, type AttentionInbox } from '@acorn/client-core/features/notifications'
 import { trackBadge } from '@acorn/client-core/features/notifications'
 import {
-  markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount,
+  markRead,
+  noticesForActiveNode,
+  openNoticeTarget,
+  openTarget,
+  unreadCount,
 } from '@acorn/client-core/features/notifications'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { projectPath } from '@acorn/client-core/host/registries/commands'
@@ -40,7 +44,9 @@ let inbox: (() => AttentionInbox) | null = null
 export function initInbox(): void {
   const rows = createAttentionInbox()
   inbox = rows
-  onCleanup(() => { inbox = null })
+  onCleanup(() => {
+    inbox = null
+  })
   // One pill for both sections, the same sum the desktop's bell shows: an attention item always
   // counts, because it is unresolved by definition. `setBadge` on this host writes the signal the
   // topbar draws (../kit/notify.ts).
@@ -48,7 +54,10 @@ export function initInbox(): void {
   // Always on, where the desktop reads the `badge` switch. There is no device preference store here,
   // and `ACORN_TUI_NOTIFY` is about the channels that interrupt you — a number in your own topbar is
   // not one of them.
-  trackBadge(() => unreadCount() + rows().rows.length, () => true)
+  trackBadge(
+    () => unreadCount() + rows().rows.length,
+    () => true,
+  )
 }
 
 type InboxRow = {
@@ -148,7 +157,9 @@ export function Inbox(props: { model: ShellModel }) {
                 // collection means `j` and `k` walk the whole inbox, and a head that was an item
                 // would be a stop that opens nothing.
                 <box flexDirection="column" flexShrink={0}>
-                  <Show when={row.first}><Line role="eyebrow">{row.section}</Line></Show>
+                  <Show when={row.first}>
+                    <Line role="eyebrow">{row.section}</Line>
+                  </Show>
                   <Row
                     item={item}
                     selected={row.unread}

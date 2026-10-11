@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest'
 import type { AgentAttachment } from '../../plugins/agents/src/contract/wire'
-import type { AgentBeforePermissionPayload, AgentPermissionSubject } from '../../plugins/agents/src/contract/permissionHook'
+import type {
+  AgentBeforePermissionPayload,
+  AgentPermissionSubject,
+} from '../../plugins/agents/src/contract/permissionHook'
 import type { AgentAfterToolPayload, AgentBeforeToolPayload } from '../../plugins/agents/src/contract/loopHook'
 import type {
   SessionMessage,
@@ -40,14 +43,33 @@ const sessionControl: Mutual<AgentSessionControl, Published.AgentSessionControl>
 const requests: Mutual<AgentRequestsCapability, Published.AgentRequestsCapability> = [true, true]
 const reviewInput: Mutual<AgentReviewInputCapability, Published.AgentReviewInputCapability> = [true, true]
 const activity: Mutual<AgentActivityCapability, Published.AgentActivityCapability> = [true, true]
-const activityFrame: Mutual<Extract<AgentLifecycleFrame, { channel: 'plugin:agents:activity' }>, Published.AgentActivityFrame> = [true, true]
+const activityFrame: Mutual<
+  Extract<AgentLifecycleFrame, { channel: 'plugin:agents:activity' }>,
+  Published.AgentActivityFrame
+> = [true, true]
 
 it('keeps published draft attachments aligned with Agents', () => {
   expect(attachment).toEqual([true, true])
 })
 
 it('keeps the published Agents hook payloads, entries, and capabilities aligned with Agents', () => {
-  for (const pair of [permissionSubject, beforePermission, beforeTool, afterTool, message, messageResult, messenger, messengerEntry, followUpWindow, followUpEntry, sessionControl, requests, reviewInput, activity, activityFrame]) {
+  for (const pair of [
+    permissionSubject,
+    beforePermission,
+    beforeTool,
+    afterTool,
+    message,
+    messageResult,
+    messenger,
+    messengerEntry,
+    followUpWindow,
+    followUpEntry,
+    sessionControl,
+    requests,
+    reviewInput,
+    activity,
+    activityFrame,
+  ]) {
     expect(pair).toEqual([true, true])
   }
 })

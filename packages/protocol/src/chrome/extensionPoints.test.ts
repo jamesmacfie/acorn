@@ -3,8 +3,9 @@ import { linkPreviewKey, markdownFenceKey, MAX_LINK_PREVIEW_URL, MAX_MARKDOWN_FE
 
 describe('linkPreviewKey', () => {
   it('keeps the path, query and fragment as written and lowercases only the host', () => {
-    expect(linkPreviewKey('https://Docs.Example.com/Guide/Intro?utm_source=x#Part-2'))
-      .toBe('https://docs.example.com/Guide/Intro?utm_source=x#Part-2')
+    expect(linkPreviewKey('https://Docs.Example.com/Guide/Intro?utm_source=x#Part-2')).toBe(
+      'https://docs.example.com/Guide/Intro?utm_source=x#Part-2',
+    )
   })
 
   it('refuses anything but HTTPS, and any URL that carries credentials', () => {

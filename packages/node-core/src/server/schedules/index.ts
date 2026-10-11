@@ -8,7 +8,14 @@ import { registerDatasetCaptureTarget } from '../datasets/schedule'
 import { type Clock, Scheduler } from './scheduler'
 
 export { keyOwner, Scheduler } from './scheduler'
-export type { Clock, CreateScheduleInput, DeclaredSchedule, PatchScheduleInput, ScheduleRunner, ScheduleTarget } from './scheduler'
+export type {
+  Clock,
+  CreateScheduleInput,
+  DeclaredSchedule,
+  PatchScheduleInput,
+  ScheduleRunner,
+  ScheduleTarget,
+} from './scheduler'
 
 /** The handle on the one scheduler this process owns. A capability rather than a binding on c.env, for
  *  the same reason PLUGIN_STATE is one: the scheduler exists only once the composition root has built
@@ -18,7 +25,21 @@ export type { Clock, CreateScheduleInput, DeclaredSchedule, PatchScheduleInput, 
  *  scheduler through this capability at call time rather than being threaded through initPlugins, the
  *  late binding every other cross-plugin need uses (server/pluginHost/host.ts). Not `start`, `stop` or the
  *  constructor: the composition root owns the lifetime and nothing else may. */
-export type SchedulerBridge = Pick<Scheduler, 'list' | 'runs' | 'create' | 'confirm' | 'patch' | 'remove' | 'runNow' | 'paused' | 'setPaused' | 'register' | 'registerTarget' | 'targets'>
+export type SchedulerBridge = Pick<
+  Scheduler,
+  | 'list'
+  | 'runs'
+  | 'create'
+  | 'confirm'
+  | 'patch'
+  | 'remove'
+  | 'runNow'
+  | 'paused'
+  | 'setPaused'
+  | 'register'
+  | 'registerTarget'
+  | 'targets'
+>
 export const SCHEDULER = routeCapability<SchedulerBridge>('core.scheduler')
 
 /** Builds the node's scheduler and declares core's own periodic work on it (docs/schedules.md
@@ -90,11 +111,15 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
     // route the way a click does, and no plugin should register that dispatch on its own behalf.
     registerNodeActionTarget(scheduler, env)
     registerDatasetCaptureTarget(scheduler, db, env)
-    scheduler.register({ key: 'core:compact-datasets', name: 'Prune dataset retention', cadence: { daily: '03:50' },
+    scheduler.register({
+      key: 'core:compact-datasets',
+      name: 'Prune dataset retention',
+      cadence: { daily: '03:50' },
       run: async () => {
         const { pruneDatasetRows } = await import('../datasets/store')
         return `${pruneDatasetRows(db)} expired dataset rows removed`
-      } })
+      },
+    })
   }
 
   return scheduler

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { applyRailOrder, applySourceOrder, EMPTY_RAIL_ORDER, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask } from './railOrder'
+import {
+  applyRailOrder,
+  applySourceOrder,
+  EMPTY_RAIL_ORDER,
+  moveTask,
+  parseRailOrder,
+  pinTask,
+  serializeRailOrder,
+  unpinTask,
+} from './railOrder'
 
 const tasks = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
 
@@ -49,8 +58,20 @@ describe('moveTask (drag-reorder)', () => {
   it('preserves another workspace order when tasks are dragged in both workspaces', () => {
     const first = [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }]
     const second = [{ id: 'b1' }, { id: 'b2' }]
-    const firstOrder = moveTask(EMPTY_RAIL_ORDER, first.map((task) => task.id), 'a3', 'a1', 'before')
-    const secondOrder = moveTask(firstOrder, second.map((task) => task.id), 'b2', 'b1', 'before')
+    const firstOrder = moveTask(
+      EMPTY_RAIL_ORDER,
+      first.map((task) => task.id),
+      'a3',
+      'a1',
+      'before',
+    )
+    const secondOrder = moveTask(
+      firstOrder,
+      second.map((task) => task.id),
+      'b2',
+      'b1',
+      'before',
+    )
 
     expect(applyRailOrder(first, secondOrder).map((task) => task.id)).toEqual(['a3', 'a1', 'a2'])
     expect(applyRailOrder(second, secondOrder).map((task) => task.id)).toEqual(['b2', 'b1'])
@@ -84,8 +105,11 @@ describe('persistence round-trip', () => {
     const sources = [{ id: 'home' }, { id: 'github' }, { id: 'fleet' }]
     expect(applySourceOrder(sources, older).map((entry) => entry.id)).toEqual(['home', 'github', 'fleet'])
     const chosen = { ...older, sources: ['fleet', 'home'] }
-    expect(applySourceOrder(sources, parseRailOrder(serializeRailOrder(chosen))).map((entry) => entry.id))
-      .toEqual(['fleet', 'home', 'github'])
+    expect(applySourceOrder(sources, parseRailOrder(serializeRailOrder(chosen))).map((entry) => entry.id)).toEqual([
+      'fleet',
+      'home',
+      'github',
+    ])
     expect(moveTask(chosen, ['task-a', 'task-b'], 'task-b', 'task-a', 'before').sources).toEqual(chosen.sources)
   })
 

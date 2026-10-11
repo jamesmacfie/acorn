@@ -110,7 +110,9 @@ describe('capturePty', () => {
   it('retires after a prompt write fails and leaves no capture timers', async () => {
     vi.useFakeTimers()
     const { pty, run } = setup()
-    vi.spyOn(pty, 'write').mockImplementation(() => { throw new Error('synthetic write failure') })
+    vi.spyOn(pty, 'write').mockImplementation(() => {
+      throw new Error('synthetic write failure')
+    })
     const result = run({ promptResponses: [{ pattern: /trust/i, response: '\r' }] })
     const rejection = expect(result).rejects.toMatchObject({ code: 'execution_failure' })
     pty.emitData('Trust this folder?')
@@ -162,7 +164,9 @@ describe('capturePty', () => {
     })
     pty.emitData('usage output\n')
     let finished = false
-    void capture.then(() => { finished = true })
+    void capture.then(() => {
+      finished = true
+    })
     await vi.waitFor(() => expect(pty.signals).toEqual(['SIGHUP']))
     expect(finished).toBe(false)
     await capture

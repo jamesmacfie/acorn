@@ -2,16 +2,18 @@ import { describe, expect, it } from 'vitest'
 import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
 import { sameAgentConfigOptions, sessionModelLabel, sessionModelSummary } from './agentConfigOptions'
 
-const options = (): AgentConfigOption[] => [{
-  id: 'model',
-  label: 'Model',
-  category: 'model',
-  currentValue: 'gpt-5.6-sol',
-  values: [
-    { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Frontier coding model' },
-    { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
-  ],
-}]
+const options = (): AgentConfigOption[] => [
+  {
+    id: 'model',
+    label: 'Model',
+    category: 'model',
+    currentValue: 'gpt-5.6-sol',
+    values: [
+      { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', description: 'Frontier coding model' },
+      { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+    ],
+  },
+]
 
 describe('managed-agent configuration stability', () => {
   it('treats re-hydrated but unchanged provider options as equal', () => {
@@ -50,7 +52,8 @@ const session = (config: Record<string, unknown>, model: string | null = null): 
   config,
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [], queuedTurns: 0,
+  subagents: [],
+  queuedTurns: 0,
   lastEventSeq: 0,
   lastReadSeq: 0,
   archivedAt: null,
@@ -75,18 +78,22 @@ describe('the model a session is running', () => {
   })
 
   it('puts a separately advertised reasoning effort beside the model in session summaries', () => {
-    expect(sessionModelSummary(session({
-      configOptions: [
-        ...options(),
-        {
-          id: 'reasoning',
-          label: 'Effort',
-          category: 'reasoning',
-          currentValue: 'high',
-          values: [{ value: 'high', label: 'High' }],
-        },
-      ],
-    }))).toBe('GPT-5.6 Sol · High')
+    expect(
+      sessionModelSummary(
+        session({
+          configOptions: [
+            ...options(),
+            {
+              id: 'reasoning',
+              label: 'Effort',
+              category: 'reasoning',
+              currentValue: 'high',
+              values: [{ value: 'high', label: 'High' }],
+            },
+          ],
+        }),
+      ),
+    ).toBe('GPT-5.6 Sol · High')
   })
 
   it('keeps the model-only summary when the provider reports no effort', () => {

@@ -20,7 +20,12 @@ import { kitComponent, type KitEntry } from './kitEntry'
 const HEAVY: KitNodeName[] = [
   // The diff viewer and the five nodes that share `kit/diff/DiffRows.tsx` with it. `DiffPane` reaches
   // features/diff, and through it infra/highlight, which is the syntax highlighter.
-  'DiffPane', 'DiffLine', 'FileHead', 'NonCodeRow', 'SplitCell', 'StackedDiff',
+  'DiffPane',
+  'DiffLine',
+  'FileHead',
+  'NonCodeRow',
+  'SplitCell',
+  'StackedDiff',
   // Fetches a grammar per fence at render time, and is the surface a streaming transcript re-renders.
   'Markdown',
   // Carries the follow-scroll machinery.
@@ -31,7 +36,7 @@ const HEAVY: KitNodeName[] = [
 
 const isLoader = (entry: KitEntry): boolean => typeof entry !== 'function'
 
-describe('the DOM host\'s kit table', () => {
+describe("the DOM host's kit table", () => {
   it('has an entry for every node in the kit, and nothing else', () => {
     expect(Object.keys(KIT_COMPONENTS).sort()).toEqual([...KIT_NODES].sort())
     // Anti-vacuity: two empty lists compare equal.
@@ -81,11 +86,13 @@ describe('the DOM host\'s kit table', () => {
     // A loader's specifier is a string the compiler checks for existence and nothing checks for
     // correctness: `m.DiffPane` on a module that renamed the export is `undefined`, and what a reader
     // sees is a tree that draws nothing with no error. So every one is resolved once.
-    return Promise.all(HEAVY.map(async (name) => {
-      const entry = KIT_COMPONENTS[name]
-      if (typeof entry === 'function') throw new Error(`${name} is not a loader`)
-      const module = await entry.load()
-      expect(module.default, name).toBeTypeOf('function')
-    }))
+    return Promise.all(
+      HEAVY.map(async (name) => {
+        const entry = KIT_COMPONENTS[name]
+        if (typeof entry === 'function') throw new Error(`${name} is not a loader`)
+        const module = await entry.load()
+        expect(module.default, name).toBeTypeOf('function')
+      }),
+    )
   })
 })

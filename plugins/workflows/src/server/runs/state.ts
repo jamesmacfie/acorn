@@ -14,7 +14,10 @@ export class WorkflowRunState {
 
   constructor(
     private readonly db: PluginDatabase,
-    private readonly deps: Pick<RunnerDeps, 'runChanged' | 'stepChanged' | 'gateChanged' | 'statusChanged' | 'telemetry'>,
+    private readonly deps: Pick<
+      RunnerDeps,
+      'runChanged' | 'stepChanged' | 'gateChanged' | 'statusChanged' | 'telemetry'
+    >,
     private readonly publishChild: (runId: string) => Promise<void>,
   ) {}
 
@@ -43,24 +46,39 @@ export class WorkflowRunState {
   }
 
   async steps(runId: string): Promise<WorkflowStepRow[]> {
-    return this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.runId, runId)).orderBy(asc(schema.workflowSteps.idx))
+    return this.db
+      .select()
+      .from(schema.workflowSteps)
+      .where(eq(schema.workflowSteps.runId, runId))
+      .orderBy(asc(schema.workflowSteps.idx))
   }
 
   async childSteps(parentStepId: string): Promise<WorkflowStepRow[]> {
-    return this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.parentStepId, parentStepId)).orderBy(asc(schema.workflowSteps.createdAt))
+    return this.db
+      .select()
+      .from(schema.workflowSteps)
+      .where(eq(schema.workflowSteps.parentStepId, parentStepId))
+      .orderBy(asc(schema.workflowSteps.createdAt))
   }
 
   async setWaitingParentStatus(runId: string, status: 'running' | 'gated'): Promise<void> {
     const run = await this.run(runId)
     if (!run || !['running', 'gated'].includes(run.status)) return
     const ownGate = (await this.steps(runId)).some((step) => step.status === 'waiting-gate')
-    const dispatches = await this.db.select({ runId: schema.workflowDispatches.runId })
+    const dispatches = await this.db
+      .select({ runId: schema.workflowDispatches.runId })
       .from(schema.workflowDispatches)
       .where(eq(schema.workflowDispatches.parentRunId, runId))
     const children = dispatches.length
-      ? await this.db.select({ status: schema.workflowRuns.status })
-        .from(schema.workflowRuns)
-        .where(inArray(schema.workflowRuns.id, dispatches.map((dispatch) => dispatch.runId)))
+      ? await this.db
+          .select({ status: schema.workflowRuns.status })
+          .from(schema.workflowRuns)
+          .where(
+            inArray(
+              schema.workflowRuns.id,
+              dispatches.map((dispatch) => dispatch.runId),
+            ),
+          )
       : []
     // One child settling cannot clear another child's gate or a gate in this run.
     const next = ownGate || children.some((child) => child.status === 'gated') ? 'gated' : status
@@ -69,7 +87,10 @@ export class WorkflowRunState {
 
   async setRun(runId: string, patch: Partial<WorkflowRunRow>): Promise<void> {
     const before = patch.status == null ? undefined : await this.run(runId)
-    await this.db.update(schema.workflowRuns).set({ ...patch, updatedAt: Date.now() }).where(eq(schema.workflowRuns.id, runId))
+    await this.db
+      .update(schema.workflowRuns)
+      .set({ ...patch, updatedAt: Date.now() })
+      .where(eq(schema.workflowRuns.id, runId))
     if (before && before.status !== patch.status) {
       this.deps.runChanged?.(before.taskId, runId, patch.status as WorkflowRunStatus)
       if (before.parentRunId) await this.publishChild(runId)
@@ -84,14 +105,21 @@ export class WorkflowRunState {
   /** Write only while the persisted status matches the expected status. */
   async setStepIf(stepId: string, expected: string | undefined, patch: Partial<WorkflowStepRow>): Promise<boolean> {
     // A patch without a status edge does not emit a step or gate event.
-    const [before] = patch.status == null
-      ? []
-      : await this.db.select({ runId: schema.workflowSteps.runId, status: schema.workflowSteps.status })
-        .from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    const written = await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: Date.now() })
-      .where(expected == null
-        ? eq(schema.workflowSteps.id, stepId)
-        : and(eq(schema.workflowSteps.id, stepId), eq(schema.workflowSteps.status, expected)))
+    const [before] =
+      patch.status == null
+        ? []
+        : await this.db
+            .select({ runId: schema.workflowSteps.runId, status: schema.workflowSteps.status })
+            .from(schema.workflowSteps)
+            .where(eq(schema.workflowSteps.id, stepId))
+    const written = await this.db
+      .update(schema.workflowSteps)
+      .set({ ...patch, updatedAt: Date.now() })
+      .where(
+        expected == null
+          ? eq(schema.workflowSteps.id, stepId)
+          : and(eq(schema.workflowSteps.id, stepId), eq(schema.workflowSteps.status, expected)),
+      )
       .returning({ id: schema.workflowSteps.id })
     if (!written.length) return false
     if (before && before.status !== patch.status) {

@@ -12,14 +12,20 @@ export const canAddProjectFromFolder = (): boolean =>
   canPickFolder() && nodes().some((node) => node.nodeId === activeNodeId() && node.local)
 
 /** Registers a folder in the active Node's mode; grouped mode may assign its workspace. */
-export async function addProjectFromFolder(queryClient: QueryClient, mode: WorkspacesMode, workspaceId?: string): Promise<void> {
+export async function addProjectFromFolder(
+  queryClient: QueryClient,
+  mode: WorkspacesMode,
+  workspaceId?: string,
+): Promise<void> {
   try {
     if (!canAddProjectFromFolder()) throw new Error('Choose the local Node to add a folder.')
     const nodeId = activeNodeId()
     const path = await pickFolder()
     if (!path) return
     if (activeNodeId() !== nodeId) throw new Error('The active Node changed. Choose the folder again.')
-    const knownProjectIds = new Set(queryClient.getQueryData<Project[]>(projectsKey)?.map((project) => project.id) ?? [])
+    const knownProjectIds = new Set(
+      queryClient.getQueryData<Project[]>(projectsKey)?.map((project) => project.id) ?? [],
+    )
     const { project } = await createProject({ path, ...(mode === 'on' && workspaceId ? { workspaceId } : {}) })
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: projectsKey }),
@@ -27,9 +33,13 @@ export async function addProjectFromFolder(queryClient: QueryClient, mode: Works
     ])
     if (mode === 'off') {
       const alreadyAdded = knownProjectIds.has(project.id)
-      toast(alreadyAdded ? `${project.name} is already added.` : `Added ${project.name}.`, { tone: alreadyAdded ? 'neutral' : 'success' })
+      toast(alreadyAdded ? `${project.name} is already added.` : `Added ${project.name}.`, {
+        tone: alreadyAdded ? 'neutral' : 'success',
+      })
     } else if (workspaceId && project.workspaceId !== workspaceId) {
-      const workspace = queryClient.getQueryData<Workspace[]>(workspacesKey)?.find((entry) => entry.id === project.workspaceId)
+      const workspace = queryClient
+        .getQueryData<Workspace[]>(workspacesKey)
+        ?.find((entry) => entry.id === project.workspaceId)
       toast(`${project.name} is already in ${workspace?.name ?? 'another workspace'}. Move it in Settings → Overview.`)
     } else {
       toast(`Added ${project.name}.`, { tone: 'success' })

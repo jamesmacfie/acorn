@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@acorn/node-core/server/index.ts'
-import { requireDevice, requireProviderAccess, requireTaskScope } from '@acorn/node-core/server/middleware/requireUser.ts'
+import {
+  requireDevice,
+  requireProviderAccess,
+  requireTaskScope,
+} from '@acorn/node-core/server/middleware/requireUser.ts'
 import { PLUGIN_NAMESPACE } from '@acorn/node-core/server/routes/registry.ts'
 import { mountCovers, registeredHandler } from '@acorn/node-core/testkit'
 import { initCompiledPlugins } from '../helpers/compiledPlugins'
@@ -24,25 +28,25 @@ import { initCompiledPlugins } from '../helpers/compiledPlugins'
 const OWNERSHIP_GATES: Record<string, string> = {
   // The bare form also covers `GET /sessions/search`, which this gate skips. That handler confines
   // its own filter to the caller's task.
-  '/v1/p/agents/sessions/:sessionId': 'ownsSession resolves the session\'s task',
-  '/v1/p/agents/sessions/:sessionId/*': 'ownsSession resolves the session\'s task',
-  '/v1/p/agents/attachments/:attachmentId': 'resolves the attachment\'s task',
-  '/v1/p/agents/attachments/:attachmentId/*': 'resolves the attachment\'s task',
-  '/v1/p/agents/artifacts/:artifactId': 'resolves the artifact\'s task',
-  '/v1/p/agents/artifacts/:artifactId/*': 'resolves the artifact\'s task',
+  '/v1/p/agents/sessions/:sessionId': "ownsSession resolves the session's task",
+  '/v1/p/agents/sessions/:sessionId/*': "ownsSession resolves the session's task",
+  '/v1/p/agents/attachments/:attachmentId': "resolves the attachment's task",
+  '/v1/p/agents/attachments/:attachmentId/*': "resolves the attachment's task",
+  '/v1/p/agents/artifacts/:artifactId': "resolves the artifact's task",
+  '/v1/p/agents/artifacts/:artifactId/*': "resolves the artifact's task",
   // Terminal has no route at the bare `/sessions/:sid`, so the `/*` form covers everything.
-  '/v1/p/terminal/sessions/:sid/*': 'ownsSession resolves the terminal session\'s task',
-  '/v1/p/workflows/workflows/runs/:runId': 'ownsRun resolves the run\'s task',
-  '/v1/p/workflows/workflows/runs/:runId/*': 'ownsRun resolves the run\'s task',
+  '/v1/p/terminal/sessions/:sid/*': "ownsSession resolves the terminal session's task",
+  '/v1/p/workflows/workflows/runs/:runId': "ownsRun resolves the run's task",
+  '/v1/p/workflows/workflows/runs/:runId/*': "ownsRun resolves the run's task",
 }
 
 // Reachable by a task's agent on purpose. `${METHOD} ${path}` exactly as the app registers it.
 const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   // Filtered to the caller's own task in the handler.
-  'GET /v1/p/agents/sessions': 'confineFilter pins the list to the caller\'s task',
+  'GET /v1/p/agents/sessions': "confineFilter pins the list to the caller's task",
   'GET /v1/p/terminal/sessions': 'filtered by mayActOnTask',
-  'GET /v1/p/memory/memory': 'readMemory holds a task caller to its task\'s project',
-  'GET /v1/p/memory/memory/search': 'readMemory holds a task caller to its task\'s project',
+  'GET /v1/p/memory/memory': "readMemory holds a task caller to its task's project",
+  'GET /v1/p/memory/memory/search': "readMemory holds a task caller to its task's project",
 
   // The task is in the body or query, so no mount can see it. The handler checks it.
   'POST /v1/p/agents/attachments': 'checks the taskId query with mayActOnTask',
@@ -60,10 +64,10 @@ const OPEN_TO_A_TASK_TOKEN: Record<string, string> = {
   'GET /v1/p/agents/concurrency': 'owner settings, read only; the write is device-only',
   'GET /v1/p/agents/session-defaults': 'owner settings, read only; the write is device-only',
   'GET /v1/p/agents/custom-agents': 'owner settings, read only; the writes are device-only',
-  'GET /v1/p/github/pins': 'the owner\'s pinned repository ids; the write is device-only',
-  'GET /v1/p/agents/usage': 'the owner\'s plan usage, read only',
-  'POST /v1/p/agents/usage/refresh': 're-reads the owner\'s plan usage and changes nothing',
-  'POST /v1/p/agents/usage/refresh/:providerId': 're-reads one provider\'s plan usage and changes nothing',
+  'GET /v1/p/github/pins': "the owner's pinned repository ids; the write is device-only",
+  'GET /v1/p/agents/usage': "the owner's plan usage, read only",
+  'POST /v1/p/agents/usage/refresh': "re-reads the owner's plan usage and changes nothing",
+  'POST /v1/p/agents/usage/refresh/:providerId': "re-reads one provider's plan usage and changes nothing",
   'GET /v1/p/terminal/profiles': 'shell profile labels and availability, no task data',
 }
 
@@ -85,16 +89,29 @@ const EXECUTION_ROUTES = [
 
 describe('compiled plugin mount coverage', () => {
   let plugins: { dispose(): Promise<void> }
-  beforeAll(async () => { plugins = await initCompiledPlugins() })
+  beforeAll(async () => {
+    plugins = await initCompiledPlugins()
+  })
   afterAll(async () => plugins.dispose())
 
   const CORE_GATES = new Set<unknown>([requireDevice, requireProviderAccess, requireTaskScope])
   const table = () => {
-    const routes = createApp().routes.map((route, index) => ({ ...route, handler: registeredHandler(route.handler), index }))
+    const routes = createApp().routes.map((route, index) => ({
+      ...route,
+      handler: registeredHandler(route.handler),
+      index,
+    }))
     const gates = routes.filter((r) => CORE_GATES.has(r.handler) || (r.method === 'ALL' && OWNERSHIP_GATES[r.path]))
-    const pluginRoutes = routes.filter((r) => r.method !== 'ALL' && r.path.startsWith(`${PLUGIN_NAMESPACE}/`) && !CORE_GATES.has(r.handler))
-    const gated = (route: { method: string; path: string; index: number }) => gates.some((gate) =>
-      gate.index < route.index && (gate.method === 'ALL' || gate.method === route.method) && mountCovers(gate.path, route.path))
+    const pluginRoutes = routes.filter(
+      (r) => r.method !== 'ALL' && r.path.startsWith(`${PLUGIN_NAMESPACE}/`) && !CORE_GATES.has(r.handler),
+    )
+    const gated = (route: { method: string; path: string; index: number }) =>
+      gates.some(
+        (gate) =>
+          gate.index < route.index &&
+          (gate.method === 'ALL' || gate.method === route.method) &&
+          mountCovers(gate.path, route.path),
+      )
     return { routes, gates, pluginRoutes, gated }
   }
 
@@ -123,8 +140,18 @@ describe('compiled plugin mount coverage', () => {
   it('every route that runs a command is device-only', () => {
     const { routes } = table()
     const deviceGates = routes.filter((r) => r.handler === requireDevice)
-    const deviceOnly = (key: string) => routes.some((route) => `${route.method} ${route.path}` === key && route.handler !== requireDevice
-      && deviceGates.some((gate) => gate.index < route.index && (gate.method === 'ALL' || gate.method === route.method) && mountCovers(gate.path, route.path)))
+    const deviceOnly = (key: string) =>
+      routes.some(
+        (route) =>
+          `${route.method} ${route.path}` === key &&
+          route.handler !== requireDevice &&
+          deviceGates.some(
+            (gate) =>
+              gate.index < route.index &&
+              (gate.method === 'ALL' || gate.method === route.method) &&
+              mountCovers(gate.path, route.path),
+          ),
+      )
     expect(EXECUTION_ROUTES.filter((key) => !deviceOnly(key))).toEqual([])
   })
 

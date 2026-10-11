@@ -10,18 +10,20 @@ export type WorkflowPublicationSelection = {
   queries?: Record<string, { revision: number; parameters?: Record<string, DataValue> }>
   validation?: Record<string, { inputs?: Record<string, DataValue>; steps?: Record<string, DataValue> }>
 }
-export type WorkflowPublicationWrite = {
-  kind: 'workflow'
-  id: string
-  name: string
-  draftRevision: number
-  basePublishedRevision: number | null
-  revision: number
-  scope: QueryScope
-  def: WorkflowDef
-  digest: string
-  previousQueryIds?: string[]
-} | { kind: 'query'; id: string; name: string; scope: QueryScope; plan: QueryPublicationPlan }
+export type WorkflowPublicationWrite =
+  | {
+      kind: 'workflow'
+      id: string
+      name: string
+      draftRevision: number
+      basePublishedRevision: number | null
+      revision: number
+      scope: QueryScope
+      def: WorkflowDef
+      digest: string
+      previousQueryIds?: string[]
+    }
+  | { kind: 'query'; id: string; name: string; scope: QueryScope; plan: QueryPublicationPlan }
 export type WorkflowPublication = {
   id: string
   workspaceId: string

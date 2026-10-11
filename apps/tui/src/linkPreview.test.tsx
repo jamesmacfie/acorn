@@ -30,8 +30,13 @@ describe('link preview in the terminal', () => {
 
   it('draws the contributor that claims the site, and says whose it is', async () => {
     const contribution = extensionRegistry.register({
-      id: 'fixture:docs-preview', pluginId: 'fixture', point: CORE_LINK_PREVIEW_POINT, label: 'Docs',
-      order: 10, carrier: 'component', matches: ['https://docs.example.com/*'],
+      id: 'fixture:docs-preview',
+      pluginId: 'fixture',
+      point: CORE_LINK_PREVIEW_POINT,
+      label: 'Docs',
+      order: 10,
+      carrier: 'component',
+      matches: ['https://docs.example.com/*'],
       component: (props: { url: string }) => <Text>{`Summary of ${props.url}`}</Text>,
     })
     const screen = await renderFixture({ width: 100, height: 30 })

@@ -3,13 +3,14 @@ import { AGENT_MAP_INTERRUPTED } from '../../shared/agentMap'
 // coordinates step execution, child runs, and termination.
 import { eq, inArray } from 'drizzle-orm'
 import { claimWorkflowRecordRetry } from '../processing/retry'
-import { agentProfileRegistry, type Extension, type ExtensionPointId, type PluginDatabase } from '@acorn/plugin-api/node'
+import {
+  agentProfileRegistry,
+  type Extension,
+  type ExtensionPointId,
+  type PluginDatabase,
+} from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type {
-  WorkflowDef,
-  WorkflowRunRow,
-  WorkflowStepRow,
-} from '../../shared/workflowContracts'
+import type { WorkflowDef, WorkflowRunRow, WorkflowStepRow } from '../../shared/workflowContracts'
 import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../../shared/workflowContracts'
 import { stepKindContributionProblems } from '../../shared/stepKindAvailability'
 import { gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
@@ -18,11 +19,7 @@ import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../../contract/extensions'
 import { MAX_STEP_TURNS, buildBuiltinWorkflowContributions } from '../steps/builtins'
 import { WorkflowTreeSafety } from '../validation/treeSafety'
-import {
-  assertValidWorkflow,
-  workflowEdges,
-  type WorkflowValidationCatalog,
-} from '../validation/definition'
+import { assertValidWorkflow, workflowEdges, type WorkflowValidationCatalog } from '../validation/definition'
 import { WorkflowChildLifecycle } from '../dispatch/childLifecycle'
 import { persistWorkflowStart, type WorkflowStartOptions } from './start'
 import { WorkflowRunTermination } from './termination'
@@ -148,10 +145,11 @@ export class WorkflowRunner {
    *  host-minted `<pluginId>:<entryId>` for anything contributed. Resolved per call, never cached,
    *  because the plugin that fills the point may init after this one does. */
   #stepKind(kind: string): StepKindContribution | undefined {
-    if (kind === 'workflow') return { handler: this.#childLifecycle.handler(), describe: BUILTIN_STEP_DESCRIPTIONS.workflow }
-    if (kind === 'workflow-map') return { handler: this.#childLifecycle.mapHandler(), describe: BUILTIN_STEP_DESCRIPTIONS['workflow-map'] }
-    return this.#builtins.stepKinds.get(kind)
-      ?? this.#validContributedKinds().find((entry) => entry.id === kind)?.value
+    if (kind === 'workflow')
+      return { handler: this.#childLifecycle.handler(), describe: BUILTIN_STEP_DESCRIPTIONS.workflow }
+    if (kind === 'workflow-map')
+      return { handler: this.#childLifecycle.mapHandler(), describe: BUILTIN_STEP_DESCRIPTIONS['workflow-map'] }
+    return this.#builtins.stepKinds.get(kind) ?? this.#validContributedKinds().find((entry) => entry.id === kind)?.value
   }
 
   #validContributedKinds() {
@@ -174,8 +172,10 @@ export class WorkflowRunner {
   }
 
   #policy(policy: string): PolicyEvaluator | undefined {
-    return this.#builtins.policies.get(policy)
-      ?? this.#extensions.handlers(WORKFLOW_POLICY).find((entry) => entry.id === policy)?.value
+    return (
+      this.#builtins.policies.get(policy) ??
+      this.#extensions.handlers(WORKFLOW_POLICY).find((entry) => entry.id === policy)?.value
+    )
   }
 
   /** Every kind this node can run, with the description the editor draws from. Resolved per call for
@@ -191,7 +191,11 @@ export class WorkflowRunner {
           describe: BUILTIN_STEP_DESCRIPTIONS[id],
         },
       })),
-      ...this.#validContributedKinds().map((entry) => ({ id: entry.id, pluginId: entry.pluginId, contribution: entry.value })),
+      ...this.#validContributedKinds().map((entry) => ({
+        id: entry.id,
+        pluginId: entry.pluginId,
+        contribution: entry.value,
+      })),
     ]
   }
 
@@ -199,10 +203,23 @@ export class WorkflowRunner {
     const kinds = this.#kindEntries()
     return {
       stepKinds: new Set(kinds.map((kind) => kind.id)),
-      policies: new Set([...this.#builtins.policies.keys(), ...this.#extensions.handlers(WORKFLOW_POLICY).map((entry) => entry.id)]),
+      policies: new Set([
+        ...this.#builtins.policies.keys(),
+        ...this.#extensions.handlers(WORKFLOW_POLICY).map((entry) => entry.id),
+      ]),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
-      structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
-      managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.managedProvider).map((profile) => profile.id)),
+      structuredProfiles: new Set(
+        agentProfileRegistry
+          .list()
+          .filter((profile) => profile.aiArgv)
+          .map((profile) => profile.id),
+      ),
+      managedProfiles: new Set(
+        agentProfileRegistry
+          .list()
+          .filter((profile) => profile.managedProvider)
+          .map((profile) => profile.id),
+      ),
       // A contributed kind joins the agent kinds by saying so in its description, which is the only
       // place `isolation`, `inputs` and `configOptions` are ever allowed from.
       agentStepKinds: new Set(kinds.filter((kind) => kind.contribution.describe?.runsAgent).map((kind) => kind.id)),
@@ -214,7 +231,11 @@ export class WorkflowRunner {
   /** What the editor and the palette offer (docs/api-reference/workflow-routes.md § Runs). */
   catalog(): WorkflowCatalog {
     return {
-      kinds: this.#kindEntries().map(({ id, pluginId, contribution }) => ({ id, pluginId, describe: contribution.describe ?? null })),
+      kinds: this.#kindEntries().map(({ id, pluginId, contribution }) => ({
+        id,
+        pluginId,
+        describe: contribution.describe ?? null,
+      })),
       policies: [
         ...[...this.#builtins.policies.keys()].map((id) => ({ id, pluginId: null })),
         ...this.#extensions.handlers(WORKFLOW_POLICY).map((entry) => ({ id: entry.id, pluginId: entry.pluginId })),
@@ -269,10 +290,14 @@ export class WorkflowRunner {
     }
     const persist = () => persistWorkflowStart(this.db, taskId, def, opts)
     const { runId, created, deadlineAt, invocationParent } = this.deps.admitWork
-      ? await this.deps.admitWork(taskId, persist) : await persist()
+      ? await this.deps.admitWork(taskId, persist)
+      : await persist()
     if (!created) return runId
     this.#state.startRunSpan(runId, opts?.trigger ?? def.trigger ?? 'manual', def.steps.length)
-    if (!invocationParent || (deadlineAt != null && deadlineAt < (invocationParent.deadlineAt ?? Number.POSITIVE_INFINITY))) {
+    if (
+      !invocationParent ||
+      (deadlineAt != null && deadlineAt < (invocationParent.deadlineAt ?? Number.POSITIVE_INFINITY))
+    ) {
       this.armDeadline({ id: runId, deadlineAt })
     }
     // Announce only once the run and its complete step roster are readable.
@@ -303,10 +328,18 @@ export class WorkflowRunner {
     return this.#childLifecycle.summariesForStep(parentStepId)
   }
 
-  async resolveGate(runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue>): Promise<WorkflowGateResolution> {
+  async resolveGate(
+    runId: string,
+    stepId: string,
+    approved: boolean,
+    values?: Record<string, DataValue>,
+  ): Promise<WorkflowGateResolution> {
     const run = await this.run(runId)
     if (run?.deadlineAt != null && run.deadlineAt <= now()) {
-      await this.safetyRailRun(run.rootRunId ?? run.id, 'Safety rail: workflow deadline exhausted while waiting at a gate.')
+      await this.safetyRailRun(
+        run.rootRunId ?? run.id,
+        'Safety rail: workflow deadline exhausted while waiting at a gate.',
+      )
       return { outcome: 'resolved' }
     }
     const [step] = await this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
@@ -315,25 +348,39 @@ export class WorkflowRunner {
     const workflow = JSON.parse(run.defJson) as WorkflowDef
     const form = workflow.steps.find((candidate) => stepIdentity(candidate) === rowIdentity(workflow, step))?.form
     if (values !== undefined && (!approved || !form)) {
-      return { outcome: 'invalid', problems: { values: approved ? 'This gate has no form.' : 'A rejection carries no values.' } }
+      return {
+        outcome: 'invalid',
+        problems: { values: approved ? 'This gate has no form.' : 'A rejection carries no values.' },
+      }
     }
     if (!approved) {
-      if (!await this.#state.setStepIf(stepId, 'waiting-gate', { status: 'failed', error: 'Rejected at the human gate.' })) return { outcome: 'already-resolved' }
+      if (
+        !(await this.#state.setStepIf(stepId, 'waiting-gate', {
+          status: 'failed',
+          error: 'Rejected at the human gate.',
+        }))
+      )
+        return { outcome: 'already-resolved' }
       const currentRun = await this.run(runId)
       if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
       return { outcome: 'resolved' }
     }
     let structuredJson: string | undefined
     if (form) {
-      const proposal = (step.inputsJson ? (JSON.parse(step.inputsJson) as Partial<GateFormProposal>).form?.values : undefined) ?? {}
+      const proposal =
+        (step.inputsJson ? (JSON.parse(step.inputsJson) as Partial<GateFormProposal>).form?.values : undefined) ?? {}
       const answer = values ?? proposal
       const problems = gateFormProblems(form, answer)
       if (Object.keys(problems).length) return { outcome: 'invalid', problems }
       const output: GateFormOutput = { approved: true, values: answer, edited: gateFormEdited(form, proposal, answer) }
       structuredJson = JSON.stringify(output)
     }
-    const done = { status: 'done' as const, resultJson: JSON.stringify({ approved: true }), ...(structuredJson ? { structuredJson } : {}) }
-    if (!await this.#state.setStepIf(stepId, 'waiting-gate', done)) return { outcome: 'already-resolved' }
+    const done = {
+      status: 'done' as const,
+      resultJson: JSON.stringify({ approved: true }),
+      ...(structuredJson ? { structuredJson } : {}),
+    }
+    if (!(await this.#state.setStepIf(stepId, 'waiting-gate', done))) return { outcome: 'already-resolved' }
     await this.#state.setWaitingParentStatus(runId, 'running')
     void this.tick(runId)
     return { outcome: 'resolved' }
@@ -355,11 +402,17 @@ export class WorkflowRunner {
 
   async reconcile(): Promise<void> {
     await this.#treeSafety.recover()
-    const runs = await this.db.select().from(schema.workflowRuns).where(inArray(schema.workflowRuns.status, ['running', 'gated', 'cancelling']))
+    const runs = await this.db
+      .select()
+      .from(schema.workflowRuns)
+      .where(inArray(schema.workflowRuns.status, ['running', 'gated', 'cancelling']))
     const byId = new Map(runs.map((run) => [run.id, run]))
     for (const run of runs) {
       if (run.deadlineAt != null && run.deadlineAt <= now()) {
-        await this.safetyRailRun(run.rootRunId ?? run.id, 'Safety rail: workflow deadline exhausted before restart recovery.')
+        await this.safetyRailRun(
+          run.rootRunId ?? run.id,
+          'Safety rail: workflow deadline exhausted before restart recovery.',
+        )
         continue
       }
       const parent = run.parentRunId ? byId.get(run.parentRunId) : undefined
@@ -371,10 +424,14 @@ export class WorkflowRunner {
       } else if (run.status === 'running') {
         for (const step of await this.steps(run.id)) {
           if (run.trigger === 'agent-map' && step.status === 'running') {
-            if (step.agentSessionId) await this.deps.cancelAgentSession?.(run.taskId, step.agentSessionId).catch(() => undefined)
+            if (step.agentSessionId)
+              await this.deps.cancelAgentSession?.(run.taskId, step.agentSessionId).catch(() => undefined)
             await this.#state.setStep(step.id, { status: 'failed', error: AGENT_MAP_INTERRUPTED })
           } else if (step.status === 'running' || step.status === 'waiting-children') {
-            await this.#state.setStep(step.id, { status: 'pending', error: 'restarted: step re-queued after app restart' })
+            await this.#state.setStep(step.id, {
+              status: 'pending',
+              error: 'restarted: step re-queued after app restart',
+            })
           }
         }
         void this.tick(run.id)
@@ -382,7 +439,10 @@ export class WorkflowRunner {
         const waiting = (await this.steps(run.id)).filter((step) => step.status === 'waiting-children')
         if (!waiting.length) continue
         for (const step of waiting) {
-          await this.#state.setStep(step.id, { status: 'pending', error: 'restarted: child workflow wait restored after app restart' })
+          await this.#state.setStep(step.id, {
+            status: 'pending',
+            error: 'restarted: child workflow wait restored after app restart',
+          })
         }
         await this.#state.setRun(run.id, { status: 'running' })
         void this.tick(run.id)
@@ -407,8 +467,12 @@ export class WorkflowRunner {
       const steps = (await this.steps(runId)).filter((step) => step.parentStepId == null)
       // A persisted failed/safety-rail step with the run still 'running' means the app died
       // between the step write and finishRun. Complete the halt instead of advancing past it.
-      const admissionRails = steps.filter(step => step.status === 'safety-rail' && step.resultJson === '{"admissionStopped":true}')
-      const halted = steps.find((step) => step.status === 'failed' || (step.status === 'safety-rail' && !admissionRails.includes(step)))
+      const admissionRails = steps.filter(
+        (step) => step.status === 'safety-rail' && step.resultJson === '{"admissionStopped":true}',
+      )
+      const halted = steps.find(
+        (step) => step.status === 'failed' || (step.status === 'safety-rail' && !admissionRails.includes(step)),
+      )
       if (halted) {
         const reason = halted.error ?? `Step '${halted.name}' failed.`
         if (halted.status === 'safety-rail') {
@@ -419,30 +483,49 @@ export class WorkflowRunner {
       // A skipped predecessor counts as done: that is how a branch is not taken, and the step after
       // the decision still has to run.
       const edges = workflowEdges(def.steps)
-      const blocked = unreachableSteps(def, new Set(admissionRails.map(step => rowIdentity(def, step))))
+      const blocked = unreachableSteps(def, new Set(admissionRails.map((step) => rowIdentity(def, step))))
       for (const step of steps) {
         if (step.status === 'pending' && blocked.has(rowIdentity(def, step))) {
           await this.#state.setStep(step.id, { status: 'skipped' })
           step.status = 'skipped'
         }
       }
-      const settled = new Set(steps.filter((step) => ['done', 'completed-with-failures', 'skipped'].includes(step.status)).map((step) => rowIdentity(def, step)))
-      const ready = steps.filter((step) =>
-        step.status === 'pending'
-        && !this.#startingSteps.has(step.id)
-        && (edges.get(rowIdentity(def, step)) ?? []).every((name) => settled.has(name)))
+      const settled = new Set(
+        steps
+          .filter((step) => ['done', 'completed-with-failures', 'skipped'].includes(step.status))
+          .map((step) => rowIdentity(def, step)),
+      )
+      const ready = steps.filter(
+        (step) =>
+          step.status === 'pending' &&
+          !this.#startingSteps.has(step.id) &&
+          (edges.get(rowIdentity(def, step)) ?? []).every((name) => settled.has(name)),
+      )
       if (!ready.length) {
-        const busy = steps.some((step) => ['running', 'waiting-gate', 'waiting-children'].includes(step.status) || this.#startingSteps.has(step.id))
+        const busy = steps.some(
+          (step) =>
+            ['running', 'waiting-gate', 'waiting-children'].includes(step.status) || this.#startingSteps.has(step.id),
+        )
         if (!busy) {
           if (admissionRails.length) {
-            await this.finishRun(run, 'safety-rail', admissionRails[0]!.error ?? 'Child admission stopped at the descendant limit.')
+            await this.finishRun(
+              run,
+              'safety-rail',
+              admissionRails[0]!.error ?? 'Child admission stopped at the descendant limit.',
+            )
             return
           }
           try {
             workflowOutputs(def, steps)
-            const failures = steps.filter(step => step.status === 'completed-with-failures')
-            await this.finishRun(run, failures.length ? 'completed-with-failures' : 'done', failures.length ? 'Independent work completed with child failures.' : undefined)
-          } catch (error) { await this.finishRun(run, 'failed', String(error)) }
+            const failures = steps.filter((step) => step.status === 'completed-with-failures')
+            await this.finishRun(
+              run,
+              failures.length ? 'completed-with-failures' : 'done',
+              failures.length ? 'Independent work completed with child failures.' : undefined,
+            )
+          } catch (error) {
+            await this.finishRun(run, 'failed', String(error))
+          }
         }
         return
       }
@@ -456,9 +539,13 @@ export class WorkflowRunner {
         // Claimed here rather than by the row's status, so a tick that lands while `execute` is still
         // rendering its prompt does not start the same step twice.
         this.#startingSteps.add(step.id)
-        const execution = this.#execution.execute(run, step, stepDef, def, steps, edges)
+        const execution = this.#execution
+          .execute(run, step, stepDef, def, steps, edges)
           .catch(async (error) => {
-            await this.#state.setStep(step.id, { status: 'failed', error: error instanceof Error ? error.message : 'Step failed.' })
+            await this.#state.setStep(step.id, {
+              status: 'failed',
+              error: error instanceof Error ? error.message : 'Step failed.',
+            })
           })
           .finally(() => {
             this.#startingSteps.delete(step.id)
@@ -476,9 +563,10 @@ export class WorkflowRunner {
    *  (docs/workflows/execution.md § Execution model). A device action: an agent may not retry its own run. */
   async retryStep(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }> {
     const existing = await this.run(runId)
-    const result = existing && this.deps.admitWork
-      ? await this.deps.admitWork(existing.taskId, () => this.retryStepAdmitted(runId, stepId, prompt))
-      : await this.retryStepAdmitted(runId, stepId, prompt)
+    const result =
+      existing && this.deps.admitWork
+        ? await this.deps.admitWork(existing.taskId, () => this.retryStepAdmitted(runId, stepId, prompt))
+        : await this.retryStepAdmitted(runId, stepId, prompt)
     if (result.ok) {
       const run = await this.run(runId)
       if (run) {
@@ -495,21 +583,40 @@ export class WorkflowRunner {
     return result
   }
 
-  private async retryStepAdmitted(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }> {
+  private async retryStepAdmitted(
+    runId: string,
+    stepId: string,
+    prompt?: string,
+  ): Promise<{ ok: boolean; error?: string }> {
     const run = await this.run(runId)
     if (!run) return { ok: false, error: 'No such run.' }
-    if (!['failed', 'safety-rail', 'completed-with-failures'].includes(run.status)) return { ok: false, error: `A ${run.status} run cannot be retried.` }
+    if (!['failed', 'safety-rail', 'completed-with-failures'].includes(run.status))
+      return { ok: false, error: `A ${run.status} run cannot be retried.` }
     if (run.trigger === 'agent-map') {
-      const active = await this.db.select({ id: schema.workflowRuns.id, trigger: schema.workflowRuns.trigger, status: schema.workflowRuns.status }).from(schema.workflowRuns)
+      const active = await this.db
+        .select({
+          id: schema.workflowRuns.id,
+          trigger: schema.workflowRuns.trigger,
+          status: schema.workflowRuns.status,
+        })
+        .from(schema.workflowRuns)
         .where(eq(schema.workflowRuns.taskId, run.taskId))
-      if (active.some(candidate => candidate.id !== run.id && candidate.trigger === 'agent-map' && ['running', 'gated', 'cancelling'].includes(candidate.status))) {
+      if (
+        active.some(
+          (candidate) =>
+            candidate.id !== run.id &&
+            candidate.trigger === 'agent-map' &&
+            ['running', 'gated', 'cancelling'].includes(candidate.status),
+        )
+      ) {
         return { ok: false, error: 'Another item is using this task’s folder. Retry after it finishes.' }
       }
     }
     const rows = (await this.steps(runId)).filter((row) => row.parentStepId == null)
     const step = rows.find((row) => row.id === stepId)
     if (!step) return { ok: false, error: 'No such step in this run.' }
-    if (step.status !== 'failed' && step.status !== 'safety-rail') return { ok: false, error: `Select a failed child step to retry; this step is ${step.status}.` }
+    if (step.status !== 'failed' && step.status !== 'safety-rail')
+      return { ok: false, error: `Select a failed child step to retry; this step is ${step.status}.` }
 
     const ancestors: WorkflowRunRow[] = []
     let parent = run.parentRunId ? await this.run(run.parentRunId) : undefined
@@ -520,20 +627,23 @@ export class WorkflowRunner {
       ancestors.push(parent)
       parent = parent.parentRunId ? await this.run(parent.parentRunId) : undefined
     }
-    if ([run, ...ancestors].some(owner => owner.deadlineAt != null && owner.deadlineAt <= now())) {
+    if ([run, ...ancestors].some((owner) => owner.deadlineAt != null && owner.deadlineAt <= now())) {
       return { ok: false, error: 'The original workflow deadline has expired. Start a fresh run.' }
     }
 
     const workflow = JSON.parse(run.defJson) as WorkflowDef
     const def = workflow.steps.find((candidate) => stepIdentity(candidate) === rowIdentity(workflow, step))
-    try { claimWorkflowRecordRetry(this.db, runId) }
-    catch (error) { return { ok: false, error: error instanceof Error ? error.message : 'Record retry is unavailable' } }
+    try {
+      claimWorkflowRecordRetry(this.db, runId)
+    } catch (error) {
+      return { ok: false, error: error instanceof Error ? error.message : 'Record retry is unavailable' }
+    }
     let inputsJson = step.inputsJson
     if (prompt && def && (this.#stepKind(def.kind ?? 'agent')?.describe?.runsAgent ?? false)) {
       // The frozen definition is patched for this step alone, so the run still shows what was asked.
       const previous = (() => {
         try {
-          return step.inputsJson ? JSON.parse(step.inputsJson) as Record<string, unknown> : {}
+          return step.inputsJson ? (JSON.parse(step.inputsJson) as Record<string, unknown>) : {}
         } catch {
           return {}
         }
@@ -545,16 +655,24 @@ export class WorkflowRunner {
       })
       const patched: WorkflowDef = {
         ...workflow,
-        steps: workflow.steps.map((candidate) => stepIdentity(candidate) === rowIdentity(workflow, step) ? { ...candidate, prompt } : candidate),
+        steps: workflow.steps.map((candidate) =>
+          stepIdentity(candidate) === rowIdentity(workflow, step) ? { ...candidate, prompt } : candidate,
+        ),
       }
       await this.#state.setRun(runId, { defJson: JSON.stringify(patched) })
     }
     await this.#state.setStep(stepId, { status: 'pending', error: null, inputsJson })
     // Everything the skip only reached through this step comes back with it. A done step stays done.
-    const stillSkipped = new Set(rows.filter((row) => row.status === 'skipped' && row.id !== stepId).map((row) => rowIdentity(workflow, row)))
+    const stillSkipped = new Set(
+      rows.filter((row) => row.status === 'skipped' && row.id !== stepId).map((row) => rowIdentity(workflow, row)),
+    )
     const revived = unreachableSteps(workflow, new Set([rowIdentity(workflow, step)]))
     for (const row of rows) {
-      if (row.status === 'skipped' && revived.has(rowIdentity(workflow, row)) && stillSkipped.has(rowIdentity(workflow, row))) {
+      if (
+        row.status === 'skipped' &&
+        revived.has(rowIdentity(workflow, row)) &&
+        stillSkipped.has(rowIdentity(workflow, row))
+      ) {
         await this.#state.setStep(row.id, { status: 'pending', error: null })
       }
     }
@@ -585,12 +703,15 @@ export class WorkflowRunner {
     this.#deadlineTimers.delete(run.id)
     await this.#state.setRun(run.id, { status, error: error ?? null })
     this.#state.finishRunSpan(run.id, status)
-    await this.#execution.queueHandoff(() => this.deps.finishHandoffs?.(run.taskId, run.id) ?? Promise.resolve()).catch(() => undefined)
+    await this.#execution
+      .queueHandoff(() => this.deps.finishHandoffs?.(run.taskId, run.id) ?? Promise.resolve())
+      .catch(() => undefined)
     await this.deps.onRunTerminal?.(run.taskId, run.id).catch(() => undefined)
     const ref = { runId: run.id, ...(stepId ? { stepId } : {}) }
     if (status === 'done') this.deps.notify(run.taskId, 'run-done', `${run.name} finished`, ref)
     if (status === 'failed') this.deps.notify(run.taskId, 'run-failed', `${run.name} failed`, ref)
-    if (status === 'completed-with-failures') this.deps.notify(run.taskId, 'run-failed', `${run.name} finished with failures`, ref)
+    if (status === 'completed-with-failures')
+      this.deps.notify(run.taskId, 'run-failed', `${run.name} finished with failures`, ref)
     if (status === 'safety-rail') this.deps.notify(run.taskId, 'run-failed', `${run.name} stopped at a limit`, ref)
   }
 
@@ -598,10 +719,13 @@ export class WorkflowRunner {
     const previous = this.#deadlineTimers.get(run.id)
     if (previous) clearTimeout(previous)
     if (run.deadlineAt == null || this.#stopping) return
-    const timer = setTimeout(() => {
-      this.#deadlineTimers.delete(run.id)
-      void this.safetyRailRun(run.id, 'Safety rail: workflow deadline exhausted.')
-    }, Math.max(0, run.deadlineAt - now()))
+    const timer = setTimeout(
+      () => {
+        this.#deadlineTimers.delete(run.id)
+        void this.safetyRailRun(run.id, 'Safety rail: workflow deadline exhausted.')
+      },
+      Math.max(0, run.deadlineAt - now()),
+    )
     this.#deadlineTimers.set(run.id, timer)
   }
 

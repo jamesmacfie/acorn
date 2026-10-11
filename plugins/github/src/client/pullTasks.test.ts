@@ -13,13 +13,16 @@ const requests = vi.hoisted(() => ({
   creates: 0,
 }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
   readJson: async (route: string) => {
     requests.routes.push(route)
     if (!requests.responses.has(route)) throw new Error(`No test response for ${route}`)
     return requests.responses.get(route)
   },
-  createTask: async () => { requests.creates++; throw new Error('Unexpected task creation') },
+  createTask: async () => {
+    requests.creates++
+    throw new Error('Unexpected task creation')
+  },
 }))
 
 afterEach(() => {
@@ -48,11 +51,13 @@ const task = (overrides: Partial<Task> = {}): Task => ({
 describe('pull task promotion', () => {
   it('recognises any active task whose primary is the pull', () => {
     const existing = task()
-    expect(activeTaskForPull([
-      task({ id: 'archived', status: 'archived' }),
-      task({ id: 'other-project', projectId: 'project-2' }),
-      existing,
-    ], 'project-1', 42)).toBe(existing)
+    expect(
+      activeTaskForPull(
+        [task({ id: 'archived', status: 'archived' }), task({ id: 'other-project', projectId: 'project-2' }), existing],
+        'project-1',
+        42,
+      ),
+    ).toBe(existing)
   })
 
   it('returns a cached task instead of creating a duplicate', async () => {
@@ -60,15 +65,27 @@ describe('pull task promotion', () => {
     const existing = task()
     queryClient.setQueryData(tasksKey, [existing])
 
-    await expect(promotePullToTask(queryClient, {
-      owner: 'acme', repo: 'widget', number: '42', projectId: 'project-1', headRef: 'feature',
-    })).resolves.toBe(existing)
+    await expect(
+      promotePullToTask(queryClient, {
+        owner: 'acme',
+        repo: 'widget',
+        number: '42',
+        projectId: 'project-1',
+        headRef: 'feature',
+      }),
+    ).resolves.toBe(existing)
   })
 
   it('requires a head branch', async () => {
-    await expect(promotePullToTask(new QueryClient(), {
-      owner: 'acme', repo: 'widget', number: '42', projectId: 'project-1', headRef: ' ',
-    })).rejects.toThrow(/head branch/)
+    await expect(
+      promotePullToTask(new QueryClient(), {
+        owner: 'acme',
+        repo: 'widget',
+        number: '42',
+        projectId: 'project-1',
+        headRef: ' ',
+      }),
+    ).rejects.toThrow(/head branch/)
   })
 })
 
@@ -110,8 +127,9 @@ describe('attributing a pull request reference to a Linear connection', () => {
       { integrationId: 'work', externalId: 'lin-a' },
       { integrationId: 'unmapped-elsewhere', externalId: 'lin-b' },
     ])
-    await expect(linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')]))
-      .resolves.toBe('work')
+    await expect(linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')])).resolves.toBe(
+      'work',
+    )
   })
 
   it('counts a link that names this project as well as one that names the whole workspace', async () => {
@@ -119,8 +137,9 @@ describe('attributing a pull request reference to a Linear connection', () => {
       { integrationId: 'work', externalId: 'lin-a', projectId: 'project-1' },
       { integrationId: 'side', externalId: 'lin-b', projectId: 'project-2' },
     ])
-    await expect(linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')]))
-      .resolves.toBe('work')
+    await expect(linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')])).resolves.toBe(
+      'work',
+    )
   })
 
   it('refuses to guess when the repo follows both Linears', async () => {
@@ -128,24 +147,44 @@ describe('attributing a pull request reference to a Linear connection', () => {
       { integrationId: 'work', externalId: 'lin-a' },
       { integrationId: 'side', externalId: 'lin-b' },
     ])
-    await expect(linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')]))
-      .resolves.toBeNull()
+    await expect(
+      linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')]),
+    ).resolves.toBeNull()
   })
 
   it('refuses to guess when the repo follows neither', async () => {
     const queryClient = clientWith([])
-    await expect(linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')]))
-      .resolves.toBeNull()
+    await expect(
+      linearConnectionForProject(queryClient, 'project-1', [linear('work'), linear('side')]),
+    ).resolves.toBeNull()
   })
 })
 
 describe('the GitHub source promotion for an Acorn link', () => {
   const target = { kind: 'pr', owner: 'acme', repo: 'widget', number: '42', item: 'acme/widget#42' }
   const detail: PullDetail = {
-    pull: { number: 42, title: 'Fix deploy', state: 'open', draft: false, author: 'james',
-      headRef: 'feature/deploy', baseRef: 'main', updatedAt: 0, mergeable: null,
-      mergeStateStatus: null, autoMergeEnabled: false, body: 'Fixes https://linear.app/acme/issue/ENG-42/fix-deploy', headSha: 'abc' },
-    labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [],
+    pull: {
+      number: 42,
+      title: 'Fix deploy',
+      state: 'open',
+      draft: false,
+      author: 'james',
+      headRef: 'feature/deploy',
+      baseRef: 'main',
+      updatedAt: 0,
+      mergeable: null,
+      mergeStateStatus: null,
+      autoMergeEnabled: false,
+      body: 'Fixes https://linear.app/acme/issue/ENG-42/fix-deploy',
+      headSha: 'abc',
+    },
+    labels: [],
+    reviews: [],
+    requestedReviewers: [],
+    comments: [],
+    commits: [],
+    checks: [],
+    threads: [],
   }
 
   it('finds an active task by project and pull number before reading PR detail', async () => {
@@ -160,28 +199,47 @@ describe('the GitHub source promotion for an Acorn link', () => {
     requests.responses.set(pullRoute('acme', 'widget', '42'), detail)
     requests.responses.set(integrationsRoute, { integrations: [linear('work'), linear('side')] })
     requests.responses.set(projectsRoute, { projects: [{ id: 'project-1', workspaceId: 'ws-1' }] })
-    requests.responses.set(workspaceExternalProjectsRoute('ws-1'), { projects: [
-      { integrationId: 'work', externalId: 'linear-work', projectId: 'project-1' },
-      { integrationId: 'side', externalId: 'linear-side', projectId: 'elsewhere' },
-    ] })
+    requests.responses.set(workspaceExternalProjectsRoute('ws-1'), {
+      projects: [
+        { integrationId: 'work', externalId: 'linear-work', projectId: 'project-1' },
+        { integrationId: 'side', externalId: 'linear-side', projectId: 'elsewhere' },
+      ],
+    })
     const recogniser = contentLinkRegistry.register({
-      id: 'linear.test.issue', providerId: 'linear',
-      parse: (url) => url.startsWith('https://linear.app/acme/issue/ENG-42')
-        ? { kind: 'linear.issue', item: 'ENG-42' } : null,
+      id: 'linear.test.issue',
+      providerId: 'linear',
+      parse: (url) =>
+        url.startsWith('https://linear.app/acme/issue/ENG-42') ? { kind: 'linear.issue', item: 'ENG-42' } : null,
     })
     try {
       const pull = await githubPullPromotion.fromContentLink?.(target, 'project-1')
       expect(pull).toMatchObject({ title: 'Fix deploy', headRef: 'feature/deploy' })
       const seed = await githubPullPromotion.prepare(pull!, {
-        projectId: 'project-1', owner: 'acme', repo: 'widget', branch: '',
+        projectId: 'project-1',
+        owner: 'acme',
+        repo: 'widget',
+        branch: '',
       })
-      expect(seed).toMatchObject({ title: 'Fix deploy', branch: 'feature/deploy', pullNumber: 42,
-        links: [{ connectionId: 'work', identifier: 'ENG-42', ref: {
-          displayId: 'ENG-42', url: 'https://linear.app/acme/issue/ENG-42/fix-deploy',
-        } }],
+      expect(seed).toMatchObject({
+        title: 'Fix deploy',
+        branch: 'feature/deploy',
+        pullNumber: 42,
+        links: [
+          {
+            connectionId: 'work',
+            identifier: 'ENG-42',
+            ref: {
+              displayId: 'ENG-42',
+              url: 'https://linear.app/acme/issue/ENG-42/fix-deploy',
+            },
+          },
+        ],
       })
       expect(requests.routes).toEqual([
-        pullRoute('acme', 'widget', '42'), integrationsRoute, projectsRoute, workspaceExternalProjectsRoute('ws-1'),
+        pullRoute('acme', 'widget', '42'),
+        integrationsRoute,
+        projectsRoute,
+        workspaceExternalProjectsRoute('ws-1'),
       ])
       expect(requests.creates).toBe(0)
     } finally {

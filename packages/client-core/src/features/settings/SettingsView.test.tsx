@@ -24,7 +24,13 @@ vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { key: string }) => ({
     get data() {
       const key = options().key
-      return key === 'workspaces' ? mocks.workspaces() : key === 'projects' ? mocks.projects : key === 'integrations' ? mocks.integrations : undefined
+      return key === 'workspaces'
+        ? mocks.workspaces()
+        : key === 'projects'
+          ? mocks.projects
+          : key === 'integrations'
+            ? mocks.integrations
+            : undefined
     },
     isLoading: false,
   }),
@@ -45,12 +51,15 @@ vi.mock('../../infra/node/fleet', () => ({
   ORIGIN_NODE_ID: 'origin',
 }))
 vi.mock('../../infra/node/hostCapabilities', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../infra/node/hostCapabilities')>(),
+  ...(await importOriginal<typeof import('../../infra/node/hostCapabilities')>()),
   pluginRosterKnown: () => mocks.rosterKnown(),
   activePluginNodeStale: () => mocks.stale(),
-  hasHostCapability: (requirement: unknown) => (requirement as { plugin?: string } | undefined)?.plugin === 'fixture' ? mocks.capable() : true,
+  hasHostCapability: (requirement: unknown) =>
+    (requirement as { plugin?: string } | undefined)?.plugin === 'fixture' ? mocks.capable() : true,
 }))
-vi.mock('../notifications/attentionInbox', () => ({ createAttentionInbox: () => () => ({ rows: mocks.attention, unavailable: [] }) }))
+vi.mock('../notifications/attentionInbox', () => ({
+  createAttentionInbox: () => () => ({ rows: mocks.attention, unavailable: [] }),
+}))
 
 import SettingsView, { type SettingsRequest } from './SettingsView'
 import { WillConfirmationHost } from '../../host/registries/shell/willPhase'
@@ -65,7 +74,11 @@ import { takeConnectionRequest } from './connections/connections'
 import { CORE_SETTINGS_PAGES } from './corePages'
 
 const page = (id: string, extra: Partial<SettingsContribution> = {}): SettingsContribution => ({
-  id, label: id, order: 10, component: () => <p data-page={id}>{id} body</p>, ...extra,
+  id,
+  label: id,
+  order: 10,
+  component: () => <p data-page={id}>{id} body</p>,
+  ...extra,
 })
 
 let host: HTMLElement
@@ -75,12 +88,20 @@ const held: Disposable[] = []
 let closed = 0
 const open = (request: SettingsRequest = {}) => {
   dispose?.()
-  dispose = render(() => (
-    <>
-      <SettingsView request={request} onClose={() => { closed += 1 }} />
-      <WillConfirmationHost />
-    </>
-  ), host)
+  dispose = render(
+    () => (
+      <>
+        <SettingsView
+          request={request}
+          onClose={() => {
+            closed += 1
+          }}
+        />
+        <WillConfirmationHost />
+      </>
+    ),
+    host,
+  )
 }
 const search = (text: string) => {
   const field = host.querySelector<HTMLInputElement>('input[type="search"]')!
@@ -89,8 +110,15 @@ const search = (text: string) => {
   return field
 }
 // A result's page step and its name, read as one line: "Terminal › Text".
-const results = () => [...host.querySelectorAll('.settings-rail-result')].map((item) =>
-  [item.querySelector('.settings-rail-result-page')?.textContent, item.querySelector('.settings-rail-label')?.textContent].filter(Boolean).join(' '))
+const results = () =>
+  [...host.querySelectorAll('.settings-rail-result')].map((item) =>
+    [
+      item.querySelector('.settings-rail-result-page')?.textContent,
+      item.querySelector('.settings-rail-label')?.textContent,
+    ]
+      .filter(Boolean)
+      .join(' '),
+  )
 const title = () => host.querySelector('.settings-title')?.textContent
 const railItem = (label: string) =>
   [...host.querySelectorAll<HTMLButtonElement>('.settings-rail-item')].find((item) => item.textContent === label)
@@ -105,17 +133,26 @@ beforeEach(() => {
   mocks.rosterKnown = () => true
   mocks.stale = () => false
   mocks.capable = () => true
-  mocks.nodes = [{ nodeId: 'node-a', label: 'Laptop' }, { nodeId: 'node-b', label: 'Build box' }]
+  mocks.nodes = [
+    { nodeId: 'node-a', label: 'Laptop' },
+    { nodeId: 'node-b', label: 'Build box' },
+  ]
   setActiveNode('node-a')
   host = document.createElement('div')
   document.body.append(host)
   held.push(
     settingsRegistry.register(page('appearance', { label: 'Appearance', category: 'general', scope: 'device' })),
-    settingsRegistry.register(page('shortcuts', { label: 'Keyboard shortcuts', category: 'general', scope: 'device', order: 30 })),
-    settingsRegistry.register(page('plugins', {
-      label: 'Plugins', category: 'plugins', followsNodeSwitcher: true,
-      component: (props) => <p data-page="plugins">reads {props.context.scope.nodeId}</p>,
-    })),
+    settingsRegistry.register(
+      page('shortcuts', { label: 'Keyboard shortcuts', category: 'general', scope: 'device', order: 30 }),
+    ),
+    settingsRegistry.register(
+      page('plugins', {
+        label: 'Plugins',
+        category: 'plugins',
+        followsNodeSwitcher: true,
+        component: (props) => <p data-page="plugins">reads {props.context.scope.nodeId}</p>,
+      }),
+    ),
     // What a loaded plugin's settings frame registers when its manifest names none of the new fields.
     settingsRegistry.register(page('board-settings', { label: 'Board', group: 'general', requires: undefined })),
   )
@@ -146,7 +183,7 @@ describe('SettingsView', () => {
     expect(document.activeElement?.textContent).toBe('Keyboard shortcuts')
   })
 
-  it('points a page at the switched node without moving the window\'s active node', () => {
+  it("points a page at the switched node without moving the window's active node", () => {
     open({ target: 'plugins' })
     expect(host.querySelector('[data-page="plugins"]')?.textContent).toBe('reads node-a')
     const native = host.querySelector<HTMLSelectElement>('.settings-header select')!
@@ -213,10 +250,18 @@ describe('SettingsView', () => {
     mocks.stale = stale
     mocks.capable = capable
     let mounts = 0
-    held.push(settingsRegistry.register(page('fixture-settings', {
-      label: 'Fixture', requires: { plugin: 'fixture' },
-      component: () => { mounts++; return <input aria-label="Installer draft" value="kept" /> },
-    })))
+    held.push(
+      settingsRegistry.register(
+        page('fixture-settings', {
+          label: 'Fixture',
+          requires: { plugin: 'fixture' },
+          component: () => {
+            mounts++
+            return <input aria-label="Installer draft" value="kept" />
+          },
+        }),
+      ),
+    )
     open({ target: 'fixture-settings' })
     const field = host.querySelector<HTMLInputElement>('input[aria-label="Installer draft"]')!
     field.value = 'staged package'
@@ -229,22 +274,32 @@ describe('SettingsView', () => {
     expect(title()).toBe('Appearance')
   })
 
-  it('lists the node\'s workspaces after Overview and draws the workspace page for one', () => {
+  it("lists the node's workspaces after Overview and draws the workspace page for one", () => {
     const [workspaces, setWorkspaces] = createSignal<TestWorkspace[]>([{ id: 'ws-1', name: 'Runn', projects: [] }])
     mocks.workspaces = workspaces
     held.push(
       settingsRegistry.register(page('workspaces', { label: 'Overview', category: 'workspaces' })),
-      settingsRegistry.register(page('workspace.detail', {
-        label: 'Workspace', category: 'workspaces', scope: 'workspace', order: 20,
-        component: (props) => <p data-page="workspace">{props.context.scope.workspace?.name}</p>,
-      })),
+      settingsRegistry.register(
+        page('workspace.detail', {
+          label: 'Workspace',
+          category: 'workspaces',
+          scope: 'workspace',
+          order: 20,
+          component: (props) => <p data-page="workspace">{props.context.scope.workspace?.name}</p>,
+        }),
+      ),
     )
     open({ target: 'workspaces' })
-    const rows = [...host.querySelectorAll('[aria-label="Workspaces and projects"] .settings-rail-item')].map((item) => item.textContent)
+    const rows = [...host.querySelectorAll('[aria-label="Workspaces and projects"] .settings-rail-item')].map(
+      (item) => item.textContent,
+    )
     expect(rows).toEqual(['Overview', 'Runn'])
     railItem('Runn')!.click()
     expect(host.querySelector('[data-page="workspace"]')?.textContent).toBe('Runn')
-    expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual(['Workspace', 'Node: Laptop'])
+    expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual([
+      'Workspace',
+      'Node: Laptop',
+    ])
     // A refetch hands back new objects. The row keeps its button, and with it the focus.
     railItem('Runn')!.focus()
     setWorkspaces([{ id: 'ws-1', name: 'Runn', projects: [] }])
@@ -252,22 +307,34 @@ describe('SettingsView', () => {
     mocks.workspaces = () => []
   })
 
-  it('shows a workspace\'s projects only while it is expanded, deep-links a project, and goes back with ⌘[', () => {
+  it("shows a workspace's projects only while it is expanded, deep-links a project, and goes back with ⌘[", () => {
     mocks.workspaces = () => [{ id: 'ws-1', name: 'Runn', projects: [] }]
     mocks.projects = [{ id: 'p-1', name: 'acorn', workspaceId: 'ws-1' }]
     held.push(
       settingsRegistry.register(page('workspaces', { label: 'Overview', category: 'workspaces' })),
-      settingsRegistry.register(page('workspace.detail', { label: 'Workspace', category: 'workspaces', scope: 'workspace', order: 20 })),
-      settingsRegistry.register(page('project.detail', {
-        label: 'Project', category: 'workspaces', scope: 'project', order: 30,
-        component: (props) => <p data-page="project">{props.context.scope.project?.name} in {props.context.scope.workspace?.name}</p>,
-      })),
+      settingsRegistry.register(
+        page('workspace.detail', { label: 'Workspace', category: 'workspaces', scope: 'workspace', order: 20 }),
+      ),
+      settingsRegistry.register(
+        page('project.detail', {
+          label: 'Project',
+          category: 'workspaces',
+          scope: 'project',
+          order: 30,
+          component: (props) => (
+            <p data-page="project">
+              {props.context.scope.project?.name} in {props.context.scope.workspace?.name}
+            </p>
+          ),
+        }),
+      ),
     )
     // A workspace with projects reads as its name and whether it is open: "Runn (closed)".
-    const railRows = () => [...host.querySelectorAll('[aria-label="Workspaces and projects"] .settings-rail-item')].map((item) => {
-      const expanded = item.getAttribute('aria-expanded')
-      return expanded === null ? item.textContent : `${item.textContent} (${expanded === 'true' ? 'open' : 'closed'})`
-    })
+    const railRows = () =>
+      [...host.querySelectorAll('[aria-label="Workspaces and projects"] .settings-rail-item')].map((item) => {
+        const expanded = item.getAttribute('aria-expanded')
+        return expanded === null ? item.textContent : `${item.textContent} (${expanded === 'true' ? 'open' : 'closed'})`
+      })
     open({ target: 'workspaces' })
     expect(railRows()).toEqual(['Overview', 'Runn (closed)'])
     railItem('Runn')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
@@ -276,13 +343,27 @@ describe('SettingsView', () => {
     open({ target: 'settings/project/p-1' })
     expect(host.querySelector('[data-page="project"]')?.textContent).toBe('acorn in Runn')
     expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('Workspaces and projects › Runn')
-    expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual(['Project', 'Node: Laptop'])
+    expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual([
+      'Project',
+      'Node: Laptop',
+    ])
     // The workspace in the path is the way back, and its tip names the chord.
-    const crumb = [...host.querySelectorAll<HTMLElement>('.settings-crumb')].find((item) => item.textContent === 'Runn')!
+    const crumb = [...host.querySelectorAll<HTMLElement>('.settings-crumb')].find(
+      (item) => item.textContent === 'Runn',
+    )!
     expect(crumb.dataset.tipKey).toBe('⌘[')
     // Opening a project expands its workspace, and its list is the workspace's page.
     expect(railRows()).toEqual(['Overview', 'Runn (open)', 'acorn'])
-    const back = () => host.querySelector('.settings-view')!.dispatchEvent(new KeyboardEvent('keydown', { key: '[', code: 'BracketLeft', metaKey: true, bubbles: true, cancelable: true }))
+    const back = () =>
+      host.querySelector('.settings-view')!.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: '[',
+          code: 'BracketLeft',
+          metaKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
     back()
     expect(title()).toBe('Runn')
     back()
@@ -297,11 +378,15 @@ describe('SettingsView', () => {
     mocks.projects = [{ id: 'p-1', name: 'acorn', workspaceId: 'ws-1' }]
     held.push(
       settingsRegistry.register(page('workspaces', { label: 'Overview', category: 'workspaces' })),
-      settingsRegistry.register(page('workspace.detail', { label: 'Workspace', category: 'workspaces', scope: 'workspace' })),
+      settingsRegistry.register(
+        page('workspace.detail', { label: 'Workspace', category: 'workspaces', scope: 'workspace' }),
+      ),
       settingsRegistry.register(page('project.detail', { label: 'Project', category: 'workspaces', scope: 'project' })),
     )
     open({ target: 'workspaces' })
-    const rows = [...host.querySelectorAll('[aria-label="Projects"] .settings-rail-item')].map((item) => item.textContent)
+    const rows = [...host.querySelectorAll('[aria-label="Projects"] .settings-rail-item')].map(
+      (item) => item.textContent,
+    )
     expect(rows).toEqual(['Overview', 'acorn'])
     railItem('acorn')!.click()
     expect(host.querySelector('.settings-breadcrumb')?.textContent).not.toContain('Runn')
@@ -322,20 +407,30 @@ describe('SettingsView', () => {
 
   it('ranks page names, then section names, then row labels, then keywords, and lands on the section', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    held.push(settingsRegistry.register(page('terminal', {
-      label: 'Terminal', category: 'features', scope: 'device',
-      keywords: ['drawer'],
-      sections: [
-        { id: 'drawer', label: 'Drawer defaults', rows: ['Open on click'] },
-        { id: 'text', label: 'Text', rows: ['Drawer text size'], keywords: ['font'] },
-      ],
-      component: () => (
-        <>
-          <SettingsSection id="drawer" label="Drawer defaults"><p>rows</p></SettingsSection>
-          <SettingsSection id="text" label="Text"><p>rows</p></SettingsSection>
-        </>
+    held.push(
+      settingsRegistry.register(
+        page('terminal', {
+          label: 'Terminal',
+          category: 'features',
+          scope: 'device',
+          keywords: ['drawer'],
+          sections: [
+            { id: 'drawer', label: 'Drawer defaults', rows: ['Open on click'] },
+            { id: 'text', label: 'Text', rows: ['Drawer text size'], keywords: ['font'] },
+          ],
+          component: () => (
+            <>
+              <SettingsSection id="drawer" label="Drawer defaults">
+                <p>rows</p>
+              </SettingsSection>
+              <SettingsSection id="text" label="Text">
+                <p>rows</p>
+              </SettingsSection>
+            </>
+          ),
+        }),
       ),
-    })))
+    )
     held.push(settingsRegistry.register(page('drawers', { label: 'Drawer', category: 'features', order: 20 })))
     open({ target: 'appearance' })
 
@@ -360,18 +455,29 @@ describe('SettingsView', () => {
     vi.useRealTimers()
   })
 
-  it('asks before Escape drops a form\'s unsaved changes, and stays when told to', async () => {
+  it("asks before Escape drops a form's unsaved changes, and stays when told to", async () => {
     const [dirty, setDirty] = createSignal(true)
-    held.push(settingsRegistry.register(page('agents', {
-      label: 'Custom agents', category: 'agents',
-      component: () => {
-        useUnsavedChanges(dirty)
-        return <p>form</p>
-      },
-    })))
+    held.push(
+      settingsRegistry.register(
+        page('agents', {
+          label: 'Custom agents',
+          category: 'agents',
+          component: () => {
+            useUnsavedChanges(dirty)
+            return <p>form</p>
+          },
+        }),
+      ),
+    )
     open({ target: 'agents' })
-    const escape = () => host.querySelector('.settings-view')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-    const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')].find((item) => item.textContent === label)
+    const escape = () =>
+      host
+        .querySelector('.settings-view')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    const button = (label: string) =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')].find(
+        (item) => item.textContent === label,
+      )
 
     escape()
     expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('Discard unsaved changes')
@@ -392,9 +498,15 @@ describe('SettingsView', () => {
   })
 
   it('lands an old page id on the page that absorbed it, at the section it moved to', () => {
-    held.push(settingsRegistry.register(page('agent-limits', {
-      label: 'Limits and cost', category: 'agents', aliases: ['agent-concurrency#limits', 'agent-pricing#claude'],
-    })))
+    held.push(
+      settingsRegistry.register(
+        page('agent-limits', {
+          label: 'Limits and cost',
+          category: 'agents',
+          aliases: ['agent-concurrency#limits', 'agent-pricing#claude'],
+        }),
+      ),
+    )
     open({ target: 'agent-pricing' })
     expect(title()).toBe('Limits and cost')
     expect(railItem('Limits and cost')?.getAttribute('aria-current')).toBe('page')
@@ -402,15 +514,19 @@ describe('SettingsView', () => {
     expect(localStorage.getItem('acorn.settings.last-page')).toBe('agent-limits#claude')
   })
 
-  it('draws the plugin strip above a plugin\'s page, outside the box the page draws in', () => {
+  it("draws the plugin strip above a plugin's page, outside the box the page draws in", () => {
     held.push(
       sourceRegistry.register({ id: 'board-src', order: 50, glyph: 'x', label: 'Board' }, 'board'),
-      settingsRegistry.register(page('board-own', {
-        label: 'Board own', category: 'features',
-        // Its own source gets a switch; a core source named here gets none.
-        railSourceVisibility: ['board-src', 'home'],
-        component: () => <p data-page="board-own">board body</p>,
-      }), 'board'),
+      settingsRegistry.register(
+        page('board-own', {
+          label: 'Board own',
+          category: 'features',
+          // Its own source gets a switch; a core source named here gets none.
+          railSourceVisibility: ['board-src', 'home'],
+          component: () => <p data-page="board-own">board body</p>,
+        }),
+        'board',
+      ),
     )
     open({ target: 'board-own' })
     const strip = host.querySelector<HTMLElement>('.settings-plugin-strip')!
@@ -423,7 +539,9 @@ describe('SettingsView', () => {
     expect(body.contains(strip)).toBe(false)
     expect(body.contains(content)).toBe(true)
     expect(body.hasAttribute('data-plugin')).toBe(true)
-    expect([...strip.querySelectorAll('[role="switch"]')].map((box) => box.closest('label')?.textContent)).toEqual(['Show in left rail'])
+    expect([...strip.querySelectorAll('[role="switch"]')].map((box) => box.closest('label')?.textContent)).toEqual([
+      'Show in left rail',
+    ])
 
     // Manage plugin opens that plugin's page under Installed.
     const manage = [...strip.querySelectorAll('button')].find((button) => button.textContent === 'Manage plugin')!
@@ -440,11 +558,32 @@ describe('SettingsView', () => {
   it('dots Services for a refused connection, and opens the connection page from its name', () => {
     held.push(settingsRegistry.register(page('integrations', { label: 'Services', category: 'connections' })))
     mocks.integrations = {
-      providers: [{ id: 'linear', label: 'Linear', kind: 'issue-tracker', glyph: 'L', capabilities: {}, connection: { authKind: 'api-key', fields: [], connectable: true, disconnectable: true } }],
+      providers: [
+        {
+          id: 'linear',
+          label: 'Linear',
+          kind: 'issue-tracker',
+          glyph: 'L',
+          capabilities: {},
+          connection: { authKind: 'api-key', fields: [], connectable: true, disconnectable: true },
+        },
+      ],
       integrations: [{ id: 'c-1', providerId: 'linear', label: 'Linear · Acme', status: 'needs-auth' }],
     }
     // What ./connections/connectionAttention.ts reports for it.
-    mocks.attention = [{ nodeId: 'node-a', sourceId: 'core.connectionsNeedAuth', item: { id: 'x', title: 't', severity: 'warn', at: 1, target: { kind: 'settings', resourceId: 'integrations' } } }]
+    mocks.attention = [
+      {
+        nodeId: 'node-a',
+        sourceId: 'core.connectionsNeedAuth',
+        item: {
+          id: 'x',
+          title: 't',
+          severity: 'warn',
+          at: 1,
+          target: { kind: 'settings', resourceId: 'integrations' },
+        },
+      },
+    ]
     open({ target: 'appearance' })
     expect(railItem('Services')?.querySelector('.ui-dot')?.getAttribute('data-tone')).toBe('warn')
     expect(railItem('Appearance')?.querySelector('.ui-dot')).toBeNull()
@@ -460,21 +599,35 @@ describe('SettingsView', () => {
     const [dirty, setDirty] = createSignal(true)
     held.push(
       settingsRegistry.register(page('integrations', { label: 'Services', category: 'connections' })),
-      settingsRegistry.register(page('form', {
-        label: 'Form', category: 'agents',
-        component: () => {
-          useUnsavedChanges(dirty)
-          return <p>form</p>
-        },
-      })),
+      settingsRegistry.register(
+        page('form', {
+          label: 'Form',
+          category: 'agents',
+          component: () => {
+            useUnsavedChanges(dirty)
+            return <p>form</p>
+          },
+        }),
+      ),
     )
     mocks.integrations = {
-      providers: [{ id: 'linear', label: 'Linear', kind: 'issue-tracker', glyph: 'L', capabilities: {}, connection: { authKind: 'api-key', fields: [], connectable: true, disconnectable: true } }],
+      providers: [
+        {
+          id: 'linear',
+          label: 'Linear',
+          kind: 'issue-tracker',
+          glyph: 'L',
+          capabilities: {},
+          connection: { authKind: 'api-key', fields: [], connectable: true, disconnectable: true },
+        },
+      ],
       integrations: [{ id: 'c-1', providerId: 'linear', label: 'Linear · Acme', status: 'connected' }],
     }
     open({ target: 'form' })
     const answer = async (label: string) => {
-      ;[...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')].find((item) => item.textContent === label)!.click()
+      ;[...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')]
+        .find((item) => item.textContent === label)!
+        .click()
       await Promise.resolve()
     }
 
@@ -491,21 +644,36 @@ describe('SettingsView', () => {
     setDirty(false)
   })
 
-  it('goes back to a page\'s list when its own rail row is clicked from one of its items', () => {
-    held.push(settingsRegistry.register(page('custom-agents', {
-      label: 'Custom agents', category: 'agents',
-      component: () => {
-        const [editing, setEditing] = createSignal(false)
-        return (
-          <Show when={editing()} fallback={<button type="button" data-open onClick={() => setEditing(true)}>list</button>}>
-            {(() => {
-              useSettingsDetail(() => 'Reviewer', () => setEditing(false))
-              return <p data-editor>editor</p>
-            })()}
-          </Show>
-        )
-      },
-    })))
+  it("goes back to a page's list when its own rail row is clicked from one of its items", () => {
+    held.push(
+      settingsRegistry.register(
+        page('custom-agents', {
+          label: 'Custom agents',
+          category: 'agents',
+          component: () => {
+            const [editing, setEditing] = createSignal(false)
+            return (
+              <Show
+                when={editing()}
+                fallback={
+                  <button type="button" data-open onClick={() => setEditing(true)}>
+                    list
+                  </button>
+                }
+              >
+                {(() => {
+                  useSettingsDetail(
+                    () => 'Reviewer',
+                    () => setEditing(false),
+                  )
+                  return <p data-editor>editor</p>
+                })()}
+              </Show>
+            )
+          },
+        }),
+      ),
+    )
     open({ target: 'custom-agents' })
     host.querySelector<HTMLButtonElement>('[data-open]')!.click()
     expect(title()).toBe('Reviewer')
@@ -517,28 +685,41 @@ describe('SettingsView', () => {
   it('names an open detail in the header and goes back to its list, asking first when it holds changes', async () => {
     const [editing, setEditing] = createSignal(true)
     const [dirty, setDirty] = createSignal(false)
-    held.push(settingsRegistry.register(page('custom-agents', {
-      label: 'Custom agents', category: 'agents',
-      component: () => (
-        <Show when={editing()} fallback={<p>list</p>}>
-          {(() => {
-            useUnsavedChanges(dirty)
-            useSettingsDetail(() => 'Reviewer', () => setEditing(false))
-            return <p>editor</p>
-          })()}
-        </Show>
+    held.push(
+      settingsRegistry.register(
+        page('custom-agents', {
+          label: 'Custom agents',
+          category: 'agents',
+          component: () => (
+            <Show when={editing()} fallback={<p>list</p>}>
+              {(() => {
+                useUnsavedChanges(dirty)
+                useSettingsDetail(
+                  () => 'Reviewer',
+                  () => setEditing(false),
+                )
+                return <p>editor</p>
+              })()}
+            </Show>
+          ),
+        }),
       ),
-    })))
+    )
     open({ target: 'custom-agents' })
     expect(title()).toBe('Reviewer')
     expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('Agents › Custom agents')
     // The page in the path is the link back to its list.
-    const backLink = () => [...host.querySelectorAll<HTMLButtonElement>('.settings-crumb')].find((item) => item.textContent === 'Custom agents')
+    const backLink = () =>
+      [...host.querySelectorAll<HTMLButtonElement>('.settings-crumb')].find(
+        (item) => item.textContent === 'Custom agents',
+      )
 
     setDirty(true)
     backLink()!.click()
     expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('Discard unsaved changes')
-    ;[...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')].find((item) => item.textContent === 'Discard changes')!.click()
+    ;[...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')]
+      .find((item) => item.textContent === 'Discard changes')!
+      .click()
     await Promise.resolve()
     expect(editing()).toBe(false)
     // Back on the list, the header is the page's own again and has no back link.

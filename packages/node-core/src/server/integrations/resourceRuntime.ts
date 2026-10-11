@@ -78,16 +78,20 @@ export async function runProviderResource<TInput, TOutput>(args: {
         // The provider call runs inside the secret scope (docs/integrations/provider-boundaries.md § Provider
         // boundaries), so a credential echoed back in an error body is scrubbed before this failure
         // is logged or surfaced.
-        const refreshed = await args.secrets.use(connection.encryptedCredentials, `${connection.provider}: read ${resource.id}`, (secret) =>
-          providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
-            resource.refresh({ ...context(), secret }, args.input),
-          ),
+        const refreshed = await args.secrets.use(
+          connection.encryptedCredentials,
+          `${connection.provider}: read ${resource.id}`,
+          (secret) =>
+            providerRequestScheduler.run(provider.id, connection.id, provider.budgets, () =>
+              resource.refresh({ ...context(), secret }, args.input),
+            ),
         )
         // The provider's own `items-changed` verb (docs/plugins/events.md § Hearing another plugin), sent from here
         // because core owns the mirror write every provider converges on: one site instead of one per
         // plugin, and a loaded provider never has to reach for `ctx.events` from inside a refresh.
         // Once per refresh, not per row, so a list of two hundred items is one frame.
-        if (refreshed.ok) wsBroadcast({ channel: pluginChannel(provider.id, 'items-changed'), connectionId: connection.id })
+        if (refreshed.ok)
+          wsBroadcast({ channel: pluginChannel(provider.id, 'items-changed'), connectionId: connection.id })
         return refreshed
       } catch (error) {
         if (!(error instanceof SecretUnavailableError)) throw error
@@ -95,7 +99,11 @@ export async function runProviderResource<TInput, TOutput>(args: {
           .update(schema.integrations)
           .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: Date.now() })
           .where(eq(schema.integrations.id, connection.id))
-        broadcastConnectionChanged({ integrationId: connection.id, providerId: connection.provider, status: 'needs-auth' })
+        broadcastConnectionChanged({
+          integrationId: connection.id,
+          providerId: connection.provider,
+          status: 'needs-auth',
+        })
         return { ok: false, failure: { error: 'provider_secret_unreadable', status: 401 } }
       }
     },

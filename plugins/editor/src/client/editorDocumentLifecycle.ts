@@ -14,28 +14,55 @@ export type FileDecision = {
 
 /** A confirmation names one document and one observed disk version, never the next active tab. */
 export function captureFileDecision(
-  action: FileDecision['action'], nodeId: string | null, taskId: string, path: string, entry: PooledFile,
+  action: FileDecision['action'],
+  nodeId: string | null,
+  taskId: string,
+  path: string,
+  entry: PooledFile,
   destination = path,
 ): FileDecision {
-  return { action, nodeId, taskId, path, destination, entry, editRevision: entry.custody.revision, disk: entry.disk ? { ...entry.disk } : null }
+  return {
+    action,
+    nodeId,
+    taskId,
+    path,
+    destination,
+    entry,
+    editRevision: entry.custody.revision,
+    disk: entry.disk ? { ...entry.disk } : null,
+  }
 }
 
 export function fileDecisionIsCurrent(
-  decision: FileDecision, action: FileDecision['action'], nodeId: string | null, taskId: string,
-  activePath: string | null, entry: PooledFile | undefined,
+  decision: FileDecision,
+  action: FileDecision['action'],
+  nodeId: string | null,
+  taskId: string,
+  activePath: string | null,
+  entry: PooledFile | undefined,
 ): boolean {
   if (!entry) return false
-  return decision.action === action && decision.nodeId === nodeId && decision.taskId === taskId
-    && decision.path === activePath && decision.entry === entry
-    && decision.editRevision === entry.custody.revision
-    && decision.disk?.revision === entry.disk?.revision
+  return (
+    decision.action === action &&
+    decision.nodeId === nodeId &&
+    decision.taskId === taskId &&
+    decision.path === activePath &&
+    decision.entry === entry &&
+    decision.editRevision === entry.custody.revision &&
+    decision.disk?.revision === entry.disk?.revision
+  )
 }
 
-export type DiskReconciliation = { kind: 'held'; status: 'unknown' | 'changed' | 'recovered' | null }
+export type DiskReconciliation =
+  | { kind: 'held'; status: 'unknown' | 'changed' | 'recovered' | null }
   | { kind: 'unchanged' | 'replace' }
 
 /** Reconcile disk with one custody owner; the pane only applies a replacement to CodeMirror. */
-export function reconcileEditorDisk(entry: PooledFile, disk: EditorReadResult, discardDraft: boolean): DiskReconciliation {
+export function reconcileEditorDisk(
+  entry: PooledFile,
+  disk: EditorReadResult,
+  discardDraft: boolean,
+): DiskReconciliation {
   const custody = entry.custody
   entry.disk = disk
   if (custody.dirty && !discardDraft) {
@@ -56,7 +83,10 @@ export function reconcileEditorDisk(entry: PooledFile, disk: EditorReadResult, d
   }
   if (disk.text === custody.current.toString()) {
     if (custody.dirty || custody.requiresResolution) custody.reload(disk.text, disk.revision)
-    else { custody.acknowledgedRevision = disk.revision; custody.writeBlock = '' }
+    else {
+      custody.acknowledgedRevision = disk.revision
+      custody.writeBlock = ''
+    }
     return { kind: 'unchanged' }
   }
   custody.reload(disk.text, disk.revision)
@@ -71,18 +101,32 @@ export function createEditorRefreshQueue(read: (path: string) => Promise<void>, 
   let stopped = false
   const schedule = () => {
     if (stopped || reading || timer || !requestedPath) return
-    timer = setTimeout(() => { timer = undefined; void drain() }, delayMs)
+    timer = setTimeout(() => {
+      timer = undefined
+      void drain()
+    }, delayMs)
   }
   const drain = async () => {
     const path = requestedPath
     requestedPath = null
     if (!path || stopped) return
     reading = true
-    try { await read(path) }
-    finally { reading = false; schedule() }
+    try {
+      await read(path)
+    } finally {
+      reading = false
+      schedule()
+    }
   }
   return {
-    request(path: string) { requestedPath = path; schedule() },
-    stop() { stopped = true; requestedPath = null; if (timer) clearTimeout(timer) },
+    request(path: string) {
+      requestedPath = path
+      schedule()
+    },
+    stop() {
+      stopped = true
+      requestedPath = null
+      if (timer) clearTimeout(timer)
+    },
   }
 }

@@ -13,7 +13,8 @@ describe('captured repo configuration', () => {
       writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "edited-command"\n')
       expect(loadRepoConfig(repo, null, {}, captured).runTargets).toEqual([{ id: 'dev', command: 'captured-command' }])
       expect(loadRepoConfig(repo, null, { devScript: 'db-command' }, null)).toMatchObject({
-        runTargets: [{ id: 'dev', command: 'db-command' }], repoTargetIds: [],
+        runTargets: [{ id: 'dev', command: 'db-command' }],
+        repoTargetIds: [],
       })
     } finally {
       rmSync(repo, { recursive: true, force: true })
@@ -50,25 +51,36 @@ describe('loadRepoConfig (docs/workspaces-and-tasks/project-config.md § The lay
 
   it('workspace devScript → a base `dev` target; repo config and the run_targets JSON override it', () => {
     // Alone, the workspace dev script surfaces as a plain `dev` target: no default flag, no URL.
-    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev' }).runTargets).toEqual([{ id: 'dev', command: 'pnpm dev' }])
+    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev' }).runTargets).toEqual([
+      { id: 'dev', command: 'pnpm dev' },
+    ])
     // The per-repo run_targets JSON column is more specific, so it overrides the workspace base.
     const json = JSON.stringify([{ id: 'dev', command: 'make run' }])
-    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev', runTargetsJson: json }).runTargets).toEqual([{ id: 'dev', command: 'make run' }])
+    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev', runTargetsJson: json }).runTargets).toEqual([
+      { id: 'dev', command: 'make run' },
+    ])
     // A committed repo config.toml also wins over the workspace base.
     writeConfig(repoDir, `[scripts.run.dev]\ncommand = "./scripts/dev.sh"`)
-    expect(loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev' }).runTargets.find((t) => t.id === 'dev')?.command).toBe('./scripts/dev.sh')
+    expect(
+      loadRepoConfig(repoDir, userDir, { devScript: 'pnpm dev' }).runTargets.find((t) => t.id === 'dev')?.command,
+    ).toBe('./scripts/dev.sh')
   })
 
   it('a committed repo config wins over user config over DB', () => {
-    writeConfig(userDir, `
+    writeConfig(
+      userDir,
+      `
 [scripts]
 setup = "user-setup"
 [scripts.run.dev]
 command = "user-dev"
 [scripts.run.lint]
 command = "pnpm lint"
-`)
-    writeConfig(repoDir, `
+`,
+    )
+    writeConfig(
+      repoDir,
+      `
 [scripts]
 setup = "repo-setup"
 [scripts.run.dev]
@@ -80,7 +92,8 @@ command = "docker compose -p acorn-$ACORN_TASK_SLUG up"
 stop = "docker compose -p acorn-$ACORN_TASK_SLUG down"
 url = "http://localhost:8080"
 copy = [".env.local"]
-`)
+`,
+    )
     const cfg = loadRepoConfig(repoDir, userDir, {})
     // `[scripts] setup` is reported, not applied, once per layer that declares it (parseLayer).
     expect(cfg.errors.map((e) => `${e.source}: ${e.message}`)).toEqual([
@@ -90,7 +103,15 @@ copy = [".env.local"]
     const ids = cfg.runTargets.map((t) => t.id).sort()
     expect(ids).toEqual(['dev', 'lint', 'stack'])
     const dev = cfg.runTargets.find((t) => t.id === 'dev')
-    expect(dev).toEqual({ id: 'dev', command: './scripts/dev.sh', urlCommand: './scripts/dev-url.sh', default: true, stop: undefined, url: undefined, icon: undefined })
+    expect(dev).toEqual({
+      id: 'dev',
+      command: './scripts/dev.sh',
+      urlCommand: './scripts/dev-url.sh',
+      default: true,
+      stop: undefined,
+      url: undefined,
+      icon: undefined,
+    })
     const stack = cfg.runTargets.find((t) => t.id === 'stack')
     expect(stack?.stop).toContain('down')
     expect(stack?.url).toBe('http://localhost:8080')
@@ -100,19 +121,25 @@ copy = [".env.local"]
     writeConfig(repoDir, `[scripts.run.dev]\ncommand = "repo-dev"\n${'#'.repeat(1024 * 1024)}\n`)
     const cfg = loadRepoConfig(repoDir, null, {})
     expect(cfg.errors).toHaveLength(1)
-    expect(cfg.errors[0]).toMatchObject({ source: 'repo', message: expect.stringContaining('config.toml is larger than the 1048576-byte limit') })
+    expect(cfg.errors[0]).toMatchObject({
+      source: 'repo',
+      message: expect.stringContaining('config.toml is larger than the 1048576-byte limit'),
+    })
     expect(cfg.runTargets).toEqual([])
   })
 
   it('parses copy and layout recipes', () => {
-    writeConfig(repoDir, `
+    writeConfig(
+      repoDir,
+      `
 copy = [".env.local", ".env.development"]
 [layout.review]
 panes = ["pr", "changes"]
 ratio = 0.5
 terminal = "dev"
 browser = "run:dev"
-`)
+`,
+    )
     const cfg = loadRepoConfig(repoDir, null, {})
     expect(cfg.errors).toEqual([])
     expect(cfg.copy).toEqual(['.env.local', '.env.development'])
@@ -122,24 +149,41 @@ browser = "run:dev"
 
   it('db/preview: project config fallback resolves; committed [database]/[preview] toml wins (project-level-settings)', () => {
     // DB fallback only, with no toml, so the project values pass through.
-    const fallback = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback', previewMode: 'port', previewValue: '3000' })
+    const fallback = loadRepoConfig(repoDir, userDir, {
+      dbUrlScript: 'db-fallback',
+      previewMode: 'port',
+      previewValue: '3000',
+    })
     expect(fallback.errors).toEqual([])
     expect(fallback.dbUrlScript).toBe('db-fallback')
     expect(fallback.preview).toEqual({ mode: 'port', value: '3000' })
     // Committed .acorn/config.toml wins over the project fallback.
-    writeConfig(repoDir, `
+    writeConfig(
+      repoDir,
+      `
 [database]
 url_script = "bin/print-db-url"
 [preview]
 mode = "url"
 value = "https://app.test"
-`)
-    const cfg = loadRepoConfig(repoDir, userDir, { dbUrlScript: 'db-fallback', previewMode: 'port', previewValue: '3000' })
+`,
+    )
+    const cfg = loadRepoConfig(repoDir, userDir, {
+      dbUrlScript: 'db-fallback',
+      previewMode: 'port',
+      previewValue: '3000',
+    })
     expect(cfg.errors).toEqual([])
     expect(cfg.dbUrlScript).toBe('bin/print-db-url')
     expect(cfg.preview).toEqual({ mode: 'url', value: 'https://app.test' })
     // browserRules is DB-only, with no toml layer, so it passes through untouched.
-    const rule = { id: 'r1', enabled: true, urlPattern: 'localhost/login', trigger: 'load' as const, action: { type: 'fill' as const, selector: '#u', value: 'dev' } }
+    const rule = {
+      id: 'r1',
+      enabled: true,
+      urlPattern: 'localhost/login',
+      trigger: 'load' as const,
+      action: { type: 'fill' as const, selector: '#u', value: 'dev' },
+    }
     expect(loadRepoConfig(repoDir, userDir, { browserRules: [rule] }).browserRules).toEqual([rule])
   })
 
@@ -164,7 +208,17 @@ value = "https://app.test"
     const cfg = loadRepoConfig(repoDir, userDir, {})
     expect(cfg.errors).toHaveLength(1)
     expect(cfg.errors[0].source).toBe('repo')
-    expect(cfg.runTargets).toEqual([{ id: 'dev', command: 'user-dev', stop: undefined, url: undefined, urlCommand: undefined, icon: undefined, default: undefined }])
+    expect(cfg.runTargets).toEqual([
+      {
+        id: 'dev',
+        command: 'user-dev',
+        stop: undefined,
+        url: undefined,
+        urlCommand: undefined,
+        icon: undefined,
+        default: undefined,
+      },
+    ])
   })
 
   // The drift this replaced: `[scripts] setup` and `[scripts] archive` parsed, merged, and were read by
@@ -178,7 +232,9 @@ value = "https://app.test"
   })
 
   it('validates run targets: missing command and url+url_command conflicts are errors', () => {
-    writeConfig(repoDir, `
+    writeConfig(
+      repoDir,
+      `
 [scripts.run.bad]
 icon = "play"
 [scripts.run.conflicted]
@@ -187,11 +243,22 @@ url = "http://a"
 url_command = "echo b"
 [scripts.run.good]
 command = "pnpm db:seed"
-`)
+`,
+    )
     const cfg = loadRepoConfig(repoDir, null, {})
     expect(cfg.errors.map((e) => e.message).join(' ')).toMatch(/bad.*command/)
     expect(cfg.errors).toHaveLength(2)
-    expect(cfg.runTargets).toEqual([{ id: 'good', command: 'pnpm db:seed', stop: undefined, url: undefined, urlCommand: undefined, icon: undefined, default: undefined }])
+    expect(cfg.runTargets).toEqual([
+      {
+        id: 'good',
+        command: 'pnpm db:seed',
+        stop: undefined,
+        url: undefined,
+        urlCommand: undefined,
+        icon: undefined,
+        default: undefined,
+      },
+    ])
   })
 })
 

@@ -3,25 +3,31 @@ import { boundProviderEvent } from './boundProviderEvent'
 
 describe('provider event storage bounds', () => {
   it('bounds request collections and redacts diagnostics before persistence', () => {
-    const request = boundProviderEvent({
-      type: 'request',
-      requestId: 'r',
-      kind: 'question',
-      title: 't'.repeat(1_000),
-      options: Array.from({ length: 150 }, (_, index) => ({
-        id: String(index),
-        label: 'label',
-        kind: 'other' as const,
-      })),
-    }, [])
+    const request = boundProviderEvent(
+      {
+        type: 'request',
+        requestId: 'r',
+        kind: 'question',
+        title: 't'.repeat(1_000),
+        options: Array.from({ length: 150 }, (_, index) => ({
+          id: String(index),
+          label: 'label',
+          kind: 'other' as const,
+        })),
+      },
+      [],
+    )
     expect(request.type === 'request' && request.title).toHaveLength(500)
     expect(request.type === 'request' && request.options).toHaveLength(100)
 
-    const diagnostic = boundProviderEvent({
-      type: 'diagnostic',
-      level: 'warning',
-      message: 'token=private-token-value',
-    }, ['private-token-value'])
+    const diagnostic = boundProviderEvent(
+      {
+        type: 'diagnostic',
+        level: 'warning',
+        message: 'token=private-token-value',
+      },
+      ['private-token-value'],
+    )
     expect(diagnostic.type === 'diagnostic' ? diagnostic.message : '').not.toContain('private-token-value')
   })
 })
@@ -31,10 +37,13 @@ describe('provider event storage bounds', () => {
 // else's HTML. These cases are the ceiling on all of it.
 describe('web activity bounds', () => {
   const web = (tool: Partial<import('../../contract/wire.ts').AgentToolCall>) => {
-    const event = boundProviderEvent({
-      type: 'tool',
-      tool: { id: 't', title: 'Search web', status: 'completed', ...tool },
-    }, [])
+    const event = boundProviderEvent(
+      {
+        type: 'tool',
+        tool: { id: 't', title: 'Search web', status: 'completed', ...tool },
+      },
+      [],
+    )
     return event.type === 'tool' ? event.tool.web : undefined
   }
 
@@ -79,7 +88,12 @@ describe('web activity bounds', () => {
     // Trailing sources go first, and the query that says what the call was never does.
     expect(bounded?.results?.length).toBeGreaterThan(0)
     expect(bounded?.results?.length).toBeLessThan(50)
-    expect(bounded?.action).toEqual({ type: 'search', queries: ['the query that explains the call'], allowedDomains: undefined, blockedDomains: undefined })
+    expect(bounded?.action).toEqual({
+      type: 'search',
+      queries: ['the query that explains the call'],
+      allowedDomains: undefined,
+      blockedDomains: undefined,
+    })
   })
 
   it('leaves an action that is maximal on every field well inside the budget on its own', () => {

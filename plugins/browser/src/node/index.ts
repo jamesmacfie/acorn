@@ -28,7 +28,8 @@ export const browserPlugin = (): NodePlugin => {
   const serveCapture: PluginFetchHandler = async (request, context) => {
     const id = new URL(request.url, 'http://node').pathname.split('/').pop() ?? ''
     const capture = await captures.current?.read(id)
-    if (!capture || !principalMayActOnTask(context.principal, capture.taskId)) return new Response(null, { status: 404 })
+    if (!capture || !principalMayActOnTask(context.principal, capture.taskId))
+      return new Response(null, { status: 404 })
     return new Response(new Uint8Array(capture.bytes), {
       headers: {
         'content-type': capture.mime,
@@ -53,12 +54,17 @@ export const browserPlugin = (): NodePlugin => {
     init: (ctx) => {
       const db = ctx.storage.open()
       captures.current = captureStore(db, ctx.events.send)
-      registerDeletedTaskPurge(ctx, async (taskIds) =>
-        (await db.delete(browserCaptures).where(inArray(browserCaptures.taskId, [...taskIds]))).changes)
+      registerDeletedTaskPurge(
+        ctx,
+        async (taskIds) =>
+          (await db.delete(browserCaptures).where(inArray(browserCaptures.taskId, [...taskIds]))).changes,
+      )
       pool = new BrowserPool(captures.current)
       for (const tool of browserAgentTools(pool)) ctx.tools.register(tool)
       ctx.routes.fetch(serveCapture, { prefix: '/captures', note: '/captures/:captureId' })
-      ctx.capabilities.provide(BROWSER_CAPTURES, { list: (taskId) => captures.current?.list(taskId) ?? Promise.resolve([]) })
+      ctx.capabilities.provide(BROWSER_CAPTURES, {
+        list: (taskId) => captures.current?.list(taskId) ?? Promise.resolve([]),
+      })
     },
     // A browser process outlives every request. Close it on the way down, or a node restart leaves a
     // headless Chrome behind holding its profile directory.

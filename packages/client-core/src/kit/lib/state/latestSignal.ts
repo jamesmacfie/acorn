@@ -10,12 +10,16 @@ export type LatestSignal = {
 export function latestSignal(): LatestSignal {
   let controller = new AbortController()
   return {
-    get signal() { return controller.signal },
+    get signal() {
+      return controller.signal
+    },
     next() {
       controller.abort()
       controller = new AbortController()
       return controller.signal
     },
-    abort() { controller.abort() },
+    abort() {
+      controller.abort()
+    },
   }
 }

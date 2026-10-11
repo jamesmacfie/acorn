@@ -7,7 +7,10 @@ const queues = new Map<string, Queue>()
 export function serializeHttpWrite<T>(identity: string, signal: AbortSignal, work: () => Promise<T>): Promise<T> {
   signal.throwIfAborted()
   let queue = queues.get(identity)
-  if (!queue) { queue = { active: false, pending: [] }; queues.set(identity, queue) }
+  if (!queue) {
+    queue = { active: false, pending: [] }
+    queues.set(identity, queue)
+  }
   const owner = queue
   return new Promise<T>((resolve, reject) => {
     let run: (() => Promise<T>) | undefined = work
@@ -26,9 +29,14 @@ export function serializeHttpWrite<T>(identity: string, signal: AbortSignal, wor
         const invoke = run!
         run = undefined
         void (async () => {
-          try { signal.throwIfAborted(); resolve(await invoke()) }
-          catch (error) { reject(error) }
-          finally { release() }
+          try {
+            signal.throwIfAborted()
+            resolve(await invoke())
+          } catch (error) {
+            reject(error)
+          } finally {
+            release()
+          }
         })()
       },
       cancel: () => {

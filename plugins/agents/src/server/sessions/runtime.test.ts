@@ -9,14 +9,21 @@ import { agentProfileRegistry, configureAcornMcp, type CompiledCoreServices } fr
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { catalogueSkills, readPackageSkill, registerSkill, skillDeliveries, skillStateStore } from '@acorn/plugin-api/testkit'
-import type { AgentAppApproval, AgentInputPart, AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
+import {
+  catalogueSkills,
+  readPackageSkill,
+  registerSkill,
+  skillDeliveries,
+  skillStateStore,
+} from '@acorn/plugin-api/testkit'
 import type {
-  AgentDriver,
-  AgentDriverSession,
-  AgentDriverStartOptions,
-  AgentDriverTurnOptions,
-} from '../drivers/types'
+  AgentAppApproval,
+  AgentInputPart,
+  AgentNormalizedEvent,
+  AgentProviderDescriptor,
+  AgentSession,
+} from '../../contract/wire.ts'
+import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from '../drivers/types'
 import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
@@ -217,7 +224,9 @@ class UsageLimitDriver implements AgentDriver {
     await options.onEvent({ type: 'session_state', state: 'ready' })
     return {
       providerSessionRef: 'usage-limit-session',
-      get ready() { return !active },
+      get ready() {
+        return !active
+      },
       sendTurn: async (turn) => {
         active = true
         this.attempts.push(turn)
@@ -237,9 +246,13 @@ class UsageLimitDriver implements AgentDriver {
         active = false
         return {}
       },
-      async cancel() { active = false },
+      async cancel() {
+        active = false
+      },
       async resolveRequest() {},
-      async stop() { active = false },
+      async stop() {
+        active = false
+      },
     }
   }
 }
@@ -320,10 +333,14 @@ class DeferredStartDriver implements AgentDriver {
     return {
       providerSessionRef,
       ready: true,
-      async sendTurn() { return {} },
+      async sendTurn() {
+        return {}
+      },
       async cancel() {},
       async resolveRequest() {},
-      stop: async () => { this.stops++ },
+      stop: async () => {
+        this.stops++
+      },
     }
   }
 }
@@ -371,9 +388,13 @@ class BackgroundSubagentDriver extends FakeAgentDriver {
         active = false
         return { providerTurnRef: `fake-turn-${turn.turn.id}` }
       },
-      async cancel() { active = false },
+      async cancel() {
+        active = false
+      },
       async resolveRequest() {},
-      async stop() { stopped = true },
+      async stop() {
+        stopped = true
+      },
     }
   }
 
@@ -410,7 +431,10 @@ class LongTurnDriver implements AgentDriver {
       },
       sendTurn: async () => {
         active = true
-        if (this.holdTurns) await new Promise<never>((_, reject) => { release = reject })
+        if (this.holdTurns)
+          await new Promise<never>((_, reject) => {
+            release = reject
+          })
         await options.onEvent({ type: 'assistant_message', text: 'Picked up where it left off.' })
         await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
         active = false
@@ -445,7 +469,12 @@ describe('managed agent runtime conformance', () => {
   beforeEach(async () => {
     testDb = makeTestDb()
     pluginDb = makeTestPluginDb('agents')
-    core = createCoreServices({ secrets: SECRETS, db: testDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
+    core = createCoreServices({
+      secrets: SECRETS,
+      db: testDb.db,
+      activeIdentity: memoryIdentityStore(),
+      ...testCoreSeams(),
+    })
     dataDir = await mkdtemp(join(tmpdir(), 'acorn-managed-runtime-'))
     runtime = null
     disposeProfile = null
@@ -476,12 +505,19 @@ describe('managed agent runtime conformance', () => {
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => new FakeAgentDriver())
     runtime = new ManagedAgentRuntime({
-      db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS,
-      currentUserId: () => null, registry,
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
     })
 
     const session = await runtime.importTranscript({
-      taskId, providerId: 'fake', profileId: 'fake',
+      taskId,
+      providerId: 'fake',
+      profileId: 'fake',
       content: '# Prior work\n\n## User\n\nCheck the queue\n\n## Assistant\n\nThe queue is clear.',
     })
     expect(session.kind).toBe('imported')
@@ -500,7 +536,12 @@ describe('managed agent runtime conformance', () => {
     const admitted: SecretCheckReport[] = []
     let blocking = false
     runtime = new ManagedAgentRuntime({
-      db: pluginDb.db, dataDir, internalEnv: () => ({}), secrets: SECRETS, currentUserId: () => null, registry,
+      db: pluginDb.db,
+      dataDir,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
       core: {
         ...core,
         secretPublication: {
@@ -513,14 +554,18 @@ describe('managed agent runtime conformance', () => {
       },
     })
     const session = await runtime.importTranscript({
-      taskId, providerId: 'fake', profileId: 'fake',
+      taskId,
+      providerId: 'fake',
+      profileId: 'fake',
       content: `# Prior work\n\n## User\n\nUse ${token} for the "deploy"\n\n## Assistant\n\nDone.`,
     })
 
     expect((await runtime.exportSession(session.id, 'markdown')).content).toContain(token)
     expect(admitted).toEqual([])
     blocking = true
-    await expect(runtime.exportSession(session.id, 'json')).rejects.toThrow(/secret check blocked this export: \d+ likely secrets \(github-token at original json export:\d+.*\)\. Choose an export without secrets from the session menu instead/)
+    await expect(runtime.exportSession(session.id, 'json')).rejects.toThrow(
+      /secret check blocked this export: \d+ likely secrets \(github-token at original json export:\d+.*\)\. Choose an export without secrets from the session menu instead/,
+    )
     expect(JSON.stringify(admitted)).not.toContain(token.slice(4))
 
     const redacted = await runtime.exportSession(session.id, 'json', 'redacted')
@@ -529,7 +574,7 @@ describe('managed agent runtime conformance', () => {
     // Keys are redacted too: tool inputs and provider payloads carry caller-chosen key names.
     const store = runtime.store as unknown as { exportSnapshot: (id: string) => Promise<unknown> }
     const original = store.exportSnapshot.bind(runtime.store)
-    store.exportSnapshot = async (id) => ({ ...(await original(id) as object), extra: { [token]: 'value' } })
+    store.exportSnapshot = async (id) => ({ ...((await original(id)) as object), extra: { [token]: 'value' } })
     expect((await runtime.exportSession(session.id, 'json', 'redacted')).content).not.toContain(token)
     store.exportSnapshot = original
     // Same bytes apart from the export time, same digest: an allowance survives the re-export.
@@ -553,13 +598,15 @@ describe('managed agent runtime conformance', () => {
       registry,
     })
 
-    await expect(runtime.acceptSession({
-      taskId: seed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    })).rejects.toThrow('Git could not create the worktree.')
+    await expect(
+      runtime.acceptSession({
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      }),
+    ).rejects.toThrow('Git could not create the worktree.')
   })
 
   it('acknowledges an interactive session once durable while its provider keeps connecting', async () => {
@@ -673,7 +720,9 @@ describe('managed agent runtime conformance', () => {
     driver.release()
 
     expect(driver.blocked).toMatchObject({ fileGuard: { command: '/app/node', args: ['/app/helper/file-guard.js'] } })
-    expect(minted).toContainEqual(expect.objectContaining({ toolCeiling: { allow: ['run_start', 'notes_write'], maxRisk: 'write' } }))
+    expect(minted).toContainEqual(
+      expect.objectContaining({ toolCeiling: { allow: ['run_start', 'notes_write'], maxRisk: 'write' } }),
+    )
   })
 
   it('does not miss a condition committed between the initial wait snapshot and subscription', async () => {
@@ -687,13 +736,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'delegated',
-      config: {},
-    }, descriptor('fake'))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'delegated',
+        config: {},
+      },
+      descriptor('fake'),
+    )
     const { turn } = await runtime.store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Finish during the wait setup window.' }],
       source: 'delegation',
@@ -749,8 +801,9 @@ describe('managed agent runtime conformance', () => {
 
     expect(accepted.runtimeState).toBe('creating')
     expect(failed.session.runtimeState).toBe('failed')
-    expect(failed.events.some((record) =>
-      record.event.type === 'error' && record.event.code === 'provider_start_failed')).toBe(true)
+    expect(
+      failed.events.some((record) => record.event.type === 'error' && record.event.code === 'provider_start_failed'),
+    ).toBe(true)
   })
 
   it('keeps the internal creation contract blocked until the provider is ready', async () => {
@@ -769,16 +822,18 @@ describe('managed agent runtime conformance', () => {
     })
 
     let settled = false
-    const opening = runtime.createSession({
-      taskId: seed.taskId,
-      providerId: driver.providerId,
-      profileId: driver.profileId,
-      kind: 'workflow',
-      config: {},
-    }).then((session) => {
-      settled = true
-      return session
-    })
+    const opening = runtime
+      .createSession({
+        taskId: seed.taskId,
+        providerId: driver.providerId,
+        profileId: driver.profileId,
+        kind: 'workflow',
+        config: {},
+      })
+      .then((session) => {
+        settled = true
+        return session
+      })
     await driver.entered
     await Promise.resolve()
     expect(settled).toBe(false)
@@ -811,7 +866,9 @@ describe('managed agent runtime conformance', () => {
     })
     await driver.entered
     let stopped = false
-    const stopping = runtime.stop().then(() => { stopped = true })
+    const stopping = runtime.stop().then(() => {
+      stopped = true
+    })
     await Promise.resolve()
     expect(stopped).toBe(false)
 
@@ -861,19 +918,49 @@ describe('managed agent runtime conformance', () => {
     expect(snapshot.session.providerSessionRef).toMatch(/^fake-/)
     expect(snapshot.session.runtimeState).toBe('ready')
     expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.status).toBe('completed')
-    expect(snapshot.events.map((event) => event.seq)).toEqual(
-      snapshot.events.map((_, index) => index + 1),
-    )
+    expect(snapshot.events.map((event) => event.seq)).toEqual(snapshot.events.map((_, index) => index + 1))
     expect(published).toEqual([...published].sort((a, b) => a - b))
     expect(snapshot.events.some((event) => event.event.type === 'assistant_message')).toBe(true)
     // The socket leaves the search text out; the node's own readers, like this wait, keep it.
     expect(searchTexts).toEqual([])
     expect(snapshot.events.some((event) => typeof event.searchText === 'string')).toBe(true)
     expect(lifecycle.filter((frame) => frame.channel === 'plugin:agents:turn-changed')).toEqual([
-      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'queued', attempt: 0 },
-      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'dispatching', attempt: 1 },
-      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'active', attempt: 1 },
-      { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'completed', attempt: 1 },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId: seed.taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'interactive',
+        status: 'queued',
+        attempt: 0,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId: seed.taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'interactive',
+        status: 'dispatching',
+        attempt: 1,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId: seed.taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'interactive',
+        status: 'active',
+        attempt: 1,
+      },
+      {
+        channel: 'plugin:agents:turn-changed',
+        taskId: seed.taskId,
+        sessionId: session.id,
+        turnId: turn.id,
+        source: 'interactive',
+        status: 'completed',
+        attempt: 1,
+      },
     ])
   })
 
@@ -882,7 +969,8 @@ describe('managed agent runtime conformance', () => {
     const registry = new AgentDriverRegistry()
     const driver = new TrailingEventDriver()
     registry.registerNative('fake', () => driver)
-    const frames: { channel: string; session?: { runtimeState: string; attention: string; lastEventSeq: number } }[] = []
+    const frames: { channel: string; session?: { runtimeState: string; attention: string; lastEventSeq: number } }[] =
+      []
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
       dataDir,
@@ -923,8 +1011,9 @@ describe('managed agent runtime conformance', () => {
     frames.length = 0
     await runtime.patchSession(session.id, { lastReadSeq: 1_000 })
     await driver.push({ type: 'assistant_message', text: 'and one more' })
-    expect(frames.filter((frame) => frame.channel === 'agent:session').map((frame) => frame.session!.attention))
-      .toEqual(['none', 'unread'])
+    expect(
+      frames.filter((frame) => frame.channel === 'agent:session').map((frame) => frame.session!.attention),
+    ).toEqual(['none', 'unread'])
   })
 
   it('sends every tool update on the socket and stores the call as two rows', async () => {
@@ -968,10 +1057,15 @@ describe('managed agent runtime conformance', () => {
     ]
     for (const update of updates) await driver.push(update)
     expect(frames).toEqual(updates)
-    const stored = (await runtime.store.exportSnapshot(session.id)).events.filter((record) => record.event.type === 'tool')
+    const stored = (await runtime.store.exportSnapshot(session.id)).events.filter(
+      (record) => record.event.type === 'tool',
+    )
     expect(stored.map((record) => record.event)).toEqual([
       updates[0],
-      { type: 'tool', tool: { id: 'cmd', title: 'Build', status: 'completed', input: 'pnpm build', output: 'one\ntwo\n' } },
+      {
+        type: 'tool',
+        tool: { id: 'cmd', title: 'Build', status: 'completed', input: 'pnpm build', output: 'one\ntwo\n' },
+      },
     ])
   })
 
@@ -1032,15 +1126,28 @@ describe('managed agent runtime conformance', () => {
     const cancelParent = vi.fn(async () => {})
     class ChildControlDriver extends TrailingEventDriver {
       override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
-        return { ...await super.start(options), cancelSubagent: cancelChild, cancel: cancelParent }
+        return { ...(await super.start(options)), cancelSubagent: cancelChild, cancel: cancelParent }
       }
     }
     const driver = new ChildControlDriver()
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => driver)
-    runtime = new ManagedAgentRuntime({ db: pluginDb.db, dataDir, core, internalEnv: () => ({}),
-      secrets: SECRETS, currentUserId: () => null, registry })
-    const session = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
     await driver.push({ type: 'subagent', subagent: { id: 'child-1', title: 'Child', status: 'running' } })
     await driver.push({ type: 'subagent', subagent: { id: 'child-2', title: 'Sibling', status: 'running' } })
     await runtime.cancelSubagent(session.id, 'child-1')
@@ -1145,13 +1252,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry,
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: driver.providerId,
-      profileId: driver.profileId,
-      kind: 'interactive',
-      config: {},
-    }, descriptor(driver.providerId))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: driver.providerId,
+        profileId: driver.profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor(driver.providerId),
+    )
 
     const turn = await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Keep this queued.' }],
@@ -1165,8 +1275,9 @@ describe('managed agent runtime conformance', () => {
     expect(driver.noProviderExecutionHistory).toBe(true)
     expect(failed.session.runtimeState).toBe('failed')
     expect(failed.turns.find((candidate) => candidate.id === turn.id)?.status).toBe('queued')
-    expect(failed.events.some((record) =>
-      record.event.type === 'error' && record.event.code === 'provider_start_failed')).toBe(true)
+    expect(
+      failed.events.some((record) => record.event.type === 'error' && record.event.code === 'provider_start_failed'),
+    ).toBe(true)
     expect(await runtime.store.hasProviderExecutionHistory(session.id)).toBe(false)
 
     await runtime.store.startTurn(turn.id)
@@ -1194,13 +1305,16 @@ describe('managed agent runtime conformance', () => {
       registry: new AgentDriverRegistry(),
       publish: (frame) => published.push(frame),
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: profileId,
-      profileId,
-      kind: 'interactive',
-      config: {},
-    }, descriptor(profileId))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: profileId,
+        profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor(profileId),
+    )
     const key = randomUUID()
 
     const turn = await runtime.enqueueTurn(session.id, {
@@ -1211,17 +1325,24 @@ describe('managed agent runtime conformance', () => {
     })
     expect(turn.ordinal).toBe(0)
     expect((await runtime.store.requireSession(session.id)).title).toBe('Please implement generated session naming now')
-    expect(generateText).toHaveBeenCalledWith(expect.objectContaining({
-      userId: 'owner',
-      backendId: `harness:${profileId}`,
-      timeoutMs: 30_000,
-      input: expect.objectContaining({
-        maxOutputTokens: 64,
-        prompt: 'First user request:\nPlease implement generated session naming now',
+    expect(generateText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'owner',
+        backendId: `harness:${profileId}`,
+        timeoutMs: 30_000,
+        input: expect.objectContaining({
+          maxOutputTokens: 64,
+          prompt: 'First user request:\nPlease implement generated session naming now',
+        }),
       }),
-    }))
-    expect(published.some((frame) => frame.channel === 'agent:session'
-      && (frame.session as { title?: string }).title === 'Please implement generated session naming now')).toBe(true)
+    )
+    expect(
+      published.some(
+        (frame) =>
+          frame.channel === 'agent:session' &&
+          (frame.session as { title?: string }).title === 'Please implement generated session naming now',
+      ),
+    ).toBe(true)
 
     await runtime.patchSession(session.id, { title: 'My chosen title' })
     resolveGeneration({
@@ -1265,13 +1386,16 @@ describe('managed agent runtime conformance', () => {
         if (frame.channel === 'agent:session') titles.push(frame.session.title)
       },
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: profileId,
-      profileId,
-      kind: 'interactive',
-      config: {},
-    }, descriptor(profileId))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: profileId,
+        profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor(profileId),
+    )
     await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Please implement generated session naming now' }],
       source: 'interactive',
@@ -1281,10 +1405,9 @@ describe('managed agent runtime conformance', () => {
     await vi.waitFor(async () => {
       expect((await runtime!.store.requireSession(session.id)).title).toBe('Generated session naming')
     })
-    expect(titles).toEqual(expect.arrayContaining([
-      'Please implement generated session naming now',
-      'Generated session naming',
-    ]))
+    expect(titles).toEqual(
+      expect.arrayContaining(['Please implement generated session naming now', 'Generated session naming']),
+    )
   })
 
   it('regenerates from the first durable prompt without overwriting a concurrent user rename', async () => {
@@ -1295,7 +1418,8 @@ describe('managed agent runtime conformance', () => {
     const firstGeneration = new Promise<Awaited<ReturnType<CoreServices['models']['generateText']>>>((resolve) => {
       resolveFirst = resolve
     })
-    core.models.generateText = vi.fn()
+    core.models.generateText = vi
+      .fn()
       .mockImplementationOnce(() => firstGeneration)
       .mockResolvedValueOnce({
         text: 'Regenerated session title',
@@ -1316,13 +1440,16 @@ describe('managed agent runtime conformance', () => {
         if (frame.channel === 'agent:session') titles.push(frame.session.title)
       },
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: profileId,
-      profileId,
-      kind: 'interactive',
-      config: {},
-    }, descriptor(profileId))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: profileId,
+        profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor(profileId),
+    )
     await runtime.store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Build a durable manual title regeneration command' }],
       source: 'interactive',
@@ -1343,11 +1470,13 @@ describe('managed agent runtime conformance', () => {
 
     const regenerated = await runtime.regenerateTitle(session.id)
     expect(regenerated.title).toBe('Regenerated session title')
-    expect(core.models.generateText).toHaveBeenLastCalledWith(expect.objectContaining({
-      input: expect.objectContaining({
-        prompt: 'First user request:\nBuild a durable manual title regeneration command',
+    expect(core.models.generateText).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        input: expect.objectContaining({
+          prompt: 'First user request:\nBuild a durable manual title regeneration command',
+        }),
       }),
-    }))
+    )
     expect(titles).toContain('Regenerated session title')
   })
 
@@ -1357,14 +1486,21 @@ describe('managed agent runtime conformance', () => {
       const seed = await seedTask(testDb, dataDir)
       const profileId = 'title-generation-slow-success'
       registerTitleProfile(profileId)
-      core.models.generateText = vi.fn(() => new Promise<Awaited<ReturnType<CoreServices['models']['generateText']>>>((resolve) => {
-        setTimeout(() => resolve({
-          text: 'Generated after CLI startup',
-          providerId: profileId,
-          backendId: `harness:${profileId}`,
-          modelId: 'default',
-        }), 10_000)
-      }))
+      core.models.generateText = vi.fn(
+        () =>
+          new Promise<Awaited<ReturnType<CoreServices['models']['generateText']>>>((resolve) => {
+            setTimeout(
+              () =>
+                resolve({
+                  text: 'Generated after CLI startup',
+                  providerId: profileId,
+                  backendId: `harness:${profileId}`,
+                  modelId: 'default',
+                }),
+              10_000,
+            )
+          }),
+      )
       runtime = new ManagedAgentRuntime({
         db: pluginDb.db,
         dataDir,
@@ -1374,13 +1510,16 @@ describe('managed agent runtime conformance', () => {
         currentUserId: () => 'owner',
         registry: new AgentDriverRegistry(),
       })
-      const session = await runtime.store.createSession({
-        taskId: seed.taskId,
-        providerId: profileId,
-        profileId,
-        kind: 'interactive',
-        config: {},
-      }, descriptor(profileId))
+      const session = await runtime.store.createSession(
+        {
+          taskId: seed.taskId,
+          providerId: profileId,
+          profileId,
+          kind: 'interactive',
+          config: {},
+        },
+        descriptor(profileId),
+      )
 
       await runtime.enqueueTurn(session.id, {
         input: [{ type: 'text', text: 'Allow enough time for title generation' }],
@@ -1401,10 +1540,12 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const profileId = 'title-generation-shutdown'
     registerTitleProfile(profileId)
-    const generateText = vi.fn(({ input }: Parameters<CoreServices['models']['generateText']>[0]) =>
-      new Promise<never>((_resolve, reject) => {
-        input.signal?.addEventListener('abort', () => reject(input.signal?.reason), { once: true })
-      }))
+    const generateText = vi.fn(
+      ({ input }: Parameters<CoreServices['models']['generateText']>[0]) =>
+        new Promise<never>((_resolve, reject) => {
+          input.signal?.addEventListener('abort', () => reject(input.signal?.reason), { once: true })
+        }),
+    )
     core.models.generateText = generateText
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
@@ -1415,13 +1556,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => 'owner',
       registry: new AgentDriverRegistry(),
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: profileId,
-      profileId,
-      kind: 'interactive',
-      config: {},
-    }, descriptor(profileId))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: profileId,
+        profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor(profileId),
+    )
     await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Keep the fallback when runtime stops' }],
       source: 'interactive',
@@ -1445,13 +1589,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, descriptor('fake'))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor('fake'),
+    )
     const { turn: first } = await runtime.store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'First prompt.' }],
       source: 'interactive',
@@ -1493,13 +1640,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry,
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: driver.providerId,
-      profileId: driver.profileId,
-      kind: 'interactive',
-      config: {},
-    }, descriptor(driver.providerId))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: driver.providerId,
+        profileId: driver.profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor(driver.providerId),
+    )
 
     await expect(runtime.deleteSession(session.id)).resolves.toEqual({
       local: 'deleted',
@@ -1521,13 +1671,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, descriptor('fake'))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor('fake'),
+    )
 
     const before = await runtime.store.listSessions({ archived: false })
     expect(before.sessions.map((row) => row.id)).toEqual([session.id])
@@ -1559,22 +1712,24 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry,
     })
-    const create = (taskId: string) => runtime!.createSession({
-      taskId,
-      providerId: 'long-turn',
-      profileId: 'long-turn',
-      kind: 'interactive',
-      config: {},
-    })
+    const create = (taskId: string) =>
+      runtime!.createSession({
+        taskId,
+        providerId: 'long-turn',
+        profileId: 'long-turn',
+        kind: 'interactive',
+        config: {},
+      })
     const working = await create(archived.taskId)
     const idle = await create(archived.taskId)
     const bystander = await create(other.taskId)
-    const prompt = (sessionId: string, text: string) => runtime!.enqueueTurn(sessionId, {
-      input: [{ type: 'text', text }],
-      source: 'interactive',
-      effectivePolicy: { providerDefault: true },
-      idempotencyKey: randomUUID(),
-    })
+    const prompt = (sessionId: string, text: string) =>
+      runtime!.enqueueTurn(sessionId, {
+        input: [{ type: 'text', text }],
+        source: 'interactive',
+        effectivePolicy: { providerDefault: true },
+        idempotencyKey: randomUUID(),
+      })
     const turn = await prompt(working.id, 'Keep going.')
     await vi.waitFor(async () => expect((await runtime!.store.turn(turn.id))?.status).toBe('active'))
     await vi.waitFor(async () => expect((await runtime!.store.requireSession(idle.id)).runtimeState).toBe('ready'))
@@ -1617,13 +1772,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
-    const session = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, descriptor('fake'))
+    const session = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor('fake'),
+    )
 
     const empty = await runtime.store.listSessions({ taskId: seed.taskId })
     expect(empty.sessions[0]?.queuedTurns).toBe(0)
@@ -1662,20 +1820,26 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
-    const first = await runtime.store.createSession({
-      taskId: firstSeed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, descriptor('fake'))
-    const second = await runtime.store.createSession({
-      taskId: secondSeed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, descriptor('fake'))
+    const first = await runtime.store.createSession(
+      {
+        taskId: firstSeed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor('fake'),
+    )
+    const second = await runtime.store.createSession(
+      {
+        taskId: secondSeed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor('fake'),
+    )
     await runtime.store.recordEvent(first.id, null, {
       type: 'assistant_message',
       text: 'shared workspace needle',
@@ -1768,8 +1932,9 @@ describe('managed agent runtime conformance', () => {
     await runtime.wait(session.id, 0, 'attention', 2_000)
     expect((await runtime.store.request(session.id, 'permission-1'))?.payload.approval).toEqual(approval)
 
-    await expect(runtime.resolveRequest(session.id, 'permission-1', { optionId: 'acceptAlways' }, randomUUID()))
-      .rejects.toThrow('That choice was not offered for this request.')
+    await expect(
+      runtime.resolveRequest(session.id, 'permission-1', { optionId: 'acceptAlways' }, randomUUID()),
+    ).rejects.toThrow('That choice was not offered for this request.')
     expect(driver.resolutions).toBe(0)
     expect((await runtime.store.request(session.id, 'permission-1'))?.status).toBe('pending')
 
@@ -1808,8 +1973,9 @@ describe('managed agent runtime conformance', () => {
 
     expect(driver.attempts).toBe(2)
     expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.attempt).toBe(2)
-    expect(snapshot.events.some((record) =>
-      record.event.type === 'diagnostic' && record.event.message.includes('retrying'))).toBe(true)
+    expect(
+      snapshot.events.some((record) => record.event.type === 'diagnostic' && record.event.message.includes('retrying')),
+    ).toBe(true)
   })
 
   it.each([
@@ -1821,16 +1987,26 @@ describe('managed agent runtime conformance', () => {
     const driver = new SafeRetryDriver(failure)
     registry.registerNative(driver.providerId, () => driver)
     runtime = new ManagedAgentRuntime({
-      db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS,
-      currentUserId: () => null, registry,
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
     })
     const session = await runtime.createSession({
-      taskId: seed.taskId, providerId: driver.providerId, profileId: driver.profileId,
-      kind: 'interactive', config: {},
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
     })
     const turn = await runtime.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: 'Retry only when safe.' }], source: 'interactive',
-      effectivePolicy: {}, idempotencyKey: randomUUID(),
+      input: [{ type: 'text', text: 'Retry only when safe.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
     })
     await vi.waitFor(async () => expect((await runtime!.store.turn(turn.id))?.status).toBe('failed'))
     expect(driver.attempts).toBe(attempts)
@@ -1853,13 +2029,17 @@ describe('managed agent runtime conformance', () => {
       usageLimitResetAt: async () => Date.now() + 20,
       usageContinuationGraceMs: 0,
     })
-    const session = await runtime.createSession({
-      taskId: seed.taskId,
-      providerId: driver.providerId,
-      profileId: driver.profileId,
-      kind: 'workflow',
-      config: {},
-    }, randomUUID(), 'autonomous')
+    const session = await runtime.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: driver.providerId,
+        profileId: driver.profileId,
+        kind: 'workflow',
+        config: {},
+      },
+      randomUUID(),
+      'autonomous',
+    )
     const originalInput = [{ type: 'text' as const, text: 'Complete the whole task.' }]
     const turn = await runtime.enqueueTurn(session.id, {
       input: originalInput,
@@ -1869,22 +2049,33 @@ describe('managed agent runtime conformance', () => {
     })
     const snapshot = await runtime.wait(session.id, 0, 'turn_completed', 2_000)
     const completed = snapshot.turns.find((candidate) => candidate.id === turn.id)
-    const messages = snapshot.events.flatMap((record) =>
-      record.event.type === 'user_message' ? [record.event] : [])
+    const messages = snapshot.events.flatMap((record) => (record.event.type === 'user_message' ? [record.event] : []))
 
     expect(driver.attempts).toHaveLength(2)
     expect(driver.attempts[0]?.input.slice(1)).toEqual(originalInput)
     expect(driver.attempts[0]?.input[0]).toMatchObject({ text: expect.stringContaining('Nobody is waiting') })
-    expect(driver.attempts[1]?.input[1]).toMatchObject({ type: 'text', text: expect.stringContaining('Continue the task') })
-    expect(completed).toMatchObject({ status: 'completed', attempt: 2, input: originalInput, effectivePolicy: expect.objectContaining({ attendance: 'autonomous' }) })
+    expect(driver.attempts[1]?.input[1]).toMatchObject({
+      type: 'text',
+      text: expect.stringContaining('Continue the task'),
+    })
+    expect(completed).toMatchObject({
+      status: 'completed',
+      attempt: 2,
+      input: originalInput,
+      effectivePolicy: expect.objectContaining({ attendance: 'autonomous' }),
+    })
     expect(completed?.continuationInput).toBeNull()
     expect(completed?.notBefore).toBeNull()
     expect(messages).toEqual([
       expect.objectContaining({ text: 'Complete the whole task.' }),
       expect.objectContaining({ automatic: true, text: expect.stringContaining('Continue the task') }),
     ])
-    expect(snapshot.events.some((record) =>
-      record.event.type === 'diagnostic' && record.event.message.includes('continue this turn automatically'))).toBe(true)
+    expect(
+      snapshot.events.some(
+        (record) =>
+          record.event.type === 'diagnostic' && record.event.message.includes('continue this turn automatically'),
+      ),
+    ).toBe(true)
     expect(snapshot.events.some((record) => record.event.type === 'error')).toBe(false)
   })
 
@@ -1911,13 +2102,16 @@ describe('managed agent runtime conformance', () => {
       config: {},
     })
     // Queued through the store, so the only thing that can dispatch it is the scan reconcile starts.
-    const stuck = await runtime.store.createSession({
-      taskId: seed.taskId,
-      providerId: gated.providerId,
-      profileId: gated.profileId,
-      kind: 'interactive',
-      config: {},
-    }, descriptor(gated.providerId))
+    const stuck = await runtime.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: gated.providerId,
+        profileId: gated.profileId,
+        kind: 'interactive',
+        config: {},
+      },
+      descriptor(gated.providerId),
+    )
     await runtime.store.enqueueTurn(stuck.id, {
       input: [{ type: 'text', text: 'Never starts.' }],
       source: 'interactive',
@@ -1953,13 +2147,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry: new AgentDriverRegistry(),
     })
-    const session = await beforeRestart.store.createSession({
-      taskId: seed.taskId,
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'delegated',
-      config: {},
-    }, descriptor('fake'))
+    const session = await beforeRestart.store.createSession(
+      {
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'delegated',
+        config: {},
+      },
+      descriptor('fake'),
+    )
     const { turn: active } = await beforeRestart.store.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Was active before restart.' }],
       source: 'delegation',
@@ -2023,8 +2220,11 @@ describe('managed agent runtime conformance', () => {
       kind: 'question',
       status: 'expired',
     })
-    expect((await runtime.store.eventsForTurn(active.id)).some((record) =>
-      record.event.type === 'diagnostic' && record.event.message === 'Preserve me.')).toBe(true)
+    expect(
+      (await runtime.store.eventsForTurn(active.id)).some(
+        (record) => record.event.type === 'diagnostic' && record.event.message === 'Preserve me.',
+      ),
+    ).toBe(true)
   })
 
   it('gates dispatch on the stored concurrency limits and drains when they are raised', async () => {
@@ -2043,21 +2243,23 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => owner,
       registry,
     })
-    const open = async () => runtime!.createSession({
-      taskId: seed.taskId,
-      providerId: driver.providerId,
-      profileId: driver.profileId,
-      kind: 'interactive',
-      config: {},
-    })
+    const open = async () =>
+      runtime!.createSession({
+        taskId: seed.taskId,
+        providerId: driver.providerId,
+        profileId: driver.profileId,
+        kind: 'interactive',
+        config: {},
+      })
     const first = await open()
     const second = await open()
-    const prompt = (sessionId: string) => runtime!.enqueueTurn(sessionId, {
-      input: [{ type: 'text', text: 'Take the slot.' }],
-      source: 'interactive',
-      effectivePolicy: {},
-      idempotencyKey: randomUUID(),
-    })
+    const prompt = (sessionId: string) =>
+      runtime!.enqueueTurn(sessionId, {
+        input: [{ type: 'text', text: 'Take the slot.' }],
+        source: 'interactive',
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
+      })
 
     // The first turn holds the one provider slot: this driver waits on a permission and does not finish.
     await prompt(first.id)
@@ -2095,21 +2297,30 @@ describe('managed agent runtime conformance', () => {
         label: 'Model',
         category: 'model',
         currentValue: 'sonnet',
-        values: [{ value: 'sonnet', label: 'Sonnet 5' }, { value: 'opus', label: 'Opus 5' }],
+        values: [
+          { value: 'sonnet', label: 'Sonnet 5' },
+          { value: 'opus', label: 'Opus 5' },
+        ],
       },
       {
         id: 'reasoning',
         label: 'Reasoning effort',
         category: 'reasoning',
         currentValue: 'medium',
-        values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }],
+        values: [
+          { value: 'medium', label: 'Medium' },
+          { value: 'high', label: 'High' },
+        ],
       },
       {
         id: 'mode',
         label: 'Mode',
         category: 'mode',
         currentValue: 'default',
-        values: [{ value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }],
+        values: [
+          { value: 'default', label: 'Default' },
+          { value: 'plan', label: 'Plan' },
+        ],
       },
     ]
     const session = await runtime.createSession({
@@ -2131,7 +2342,8 @@ describe('managed agent runtime conformance', () => {
 
     const snapshot = await runtime.store.snapshot(session.id, 0)
     const messages = snapshot.events.flatMap((record) =>
-      record.event.type === 'diagnostic' ? [record.event.message] : [])
+      record.event.type === 'diagnostic' ? [record.event.message] : [],
+    )
     expect(messages).toContain('Model changed to Opus 5')
     expect(messages).toContain('Reasoning effort changed to High')
     expect(messages).toContain('Mode changed to Plan')
@@ -2159,64 +2371,96 @@ describe('managed agent runtime conformance', () => {
       label: 'Model',
       category: 'model' as const,
       currentValue: 'sonnet',
-      values: [{ value: 'sonnet', label: 'Sonnet 5' }, { value: 'opus', label: 'Opus 5' }],
+      values: [
+        { value: 'sonnet', label: 'Sonnet 5' },
+        { value: 'opus', label: 'Opus 5' },
+      ],
     },
     {
       id: 'reasoning',
       label: 'Reasoning effort',
       category: 'reasoning' as const,
       currentValue: 'medium',
-      values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }],
+      values: [
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' },
+      ],
     },
     {
       id: 'mode',
       label: 'Mode',
       category: 'mode' as const,
       currentValue: 'default',
-      values: [{ value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }],
+      values: [
+        { value: 'default', label: 'Default' },
+        { value: 'plan', label: 'Plan' },
+      ],
     },
   ]
 
-  const defaultsRuntime = (owner: string, driver: () => AgentDriver = () => new FakeAgentDriver()) => new ManagedAgentRuntime({
-    db: pluginDb.db,
-    dataDir,
-    core,
-    internalEnv: () => ({}),
-    secrets: SECRETS,
-    currentUserId: () => owner,
-    registry: (() => {
-      const registry = new AgentDriverRegistry()
-      registry.registerNative('fake', driver)
-      return registry
-    })(),
-  })
+  const defaultsRuntime = (owner: string, driver: () => AgentDriver = () => new FakeAgentDriver()) =>
+    new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => owner,
+      registry: (() => {
+        const registry = new AgentDriverRegistry()
+        registry.registerNative('fake', driver)
+        return registry
+      })(),
+    })
 
   it('lets a plugin pick an advertised option through the picker path, named in the transcript and not remembered', async () => {
     const seed = await seedTask(testDb, dataDir)
     const owner = 'owner-plugin-config'
     runtime = defaultsRuntime(owner)
     const session = await runtime.createSession({
-      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { configOptions: advertised() },
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { configOptions: advertised() },
     })
     const rows: AgentSession[] = []
-    runtime.frames.subscribe((frame) => { if (frame.channel === 'agent:session') rows.push(frame.session) })
+    runtime.frames.subscribe((frame) => {
+      if (frame.channel === 'agent:session') rows.push(frame.session)
+    })
     // What the host hands a loaded plugin (node-core's scopeCapabilities).
-    const bound = (createSessionControl(runtime) as AgentSessionControl & { [BIND_CAPABILITY_CALLER]: (id: string) => AgentSessionControl })[BIND_CAPABILITY_CALLER]('acorn-session-meter')
+    const bound = (
+      createSessionControl(runtime) as AgentSessionControl & {
+        [BIND_CAPABILITY_CALLER]: (id: string) => AgentSessionControl
+      }
+    )[BIND_CAPABILITY_CALLER]('acorn-session-meter')
 
     await bound.setConfig(seed.taskId, session.id, 'reasoning', 'high')
-    const effort = (config: Record<string, unknown>) => (config.configOptions as Array<{ id: string; currentValue: string }>).find((option) => option.id === 'reasoning')?.currentValue
+    const effort = (config: Record<string, unknown>) =>
+      (config.configOptions as Array<{ id: string; currentValue: string }>).find((option) => option.id === 'reasoning')
+        ?.currentValue
     expect(effort((await runtime.store.requireSession(session.id)).config)).toBe('high')
     // The row every client's picker reads.
     expect(effort(rows.at(-1)!.config)).toBe('high')
-    const messages = (await runtime.store.snapshot(session.id, 0)).events.flatMap((record) => record.event.type === 'diagnostic' ? [record.event.message] : [])
+    const messages = (await runtime.store.snapshot(session.id, 0)).events.flatMap((record) =>
+      record.event.type === 'diagnostic' ? [record.event.message] : [],
+    )
     expect(messages).toContain('Reasoning effort changed to High by acorn-session-meter')
     expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
 
-    await expect(bound.setConfig(seed.taskId, session.id, 'temperature', 'hot')).rejects.toThrow("did not advertise option 'temperature'")
-    await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'max')).rejects.toThrow("did not advertise value 'max'")
-    await expect(bound.setConfig('another-task', session.id, 'reasoning', 'medium')).rejects.toThrow('not found for this task')
+    await expect(bound.setConfig(seed.taskId, session.id, 'temperature', 'hot')).rejects.toThrow(
+      "did not advertise option 'temperature'",
+    )
+    await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'max')).rejects.toThrow(
+      "did not advertise value 'max'",
+    )
+    await expect(bound.setConfig('another-task', session.id, 'reasoning', 'medium')).rejects.toThrow(
+      'not found for this task',
+    )
     await runtime.store.setController(session.id, 'terminal')
-    await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'medium')).rejects.toThrow('controlled by terminal')
+    await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'medium')).rejects.toThrow(
+      'controlled by terminal',
+    )
     await runtime.store.setController(session.id, 'acorn')
     await runtime.patchSession(session.id, { archived: true })
     await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'medium')).rejects.toThrow('Archived')
@@ -2251,12 +2495,16 @@ describe('managed agent runtime conformance', () => {
     // 'nonsense' is not one of the values the provider advertised, so the provider's own choice stands.
     expect(options.find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
     const startupEvents = (await runtime.store.snapshot(session.id, 0)).events
-    expect(startupEvents.flatMap((record) =>
-      record.event.type === 'diagnostic' ? [record.event.message] : [])).toContain('Model changed to Opus 5')
-    expect(startupEvents.findLastIndex((record) =>
-      record.event.type === 'session_state' && record.event.state === 'ready'))
-      .toBeGreaterThan(startupEvents.findIndex((record) =>
-        record.event.type === 'diagnostic' && record.event.message === 'Model changed to Opus 5'))
+    expect(
+      startupEvents.flatMap((record) => (record.event.type === 'diagnostic' ? [record.event.message] : [])),
+    ).toContain('Model changed to Opus 5')
+    expect(
+      startupEvents.findLastIndex((record) => record.event.type === 'session_state' && record.event.state === 'ready'),
+    ).toBeGreaterThan(
+      startupEvents.findIndex(
+        (record) => record.event.type === 'diagnostic' && record.event.message === 'Model changed to Opus 5',
+      ),
+    )
     // Applying a stored default is not the owner switching anything.
     expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
   })
@@ -2274,9 +2522,12 @@ describe('managed agent runtime conformance', () => {
         let configOptions = advertised()
         await options.onEvent({ type: 'session_metadata', configOptions })
         const handle = await super.start(options)
-        return { ...handle,
+        return {
+          ...handle,
           async setConfig(id: string, value: string) {
-            configOptions = configOptions.map((option) => option.id === id ? { ...option, currentValue: value } : option)
+            configOptions = configOptions.map((option) =>
+              option.id === id ? { ...option, currentValue: value } : option,
+            )
             return configOptions
           },
           async sendTurn(input: Parameters<typeof handle.sendTurn>[0]) {
@@ -2287,20 +2538,33 @@ describe('managed agent runtime conformance', () => {
       }
     }
     runtime = defaultsRuntime(owner, () => new AdvertisingDriver())
-    const parent = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake',
-      kind: 'interactive', config: { configOptions: advertised() } })
-    const delegation = new AgentDelegationService(runtime, new AgentDelegationStore(pluginDb.db), async () => [])
-    const spawned = await delegation.spawn({ title: 'Child', prompt: 'Inspect.', isolation: 'shared' }, {
-      taskId: seed.taskId, sessionId: parent.id, callId: 'spawn-settings', userLogin: owner,
+    const parent = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { configOptions: advertised() },
     })
+    const delegation = new AgentDelegationService(runtime, new AgentDelegationStore(pluginDb.db), async () => [])
+    const spawned = await delegation.spawn(
+      { title: 'Child', prompt: 'Inspect.', isolation: 'shared' },
+      {
+        taskId: seed.taskId,
+        sessionId: parent.id,
+        callId: 'spawn-settings',
+        userLogin: owner,
+      },
+    )
     await vi.waitFor(async () => expect((await runtime!.store.turn(spawned.turnId!))?.status).toBe('completed'))
     const child = await runtime.store.requireSession(spawned.sessionId!)
     const options = child.config.configOptions as Array<{ id: string; currentValue: string }>
     expect(options.find((option) => option.id === 'model')?.currentValue).toBe('opus')
     expect(options.find((option) => option.id === 'reasoning')?.currentValue).toBe('high')
     expect(sentSettings).toEqual([{ model: 'opus', reasoning: 'high', mode: 'default' }])
-    expect((await runtime.store.turn(spawned.turnId!))?.effectivePolicy.configOptions)
-      .toEqual({ model: 'opus', reasoning: 'high' })
+    expect((await runtime.store.turn(spawned.turnId!))?.effectivePolicy.configOptions).toEqual({
+      model: 'opus',
+      reasoning: 'high',
+    })
     expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
   })
 
@@ -2317,11 +2581,13 @@ describe('managed agent runtime conformance', () => {
       config: { configOptions: advertised() },
     })
     await runtime.patchSession(first.id, {
-      config: { configOptions: advertised().map((option) => {
-        if (option.id === 'reasoning') return { ...option, currentValue: 'high' }
-        if (option.id === 'mode') return { ...option, currentValue: 'plan' }
-        return option
-      }) },
+      config: {
+        configOptions: advertised().map((option) => {
+          if (option.id === 'reasoning') return { ...option, currentValue: 'high' }
+          if (option.id === 'mode') return { ...option, currentValue: 'plan' }
+          return option
+        }),
+      },
     })
     expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({
       fake: { reasoning: 'high', mode: 'plan' },
@@ -2334,17 +2600,20 @@ describe('managed agent runtime conformance', () => {
       kind: 'interactive',
       config: { configOptions: advertised() },
     })
-    expect((second.config.configOptions as Array<{ id: string; currentValue: string }>)
-      .find((option) => option.id === 'reasoning')?.currentValue).toBe('high')
-    expect((second.config.configOptions as Array<{ id: string; currentValue: string }>)
-      .find((option) => option.id === 'mode')?.currentValue).toBe('plan')
+    expect(
+      (second.config.configOptions as Array<{ id: string; currentValue: string }>).find(
+        (option) => option.id === 'reasoning',
+      )?.currentValue,
+    ).toBe('high')
+    expect(
+      (second.config.configOptions as Array<{ id: string; currentValue: string }>).find(
+        (option) => option.id === 'mode',
+      )?.currentValue,
+    ).toBe('plan')
 
     // A workflow step names the model it wants in its own policy, and a fork continues the session it
     // came from, so neither takes the owner's interactive picks.
-    for (const input of [
-      { kind: 'workflow' as const },
-      { kind: 'interactive' as const, parentSessionId: first.id },
-    ]) {
+    for (const input of [{ kind: 'workflow' as const }, { kind: 'interactive' as const, parentSessionId: first.id }]) {
       const session = await runtime.createSession({
         taskId: seed.taskId,
         providerId: 'fake',
@@ -2352,10 +2621,16 @@ describe('managed agent runtime conformance', () => {
         config: { configOptions: advertised() },
         ...input,
       })
-      expect((session.config.configOptions as Array<{ id: string; currentValue: string }>)
-        .find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
-      expect((session.config.configOptions as Array<{ id: string; currentValue: string }>)
-        .find((option) => option.id === 'mode')?.currentValue).toBe('default')
+      expect(
+        (session.config.configOptions as Array<{ id: string; currentValue: string }>).find(
+          (option) => option.id === 'reasoning',
+        )?.currentValue,
+      ).toBe('medium')
+      expect(
+        (session.config.configOptions as Array<{ id: string; currentValue: string }>).find(
+          (option) => option.id === 'mode',
+        )?.currentValue,
+      ).toBe('default')
     }
   })
 
@@ -2392,43 +2667,78 @@ describe('managed agent runtime conformance', () => {
       config: { configOptions: advertised(), customAgent: { id: agent.id, name: 'x', instructions: 'Stale.' } },
     })
 
-    const value = (id: string) => (session.config.configOptions as Array<{ id: string; currentValue: string }>)
-      .find((option) => option.id === id)?.currentValue
+    const value = (id: string) =>
+      (session.config.configOptions as Array<{ id: string; currentValue: string }>).find((option) => option.id === id)
+        ?.currentValue
     // The agent names reasoning and mode; the model it leaves alone follows the owner's pin.
     expect([value('model'), value('reasoning'), value('mode')]).toEqual(['opus', 'high', 'plan'])
-    expect(session.config.customAgent).toEqual({ id: agent.id, name: 'Bug reviewer', instructions: 'Review for correctness only.' })
+    expect(session.config.customAgent).toEqual({
+      id: agent.id,
+      name: 'Bug reviewer',
+      instructions: 'Review for correctness only.',
+    })
     expect(session.config.toolCeiling).toEqual({ maxRisk: 'read' })
     // Starting from an agent is not the owner switching anything.
     expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
 
     // Editing the agent later leaves the running session's snapshot alone.
     await saveCustomAgent(core.prefs, owner, agent.id, { ...agent, instructions: 'Something else.' })
-    expect((await runtime.store.requireSession(session.id)).config.customAgent)
-      .toMatchObject({ instructions: 'Review for correctness only.' })
+    expect((await runtime.store.requireSession(session.id)).config.customAgent).toMatchObject({
+      instructions: 'Review for correctness only.',
+    })
 
     // A fork carries the snapshot and the settings its source is running, and does not re-apply the
     // agent's options over a switch made in the source.
-    await runtime.patchSession(session.id, { config: { ...(await runtime.store.requireSession(session.id)).config,
-      configOptions: (session.config.configOptions as Array<{ id: string }>).map((option) =>
-        option.id === 'reasoning' ? { ...option, currentValue: 'medium' } : option) } })
-    const replaced = await runtime.patchSession(session.id, { config: {
-      configOptions: (await runtime.store.requireSession(session.id)).config.configOptions,
-      customAgent: { id: 'forged', instructions: 'Changed instructions.' },
-    } })
+    await runtime.patchSession(session.id, {
+      config: {
+        ...(await runtime.store.requireSession(session.id)).config,
+        configOptions: (session.config.configOptions as Array<{ id: string }>).map((option) =>
+          option.id === 'reasoning' ? { ...option, currentValue: 'medium' } : option,
+        ),
+      },
+    })
+    const replaced = await runtime.patchSession(session.id, {
+      config: {
+        configOptions: (await runtime.store.requireSession(session.id)).config.configOptions,
+        customAgent: { id: 'forged', instructions: 'Changed instructions.' },
+      },
+    })
     expect(replaced.config.customAgent).toEqual(session.config.customAgent)
     const fork = await runtime.fork(session.id)
     expect(fork.config.customAgent).toMatchObject({ id: agent.id, instructions: 'Review for correctness only.' })
-    expect((fork.config.configOptions as Array<{ id: string; currentValue: string }>)
-      .find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
+    expect(
+      (fork.config.configOptions as Array<{ id: string; currentValue: string }>).find(
+        (option) => option.id === 'reasoning',
+      )?.currentValue,
+    ).toBe('medium')
 
     // An agent on another provider, or one that no longer exists, is refused rather than half-applied.
-    await expect(runtime.createSession({
-      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', customAgentId: 'missing', config: {},
-    })).rejects.toThrow('no longer exists')
-    const other = await saveCustomAgent(core.prefs, owner, null, { name: 'Elsewhere', providerId: 'codex', profileId: 'codex', options: {} })
-    await expect(runtime.createSession({
-      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', customAgentId: other.id, config: {},
-    })).rejects.toThrow("runs on 'codex'")
+    await expect(
+      runtime.createSession({
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        customAgentId: 'missing',
+        config: {},
+      }),
+    ).rejects.toThrow('no longer exists')
+    const other = await saveCustomAgent(core.prefs, owner, null, {
+      name: 'Elsewhere',
+      providerId: 'codex',
+      profileId: 'codex',
+      options: {},
+    })
+    await expect(
+      runtime.createSession({
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        customAgentId: other.id,
+        config: {},
+      }),
+    ).rejects.toThrow("runs on 'codex'")
   })
 
   // docs/mcp.md § Your own servers. Which programs a session starts is the owner's setting: it comes from
@@ -2452,23 +2762,49 @@ describe('managed agent runtime conformance', () => {
           starts.push(options)
           const handle = await super.start(options)
           const send = handle.sendTurn.bind(handle)
-          handle.sendTurn = (turn) => { sent.push(turn.input); return send(turn) }
+          handle.sendTurn = (turn) => {
+            sent.push(turn.input)
+            return send(turn)
+          }
           return handle
         }
       }
       registry.registerNative('fake', () => new CaptureDriver())
-      const boot = () => new ManagedAgentRuntime({ db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS, currentUserId: () => null, registry })
+      const boot = () =>
+        new ManagedAgentRuntime({
+          db: pluginDb.db,
+          dataDir,
+          core,
+          internalEnv: () => ({}),
+          secrets: SECRETS,
+          currentUserId: () => null,
+          registry,
+        })
       runtime = boot()
-      const session = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+      const session = await runtime.createSession({
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      })
       const turn = async (text: string) => {
-        await runtime!.enqueueTurn(session.id, { input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: { providerDefault: true }, idempotencyKey: randomUUID() })
+        await runtime!.enqueueTurn(session.id, {
+          input: [{ type: 'text', text }],
+          source: 'interactive',
+          effectivePolicy: { providerDefault: true },
+          idempotencyKey: randomUUID(),
+        })
       }
-      const skillPart = (input: AgentInputPart[]) => input[0]?.type === 'context' && input[0].source === 'context.skills' ? input[0].content : null
+      const skillPart = (input: AgentInputPart[]) =>
+        input[0]?.type === 'context' && input[0].source === 'context.skills' ? input[0].content : null
       await turn('Review this.')
       await runtime.wait(session.id, 0, 'turn_completed', 2_000)
       expect(starts.at(-1)!.skillFolders).toEqual([read.skill.dir])
       expect(skillPart(sent.at(-1)!)).toContain(read.skill.file)
-      await vi.waitFor(() => expect(skillDeliveries(catalogueSkills('acme')[0]!).map((entry) => entry.outcome)).toEqual(['delivered']))
+      await vi.waitFor(() =>
+        expect(skillDeliveries(catalogueSkills('acme')[0]!).map((entry) => entry.outcome)).toEqual(['delivered']),
+      )
       // Once per start: the next turn on the same process carries no index.
       await turn('And this.')
       await runtime.wait(session.id, 0, 'turn_completed', 2_000)
@@ -2515,18 +2851,42 @@ describe('managed agent runtime conformance', () => {
           else await starts[0]!.onEvent({ type: 'session_metadata', commands: [{ name: 'acorn-acme:review' }] })
           const handle = await super.start(options)
           const send = handle.sendTurn.bind(handle)
-          handle.sendTurn = (turn) => { sent.push(turn.input); return send(turn) }
+          handle.sendTurn = (turn) => {
+            sent.push(turn.input)
+            return send(turn)
+          }
           return handle
         }
       }
       registry.registerNative('fake', () => new NativeDriver())
-      const boot = () => new ManagedAgentRuntime({ db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS, currentUserId: () => null, registry })
+      const boot = () =>
+        new ManagedAgentRuntime({
+          db: pluginDb.db,
+          dataDir,
+          core,
+          internalEnv: () => ({}),
+          secrets: SECRETS,
+          currentUserId: () => null,
+          registry,
+        })
       runtime = boot()
-      const session = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+      const session = await runtime.createSession({
+        taskId: seed.taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      })
       const turn = async (text: string) => {
-        await runtime!.enqueueTurn(session.id, { input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: { providerDefault: true }, idempotencyKey: randomUUID() })
+        await runtime!.enqueueTurn(session.id, {
+          input: [{ type: 'text', text }],
+          source: 'interactive',
+          effectivePolicy: { providerDefault: true },
+          idempotencyKey: randomUUID(),
+        })
       }
-      const skillPart = (input: AgentInputPart[]) => input[0]?.type === 'context' && input[0].source === 'context.skills' ? input[0].content : null
+      const skillPart = (input: AgentInputPart[]) =>
+        input[0]?.type === 'context' && input[0].source === 'context.skills' ? input[0].content : null
       const sessionFolders = join(dataDir, 'agent-skills', session.id)
 
       await turn('Review this.')
@@ -2536,8 +2896,12 @@ describe('managed agent runtime conformance', () => {
       expect(await readFile(join(plugin!, 'skills', 'review', 'format.md'), 'utf8')).toBe('The format.\n')
       expect(starts[0]!.skillFolders).toEqual([join(plugin!, 'skills', 'review')])
       expect(skillPart(sent[0]!)).toBeNull()
-      await vi.waitFor(() => expect(skillDeliveries(catalogueSkills('acme')[0]!)).toMatchObject([{ outcome: 'delivered', native: true }]))
-      await vi.waitFor(async () => expect((await runtime!.store.requireSession(session.id)).config.skillIndex).toEqual(['acorn-acme:review']))
+      await vi.waitFor(() =>
+        expect(skillDeliveries(catalogueSkills('acme')[0]!)).toMatchObject([{ outcome: 'delivered', native: true }]),
+      )
+      await vi.waitFor(async () =>
+        expect((await runtime!.store.requireSession(session.id)).config.skillIndex).toEqual(['acorn-acme:review']),
+      )
 
       // Archived, the process stops and its copy goes. Restored, the next start writes a new one, and
       // with the harness silent the skill reaches the agent through the index, at the copy's path.
@@ -2591,7 +2955,12 @@ describe('managed agent runtime conformance', () => {
       values: [{ name: 'LINEAR_API_KEY', value: 'lin_api_0123456789', secret: true }],
       enabled: true,
     })
-    const docs = await runtime.mcpServers.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: false })
+    const docs = await runtime.mcpServers.save('docs', {
+      transport: 'http',
+      url: 'https://docs.example/mcp',
+      values: [],
+      enabled: false,
+    })
     await runtime.mcpServers.consent('linear', linear.revision)
     await runtime.mcpServers.consent('docs', docs.revision)
 
@@ -2611,13 +2980,15 @@ describe('managed agent runtime conformance', () => {
       idempotencyKey: randomUUID(),
     })
     await runtime.wait(session.id, 0, 'turn_completed', 2_000)
-    expect(starts.at(-1)!.mcpServers).toEqual([{
-      transport: 'stdio',
-      name: 'linear',
-      command: 'npx',
-      args: ['linear-mcp'],
-      env: { LINEAR_API_KEY: 'lin_api_0123456789' },
-    }])
+    expect(starts.at(-1)!.mcpServers).toEqual([
+      {
+        transport: 'stdio',
+        name: 'linear',
+        command: 'npx',
+        args: ['linear-mcp'],
+        env: { LINEAR_API_KEY: 'lin_api_0123456789' },
+      },
+    ])
 
     // The general config patch cannot switch servers, the same way it cannot touch the tool ceiling.
     const patched = await runtime.patchSession(session.id, { config: { ...session.config, mcpServers: ['docs'] } })

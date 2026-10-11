@@ -21,10 +21,7 @@ type WorkflowInternalStartBase = {
   trigger: string
 }
 
-export type WorkflowInternalStart = WorkflowInternalStartBase & (
-  | { workflow: WorkflowDef }
-  | { workflowId: string }
-)
+export type WorkflowInternalStart = WorkflowInternalStartBase & ({ workflow: WorkflowDef } | { workflowId: string })
 
 export type WorkflowsRunnerHandle = {
   reconcile(): Promise<void>

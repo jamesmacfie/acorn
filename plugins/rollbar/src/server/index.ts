@@ -72,7 +72,8 @@ export type RollbarApiInstancesPage = { instances?: RollbarApiInstance[] }
 
 // Rollbar's items API reports level as a number on some plans; normalise to the word.
 const LEVELS: Record<number, string> = { 10: 'debug', 20: 'info', 30: 'warning', 40: 'error', 50: 'critical' }
-export const levelName = (level: string | number): string => (typeof level === 'number' ? (LEVELS[level] ?? String(level)) : level)
+export const levelName = (level: string | number): string =>
+  typeof level === 'number' ? (LEVELS[level] ?? String(level)) : level
 
 export const projectPath = '/project'
 export const itemsPath = (page: number) => `/items?status=active&page=${page}`

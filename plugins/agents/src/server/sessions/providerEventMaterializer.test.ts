@@ -55,10 +55,12 @@ describe('provider event materialization', () => {
       bytes: new Uint8Array(16 * 1024 * 1024 + 1),
     })
 
-    expect(events).toEqual([{
-      type: 'diagnostic',
-      level: 'warning',
-      message: 'The provider returned a generated artifact larger than 16 MiB.',
-    }])
+    expect(events).toEqual([
+      {
+        type: 'diagnostic',
+        level: 'warning',
+        message: 'The provider returned a generated artifact larger than 16 MiB.',
+      },
+    ])
   })
 })

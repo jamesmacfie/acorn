@@ -79,13 +79,20 @@ const startup = createPluginStartup({
 
 /** Resolves false when the roster failed. The startup screen shows and reports that failure
  *  (./startupStage.ts), so it is not also an unhandled rejection. */
-export const startClientPlugins = (): Promise<boolean> => startup.initialize().then(() => true, () => false)
+export const startClientPlugins = (): Promise<boolean> =>
+  startup.initialize().then(
+    () => true,
+    () => false,
+  )
 
 /** The startup screen's Try again. Imports and registers the roster afresh, then applies the node. */
 export function retryClientPlugins(): void {
   if (clientPlugins().kind !== 'failed') return
   setClientPlugins({ kind: 'pending' })
-  void startup.retry().then(() => applyNodePlugins(), () => {})
+  void startup.retry().then(
+    () => applyNodePlugins(),
+    () => {},
+  )
 }
 
 export async function applyNodePlugins(nodeId?: string): Promise<void> {

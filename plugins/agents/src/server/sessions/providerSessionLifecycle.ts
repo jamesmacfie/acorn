@@ -1,7 +1,14 @@
 import { ProcessRetirementError } from '../processes/ownedProcess'
 import { awaitWithSignal } from '../processes/startCancellation'
 import type { AgentSession } from '../../contract/wire'
-import type { AgentDriver, AgentDriverEvent, AgentDriverLoopHooks, AgentDriverMcpServer, AgentDriverReadBlock, AgentDriverSession } from '../drivers/types'
+import type {
+  AgentDriver,
+  AgentDriverEvent,
+  AgentDriverLoopHooks,
+  AgentDriverMcpServer,
+  AgentDriverReadBlock,
+  AgentDriverSession,
+} from '../drivers/types'
 import type { AgentDriverRegistry } from '../drivers/registry'
 import type { PluginTelemetry } from '@acorn/plugin-api/node'
 import type { AgentStartupPhase, MeasureAgentStartup } from '../drivers/startupTelemetry'
@@ -59,7 +66,11 @@ export type ProviderLifecyclePorts = {
   hasProviderExecutionHistory(sessionId: string): Promise<boolean>
   /** The session's environment and task token. A `sandboxed` start's token can't reach execute tools. */
   scopedEnvironment(session: AgentSession, sandboxed: boolean): Record<string, string>
-  mcpServers(session: AgentSession, env: Record<string, string>, signal: AbortSignal): Promise<{
+  mcpServers(
+    session: AgentSession,
+    env: Record<string, string>,
+    signal: AbortSignal,
+  ): Promise<{
     servers: AgentDriverMcpServer[]
     unavailable: string[]
     retire?: () => Promise<void>
@@ -74,7 +85,12 @@ export type ProviderLifecyclePorts = {
   /** Whether the person switched the read block on, read at every start. */
   readBlockOn(): Promise<boolean>
   /** The read block for a start of a driver with `readBlock`, once `readBlockOn` said yes. */
-  readBlock(input: { sessionId: string; worktree: string; env: Record<string, string>; skillPaths: readonly string[] }): Promise<AgentDriverReadBlock>
+  readBlock(input: {
+    sessionId: string
+    worktree: string
+    env: Record<string, string>
+    skillPaths: readonly string[]
+  }): Promise<AgentDriverReadBlock>
   event(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void>
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
@@ -131,25 +147,50 @@ export class ProviderSessionLifecycle {
     return live ? this.facts(live) : null
   }
 
-  occupancy(): ProviderFacts[] { return [...this.live.values()].map((live) => this.facts(live)) }
-  ids(): string[] { return [...this.live.keys()] }
-  has(sessionId: string): boolean { return this.live.has(sessionId) }
+  occupancy(): ProviderFacts[] {
+    return [...this.live.values()].map((live) => this.facts(live))
+  }
+  ids(): string[] {
+    return [...this.live.keys()]
+  }
+  has(sessionId: string): boolean {
+    return this.live.has(sessionId)
+  }
   owns(generation: ProviderGeneration): boolean {
     const live = this.live.get(generation.sessionId)
-    return !!live && live.generation === generation && !live.stopping && !live.controller.signal.aborted && !this.ports.shuttingDown()
+    return (
+      !!live &&
+      live.generation === generation &&
+      !live.stopping &&
+      !live.controller.signal.aborted &&
+      !this.ports.shuttingDown()
+    )
   }
   signal(generation: ProviderGeneration): AbortSignal {
     const live = this.require(generation)
     return live.controller.signal
   }
-  holdReadiness(sessionId: string): void { this.readinessHolds.add(sessionId) }
-  releaseReadiness(sessionId: string): void { this.readinessHolds.delete(sessionId) }
-  isReadinessHeld(sessionId: string): boolean { return this.readinessHolds.has(sessionId) }
+  holdReadiness(sessionId: string): void {
+    this.readinessHolds.add(sessionId)
+  }
+  releaseReadiness(sessionId: string): void {
+    this.readinessHolds.delete(sessionId)
+  }
+  isReadinessHeld(sessionId: string): boolean {
+    return this.readinessHolds.has(sessionId)
+  }
   idleCandidate(sessionId: string, generation: ProviderGeneration, before: number): boolean {
     const live = this.live.get(sessionId)
-    return !!live && live.generation === generation && live.handle != null && !live.startPromise
-      && !live.stopping && !live.activeTurnId && !this.readinessHolds.has(sessionId)
-      && live.lastActivityAt <= before
+    return (
+      !!live &&
+      live.generation === generation &&
+      live.handle != null &&
+      !live.startPromise &&
+      !live.stopping &&
+      !live.activeTurnId &&
+      !this.readinessHolds.has(sessionId) &&
+      live.lastActivityAt <= before
+    )
   }
   markStopping(generation: ProviderGeneration): boolean {
     const live = this.live.get(generation.sessionId)
@@ -186,7 +227,9 @@ export class ProviderSessionLifecycle {
     live.acceptedResponse = false
     live.lastActivityAt = Date.now()
   }
-  accepted(generation: ProviderGeneration): boolean { return this.require(generation).acceptedResponse }
+  accepted(generation: ProviderGeneration): boolean {
+    return this.require(generation).acceptedResponse
+  }
   heard(generation: ProviderGeneration, substantive: boolean): void {
     const live = this.live.get(generation.sessionId)
     if (!live || live.generation !== generation) return
@@ -202,7 +245,10 @@ export class ProviderSessionLifecycle {
     return live
   }
 
-  async ensure(session: AgentSession, admission?: { turnId: string; workspaceId: string }): Promise<ProviderGeneration> {
+  async ensure(
+    session: AgentSession,
+    admission?: { turnId: string; workspaceId: string },
+  ): Promise<ProviderGeneration> {
     if (this.ports.shuttingDown()) throw new Error('The managed agent runtime is shutting down.')
     const existing = this.live.get(session.id)
     if (existing?.retirementFailure) throw existing.retirementFailure
@@ -219,13 +265,26 @@ export class ProviderSessionLifecycle {
     if (!driver) throw new Error(`Managed provider is not registered: ${session.providerId}`)
     const live: LiveSession = {
       generation: { sessionId: session.id, number: ++this.nextGeneration },
-      handle: null, startPromise: null, controller: new AbortController(), stopPromise: null,
-      retirementFailure: null, callbacks: new Set(), activeTurnId: null,
-      admissionTurnId: admission?.turnId ?? null, taskId: session.taskId,
-      workspaceId: admission?.workspaceId ?? '', providerId: session.providerId,
-      stopping: false, closing: false, lastActivityAt: Date.now(),
-      reconnectAttempt: existing?.reconnectAttempt ?? 0, acceptedResponse: false, driver,
-      skills: null, skillsOwed: false, advertised: new Set(),
+      handle: null,
+      startPromise: null,
+      controller: new AbortController(),
+      stopPromise: null,
+      retirementFailure: null,
+      callbacks: new Set(),
+      activeTurnId: null,
+      admissionTurnId: admission?.turnId ?? null,
+      taskId: session.taskId,
+      workspaceId: admission?.workspaceId ?? '',
+      providerId: session.providerId,
+      stopping: false,
+      closing: false,
+      lastActivityAt: Date.now(),
+      reconnectAttempt: existing?.reconnectAttempt ?? 0,
+      acceptedResponse: false,
+      driver,
+      skills: null,
+      skillsOwed: false,
+      advertised: new Set(),
       retireMcp: null,
     }
     // Install before any task, ledger, environment, or driver await.
@@ -239,7 +298,7 @@ export class ProviderSessionLifecycle {
 
   private async start(session: AgentSession, live: LiveSession): Promise<AgentDriverSession> {
     const signal = live.controller.signal
-    let startup: ReturnType<typeof import('./startupTelemetry')['sessionStartupTelemetry']>
+    let startup: ReturnType<(typeof import('./startupTelemetry'))['sessionStartupTelemetry']>
     try {
       if (this.ports.telemetry?.enabled()) {
         const { sessionStartupTelemetry } = await import('./startupTelemetry')
@@ -253,12 +312,15 @@ export class ProviderSessionLifecycle {
         return awaitWithSignal(query(), signal)
       }
       const cwd = await prepare('task.root', () => read(() => this.ports.taskRoot(session.taskId)))
-      if (!live.workspaceId) live.workspaceId = await prepare('workspace.read', () => read(() => this.ports.workspaceId(session.taskId)))
-      const noProviderExecutionHistory = !(await prepare('history.read', () => read(() => this.ports.hasProviderExecutionHistory(session.id))))
+      if (!live.workspaceId)
+        live.workspaceId = await prepare('workspace.read', () => read(() => this.ports.workspaceId(session.taskId)))
+      const noProviderExecutionHistory = !(await prepare('history.read', () =>
+        read(() => this.ports.hasProviderExecutionHistory(session.id)),
+      ))
       // Read at every start, like the hooks, so switching it applies from the next start. Decided before
       // the token is minted, because every execute tool runs outside the harness's sandbox, so a
       // sandboxed session's token stops at write tools (docs/managed-agents/read-block.md).
-      const sandboxed = live.driver.readBlock === true && await read(() => this.ports.readBlockOn())
+      const sandboxed = live.driver.readBlock === true && (await read(() => this.ports.readBlockOn()))
       signal.throwIfAborted()
       const env = this.ports.scopedEnvironment(session, sandboxed)
       const mcp = await prepare('mcp.prepare', () => read(() => this.ports.mcpServers(session, env, signal)))
@@ -274,25 +336,41 @@ export class ProviderSessionLifecycle {
       live.skillsOwed = true
       const loopHooks = live.driver.loopHooks ? await read(() => this.ports.loopHooks(session)) : null
       const readBlock = sandboxed
-        ? await read(() => this.ports.readBlock({ sessionId: session.id, worktree: cwd, env, skillPaths: [...skills.folders, ...skills.plugins] }))
+        ? await read(() =>
+            this.ports.readBlock({
+              sessionId: session.id,
+              worktree: cwd,
+              env,
+              skillPaths: [...skills.folders, ...skills.plugins],
+            }),
+          )
         : null
       const { attendanceInstructions } = await import('./attendanceInstructions')
       const instructions = attendanceInstructions(sessionAttendance(session))
       signal.throwIfAborted()
-      const launch = (measureStartup?: MeasureAgentStartup) => live.driver.start({
-        cwd, env, mcpServers: mcp.servers, skillFolders: skills.folders, skillPlugins: skills.plugins,
-        ...(loopHooks ? { loopHooks } : {}),
-        ...(readBlock ? { readBlock } : {}),
-        noProviderExecutionHistory, signal, session, measureStartup,
-        ...(instructions ? { attendanceInstructions: instructions } : {}),
-        onEvent: (event) => this.callback(live, () => {
-          if (event.type === 'session_metadata') {
-            for (const item of [...event.commands ?? [], ...event.skills ?? []]) live.advertised.add(item.name)
-          }
-          return this.ports.event(session.id, live.generation, event)
-        }),
-        onClosed: (error) => this.callback(live, () => this.closed(session.id, live, error)),
-      })
+      const launch = (measureStartup?: MeasureAgentStartup) =>
+        live.driver.start({
+          cwd,
+          env,
+          mcpServers: mcp.servers,
+          skillFolders: skills.folders,
+          skillPlugins: skills.plugins,
+          ...(loopHooks ? { loopHooks } : {}),
+          ...(readBlock ? { readBlock } : {}),
+          noProviderExecutionHistory,
+          signal,
+          session,
+          measureStartup,
+          ...(instructions ? { attendanceInstructions: instructions } : {}),
+          onEvent: (event) =>
+            this.callback(live, () => {
+              if (event.type === 'session_metadata') {
+                for (const item of [...(event.commands ?? []), ...(event.skills ?? [])]) live.advertised.add(item.name)
+              }
+              return this.ports.event(session.id, live.generation, event)
+            }),
+          onClosed: (error) => this.callback(live, () => this.closed(session.id, live, error)),
+        })
       const handle = await (startup ? startup.provider(launch) : launch())
       if (!this.owns(live.generation)) {
         await handle.stop()
@@ -307,12 +385,17 @@ export class ProviderSessionLifecycle {
     } catch (error) {
       startup?.end('error')
       if (error instanceof ProcessRetirementError) live.retirementFailure = error
-      if (!this.ports.shuttingDown() && !live.stopping) await this.ports.startFailed(session.id, live.admissionTurnId, error)
+      if (!this.ports.shuttingDown() && !live.stopping)
+        await this.ports.startFailed(session.id, live.admissionTurnId, error)
       throw error
     } finally {
       live.startPromise = null
-      if (!live.handle) { await this.retireSkills(live); await this.retireMcp(live) }
-      if (!live.handle && !live.stopping && !live.retirementFailure && this.live.get(session.id) === live) this.live.delete(session.id)
+      if (!live.handle) {
+        await this.retireSkills(live)
+        await this.retireMcp(live)
+      }
+      if (!live.handle && !live.stopping && !live.retirementFailure && this.live.get(session.id) === live)
+        this.live.delete(session.id)
     }
   }
 
@@ -335,17 +418,26 @@ export class ProviderSessionLifecycle {
     const done = work()
     this.callbacks.add(done)
     live.callbacks.add(done)
-    const settled = () => { this.callbacks.delete(done); live.callbacks.delete(done) }
+    const settled = () => {
+      this.callbacks.delete(done)
+      live.callbacks.delete(done)
+    }
     void done.then(settled, settled)
     return done
   }
 
-  async withHandle<T>(generation: ProviderGeneration, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T> {
+  async withHandle<T>(
+    generation: ProviderGeneration,
+    operation: (handle: AgentDriverSession) => Promise<T>,
+  ): Promise<T> {
     const live = this.require(generation)
     if (!this.owns(generation) || !live.handle) throw new Error('Provider session is not connected.')
     return operation(live.handle)
   }
-  async withCurrentHandle<T>(generation: ProviderGeneration, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T | null> {
+  async withCurrentHandle<T>(
+    generation: ProviderGeneration,
+    operation: (handle: AgentDriverSession) => Promise<T>,
+  ): Promise<T | null> {
     const live = this.live.get(generation.sessionId)
     if (!live || live.generation !== generation || !this.owns(generation) || !live.handle) return null
     return operation(live.handle)
@@ -361,12 +453,16 @@ export class ProviderSessionLifecycle {
     // The skills part rides ahead of the first turn after a start (../drivers/skillIndex.ts), decided now
     // from what the harness has advertised so far. It counts as delivered once that turn has run, and is
     // owed again if the turn failed.
-    const skills = live.skillsOwed ? live.skills?.firstTurn(live.advertised) ?? null : null
+    const skills = live.skillsOwed ? (live.skills?.firstTurn(live.advertised) ?? null) : null
     live.skillsOwed = false
-    void live.handle.sendTurn(skills?.part ? { ...request, input: [skills.part, ...request.input] } : request)
+    void live.handle
+      .sendTurn(skills?.part ? { ...request, input: [skills.part, ...request.input] } : request)
       .then(async (result) => {
         // A failed report must not turn a finished turn into a failed one.
-        if (skills) await this.callback(live, () => this.ports.skillsDelivered(generation.sessionId, skills.report)).catch(() => undefined)
+        if (skills)
+          await this.callback(live, () => this.ports.skillsDelivered(generation.sessionId, skills.report)).catch(
+            () => undefined,
+          )
         await this.callback(live, () => onSuccess(result))
       })
       .catch((error) => {
@@ -374,7 +470,10 @@ export class ProviderSessionLifecycle {
         return this.callback(live, () => onError(error))
       })
   }
-  async handleIfPresent<T>(sessionId: string, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T | null> {
+  async handleIfPresent<T>(
+    sessionId: string,
+    operation: (handle: AgentDriverSession) => Promise<T>,
+  ): Promise<T | null> {
     const live = this.live.get(sessionId)
     if (!live || !this.owns(live.generation) || !live.handle) return null
     return operation(live.handle)
@@ -382,7 +481,10 @@ export class ProviderSessionLifecycle {
 
   private async closed(sessionId: string, live: LiveSession, error?: Error): Promise<void> {
     if (!this.owns(live.generation) || live.closing) return
-    if (live.startPromise) { live.controller.abort(new Error(this.ports.closeMessage(error))); return }
+    if (live.startPromise) {
+      live.controller.abort(new Error(this.ports.closeMessage(error)))
+      return
+    }
     live.closing = true
     try {
       await live.handle?.stop()
@@ -404,8 +506,9 @@ export class ProviderSessionLifecycle {
     const timer = setTimeout(() => {
       this.reconnectTimers.delete(timer)
       if (!this.owns(live.generation)) return
-      void this.ports.session(sessionId)
-        .then((session) => this.owns(live.generation) ? this.ensure(session) : undefined)
+      void this.ports
+        .session(sessionId)
+        .then((session) => (this.owns(live.generation) ? this.ensure(session) : undefined))
         .catch(() => undefined)
     }, RECONNECT_DELAYS_MS[attempt])
     timer.unref?.()
@@ -448,7 +551,8 @@ export class ProviderSessionLifecycle {
   }
 
   abortAndClearTimers(): void {
-    for (const live of this.live.values()) live.controller.abort(new Error('The managed agent runtime is shutting down.'))
+    for (const live of this.live.values())
+      live.controller.abort(new Error('The managed agent runtime is shutting down.'))
     for (const timer of this.reconnectTimers) clearTimeout(timer)
     this.reconnectTimers.clear()
     for (const timer of this.quietTimers.values()) clearTimeout(timer)
@@ -463,13 +567,15 @@ export class ProviderSessionLifecycle {
     const failure = results.find((result): result is PromiseRejectedResult => result.status === 'rejected')
     if (failure) throw failure.reason
   }
-  async joinCallbacks(): Promise<void> { await Promise.allSettled([...this.callbacks]) }
+  async joinCallbacks(): Promise<void> {
+    await Promise.allSettled([...this.callbacks])
+  }
   stop(sessionId: string): Promise<void> {
     const live = this.live.get(sessionId)
     if (!live) return Promise.resolve()
     live.stopping = true
     live.controller.abort(new Error('The managed agent session is stopping.'))
-    return live.stopPromise ??= (async () => {
+    return (live.stopPromise ??= (async () => {
       await live.startPromise?.catch(() => undefined)
       if (live.retirementFailure) throw live.retirementFailure
       if (live.handle) await live.handle.stop()
@@ -479,6 +585,6 @@ export class ProviderSessionLifecycle {
       if (live.retirementFailure) throw live.retirementFailure
       await this.ports.retirementFlush(sessionId)
       if (this.live.get(sessionId) === live) this.live.delete(sessionId)
-    })()
+    })())
   }
 }

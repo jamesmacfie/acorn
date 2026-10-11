@@ -13,8 +13,19 @@ export const PLUGIN_CONTEXT_SECTION_MAX_BYTES = 64 * 1024
 export const PLUGIN_CONTEXT_SECTION_MAX_TOKENS = 16_384
 
 const SUPPORTED_SCHEMA_KEYS = new Set([
-  'type', 'description', 'properties', 'required', 'additionalProperties', 'items', 'enum',
-  'minLength', 'maxLength', 'minimum', 'maximum', 'minItems', 'maxItems',
+  'type',
+  'description',
+  'properties',
+  'required',
+  'additionalProperties',
+  'items',
+  'enum',
+  'minLength',
+  'maxLength',
+  'minimum',
+  'maximum',
+  'minItems',
+  'maxItems',
 ])
 const TYPES = new Set(['object', 'array', 'string', 'number', 'integer', 'boolean', 'null'])
 
@@ -24,7 +35,12 @@ const nonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0
 const finiteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value)
 
-function inspectSchema(value: unknown, path: (string | number)[], depth: number, issue: (path: (string | number)[], message: string) => void): void {
+function inspectSchema(
+  value: unknown,
+  path: (string | number)[],
+  depth: number,
+  issue: (path: (string | number)[], message: string) => void,
+): void {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     issue(path, 'must be a JSON Schema object')
     return
@@ -44,14 +60,21 @@ function inspectSchema(value: unknown, path: (string | number)[], depth: number,
     issue([...path, 'description'], 'must be a string')
   }
   if (schema.enum !== undefined) {
-    if (!Array.isArray(schema.enum) || schema.enum.length === 0 || schema.enum.length > PLUGIN_TOOL_SCHEMA_MAX_ENUM_VALUES) {
+    if (
+      !Array.isArray(schema.enum) ||
+      schema.enum.length === 0 ||
+      schema.enum.length > PLUGIN_TOOL_SCHEMA_MAX_ENUM_VALUES
+    ) {
       issue([...path, 'enum'], `must contain 1-${PLUGIN_TOOL_SCHEMA_MAX_ENUM_VALUES} JSON values`)
     } else if (schema.enum.some((entry) => entry !== null && !['string', 'number', 'boolean'].includes(typeof entry))) {
       issue([...path, 'enum'], 'values must be JSON scalars')
     }
   }
   if (schema.type === 'object') {
-    if (schema.properties !== undefined && (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties))) {
+    if (
+      schema.properties !== undefined &&
+      (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties))
+    ) {
       issue([...path, 'properties'], 'must be an object')
     } else {
       const properties = Object.entries((schema.properties ?? {}) as Record<string, unknown>)
@@ -60,13 +83,17 @@ function inspectSchema(value: unknown, path: (string | number)[], depth: number,
       }
       for (const [name, child] of properties) inspectSchema(child, [...path, 'properties', name], depth + 1, issue)
     }
-    if (schema.required !== undefined && (!Array.isArray(schema.required) || schema.required.some((entry) => typeof entry !== 'string'))) {
+    if (
+      schema.required !== undefined &&
+      (!Array.isArray(schema.required) || schema.required.some((entry) => typeof entry !== 'string'))
+    ) {
       issue([...path, 'required'], 'must be an array of property names')
     } else if (Array.isArray(schema.required)) {
       const required = schema.required as string[]
       const properties = (schema.properties ?? {}) as Record<string, unknown>
       if (new Set(required).size !== required.length) issue([...path, 'required'], 'must not repeat a property name')
-      for (const name of required) if (!(name in properties)) issue([...path, 'required'], `names unknown property '${name}'`)
+      for (const name of required)
+        if (!(name in properties)) issue([...path, 'required'], `names unknown property '${name}'`)
     }
     if (schema.additionalProperties !== undefined && typeof schema.additionalProperties !== 'boolean') {
       issue([...path, 'additionalProperties'], 'must be a boolean')
@@ -77,12 +104,17 @@ function inspectSchema(value: unknown, path: (string | number)[], depth: number,
     else inspectSchema(schema.items, [...path, 'items'], depth + 1, issue)
   }
   for (const key of ['minLength', 'maxLength', 'minItems', 'maxItems'] as const) {
-    if (schema[key] !== undefined && !nonNegativeInteger(schema[key])) issue([...path, key], 'must be a non-negative integer')
+    if (schema[key] !== undefined && !nonNegativeInteger(schema[key]))
+      issue([...path, key], 'must be a non-negative integer')
   }
   for (const key of ['minimum', 'maximum'] as const) {
     if (schema[key] !== undefined && !finiteNumber(schema[key])) issue([...path, key], 'must be a finite number')
   }
-  if (nonNegativeInteger(schema.minLength) && nonNegativeInteger(schema.maxLength) && schema.minLength > schema.maxLength) {
+  if (
+    nonNegativeInteger(schema.minLength) &&
+    nonNegativeInteger(schema.maxLength) &&
+    schema.minLength > schema.maxLength
+  ) {
     issue(path, 'minLength must not exceed maxLength')
   }
   if (nonNegativeInteger(schema.minItems) && nonNegativeInteger(schema.maxItems) && schema.minItems > schema.maxItems) {
@@ -99,7 +131,8 @@ export const boundedPluginToolSchema = z.record(z.string(), z.unknown()).superRe
     return
   }
   inspectSchema(value, [], 1, (path, message) => ctx.addIssue({ code: 'custom', path, message }))
-  if (value.type !== 'object') ctx.addIssue({ code: 'custom', path: ['type'], message: 'a plugin JSON schema must have type object' })
+  if (value.type !== 'object')
+    ctx.addIssue({ code: 'custom', path: ['type'], message: 'a plugin JSON schema must have type object' })
 })
 
 const localId = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/, 'id must be lowercase snake_case and start with a letter')
@@ -114,7 +147,12 @@ export const pluginAgentToolDescriptorSchema = z.object({
   handler: pluginRoute,
   requiresSession: z.boolean().default(false),
   timeoutMs: z.number().int().min(100).max(PLUGIN_TOOL_TIMEOUT_MAX_MS).default(10_000),
-  maxOutputBytes: z.number().int().min(1_024).max(PLUGIN_TOOL_OUTPUT_MAX_BYTES).default(64 * 1024),
+  maxOutputBytes: z
+    .number()
+    .int()
+    .min(1_024)
+    .max(PLUGIN_TOOL_OUTPUT_MAX_BYTES)
+    .default(64 * 1024),
 })
 
 export const pluginContextSectionDescriptorSchema = z.object({

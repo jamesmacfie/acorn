@@ -8,7 +8,11 @@ const DockerChips = lazy(async () => ({ default: (await import('./DockerTaskPane
 const DockerTaskDetail = lazy(async () => ({ default: (await import('./DockerTaskPane')).DockerTaskDetail }))
 
 export const dockerPaneContribution: PaneLayoutContribution = {
-  id: 'docker', label: 'Docker', glyph: 'brand:docker', description: 'Containers linked to this task', order: 75,
+  id: 'docker',
+  label: 'Docker',
+  glyph: 'brand:docker',
+  description: 'Containers linked to this task',
+  order: 75,
   when: (task) => (dockerTaskSummary(task.id)?.total ?? 0) > 0,
   minWidth: 320,
   layout: 'header-body-footer',

@@ -6,13 +6,33 @@ import { PANE_SWITCHER_ACTIONS, paneSwitcherRemote } from './paneSwitcherRemote'
 const person = { byPerson: true }
 
 const props = (): PaneSwitcherProps => ({
-  panes: [{
-    id: 'changes', label: 'Changes', icon: 'git-diff', shown: true, pinned: false,
-    markers: [{ id: 'core:pane:review:0', label: 'Two files flagged — review', dotTone: 'warn', tone: 'warn', placements: ['top-end', 'top-start'] }],
-  }],
+  panes: [
+    {
+      id: 'changes',
+      label: 'Changes',
+      icon: 'git-diff',
+      shown: true,
+      pinned: false,
+      markers: [
+        {
+          id: 'core:pane:review:0',
+          label: 'Two files flagged — review',
+          dotTone: 'warn',
+          tone: 'warn',
+          placements: ['top-end', 'top-start'],
+        },
+      ],
+    },
+  ],
   task: { id: 'task-1', title: 'Review', projectId: 'project-1' },
   maximized: null,
-  show: vi.fn(), add: vi.fn(), close: vi.fn(), pin: vi.fn(), toggleMaximize: vi.fn(), equalize: vi.fn(), openContextMenu: vi.fn(),
+  show: vi.fn(),
+  add: vi.fn(),
+  close: vi.fn(),
+  pin: vi.fn(),
+  toggleMaximize: vi.fn(),
+  equalize: vi.fn(),
+  openContextMenu: vi.fn(),
 })
 
 describe('pane switcher worker contract', () => {

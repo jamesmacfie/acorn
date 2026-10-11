@@ -4,7 +4,19 @@ import { createCredentialForm, integrationsOptions, modelBackendsOptions } from 
 import { integrationsKey, modelBackendsKey } from '@acorn/protocol/api.ts'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import { Alert, Badge, Button, Card, DescriptionList, Field, Heading, Inline, Input, Stack, Text } from '@acorn/plugin-api/ui'
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  DescriptionList,
+  Field,
+  Heading,
+  Inline,
+  Input,
+  Stack,
+  Text,
+} from '@acorn/plugin-api/ui'
 
 // The AI branch of the wizard: what this machine can already generate with, and a form for a key if
 // it can generate with nothing.
@@ -38,11 +50,12 @@ export default function AiSetup() {
   const keyProviders = createMemo(() => {
     const connected = integrations.data?.integrations ?? []
     const count = (providerId: string) => connected.filter((entry) => entry.providerId === providerId).length
-    return (integrations.data?.providers ?? []).filter((provider) =>
-      provider.kind === 'model-provider' &&
-      provider.connection.connectable &&
-      provider.connection.kind !== 'device-flow' &&
-      (provider.connection.maxConnections === undefined || count(provider.id) < provider.connection.maxConnections),
+    return (integrations.data?.providers ?? []).filter(
+      (provider) =>
+        provider.kind === 'model-provider' &&
+        provider.connection.connectable &&
+        provider.connection.kind !== 'device-flow' &&
+        (provider.connection.maxConnections === undefined || count(provider.id) < provider.connection.maxConnections),
     )
   })
 
@@ -70,8 +83,8 @@ export default function AiSetup() {
     <Stack gap="row">
       <Heading level={2}>Generate with AI</Heading>
       <Text emphasis="muted" wrap>
-        acorn can write commit messages, SQL queries, and workflows for you. It uses an AI tool already
-        on this computer, or an API key you add here.
+        acorn can write commit messages, SQL queries, and workflows for you. It uses an AI tool already on this
+        computer, or an API key you add here.
       </Text>
 
       {/* A list of facts, not cards: a card here looked exactly like the key cards below it, which
@@ -156,7 +169,9 @@ export default function AiSetup() {
                 >
                   Connect
                 </Button>
-                <Button variant="ghost" onPress={() => setOpenId('')}>Cancel</Button>
+                <Button variant="ghost" onPress={() => setOpenId('')}>
+                  Cancel
+                </Button>
               </Inline>
               <Show when={form.error()}>{(text) => <Alert>{text()}</Alert>}</Show>
             </Stack>

@@ -20,10 +20,12 @@ export class OwnedProcess {
     private readonly signalChild: (signal: NodeJS.Signals) => void,
     private readonly graceMs = SIGNAL_GRACE_MS,
   ) {
-    this.exited = new Promise((resolve) => observeExit(() => {
-      this.#exited = true
-      resolve()
-    }))
+    this.exited = new Promise((resolve) =>
+      observeExit(() => {
+        this.#exited = true
+        resolve()
+      }),
+    )
   }
 
   #groupAlive(): boolean {
@@ -42,7 +44,9 @@ export class OwnedProcess {
 
   #signal(signal: NodeJS.Signals): void {
     if (process.platform !== 'win32' && this.pid) {
-      try { process.kill(-this.pid, signal) } catch (error) {
+      try {
+        process.kill(-this.pid, signal)
+      } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
       }
     } else if (!this.#exited) {
@@ -51,9 +55,11 @@ export class OwnedProcess {
   }
 
   stop(polite?: () => void | Promise<unknown>, signal: NodeJS.Signals = 'SIGTERM'): Promise<void> {
-    return this.#stop ??= this.#retire(polite, signal).catch((error: unknown) => {
-      throw new ProcessRetirementError(error instanceof Error ? error.message : 'Agent process retirement failed.', { cause: error })
-    })
+    return (this.#stop ??= this.#retire(polite, signal).catch((error: unknown) => {
+      throw new ProcessRetirementError(error instanceof Error ? error.message : 'Agent process retirement failed.', {
+        cause: error,
+      })
+    }))
   }
 
   async #retire(polite: (() => void | Promise<unknown>) | undefined, signal: NodeJS.Signals): Promise<void> {
@@ -61,10 +67,16 @@ export class OwnedProcess {
       let timer: ReturnType<typeof setTimeout> | undefined
       try {
         await Promise.race([
-          Promise.resolve().then(polite).catch(() => undefined),
-          new Promise<void>((resolve) => { timer = setTimeout(resolve, PROTOCOL_CLOSE_MS) }),
+          Promise.resolve()
+            .then(polite)
+            .catch(() => undefined),
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, PROTOCOL_CLOSE_MS)
+          }),
         ])
-      } finally { clearTimeout(timer) }
+      } finally {
+        clearTimeout(timer)
+      }
     }
     this.#signal(signal)
     const graceUntil = Date.now() + this.graceMs
@@ -77,12 +89,10 @@ export class OwnedProcess {
   }
 }
 
-export function spawnOwnedProcess(options: {
-  command: string
-  args: string[]
-  cwd?: string
-  env: NodeJS.ProcessEnv
-}): { child: ChildProcessWithoutNullStreams; owner: OwnedProcess } {
+export function spawnOwnedProcess(options: { command: string; args: string[]; cwd?: string; env: NodeJS.ProcessEnv }): {
+  child: ChildProcessWithoutNullStreams
+  owner: OwnedProcess
+} {
   const child = spawn(options.command, options.args, {
     cwd: options.cwd,
     env: options.env,
@@ -90,9 +100,17 @@ export function spawnOwnedProcess(options: {
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
   })
-  const owner = new OwnedProcess(child.pid, (done) => {
-    child.once('exit', done)
-    child.once('error', () => { if (!child.pid) done() })
-  }, (signal) => { child.kill(signal) })
+  const owner = new OwnedProcess(
+    child.pid,
+    (done) => {
+      child.once('exit', done)
+      child.once('error', () => {
+        if (!child.pid) done()
+      })
+    },
+    (signal) => {
+      child.kill(signal)
+    },
+  )
   return { child, owner }
 }

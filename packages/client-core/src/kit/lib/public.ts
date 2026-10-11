@@ -4,8 +4,16 @@ export { copyText } from './controls/clipboard.ts'
 export { debounce } from './state/debounce.ts'
 export { clearLocal, deviceStorage, readLocal, writeLocal } from './state/deviceStorage.ts'
 export {
-  CHECK_TONE, FAILED_STATUSES, checkStatusTone, checkStatusWord, checksState, checksSummary,
-  fileStatusMeta, githubAvatarUrl, railDotProps, summarizeFileStats,
+  CHECK_TONE,
+  FAILED_STATUSES,
+  checkStatusTone,
+  checkStatusWord,
+  checksState,
+  checksSummary,
+  fileStatusMeta,
+  githubAvatarUrl,
+  railDotProps,
+  summarizeFileStats,
 } from './rendering/displayMeta.ts'
 export { persistDraft, readDraft, writeDraft } from './state/draftState.ts'
 export { formatRelativeTime } from './rendering/formatRelativeTime.ts'

@@ -11,18 +11,33 @@ describe('linear project source', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   const respond = (body: unknown, status = 200) =>
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+    )
 
   // The source asks twice, once per kind, so the stub answers on what the query names.
   const respondByQuery = (bodies: { projects: unknown; teams: unknown }) =>
-    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => {
-      const query = String(JSON.parse(String(init.body)).query)
-      return Promise.resolve(new Response(JSON.stringify({ data: query.includes('teams') ? bodies.teams : bodies.projects })))
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init: RequestInit) => {
+        const query = String(JSON.parse(String(init.body)).query)
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: query.includes('teams') ? bodies.teams : bodies.projects })),
+        )
+      }),
+    )
 
   it('projects Linear projects and teams onto the host shape', async () => {
     respondByQuery({
-      projects: { projects: { nodes: [{ id: 'proj-1', name: 'Platform' }, { id: 'proj-2', name: 'Mobile' }] } },
+      projects: {
+        projects: {
+          nodes: [
+            { id: 'proj-1', name: 'Platform' },
+            { id: 'proj-2', name: 'Mobile' },
+          ],
+        },
+      },
       teams: { teams: { nodes: [{ id: 'team-1', name: 'Engineering' }] } },
     })
     await expect(list()).resolves.toEqual([
@@ -55,7 +70,10 @@ describe('linear connection validate', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   const respond = (body: unknown, status = 200) =>
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify(body), { status }))),
+    )
 
   it('accepts a key that names a workspace', async () => {
     respond({ data: { viewer: { name: 'Jo', organization: { name: 'Acme' } } } })
@@ -82,43 +100,122 @@ describe('linear connection validate', () => {
 describe('linear provider normalization', () => {
   it('normalizes detail fields, activity, labels, and related issues', () => {
     const detail = linearNodeToDetail({
-      id: 'issue-1', identifier: 'ENG-42', title: 'Fix login', url: 'https://linear.app/acme/issue/ENG-42',
-      description: 'Body', createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-03T00:00:00Z',
-      state: { name: 'In Progress', type: 'started', color: '#fff' }, assignee: { name: 'Jo' },
-      creator: { name: 'Sam' }, labels: { nodes: [{ id: 'bug', name: 'Bug', color: '#f00' }] },
-      history: { nodes: [{
-        id: 'h1', createdAt: '2026-01-02T01:00:00Z', actor: { name: 'Sam' }, botActor: null,
-        fromState: null, toState: { name: 'In Progress', color: '#fff' }, fromAssignee: null, toAssignee: null,
-        addedLabelIds: ['bug'], removedLabelIds: null, fromTitle: null, toTitle: null,
-      }] },
-      comments: { nodes: [{ id: 'c1', body: 'Looks good', createdAt: '2026-01-03T00:00:00Z', user: null, parent: null }] },
-      relations: { nodes: [{ id: 'r1', type: 'blocks', relatedIssue: { id: 'issue-2', identifier: 'ENG-43', title: 'Ship it', state: null } }] },
+      id: 'issue-1',
+      identifier: 'ENG-42',
+      title: 'Fix login',
+      url: 'https://linear.app/acme/issue/ENG-42',
+      description: 'Body',
+      createdAt: '2026-01-02T00:00:00Z',
+      updatedAt: '2026-01-03T00:00:00Z',
+      state: { name: 'In Progress', type: 'started', color: '#fff' },
+      assignee: { name: 'Jo' },
+      creator: { name: 'Sam' },
+      labels: { nodes: [{ id: 'bug', name: 'Bug', color: '#f00' }] },
+      history: {
+        nodes: [
+          {
+            id: 'h1',
+            createdAt: '2026-01-02T01:00:00Z',
+            actor: { name: 'Sam' },
+            botActor: null,
+            fromState: null,
+            toState: { name: 'In Progress', color: '#fff' },
+            fromAssignee: null,
+            toAssignee: null,
+            addedLabelIds: ['bug'],
+            removedLabelIds: null,
+            fromTitle: null,
+            toTitle: null,
+          },
+        ],
+      },
+      comments: {
+        nodes: [{ id: 'c1', body: 'Looks good', createdAt: '2026-01-03T00:00:00Z', user: null, parent: null }],
+      },
+      relations: {
+        nodes: [
+          {
+            id: 'r1',
+            type: 'blocks',
+            relatedIssue: { id: 'issue-2', identifier: 'ENG-43', title: 'Ship it', state: null },
+          },
+        ],
+      },
       inverseRelations: { nodes: [] },
     })
 
     expect(detail).toMatchObject({
-      id: 'issue-1', identifier: 'ENG-42', assignee: 'Jo', creator: 'Sam',
-      createdAt: Date.parse('2026-01-02T00:00:00Z'), updatedAt: Date.parse('2026-01-03T00:00:00Z'),
+      id: 'issue-1',
+      identifier: 'ENG-42',
+      assignee: 'Jo',
+      creator: 'Sam',
+      createdAt: Date.parse('2026-01-02T00:00:00Z'),
+      updatedAt: Date.parse('2026-01-03T00:00:00Z'),
       labels: [{ id: 'bug', name: 'Bug', color: '#f00' }],
       comments: [{ id: 'c1', author: null, parentId: null }],
       relations: [{ id: 'r1', kind: 'blocks', label: 'Blocks', issue: { identifier: 'ENG-43' } }],
     })
     expect(detail.activity).toEqual([
-      { id: 'created', actor: 'Sam', text: 'created the issue', createdAt: Date.parse('2026-01-02T00:00:00Z'), icon: 'created' },
-      { id: 'h1:1', actor: 'Sam', text: 'moved to In Progress', createdAt: Date.parse('2026-01-02T01:00:00Z'), icon: 'state', color: '#fff' },
-      { id: 'h1:2', actor: 'Sam', text: 'added label Bug', createdAt: Date.parse('2026-01-02T01:00:00Z'), icon: 'label' },
+      {
+        id: 'created',
+        actor: 'Sam',
+        text: 'created the issue',
+        createdAt: Date.parse('2026-01-02T00:00:00Z'),
+        icon: 'created',
+      },
+      {
+        id: 'h1:1',
+        actor: 'Sam',
+        text: 'moved to In Progress',
+        createdAt: Date.parse('2026-01-02T01:00:00Z'),
+        icon: 'state',
+        color: '#fff',
+      },
+      {
+        id: 'h1:2',
+        actor: 'Sam',
+        text: 'added label Bug',
+        createdAt: Date.parse('2026-01-02T01:00:00Z'),
+        icon: 'label',
+      },
     ])
   })
 
   it('derives the summary from normalized detail without leaking detail fields', () => {
     const summary = linearSummaryOf({
-      id: 'issue-1', identifier: 'ENG-42', title: 'Fix login', url: 'https://linear.app/acme/issue/ENG-42',
-      state: { name: 'Done', type: 'completed', color: '#0f0' }, assignee: 'Jo', description: null,
-      comments: [], activity: [], labels: [], createdAt: null, updatedAt: null, creator: null,
-      priority: null, priorityLabel: null, estimate: null, dueDate: null, branchName: null, team: null,
-      project: null, cycle: null, attachments: [], parent: null, children: [], relations: [],
+      id: 'issue-1',
+      identifier: 'ENG-42',
+      title: 'Fix login',
+      url: 'https://linear.app/acme/issue/ENG-42',
+      state: { name: 'Done', type: 'completed', color: '#0f0' },
+      assignee: 'Jo',
+      description: null,
+      comments: [],
+      activity: [],
+      labels: [],
+      createdAt: null,
+      updatedAt: null,
+      creator: null,
+      priority: null,
+      priorityLabel: null,
+      estimate: null,
+      dueDate: null,
+      branchName: null,
+      team: null,
+      project: null,
+      cycle: null,
+      attachments: [],
+      parent: null,
+      children: [],
+      relations: [],
     })
-    expect(summary).toEqual({ identifier: 'ENG-42', title: 'Fix login', url: 'https://linear.app/acme/issue/ENG-42', state: { name: 'Done', type: 'completed', color: '#0f0' }, assignee: 'Jo' })
+    expect(summary).toEqual({
+      identifier: 'ENG-42',
+      title: 'Fix login',
+      url: 'https://linear.app/acme/issue/ENG-42',
+      state: { name: 'Done', type: 'completed', color: '#0f0' },
+      assignee: 'Jo',
+    })
   })
 })
 
@@ -128,16 +225,22 @@ describe('linear item detail', () => {
   const detailFor = (result: unknown) => linearProvider.detail!({ resource: async () => result } as never, 'ENG-42')
 
   it('returns the issue the resource served', async () => {
-    await expect(detailFor({ ok: true, value: { identifier: 'ENG-42', description: 'the brief' } }))
-      .resolves.toEqual({ identifier: 'ENG-42', description: 'the brief' })
+    await expect(detailFor({ ok: true, value: { identifier: 'ENG-42', description: 'the brief' } })).resolves.toEqual({
+      identifier: 'ENG-42',
+      description: 'the brief',
+    })
   })
 
   it('returns null when this workspace does not have the issue', async () => {
-    await expect(detailFor({ ok: false, failure: { error: 'provider_resource_not_found', status: 404 } })).resolves.toBeNull()
+    await expect(
+      detailFor({ ok: false, failure: { error: 'provider_resource_not_found', status: 404 } }),
+    ).resolves.toBeNull()
   })
 
   it('throws when the workspace refuses', async () => {
-    await expect(detailFor({ ok: false, failure: { error: 'provider_needs_auth', status: 401 } })).rejects.toThrow('provider_needs_auth')
+    await expect(detailFor({ ok: false, failure: { error: 'provider_needs_auth', status: 401 } })).rejects.toThrow(
+      'provider_needs_auth',
+    )
   })
 })
 
@@ -151,19 +254,31 @@ describe('linear agent hooks', () => {
 
   it('comments on the issue UUID the cached detail carries, with the call id as the comment id', async () => {
     const sent: unknown[] = []
-    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => {
-      sent.push(JSON.parse(String(init.body)).variables.input)
-      return Promise.resolve(new Response(JSON.stringify({ data: { commentCreate: { success: true, comment: { url: 'https://linear.app/c/1' } } } })))
-    }))
-    await expect(linearProvider.comment!({ resource, secret: 'lin_api_test', idempotencyKey: 'call-uuid' }, 'ENG-42', 'Done.'))
-      .resolves.toEqual({ url: 'https://linear.app/c/1' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init: RequestInit) => {
+        sent.push(JSON.parse(String(init.body)).variables.input)
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ data: { commentCreate: { success: true, comment: { url: 'https://linear.app/c/1' } } } }),
+          ),
+        )
+      }),
+    )
+    await expect(
+      linearProvider.comment!({ resource, secret: 'lin_api_test', idempotencyKey: 'call-uuid' }, 'ENG-42', 'Done.'),
+    ).resolves.toEqual({ url: 'https://linear.app/c/1' })
     expect(sent).toEqual([{ issueId: 'issue-uuid', body: 'Done.', id: 'call-uuid' }])
   })
 
   it('fetches only upload-host images, and hands back a non-image without its bytes', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('video', { headers: { 'content-type': 'video/mp4' } }))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('video', { headers: { 'content-type': 'video/mp4' } }))),
+    )
     await expect(linearProvider.image!({ secret: 'lin_api_test' }, 'https://evil.test/a.png')).resolves.toBeNull()
-    await expect(linearProvider.image!({ secret: 'lin_api_test' }, 'https://uploads.linear.app/w/clip.mp4'))
-      .resolves.toEqual({ mimeType: 'video/mp4', data: '' })
+    await expect(
+      linearProvider.image!({ secret: 'lin_api_test' }, 'https://uploads.linear.app/w/clip.mp4'),
+    ).resolves.toEqual({ mimeType: 'video/mp4', data: '' })
   })
 })

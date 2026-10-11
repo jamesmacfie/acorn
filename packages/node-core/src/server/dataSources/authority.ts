@@ -1,5 +1,11 @@
 import { eq } from 'drizzle-orm'
-import { parseDataSourceInputRef, type DataSourceInput, type DataSourceInputBinding, type DataSourceRequest, type DataSourceScope } from '@acorn/protocol/dataSources.ts'
+import {
+  parseDataSourceInputRef,
+  type DataSourceInput,
+  type DataSourceInputBinding,
+  type DataSourceRequest,
+  type DataSourceScope,
+} from '@acorn/protocol/dataSources.ts'
 import type { Env } from '../bindings'
 import { getDb, schema } from '../db'
 import { getConnection } from '../integrations/connections'
@@ -27,20 +33,27 @@ export async function authorizeDataSource(
   }
   const db = getDb(env)
   if (scope.workspaceId) {
-    const [workspace] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces)
+    const [workspace] = await db
+      .select({ id: schema.workspaces.id })
+      .from(schema.workspaces)
       .where(eq(schema.workspaces.id, scope.workspaceId))
     if (!workspace) throw new DataSourceError('forbidden')
   }
   if (scope.projectId) {
-    const [project] = await db.select({ workspaceId: schema.projects.workspaceId })
-      .from(schema.projects).where(eq(schema.projects.id, scope.projectId))
+    const [project] = await db
+      .select({ workspaceId: schema.projects.workspaceId })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, scope.projectId))
     if (!project || !scope.workspaceId || project.workspaceId !== scope.workspaceId) {
       throw new DataSourceError('forbidden')
     }
   }
   if (providerId) {
-    try { connectionProviderRegistry.assertOwnedBy(providerId, pluginId!) }
-    catch { throw new DataSourceError('forbidden') }
+    try {
+      connectionProviderRegistry.assertOwnedBy(providerId, pluginId!)
+    } catch {
+      throw new DataSourceError('forbidden')
+    }
     if (!scope.connectionId) throw new DataSourceError('connection-required')
     const connection = await getConnection(db, principal.userId, scope.connectionId)
     if (!connection || connection.provider !== providerId || ['disabled', 'needs-auth'].includes(connection.status)) {
@@ -76,7 +89,8 @@ export async function authorizeSourceInputs(
 ): Promise<void> {
   const declared = source.inputs ?? {}
   for (const name of Object.keys(scope.inputs ?? {})) {
-    if (!Object.hasOwn(declared, name)) throw new DataSourceError('invalid-request', { input: name, reason: 'Not a declared input' })
+    if (!Object.hasOwn(declared, name))
+      throw new DataSourceError('invalid-request', { input: name, reason: 'Not a declared input' })
   }
   for (const [name, input] of Object.entries(declared)) {
     const binding = scope.inputs?.[name]
@@ -86,11 +100,15 @@ export async function authorizeSourceInputs(
     }
     const target = inputSource(input)
     if (!target) throw new DataSourceError('input-unavailable', { input: name, reason: 'Source not installed' })
-    try { await authorizeDataSource(env, invocation, inputScope(scope, binding), target.pluginId, target.providerId) }
-    catch (error) {
+    try {
+      await authorizeDataSource(env, invocation, inputScope(scope, binding), target.pluginId, target.providerId)
+    } catch (error) {
       if (!(error instanceof DataSourceError) || error.code === 'cancelled' || error.code === 'timeout') throw error
       if (error.code === 'connection-required') throw new DataSourceError('input-required', { input: name })
-      throw new DataSourceError('input-unavailable', { input: name, reason: error.code === 'forbidden' ? 'Account unavailable' : error.code })
+      throw new DataSourceError('input-unavailable', {
+        input: name,
+        reason: error.code === 'forbidden' ? 'Account unavailable' : error.code,
+      })
     }
   }
 }

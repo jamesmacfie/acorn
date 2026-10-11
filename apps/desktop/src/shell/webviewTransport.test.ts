@@ -12,9 +12,12 @@ beforeEach(() => {
 
 it('registers the native listener before ensure replays retained browsing state', async () => {
   let registered!: () => void
-  native.listen.mockImplementation(() => new Promise((resolve) => {
-    registered = () => resolve(() => {})
-  }))
+  native.listen.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        registered = () => resolve(() => {})
+      }),
+  )
   const transport = await import('./webviewTransport')
   const observer = vi.fn()
   const off = transport.onWebviewState(observer, (key) => key === 'preview:a')
@@ -23,7 +26,13 @@ it('registers the native listener before ensure replays retained browsing state'
   expect(native.invoke).not.toHaveBeenCalled()
   registered()
   await ensured
-  const state = { key: 'preview:a', url: 'http://localhost:3000/settings', loading: false, canGoBack: true, canGoForward: false }
+  const state = {
+    key: 'preview:a',
+    url: 'http://localhost:3000/settings',
+    loading: false,
+    canGoBack: true,
+    canGoForward: false,
+  }
   native.listen.mock.calls[0][1]({ payload: state })
   expect(observer).toHaveBeenCalledWith(state)
   off()
@@ -33,7 +42,12 @@ it('registers the native listener before ensure replays retained browsing state'
 
 it('invalidates an in-flight ensure and queued show before retiring an owner', async () => {
   let finish!: (value: boolean) => void
-  native.invoke.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+  native.invoke.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
   const transport = await import('./webviewTransport')
   const ensured = transport.webviewOperation('preview:a', 'webview_ensure', { url: 'http://localhost:3000' })
   await vi.waitFor(() => expect(native.invoke).toHaveBeenCalledOnce())
@@ -44,26 +58,48 @@ it('invalidates an in-flight ensure and queued show before retiring an owner', a
   expect(await ensured).toBe(false)
   expect(await shown).toBe(false)
   expect(await replacement).toBe(true)
-  expect(native.invoke.mock.calls.map(([command]) => command)).toEqual(['webview_ensure', 'webview_evict_previews', 'webview_ensure'])
+  expect(native.invoke.mock.calls.map(([command]) => command)).toEqual([
+    'webview_ensure',
+    'webview_evict_previews',
+    'webview_ensure',
+  ])
 })
 
 it('keeps plugin retirement ordered and does not evict plugin pages on a preview Node switch', async () => {
   const transport = await import('./webviewTransport')
-  await transport.webviewOperation('plugin:db:n:pane', 'webview_ensure', { url: 'https://example.com', hosts: ['example.com'] })
+  await transport.webviewOperation('plugin:db:n:pane', 'webview_ensure', {
+    url: 'https://example.com',
+    hosts: ['example.com'],
+  })
   transport.evictPreviews()
   await vi.waitFor(() => expect(native.invoke).toHaveBeenCalledWith('webview_evict_previews'))
   transport.evictWebview('plugin:db:n:pane')
-  await transport.webviewOperation('plugin:db:n:pane', 'webview_ensure', { url: 'https://other.example', hosts: ['other.example'] })
-  expect(native.invoke.mock.calls.map(([command]) => command)).toEqual(['webview_ensure', 'webview_evict_previews', 'webview_evict', 'webview_ensure'])
+  await transport.webviewOperation('plugin:db:n:pane', 'webview_ensure', {
+    url: 'https://other.example',
+    hosts: ['other.example'],
+  })
+  expect(native.invoke.mock.calls.map(([command]) => command)).toEqual([
+    'webview_ensure',
+    'webview_evict_previews',
+    'webview_evict',
+    'webview_ensure',
+  ])
 })
 
 it('retires untracked native previews and blocks a different task until retirement completes', async () => {
   let finish!: () => void
-  native.invoke.mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(undefined) }))
+  native.invoke.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = () => resolve(undefined)
+      }),
+  )
   const transport = await import('./webviewTransport')
   transport.evictPreviews()
   await vi.waitFor(() => expect(native.invoke).toHaveBeenCalledWith('webview_evict_previews'))
-  const ensured = transport.webviewOperation('preview:new-node-task', 'webview_ensure', { url: 'http://localhost:3001' })
+  const ensured = transport.webviewOperation('preview:new-node-task', 'webview_ensure', {
+    url: 'http://localhost:3001',
+  })
   await Promise.resolve()
   expect(native.invoke).toHaveBeenCalledOnce()
   finish()

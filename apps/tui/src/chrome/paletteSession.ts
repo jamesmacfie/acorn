@@ -1,9 +1,5 @@
-import {
-  type CommandExecutionContext,
-} from '@acorn/client-core/host/registries/commands'
-import {
-  createCommandSession, type CommandSession,
-} from '@acorn/client-core/host/registries/commands'
+import { type CommandExecutionContext } from '@acorn/client-core/host/registries/commands'
+import { createCommandSession, type CommandSession } from '@acorn/client-core/host/registries/commands'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { activeTaskId } from '@acorn/client-core/features/tasks/tasks.ts'
 import { useNavigate } from '../kit/router'

@@ -20,35 +20,42 @@ const FOREIGN_PROVIDER = 'other-tracker-provider'
 const USER = 'owner-1'
 const SECRETS = new SecretService('24'.repeat(32))
 
-const provider = (id: string) => publicProvider({
-  id,
-  label: 'Portable tracker',
-  glyph: 'T',
-  kind: 'issue-tracker',
-  connection: {
-    authKind: 'api-key' as const,
-    fields: [],
-    connectable: true,
-    disconnectable: true,
-    async validate() { return 'secret' },
-    normalize(_credentials, secret) {
-      return { secret, label: 'Portable tracker', account: null, scopes: [], config: {}, capabilities: {} }
+const provider = (id: string) =>
+  publicProvider({
+    id,
+    label: 'Portable tracker',
+    glyph: 'T',
+    kind: 'issue-tracker',
+    connection: {
+      authKind: 'api-key' as const,
+      fields: [],
+      connectable: true,
+      disconnectable: true,
+      async validate() {
+        return 'secret'
+      },
+      normalize(_credentials, secret) {
+        return { secret, label: 'Portable tracker', account: null, scopes: [], config: {}, capabilities: {} }
+      },
+      async test() {
+        return { ok: true as const }
+      },
     },
-    async test() { return { ok: true as const } },
-  },
-  externalIds: externalIdsFor(id),
-  capabilities: { browse: true },
-  resources: [{
-    id: 'items',
-    ttlMs: 60_000,
-    merge: 'replace' as const,
-    key: (connectionId: string) => `${id}:${connectionId}:items`,
-    read: async () => ({ data: { items: ['one'] }, fetchedAt: Date.now() }),
-    refresh: async () => ({ ok: true as const }),
-  }],
-  budgets: defaultBudgets,
-  memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
-})
+    externalIds: externalIdsFor(id),
+    capabilities: { browse: true },
+    resources: [
+      {
+        id: 'items',
+        ttlMs: 60_000,
+        merge: 'replace' as const,
+        key: (connectionId: string) => `${id}:${connectionId}:items`,
+        read: async () => ({ data: { items: ['one'] }, fetchedAt: Date.now() }),
+        refresh: async () => ({ ok: true as const }),
+      },
+    ],
+    budgets: defaultBudgets,
+    memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
+  })
 
 const register = (id: string, owner: string): void => {
   const contribution = provider(id)
@@ -56,9 +63,8 @@ const register = (id: string, owner: string): void => {
   integrationProviderRegistry.register(contribution, owner)
 }
 
-const app = (principal: Principal) => new Hono<AppEnv>()
-  .use('/v1/*', ...testGate(principal))
-  .route('/v1/p', buildIntegrationProviderRoutes())
+const app = (principal: Principal) =>
+  new Hono<AppEnv>().use('/v1/*', ...testGate(principal)).route('/v1/p', buildIntegrationProviderRoutes())
 
 afterEach(() => {
   integrationProviderRegistry.removeForPlugin(OWNER)
@@ -70,22 +76,38 @@ afterEach(() => {
 describe('portable provider routes', () => {
   it('keeps host credentials out of the provider request while preserving verified identity', async () => {
     register(PROVIDER, OWNER)
-    integrationProviderRegistry.registerRoute({ providerId: PROVIDER, prefix: '', fetch: async (request, context) => Response.json({
-      headers: Object.fromEntries(request.headers), principal: context.principal, body: await request.text(),
-    }) })
+    integrationProviderRegistry.registerRoute({
+      providerId: PROVIDER,
+      prefix: '',
+      fetch: async (request, context) =>
+        Response.json({
+          headers: Object.fromEntries(request.headers),
+          principal: context.principal,
+          body: await request.text(),
+        }),
+    })
     const principal: Principal = { kind: 'device', userId: USER, deviceId: 'synthetic-device' }
-    const response = await app(principal).fetch(new Request(`http://acorn.test/v1/p/${PROVIDER}/echo`, {
-      method: 'POST', body: 'synthetic provider body', headers: {
-        Authorization: 'Bearer synthetic-owner-token', 'X-Acorn-Internal': 'synthetic-service-token',
-        Cookie: 'synthetic=secret', 'Proxy-Authorization': 'synthetic-proxy', 'X-Application': 'retained',
-      },
-    }), {} as Env)
+    const response = await app(principal).fetch(
+      new Request(`http://acorn.test/v1/p/${PROVIDER}/echo`, {
+        method: 'POST',
+        body: 'synthetic provider body',
+        headers: {
+          Authorization: 'Bearer synthetic-owner-token',
+          'X-Acorn-Internal': 'synthetic-service-token',
+          Cookie: 'synthetic=secret',
+          'Proxy-Authorization': 'synthetic-proxy',
+          'X-Application': 'retained',
+        },
+      }),
+      {} as Env,
+    )
     expect(response.status).toBe(200)
-    const seen = await response.json() as { headers: Record<string, string>; principal: Principal; body: string }
+    const seen = (await response.json()) as { headers: Record<string, string>; principal: Principal; body: string }
     expect(seen.principal).toEqual(principal)
     expect(seen.body).toBe('synthetic provider body')
     expect(seen.headers['x-application']).toBe('retained')
-    for (const name of ['authorization', 'x-acorn-internal', 'cookie', 'proxy-authorization']) expect(seen.headers).not.toHaveProperty(name)
+    for (const name of ['authorization', 'x-acorn-internal', 'cookie', 'proxy-authorization'])
+      expect(seen.headers).not.toHaveProperty(name)
   })
 
   it('mounts a fetch handler and preserves the provider-credential gate', async () => {
@@ -96,13 +118,17 @@ describe('portable provider routes', () => {
       fetch: (_request, context) => Response.json({ userId: context.userId }),
     })
 
-    const device = await app({ kind: 'device', userId: USER, deviceId: 'device-1' })
-      .fetch(new Request(`http://acorn.test/v1/p/${PROVIDER}`), {} as Env)
+    const device = await app({ kind: 'device', userId: USER, deviceId: 'device-1' }).fetch(
+      new Request(`http://acorn.test/v1/p/${PROVIDER}`),
+      {} as Env,
+    )
     expect(device.status).toBe(200)
     expect(await device.json()).toEqual({ userId: USER })
 
-    const task = await app({ kind: 'internal', userId: USER, scope: 'task', taskId: 'task-1' })
-      .fetch(new Request(`http://acorn.test/v1/p/${PROVIDER}`), {} as Env)
+    const task = await app({ kind: 'internal', userId: USER, scope: 'task', taskId: 'task-1' }).fetch(
+      new Request(`http://acorn.test/v1/p/${PROVIDER}`),
+      {} as Env,
+    )
     expect(task.status).toBe(403)
   })
 
@@ -166,9 +192,16 @@ describe('portable provider routes', () => {
     expect(await actual.json()).toEqual(expected)
     // Explicit source detail reads cannot silently turn a failed refresh into cached success.
     const contribution = integrationProviderRegistry.require(PROVIDER)
-    contribution.resources[0]!.refresh = async () => ({ ok: false, failure: { error: 'provider_unavailable', status: 502 } })
-    expect(await runProviderResource({ db: testDb.db, userId: USER, secrets: SECRETS, ...args, force: true })).toEqual(expected)
-    expect(await runProviderResource({ db: testDb.db, userId: USER, secrets: SECRETS, ...args, requireFresh: true })).toEqual({ ok: false, failure: { error: 'provider_unavailable', status: 502 } })
+    contribution.resources[0]!.refresh = async () => ({
+      ok: false,
+      failure: { error: 'provider_unavailable', status: 502 },
+    })
+    expect(await runProviderResource({ db: testDb.db, userId: USER, secrets: SECRETS, ...args, force: true })).toEqual(
+      expected,
+    )
+    expect(
+      await runProviderResource({ db: testDb.db, userId: USER, secrets: SECRETS, ...args, requireFresh: true }),
+    ).toEqual({ ok: false, failure: { error: 'provider_unavailable', status: 502 } })
     testDb.cleanup()
   })
 })

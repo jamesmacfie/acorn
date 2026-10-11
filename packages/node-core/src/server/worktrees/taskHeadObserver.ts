@@ -27,7 +27,14 @@ export function admitTaskHead(taskId: string, admittedScope: object): object {
   return generation
 }
 
-export function noticeTaskHead(taskId: string, generation: object, projectId: string, branch: string | null, head: string | null, dirty: boolean): void {
+export function noticeTaskHead(
+  taskId: string,
+  generation: object,
+  projectId: string,
+  branch: string | null,
+  head: string | null,
+  dirty: boolean,
+): void {
   const known = observations.get(taskId)
   if (!known || known.generation !== generation || !head) return
   const previous = known.head

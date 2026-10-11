@@ -7,7 +7,13 @@
 // The engine loads this on the first bridge call, not at boot (apps/node/scripts/check-service-budget.mjs).
 import { randomUUID } from 'node:crypto'
 import { createLogger, describeError, type PluginHookRegistry } from '@acorn/plugin-api/node'
-import type { AgentCapability, AgentNormalizedEvent, AgentProviderDescriptor, AgentSession, AgentTurn } from '../../contract/wire.ts'
+import type {
+  AgentCapability,
+  AgentNormalizedEvent,
+  AgentProviderDescriptor,
+  AgentSession,
+  AgentTurn,
+} from '../../contract/wire.ts'
 import { BEFORE_PERMISSION_HOOK } from '../../contract/permissionHook.ts'
 import {
   AFTER_TOOL_HOOK,
@@ -66,7 +72,8 @@ export async function answerLoopHook(
     const activeTurnId = ports.live(session.id)?.activeTurnId
     const turn = activeTurnId ? await ports.turn(activeTurnId) : null
     const attendance = turn
-      ? persistedAttendance(turn.effectivePolicy, { session, source: turn.source }) : sessionAttendance(session)
+      ? persistedAttendance(turn.effectivePolicy, { session, source: turn.source })
+      : sessionAttendance(session)
     const before: AgentBeforeToolPayload = {
       sessionId: session.id,
       taskId: session.taskId,
@@ -83,19 +90,31 @@ export async function answerLoopHook(
     }
     if (request.event === 'PostToolUse') {
       // Claude sends PostToolUse only for a call that finished; a failed one is a different event.
-      const verdict = await hooks.run<AgentAfterToolPayload>(AFTER_TOOL_HOOK.id, { ...before, succeeded: true, note: '' })
+      const verdict = await hooks.run<AgentAfterToolPayload>(AFTER_TOOL_HOOK.id, {
+        ...before,
+        succeeded: true,
+        note: '',
+      })
       return reply(claudeHookOutput('PostToolUse', { note: verdict.payload.note.trim().slice(0, LOOP_NOTE_MAX) }))
     }
     const verdict = await hooks.run(BEFORE_TOOL_HOOK.id, before)
     if (!verdict.ok) {
-      return reply(claudeHookOutput('PreToolUse', { deny: `Blocked by ${verdict.by ?? 'a plugin'}: ${verdict.reason ?? ''}`.trim() }))
+      return reply(
+        claudeHookOutput('PreToolUse', {
+          deny: `Blocked by ${verdict.by ?? 'a plugin'}: ${verdict.reason ?? ''}`.trim(),
+        }),
+      )
     }
     if (!verdict.ask) return reply('')
     if (attendance === 'autonomous') {
       const live = ports.live(session.id)
       if (live && live.activeTurnId === activeTurnId) {
-        await ports.accept({ sessionId: session.id, turnId: activeTurnId, generation: live.generation,
-          event: { type: 'diagnostic', level: 'info', message: AUTONOMOUS_REQUEST_MESSAGE } })
+        await ports.accept({
+          sessionId: session.id,
+          turnId: activeTurnId,
+          generation: live.generation,
+          event: { type: 'diagnostic', level: 'info', message: AUTONOMOUS_REQUEST_MESSAGE },
+        })
       }
       return reply(claudeHookOutput('PreToolUse', { deny: AUTONOMOUS_REQUEST_MESSAGE }))
     }
@@ -103,11 +122,14 @@ export async function answerLoopHook(
     const answer = await holdAsk(ports, session.id, { title: before.title, by, reason })
     // An approval is no decision, so the harness's own checks still run. Never an allow.
     if (answer === 'allowed') return reply('')
-    return reply(claudeHookOutput('PreToolUse', {
-      deny: answer === 'refused'
-        ? `The person refused this when ${by} asked them: ${reason}`
-        : `Nobody answered when ${by} asked the person about this: ${reason}`,
-    }))
+    return reply(
+      claudeHookOutput('PreToolUse', {
+        deny:
+          answer === 'refused'
+            ? `The person refused this when ${by} asked them: ${reason}`
+            : `Nobody answered when ${by} asked the person about this: ${reason}`,
+      }),
+    )
   } catch (error) {
     log.warn(`a ${request.event} bridge call was skipped: ${describeError(error).message}`)
     return reply('')
@@ -116,7 +138,11 @@ export async function answerLoopHook(
 
 // An ordinary permission card that names the plugin, recorded on the asking turn. The bridge call
 // waits here, not in the harness's own permission flow, which runs afterward on an approval.
-async function holdAsk(ports: LoopHookPorts, sessionId: string, question: { title: string; by: string; reason: string }): Promise<LoopAskAnswer> {
+async function holdAsk(
+  ports: LoopHookPorts,
+  sessionId: string,
+  question: { title: string; by: string; reason: string },
+): Promise<LoopAskAnswer> {
   const live = ports.live(sessionId)
   if (!live) return 'expired'
   const { generation, activeTurnId: turnId } = live
@@ -126,7 +152,10 @@ async function holdAsk(ports: LoopHookPorts, sessionId: string, question: { titl
   const answered = new Promise<unknown>((resolve) => {
     const timer = setTimeout(() => resolve(null), LOOP_ASK_HOLD_MS)
     timer.unref?.()
-    ports.asks.set(requestId, (resolution) => { clearTimeout(timer); resolve(resolution) })
+    ports.asks.set(requestId, (resolution) => {
+      clearTimeout(timer)
+      resolve(resolution)
+    })
   }).finally(() => ports.asks.delete(requestId))
   const request: AgentNormalizedEvent = {
     type: 'request',
@@ -139,7 +168,8 @@ async function holdAsk(ports: LoopHookPorts, sessionId: string, question: { titl
       { id: 'reject', label: 'Reject', kind: 'reject_once' },
     ],
   }
-  for (const event of await ports.materialize(sessionId, turnId, request)) await ports.accept({ sessionId, turnId, event, generation })
+  for (const event of await ports.materialize(sessionId, turnId, request))
+    await ports.accept({ sessionId, turnId, event, generation })
   const resolution = await answered
   if (resolution == null) {
     await ports.expire(sessionId, requestId)
@@ -155,23 +185,36 @@ export async function loopCoverage(
   pluginId: string,
 ): Promise<AgentLoopCoverage> {
   const [permission, before, after] = await Promise.all(
-    [BEFORE_PERMISSION_HOOK.id, BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map(async (id) => (await hooks.handlers(id)).includes(pluginId)),
+    [BEFORE_PERMISSION_HOOK.id, BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map(async (id) =>
+      (await hooks.handlers(id)).includes(pluginId),
+    ),
   )
   if (!permission && !before && !after) return { harnesses: [] }
   return {
-    harnesses: providers.filter((provider) => provider.installed).map((provider) => {
-      const coverage = reportedLoopCoverage(provider)
-      return {
-        label: provider.label,
-        beforeTool: before && coverage.beforeTool === 'every' ? 'every' : permission && coverage.permissionRequests ? 'asked' : 'none',
-        afterTool: after && coverage.afterTool,
-      }
-    }),
+    harnesses: providers
+      .filter((provider) => provider.installed)
+      .map((provider) => {
+        const coverage = reportedLoopCoverage(provider)
+        return {
+          label: provider.label,
+          beforeTool:
+            before && coverage.beforeTool === 'every'
+              ? 'every'
+              : permission && coverage.permissionRequests
+                ? 'asked'
+                : 'none',
+          afterTool: after && coverage.afterTool,
+        }
+      }),
   }
 }
 
 /** Capability interpretation shared by loop hooks and passive security diagnostics. */
-export function reportedLoopCoverage(provider: Pick<AgentProviderDescriptor, 'capabilities'>): { beforeTool: 'every' | 'asked' | 'none'; afterTool: boolean; permissionRequests: boolean } {
+export function reportedLoopCoverage(provider: Pick<AgentProviderDescriptor, 'capabilities'>): {
+  beforeTool: 'every' | 'asked' | 'none'
+  afterTool: boolean
+  permissionRequests: boolean
+} {
   const reports = (capability: AgentCapability) => provider.capabilities.includes(capability)
   return {
     beforeTool: reports('loop_before_tool') ? 'every' : reports('permissions') ? 'asked' : 'none',

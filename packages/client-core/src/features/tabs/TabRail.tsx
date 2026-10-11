@@ -1,10 +1,35 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Task, type Workspace } from '../../infra/queries'
-import { applyRailOrder, applySourceOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
+import {
+  integrationsOptions,
+  prefsOptions,
+  projectsOptions,
+  tasksKey,
+  tasksOptions,
+  workspacesOptions,
+  type Task,
+  type Workspace,
+} from '../../infra/queries'
+import {
+  applyRailOrder,
+  applySourceOrder,
+  moveTask,
+  parseRailOrder,
+  pinTask,
+  unpinTask,
+  type RailDropPosition,
+  type RailOrder,
+} from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
-import { activeTaskId, layoutForTask, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
+import {
+  activeTaskId,
+  layoutForTask,
+  selectedSource,
+  setActiveTaskId,
+  setSelectedSource,
+  type SourceId,
+} from '../tasks/tasks'
 import { defaultLayout } from '../tasks/taskLayout'
 import { defaultSourceId } from '../../host/registries/sources/sources'
 import { schedulePanePrefetch } from '../../host/registries/panes/panes'
@@ -33,7 +58,11 @@ import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
 import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
 import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints/exclusiveSlots'
-import { registerContextMenuItems, type TaskRowTarget, type RailSourceTarget } from '../../host/registries/panes/contextMenus'
+import {
+  registerContextMenuItems,
+  type TaskRowTarget,
+  type RailSourceTarget,
+} from '../../host/registries/panes/contextMenus'
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 import { menuPoint } from '../../host/registries/panes/menuPoint'
 import { activeNodeId } from '../../infra/node/activeNode'
@@ -87,7 +116,15 @@ export default function TabRail() {
   }
   async function commitDrop(id: string, targetId: string, position: RailDropPosition) {
     if (id === targetId) return
-    await saveOrder(moveTask(railOrder(), orderedTasks().map((t) => t.id), id, targetId, position))
+    await saveOrder(
+      moveTask(
+        railOrder(),
+        orderedTasks().map((t) => t.id),
+        id,
+        targetId,
+        position,
+      ),
+    )
   }
   const railDrag = createRailDrag({
     // Drag by the drawn tree. A task whose parent is gone, for example archived, is drawn as a
@@ -117,19 +154,27 @@ export default function TabRail() {
   const activeProjectId = () => params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId
   // A task refresh can remove the active row before archive navigation reaches its project.
   // Retain the workspace through that gap, as the desktop shell does for its topbar.
-  const activeWorkspace = createMemo<Workspace | null>((previous) =>
-    workspaceForProject(workspaces.data, activeProjectId()) ?? previous ?? null)
+  const activeWorkspace = createMemo<Workspace | null>(
+    (previous) => workspaceForProject(workspaces.data, activeProjectId()) ?? previous ?? null,
+  )
   const sourceScope = createSourceScope(() => activeWorkspace()?.id)
   const orderedTasks = () => {
     const ws = activeWorkspace()
     const all = query.data ?? []
     const inWs = ws ? new Set(ws.projects.map((project) => project.id)) : null
-    const scoped = inWs ? all.filter((task) => inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden) : all
+    const scoped = inWs
+      ? all.filter(
+          (task) =>
+            inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden,
+        )
+      : all
     return applyRailOrder(scoped, railOrder())
   }
   // The New task button's key cap, read from the live binding so a rebound chord shows as rebound.
   const newTaskChord = createMemo(() => {
-    const chord = resolveKeybindings(keybindingRegistry.entries(), prefs.data ?? {}).find((binding) => binding.id === 'task.create')?.chord
+    const chord = resolveKeybindings(keybindingRegistry.entries(), prefs.data ?? {}).find(
+      (binding) => binding.id === 'task.create',
+    )?.chord
     return chord ? formatChord(chord) : undefined
   })
   const taskRows = createMemo(() => workflowTaskHierarchy(orderedTasks(), expandedWorkflowRoots(), activeTaskId()))
@@ -145,14 +190,20 @@ export default function TabRail() {
 
   // Every source that can open, then the ones this device draws an icon for. The palette opens the
   // rest (./railVisibility.ts), so a hidden source is still one click away from somewhere.
-  const openableSources = () => applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
+  const openableSources = () =>
+    applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
   const sources = () => {
     const visibility = parseRailVisibility(prefs.data?.[PrefKeys.railVisibility])
     return openableSources().filter((source) => shownInRail(source.id, visibility))
   }
   // `core:source`, for the icons drawn and the routed project (../../host/annotations/statusAnnotations.ts).
   // Only sources whose owner consented are asked about, and the marks come back through `markersFor`.
-  createEffect(() => requestSourceAnnotations(sources().map((source) => source.id), activeProjectId()))
+  createEffect(() =>
+    requestSourceAnnotations(
+      sources().map((source) => source.id),
+      activeProjectId(),
+    ),
+  )
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
@@ -176,20 +227,36 @@ export default function TabRail() {
   }
   const sourceAction = registerContextMenuItems<'rail.source'>([
     {
-      id: 'core:rail-source-open', location: 'rail.source', label: 'Open', order: 100,
-      run: (target) => { if (target.nodeId === activeNodeId() && sources().some((source) => source.id === target.id)) selectSource(target.id) },
+      id: 'core:rail-source-open',
+      location: 'rail.source',
+      label: 'Open',
+      order: 100,
+      run: (target) => {
+        if (target.nodeId === activeNodeId() && sources().some((source) => source.id === target.id))
+          selectSource(target.id)
+      },
     },
     {
-      id: 'core:rail-source-copy-link', location: 'rail.source', label: 'Copy link', icon: 'copy', order: 110,
-      run: (target) => { if (target.nodeId === activeNodeId()) void copyLink(target.nodeId, { kind: 'source', sourceId: target.id }) },
+      id: 'core:rail-source-copy-link',
+      location: 'rail.source',
+      label: 'Copy link',
+      icon: 'copy',
+      order: 110,
+      run: (target) => {
+        if (target.nodeId === activeNodeId()) void copyLink(target.nodeId, { kind: 'source', sourceId: target.id })
+      },
     },
   ])
   onCleanup(() => sourceAction.dispose())
   createEffect(() => {
     const opened = sourceMenu()?.target
-    if (opened?.location === 'rail.source' &&
-      (opened.nodeId !== activeNodeId() || !sources().some((source) => source.id === opened.id) ||
-        sourceRegistry.get(opened.id) !== openedSource)) setSourceMenu(null)
+    if (
+      opened?.location === 'rail.source' &&
+      (opened.nodeId !== activeNodeId() ||
+        !sources().some((source) => source.id === opened.id) ||
+        sourceRegistry.get(opened.id) !== openedSource)
+    )
+      setSourceMenu(null)
   })
 
   function onRowClick(w: Task) {
@@ -227,28 +294,55 @@ export default function TabRail() {
     // menus).
     const rowActions = registerContextMenuItems([
       {
-        id: 'task.copy-link', location: 'task.row', label: 'Copy link', icon: 'copy', order: 5,
+        id: 'task.copy-link',
+        location: 'task.row',
+        label: 'Copy link',
+        icon: 'copy',
+        order: 5,
         run: (target) => void copyLink(activeNodeId(), { kind: 'task', taskId: target.id }),
       },
       {
-        id: 'task.pin', location: 'task.row', label: 'Pin to top', icon: 'pin', order: 10,
+        id: 'task.pin',
+        location: 'task.row',
+        label: 'Pin to top',
+        icon: 'pin',
+        order: 10,
         when: (target) => !target.pinned,
         run: (target) => void saveOrder(pinTask(railOrder(), target.id)),
       },
       {
-        id: 'task.unpin', location: 'task.row', label: 'Unpin', icon: 'pin-off', order: 10,
+        id: 'task.unpin',
+        location: 'task.row',
+        label: 'Unpin',
+        icon: 'pin-off',
+        order: 10,
         when: (target) => target.pinned,
         run: (target) => void saveOrder(unpinTask(railOrder(), target.id)),
       },
       {
-        id: 'task.rename', location: 'task.row', label: 'Rename', icon: 'square-pen', order: 20,
+        id: 'task.rename',
+        location: 'task.row',
+        label: 'Rename',
+        icon: 'square-pen',
+        order: 20,
         // Re-read from the query rather than closed over: a contribution gets the flat target and
         // the modal wants the whole row, which can have gone away in between.
-        run: (target) => { const task = taskById(target.id); if (task) openRename(task) },
+        run: (target) => {
+          const task = taskById(target.id)
+          if (task) openRename(task)
+        },
       },
       {
-        id: 'task.archive', location: 'task.row', label: 'Archive', icon: 'archive', order: 30, tone: 'danger',
-        run: (target) => { const task = taskById(target.id); if (task) void openArchive(task) },
+        id: 'task.archive',
+        location: 'task.row',
+        label: 'Archive',
+        icon: 'archive',
+        order: 30,
+        tone: 'danger',
+        run: (target) => {
+          const task = taskById(target.id)
+          if (task) void openArchive(task)
+        },
       },
     ])
     const numbered = Array.from({ length: 9 }, (_, index) => ({
@@ -272,25 +366,51 @@ export default function TabRail() {
       ...numbered,
     ])
     const bindings = registerKeybindings([
-      { id: 'task.create', command: 'task.create', description: 'New task', category: 'Tasks', defaultChord: 'meta+shift+n', when: 'global' },
+      {
+        id: 'task.create',
+        command: 'task.create',
+        description: 'New task',
+        category: 'Tasks',
+        defaultChord: 'meta+shift+n',
+        when: 'global',
+      },
       ...numbered.map((command, index) => ({
-        id: command.id, command: command.id, description: command.title, category: 'Tasks',
-        defaultChord: `meta+${index + 1}`, when: 'global' as const,
+        id: command.id,
+        command: command.id,
+        description: command.title,
+        category: 'Tasks',
+        defaultChord: `meta+${index + 1}`,
+        when: 'global' as const,
         active: () => visibleTasks().length > index,
       })),
     ])
-    onCleanup(() => { bindings.dispose(); commands.dispose(); rowActions.dispose() })
+    onCleanup(() => {
+      bindings.dispose()
+      commands.dispose()
+      rowActions.dispose()
+    })
   })
 
   function openNew() {
     setMenuId(null)
-    const options = (projects.data ?? []).filter((project) => !project.hidden && project.workspaceId === activeWorkspace()?.id)
+    const options = (projects.data ?? []).filter(
+      (project) => !project.hidden && project.workspaceId === activeWorkspace()?.id,
+    )
     if (!options.length) {
-        toast(words().singular === 'project' ? 'This project is hidden. Show it in Projects settings first.' : 'This workspace has no visible projects yet. Add one in Projects settings first.')
+      toast(
+        words().singular === 'project'
+          ? 'This project is hidden. Show it in Projects settings first.'
+          : 'This workspace has no visible projects yet. Add one in Projects settings first.',
+      )
       return
     }
     const current = params.projectId
-    setDraft({ mode: 'new', nodeId: activeNodeId(), projects: options, projectId: options.some((project) => project.id === current) ? current! : options[0].id })
+    setDraft({
+      mode: 'new',
+      nodeId: activeNodeId(),
+      projects: options,
+      projectId: options.some((project) => project.id === current) ? current! : options[0].id,
+    })
   }
 
   function openRename(task: Task) {
@@ -346,45 +466,52 @@ export default function TabRail() {
   }
 
   function finishArchive(w: Task, archivedTaskIds: string[]) {
-    completeTaskArchive(w.id, () => {
-      if (archivedTaskIds.includes(activeTaskId() ?? '')) {
-        setActiveTaskId(null)
-        const source = defaultSourceId()
-        if (source) setSelectedSource(source) // archived the active task → fall back to the default browse
-        navigate(projectPath(w.projectId))
-      }
-    }, archivedTaskIds)
+    completeTaskArchive(
+      w.id,
+      () => {
+        if (archivedTaskIds.includes(activeTaskId() ?? '')) {
+          setActiveTaskId(null)
+          const source = defaultSourceId()
+          if (source) setSelectedSource(source) // archived the active task → fall back to the default browse
+          navigate(projectPath(w.projectId))
+        }
+      },
+      archivedTaskIds,
+    )
   }
 
   const CoreTaskList = () => (
-      <div class="tabrail-list">
-        <For each={visibleTasks()}>
-          {(w) => {
-            // CI checks are provider-owned data. The shared rail no longer reaches through a
-            // repository source seam; the GitHub PR pane remains the authoritative check surface.
-            const scripts = createTaskScripts(() => w.id)
-            const checks = () => []
-            const st = () => taskStatus(w.id)
-            // Core's own states plus whatever plugins publish for this task. RailTab orders them,
-            // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
-            // and the words cannot drift.
-            const markers = () => [
-              ...railStatusMarkers({
-                checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
-                unread: !!unreadForTask(w.id),
-                status: st(),
-                archiving: isArchiving(w.id) || scripts.freshness() === 'live' && !!scripts.query.data?.archiveInProgress,
-                settingUp: scripts.freshness() === 'live' && ['starting', 'running'].includes(scripts.query.data?.setup.state ?? ''),
-                pinned: pinnedTasks().has(w.id),
-              }),
-              ...markersFor({ kind: 'task', id: w.id }),
-            ]
-            // Project identity owns the optional 3px accent. The task's projectId is the stable join;
-            // workspace membership only scopes which task rows are visible.
-            const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
-            const accent = () => resolveProjectColor(project()?.color) ?? undefined
-            const group = () => workflowGroups().get(w.id)
-            return (
+    <div class="tabrail-list">
+      <For each={visibleTasks()}>
+        {(w) => {
+          // CI checks are provider-owned data. The shared rail no longer reaches through a
+          // repository source seam; the GitHub PR pane remains the authoritative check surface.
+          const scripts = createTaskScripts(() => w.id)
+          const checks = () => []
+          const st = () => taskStatus(w.id)
+          // Core's own states plus whatever plugins publish for this task. RailTab orders them,
+          // picks a free corner for each, and legends the lot in the hover tooltip, so the icons
+          // and the words cannot drift.
+          const markers = () => [
+            ...railStatusMarkers({
+              checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
+              unread: !!unreadForTask(w.id),
+              status: st(),
+              archiving:
+                isArchiving(w.id) || (scripts.freshness() === 'live' && !!scripts.query.data?.archiveInProgress),
+              settingUp:
+                scripts.freshness() === 'live' &&
+                ['starting', 'running'].includes(scripts.query.data?.setup.state ?? ''),
+              pinned: pinnedTasks().has(w.id),
+            }),
+            ...markersFor({ kind: 'task', id: w.id }),
+          ]
+          // Project identity owns the optional 3px accent. The task's projectId is the stable join;
+          // workspace membership only scopes which task rows are visible.
+          const project = () => projects.data?.find((candidate) => candidate.id === w.projectId)
+          const accent = () => resolveProjectColor(project()?.color) ?? undefined
+          const group = () => workflowGroups().get(w.id)
+          return (
             <div
               class="tabrail-item"
               data-task-id={w.id}
@@ -427,10 +554,9 @@ export default function TabRail() {
                     active={!selectedSource() && w.id === activeTaskId()}
                     accent={accent()}
                     markers={markers()}
-                    data-tip-sub={[
-                      w.branch ?? 'Project folder',
-                      taskOriginAppearance(w.origin).tooltip,
-                    ].filter(Boolean).join(' · ')}
+                    data-tip-sub={[w.branch ?? 'Project folder', taskOriginAppearance(w.origin).tooltip]
+                      .filter(Boolean)
+                      .join(' · ')}
                     aria-haspopup="menu"
                     aria-expanded={menuId() === w.id}
                     onClick={() => onRowClick(w)}
@@ -453,16 +579,20 @@ export default function TabRail() {
                   aria-label={`${group()?.expanded ? 'Collapse' : 'Show'} ${group()?.workflowDescendants} workflow tasks under ${w.title}`}
                   aria-expanded={group()?.expanded}
                   onMouseDown={(event) => event.stopPropagation()}
-                  onClick={(event) => { event.stopPropagation(); toggleWorkflowRoot(w.id) }}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    toggleWorkflowRoot(w.id)
+                  }}
                 >
-                  {group()?.expanded ? '▾' : '▸'}<span>{group()?.workflowDescendants}</span>
+                  {group()?.expanded ? '▾' : '▸'}
+                  <span>{group()?.workflowDescendants}</span>
                 </button>
               </Show>
             </div>
-            )
-          }}
-        </For>
-      </div>
+          )
+        }}
+      </For>
+    </div>
   )
   const coreTaskList = registerCoreExclusiveSlot('rail.taskList', CoreTaskList)
   onCleanup(() => coreTaskList.dispose())
@@ -470,31 +600,45 @@ export default function TabRail() {
   const taskListRef = mintSlotRef()
   const railProps = (): RailProps => ({
     sources: sources().map((source) => ({
-      id: source.id, label: source.label, icon: source.glyph,
+      id: source.id,
+      label: source.label,
+      icon: source.glyph,
       selected: selectedSource() === source.id,
       markers: markersFor({ kind: 'source', id: source.id }),
     })),
-    workspaces: (workspaces.data ?? []).filter((workspace) => workspace.projects.length).map((workspace) => ({
-      id: workspace.id, label: workspace.name, active: workspace.id === activeWorkspace()?.id,
-    })),
+    workspaces: (workspaces.data ?? [])
+      .filter((workspace) => workspace.projects.length)
+      .map((workspace) => ({
+        id: workspace.id,
+        label: workspace.name,
+        active: workspace.id === activeWorkspace()?.id,
+      })),
     collapsed: prefs.data?.[PrefKeys.leftCollapsed] === 'true',
     formFactor: 'desktop',
     slots: { taskList: taskListRef },
-    selectSource: (id) => { if (sources().some((source) => source.id === id)) selectSource(id) },
+    selectSource: (id) => {
+      if (sources().some((source) => source.id === id)) selectSource(id)
+    },
     openContextMenu: openSourceMenu,
     openWorkspace: (id) => {
       const workspace = workspaces.data?.find((candidate) => candidate.id === id)
       const first = workspace?.projects[0]
       if (first) navigate(projectPath(first.id))
     },
-    toggleCollapsed: () => void saveJsonPref(queryClient, PrefKeys.leftCollapsed, prefs.data?.[PrefKeys.leftCollapsed] !== 'true'),
+    toggleCollapsed: () =>
+      void saveJsonPref(queryClient, PrefKeys.leftCollapsed, prefs.data?.[PrefKeys.leftCollapsed] !== 'true'),
     reorderSources: (ids) => {
       const available = sources().map((source) => source.id)
-      if (ids.length !== available.length || new Set(ids).size !== available.length || ids.some((id) => !available.includes(id))) return
+      if (
+        ids.length !== available.length ||
+        new Set(ids).size !== available.length ||
+        ids.some((id) => !available.includes(id))
+      )
+        return
       // The drawn icons take the drawn slots in their new order, and a hidden source keeps its own
       // slot, so showing it again puts it back where it was.
       const drawn = [...ids]
-      const merged = openableSources().map((source) => available.includes(source.id) ? drawn.shift()! : source.id)
+      const merged = openableSources().map((source) => (available.includes(source.id) ? drawn.shift()! : source.id))
       void saveOrder({ ...railOrder(), sources: merged })
     },
     createTask: openNew,
@@ -527,8 +671,13 @@ export default function TabRail() {
         </div>
         <div class="tabrail-sep" />
         <NestedChromeSlot slotRef={value().slots.taskList} />
-        <RailTab class="tabrail-bottom" label="New task" glyph="plus"
-          data-tip-key={newTaskChord()} onClick={value().createTask} />
+        <RailTab
+          class="tabrail-bottom"
+          label="New task"
+          glyph="plus"
+          data-tip-key={newTaskChord()}
+          onClick={value().createTask}
+        />
       </nav>
     )
   }
@@ -537,8 +686,11 @@ export default function TabRail() {
 
   return (
     <div class="rail-host" data-collapsed={railProps().collapsed || undefined}>
-      <ExclusiveSlotHost slot="rail" value={railProps()}
-        nestedSlots={[{ ref: taskListRef, render: () => <ExclusiveSlotHost slot="rail.taskList" /> }]} />
+      <ExclusiveSlotHost
+        slot="rail"
+        value={railProps()}
+        nestedSlots={[{ ref: taskListRef, render: () => <ExclusiveSlotHost slot="rail.taskList" /> }]}
+      />
       {/* One right-click menu for the whole list. Focus returns to the row's own button on dismiss,
           which is what keeps it usable from the keyboard. */}
       <ContextMenuHost
@@ -553,15 +705,23 @@ export default function TabRail() {
         ariaLabel={sourceMenu() ? `Actions for ${sourceMenu()!.target.title}` : 'Source actions'}
         opening={sourceMenu}
         onClose={() => setSourceMenu(null)}
-        returnFocus={() => sourceMenuReturnFocus?.isConnected ? sourceMenuReturnFocus : undefined}
+        returnFocus={() => (sourceMenuReturnFocus?.isConnected ? sourceMenuReturnFocus : undefined)}
       />
       <Show when={draft()} keyed>
         {(open) => <TaskDraftDialog draft={open} tasks={() => query.data} onClose={() => setDraft(null)} />}
       </Show>
       <Show when={taskLaunchRequest()} keyed>
-        {(open) => <TaskDraftDialog draft={{ mode: 'new', ...open, projects: projects.data ?? [] }} tasks={() => query.data} onClose={closeTaskLaunch} />}
+        {(open) => (
+          <TaskDraftDialog
+            draft={{ mode: 'new', ...open, projects: projects.data ?? [] }}
+            tasks={() => query.data}
+            onClose={closeTaskLaunch}
+          />
+        )}
       </Show>
-      <Show when={actionPickerRequest()} keyed>{(open) => <ActionPickerDialog request={open} />}</Show>
+      <Show when={actionPickerRequest()} keyed>
+        {(open) => <ActionPickerDialog request={open} />}
+      </Show>
     </div>
   )
 }

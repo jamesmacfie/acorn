@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
-import { AcornBridgeError, connect, mountFrame, mountTree, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
+import {
+  AcornBridgeError,
+  connect,
+  mountFrame,
+  mountTree,
+  openLinkOnClick,
+  _resetConnection,
+  type AcornBridge,
+} from './sdk'
 
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node
 // (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it: something
@@ -20,7 +28,12 @@ let sent: Record<string, unknown>[] = []
 
 const HELLO = { acornBridge: 1 }
 const CONTEXT: PluginFrameContext = {
-  surface: 'board', target: 'pane', nodeId: 'node-a', theme: 'dark', style: 'terminal', claimsKeys: ['meta+f'],
+  surface: 'board',
+  target: 'pane',
+  nodeId: 'node-a',
+  theme: 'dark',
+  style: 'terminal',
+  claimsKeys: ['meta+f'],
 }
 
 // A stand-in host: replies to whatever the frame asks with whatever the test told it to.
@@ -49,14 +62,20 @@ beforeEach(() => {
   keyListeners = []
   sent = []
   channel = new MessageChannel()
-  vi.stubGlobal('addEventListener', (type: string, listener: ((event: Hello) => void) | ((event: KeyboardEvent) => void)) => {
-    if (type === 'message') windowListeners.push(listener as (event: Hello) => void)
-    if (type === 'keydown') keyListeners.push(listener as (event: KeyboardEvent) => void)
-  })
-  vi.stubGlobal('removeEventListener', (type: string, listener: ((event: Hello) => void) | ((event: KeyboardEvent) => void)) => {
-    if (type === 'message') windowListeners = windowListeners.filter((entry) => entry !== listener)
-    if (type === 'keydown') keyListeners = keyListeners.filter((entry) => entry !== listener)
-  })
+  vi.stubGlobal(
+    'addEventListener',
+    (type: string, listener: ((event: Hello) => void) | ((event: KeyboardEvent) => void)) => {
+      if (type === 'message') windowListeners.push(listener as (event: Hello) => void)
+      if (type === 'keydown') keyListeners.push(listener as (event: KeyboardEvent) => void)
+    },
+  )
+  vi.stubGlobal(
+    'removeEventListener',
+    (type: string, listener: ((event: Hello) => void) | ((event: KeyboardEvent) => void)) => {
+      if (type === 'message') windowListeners = windowListeners.filter((entry) => entry !== listener)
+      if (type === 'keydown') keyListeners = keyListeners.filter((entry) => entry !== listener)
+    },
+  )
 })
 
 afterEach(() => {
@@ -81,7 +100,10 @@ describe('connect', () => {
       // A hello with no port is not a handshake either.
       listener({ data: HELLO, ports: [] })
     }
-    const settled = await Promise.race([connecting.then(() => 'connected'), new Promise((r) => setTimeout(() => r('waiting'), 20))])
+    const settled = await Promise.race([
+      connecting.then(() => 'connected'),
+      new Promise((r) => setTimeout(() => r('waiting'), 20)),
+    ])
     expect(settled).toBe('waiting')
   })
 
@@ -91,7 +113,7 @@ describe('connect', () => {
     expect(await connect()).toBe(acorn)
   })
 
-  it('acks the handshake, which is the host\'s only evidence the bundle evaluated', async () => {
+  it("acks the handshake, which is the host's only evidence the bundle evaluated", async () => {
     // A bundle that throws at module scope never calls connect(), so this message never arrives and the
     // host draws a placeholder instead of a blank rectangle.
     host(() => undefined)
@@ -116,15 +138,23 @@ describe('tree mount bridges', () => {
     tree.port1.onmessage = () => {}
     host(() => undefined)
 
-    mountTree({ pane: (bridge) => { drawn.set(bridge.context.surface, bridge) } })
+    mountTree({
+      pane: (bridge) => {
+        drawn.set(bridge.context.surface, bridge)
+      },
+    })
     for (const listener of windowListeners) listener({ data: HELLO, ports: [channel.port2, tree.port2] })
     push({ kind: 'ready', context: CONTEXT })
     await vi.waitFor(() => expect(sent).toContainEqual({ kind: 'connected' }))
 
     first.port1.postMessage({ kind: 'ready', context: firstContext })
     second.port1.postMessage({ kind: 'ready', context: secondContext })
-    tree.port1.postMessage({ kind: 'tree:mount', slot: 's1', entry: 'pane', props: {}, bridgePort: first.port2 }, [first.port2])
-    tree.port1.postMessage({ kind: 'tree:mount', slot: 's2', entry: 'pane', props: {}, bridgePort: second.port2 }, [second.port2])
+    tree.port1.postMessage({ kind: 'tree:mount', slot: 's1', entry: 'pane', props: {}, bridgePort: first.port2 }, [
+      first.port2,
+    ])
+    tree.port1.postMessage({ kind: 'tree:mount', slot: 's2', entry: 'pane', props: {}, bridgePort: second.port2 }, [
+      second.port2,
+    ])
     await vi.waitFor(() => expect(drawn.size).toBe(2))
     expect(drawn.get('task')?.context.taskId).toBe('task-a')
     expect(drawn.get('project')?.context.projectId).toBe('project-b')
@@ -142,7 +172,9 @@ describe('tree mount bridges', () => {
     const removeAbort = vi.spyOn(firstController.signal, 'removeEventListener')
     const firstCall = one.api.get('/v1/p/example/one', { signal: firstController.signal })
     const secondCall = two.api.get('/v1/p/example/two')
-    await vi.waitFor(() => expect(seen.every((messages) => messages.some((message) => message.kind === 'api'))).toBe(true))
+    await vi.waitFor(() =>
+      expect(seen.every((messages) => messages.some((message) => message.kind === 'api'))).toBe(true),
+    )
     const firstRequest = seen[0]!.find((message) => message.kind === 'api')!
     const secondRequest = seen[1]!.find((message) => message.kind === 'api')!
     expect(firstRequest.path).toBe('/v1/p/example/one')
@@ -165,8 +197,15 @@ describe('frame key forwarding', () => {
   const press = (over: Partial<KeyboardEvent> = {}) => {
     const preventDefault = vi.fn()
     const event = {
-      code: 'KeyK', key: 'k', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false,
-      target: { nodeName: 'DIV' }, preventDefault, ...over,
+      code: 'KeyK',
+      key: 'k',
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: false,
+      target: { nodeName: 'DIV' },
+      preventDefault,
+      ...over,
     } as unknown as KeyboardEvent
     for (const listener of keyListeners) listener(event)
     return preventDefault
@@ -214,7 +253,12 @@ describe('frame key forwarding', () => {
     const acorn = await handshake()
     acorn.keys.claim(['meta+j'])
     press({ code: 'KeyJ', key: 'j' })
-    press({ code: 'KeyA', key: 'a', metaKey: false, target: { nodeName: 'INPUT' } } as unknown as Partial<KeyboardEvent>)
+    press({
+      code: 'KeyA',
+      key: 'a',
+      metaKey: false,
+      target: { nodeName: 'INPUT' },
+    } as unknown as Partial<KeyboardEvent>)
     await vi.waitFor(() => {
       expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('meta+j'))
       expect(sent).toContainEqual({ kind: 'keydown', chord: 'meta+j' })
@@ -240,7 +284,9 @@ describe('frame key forwarding', () => {
 
 describe('api calls', () => {
   it('correlates the reply to the request', async () => {
-    host((message) => (message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: { tasks: [] } } : undefined))
+    host((message) =>
+      message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: { tasks: [] } } : undefined,
+    )
     const acorn = await handshake()
     await expect(acorn.api.get('/v1/core/tasks')).resolves.toEqual({ tasks: [] })
     expect(sent.at(-1)).toMatchObject({ kind: 'api', method: 'GET', path: '/v1/core/tasks' })
@@ -264,13 +310,26 @@ describe('api calls', () => {
   it('throws the host’s error envelope as an AcornBridgeError', async () => {
     host((message) =>
       message.kind === 'api'
-        ? { id: message.id, ok: false, error: { code: 'plugin_scope_denied', message: 'missing scope core.tasks:read', requestId: 'r1', retryable: false } }
+        ? {
+            id: message.id,
+            ok: false,
+            error: {
+              code: 'plugin_scope_denied',
+              message: 'missing scope core.tasks:read',
+              requestId: 'r1',
+              retryable: false,
+            },
+          }
         : undefined,
     )
     const acorn = await handshake()
     const error = await acorn.api.get('/v1/core/tasks').catch((e: unknown) => e)
     expect(error).toBeInstanceOf(AcornBridgeError)
-    expect(error).toMatchObject({ code: 'plugin_scope_denied', retryable: false, message: 'missing scope core.tasks:read' })
+    expect(error).toMatchObject({
+      code: 'plugin_scope_denied',
+      retryable: false,
+      message: 'missing scope core.tasks:read',
+    })
   })
 
   it('sends a body only when there is one', async () => {
@@ -294,7 +353,7 @@ describe('api calls', () => {
   })
 
   it('removes the abort listener after a request settles', async () => {
-    host((message) => message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: 'done' } : undefined)
+    host((message) => (message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: 'done' } : undefined))
     const acorn = await handshake()
     const controller = new AbortController()
     const remove = vi.spyOn(controller.signal, 'removeEventListener')
@@ -315,7 +374,9 @@ describe('api calls', () => {
 
 describe('events', () => {
   it('subscribes once per channel and fans out locally', async () => {
-    host((message) => (message.kind === 'subscribe' ? { id: message.id, ok: true, status: 200, body: null } : undefined))
+    host((message) =>
+      message.kind === 'subscribe' ? { id: message.id, ok: true, status: 200, body: null } : undefined,
+    )
     const acorn = await handshake()
     const first = vi.fn()
     const second = vi.fn()
@@ -340,7 +401,11 @@ describe('events', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     host((message) =>
       message.kind === 'subscribe'
-        ? { id: message.id, ok: false, error: { code: 'plugin_scope_denied', message: 'not declared', requestId: '', retryable: false } }
+        ? {
+            id: message.id,
+            ok: false,
+            error: { code: 'plugin_scope_denied', message: 'not declared', requestId: '', retryable: false },
+          }
         : undefined,
     )
     const acorn = await handshake()
@@ -363,7 +428,11 @@ describe('the shared document and surface actions', () => {
     expect(await acorn.document.read()).toBe('SELECT 1;')
     await acorn.document.write('SELECT 2;')
     await acorn.document.flush()
-    expect(sent.filter((message) => message.kind === 'document').map((message) => message.op)).toEqual(['read', 'write', 'flush'])
+    expect(sent.filter((message) => message.kind === 'document').map((message) => message.op)).toEqual([
+      'read',
+      'write',
+      'flush',
+    ])
     expect(sent.find((message) => message.op === 'write')?.text).toBe('SELECT 2;')
   })
 
@@ -409,7 +478,12 @@ describe('state and ui', () => {
     await acorn.ui.openPane('board')
     expect(sent.at(-1)).toMatchObject({ op: 'openPane', paneId: 'board' })
     await acorn.ui.openDestination('memory-review', 'candidate-1', 'revision-2')
-    expect(sent.at(-1)).toMatchObject({ op: 'openDestination', destinationId: 'memory-review', resourceId: 'candidate-1', subresourceId: 'revision-2' })
+    expect(sent.at(-1)).toMatchObject({
+      op: 'openDestination',
+      destinationId: 'memory-review',
+      resourceId: 'candidate-1',
+      subresourceId: 'revision-2',
+    })
     await acorn.ui.openTask('task-9')
     expect(sent.at(-1)).toMatchObject({ op: 'openTask', taskId: 'task-9' })
     await acorn.ui.openUrl('https://github.com/runn/acorn/pull/1')
@@ -423,7 +497,11 @@ describe('state and ui', () => {
   it('surfaces a denied ui verb as a rejection', async () => {
     host((message) =>
       message.kind === 'ui'
-        ? { id: message.id, ok: false, error: { code: 'plugin_scope_denied', message: 'not an importer', requestId: '', retryable: false } }
+        ? {
+            id: message.id,
+            ok: false,
+            error: { code: 'plugin_scope_denied', message: 'not an importer', requestId: '', retryable: false },
+          }
         : undefined,
     )
     const acorn = await handshake()
@@ -439,7 +517,9 @@ describe('openLinkOnClick', () => {
       defaultPrevented: false,
       button: 0,
       prevented: false,
-      target: { closest: (selector: string) => (selector === 'a' && href !== null ? { getAttribute: () => href } : null) },
+      target: {
+        closest: (selector: string) => (selector === 'a' && href !== null ? { getAttribute: () => href } : null),
+      },
       preventDefault() {
         this.prevented = true
       },
@@ -481,7 +561,11 @@ describe('openLinkOnClick', () => {
     expect(event.prevented).toBe(true)
     // The message this click sent, found by name rather than taken as the last one to arrive: the SDK's
     // handshake ack rides the same port unasked, so `sent.at(-1)` is a race even when nothing is slow.
-    expect(await delivered('openUrl')).toMatchObject({ kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/20535' })
+    expect(await delivered('openUrl')).toMatchObject({
+      kind: 'ui',
+      op: 'openUrl',
+      url: 'https://github.com/runn/acorn/pull/20535',
+    })
   })
 
   it('takes a MODIFIED click too, unlike the shell handler it mirrors', async () => {
@@ -499,7 +583,13 @@ describe('openLinkOnClick', () => {
     const before = sent.length
     // `mailto:` is the honest casualty: renderMarkdown allows it, the verb does not, and preventing the
     // default would only replace an inert link with a denied bridge call.
-    for (const href of ['mailto:someone@example.com', 'http://internal.example/', 'javascript:alert(1)', '#anchor', null]) {
+    for (const href of [
+      'mailto:someone@example.com',
+      'http://internal.example/',
+      'javascript:alert(1)',
+      '#anchor',
+      null,
+    ]) {
       const event = clickOn(href)
       expect(openLinkOnClick(acorn, event), String(href)).toBe(false)
       expect(event.prevented, String(href)).toBe(false)
@@ -534,7 +624,11 @@ describe('webview controls', () => {
 
     const navigated = vi.fn()
     acorn.webview.onNavigated(navigated)
-    push({ kind: 'event', channel: 'webview:navigated', payload: { url: 'https://docs.example.com/start', loading: false } })
+    push({
+      kind: 'event',
+      channel: 'webview:navigated',
+      payload: { url: 'https://docs.example.com/start', loading: false },
+    })
     await vi.waitFor(() =>
       expect(navigated).toHaveBeenCalledWith(expect.objectContaining({ url: 'https://docs.example.com/start' })),
     )
@@ -579,8 +673,12 @@ describe('mountFrame', () => {
     dataset: {},
     style: {},
     children: [],
-    append(...nodes) { this.children.push(...nodes) },
-    replaceChildren() { this.children = [] },
+    append(...nodes) {
+      this.children.push(...nodes)
+    },
+    replaceChildren() {
+      this.children = []
+    },
     remove() {},
   })
 
@@ -649,7 +747,9 @@ describe('telemetry and log', () => {
       { type: 'gauge', name: 'queue-depth', value: 3 },
       { type: 'error', name: 'UpstreamError', message: 'rate limited' },
     ])
-    expect(sent.filter((message) => message.kind === 'telemetry').every((message) => message.id === undefined)).toBe(true)
+    expect(sent.filter((message) => message.kind === 'telemetry').every((message) => message.id === undefined)).toBe(
+      true,
+    )
   })
 
   it('hands back what a measured call returned, and times a promise to settlement', async () => {
@@ -658,7 +758,10 @@ describe('telemetry and log', () => {
     expect(acorn.telemetry.measure('add', () => 41 + 1)).toBe(42)
 
     let release = (): void => {}
-    const pending = acorn.telemetry.measure('fetch', () => new Promise<string>((resolve) => (release = () => resolve('done'))))
+    const pending = acorn.telemetry.measure(
+      'fetch',
+      () => new Promise<string>((resolve) => (release = () => resolve('done'))),
+    )
     // Nothing is sent while the promise is open: a span that reported before its work finished
     // would be timing the call rather than the work.
     await vi.waitFor(() => expect(sent.filter((message) => message.kind === 'telemetry')).toHaveLength(1))
@@ -666,16 +769,23 @@ describe('telemetry and log', () => {
     expect(await pending).toBe('done')
     await vi.waitFor(() => expect(sent.filter((message) => message.kind === 'telemetry')).toHaveLength(2))
 
-    const spans = sent.filter((message) => message.kind === 'telemetry').map((message) => message.record as { type: string; name: string; status: string })
-    expect(spans.map((span) => [span.type, span.name, span.status])).toEqual([['span', 'add', 'ok'], ['span', 'fetch', 'ok']])
+    const spans = sent
+      .filter((message) => message.kind === 'telemetry')
+      .map((message) => message.record as { type: string; name: string; status: string })
+    expect(spans.map((span) => [span.type, span.name, span.status])).toEqual([
+      ['span', 'add', 'ok'],
+      ['span', 'fetch', 'ok'],
+    ])
   })
 
   it('marks a span that threw, and rethrows', async () => {
     host(() => undefined)
     const acorn = await handshake()
-    expect(() => acorn.telemetry.measure('boom', () => {
-      throw new Error('no')
-    })).toThrow('no')
+    expect(() =>
+      acorn.telemetry.measure('boom', () => {
+        throw new Error('no')
+      }),
+    ).toThrow('no')
     await new Promise((r) => setTimeout(r, 0))
     const span = sent.find((message) => message.kind === 'telemetry')?.record as { status: string }
     expect(span.status).toBe('error')
@@ -688,7 +798,9 @@ describe('telemetry and log', () => {
     span.end('error')
     span.end()
     await new Promise((r) => setTimeout(r, 0))
-    const records = sent.filter((message) => message.kind === 'telemetry').map((message) => message.record as { name: string; status: string; attrs: unknown })
+    const records = sent
+      .filter((message) => message.kind === 'telemetry')
+      .map((message) => message.record as { name: string; status: string; attrs: unknown })
     expect(records).toHaveLength(1)
     expect(records[0]).toMatchObject({ name: 'reindex', status: 'error', attrs: { pages: 4 } })
   })
@@ -702,7 +814,10 @@ describe('telemetry and log', () => {
       expect(warn).toHaveBeenCalledWith('upstream is slow retryAfter=30')
       await vi.waitFor(() => expect(sent.some((message) => message.kind === 'telemetry')).toBe(true))
       expect(sent.find((message) => message.kind === 'telemetry')?.record).toEqual({
-        type: 'log', level: 'warn', message: 'upstream is slow', attrs: { retryAfter: 30 },
+        type: 'log',
+        level: 'warn',
+        message: 'upstream is slow',
+        attrs: { retryAfter: 30 },
       })
     } finally {
       warn.mockRestore()

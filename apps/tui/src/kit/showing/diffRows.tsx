@@ -1,6 +1,14 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, For, Show } from 'solid-js'
-import { buildDiffRows, isCodeRow, plainTokenize, type CodeRow, type DiffFile, type HunkRow, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
+import {
+  buildDiffRows,
+  isCodeRow,
+  plainTokenize,
+  type CodeRow,
+  type DiffFile,
+  type HunkRow,
+  type Row as DiffRowT,
+} from '@acorn/client-core/kit/diff/diffModel.ts'
 import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
 import { annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
@@ -28,7 +36,12 @@ export function DiffLine(props: { r: CodeRow; canAdd?: boolean; highlight?: unkn
 }
 
 /** reduced: the path in bold with `+n −m` at the far end, and no collapse control. */
-export function FileHead(props: { file: Pick<DiffFile, 'path' | 'additions' | 'deletions'>; anchorId?: string; collapsed?: boolean; onToggleCollapse?: (path: string) => void }) {
+export function FileHead(props: {
+  file: Pick<DiffFile, 'path' | 'additions' | 'deletions'>
+  anchorId?: string
+  collapsed?: boolean
+  onToggleCollapse?: (path: string) => void
+}) {
   return (
     <box flexDirection="row" gap={1} flexShrink={0}>
       <Line role="strong">{props.file.path}</Line>
@@ -44,22 +57,41 @@ export function NonCodeRow(props: { row: Exclude<DiffRowT, CodeRow> }) {
   const text = () => {
     const row = props.row
     switch (row.kind) {
-      case 'file': return row.file.path
-      case 'hunk': return row.text
-      case 'gap': return `… ${row.count ?? 'more'} unchanged lines`
-      case 'nodiff': return 'no changes'
-      case 'load': return row.status === 'error' ? 'could not load this diff' : 'loading…'
-      case 'thread': return `${row.thread.comments.length} comment${row.thread.comments.length === 1 ? '' : 's'}`
-      default: return ''
+      case 'file':
+        return row.file.path
+      case 'hunk':
+        return row.text
+      case 'gap':
+        return `… ${row.count ?? 'more'} unchanged lines`
+      case 'nodiff':
+        return 'no changes'
+      case 'load':
+        return row.status === 'error' ? 'could not load this diff' : 'loading…'
+      case 'thread':
+        return `${row.thread.comments.length} comment${row.thread.comments.length === 1 ? '' : 's'}`
+      default:
+        return ''
     }
   }
-  return <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>{text()}</text>
+  return (
+    <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>
+      {text()}
+    </text>
+  )
 }
 
 /** reduced: show the file header and unified rows without interactive diff controls. */
 export function StackedDiff(props: { path: string; patch: string; lineNumbers?: boolean }) {
   const rows = createMemo(() => {
-    const file = { path: props.path, status: null, additions: null, deletions: null, sha: null, viewed: false, patch: props.patch }
+    const file = {
+      path: props.path,
+      status: null,
+      additions: null,
+      deletions: null,
+      sha: null,
+      viewed: false,
+      patch: props.patch,
+    }
     return buildDiffRows(file, plainTokenize).flatMap<HunkRow | CodeRow>((row) => {
       if (row.kind === 'hunk') return [row]
       if (!isCodeRow(row)) return []
@@ -93,7 +125,9 @@ export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotatio
         {(mark) => (
           <box flexDirection="row" gap={1} flexShrink={0}>
             <Show when={mark.icon}>{(name) => <Icon name={name()} />}</Show>
-            <Line tone={mark.severity === 'danger' ? 'danger' : mark.severity === 'warn' ? 'warn' : undefined}>{mark.text}</Line>
+            <Line tone={mark.severity === 'danger' ? 'danger' : mark.severity === 'warn' ? 'warn' : undefined}>
+              {mark.text}
+            </Line>
             <Line role="muted">{mark.pluginId}</Line>
           </box>
         )}

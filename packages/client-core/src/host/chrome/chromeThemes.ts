@@ -44,9 +44,9 @@ export function pluginThemeBlock(id: string, descriptor: PluginThemeDescriptor):
   // Self-description, written by the host from one boolean (docs/ui-design/appearance.md § Plugin themes).
   // --color-scheme is what makes a plugin theme colour syntax correctly with no further declaration:
   // the diff and fence rules read Shiki's dual output through light-dark(), which follows it.
-  declarations.push(descriptor.dark
-    ? '  --is-dark: 1;  --color-scheme: dark;'
-    : '  --is-dark: 0;  --color-scheme: light;')
+  declarations.push(
+    descriptor.dark ? '  --is-dark: 1;  --color-scheme: dark;' : '  --is-dark: 0;  --color-scheme: light;',
+  )
   return `:root[data-theme="${id}"] {\n${declarations.join('\n')}\n}`
 }
 

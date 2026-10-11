@@ -63,7 +63,12 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
     }
     try {
       const keys = JSON.parse(cipher.decrypt(Buffer.from(body, 'base64'))) as Partial<SealedKeys>
-      if (typeof keys.sessionKey === 'string' && HEX_KEY.test(keys.sessionKey) && typeof keys.signingKey === 'string' && keys.signingKey) {
+      if (
+        typeof keys.sessionKey === 'string' &&
+        HEX_KEY.test(keys.sessionKey) &&
+        typeof keys.signingKey === 'string' &&
+        keys.signingKey
+      ) {
         return { sessionKey: keys.sessionKey, signingKey: keys.signingKey }
       }
     } catch {
@@ -98,17 +103,24 @@ export function nodeKeyCustody(dataDir: string, cipher: TokenCipher, envSessionK
       // The same refusal as the Node's own (node-core server/sessionKey.ts): sealing a damaged key
       // would turn a broken file into credentials nobody can read.
       if (plainSession && !HEX_KEY.test(plainSession)) {
-        throw new Error(`${join(dataDir, PLAIN_SESSION_KEY)} does not hold a 64-hex key. Fix or remove it. Minting a second key would orphan every secret encrypted under the first.`)
+        throw new Error(
+          `${join(dataDir, PLAIN_SESSION_KEY)} does not hold a 64-hex key. Fix or remove it. Minting a second key would orphan every secret encrypted under the first.`,
+        )
       }
 
       let sealed = unseal()
       // Never rebuilt from plain files. An agent can damage this file and plant its own session.key,
       // and a rebuild would seal the agent's key. Deleting the file is the person's decision.
       if (sealed === 'unreadable') {
-        throw new Error(`${sealedPath} can't be opened with this app's data key, so the Node's stored credentials can't be read. Restore the "acorn" keychain item, or delete the file to start over. A plain session.key beside it is sealed again.`)
+        throw new Error(
+          `${sealedPath} can't be opened with this app's data key, so the Node's stored credentials can't be read. Restore the "acorn" keychain item, or delete the file to start over. A plain session.key beside it is sealed again.`,
+        )
       }
       if (!sealed) {
-        sealed = { sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'), signingKey: randomBytes(32).toString('hex') }
+        sealed = {
+          sessionKey: envSessionKey ?? plainSession ?? randomBytes(32).toString('hex'),
+          signingKey: randomBytes(32).toString('hex'),
+        }
         seal(sealed)
       }
       return { sessionKey: envSessionKey ?? sealed.sessionKey, signingKey: sealed.signingKey }

@@ -20,7 +20,12 @@ export type ExternalItemStore = {
    */
   listByIdentifier(identifiers: string[]): Promise<ExternalItemRow[]>
   write(row: { connectionId: string; identifier: string; data: string; fetchedAt: number }): Promise<void>
-  readResource(connectionId: string, issueIdentifier: string, resource: string, identifier: string): Promise<ExternalResourceRow | null>
+  readResource(
+    connectionId: string,
+    issueIdentifier: string,
+    resource: string,
+    identifier: string,
+  ): Promise<ExternalResourceRow | null>
   writeResource(row: {
     connectionId: string
     issueIdentifier: string
@@ -59,7 +64,9 @@ export function createExternalItemStore(db: AppDatabase, userId: string, provide
   const markerPrefix = `provider:${provider}:`
   const ownMarker = (resource: string): string => {
     if (!resource.startsWith(markerPrefix)) {
-      throw new Error(`External-item marker keys for ${provider} must start with "${markerPrefix}" — got "${resource}".`)
+      throw new Error(
+        `External-item marker keys for ${provider} must start with "${markerPrefix}" — got "${resource}".`,
+      )
     }
     return resource
   }
@@ -84,7 +91,13 @@ export function createExternalItemStore(db: AppDatabase, userId: string, provide
       const rows = await db
         .select()
         .from(schema.issues)
-        .where(and(eq(schema.issues.userId, userId), eq(schema.issues.integrationId, connectionId), eq(schema.issues.provider, provider)))
+        .where(
+          and(
+            eq(schema.issues.userId, userId),
+            eq(schema.issues.integrationId, connectionId),
+            eq(schema.issues.provider, provider),
+          ),
+        )
       return rows.map(item)
     },
 
@@ -93,7 +106,9 @@ export function createExternalItemStore(db: AppDatabase, userId: string, provide
       // provider-scoped passes its provider id here, where it would reach `inArray` as a string and
       // die as a malformed-SQL error three layers down. Say what is actually wrong instead.
       if (!Array.isArray(identifiers)) {
-        throw new TypeError(`listByIdentifier takes an array of identifiers — got ${typeof identifiers}. A plugin bundle built before the store was provider-scoped needs rebuilding (build:plugin).`)
+        throw new TypeError(
+          `listByIdentifier takes an array of identifiers — got ${typeof identifiers}. A plugin bundle built before the store was provider-scoped needs rebuilding (build:plugin).`,
+        )
       }
       // `inArray` with an empty list is a SQL syntax error in SQLite rather than an empty result, and
       // the caller legitimately reaches here with nothing to resolve.
@@ -101,14 +116,27 @@ export function createExternalItemStore(db: AppDatabase, userId: string, provide
       const rows = await db
         .select()
         .from(schema.issues)
-        .where(and(eq(schema.issues.userId, userId), eq(schema.issues.provider, provider), inArray(schema.issues.identifier, identifiers)))
+        .where(
+          and(
+            eq(schema.issues.userId, userId),
+            eq(schema.issues.provider, provider),
+            inArray(schema.issues.identifier, identifiers),
+          ),
+        )
       return rows.map(item)
     },
 
     async write(row) {
       await db
         .insert(schema.issues)
-        .values({ userId, integrationId: row.connectionId, provider, identifier: row.identifier, data: row.data, fetchedAt: row.fetchedAt })
+        .values({
+          userId,
+          integrationId: row.connectionId,
+          provider,
+          identifier: row.identifier,
+          data: row.data,
+          fetchedAt: row.fetchedAt,
+        })
         .onConflictDoUpdate({
           target: [schema.issues.userId, schema.issues.integrationId, schema.issues.identifier],
           set: { data: row.data, fetchedAt: row.fetchedAt },

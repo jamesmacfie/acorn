@@ -7,7 +7,10 @@ import type { SourceScope } from './railSources'
  *  each call site: the rail hides a source's row and App resets the selection when a source goes away,
  *  and those two must never disagree about which sources the active workspace has. */
 /** `enabled` is for a caller created before the startup gate releases, which App is. */
-export function createSourceScope(workspaceId: () => string | null | undefined, enabled: () => boolean = () => true): () => SourceScope {
+export function createSourceScope(
+  workspaceId: () => string | null | undefined,
+  enabled: () => boolean = () => true,
+): () => SourceScope {
   const integrations = createQuery(() => integrationsOptions(enabled()))
   const linked = createQuery(() => workspaceExternalProjectsOptions(workspaceId() ?? null, enabled()))
   // The same projects query the rail already holds, so this adds no request.

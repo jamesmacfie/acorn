@@ -8,25 +8,29 @@ export const composerExpanded = (taskId: string, sessionId: string): boolean =>
   expansionByTask()[taskId]?.[sessionId] ?? false
 
 export function toggleComposerExpanded(taskId: string, sessionId: string): void {
-  setExpansionByTask(current => ({
+  setExpansionByTask((current) => ({
     ...current,
     [taskId]: { ...current[taskId], [sessionId]: !current[taskId]?.[sessionId] },
   }))
 }
 
 export function clearComposerExpansion(sessionId: string): void {
-  setExpansionByTask(current => Object.fromEntries(Object.entries(current).map(([taskId, sessions]) => {
-    if (!(sessionId in sessions)) return [taskId, sessions]
-    const next = { ...sessions }
-    delete next[sessionId]
-    return [taskId, next]
-  })))
+  setExpansionByTask((current) =>
+    Object.fromEntries(
+      Object.entries(current).map(([taskId, sessions]) => {
+        if (!(sessionId in sessions)) return [taskId, sessions]
+        const next = { ...sessions }
+        delete next[sessionId]
+        return [taskId, next]
+      }),
+    ),
+  )
 }
 
-onScopeEvicted(event => {
+onScopeEvicted((event) => {
   if (event.scope === 'node-switched') setExpansionByTask({})
   else if (event.scope === 'task') {
-    setExpansionByTask(current => {
+    setExpansionByTask((current) => {
       const next = { ...current }
       delete next[event.taskId]
       return next
@@ -43,21 +47,22 @@ export const composerExpansionSlice: PersistedStateSlice<SessionExpansion> = {
   restore: 'panes',
   version: 1,
   codec: {
-    parse: raw => {
+    parse: (raw) => {
       const value = parseJson(raw)
       if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
       return Object.fromEntries(Object.entries(value).filter(([, expanded]) => typeof expanded === 'boolean'))
     },
-    serialize: value => value,
+    serialize: (value) => value,
   },
   empty: () => ({}),
   unknownIds: 'retain-inert',
   maxBytes: 64 * 1024,
   binding: {
     values: expansionByTask,
-    hydrate: (taskId, value) => setExpansionByTask(current => ({
-      ...current,
-      [taskId]: { ...value, ...current[taskId] },
-    })),
+    hydrate: (taskId, value) =>
+      setExpansionByTask((current) => ({
+        ...current,
+        [taskId]: { ...value, ...current[taskId] },
+      })),
   },
 }

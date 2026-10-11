@@ -8,7 +8,7 @@ export function parseStreamLine(line: string): StreamEvent | null {
   if (!trimmed) return null
   try {
     const parsed = streamEventSchema.safeParse(JSON.parse(trimmed))
-    return parsed.success ? parsed.data as StreamEvent : null
+    return parsed.success ? (parsed.data as StreamEvent) : null
   } catch {
     return null
   }
@@ -17,18 +17,21 @@ export function parseStreamLine(line: string): StreamEvent | null {
 // Both adapters below read the same newline-delimited stdout and differ only in which events they
 // care about, so the splitting lives here once and `parseStreamLine` stays the only line parser.
 function parseStreamEvents(stdout: string): StreamEvent[] {
-  return stdout.split('\n').map(parseStreamLine).filter((event): event is StreamEvent => event != null)
+  return stdout
+    .split('\n')
+    .map(parseStreamLine)
+    .filter((event): event is StreamEvent => event != null)
 }
 
 export function parseStreamJson(stdout: string): HeadlessCapture {
   const events = parseStreamEvents(stdout)
   const resultEvent = [...events].reverse().find((event) => event.type === 'result')
-  const usage = resultEvent?.usage && typeof resultEvent.usage === 'object'
-    ? resultEvent.usage as Record<string, unknown>
-    : null
+  const usage =
+    resultEvent?.usage && typeof resultEvent.usage === 'object' ? (resultEvent.usage as Record<string, unknown>) : null
   return {
     result: typeof resultEvent?.result === 'string' ? resultEvent.result : null,
-    structuredOutput: resultEvent && 'structured_output' in resultEvent ? (resultEvent.structured_output ?? null) : null,
+    structuredOutput:
+      resultEvent && 'structured_output' in resultEvent ? (resultEvent.structured_output ?? null) : null,
     sessionId: typeof resultEvent?.session_id === 'string' ? resultEvent.session_id : null,
     costUsd:
       typeof resultEvent?.total_cost_usd === 'number'
@@ -67,11 +70,11 @@ export const lineDelimitedJsonAdapter: StreamJsonAdapter = { parse: parseStreamJ
 // The stream carries no cost, so `costUsd` is null and stays null. Codex reports tokens only, and a
 // number we would have to invent from a price table is worse than an honest absence.
 function codexItem(event: StreamEvent): Record<string, unknown> | null {
-  return event.item && typeof event.item === 'object' ? event.item as Record<string, unknown> : null
+  return event.item && typeof event.item === 'object' ? (event.item as Record<string, unknown>) : null
 }
 
 const codexNumber = (usage: Record<string, unknown>, key: string): number | undefined =>
-  typeof usage[key] === 'number' ? usage[key] as number : undefined
+  typeof usage[key] === 'number' ? (usage[key] as number) : undefined
 
 // With `--output-schema`, codex answers with the JSON as the agent message's text: there is no separate
 // structured field to read. So we parse the text, and only accept an object or an array. The adapter
@@ -108,7 +111,7 @@ export function parseCodexStreamJson(stdout: string): HeadlessCapture {
   }
   const threadId = events.find((event) => event.type === 'thread.started')?.thread_id
   const turn = [...events].reverse().find((event) => event.type === 'turn.completed')
-  const usage = turn?.usage && typeof turn.usage === 'object' ? turn.usage as Record<string, unknown> : null
+  const usage = turn?.usage && typeof turn.usage === 'object' ? (turn.usage as Record<string, unknown>) : null
   const inputTokens = usage ? codexNumber(usage, 'input_tokens') : undefined
   const outputTokens = usage ? codexNumber(usage, 'output_tokens') : undefined
   const cachedInputTokens = usage ? codexNumber(usage, 'cached_input_tokens') : undefined
@@ -118,7 +121,10 @@ export function parseCodexStreamJson(stdout: string): HeadlessCapture {
     structuredOutput: codexStructured(result),
     sessionId: typeof threadId === 'string' ? threadId : null,
     costUsd: null,
-    ...(inputTokens !== undefined || outputTokens !== undefined || cachedInputTokens !== undefined || cacheWriteInputTokens !== undefined
+    ...(inputTokens !== undefined ||
+    outputTokens !== undefined ||
+    cachedInputTokens !== undefined ||
+    cacheWriteInputTokens !== undefined
       ? {
           usage: {
             ...(inputTokens !== undefined ? { inputTokens } : {}),

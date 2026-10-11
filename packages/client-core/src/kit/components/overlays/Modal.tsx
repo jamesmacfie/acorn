@@ -66,23 +66,39 @@ export function Modal(props: {
   const resize = latestSignal()
   // Read the old box before the size attribute and children update, then animate to the final box.
   // This follows the layout rather than scaling text, and applies to any dialog that changes size.
-  createRenderEffect(on(() => props.size, () => {
-    if (!dialog?.isConnected || !dialog.animate || document.visibilityState === 'hidden'
-      || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    const resizing = resize.next()
-    const before = dialog.getBoundingClientRect()
-    sizeAnimation?.cancel()
-    queueMicrotask(() => {
-      if (!dialog.isConnected || resizing.aborted || document.visibilityState === 'hidden') return
-      const after = dialog.getBoundingClientRect()
-      sizeAnimation = dialog.animate([
-        { width: `${before.width}px`, height: `${before.height}px` },
-        { width: `${after.width}px`, height: `${after.height}px` },
-      ], { duration: 220, easing: 'ease-out' })
-    })
-  }, { defer: true }))
+  createRenderEffect(
+    on(
+      () => props.size,
+      () => {
+        if (
+          !dialog?.isConnected ||
+          !dialog.animate ||
+          document.visibilityState === 'hidden' ||
+          window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+        )
+          return
+        const resizing = resize.next()
+        const before = dialog.getBoundingClientRect()
+        sizeAnimation?.cancel()
+        queueMicrotask(() => {
+          if (!dialog.isConnected || resizing.aborted || document.visibilityState === 'hidden') return
+          const after = dialog.getBoundingClientRect()
+          sizeAnimation = dialog.animate(
+            [
+              { width: `${before.width}px`, height: `${before.height}px` },
+              { width: `${after.width}px`, height: `${after.height}px` },
+            ],
+            { duration: 220, easing: 'ease-out' },
+          )
+        })
+      },
+      { defer: true },
+    ),
+  )
   // WebKit pauses animation clocks in an occluded window. Keep the final layout if it is hidden.
-  const settleHiddenResize = () => { if (document.visibilityState === 'hidden') sizeAnimation?.cancel() }
+  const settleHiddenResize = () => {
+    if (document.visibilityState === 'hidden') sizeAnimation?.cancel()
+  }
   document.addEventListener('visibilitychange', settleHiddenResize)
   onCleanup(() => {
     resize.abort()
@@ -100,12 +116,14 @@ export function Modal(props: {
   restoreFocusOnCleanup()
   // After mount rather than straight away: a dialog under a Suspense boundary is built before it is
   // in the document, and a focus call on a detached element does nothing.
-  onMount(() => queueMicrotask(() => {
-    const own = props.autoFocus?.()
-    if (own) return own.focus()
-    if (!dialog?.isConnected || dialog.contains(document.activeElement)) return
-    firstFocus(dialog, props.role ?? 'dialog').focus({ preventScroll: true })
-  }))
+  onMount(() =>
+    queueMicrotask(() => {
+      const own = props.autoFocus?.()
+      if (own) return own.focus()
+      if (!dialog?.isConnected || dialog.contains(document.activeElement)) return
+      firstFocus(dialog, props.role ?? 'dialog').focus({ preventScroll: true })
+    }),
+  )
   // An empty `dismissOn` means the dialog must be finished, not left, so it draws no close button.
   const closable = () => (props.dismissOn ?? ['escape']).length > 0
 
@@ -130,7 +148,9 @@ export function Modal(props: {
         >
           <Show when={props.title}>
             <div class="overlay-title">
-              <span class="overlay-title-text" id={titleId}>{props.title}</span>
+              <span class="overlay-title-text" id={titleId}>
+                {props.title}
+              </span>
               <Show when={closable()}>
                 <IconButton icon="x" label="Close" onPress={() => props.onDismiss()} />
               </Show>

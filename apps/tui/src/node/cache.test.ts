@@ -14,7 +14,9 @@ describe('fileCacheStorage', () => {
   const KEY = 'acorn-cache:acorn-1:11111111-2222-4333-8444-555555555555'
   const file = (): string => join(dir, `${encodeURIComponent(KEY)}.json`)
 
-  beforeEach(() => { dir = join(mkdtempSync(join(tmpdir(), 'acorn-cache-')), 'cache') })
+  beforeEach(() => {
+    dir = join(mkdtempSync(join(tmpdir(), 'acorn-cache-')), 'cache')
+  })
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
   it('names the file after the partition key, at 0600 in a 0700 directory', async () => {
@@ -83,7 +85,8 @@ describe('fileCacheStorage', () => {
     expect(await storage.getItem(cacheKeyFor('tui-disposable'))).toBeUndefined()
     expect(existsSync(join(dir, `${encodeURIComponent(cacheKeyFor('tui-disposable'))}.json.tmp`))).toBe(false)
     const replacement = clientFor('tui-disposable')
-    const next = replacement.persistence.acquire(); await next.restored
+    const next = replacement.persistence.acquire()
+    await next.restored
     expect(replacement.client.getQueryData(['tasks'])).toBeUndefined()
     replacement.client.setQueryData(['tasks'], [{ id: 'new-owner' }])
     await replacement.persistence.flush()

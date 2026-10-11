@@ -47,14 +47,29 @@ const sessions = (over: Partial<TaskSessionsBridge> = {}): TaskSessionsBridge =>
 
 beforeEach(async () => {
   testDb = makeTestDb()
-  registerCheckoutAdmission(testDb.db, { admitWork: async (_taskId: string, action: () => Promise<unknown>) => action() } as unknown as CheckoutAdmission)
+  registerCheckoutAdmission(testDb.db, {
+    admitWork: async (_taskId: string, action: () => Promise<unknown>) => action(),
+  } as unknown as CheckoutAdmission)
   dir = mkdtempSync(join(tmpdir(), 'acorn-worktree-route-'))
   const now = Date.now()
-  await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+  await testDb.db
+    .insert(schema.workspaces)
+    .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
   await testDb.db.insert(schema.projects).values({
-    id: 'project-widget', name: 'widget', path: dir, workspaceId: 'workspace-1', sort: 0, hidden: false,
-    vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/widget.git', githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-    createdAt: now, updatedAt: now,
+    id: 'project-widget',
+    name: 'widget',
+    path: dir,
+    workspaceId: 'workspace-1',
+    sort: 0,
+    hidden: false,
+    vcs: 'git',
+    defaultBranch: 'main',
+    remoteUrl: 'https://github.com/acme/widget.git',
+    githubOwner: 'acme',
+    githubName: 'widget',
+    githubRepoId: null,
+    createdAt: now,
+    updatedAt: now,
   })
   await testDb.db.insert(schema.tasks).values({
     id: 'task1',
@@ -87,9 +102,13 @@ describe('worktree routes', () => {
     const worktrees = mkdtempSync(join(tmpdir(), 'acorn-on-created-'))
     setWorktreesRoot(worktrees)
     try {
-      await testDb.db.update(schema.projects).set({ setupScript: 'true', setupScriptTrigger: 'created' })
+      await testDb.db
+        .update(schema.projects)
+        .set({ setupScript: 'true', setupScriptTrigger: 'created' })
         .where(eq(schema.projects.id, 'project-widget'))
-      await testDb.db.update(schema.tasks).set({ branch: 'feature', worktreePath: null, skipSetup: true })
+      await testDb.db
+        .update(schema.tasks)
+        .set({ branch: 'feature', worktreePath: null, skipSetup: true })
         .where(eq(schema.tasks.id, 'task1'))
 
       const app = authed()
@@ -104,21 +123,33 @@ describe('worktree routes', () => {
 
   it('captures a preview URL from the last non-empty stdout line', async () => {
     const app = authed()
-    const res = await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'echo noise; echo http://localhost:3000' }), env())
+    const res = await app.fetch(
+      req('/core/tasks/task1/preview-url', 'POST', { script: 'echo noise; echo http://localhost:3000' }),
+      env(),
+    )
     expect(await res.json()).toEqual({ ok: true, url: 'http://localhost:3000' })
   })
 
   it('reports a preview script that fails or produces nothing, rather than throwing', async () => {
     const app = authed()
-    expect(await (await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'true' }), env())).json()).toMatchObject({ ok: false })
-    expect(await (await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'exit 3' }), env())).json()).toMatchObject({ ok: false })
-    expect(await (await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: '  ' }), env())).json()).toEqual({ ok: false, reason: 'no script configured' })
+    expect(
+      await (await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'true' }), env())).json(),
+    ).toMatchObject({ ok: false })
+    expect(
+      await (await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'exit 3' }), env())).json(),
+    ).toMatchObject({ ok: false })
+    expect(
+      await (await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: '  ' }), env())).json(),
+    ).toEqual({ ok: false, reason: 'no script configured' })
     expect((await app.fetch(req('/core/tasks/task1/preview-url', 'POST', {}), env())).status).toBe(400)
   })
 
   it('does not leak the node environment into a captured command', async () => {
     const app = authed()
-    const res = await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'echo "[${SESSION_ENC_KEY:-absent}]"' }), env())
+    const res = await app.fetch(
+      req('/core/tasks/task1/preview-url', 'POST', { script: 'echo "[${SESSION_ENC_KEY:-absent}]"' }),
+      env(),
+    )
     expect(await res.json()).toEqual({ ok: true, url: '[absent]' })
   })
 
@@ -136,7 +167,14 @@ describe('worktree routes', () => {
 
   it('delete archives an active task, deletes it, and tells plugins which ids went', async () => {
     const deleted = vi.fn(async () => undefined)
-    const handler = registerHookHandler({ id: 'test:purge', pluginId: 'test', point: 'core:task-deleted', mode: 'observe', priority: 0, call: deleted })
+    const handler = registerHookHandler({
+      id: 'test:purge',
+      pluginId: 'test',
+      point: 'core:task-deleted',
+      mode: 'observe',
+      priority: 0,
+      call: deleted,
+    })
     try {
       setTaskSessionsBridge(sessions())
       const res = await authed().fetch(req('/core/tasks/task1/delete', 'POST', { force: true }), env())
@@ -169,7 +207,14 @@ describe('worktree routes', () => {
   it('refuses a cascading worktree archive by a caller confined to the parent task', async () => {
     const now = Date.now()
     await testDb.db.insert(schema.tasks).values({
-      id: 'child', parentId: 'task1', projectId: 'project-widget', title: 'Child', origin: 'local', status: 'active', createdAt: now, updatedAt: now,
+      id: 'child',
+      parentId: 'task1',
+      projectId: 'project-widget',
+      title: 'Child',
+      origin: 'local',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
     })
     setTaskSessionsBridge(sessions())
     const confined = new Hono<AppEnv>()
@@ -189,8 +234,15 @@ describe('worktree routes', () => {
   it('answers a task-confined caller with its own task only', async () => {
     const now = Date.now()
     await testDb.db.insert(schema.tasks).values({
-      id: 'task2', projectId: 'project-widget', branch: 'other', title: 'someone else', status: 'active',
-      origin: 'local', worktreePath: dir, createdAt: now, updatedAt: now,
+      id: 'task2',
+      projectId: 'project-widget',
+      branch: 'other',
+      title: 'someone else',
+      status: 'active',
+      origin: 'local',
+      worktreePath: dir,
+      createdAt: now,
+      updatedAt: now,
     })
 
     const confined = new Hono<AppEnv>()

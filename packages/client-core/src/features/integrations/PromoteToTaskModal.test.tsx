@@ -7,7 +7,11 @@ import type { Disposable } from '../../kit/lib/state/registry'
 
 vi.mock('@solidjs/router', () => ({ useParams: () => ({ projectId: 'p1' }) }))
 vi.mock('@tanstack/solid-query', () => ({
-  createQuery: () => ({ get data() { return [{ id: 'p1', name: 'acorn', vcs: 'git' }] } }),
+  createQuery: () => ({
+    get data() {
+      return [{ id: 'p1', name: 'acorn', vcs: 'git' }]
+    },
+  }),
 }))
 vi.mock('../../infra/queries', () => ({ projectsOptions: () => ({}) }))
 let nodeId = 'node-a'
@@ -27,22 +31,40 @@ let seedBranch = 'james/typeerror'
 let prepareOverride: (() => Promise<{ origin: string; projectId: string; title: string; branch: string }>) | null = null
 
 const mount = (action?: PromoteTaskAction, attachTasks: Task[] = []) => {
-  registered.push(sourceRegistry.register({
-    id: 'rollbar', order: 1, glyph: 'bug', label: 'Rollbar',
-    promotion: {
-      canPromote: () => true,
-      prepare: () => prepareOverride?.() ?? { origin: 'rollbar', projectId: 'p1', title: 'TypeError', branch: seedBranch },
-      create: created,
-      attachToCurrentTask: attached,
-    },
-  }))
+  registered.push(
+    sourceRegistry.register({
+      id: 'rollbar',
+      order: 1,
+      glyph: 'bug',
+      label: 'Rollbar',
+      promotion: {
+        canPromote: () => true,
+        prepare: () =>
+          prepareOverride?.() ?? { origin: 'rollbar', projectId: 'p1', title: 'TypeError', branch: seedBranch },
+        create: created,
+        attachToCurrentTask: attached,
+      },
+    }),
+  )
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => (
-    <PromoteToTaskModal providerId="rollbar" item={{ id: 'RB-4412' }} itemTitle="TypeError in pullsBatch"
-      headerLabel="Promote item" attachTasks={attachTasks} existingBranches={[]}
-      {...(action ? { action } : {})} onClose={() => {}} onCreated={onCreated} onAttached={() => {}} />
-  ), host)
+  dispose = render(
+    () => (
+      <PromoteToTaskModal
+        providerId="rollbar"
+        item={{ id: 'RB-4412' }}
+        itemTitle="TypeError in pullsBatch"
+        headerLabel="Promote item"
+        attachTasks={attachTasks}
+        existingBranches={[]}
+        {...(action ? { action } : {})}
+        onClose={() => {}}
+        onCreated={onCreated}
+        onAttached={() => {}}
+      />
+    ),
+    host,
+  )
 }
 
 const primary = () => [...document.querySelectorAll('button')].find((button) => button.type === 'submit')!
@@ -51,7 +73,9 @@ const type = (element: HTMLInputElement, value: string) => {
   element.value = value
   element.dispatchEvent(new Event('input', { bubbles: true }))
 }
-const settle = async () => { for (let tick = 0; tick < 4; tick += 1) await Promise.resolve() }
+const settle = async () => {
+  for (let tick = 0; tick < 4; tick += 1) await Promise.resolve()
+}
 
 afterEach(() => {
   nodeId = 'node-a'
@@ -68,7 +92,12 @@ afterEach(() => {
 describe('the optional task action', () => {
   it('does not navigate when creation completes after the dialog unmounts', async () => {
     let release!: (task: Task) => void
-    created.mockImplementationOnce(() => new Promise((resolve) => { release = resolve }))
+    created.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve
+        }),
+    )
     mount()
     await settle()
     primary().click()
@@ -85,7 +114,10 @@ describe('the optional task action', () => {
     mount()
     await settle()
     let release!: (seed: { origin: string; projectId: string; title: string; branch: string }) => void
-    prepareOverride = () => new Promise((resolve) => { release = resolve })
+    prepareOverride = () =>
+      new Promise((resolve) => {
+        release = resolve
+      })
     primary().click()
     nodeId = 'node-b'
     release({ origin: 'github-pr', projectId: 'p1', title: 'Fix deploy', branch: 'feature/deploy' })
@@ -140,7 +172,9 @@ describe('the optional task action', () => {
     mount({ content: <span>Run</span>, label: 'run', ready: () => true, onTaskReady }, [TASK])
     await settle()
     document.querySelector<HTMLButtonElement>('button[role="tab"]:last-child')?.click()
-    const attachButton = [...document.querySelectorAll('button')].find((button) => button.type === 'submit' && button.textContent?.includes('Attach'))!
+    const attachButton = [...document.querySelectorAll('button')].find(
+      (button) => button.type === 'submit' && button.textContent?.includes('Attach'),
+    )!
     attachButton.click()
     await settle()
     expect(document.body.textContent).toContain('start failed')
@@ -154,7 +188,10 @@ describe('the optional task action', () => {
 describe('the branch field', () => {
   it('fills the title and branch when preparation resolves after the modal mounts', async () => {
     let release!: (seed: { origin: string; projectId: string; title: string; branch: string }) => void
-    prepareOverride = () => new Promise((resolve) => { release = resolve })
+    prepareOverride = () =>
+      new Promise((resolve) => {
+        release = resolve
+      })
     mount()
     expect(inputs()[0].value).toBe('')
     release({ origin: 'github-pr', projectId: 'p1', title: 'Fix deploy', branch: 'feature/deploy' })
@@ -165,7 +202,10 @@ describe('the branch field', () => {
 
   it('keeps edits made while the promotion seed is loading', async () => {
     let release!: (seed: { origin: string; projectId: string; title: string; branch: string }) => void
-    prepareOverride = () => new Promise((resolve) => { release = resolve })
+    prepareOverride = () =>
+      new Promise((resolve) => {
+        release = resolve
+      })
     mount()
     type(inputs()[0], 'My title')
     type(inputs()[1], 'my-branch')

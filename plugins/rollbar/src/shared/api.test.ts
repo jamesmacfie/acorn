@@ -6,13 +6,18 @@ import { rollbarItemsForConnectionsRoute, rollbarItemsKey } from './api'
 // that returns 404 or a changed query key that orphans a persisted IndexedDB cache.
 describe('rollbar wire contract', () => {
   it('sorts and dedupes the connection set in the list route', () => {
-    expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b']))
-      .toBe('/v1/p/rollbar/items?integrations=rollbar-a%2Crollbar-b')
+    expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b'])).toBe(
+      '/v1/p/rollbar/items?integrations=rollbar-a%2Crollbar-b',
+    )
   })
 
   it('preserves the query key shape for cache compatibility', () => {
-    expect(rollbarItemsKey(['rollbar-b', 'rollbar-a', 'rollbar-b']))
-      .toEqual(['rollbar-items', 'connections', 'rollbar-a', 'rollbar-b'])
+    expect(rollbarItemsKey(['rollbar-b', 'rollbar-a', 'rollbar-b'])).toEqual([
+      'rollbar-items',
+      'connections',
+      'rollbar-a',
+      'rollbar-b',
+    ])
   })
 
   // The same net protocol's api.test.ts keeps over its own builders, now scoped to this plugin:
@@ -24,7 +29,9 @@ describe('rollbar wire contract', () => {
       .filter(([name]) => name.endsWith('Route'))
       .map(([name, value]): [string, unknown] => [
         name,
-        typeof value === 'function' ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy)) : value,
+        typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown)(...Array.from({ length: value.length }, () => dummy))
+          : value,
       ])
     expect(paths.length).toBe(6) // guards against the filter silently matching nothing
     for (const [name, path] of paths) {

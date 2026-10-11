@@ -18,9 +18,13 @@ import { Line } from '../kit/cells'
 export function ExtendedPane(props: ExtendedPaneProps) {
   return (
     <box flexDirection="column" flexGrow={1}>
-      <Show when={props.detail?.headerPointId}>{(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}</Show>
+      <Show when={props.detail?.headerPointId}>
+        {(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}
+      </Show>
       {props.children}
-      <Show when={props.detail?.footerPointId}>{(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}</Show>
+      <Show when={props.detail?.footerPointId}>
+        {(pointId) => <DetailRegion point={pointId()} detail={props.detail!} />}
+      </Show>
       {/* Two rectangles that need pixels, each named on one line so a reader knows the box was
           reserved and why it is empty (../kit/host.tsx § InlineSlot, docs/tui/rectangles.md § Rectangles). */}
       <Show when={props.inlineBesidePointId}>{(pointId) => <InlineSlot point={pointId()} />}</Show>

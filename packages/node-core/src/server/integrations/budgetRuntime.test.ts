@@ -21,16 +21,17 @@ describe('provider request budgets', () => {
     const connectionPeak = new Map<string, number>()
     let release!: () => void
     const gate = new Promise<void>((resolve) => (release = resolve))
-    const operation = (connectionId: string) => scheduler.run('linear', connectionId, budgets, async () => {
-      providerActive++
-      providerPeak = Math.max(providerPeak, providerActive)
-      const active = (connectionActive.get(connectionId) ?? 0) + 1
-      connectionActive.set(connectionId, active)
-      connectionPeak.set(connectionId, Math.max(connectionPeak.get(connectionId) ?? 0, active))
-      await gate
-      providerActive--
-      connectionActive.set(connectionId, active - 1)
-    })
+    const operation = (connectionId: string) =>
+      scheduler.run('linear', connectionId, budgets, async () => {
+        providerActive++
+        providerPeak = Math.max(providerPeak, providerActive)
+        const active = (connectionActive.get(connectionId) ?? 0) + 1
+        connectionActive.set(connectionId, active)
+        connectionPeak.set(connectionId, Math.max(connectionPeak.get(connectionId) ?? 0, active))
+        await gate
+        providerActive--
+        connectionActive.set(connectionId, active - 1)
+      })
 
     const pending = [operation('a'), operation('a'), operation('b'), operation('b')]
     await new Promise((resolve) => setTimeout(resolve, 0))

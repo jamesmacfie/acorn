@@ -34,7 +34,8 @@ type ProcessUpkeepDeps = {
  */
 export class ProcessUpkeep {
   // The last folder measurement, shared by every caller inside DISK_FOOTPRINT_MS.
-  private diskMeasure: { at: number; bytes: Promise<{ attachmentsBytes: number; artifactsBytes: number }> } | null = null
+  private diskMeasure: { at: number; bytes: Promise<{ attachmentsBytes: number; artifactsBytes: number }> } | null =
+    null
 
   constructor(private readonly deps: ProcessUpkeepDeps) {}
 
@@ -45,22 +46,25 @@ export class ProcessUpkeep {
   async stopTaskSessions(taskId: string): Promise<void> {
     const { processes, store } = this.deps
     const stopping = processes.occupancy().filter((live) => live.taskId === taskId)
-    await Promise.all(stopping.map(async (live) => {
-      const sessionId = live.generation.sessionId
-      const turnId = processes.takeActive(live.generation)
-      // Cleared before the stop, so the send that fails when the process dies is not retried or
-      // recorded as a provider failure.
-      await processes.stop(sessionId)
-      await store.interruptActiveTurn(sessionId, 'The task was archived while the provider turn was active.')
-      if (turnId) await this.deps.pauseGoal(sessionId)
-      await store.expirePendingRequests(sessionId)
-      if (turnId) this.deps.endTurnSpan(turnId, 'interrupted')
-      await this.deps.record(sessionId, null, {
-        type: 'session_state',
-        state: 'stopped',
-        detail: 'The provider process stopped when this task was archived. Restore the task and send a prompt to resume.',
-      })
-    }))
+    await Promise.all(
+      stopping.map(async (live) => {
+        const sessionId = live.generation.sessionId
+        const turnId = processes.takeActive(live.generation)
+        // Cleared before the stop, so the send that fails when the process dies is not retried or
+        // recorded as a provider failure.
+        await processes.stop(sessionId)
+        await store.interruptActiveTurn(sessionId, 'The task was archived while the provider turn was active.')
+        if (turnId) await this.deps.pauseGoal(sessionId)
+        await store.expirePendingRequests(sessionId)
+        if (turnId) this.deps.endTurnSpan(turnId, 'interrupted')
+        await this.deps.record(sessionId, null, {
+          type: 'session_state',
+          state: 'stopped',
+          detail:
+            'The provider process stopped when this task was archived. Restore the task and send a prompt to resume.',
+        })
+      }),
+    )
   }
 
   /**
@@ -72,10 +76,12 @@ export class ProcessUpkeep {
     if (shutdown.aborted || !this.deps.processes.ids().length) return []
     const userId = this.deps.currentUserId()
     const { stopIdleAfterMinutes: minutes } = userId
-      ? await this.readWhileRunning(() => readAgentSessionDefaults(this.deps.core.prefs, userId)).catch((error: unknown) => {
-        if (shutdown.aborted) return defaultAgentSessionDefaults()
-        throw error
-      })
+      ? await this.readWhileRunning(() => readAgentSessionDefaults(this.deps.core.prefs, userId)).catch(
+          (error: unknown) => {
+            if (shutdown.aborted) return defaultAgentSessionDefaults()
+            throw error
+          },
+        )
       : defaultAgentSessionDefaults()
     if (shutdown.aborted || !minutes) return []
     const label = AGENT_IDLE_STOP_CHOICES.find((choice) => choice.minutes === minutes)?.label ?? `${minutes} minutes`
@@ -89,7 +95,10 @@ export class ProcessUpkeep {
    *  It runs whatever the owner's limit is, Never included, because the owner asked for it. */
   async stopIdleSessionsNow(): Promise<string[]> {
     if (this.deps.shutdown.aborted || !this.deps.processes.ids().length) return []
-    return this.stopIdle(Date.now(), 'The provider process was stopped from Settings to free memory. Send a prompt to resume.')
+    return this.stopIdle(
+      Date.now(),
+      'The provider process was stopped from Settings to free memory. Send a prompt to resume.',
+    )
   }
 
   /**
@@ -97,7 +106,8 @@ export class ProcessUpkeep {
    * trees. `list` is a parameter so a test can hand it a fake table.
    */
   async processFootprint(
-    list: () => Promise<ProcessRow[] | null> = async () => (await import('./footprint')).listProcesses(this.deps.core.proc),
+    list: () => Promise<ProcessRow[] | null> = async () =>
+      (await import('./footprint')).listProcesses(this.deps.core.proc),
   ): Promise<{ live: number; idle: number; memoryBytes: number | null }> {
     const running = this.deps.processes.occupancy().filter((live) => !live.stopping)
     const now = Date.now()
@@ -106,9 +116,13 @@ export class ProcessUpkeep {
       if (await this.stoppableIdle(live.generation.sessionId, live.generation, now)) idle++
     }
     if (this.deps.shutdown.aborted) return { live: 0, idle: 0, memoryBytes: null }
-    const pids = running.flatMap((live) => live.pid ? [live.pid] : [])
+    const pids = running.flatMap((live) => (live.pid ? [live.pid] : []))
     const rows = running.length ? await list() : []
-    return { live: running.length, idle, memoryBytes: rows ? (await import('./footprint')).processTreeBytes(rows, pids) : null }
+    return {
+      live: running.length,
+      idle,
+      memoryBytes: rows ? (await import('./footprint')).processTreeBytes(rows, pids) : null,
+    }
   }
 
   /**
@@ -133,7 +147,8 @@ export class ProcessUpkeep {
     if (this.diskMeasure && now - this.diskMeasure.at < DISK_FOOTPRINT_MS) return this.diskMeasure.bytes
     const bytes = import('./footprint').then(async ({ directoryBytes }) => {
       const [attachmentsBytes, artifactsBytes] = await Promise.all([
-        directoryBytes(this.deps.folders.attachments), directoryBytes(this.deps.folders.artifacts),
+        directoryBytes(this.deps.folders.attachments),
+        directoryBytes(this.deps.folders.artifacts),
       ])
       return { attachmentsBytes, artifactsBytes }
     })
@@ -153,12 +168,22 @@ export class ProcessUpkeep {
    * workflow steps reach a session through enqueueTurn, which resumes a stopped one, so those need no
    * exception.
    */
-  private async stoppableIdle(sessionId: string, generation: ProviderGeneration, before: number): Promise<AgentSession | null> {
+  private async stoppableIdle(
+    sessionId: string,
+    generation: ProviderGeneration,
+    before: number,
+  ): Promise<AgentSession | null> {
     if (!this.deps.processes.idleCandidate(sessionId, generation, before)) return null
     const session = await this.deps.store.getSession(sessionId)
     // `failed` too: a turn error leaves the process running, and the next prompt restarts a failed
     // session anyway.
-    if (this.deps.shutdown.aborted || !session || !['ready', 'failed'].includes(session.runtimeState) || session.queuedTurns > 0) return null
+    if (
+      this.deps.shutdown.aborted ||
+      !session ||
+      !['ready', 'failed'].includes(session.runtimeState) ||
+      session.queuedTurns > 0
+    )
+      return null
     if (session.subagents.some(isActiveSubagent)) return null
     // The request rows are the authority here. `ready` is only what the last event projected.
     if ((await this.deps.store.pendingRequests(sessionId)).length) return null

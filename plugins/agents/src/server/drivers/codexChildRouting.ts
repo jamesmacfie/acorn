@@ -159,15 +159,17 @@ export class CodexChildRouter {
     const started = stringValue(item?.kind) === 'started'
     return {
       to: 'subagent',
-      events: [{
-        type: 'subagent',
-        subagent: {
-          id: agentThreadId,
-          title: titleFromAgentPath(agentPath),
-          role: titleFromAgentPath(agentPath),
-          status: started && !child.active ? 'running' : undefined,
+      events: [
+        {
+          type: 'subagent',
+          subagent: {
+            id: agentThreadId,
+            title: titleFromAgentPath(agentPath),
+            role: titleFromAgentPath(agentPath),
+            status: started && !child.active ? 'running' : undefined,
+          },
         },
-      }],
+      ],
     }
   }
 
@@ -185,17 +187,15 @@ export class CodexChildRouter {
   // Normalized once, then translated. Going through `normalizeCodexNotification` rather than reading
   // the wire again means the child path cannot drift from the parent path when a notification's shape
   // changes: usage, statuses, and item mapping all stay stated in exactly one place.
-  #childEvents(
-    notification: JsonRpcNotification,
-    subagentId: string,
-    child: ChildState,
-  ): AgentNormalizedEvent[] {
+  #childEvents(notification: JsonRpcNotification, subagentId: string, child: ChildState): AgentNormalizedEvent[] {
     if (notification.method === 'turn/started') {
       child.turnId = stringValue(asObject(notification.params.turn)?.id)
     }
     if (notification.method === 'turn/completed' || notification.method === 'thread/closed') child.turnId = null
-    const roster = (subagent: Omit<AgentSubagentUpdate, 'id'>): AgentNormalizedEvent =>
-      ({ type: 'subagent', subagent: { id: subagentId, ...subagent } })
+    const roster = (subagent: Omit<AgentSubagentUpdate, 'id'>): AgentNormalizedEvent => ({
+      type: 'subagent',
+      subagent: { id: subagentId, ...subagent },
+    })
     return normalizeCodexNotification(notification).flatMap((event): AgentNormalizedEvent[] => {
       switch (event.type) {
         case 'session_state':

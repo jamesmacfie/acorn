@@ -3,14 +3,30 @@ import type { WorkflowRecordHistory } from '../../shared/workflowProcessing'
 import { progressSummary, recordCanReprocess, recordCanRetry, recordStatus } from './recordHistoryModel'
 
 const row = (over: Partial<WorkflowRecordHistory> = {}): WorkflowRecordHistory => ({
-  id: 'row', position: 0, recordKey: 'record', decision: 'admitted', title: 'Record', attemptId: 'attempt',
-  taskId: 'task', runId: 'run', status: 'done', reason: null, result: null, retryStepId: null, outputs: [], ...over,
+  id: 'row',
+  position: 0,
+  recordKey: 'record',
+  decision: 'admitted',
+  title: 'Record',
+  attemptId: 'attempt',
+  taskId: 'task',
+  runId: 'run',
+  status: 'done',
+  reason: null,
+  result: null,
+  retryStepId: null,
+  outputs: [],
+  ...over,
 })
 
 describe('record history presentation', () => {
   it('keeps zero matches distinct from an all-skipped selection', () => {
-    expect(progressSummary({ total: 0, running: 0, attention: 0, failed: 0, skipped: 0, completed: 0 })).toBe('No matching records')
-    expect(progressSummary({ total: 3, running: 0, attention: 0, failed: 0, skipped: 3, completed: 0 })).toBe('3 matches · all already processed')
+    expect(progressSummary({ total: 0, running: 0, attention: 0, failed: 0, skipped: 0, completed: 0 })).toBe(
+      'No matching records',
+    )
+    expect(progressSummary({ total: 3, running: 0, attention: 0, failed: 0, skipped: 3, completed: 0 })).toBe(
+      '3 matches · all already processed',
+    )
   })
 
   it('names repeat decisions and separates retry from reprocess eligibility', () => {

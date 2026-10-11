@@ -13,16 +13,29 @@ export function readGate() {
     if (signal.aborted) throw signal.reason
     if (running < 2) running++
     else {
-      if (waiting.length >= 32) throw new BridgeError(422, 'git_read_busy', 'Too many Git reads are waiting. Try again.')
+      if (waiting.length >= 32)
+        throw new BridgeError(422, 'git_read_busy', 'Too many Git reads are waiting. Try again.')
       await new Promise<void>((resolve, reject) => {
-        const ready = () => { signal.removeEventListener('abort', abort); resolve() }
-        const abort = () => { waiting.splice(waiting.indexOf(ready), 1); reject(signal.reason) }
+        const ready = () => {
+          signal.removeEventListener('abort', abort)
+          resolve()
+        }
+        const abort = () => {
+          waiting.splice(waiting.indexOf(ready), 1)
+          reject(signal.reason)
+        }
         waiting.push(ready)
         signal.addEventListener('abort', abort, { once: true })
       })
     }
-    if (signal.aborted) { release(); throw signal.reason }
-    try { return await read() }
-    finally { release() }
+    if (signal.aborted) {
+      release()
+      throw signal.reason
+    }
+    try {
+      return await read()
+    } finally {
+      release()
+    }
   }
 }

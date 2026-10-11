@@ -80,13 +80,7 @@ export function CommitField(props: {
 export function CommitOptionsMenu(props: { model: ChangesModel }) {
   const model = () => props.model
   const Toggle = (own: { menu: MenuContext; on: boolean; hint: string; onSelect: () => void; children: string }) => (
-    <Menu.Item
-      context={own.menu}
-      kind="checkbox"
-      checked={own.on}
-      title={own.hint}
-      onSelect={own.onSelect}
-    >
+    <Menu.Item context={own.menu} kind="checkbox" checked={own.on} title={own.hint} onSelect={own.onSelect}>
       {own.children}
     </Menu.Item>
   )

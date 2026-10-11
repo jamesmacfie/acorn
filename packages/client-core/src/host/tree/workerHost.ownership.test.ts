@@ -9,7 +9,14 @@ const ports: MessagePort[] = []
 let sequence = 0
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 10))
 const hash = () => `ownership-${++sequence}`
-const context: PluginFrameContext = { surface: 'probe.panel', target: 'remote', nodeId: 'a', theme: 'light', style: 'terminal', claimsKeys: [] }
+const context: PluginFrameContext = {
+  surface: 'probe.panel',
+  target: 'remote',
+  nodeId: 'a',
+  theme: 'light',
+  style: 'terminal',
+  claimsKeys: [],
+}
 function factory(modern = true, ready = true) {
   _setWorkerFactory(() => {
     const sandbox = { seen: [], closed: 0 } as unknown as Sandbox
@@ -32,14 +39,31 @@ function factory(modern = true, ready = true) {
           sandbox.bridge.postMessage({ kind: 'connected', ...(modern ? { treeSlotBridge: 1 } : {}) })
         } else sandbox.seen.push(message)
       },
-      terminate() { sandbox.closed++ },
+      terminate() {
+        sandbox.closed++
+      },
     } as unknown as Worker
     sandboxes.push(sandbox)
     return sandbox.worker
   })
 }
 function acquire(bundle: string, authority = 'a', disposed = vi.fn()) {
-  return acquireTreeWorker({ pluginId: 'probe', hash: bundle, context, authority, onRefused: () => {}, connect: (port) => { port.onmessage = () => {}; return { dispose: () => { disposed(); port.close() } } } })
+  return acquireTreeWorker({
+    pluginId: 'probe',
+    hash: bundle,
+    context,
+    authority,
+    onRefused: () => {},
+    connect: (port) => {
+      port.onmessage = () => {}
+      return {
+        dispose: () => {
+          disposed()
+          port.close()
+        },
+      }
+    },
+  })
 }
 afterEach(() => {
   _stopAllTreeWorkers()
@@ -54,8 +78,10 @@ it('owns one modern bridge per slot, preserves props updates and reuses the warm
   factory()
   const bundle = hash()
   const disposed = vi.fn()
-  const a = acquire(bundle, 'a', disposed), b = acquire(bundle, 'b', disposed)
-  a.mount('a', 'panel', { value: 1 }); b.mount('b', 'panel', {})
+  const a = acquire(bundle, 'a', disposed),
+    b = acquire(bundle, 'b', disposed)
+  a.mount('a', 'panel', { value: 1 })
+  b.mount('b', 'panel', {})
   await settle()
   expect(sandboxes).toHaveLength(1)
   expect(a.bridgePort('a')).not.toBe(b.bridgePort('b'))
@@ -77,8 +103,12 @@ it('owns one modern bridge per slot, preserves props updates and reuses the warm
 it('gives equivalent and foreign legacy slots separate workers and retires each immediately', async () => {
   factory(false)
   const bundle = hash()
-  const a = acquire(bundle), sibling = acquire(bundle), foreign = acquire(bundle, 'b')
-  a.mount('a', 'panel', {}); sibling.mount('sibling', 'panel', {}); foreign.mount('foreign', 'panel', {})
+  const a = acquire(bundle),
+    sibling = acquire(bundle),
+    foreign = acquire(bundle, 'b')
+  a.mount('a', 'panel', {})
+  sibling.mount('sibling', 'panel', {})
+  foreign.mount('foreign', 'panel', {})
   await settle()
   expect(sandboxes).toHaveLength(3)
   expect(a.bridgePort('a')).not.toBe(sibling.bridgePort('sibling'))
@@ -95,8 +125,13 @@ it('drops an admitted old-slot completion rather than publishing into a reused s
   factory()
   const owner = acquire(hash())
   let finish = () => {}
-  const held = new Promise<void>((resolve) => { finish = resolve })
-  owner.onHostRequest('slot', async () => { await held; return { ok: true, body: 'old' } })
+  const held = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  owner.onHostRequest('slot', async () => {
+    await held
+    return { ok: true, body: 'old' }
+  })
   owner.mount('slot', 'panel', {})
   await settle()
   sandboxes[0]!.tree.postMessage({ kind: 'tree:host-request', slot: 'slot', id: 1, op: 'owner.invoke', name: 'held' })
@@ -111,8 +146,21 @@ it('drops an admitted old-slot completion rather than publishing into a reused s
 
 it('retires all resources even when an external bridge disposer throws', async () => {
   factory()
-  const owner = acquireTreeWorker({ pluginId: 'probe', hash: hash(), context, authority: 'a', onRefused: () => {}, connect: (port) => ({ dispose: () => { port.close(); throw new Error('external disposer') } }) })
-  owner.mount('a', 'panel', {}); owner.mount('b', 'panel', {})
+  const owner = acquireTreeWorker({
+    pluginId: 'probe',
+    hash: hash(),
+    context,
+    authority: 'a',
+    onRefused: () => {},
+    connect: (port) => ({
+      dispose: () => {
+        port.close()
+        throw new Error('external disposer')
+      },
+    }),
+  })
+  owner.mount('a', 'panel', {})
+  owner.mount('b', 'panel', {})
   await settle()
   expect(() => _stopAllTreeWorkers()).not.toThrow()
   expect(sandboxes[0]!.closed).toBe(1)
@@ -148,12 +196,14 @@ it('ignores a captured error callback from a retired worker generation', async (
   replacement.mount('b', 'panel', {})
   error.call(sandboxes[0]!.worker, { message: 'late old failure' } as ErrorEvent)
   expect(sandboxes[1]!.closed).toBe(0)
-  owner.release(); replacement.release()
+  owner.release()
+  replacement.release()
 })
 
 it('bounds retired classification hints and derives legacy mode from live slot workers after hint eviction', async () => {
   factory(false)
-  const liveBundle = hash(), retiredBundle = hash()
+  const liveBundle = hash(),
+    retiredBundle = hash()
   const active = acquire(liveBundle)
   const retired = acquire(retiredBundle)
   await settle()
@@ -174,11 +224,15 @@ it('bounds retired classification hints and derives legacy mode from live slot w
   expect(reprobe.bridgePort()).toBeNull()
   await settle()
   expect(reprobe.bridgePort()).not.toBeNull()
-  active.release(); equivalent.release(); foreign.release(); reprobe.release()
+  active.release()
+  equivalent.release()
+  foreign.release()
+  reprobe.release()
 })
 
 it.each(['spawn', 'bridge-channel', 'tree-channel', 'transfer'] as const)(
-  'retires every admitted startup handle exactly once when %s fails', async (step) => {
+  'retires every admitted startup handle exactly once when %s fails',
+  async (step) => {
     const failure = new Error(`failed ${step}`)
     const closes: ReturnType<typeof vi.fn>[] = []
     let channels = 0
@@ -197,12 +251,28 @@ it.each(['spawn', 'bridge-channel', 'tree-channel', 'transfer'] as const)(
     const terminate = vi.fn()
     _setWorkerFactory(() => {
       if (step === 'spawn') throw failure
-      return { onerror: null, postMessage: () => { if (step === 'transfer') throw failure }, terminate } as unknown as Worker
+      return {
+        onerror: null,
+        postMessage: () => {
+          if (step === 'transfer') throw failure
+        },
+        terminate,
+      } as unknown as Worker
     })
     const refused = vi.fn()
-    const handle = acquireTreeWorker({ pluginId: 'probe', hash: hash(), onRefused: refused, connect: (port) => {
-      return { dispose: () => { port.close(); throw new Error('cleanup must preserve original startup failure') } }
-    } })
+    const handle = acquireTreeWorker({
+      pluginId: 'probe',
+      hash: hash(),
+      onRefused: refused,
+      connect: (port) => {
+        return {
+          dispose: () => {
+            port.close()
+            throw new Error('cleanup must preserve original startup failure')
+          },
+        }
+      },
+    })
     const failed = vi.fn()
     handle.transport('failed').onFailed(failed)
     await settle()
@@ -235,7 +305,8 @@ it('reserves the 512 slot budget before spawning, and returns reservations after
 
 it('supports multiple slots on one owner within the same early reservation budget', async () => {
   factory(false)
-  const bundle = hash(), owner = acquire(bundle)
+  const bundle = hash(),
+    owner = acquire(bundle)
   await settle()
   for (let i = 0; i < 512; i++) owner.mount(`slot-${i}`, 'panel', {})
   expect(() => owner.mount('overflow', 'panel', {})).toThrow('512')
@@ -244,7 +315,8 @@ it('supports multiple slots on one owner within the same early reservation budge
   const sibling = acquire(bundle)
   expect(sandboxes).toHaveLength(513)
   expect(sandboxes[0]!.closed).toBe(1)
-  owner.release(); sibling.release()
+  owner.release()
+  sibling.release()
   expect(sandboxes.every((sandbox) => sandbox.closed === 1)).toBe(true)
 })
 
@@ -266,10 +338,19 @@ it.each([true, false])('owns only the latest pre-ready props (modern=%s)', async
 it('keeps the existing failure deadline while native construction is deferred and ignores late readiness', async () => {
   factory(false, false)
   let constructed = () => {}
-  const readiness = new Promise<void>((resolve) => { constructed = resolve })
+  const readiness = new Promise<void>((resolve) => {
+    constructed = resolve
+  })
   const spawning: Sandbox[] = []
   _setWorkerFactory(() => {
-    const worker = { ready: readiness, onerror: null, postMessage: (message: { acornBridge?: number }) => { if (!message.acornBridge) throw new Error('deferred worker owns only hello') }, terminate: vi.fn() } as unknown as Worker
+    const worker = {
+      ready: readiness,
+      onerror: null,
+      postMessage: (message: { acornBridge?: number }) => {
+        if (!message.acornBridge) throw new Error('deferred worker owns only hello')
+      },
+      terminate: vi.fn(),
+    } as unknown as Worker
     spawning.push({ worker } as Sandbox)
     return worker
   })
@@ -301,7 +382,15 @@ it('retires both modern mount endpoints when scoped bridge construction fails wi
   })
   const bundle = hash()
   const failed = vi.fn()
-  const owner = acquireTreeWorker({ pluginId: 'probe', hash: bundle, context, onRefused: failed, connect: () => { throw new Error('bridge construction failed') } })
+  const owner = acquireTreeWorker({
+    pluginId: 'probe',
+    hash: bundle,
+    context,
+    onRefused: failed,
+    connect: () => {
+      throw new Error('bridge construction failed')
+    },
+  })
   const sibling = acquire(bundle)
   const failures: string[] = []
   owner.transport('failed').onFailed((reason) => failures.push(reason))
@@ -314,5 +403,6 @@ it('retires both modern mount endpoints when scoped bridge construction fails wi
   expect(owner.bridgePort('failed')).toBeNull()
   expect(sibling.bridgePort('live')).not.toBeNull()
   expect(sandboxes[0]!.closed).toBe(0)
-  owner.release(); sibling.release()
+  owner.release()
+  sibling.release()
 })

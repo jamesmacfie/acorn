@@ -18,7 +18,19 @@ vi.mock('@tanstack/solid-query', () => ({
     get data() {
       const key = options().queryKey
       if (key.includes('session-defaults')) return defaultAgentSessionDefaults()
-      if (key.includes('model-backends')) return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [{ id: 'opus', label: 'Opus' }], defaultModelId: 'opus' }], missing: [] }
+      if (key.includes('model-backends'))
+        return {
+          backends: [
+            {
+              id: 'harness:claude',
+              kind: 'harness',
+              label: 'Claude Code',
+              models: [{ id: 'opus', label: 'Opus' }],
+              defaultModelId: 'opus',
+            },
+          ],
+          missing: [],
+        }
       return mocks.prefs
     },
   }),
@@ -31,7 +43,15 @@ vi.mock('./startupContext', async (importOriginal) => ({
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
     providers: async () => [
-      { id: 'claude', profileId: 'claude-code', label: 'Claude Code', installed: true, executableVersion: '2.1.0', authenticated: true, diagnostics: [] },
+      {
+        id: 'claude',
+        profileId: 'claude-code',
+        label: 'Claude Code',
+        installed: true,
+        executableVersion: '2.1.0',
+        authenticated: true,
+        diagnostics: [],
+      },
       { id: 'codex', profileId: 'codex', label: 'Codex', installed: false, authenticated: null, diagnostics: [] },
     ],
     sessions: async () => ({ sessions: [] }),
@@ -44,7 +64,9 @@ let host: HTMLElement
 let dispose: (() => void) | undefined
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 const row = (label: string) =>
-  [...host.querySelectorAll('.ui-setting-row')].find((each) => each.querySelector('.ui-setting-label')?.textContent?.startsWith(label))
+  [...host.querySelectorAll('.ui-setting-row')].find((each) =>
+    each.querySelector('.ui-setting-label')?.textContent?.startsWith(label),
+  )
 
 beforeEach(() => {
   mocks.prefs = {}

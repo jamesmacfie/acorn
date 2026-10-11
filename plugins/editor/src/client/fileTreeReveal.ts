@@ -16,7 +16,7 @@ export const canRevealActiveFile = (context: {
   activeFile: string | null
   treeAvailable: boolean
 }): boolean =>
-  context.paneTaskId === context.activeTaskId
-  && context.focusedPane === 'editor'
-  && context.activeFile !== null
-  && context.treeAvailable
+  context.paneTaskId === context.activeTaskId &&
+  context.focusedPane === 'editor' &&
+  context.activeFile !== null &&
+  context.treeAvailable

@@ -31,16 +31,22 @@ export async function runPluginTaskCheck(
   task: TaskRef,
   signal: AbortSignal,
 ): Promise<TaskConcern | null> {
-  const response = await dispatchPluginRoute(env, pluginId, scopedPath(descriptor.check, task.id), { method: 'GET' }, signal)
+  const response = await dispatchPluginRoute(
+    env,
+    pluginId,
+    scopedPath(descriptor.check, task.id),
+    { method: 'GET' },
+    signal,
+  )
   if (!response.ok) {
     log.warn(`${pluginId}:${descriptor.id} answered ${response.status} from ${descriptor.check}`)
     return null
   }
-  const body = await response.json().catch(() => null) as { concern?: unknown } | null
+  const body = (await response.json().catch(() => null)) as { concern?: unknown } | null
   // `{ concern: null }` and a bare `{}` both mean "nothing to say". The shape is checked properly by
   // the caller's sanitiser; this only has to decide whether there is an object to hand it.
   const concern = body?.concern
-  return concern && typeof concern === 'object' ? concern as TaskConcern : null
+  return concern && typeof concern === 'object' ? (concern as TaskConcern) : null
 }
 
 /** Run one manifest-declared cleanup. Throws on a non-2xx, because the caller collects failures and
@@ -52,6 +58,12 @@ export async function runPluginTaskApply(
   task: TaskRef,
   signal: AbortSignal,
 ): Promise<void> {
-  const response = await dispatchPluginRoute(env, pluginId, path, { method: 'POST', body: JSON.stringify({ taskId: task.id }) }, signal)
+  const response = await dispatchPluginRoute(
+    env,
+    pluginId,
+    path,
+    { method: 'POST', body: JSON.stringify({ taskId: task.id }) },
+    signal,
+  )
   if (!response.ok) throw new Error(`${response.status} from ${path}`)
 }

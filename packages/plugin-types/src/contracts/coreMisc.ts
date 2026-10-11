@@ -4,7 +4,11 @@ import type { GenerateTextInput, GenerateTextUsage } from './providers.js'
 export type CoreContextService = {
   /** The owner's `startup_context_injection` pref. Absent means true. */
   injectionEnabled(userId: string): Promise<boolean>
-  assemble(userLogin: string, taskId: string, include: Set<string>): Promise<HostOwned<'protocol/api.TaskContext'> | null>
+  assemble(
+    userLogin: string,
+    taskId: string,
+    include: Set<string>,
+  ): Promise<HostOwned<'protocol/api.TaskContext'> | null>
 }
 
 /** What `generateText` takes. Leave `backendId` out to spend your plugin's model grant

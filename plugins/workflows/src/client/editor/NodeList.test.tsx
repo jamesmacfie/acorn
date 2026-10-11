@@ -9,7 +9,9 @@ import NodeList from './NodeList'
 // keyboard's — so this list was arrow-keys-only and nothing happened when anybody clicked it
 // (client-core kit/components/layout/Row.tsx).
 
-const def: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+const def: WorkflowDef = {
+  baseline: 'acorn-1' as const,
+  formatVersion: 1 as const,
   name: 'PR review',
   steps: [
     { name: 'understand-pr', kind: 'agent', with: { prompt: 'read it' } },
@@ -28,14 +30,10 @@ describe('the node list', () => {
     const onSelect = vi.fn()
     const host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => (
-      <NodeList
-        draft={newDraft(def)}
-        catalog={undefined}
-        onSelect={onSelect}
-        onAdd={vi.fn()}
-      />
-    ), host)
+    dispose = render(
+      () => <NodeList draft={newDraft(def)} catalog={undefined} onSelect={onSelect} onAdd={vi.fn()} />,
+      host,
+    )
 
     const rows = [...host.querySelectorAll<HTMLElement>('.ui-row')]
     const labels = rows.map((row) => row.textContent)

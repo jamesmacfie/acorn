@@ -11,16 +11,26 @@ import { Button, type ButtonProps } from './Button'
    The prompt is "{Verb} {thing}?", such as "Remove container?". The armed button keeps at least its
    resting width, so a shorter prompt cannot pull the bar in under the pointer before the second
    click. */
-export function ConfirmButton(props: ButtonProps & {
-  /** The prompt the armed button shows. Name the verb and the thing: "Delete note?". */
-  confirmLabel?: string
-  timeoutMs?: number
-  skipConfirm?: boolean
-  /** Capture the target before the button shows its second-click prompt. */
-  onArm?: () => void
-  onConfirm: () => void
-}) {
-  const [own, rest] = splitProps(props, ['confirmLabel', 'timeoutMs', 'skipConfirm', 'onArm', 'onConfirm', 'children', 'tone'])
+export function ConfirmButton(
+  props: ButtonProps & {
+    /** The prompt the armed button shows. Name the verb and the thing: "Delete note?". */
+    confirmLabel?: string
+    timeoutMs?: number
+    skipConfirm?: boolean
+    /** Capture the target before the button shows its second-click prompt. */
+    onArm?: () => void
+    onConfirm: () => void
+  },
+) {
+  const [own, rest] = splitProps(props, [
+    'confirmLabel',
+    'timeoutMs',
+    'skipConfirm',
+    'onArm',
+    'onConfirm',
+    'children',
+    'tone',
+  ])
   const armed = createArmedConfirm(() => own.timeoutMs ?? 3000)
   let wrap: HTMLSpanElement | undefined
   const button = () => (wrap?.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : undefined)

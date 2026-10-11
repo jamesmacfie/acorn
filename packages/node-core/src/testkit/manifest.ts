@@ -39,7 +39,10 @@ export async function validatePluginConfig(configPath: string): Promise<PluginMa
     }
     spec = mod.default as Record<string, unknown>
   } catch (error) {
-    return { ok: false, reason: `${PLUGIN_CONFIG_FILE} could not be imported: ${error instanceof Error ? error.message : String(error)}` }
+    return {
+      ok: false,
+      reason: `${PLUGIN_CONFIG_FILE} could not be imported: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
 
   // The directory name is the plugin id (docs/plugins/loaded-plugins.md § Loaded plugins). It binds the route
@@ -55,18 +58,21 @@ export async function validatePluginConfig(configPath: string): Promise<PluginMa
     // it. Validating the contributions block is still worth doing.
   }
   const client = spec.client as { entry?: string } | undefined
-  return parsePluginManifest({
-    id,
-    name: spec.name,
-    ...(spec.icon ? { icon: spec.icon } : {}),
-    ...(spec.icons ? { icons: spec.icons } : {}),
-    version,
-    baseline: ACORN_BASELINE,
-    apiVersion: PLUGIN_API_MAJOR,
-    node: './dist/node.js',
-    ...(client ? { client: './dist/client.js' } : {}),
-    ...(spec.migrations ? { migrations: './migrations' } : {}),
-    permissions: spec.permissions,
-    contributions: spec.contributions,
-  }, PLUGIN_CONFIG_FILE)
+  return parsePluginManifest(
+    {
+      id,
+      name: spec.name,
+      ...(spec.icon ? { icon: spec.icon } : {}),
+      ...(spec.icons ? { icons: spec.icons } : {}),
+      version,
+      baseline: ACORN_BASELINE,
+      apiVersion: PLUGIN_API_MAJOR,
+      node: './dist/node.js',
+      ...(client ? { client: './dist/client.js' } : {}),
+      ...(spec.migrations ? { migrations: './migrations' } : {}),
+      permissions: spec.permissions,
+      contributions: spec.contributions,
+    },
+    PLUGIN_CONFIG_FILE,
+  )
 }

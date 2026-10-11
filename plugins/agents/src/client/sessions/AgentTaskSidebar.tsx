@@ -3,8 +3,21 @@ import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../../contract/wire.ts'
 import {
-  EmptyState, Fold, Icon, IconButton, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
-  sidebarCollapsed, Stack, Text,
+  EmptyState,
+  Fold,
+  Icon,
+  IconButton,
+  Inline,
+  Menu,
+  paneCollapseKey,
+  Row,
+  RowActions,
+  Rows,
+  Section,
+  SectionHeader,
+  sidebarCollapsed,
+  Stack,
+  Text,
 } from '@acorn/plugin-api/ui'
 import { managedAgentStore } from './managedStore'
 import type { AgentPaneModel } from './agentPaneModel'
@@ -17,12 +30,20 @@ import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { agentSessionRoster, delegationSummary } from './sessionRoster'
 import {
-  compareSessions, compareSubagents, SESSION_ORDER_CHOICES, sessionOrderFor, setSessionOrder, type SessionGroup,
+  compareSessions,
+  compareSubagents,
+  SESSION_ORDER_CHOICES,
+  sessionOrderFor,
+  setSessionOrder,
+  type SessionGroup,
 } from './sessionOrder'
 import { isStale } from '../inlineDiff/patchStatus.ts'
 import { eventTime } from './eventTime'
 import {
-  clearManagedSubagent, openManagedSession, selectManagedSession, selectManagedSubagent,
+  clearManagedSubagent,
+  openManagedSession,
+  selectManagedSession,
+  selectManagedSubagent,
   selectedManagedSubagent,
 } from './managedSelection'
 
@@ -50,19 +71,27 @@ function OrderMenu(props: { taskId: string; group: SessionGroup; label: string }
       ariaLabel={`Order ${props.label}`}
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <IconButton icon="arrow-up-down" label={`Order ${props.label}`} opens="menu" expanded={open()} onPress={toggle} />
+        <IconButton
+          icon="arrow-up-down"
+          label={`Order ${props.label}`}
+          opens="menu"
+          expanded={open()}
+          onPress={toggle}
+        />
       )}
     >
-      {(menu) => SESSION_ORDER_CHOICES.map((choice) => (
-        <Menu.Item
-          context={menu}
-          kind="radio"
-          checked={chosen() === choice.value}
-          onSelect={() => setSessionOrder(props.taskId, props.group, choice.value)}
-        >
-          {choice.label}
-        </Menu.Item>
-      ))}
+      {(menu) =>
+        SESSION_ORDER_CHOICES.map((choice) => (
+          <Menu.Item
+            context={menu}
+            kind="radio"
+            checked={chosen() === choice.value}
+            onSelect={() => setSessionOrder(props.taskId, props.group, choice.value)}
+          >
+            {choice.label}
+          </Menu.Item>
+        ))
+      }
     </Menu>
   )
 }
@@ -91,10 +120,15 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   onCleanup(view.dispose)
   void model.sessionsLoaded.then(view.ready, view.fail)
 
-  const managedRequests = createMemo(() => model.taskSessions().flatMap((session) =>
-    (managedAgentStore.snapshots()[session.id]?.requests ?? [])
-      .filter((request) => request.status === 'pending' || request.status === 'resolving')
-      .map((request) => ({ session, request }))))
+  const managedRequests = createMemo(() =>
+    model
+      .taskSessions()
+      .flatMap((session) =>
+        (managedAgentStore.snapshots()[session.id]?.requests ?? [])
+          .filter((request) => request.status === 'pending' || request.status === 'resolving')
+          .map((request) => ({ session, request })),
+      ),
+  )
 
   const attentionLoaded = new Map<string, number>()
   // The snapshots read above for their requests, held while this list is drawn, or the store's bound
@@ -137,16 +171,30 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
       [...model.taskSessions()].sort(compareSessions(order)),
       managedAgentStore.delegations(),
       compareSubagents(order),
-    ).filter((row) => keep(row.session)).map(({ key, label }) => ({ key, label }))
+    )
+      .filter((row) => keep(row.session))
+      .map(({ key, label }) => ({ key, label }))
   }
-  const sessionRows = createMemo(() => agentTelemetry.measure('agents.sidebar.rows', () =>
-    groupRows('managed', (session) => !session.origin && session.kind !== 'workflow')))
-  const workflowRows = createMemo(() => groupRows('workflow', (session) => !session.origin && session.kind === 'workflow'))
-  const workflowSessionCount = createMemo(() =>
-    model.taskSessions().filter((session) => !session.origin && session.kind === 'workflow').length)
-  const inlineSessions = createMemo(() => model.taskSessions().filter((session) => session.origin?.kind === 'inline-diff')
-    .sort(compareSessions(sessionOrderFor(props.task.id, 'inline'))))
-  const inlineNeedsYou = createMemo(() => inlineSessions().filter((session) => !['none', 'unread'].includes(session.attention)).length)
+  const sessionRows = createMemo(() =>
+    agentTelemetry.measure('agents.sidebar.rows', () =>
+      groupRows('managed', (session) => !session.origin && session.kind !== 'workflow'),
+    ),
+  )
+  const workflowRows = createMemo(() =>
+    groupRows('workflow', (session) => !session.origin && session.kind === 'workflow'),
+  )
+  const workflowSessionCount = createMemo(
+    () => model.taskSessions().filter((session) => !session.origin && session.kind === 'workflow').length,
+  )
+  const inlineSessions = createMemo(() =>
+    model
+      .taskSessions()
+      .filter((session) => session.origin?.kind === 'inline-diff')
+      .sort(compareSessions(sessionOrderFor(props.task.id, 'inline'))),
+  )
+  const inlineNeedsYou = createMemo(
+    () => inlineSessions().filter((session) => !['none', 'unread'].includes(session.attention)).length,
+  )
   createEffect(() => agentTelemetry.observe('agents.sidebar.row_count', sessionRows().length))
   const sessionOf = (key: string) => model.sessionRoster().find((candidate) => candidate.key === key) ?? null
   const selectedRowKey = createMemo(() => {
@@ -209,9 +257,11 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     title={current().title}
                     tip={lastActive(current().updatedAt)}
                     tipAt={current().updatedAt}
-                    collapsed={collapsed()
-                      ? <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
-                      : undefined}
+                    collapsed={
+                      collapsed() ? (
+                        <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
+                      ) : undefined
+                    }
                     leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
                     trailing={
                       <>
@@ -222,15 +272,28 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           {(menu) => (
                             <>
                               <Show when={canStopAgent(current())}>
-                                <Menu.Item context={menu} leading={<Icon name="circle-stop" />} onSelect={() => model.sessionAction(current(), 'stop')}>
+                                <Menu.Item
+                                  context={menu}
+                                  leading={<Icon name="circle-stop" />}
+                                  onSelect={() => model.sessionAction(current(), 'stop')}
+                                >
                                   Stop
                                 </Menu.Item>
                               </Show>
-                              <Menu.Item context={menu} leading={<Icon name="pencil" />} onSelect={() => model.sessionAction(current(), 'rename')}>
+                              <Menu.Item
+                                context={menu}
+                                leading={<Icon name="pencil" />}
+                                onSelect={() => model.sessionAction(current(), 'rename')}
+                              >
                                 Rename session
                               </Menu.Item>
                               <Menu.Separator />
-                              <Menu.Item context={menu} tone="danger" leading={<Icon name="archive" />} onSelect={() => model.sessionAction(current(), 'archive')}>
+                              <Menu.Item
+                                context={menu}
+                                tone="danger"
+                                leading={<Icon name="archive" />}
+                                onSelect={() => model.sessionAction(current(), 'archive')}
+                              >
                                 Archive session…
                               </Menu.Item>
                             </>
@@ -242,12 +305,13 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                   >
                     <Text emphasis="strong">{current().title}</Text>
                     <Inline gap="inline">
-                        <Show when={providerMarkName(current().providerId)}>
+                      <Show when={providerMarkName(current().providerId)}>
                         {(mark) => <ProviderGlyph glyph={mark()} label={current().providerId} />}
                       </Show>
                       <Text emphasis="muted">
                         {[current().providerId, sessionModelSummary(current()), current().runtimeState]
-                          .filter(Boolean).join(' · ')}
+                          .filter(Boolean)
+                          .join(' · ')}
                       </Text>
                     </Inline>
                     <Show when={managedRow()}>
@@ -304,36 +368,33 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
               label: request.title,
             }))}
             onActivate={(key) => {
-              const entry = managedRequests()
-                .find(({ session, request }) => `${session.id}:${request.providerRequestId}` === key)
+              const entry = managedRequests().find(
+                ({ session, request }) => `${session.id}:${request.providerRequestId}` === key,
+              )
               if (entry) openManagedSession(props.task.id, entry.session.id, entry.request.providerRequestId)
             }}
           >
             {(item, itemProps) => {
-              const entry = () => managedRequests()
-                .find(({ session, request }) => `${session.id}:${request.providerRequestId}` === item.key)
+              const entry = () =>
+                managedRequests().find(
+                  ({ session, request }) => `${session.id}:${request.providerRequestId}` === item.key,
+                )
               return (
                 <Row
                   item={itemProps}
                   variant="stacked"
                   density="compact"
                   title={item.label}
-                  collapsed={collapsed()
-                    ? (
+                  collapsed={
+                    collapsed() ? (
                       <>
                         <RuntimeStateIcon state="waiting" />
-                        <Show when={entry()?.request.kind}>
-                          {(kind) => <Icon {...attentionMark(kind())} />}
-                        </Show>
+                        <Show when={entry()?.request.kind}>{(kind) => <Icon {...attentionMark(kind())} />}</Show>
                       </>
-                    )
-                    : undefined}
-                  leading={<RuntimeStateIcon state="waiting" />}
-                  trailing={
-                    <Show when={entry()?.request.kind}>
-                      {(kind) => <Icon {...attentionMark(kind())} />}
-                    </Show>
+                    ) : undefined
                   }
+                  leading={<RuntimeStateIcon state="waiting" />}
+                  trailing={<Show when={entry()?.request.kind}>{(kind) => <Icon {...attentionMark(kind())} />}</Show>}
                   onPress={() => {
                     const found = entry()
                     if (found) openManagedSession(props.task.id, found.session.id, found.request.providerRequestId)
@@ -348,24 +409,38 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
         </Section>
       </Show>
 
-      <Section label="Managed sessions" actions={<OrderMenu taskId={props.task.id} group="managed" label="managed sessions" />}>
+      <Section
+        label="Managed sessions"
+        actions={<OrderMenu taskId={props.task.id} group="managed" label="managed sessions" />}
+      >
         <Show
           when={sessionRows().length}
-          fallback={<EmptyState size="sm" align="start">No managed sessions</EmptyState>}
+          fallback={
+            <EmptyState size="sm" align="start">
+              No managed sessions
+            </EmptyState>
+          }
         >
           <SessionRows id={`agents:sessions:${props.task.id}`} ariaLabel="Managed sessions" items={sessionRows()} />
         </Show>
       </Section>
       <Show when={workflowRows().length}>
-        <Fold label={`Workflow runs (${workflowSessionCount()})`} persistKey="agents.workflow-runs" defaultOpen
-          actions={<OrderMenu taskId={props.task.id} group="workflow" label="workflow runs" />}>
+        <Fold
+          label={`Workflow runs (${workflowSessionCount()})`}
+          persistKey="agents.workflow-runs"
+          defaultOpen
+          actions={<OrderMenu taskId={props.task.id} group="workflow" label="workflow runs" />}
+        >
           <SessionRows id={`agents:workflows:${props.task.id}`} ariaLabel="Workflow runs" items={workflowRows()} />
         </Fold>
       </Show>
       <Show when={inlineSessions().length}>
-        <Fold label={`Inline chats (${inlineSessions().length})`} persistKey="agents.inline-chats"
+        <Fold
+          label={`Inline chats (${inlineSessions().length})`}
+          persistKey="agents.inline-chats"
           actions={<OrderMenu taskId={props.task.id} group="inline" label="inline chats" />}
-          meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}>
+          meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}
+        >
           <Rows
             id={`agents:inline:${props.task.id}`}
             ariaLabel="Inline chats"
@@ -376,21 +451,34 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
           >
             {(item, itemProps, selected) => {
               const current = () => inlineSessions().find((session) => session.id === item.key)
-              return <Show when={current()}>{(session) => <Row
-                item={itemProps}
-                variant="stacked"
-                density="compact"
-                selected={selected()}
-                title={session().title}
-                tip={lastActive(session().updatedAt)}
-                tipAt={session().updatedAt}
-                leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
-                trailing={<Show when={!['none', 'unread'].includes(session().attention)}><Icon {...attentionMark(session().attention)} /></Show>}
-                onPress={() => openManagedSession(props.task.id, session().id)}
-              >
-                <Text emphasis="strong">{session().title}</Text>
-                <Text emphasis="muted">{session().origin?.path}:{session().origin?.line} · {session().origin && isStale(session().origin!) ? 'stale patch' : 'diff chat'}</Text>
-              </Row>}</Show>
+              return (
+                <Show when={current()}>
+                  {(session) => (
+                    <Row
+                      item={itemProps}
+                      variant="stacked"
+                      density="compact"
+                      selected={selected()}
+                      title={session().title}
+                      tip={lastActive(session().updatedAt)}
+                      tipAt={session().updatedAt}
+                      leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
+                      trailing={
+                        <Show when={!['none', 'unread'].includes(session().attention)}>
+                          <Icon {...attentionMark(session().attention)} />
+                        </Show>
+                      }
+                      onPress={() => openManagedSession(props.task.id, session().id)}
+                    >
+                      <Text emphasis="strong">{session().title}</Text>
+                      <Text emphasis="muted">
+                        {session().origin?.path}:{session().origin?.line} ·{' '}
+                        {session().origin && isStale(session().origin!) ? 'stale patch' : 'diff chat'}
+                      </Text>
+                    </Row>
+                  )}
+                </Show>
+              )
             }}
           </Rows>
         </Fold>

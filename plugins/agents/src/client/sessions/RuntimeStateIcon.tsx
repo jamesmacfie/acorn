@@ -27,13 +27,7 @@ export default function RuntimeStateIcon(props: { state: string; queued?: number
   return (
     <Show
       when={queued()}
-      fallback={(
-        <Icon
-          name={runtimeIcon(props.state)}
-          tone={runtimeTone(props.state)}
-          spin={SPINS.has(props.state)}
-        />
-      )}
+      fallback={<Icon name={runtimeIcon(props.state)} tone={runtimeTone(props.state)} spin={SPINS.has(props.state)} />}
     >
       <Icon {...queuedMark(props.queued ?? 0)} />
     </Show>
@@ -44,11 +38,5 @@ export default function RuntimeStateIcon(props: { state: string; queued?: number
 // than as a dot, so a running child turns exactly like the session above it does.
 export function SubagentStateIcon(props: { status: AgentSubagentStatus | undefined }) {
   const status = () => props.status ?? 'running'
-  return (
-    <Icon
-      name={subagentIcon(props.status)}
-      tone={subagentTone(props.status)}
-      spin={status() === 'running'}
-    />
-  )
+  return <Icon name={subagentIcon(props.status)} tone={subagentTone(props.status)} spin={status() === 'running'} />
 }

@@ -7,7 +7,16 @@ import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@a
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/server/headless.ts'
 import { NotesStore } from '@acorn/plugin-notes/testkit'
 import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/testkit'
-import { inlinePrompt, WorkflowRunner, WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER, type Extension, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/testkit'
+import {
+  inlinePrompt,
+  WorkflowRunner,
+  WORKFLOW_POLICY,
+  WORKFLOW_STEP_KIND,
+  WORKFLOW_TRIGGER,
+  type Extension,
+  type RunnerDeps,
+  type WorkflowDef,
+} from '@acorn/plugin-workflows/testkit'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 import { WorkflowDispatcher, createPublishedDef, resolveWorkflowGraph } from '@acorn/plugin-workflows/testkit'
 
@@ -41,7 +50,9 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
         env: {
           PATH: process.env.PATH ?? '',
           FAKE_AGENT_MODE: structuredByStep[def.name] === 'FAIL' ? 'fail' : 'ok',
-          ...(structuredByStep[def.name] && structuredByStep[def.name] !== 'FAIL' ? { FAKE_AGENT_STRUCTURED: structuredByStep[def.name] } : {}),
+          ...(structuredByStep[def.name] && structuredByStep[def.name] !== 'FAIL'
+            ? { FAKE_AGENT_STRUCTURED: structuredByStep[def.name] }
+            : {}),
         },
       })
     },
@@ -50,7 +61,9 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       await notes.append({ scope: 'task', taskId }, handoffSlug, `## ${stepName}\n${body}\n`, { author: 'workflow' })
     },
     assembleContext: async () => {
-      const note = handoffSlug ? await notes.read({ scope: 'task', taskId: 'task1' }, handoffSlug).catch(() => null) : null
+      const note = handoffSlug
+        ? await notes.read({ scope: 'task', taskId: 'task1' }, handoffSlug).catch(() => null)
+        : null
       return note ? `# Context\n\n## Notes\n${note.body}` : ''
     },
     evaluatePolicy: vi.fn(async () => ({ pass: true })),
@@ -76,7 +89,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   })
 
   const DEF: WorkflowDef = {
-    baseline: 'acorn-1', formatVersion: 1,
+    baseline: 'acorn-1',
+    formatVersion: 1,
     name: 'build-review',
     steps: [
       { id: 'build', name: 'build', prompt: 'Build the feature.', schema: { type: 'object' } },
@@ -84,7 +98,11 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     ],
   }
 
-  const waitDone = async (runner: WorkflowRunner, runId: string, until: string[] = ['done', 'failed', 'gated', 'safety-rail']) => {
+  const waitDone = async (
+    runner: WorkflowRunner,
+    runId: string,
+    until: string[] = ['done', 'failed', 'gated', 'safety-rail'],
+  ) => {
     const deadline = Date.now() + 15_000
     for (;;) {
       const run = await runner.run(runId)
@@ -94,19 +112,35 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     }
   }
 
-  it.each([true, false])('If persists and applies its %s branch without a model call', async enabled => {
+  it.each([true, false])('If persists and applies its %s branch without a model call', async (enabled) => {
     const d = deps()
     const runStep = vi.fn(d.runStep)
     const runner = new WorkflowRunner(wf.db, { ...d, runStep })
-    const runId = await runner.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'Condition', steps: [
-      { id: 'condition', name: 'Condition', kind: 'if', condition: { kind: 'comparison', left: { address: { from: 'literal', value: enabled } }, operator: 'eq', right: { address: { from: 'literal', value: true } } }, branches: { true: 'yes', otherwise: 'no' } },
-      { id: 'yes', name: 'Yes', kind: 'gate-policy', policy: 'checks-green', after: ['condition'] },
-      { id: 'no', name: 'No', kind: 'gate-policy', policy: 'checks-green', after: ['condition'] },
-    ] })
+    const runId = await runner.start('task1', {
+      baseline: 'acorn-1',
+      formatVersion: 1,
+      name: 'Condition',
+      steps: [
+        {
+          id: 'condition',
+          name: 'Condition',
+          kind: 'if',
+          condition: {
+            kind: 'comparison',
+            left: { address: { from: 'literal', value: enabled } },
+            operator: 'eq',
+            right: { address: { from: 'literal', value: true } },
+          },
+          branches: { true: 'yes', otherwise: 'no' },
+        },
+        { id: 'yes', name: 'Yes', kind: 'gate-policy', policy: 'checks-green', after: ['condition'] },
+        { id: 'no', name: 'No', kind: 'gate-policy', policy: 'checks-green', after: ['condition'] },
+      ],
+    })
     expect((await waitDone(runner, runId)).status).toBe('done')
     const rows = await runner.steps(runId)
-    expect(rows.find(row => row.name === (enabled ? 'Yes' : 'No'))?.status).toBe('done')
-    expect(rows.find(row => row.name === (enabled ? 'No' : 'Yes'))?.status).toBe('skipped')
+    expect(rows.find((row) => row.name === (enabled ? 'Yes' : 'No'))?.status).toBe('done')
+    expect(rows.find((row) => row.name === (enabled ? 'No' : 'Yes'))?.status).toBe('skipped')
     expect(runStep).not.toHaveBeenCalled()
   })
 
@@ -123,7 +157,10 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       ['review', 'done'],
     ])
     // Transitions persisted with the captured result, structured output and session id.
-    expect(JSON.parse(steps[0].structuredJson!)).toEqual({ summary: 'guarded the null token', files: ['src/auth/login.ts'] })
+    expect(JSON.parse(steps[0].structuredJson!)).toEqual({
+      summary: 'guarded the null token',
+      files: ['src/auth/login.ts'],
+    })
     expect(steps[0].sessionId).toBe('fake-sess-1')
     expect(steps[0].costUsd).toBeCloseTo(0.0123)
 
@@ -150,7 +187,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     const runner = new WorkflowRunner(wf.db, d)
     const def: WorkflowDef = {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'gated-ship',
       steps: [
         { id: 'build', name: 'build', prompt: 'Build.' },
@@ -163,7 +201,10 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(gated.status).toBe('gated')
     let steps = await runner.steps(runId)
     expect(steps.map((s) => s.status)).toEqual(['done', 'waiting-gate', 'pending'])
-    expect(d.notify).toHaveBeenCalledWith('task1', 'gate', expect.stringContaining('needs you'), { runId, stepId: steps[1].id })
+    expect(d.notify).toHaveBeenCalledWith('task1', 'gate', expect.stringContaining('needs you'), {
+      runId,
+      stepId: steps[1].id,
+    })
 
     // No further transitions while gated: the final step must not start.
     await new Promise((r) => setTimeout(r, 300))
@@ -190,7 +231,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'CI red' }))
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'auto',
       posture: 'autonomous',
       tools: { maxRisk: 'read' },
@@ -213,7 +255,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     d.evaluatePolicy = vi.fn(async () => ({ pass: false, detail: 'checks mirror says failing' }))
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'no-trust',
       steps: [
         { id: 'build', name: 'build', prompt: 'Build.', schema: { type: 'object' } },
@@ -234,7 +277,12 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     d.failingChecks = vi.fn(async () => (++polls <= 2 ? '- test: failure' : ''))
     const runner = new WorkflowRunner(wf.db, d)
-    const runId = await runner.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'ci', steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 3 }] })
+    const runId = await runner.start('task1', {
+      baseline: 'acorn-1',
+      formatVersion: 1,
+      name: 'ci',
+      steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 3 }],
+    })
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
     const [step] = await runner.steps(runId)
@@ -244,7 +292,12 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d2 = deps()
     d2.failingChecks = vi.fn(async () => '- test: failure')
     const runner2 = new WorkflowRunner(wf.db, d2)
-    const runId2 = await runner2.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'ci2', steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 2 }] })
+    const runId2 = await runner2.start('task1', {
+      baseline: 'acorn-1',
+      formatVersion: 1,
+      name: 'ci2',
+      steps: [{ id: 'ci-fix', name: 'ci-fix', kind: 'ci-loop', maxIterations: 2 }],
+    })
     const run2 = await waitDone(runner2, runId2)
     expect(run2.status).toBe('safety-rail')
     expect(run2.status).not.toBe('failed')
@@ -258,18 +311,23 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     d.runStep = async (_taskId, def, opts) => {
       if (def.name === 'slow') {
         return new Promise((resolveResult) => {
-          opts.signal?.addEventListener('abort', () => resolveResult({
-            status: 'cancelled',
-            exitCode: null,
-            capture: {
-              result: null,
-              structuredOutput: null,
-              sessionId: null,
-              costUsd: null,
-              events: [],
-            },
-            stderrTail: '',
-          }), { once: true })
+          opts.signal?.addEventListener(
+            'abort',
+            () =>
+              resolveResult({
+                status: 'cancelled',
+                exitCode: null,
+                capture: {
+                  result: null,
+                  structuredOutput: null,
+                  sessionId: null,
+                  costUsd: null,
+                  events: [],
+                },
+                stderrTail: '',
+              }),
+            { once: true },
+          )
         })
       }
       return {
@@ -289,10 +347,15 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
 
     const runner = new WorkflowRunner(wf.db, d)
     const usageRunId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'usage-rail',
       budget: { maxCostUsd: 1, maxInputTokens: 2000 },
-      steps: [{ id: 'one', name: 'one' }, { id: 'two', name: 'two' }, { id: 'never', name: 'never' }],
+      steps: [
+        { id: 'one', name: 'one' },
+        { id: 'two', name: 'two' },
+        { id: 'never', name: 'never' },
+      ],
     })
     const usageRun = await waitDone(runner, usageRunId)
     expect(usageRun.status).toBe('safety-rail')
@@ -301,7 +364,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(usageSteps[1].error).toContain('cost budget exceeded')
 
     const timeoutRunId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'timeout-rail',
       steps: [{ id: 'slow', name: 'slow', budget: { maxWallTimeMs: 20 } }],
     })
@@ -373,19 +437,32 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     }
     structuredByStep.FAILCHILD = 'FAIL'
 
-    const child = await createPublishedDef(wf.db, { workspaceId: 'workspace', def: {
-      baseline: 'acorn-1', formatVersion: 1,
-      name: 'Review slice',
-      inputs: [{ name: 'title', schema: { type: 'string' }, required: true }],
-      steps: [{ id: 'review', name: 'review', prompt: 'Review ${inputs.title}.', schema: { type: 'object' } }],
-    } })
+    const child = await createPublishedDef(wf.db, {
+      workspaceId: 'workspace',
+      def: {
+        baseline: 'acorn-1',
+        formatVersion: 1,
+        name: 'Review slice',
+        inputs: [{ name: 'title', schema: { type: 'string' }, required: true }],
+        steps: [{ id: 'review', name: 'review', prompt: 'Review ${inputs.title}.', schema: { type: 'object' } }],
+      },
+    })
     const mappedDefinition: WorkflowDef = {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'parallel-review',
       steps: [
         { id: 'plan', name: 'plan', prompt: 'Split the work.', schema: { type: 'object' } },
-        { id: 'aggregate', name: 'aggregate', kind: 'workflow-map', items: { step: 'plan', pointer: '/tasks' }, itemKey: '/branch',
-          childWorkflow: { ref: { source: 'database', id: child.id }, inputs: { title: { address: { from: 'item', pointer: '/title' } } } },
+        {
+          id: 'aggregate',
+          name: 'aggregate',
+          kind: 'workflow-map',
+          items: { step: 'plan', pointer: '/tasks' },
+          itemKey: '/branch',
+          childWorkflow: {
+            ref: { source: 'database', id: child.id },
+            inputs: { title: { address: { from: 'item', pointer: '/title' } } },
+          },
           title: { template: '${title}', bindings: { title: { address: { from: 'item', pointer: '/title' } } } },
         },
       ],
@@ -395,7 +472,10 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runner = new WorkflowRunner(wf.db, d)
     const dispatcher = new WorkflowDispatcher(wf.db, runner, { createChild: d.createChildTask })
     d.dispatchChildWorkflows = (requests, signal) => dispatcher.dispatchMany(requests, signal)
-    const graph = await resolveWorkflowGraph(wf.db, mappedDefinition, { scope: { workspaceId: 'workspace', projectId: 'project-api', repoDir: null, userDir: null }, catalog: runner.validationCatalog() })
+    const graph = await resolveWorkflowGraph(wf.db, mappedDefinition, {
+      scope: { workspaceId: 'workspace', projectId: 'project-api', repoDir: null, userDir: null },
+      catalog: runner.validationCatalog(),
+    })
     const runId = await runner.start('task1', mappedDefinition, { resolvedGraph: graph })
     const run = await waitDone(runner, runId)
     expect(run.status).toBe('done')
@@ -414,7 +494,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     // The mapped step retained all 3 results.
     const outcome = JSON.parse(mapStep.structuredJson!) as { children: { runStatus: string }[] }
     expect(outcome.children).toHaveLength(3)
-    expect(outcome.children.every(child => child.runStatus === 'done')).toBe(true)
+    expect(outcome.children.every((child) => child.runStatus === 'done')).toBe(true)
 
     // Partial failure: child-2 fails, so the mapped step and run are marked and all outcomes recorded.
     failSecondChild = true
@@ -427,16 +507,17 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(mapStep2.status).toBe('completed-with-failures')
     const outcome2 = JSON.parse(mapStep2.structuredJson!) as { children: { runStatus: string }[] }
     expect(outcome2.children).toHaveLength(3)
-    expect(outcome2.children.filter(child => child.runStatus === 'failed')).toHaveLength(1)
+    expect(outcome2.children.filter((child) => child.runStatus === 'failed')).toHaveLength(1)
     runner.stop()
   }, 30_000)
 
-  it("requires_run: the runner starts the target and hands its URL to the step (docs/workflows.md)", async () => {
+  it('requires_run: the runner starts the target and hands its URL to the step (docs/workflows.md)', async () => {
     const d = deps()
     d.startRunTarget = vi.fn(async () => ({ ok: true, url: 'http://localhost:8080' }))
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'e2e',
       steps: [{ id: 'verify', name: 'verify', prompt: 'Check the login page.', requiresRun: 'dev' }],
     })
@@ -449,7 +530,12 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d2 = deps()
     d2.startRunTarget = vi.fn(async () => ({ ok: false }))
     const runner2 = new WorkflowRunner(wf.db, d2)
-    const runId2 = await runner2.start('task1', { baseline: 'acorn-1', formatVersion: 1, name: 'e2e2', steps: [{ id: 'verify', name: 'verify', prompt: 'x', requiresRun: 'dev' }] })
+    const runId2 = await runner2.start('task1', {
+      baseline: 'acorn-1',
+      formatVersion: 1,
+      name: 'e2e2',
+      steps: [{ id: 'verify', name: 'verify', prompt: 'x', requiresRun: 'dev' }],
+    })
     expect((await waitDone(runner2, runId2)).status).toBe('failed')
   })
 
@@ -460,11 +546,18 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     }
     const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'branch',
       steps: [
         { id: 'plan', name: 'plan', prompt: 'Plan.', schema: { type: 'object' } },
-        { id: 'route', name: 'route', kind: 'decide', prompt: 'Route this: ${steps.plan.output}', branches: { ship: 'ship', fix: 'fix', default: 'fix' } },
+        {
+          id: 'route',
+          name: 'route',
+          kind: 'decide',
+          prompt: 'Route this: ${steps.plan.output}',
+          branches: { ship: 'ship', fix: 'fix', default: 'fix' },
+        },
         { id: 'ship', name: 'ship', prompt: 'Ship.' },
         { id: 'fix', name: 'fix', prompt: 'Fix.' },
       ],
@@ -484,7 +577,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = { route: '{"verdict":"unknown"}' }
     const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'unmatched',
       steps: [
         { id: 'route', name: 'route', kind: 'decide', prompt: 'Ship or not?', branches: { yes: 'yes' } },
@@ -508,7 +602,12 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
           exitCode: 0,
           capture: {
             result: 'planned',
-            structuredOutput: { tasks: [{ title: 'one', branch: 'one' }, { title: 'two', branch: 'two' }] },
+            structuredOutput: {
+              tasks: [
+                { title: 'one', branch: 'one' },
+                { title: 'two', branch: 'two' },
+              ],
+            },
             sessionId: null,
             costUsd: null,
             events: [],
@@ -533,23 +632,40 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runner = new WorkflowRunner(wf.db, d)
     const dispatcher = new WorkflowDispatcher(wf.db, runner, { createChild: d.createChildTask })
     d.dispatchChildWorkflows = (requests, signal) => dispatcher.dispatchMany(requests, signal)
-    const child = await createPublishedDef(wf.db, { workspaceId: 'workspace', def: { baseline: 'acorn-1', formatVersion: 1, name: 'Build', steps: [{ id: 'build', name: 'build', prompt: 'Build it.' }] } })
+    const child = await createPublishedDef(wf.db, {
+      workspaceId: 'workspace',
+      def: {
+        baseline: 'acorn-1',
+        formatVersion: 1,
+        name: 'Build',
+        steps: [{ id: 'build', name: 'build', prompt: 'Build it.' }],
+      },
+    })
     const definition: WorkflowDef = {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'cancel-tree',
       steps: [
         { id: 'plan', name: 'plan', prompt: 'Split the work.', schema: { type: 'object' } },
-        { id: 'each', name: 'each', kind: 'workflow-map', items: { step: 'plan', pointer: '/tasks' }, itemKey: '/branch',
+        {
+          id: 'each',
+          name: 'each',
+          kind: 'workflow-map',
+          items: { step: 'plan', pointer: '/tasks' },
+          itemKey: '/branch',
           childWorkflow: { ref: { source: 'database', id: child.id } },
           title: { template: '${title}', bindings: { title: { address: { from: 'item', pointer: '/title' } } } },
         },
       ],
     }
-    const graph = await resolveWorkflowGraph(wf.db, definition, { scope: { workspaceId: 'workspace', projectId: 'project-api', repoDir: null, userDir: null }, catalog: runner.validationCatalog() })
+    const graph = await resolveWorkflowGraph(wf.db, definition, {
+      scope: { workspaceId: 'workspace', projectId: 'project-api', repoDir: null, userDir: null },
+      catalog: runner.validationCatalog(),
+    })
     const runId = await runner.start('task1', definition, { resolvedGraph: graph })
     const deadline = Date.now() + 5000
     for (;;) {
-      const children = (await wf.db.select().from(workflowRuns)).filter(row => row.parentRunId === runId)
+      const children = (await wf.db.select().from(workflowRuns)).filter((row) => row.parentRunId === runId)
       if (children.length === 2 && children.every((row) => row.status === 'running')) break
       if (Date.now() > deadline) throw new Error('children did not start')
       await new Promise((resolve) => setTimeout(resolve, 10))
@@ -566,22 +682,47 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     // What `ctx.extensionPoints` hands the runner: entry ids already qualified by the host, which is
     // also the name a workflow file writes for a contributed kind (plugins/workflows/contract/extensions.ts).
     const contributed: Record<string, Extension<unknown>[]> = {
-      [WORKFLOW_STEP_KIND]: [{ id: 'src:custom', pluginId: 'src', order: 0, value: {
-        handler: async () => ({ status: 'done', result: { custom: true } }),
-        describe: { label: 'Custom', description: 'Run the custom step.', icon: 'sparkles', fields: [], output: { description: 'Custom result.' } },
-      } }],
-      [WORKFLOW_POLICY]: [{ id: 'src:always', pluginId: 'src', order: 0, value: async () => ({ pass: true }) }],
-      [WORKFLOW_TRIGGER]: [{
-        id: 'src:pr-opened',
-        pluginId: 'src',
-        order: 0,
-        value: {
-          evaluate: async () => [{
-            taskId: 'task1',
-            workflow: { baseline: 'acorn-1', formatVersion: 1, name: 'triggered', steps: [{ id: 'custom', name: 'custom', kind: 'src:custom' }, { id: 'policy', name: 'policy', kind: 'gate-policy', policy: 'src:always' }] },
-          }],
+      [WORKFLOW_STEP_KIND]: [
+        {
+          id: 'src:custom',
+          pluginId: 'src',
+          order: 0,
+          value: {
+            handler: async () => ({ status: 'done', result: { custom: true } }),
+            describe: {
+              label: 'Custom',
+              description: 'Run the custom step.',
+              icon: 'sparkles',
+              fields: [],
+              output: { description: 'Custom result.' },
+            },
+          },
         },
-      }],
+      ],
+      [WORKFLOW_POLICY]: [{ id: 'src:always', pluginId: 'src', order: 0, value: async () => ({ pass: true }) }],
+      [WORKFLOW_TRIGGER]: [
+        {
+          id: 'src:pr-opened',
+          pluginId: 'src',
+          order: 0,
+          value: {
+            evaluate: async () => [
+              {
+                taskId: 'task1',
+                workflow: {
+                  baseline: 'acorn-1',
+                  formatVersion: 1,
+                  name: 'triggered',
+                  steps: [
+                    { id: 'custom', name: 'custom', kind: 'src:custom' },
+                    { id: 'policy', name: 'policy', kind: 'gate-policy', policy: 'src:always' },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
     }
     const runner = new WorkflowRunner(wf.db, deps(), { handlers: (point) => (contributed[point] ?? []) as never })
     expect(await runner.pollTriggers()).toEqual({ started: 1, errors: [] })
@@ -593,22 +734,40 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   it('fails an affected run when its plugin disappears, then accepts the saved kind when it returns', async () => {
     const kinds: Extension<unknown>[] = []
     let removeAfterFirst = true
-    const contribution = { id: 'src:custom', pluginId: 'src', order: 0, value: {
-      describe: { label: 'Custom', description: 'Run a custom step.', icon: 'sparkles', fields: [], output: { description: 'Custom result.' } },
-      handler: async () => {
-        if (removeAfterFirst) {
-          kinds.length = 0
-          removeAfterFirst = false
-        }
-        return { status: 'done' as const }
+    const contribution = {
+      id: 'src:custom',
+      pluginId: 'src',
+      order: 0,
+      value: {
+        describe: {
+          label: 'Custom',
+          description: 'Run a custom step.',
+          icon: 'sparkles',
+          fields: [],
+          output: { description: 'Custom result.' },
+        },
+        handler: async () => {
+          if (removeAfterFirst) {
+            kinds.length = 0
+            removeAfterFirst = false
+          }
+          return { status: 'done' as const }
+        },
       },
-    } }
+    }
     kinds.push(contribution)
-    const runner = new WorkflowRunner(wf.db, deps(), { handlers: (point) => (point === WORKFLOW_STEP_KIND ? kinds : []) as never })
-    const definition: WorkflowDef = { baseline: 'acorn-1', formatVersion: 1, name: 'custom', steps: [
-      { id: 'first', name: 'First', kind: 'src:custom' },
-      { id: 'second', name: 'Second', kind: 'src:custom' },
-    ] }
+    const runner = new WorkflowRunner(wf.db, deps(), {
+      handlers: (point) => (point === WORKFLOW_STEP_KIND ? kinds : []) as never,
+    })
+    const definition: WorkflowDef = {
+      baseline: 'acorn-1',
+      formatVersion: 1,
+      name: 'custom',
+      steps: [
+        { id: 'first', name: 'First', kind: 'src:custom' },
+        { id: 'second', name: 'Second', kind: 'src:custom' },
+      ],
+    }
     const first = await runner.start('task1', definition)
     const failed = await waitDone(runner, first)
     expect(failed.status).toBe('failed')
@@ -632,7 +791,10 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       started.push(def.name)
       stepInputs[def.name] = inlinePrompt(opts.prompt, opts.context)
       stepPrompts[def.name] = opts.prompt
-      ;(d as { taskFor?: Record<string, string> }).taskFor = { ...(d as { taskFor?: Record<string, string> }).taskFor, [def.name]: taskId }
+      ;(d as { taskFor?: Record<string, string> }).taskFor = {
+        ...(d as { taskFor?: Record<string, string> }).taskFor,
+        [def.name]: taskId,
+      }
       await new Promise<void>((release) => gates.set(def.name, release))
       finished.push(def.name)
       const structured = structuredByStep[def.name]
@@ -641,7 +803,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
         exitCode: structured === 'FAIL' ? 1 : 0,
         capture: {
           result: `${def.name} says so`,
-          structuredOutput: structured && structured !== 'FAIL' ? JSON.parse(structured) as unknown : null,
+          structuredOutput: structured && structured !== 'FAIL' ? (JSON.parse(structured) as unknown) : null,
           sessionId: `${def.name}-session`,
           costUsd: null,
           events: [],
@@ -672,7 +834,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const script = scripted()
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'diamond',
       steps: [
         { id: 'left', name: 'left', after: [] },
@@ -684,8 +847,12 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     await script.waitStarted('left')
     await script.waitStarted('right')
     expect(script.finished).toEqual([])
-    expect((await runner.steps(runId)).filter((step) => step.status === 'running').map((step) => step.name).sort())
-      .toEqual(['left', 'right'])
+    expect(
+      (await runner.steps(runId))
+        .filter((step) => step.status === 'running')
+        .map((step) => step.name)
+        .sort(),
+    ).toEqual(['left', 'right'])
 
     await script.release('left')
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -704,7 +871,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = { left: '{"found":"a null token"}' }
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'merge',
       steps: [
         { id: 'left', name: 'left', after: [] },
@@ -733,10 +901,18 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = { route: '{"verdict":"fix"}' }
     const runner = new WorkflowRunner(wf.db, deps())
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'branch-tree',
       steps: [
-        { id: 'route', name: 'route', kind: 'decide', after: [], prompt: 'Ship or fix?', branches: { ship: 'ship', fix: 'fix' } },
+        {
+          id: 'route',
+          name: 'route',
+          kind: 'decide',
+          after: [],
+          prompt: 'Ship or fix?',
+          branches: { ship: 'ship', fix: 'fix' },
+        },
         { id: 'ship', name: 'ship', after: ['route'] },
         { id: 'ship-only', name: 'ship-only', after: ['ship'] },
         { id: 'fix', name: 'fix', after: ['route'] },
@@ -759,7 +935,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   it('renders ${inputs.x} into prompts and refuses a start with a required input missing', async () => {
     const runner = new WorkflowRunner(wf.db, deps())
     const def: WorkflowDef = {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'with-inputs',
       inputs: [
         { name: 'issue', schema: { type: 'string' }, required: true },
@@ -772,7 +949,9 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(stepInputs.look).toContain('Investigate the crash on save, starting with the parser.')
 
     await expect(runner.start('task1', def)).rejects.toThrow("needs a value for input 'issue'")
-    await expect(runner.start('task1', def, { inputs: { issue: 'x', nope: 'y' } })).rejects.toThrow("has no input 'nope'")
+    await expect(runner.start('task1', def, { inputs: { issue: 'x', nope: 'y' } })).rejects.toThrow(
+      "has no input 'nope'",
+    )
   })
 
   it('an isolated step runs on its own child task, and cancelling the run reaches it', async () => {
@@ -786,7 +965,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     script.deps.cancelChildTask = async (taskId) => void cancelled.push(taskId)
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'Fix the bug',
       steps: [
         { id: 'shared', name: 'shared', after: [] },
@@ -808,7 +988,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     const runner = new WorkflowRunner(wf.db, d)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'retryable',
       steps: [
         { id: 'first', name: 'first', after: [] },
@@ -817,7 +998,12 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       ],
     })
     expect((await waitDone(runner, runId)).status).toBe('failed')
-    expect(d.notify).toHaveBeenCalledWith('task1', 'run-failed', expect.stringContaining('failed'), expect.objectContaining({ runId }))
+    expect(d.notify).toHaveBeenCalledWith(
+      'task1',
+      'run-failed',
+      expect.stringContaining('failed'),
+      expect.objectContaining({ runId }),
+    )
 
     // `last` never started, so it is still pending; skip it by hand to prove the reset walk finds it.
     const failed = (await runner.steps(runId)).find((step) => step.name === 'middle')!
@@ -828,7 +1014,11 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(await runner.retryStep(runId, failed.id, 'Try again, more carefully.')).toEqual({ ok: true })
     expect((await waitDone(runner, runId)).status).toBe('done')
     const rows = await runner.steps(runId)
-    expect(rows.map((row) => [row.name, row.status])).toEqual([['first', 'done'], ['middle', 'done'], ['last', 'done']])
+    expect(rows.map((row) => [row.name, row.status])).toEqual([
+      ['first', 'done'],
+      ['middle', 'done'],
+      ['last', 'done'],
+    ])
     expect(stepInputs.middle).toContain('Try again, more carefully.')
     // The frozen definition says what was asked, and the row keeps what it used to say.
     const run = await runner.run(runId)
@@ -841,16 +1031,23 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const runId = await runner.start('task1', DEF)
     await waitDone(runner, runId)
     const [step] = await runner.steps(runId)
-    expect(await runner.retryStep(runId, step.id, undefined)).toEqual({ ok: false, error: 'A done run cannot be retried.' })
+    expect(await runner.retryStep(runId, step.id, undefined)).toEqual({
+      ok: false,
+      error: 'A done run cannot be retried.',
+    })
   })
 
   it('a restart mid-parallel-run re-queues both running steps', async () => {
     const script = scripted()
     const runner = new WorkflowRunner(wf.db, script.deps)
     const runId = await runner.start('task1', {
-      baseline: 'acorn-1', formatVersion: 1,
+      baseline: 'acorn-1',
+      formatVersion: 1,
       name: 'parallel-restart',
-      steps: [{ id: 'left', name: 'left', after: [] }, { id: 'right', name: 'right', after: [] }],
+      steps: [
+        { id: 'left', name: 'left', after: [] },
+        { id: 'right', name: 'right', after: [] },
+      ],
     })
     await script.waitStarted('left')
     await script.waitStarted('right')
@@ -889,11 +1086,19 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   // managed session is scripted: what matters here is what the runner sends it and records.
   describe('completion conditions', () => {
     const summary = (status: 'continuing' | 'satisfied' | 'stopped') => ({
-      objective: 'The tests for login pass.', status, continuations: 1, repairs: 0, verdict: null, automaticTurns: [],
+      objective: 'The tests for login pass.',
+      status,
+      continuations: 1,
+      repairs: 0,
+      verdict: null,
+      automaticTurns: [],
     })
     const capture = { result: 'Done.', structuredOutput: null, sessionId: null, costUsd: null, events: [] }
     const def = (budget?: WorkflowDef['budget']): WorkflowDef => ({
-      baseline: 'acorn-1', formatVersion: 1, name: 'goal', budget,
+      baseline: 'acorn-1',
+      formatVersion: 1,
+      name: 'goal',
+      budget,
       inputs: [{ name: 'area', schema: { type: 'string' }, default: 'login' }],
       steps: [{ id: 'fix', name: 'fix', prompt: 'Fix ${inputs.area}.', goal: 'The tests for ${inputs.area} pass.' }],
     })
@@ -921,7 +1126,13 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
       const d = deps()
       d.runStep = async (_taskId, _def, opts) => {
         const reason = await opts.admitAutomatic!({ kind: 'turn', usage: { costUsd: null, usage: undefined } })
-        return { status: 'error', exitCode: null, capture, stderrTail: reason ?? '', goal: { ...summary('stopped'), reason: reason ?? undefined } }
+        return {
+          status: 'error',
+          exitCode: null,
+          capture,
+          stderrTail: reason ?? '',
+          goal: { ...summary('stopped'), reason: reason ?? undefined },
+        }
       }
       const runner = new WorkflowRunner(wf.db, d)
       const runId = await runner.start('task1', def({ maxTurns: 1 }))

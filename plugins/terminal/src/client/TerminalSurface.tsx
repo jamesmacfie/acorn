@@ -10,7 +10,12 @@ import { liveXterm, type LiveXterm } from './liveXterm'
 // parent draws every session's surface and hides all but one, so switching tabs is a repaint; across
 // tasks the drawer itself unmounts, and coming back moves the same attached xterm into the new box
 // instead of building a fresh one and asking the node for its screen.
-export default function TerminalSurface(props: { sessionId: string; fontSize: number; hidden?: boolean; onExit?: (exitCode: number | null) => void }) {
+export default function TerminalSurface(props: {
+  sessionId: string
+  fontSize: number
+  hidden?: boolean
+  onExit?: (exitCode: number | null) => void
+}) {
   const owner = queryOwner(useQueryClient())
   const nodeId = owner === undefined ? activeNodeId() : owner
   let frame: number | undefined
@@ -39,7 +44,9 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
       terminal.mount(host, (exitCode) => props.onExit?.(exitCode))
       terminal.setFontSize(props.fontSize)
       if (frame !== undefined) cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => { if (!gone && activeNodeId() === nodeId && !props.hidden) terminal?.show() })
+      frame = requestAnimationFrame(() => {
+        if (!gone && activeNodeId() === nodeId && !props.hidden) terminal?.show()
+      })
     })
   })
 
@@ -53,5 +60,14 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
   // out of it with the keyboard, and xterm owns everything inside (docs/terminal/client.md §
   // Client). `mount` is the element xterm attaches to, drawn by the host, which is why this file spells
   // no element and carries no stylesheet.
-  return <Rectangle kind="pty" label="Terminal" hidden={props.hidden} mount={(element) => { host = element }} />
+  return (
+    <Rectangle
+      kind="pty"
+      label="Terminal"
+      hidden={props.hidden}
+      mount={(element) => {
+        host = element
+      }}
+    />
+  )
 }

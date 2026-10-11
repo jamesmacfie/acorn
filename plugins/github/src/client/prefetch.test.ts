@@ -61,7 +61,20 @@ describe('open PR warmup', () => {
   it('warms PR detail and file summaries without seeding full patch payloads', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse([{ number: 42, title: 'Speed pass', state: 'open', draft: false, author: 'james', headRef: 'speed', baseRef: 'main', updatedAt: 1 }]))
+      .mockResolvedValueOnce(
+        jsonResponse([
+          {
+            number: 42,
+            title: 'Speed pass',
+            state: 'open',
+            draft: false,
+            author: 'james',
+            headRef: 'speed',
+            baseRef: 'main',
+            updatedAt: 1,
+          },
+        ]),
+      )
       .mockResolvedValueOnce(jsonResponse([{ number: 42, detail, files }]))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -70,14 +83,22 @@ describe('open PR warmup', () => {
 
     await prefetchOpenPulls(queryClient, 'acorn', 'web', signal)
 
-    expect(fetchMock).toHaveBeenNthCalledWith(1, '/v1/p/github/repos/acorn/web/pulls?state=open', expect.objectContaining({ signal: expect.any(AbortSignal) }))
-    expect(fetchMock).toHaveBeenNthCalledWith(2, '/v1/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
-      method: 'POST',
-      // `objectContaining`, because `apiClient.send()` names every request with an
-      // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
-      headers: expect.objectContaining({ 'content-type': 'application/json' }),
-      signal,
-    }))
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/v1/p/github/repos/acorn/web/pulls?state=open',
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/v1/p/github/repos/acorn/web/pulls/batch',
+      expect.objectContaining({
+        method: 'POST',
+        // `objectContaining`, because `apiClient.send()` names every request with an
+        // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
+        headers: expect.objectContaining({ 'content-type': 'application/json' }),
+        signal,
+      }),
+    )
     expect(batchBodyOf(fetchMock, 1)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
@@ -93,13 +114,16 @@ describe('open PR warmup', () => {
 
     await prefetchPullSummary(queryClient, 'acorn', 'web', 42, signal)
 
-    expect(fetchMock).toHaveBeenCalledWith('/v1/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
-      method: 'POST',
-      // `objectContaining`, because `apiClient.send()` names every request with an
-      // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
-      headers: expect.objectContaining({ 'content-type': 'application/json' }),
-      signal,
-    }))
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/v1/p/github/repos/acorn/web/pulls/batch',
+      expect.objectContaining({
+        method: 'POST',
+        // `objectContaining`, because `apiClient.send()` names every request with an
+        // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
+        headers: expect.objectContaining({ 'content-type': 'application/json' }),
+        signal,
+      }),
+    )
     expect(batchBodyOf(fetchMock, 0)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
@@ -122,10 +146,7 @@ describe('open PR warmup', () => {
       detail: { ...detail, pull: { ...detail.pull, number: pull.number } },
       files,
     }))
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(pulls))
-      .mockResolvedValueOnce(jsonResponse(warmed))
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(pulls)).mockResolvedValueOnce(jsonResponse(warmed))
     vi.stubGlobal('fetch', fetchMock)
 
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })

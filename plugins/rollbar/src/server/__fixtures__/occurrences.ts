@@ -50,7 +50,15 @@ export const TRACE_INSTANCE: RollbarApiInstance = {
       trace: {
         exception: { class: 'TypeError', message: 'token is null' },
         frames: [
-          { filename: 'auth/session.ts', lineno: 84, colno: 12, method: 'readSession', code: 'return s.token', in_app: true, context: { pre: ['a', 'b'], post: ['c', 'd'] } },
+          {
+            filename: 'auth/session.ts',
+            lineno: 84,
+            colno: 12,
+            method: 'readSession',
+            code: 'return s.token',
+            in_app: true,
+            context: { pre: ['a', 'b'], post: ['c', 'd'] },
+          },
           { filename: 'api/login.ts', lineno: 31, method: 'login' },
         ],
       },

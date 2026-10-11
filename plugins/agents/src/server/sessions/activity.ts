@@ -15,14 +15,18 @@ import {
 } from '../../contract/lifecycle'
 import { parseJson } from './rowMapping'
 
-type ActivityItem = AgentActivityEvent extends infer Item ? Item extends unknown ? Omit<Item, 'taskId' | 'sessionId'> : never : never
+type ActivityItem = AgentActivityEvent extends infer Item
+  ? Item extends unknown
+    ? Omit<Item, 'taskId' | 'sessionId'>
+    : never
+  : never
 
 const MAX_TITLE = 200
 const MAX_KIND = 40
 const MAX_PATHS = 8
 const MAX_PATH = 1024
 
-const clip = (value: string, max: number): string => value.length > max ? `${value.slice(0, max - 1)}…` : value
+const clip = (value: string, max: number): string => (value.length > max ? `${value.slice(0, max - 1)}…` : value)
 
 export function activityTool(tool: AgentToolCall, turnId: string | null): AgentActivityTool {
   return {
@@ -68,13 +72,19 @@ export function activityItem(
     return subagent ? { kind: 'subagent', subagent: activitySubagent(subagent) } : null
   }
   if (event.type === 'usage' && (event.usage.contextUsed != null || event.usage.contextSize != null)) {
-    return { kind: 'usage', usage: { contextUsed: event.usage.contextUsed ?? null, contextSize: event.usage.contextSize ?? null } }
+    return {
+      kind: 'usage',
+      usage: { contextUsed: event.usage.contextUsed ?? null, contextSize: event.usage.contextSize ?? null },
+    }
   }
   return null
 }
 
 /** The frames' items rebuilt from the ledger: each call's newest stored row is its whole state. */
-export async function readActivity(db: PluginDatabase, ref: { taskId: string; sessionId: string }): Promise<AgentActivityState | null> {
+export async function readActivity(
+  db: PluginDatabase,
+  ref: { taskId: string; sessionId: string },
+): Promise<AgentActivityState | null> {
   const [row] = await db
     .select({ subagentsJson: schema.agentSessions.subagentsJson })
     .from(schema.agentSessions)
@@ -84,10 +94,12 @@ export async function readActivity(db: PluginDatabase, ref: { taskId: string; se
   const toolRows = await db
     .select({ turnId: schema.agentEvents.turnId, eventJson: schema.agentEvents.eventJson })
     .from(schema.agentEvents)
-    .where(and(
-      eq(schema.agentEvents.sessionId, ref.sessionId),
-      sql`json_extract(${schema.agentEvents.eventJson}, '$.type') = 'tool'`,
-    ))
+    .where(
+      and(
+        eq(schema.agentEvents.sessionId, ref.sessionId),
+        sql`json_extract(${schema.agentEvents.eventJson}, '$.type') = 'tool'`,
+      ),
+    )
     .orderBy(desc(schema.agentEvents.seq))
     // Two rows per call at most, the opener and its folded state, so this holds the newest calls.
     .limit(MAX_ACTIVITY_TOOLS * 2)
@@ -113,16 +125,22 @@ export async function readActivity(db: PluginDatabase, ref: { taskId: string; se
   }
 }
 
-async function latestUsage(db: PluginDatabase, sessionId: string, field: 'contextUsed' | 'contextSize'): Promise<number | null> {
+async function latestUsage(
+  db: PluginDatabase,
+  sessionId: string,
+  field: 'contextUsed' | 'contextSize',
+): Promise<number | null> {
   const path = `$.usage.${field}`
   const [row] = await db
     .select({ value: sql<number>`json_extract(${schema.agentEvents.eventJson}, ${path})` })
     .from(schema.agentEvents)
-    .where(and(
-      eq(schema.agentEvents.sessionId, sessionId),
-      sql`json_extract(${schema.agentEvents.eventJson}, '$.type') = 'usage'`,
-      sql`json_extract(${schema.agentEvents.eventJson}, ${path}) IS NOT NULL`,
-    ))
+    .where(
+      and(
+        eq(schema.agentEvents.sessionId, sessionId),
+        sql`json_extract(${schema.agentEvents.eventJson}, '$.type') = 'usage'`,
+        sql`json_extract(${schema.agentEvents.eventJson}, ${path}) IS NOT NULL`,
+      ),
+    )
     .orderBy(desc(schema.agentEvents.seq))
     .limit(1)
   return row ? Number(row.value) : null

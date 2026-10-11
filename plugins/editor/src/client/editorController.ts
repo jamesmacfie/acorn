@@ -3,15 +3,73 @@ import type { QueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
-import { activeNodeId, activeTaskId, createLogger, debounce, documentSelection, featureUsable, formatFileReference, latestSignal, paneModel, queryOwner, resolveDocumentServices, sendReferenceToAgent, slotFills, telemetryFor, toast, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect, type ContentSelectionTarget, type Task } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  activeTaskId,
+  createLogger,
+  debounce,
+  documentSelection,
+  featureUsable,
+  formatFileReference,
+  latestSignal,
+  paneModel,
+  queryOwner,
+  resolveDocumentServices,
+  sendReferenceToAgent,
+  slotFills,
+  telemetryFor,
+  toast,
+  wsOnNodeEvent,
+  wsOnPluginsChanged,
+  wsOnReconnect,
+  type ContentSelectionTarget,
+  type Task,
+} from '@acorn/plugin-api/client'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
-import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, languageServices, refreshEditorTheme, refreshLanguageServices, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
+import {
+  documentCustody,
+  recoverDocumentCustody,
+  type DocumentCustody,
+  applyViewState,
+  captureViewState,
+  editorSearch,
+  editorTheme,
+  languageForPath,
+  languageServices,
+  refreshEditorTheme,
+  refreshLanguageServices,
+  shouldHighlightDocument,
+  watchEditorTheme,
+} from '@acorn/plugin-api/ui/editor'
 import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
-import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
-import { captureFileDecision, createEditorRefreshQueue, fileDecisionIsCurrent, reconcileEditorDisk, type FileDecision } from './editorDocumentLifecycle'
+import {
+  assertCanRebindEditorFile,
+  createEditorDocumentPool,
+  flushEditorDocument,
+  rebindEditorFile,
+  type EditorPool,
+  type PooledFile,
+} from './editorDocumentPool'
+import {
+  captureFileDecision,
+  createEditorRefreshQueue,
+  fileDecisionIsCurrent,
+  reconcileEditorDisk,
+  type FileDecision,
+} from './editorDocumentLifecycle'
 import { editorRootKey, EDITOR_ROOT_STALE_MS, type EditorApi } from './editorClient'
 import { readEditorIndentation, readEditorMode, readEditorWordWrap } from './editorPrefs'
-import { activeFile, editorActivate, editorClose, editorOpen, editorReopen, editorSetDirty, editorTabIdentity, openFiles, requestEditorReveal } from './editorState'
+import {
+  activeFile,
+  editorActivate,
+  editorClose,
+  editorOpen,
+  editorReopen,
+  editorSetDirty,
+  editorTabIdentity,
+  openFiles,
+  requestEditorReveal,
+} from './editorState'
 import { editorViewState, forgetEditorViewState, rememberEditorViewState } from './editorViewState'
 import { createFileActionModel } from './fileActionModel'
 import { persistCapturedEditorOpenFiles } from './openFilesSlice'
@@ -19,9 +77,25 @@ import { imageTypeForPath } from '../contract/imagePreview'
 import { markerRevision } from './markerRevision'
 import type { EditorReadResult } from '../contract/api'
 import { createFileStatusReader } from './fileStatusReader'
-import { historyIsCurrent, historyStep, navigate, nextClosed, noteActivated, noteClosed, takeClosedIfCurrent, type EditorLocation } from './editorNavigation'
+import {
+  historyIsCurrent,
+  historyStep,
+  navigate,
+  nextClosed,
+  noteActivated,
+  noteClosed,
+  takeClosedIfCurrent,
+  type EditorLocation,
+} from './editorNavigation'
 import { actionAvailable, runEditorAction, type EditorAction } from './editorActions'
-import { forgetPresentation, inferIndentation, presentationFor, saveLabel, setPresentation, type Indentation } from './editorPresentation'
+import {
+  forgetPresentation,
+  inferIndentation,
+  presentationFor,
+  saveLabel,
+  setPresentation,
+  type Indentation,
+} from './editorPresentation'
 import { admitGraphicalEditor } from './editorAdmission'
 
 const log = createLogger('editor', 'editor')
@@ -124,7 +198,7 @@ export function createEditorController(input: EditorControllerInput) {
   // Which editor draws an open file. `on` re-fires on identity rather than value, so its source is a
   // memo and not an inline getter.
   const mode = createMemo(() => readEditorMode(prefs()))
-  const imagePath = createMemo(() => mode() === 'graphical' && imageTypeForPath(active() ?? '') ? active() : null)
+  const imagePath = createMemo(() => (mode() === 'graphical' && imageTypeForPath(active() ?? '') ? active() : null))
   const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
   const [ptyPath, setPtyPath] = createSignal<string | null>(null)
   // Who answers hover and diagnostics for a file, by its language, on this pane's Node.
@@ -142,7 +216,12 @@ export function createEditorController(input: EditorControllerInput) {
   const takeDecision = (action: FileDecision['action']): FileDecision | null => {
     const decision = armedDecision()
     setArmedDecision(null)
-    if (decision && live() && fileDecisionIsCurrent(decision, action, nodeId, taskId, active(), pool.files.get(decision.path))) return decision
+    if (
+      decision &&
+      live() &&
+      fileDecisionIsCurrent(decision, action, nodeId, taskId, active(), pool.files.get(decision.path))
+    )
+      return decision
     setSaveErr('The document or disk version changed. Review it and confirm again.')
     return null
   }
@@ -175,7 +254,9 @@ export function createEditorController(input: EditorControllerInput) {
     watchCustody(path, entry)
     entry.state = entry.custody.state ?? entry.state
     if (entry.mount === mountToken) return entry.state
-    entry.state = entry.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(path, entry.language, entry.indentation)) }).state
+    entry.state = entry.state.update({
+      effects: engine!.StateEffect.reconfigure.of(perFile(path, entry.language, entry.indentation)),
+    }).state
     entry.mount = mountToken
     entry.custody.state = entry.state
     return entry.state
@@ -194,15 +275,26 @@ export function createEditorController(input: EditorControllerInput) {
       const state = captureViewState(view)
       rememberEditorViewState(taskId, currentPath, state, nodeId)
       const custody = currentCustody ?? pool.files.get(currentPath)?.custody
-      if (custody) { custody.state = view.state; custody.viewState = state; custody.flushRecovery() }
+      if (custody) {
+        custody.state = view.state
+        custody.viewState = state
+        custody.flushRecovery()
+      }
     }
   }
 
-  const fileActions = createFileActionModel(api, pool, taskId, nodeId, () => {
-    scheduleSave.cancel()
-    saveViewState()
-    if (view && currentPath) remember(currentPath, view.state)
-  }, (state) => persistCapturedEditorOpenFiles(queryClient, nodeId, taskId, state))
+  const fileActions = createFileActionModel(
+    api,
+    pool,
+    taskId,
+    nodeId,
+    () => {
+      scheduleSave.cancel()
+      saveViewState()
+      if (view && currentPath) remember(currentPath, view.state)
+    },
+    (state) => persistCapturedEditorOpenFiles(queryClient, nodeId, taskId, state),
+  )
 
   // Everything a file's own state carries beyond its text: the grammar, the theme, autosave, and the
   // explicit-flush chord. Built per path, because the language is the file's and the update listener
@@ -219,11 +311,20 @@ export function createEditorController(input: EditorControllerInput) {
       nodeId: nodeId ?? '',
       routes: () => servicesFor(path),
       revision: () => pool.files.get(path)?.custody.revision,
-      onUnavailable: (reason) => { if (currentPath === path && live()) setServicesOff(reason) },
+      onUnavailable: (reason) => {
+        if (currentPath === path && live()) setServicesOff(reason)
+      },
     }),
     language,
-    wrapCompartment!.of(presentationFor(nodeId, taskId, path).wrap ?? readEditorWordWrap(prefs()) ? engine!.EditorView.lineWrapping : []),
-    indentationCompartment!.of([engine!.indentUnit.of(indentation.mode === 'tabs' ? '\t' : ' '.repeat(indentation.width)), engine!.EditorState.tabSize.of(indentation.width)]),
+    wrapCompartment!.of(
+      (presentationFor(nodeId, taskId, path).wrap ?? readEditorWordWrap(prefs()))
+        ? engine!.EditorView.lineWrapping
+        : [],
+    ),
+    indentationCompartment!.of([
+      engine!.indentUnit.of(indentation.mode === 'tabs' ? '\t' : ' '.repeat(indentation.width)),
+      engine!.EditorState.tabSize.of(indentation.width),
+    ]),
     engine!.EditorView.updateListener.of((update) => {
       if (currentPath === path && (update.docChanged || update.selectionSet)) updateStatus()
       if (!update.docChanged || applyingAcknowledgement || !live()) return
@@ -243,15 +344,33 @@ export function createEditorController(input: EditorControllerInput) {
         void refreshLineMarkers(path)
       }
     }),
-    engine!.EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
+    engine!.EditorView.domEventHandlers({
+      blur: () => {
+        scheduleSave.flush()
+        return false
+      },
+    }),
     // Highest precedence so the explicit flush wins over anything the library binds to the chord;
     // autosave still runs either way.
-    engine!.Prec.highest(engine!.keymap.of([{ key: 'Mod-s', run: () => { void save(path); return true } }])),
+    engine!.Prec.highest(
+      engine!.keymap.of([
+        {
+          key: 'Mod-s',
+          run: () => {
+            void save(path)
+            return true
+          },
+        },
+      ]),
+    ),
   ]
 
   // An empty read-only state until a file is opened: the view always has one, so "no file" is a
   // document with nothing in it rather than a special case in every handler below.
-  const emptyState = () => engine!.EditorState.create({ extensions: [engine!.basicSetup, editorSearch(), editorTheme(), engine!.EditorState.readOnly.of(true)] })
+  const emptyState = () =>
+    engine!.EditorState.create({
+      extensions: [engine!.basicSetup, editorSearch(), editorTheme(), engine!.EditorState.readOnly.of(true)],
+    })
 
   // The pane's own read, deduplicated within this mount: the warm-up and the first `show()` ask for
   // the same file in the same tick, and one of them has to be the request. An unmounted pane's read
@@ -282,19 +401,27 @@ export function createEditorController(input: EditorControllerInput) {
     if (!live() || !view || mounted.aborted || !files().some((file) => file.path === relPath)) return null
     // Optional grammar and marker work never gate usable text.
     const custody = recovery ?? documentCustody(address, content, loaded?.revision)
-    const indentation = presentationFor(nodeId, taskId, relPath).indentation ?? inferIndentation(custody.current.toString(), readEditorIndentation(prefs()))
+    const indentation =
+      presentationFor(nodeId, taskId, relPath).indentation ??
+      inferIndentation(custody.current.toString(), readEditorIndentation(prefs()))
     const language: Extension = []
     const pooled = pool.files.get(relPath)
     if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
     const highlighted = shouldHighlightDocument(content.length)
-    if (!highlighted) telemetry.observe('editor.syntax.skipped', content.length, 'character', { reason: 'document-size' })
+    if (!highlighted)
+      telemetry.observe('editor.syntax.skipped', content.length, 'character', { reason: 'document-size' })
     let activeLanguage: Extension = highlighted ? language : []
     let state: EditorState
     try {
-      state = telemetry.measure('editor.state.create', () => engine!.EditorState.create({
-        doc: custody.current,
-        extensions: perFile(relPath, activeLanguage, indentation),
-      }), { highlighted })
+      state = telemetry.measure(
+        'editor.state.create',
+        () =>
+          engine!.EditorState.create({
+            doc: custody.current,
+            extensions: perFile(relPath, activeLanguage, indentation),
+          }),
+        { highlighted },
+      )
     } catch (error) {
       // A grammar is optional presentation. If a parser rejects ordinary-sized input, keep the file
       // usable and report one bounded failure instead of rejecting `show()` into the window handler.
@@ -303,11 +430,26 @@ export function createEditorController(input: EditorControllerInput) {
         'document.characters': content.length,
       })
       activeLanguage = []
-      state = engine!.EditorState.create({ doc: custody.current, extensions: perFile(relPath, activeLanguage, indentation) })
+      state = engine!.EditorState.create({
+        doc: custody.current,
+        extensions: perFile(relPath, activeLanguage, indentation),
+      })
     }
-    if (custody.state) state = custody.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(relPath, activeLanguage, indentation)) }).state
+    if (custody.state)
+      state = custody.state.update({
+        effects: engine!.StateEffect.reconfigure.of(perFile(relPath, activeLanguage, indentation)),
+      }).state
     custody.state = state
-    const entry: PooledFile = { state, custody, release: custody.retain(), language: activeLanguage, indentation, mount: mountToken, markersReadAt: 0, markersRead: latestSignal() }
+    const entry: PooledFile = {
+      state,
+      custody,
+      release: custody.retain(),
+      language: activeLanguage,
+      indentation,
+      mount: mountToken,
+      markersReadAt: 0,
+      markersRead: latestSignal(),
+    }
     saved.set(relPath, custody.acknowledged)
     pool.files.set(relPath, entry)
     watchCustody(relPath, entry)
@@ -319,39 +461,51 @@ export function createEditorController(input: EditorControllerInput) {
       void revalidate(relPath)
     }
     void refreshLineMarkers(relPath)
-    if (highlighted) void languageForPath(relPath).then((grammar) => {
-      if (!live() || pool.files.get(relPath) !== entry || (Array.isArray(grammar) && !grammar.length)) return
-      entry.language = grammar
-      if (!view) { entry.mount = {}; return }
-      const effects = engine!.StateEffect.reconfigure.of(perFile(relPath, grammar, entry.indentation))
-      if (view && currentPath === relPath) {
-        view.dispatch({ effects })
-        remember(relPath, view.state)
-      } else entry.state = custody.state = entry.state.update({ effects }).state
-    }).catch(() => {})
+    if (highlighted)
+      void languageForPath(relPath)
+        .then((grammar) => {
+          if (!live() || pool.files.get(relPath) !== entry || (Array.isArray(grammar) && !grammar.length)) return
+          entry.language = grammar
+          if (!view) {
+            entry.mount = {}
+            return
+          }
+          const effects = engine!.StateEffect.reconfigure.of(perFile(relPath, grammar, entry.indentation))
+          if (view && currentPath === relPath) {
+            view.dispatch({ effects })
+            remember(relPath, view.state)
+          } else entry.state = custody.state = entry.state.update({ effects }).state
+        })
+        .catch(() => {})
     return state
   }
 
   function watchCustody(path: string, entry: PooledFile): void {
     if (subscriptions.has(path)) return
-    subscriptions.set(path, entry.custody.subscribe(() => {
-      if (pool.files.get(path) !== entry || pool.retired) return
-      saved.set(path, entry.custody.acknowledged)
-      entry.state = entry.custody.state ?? entry.state
-      if (!live()) return
-      if (currentPath === path) updateStatus()
-      if (entry.custody.error) setSaveErr(entry.custody.error)
-      if (entry.custody.writeBlock && currentPath === path) scheduleSave.cancel()
-      if (view && currentPath === path && !view.state.doc.eq(entry.custody.current)) {
-        applyingAcknowledgement = true
-        try { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: entry.custody.current } }) }
-        finally { applyingAcknowledgement = false }
-        entry.state = entry.custody.state = view.state
-      }
-      editorSetDirty(taskId, path, entry.custody.dirty)
-      if (!entry.custody.dirty) void refreshLineMarkers(path)
-      if (entry.stale && !entry.custody.writing) void revalidate(path)
-    }))
+    subscriptions.set(
+      path,
+      entry.custody.subscribe(() => {
+        if (pool.files.get(path) !== entry || pool.retired) return
+        saved.set(path, entry.custody.acknowledged)
+        entry.state = entry.custody.state ?? entry.state
+        if (!live()) return
+        if (currentPath === path) updateStatus()
+        if (entry.custody.error) setSaveErr(entry.custody.error)
+        if (entry.custody.writeBlock && currentPath === path) scheduleSave.cancel()
+        if (view && currentPath === path && !view.state.doc.eq(entry.custody.current)) {
+          applyingAcknowledgement = true
+          try {
+            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: entry.custody.current } })
+          } finally {
+            applyingAcknowledgement = false
+          }
+          entry.state = entry.custody.state = view.state
+        }
+        editorSetDirty(taskId, path, entry.custody.dirty)
+        if (!entry.custody.dirty) void refreshLineMarkers(path)
+        if (entry.stale && !entry.custody.writing) void revalidate(path)
+      }),
+    )
   }
 
   const unwatchCustody = (path: string) => {
@@ -369,8 +523,18 @@ export function createEditorController(input: EditorControllerInput) {
     const bodyRevision = await markerRevision(doc.toString()).catch(() => null)
     if (!bodyRevision || !live() || markersRead.aborted || entry.custody.revision !== revision) return
     const response = await api.lineMarkers(taskId, relPath, bodyRevision).catch(() => null)
-    if (!response || response.revision !== bodyRevision || !live() || pool.files.get(relPath) !== entry || entry.custody.dirty || entry.custody.writing
-      || markersRead.aborted || entry.custody.revision !== revision || !entry.custody.current.eq(doc)) return
+    if (
+      !response ||
+      response.revision !== bodyRevision ||
+      !live() ||
+      pool.files.get(relPath) !== entry ||
+      entry.custody.dirty ||
+      entry.custody.writing ||
+      markersRead.aborted ||
+      entry.custody.revision !== revision ||
+      !entry.custody.current.eq(doc)
+    )
+      return
     const markers = response.markers
     if (view && currentPath === relPath) {
       view.dispatch({ effects: engine!.lineMarkerEffect(markers) })
@@ -387,18 +551,20 @@ export function createEditorController(input: EditorControllerInput) {
   const mountEditor = (element: HTMLElement) => {
     if (!graphical) return
     const mounted = surface.next()
-    void import('./editorEngine').then((loaded) => {
-      if (!live() || mounted.aborted) return
-      engine = loaded
-      wrapCompartment = new loaded.Compartment()
-      indentationCompartment = new loaded.Compartment()
-      view = new loaded.EditorView({ state: emptyState(), parent: element })
-      stopTheme = watchEditorTheme(view)
-      const restore = active()
-      if (restore) void show(restore)
-    }).catch((cause: unknown) => {
-      if (live() && !mounted.aborted) setSaveErr(cause instanceof Error ? cause.message : 'Unable to load editor.')
-    })
+    void import('./editorEngine')
+      .then((loaded) => {
+        if (!live() || mounted.aborted) return
+        engine = loaded
+        wrapCompartment = new loaded.Compartment()
+        indentationCompartment = new loaded.Compartment()
+        view = new loaded.EditorView({ state: emptyState(), parent: element })
+        stopTheme = watchEditorTheme(view)
+        const restore = active()
+        if (restore) void show(restore)
+      })
+      .catch((cause: unknown) => {
+        if (live() && !mounted.aborted) setSaveErr(cause instanceof Error ? cause.message : 'Unable to load editor.')
+      })
     onCleanup(() => {
       surface.abort()
       scheduleSave.flush()
@@ -416,8 +582,15 @@ export function createEditorController(input: EditorControllerInput) {
   }
 
   /** The live view, while it shows the active file of the task on screen in graphical mode. */
-  const graphicalView = (): EditorView | undefined => live() && activeTaskId() === taskId
-    && mode() === 'graphical' && currentPath === active() && !imagePath() && !ptyPath() ? view : undefined
+  const graphicalView = (): EditorView | undefined =>
+    live() &&
+    activeTaskId() === taskId &&
+    mode() === 'graphical' &&
+    currentPath === active() &&
+    !imagePath() &&
+    !ptyPath()
+      ? view
+      : undefined
 
   const canRunAction = (id: EditorAction): boolean => {
     const admitted = graphicalView()
@@ -444,10 +617,12 @@ export function createEditorController(input: EditorControllerInput) {
     if (!path || !entry || !graphicalView()) return
     entry.indentation = indentation
     setPresentation(nodeId, taskId, path, { ...presentationFor(nodeId, taskId, path), indentation })
-    view!.dispatch({ effects: indentationCompartment!.reconfigure([
-      engine!.indentUnit.of(indentation.mode === 'tabs' ? '\t' : ' '.repeat(indentation.width)),
-      engine!.EditorState.tabSize.of(indentation.width),
-    ]) })
+    view!.dispatch({
+      effects: indentationCompartment!.reconfigure([
+        engine!.indentUnit.of(indentation.mode === 'tabs' ? '\t' : ' '.repeat(indentation.width)),
+        engine!.EditorState.tabSize.of(indentation.width),
+      ]),
+    })
     remember(path, view!.state)
     updateStatus()
   }
@@ -459,7 +634,15 @@ export function createEditorController(input: EditorControllerInput) {
     const { hover, diagnostics } = path ? servicesFor(path) : {}
     return `${hover?.pluginId}:${hover?.route}|${diagnostics?.pluginId}:${diagnostics?.route}`
   })
-  createEffect(on(shownServices, () => { if (view && currentPath) view.dispatch({ effects: refreshLanguageServices.of(null) }) }, { defer: true }))
+  createEffect(
+    on(
+      shownServices,
+      () => {
+        if (view && currentPath) view.dispatch({ effects: refreshLanguageServices.of(null) })
+      },
+      { defer: true },
+    ),
+  )
   createEffect(() => {
     const defaultWrap = readEditorWordWrap(prefs())
     const path = currentPath
@@ -485,9 +668,16 @@ export function createEditorController(input: EditorControllerInput) {
     currentCustody = undefined
     releaseAdmission?.()
     releaseAdmission = undefined
-    if (!view.state.readOnly) view.dispatch({ effects: engine!.StateEffect.appendConfig.of([engine!.EditorState.readOnly.of(true), engine!.EditorView.editable.of(false)]) })
+    if (!view.state.readOnly)
+      view.dispatch({
+        effects: engine!.StateEffect.appendConfig.of([
+          engine!.EditorState.readOnly.of(true),
+          engine!.EditorView.editable.of(false),
+        ]),
+      })
     const state = await stateFor(relPath).catch((cause: unknown) => {
-      if (live() && active() === relPath) setSaveErr(cause instanceof Error ? cause.message : 'Could not load this file.')
+      if (live() && active() === relPath)
+        setSaveErr(cause instanceof Error ? cause.message : 'Could not load this file.')
       return null
     })
     // A read may finish after the reader chose another tab. Active state changes synchronously at
@@ -531,7 +721,10 @@ export function createEditorController(input: EditorControllerInput) {
     const line = doc.line(Math.min(Math.max(1, r.line), doc.lines))
     const pos = Math.min(line.from + Math.max(0, (r.column ?? 1) - 1), line.to)
     view.dispatch({ selection: { anchor: pos }, effects: engine!.EditorView.scrollIntoView(pos, { y: 'center' }) })
-    if (replayScroll !== null) { view.scrollDOM.scrollTop = replayScroll; replayScroll = null }
+    if (replayScroll !== null) {
+      view.scrollDOM.scrollTop = replayScroll
+      replayScroll = null
+    }
     view.focus()
     pendingReveal = null
   }
@@ -540,18 +733,22 @@ export function createEditorController(input: EditorControllerInput) {
   // whether from a task switch, a tree click, a tab close, or the quick-open palette. Deferred so
   // the mount owns the first paint.
   createEffect(
-    on(active, (next) => {
-      if (!view) return
-      if (next && next !== currentPath) void show(next)
-      else if (!next) {
-        if (currentPath) remember(currentPath, view.state)
-        currentPath = null
-        currentCustody = undefined
-        releaseAdmission?.()
-        releaseAdmission = undefined
-        view.setState(emptyState())
-      }
-    }, { defer: true }),
+    on(
+      active,
+      (next) => {
+        if (!view) return
+        if (next && next !== currentPath) void show(next)
+        else if (!next) {
+          if (currentPath) remember(currentPath, view.state)
+          currentPath = null
+          currentCustody = undefined
+          releaseAdmission?.()
+          releaseAdmission = undefined
+          view.setState(emptyState())
+        }
+      },
+      { defer: true },
+    ),
   )
 
   // ── Navigation ────────────────────────────────────────────────────────────────────────────────
@@ -568,7 +765,10 @@ export function createEditorController(input: EditorControllerInput) {
     navigation.next()
     const from = location(active())
     const to = location(path) ?? { path, line: 1, column: 1, scroll: 0 }
-    if (line) { to.line = line; to.column = column ?? 1 }
+    if (line) {
+      to.line = line
+      to.column = column ?? 1
+    }
     if (!from || from.path !== path || line !== undefined) navigate(nodeId, taskId, from, to)
   }
   const activatePath = (path: string) => {
@@ -587,8 +787,9 @@ export function createEditorController(input: EditorControllerInput) {
     while (live() && !signal.aborted) {
       const place = historyStep(nodeId, taskId, direction, location(active()))
       if (!place) return
-      try { await api.read(taskId, place.path) }
-      catch (cause) {
+      try {
+        await api.read(taskId, place.path)
+      } catch (cause) {
         if (!live() || signal.aborted || !historyIsCurrent(nodeId, taskId, place)) return
         if ((cause as { status?: number })?.status === 404) {
           toast(`Skipped unavailable file: ${place.path}`)
@@ -610,8 +811,9 @@ export function createEditorController(input: EditorControllerInput) {
     const signal = navigation.next()
     const closed = nextClosed(nodeId, taskId)
     if (!closed) return
-    try { await api.read(taskId, closed.path) }
-    catch (cause) {
+    try {
+      await api.read(taskId, closed.path)
+    } catch (cause) {
       if (live() && !signal.aborted && nextClosed(nodeId, taskId) === closed) {
         if ((cause as { status?: number })?.status === 404) takeClosedIfCurrent(nodeId, taskId, closed)
         toast(`Could not reopen ${closed.path}: ${cause instanceof Error ? cause.message : 'file unavailable'}`)
@@ -631,15 +833,23 @@ export function createEditorController(input: EditorControllerInput) {
     // Reveal implies open: cross-pane senders such as find-in-files and stack frames reach this only
     // through the core intent bus and cannot call editorOpen. No-op when the tab is already current.
     editorOpen(taskId, place.path, true)
-    if (currentPath === place.path) { maybeReveal(place.path); noteActivated(nodeId, taskId, place.path) }
+    if (currentPath === place.path) {
+      maybeReveal(place.path)
+      noteActivated(nodeId, taskId, place.path)
+    }
   }
 
-  createEffect(on(active, (path) => {
-    if (!path || graphical && !imageTypeForPath(path)) return
-    void api.entry(taskId, path).then(() => {
-      if (live() && active() === path) noteActivated(nodeId, taskId, path)
-    }).catch(() => {})
-  }))
+  createEffect(
+    on(active, (path) => {
+      if (!path || (graphical && !imageTypeForPath(path))) return
+      void api
+        .entry(taskId, path)
+        .then(() => {
+          if (live() && active() === path) noteActivated(nodeId, taskId, path)
+        })
+        .catch(() => {})
+    }),
+  )
 
   // ── Saves and disk ────────────────────────────────────────────────────────────────────────────
 
@@ -659,7 +869,8 @@ export function createEditorController(input: EditorControllerInput) {
       if (live()) fileStatus.refresh()
       return !custody.dirty
     } catch (cause) {
-      if (live()) setSaveErr(custody.writeBlock ? '' : cause instanceof Error ? cause.message : "Couldn't save this file.")
+      if (live())
+        setSaveErr(custody.writeBlock ? '' : cause instanceof Error ? cause.message : "Couldn't save this file.")
       if (custody.writeBlock && live()) void revalidate(p)
       return false
     }
@@ -676,7 +887,10 @@ export function createEditorController(input: EditorControllerInput) {
       return
     }
     if (outcome.kind === 'replace') {
-      const state = engine!.EditorState.create({ doc: disk.text, extensions: perFile(path, entry.language, entry.indentation) })
+      const state = engine!.EditorState.create({
+        doc: disk.text,
+        extensions: perFile(path, entry.language, entry.indentation),
+      })
       entry.state = custody.state = state
       if (view && currentPath === path) {
         view.setState(state)
@@ -697,15 +911,24 @@ export function createEditorController(input: EditorControllerInput) {
   async function revalidate(path: string): Promise<void> {
     const entry = pool.files.get(path)
     if (!entry || !live()) return
-    if (entry.custody.writing) { entry.stale = true; return }
+    if (entry.custody.writing) {
+      entry.stale = true
+      return
+    }
     const signal = diskRead.next()
     const editRevision = entry.custody.revision
     let disk: EditorReadResult
-    try { disk = await api.read(taskId, path) }
-    catch (cause) {
+    try {
+      disk = await api.read(taskId, path)
+    } catch (cause) {
       if (!live() || signal.aborted || pool.files.get(path) !== entry || active() !== path) return
-      const missing = typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 404
-        && 'code' in cause && cause.code === 'not_found'
+      const missing =
+        typeof cause === 'object' &&
+        cause !== null &&
+        'status' in cause &&
+        cause.status === 404 &&
+        'code' in cause &&
+        cause.code === 'not_found'
       if (missing) entry.custody.writeBlock = 'Deleted on disk.'
       setDiskState(missing ? 'deleted' : 'read-failed')
       setCompare(false)
@@ -713,8 +936,16 @@ export function createEditorController(input: EditorControllerInput) {
       setSaveErr(missing ? '' : cause instanceof Error ? cause.message : 'Could not read this file.')
       return
     }
-    if (!live() || signal.aborted || pool.files.get(path) !== entry || active() !== path
-      || entry.custody.revision !== editRevision) { entry.stale = true; return }
+    if (
+      !live() ||
+      signal.aborted ||
+      pool.files.get(path) !== entry ||
+      active() !== path ||
+      entry.custody.revision !== editRevision
+    ) {
+      entry.stale = true
+      return
+    }
     entry.stale = false
     applyDiskRead(path, entry, disk, false)
   }
@@ -724,8 +955,16 @@ export function createEditorController(input: EditorControllerInput) {
     const signal = diskRead.next()
     try {
       const disk = await api.read(taskId, path)
-      if (!live() || signal.aborted || !fileDecisionIsCurrent(decision, 'reload', nodeId, taskId, active(), pool.files.get(path))) return
-      if (entry.custody.writing) { entry.stale = true; return }
+      if (
+        !live() ||
+        signal.aborted ||
+        !fileDecisionIsCurrent(decision, 'reload', nodeId, taskId, active(), pool.files.get(path))
+      )
+        return
+      if (entry.custody.writing) {
+        entry.stale = true
+        return
+      }
       if (disk.revision !== decision.disk?.revision) {
         entry.stale = true
         setSaveErr('The disk changed after confirmation was shown. Review it and confirm again.')
@@ -734,7 +973,11 @@ export function createEditorController(input: EditorControllerInput) {
       }
       applyDiskRead(path, entry, disk, true)
     } catch (cause) {
-      if (live() && !signal.aborted && fileDecisionIsCurrent(decision, 'reload', nodeId, taskId, active(), pool.files.get(path)))
+      if (
+        live() &&
+        !signal.aborted &&
+        fileDecisionIsCurrent(decision, 'reload', nodeId, taskId, active(), pool.files.get(path))
+      )
         setSaveErr(cause instanceof Error ? cause.message : 'Unable to reload the file.')
     }
   }
@@ -745,7 +988,10 @@ export function createEditorController(input: EditorControllerInput) {
       setSaveErr('The document or disk version changed. Review it and confirm again.')
       return
     }
-    if (decision.action === 'overwrite' && !decision.disk) { await revalidate(path); return }
+    if (decision.action === 'overwrite' && !decision.disk) {
+      await revalidate(path)
+      return
+    }
     const destinationAddress = [nodeId, 'file', taskId, destination]
     try {
       if (destination !== path) assertCanRebindEditorFile(pool, path, destination, destinationAddress)
@@ -778,7 +1024,11 @@ export function createEditorController(input: EditorControllerInput) {
       entry.custody.acknowledgeResolved(result.text, result.revision, admitted)
       entry.disk = { text: result.text, revision: result.revision }
       if (destination === path) {
-        if (active() === path) { setDiskState(null); setCompare(false); setSaveErr('') }
+        if (active() === path) {
+          setDiskState(null)
+          setCompare(false)
+          setSaveErr('')
+        }
         editorSetDirty(taskId, path, entry.custody.dirty)
       } else {
         const activeAtCompletion = active()
@@ -787,11 +1037,16 @@ export function createEditorController(input: EditorControllerInput) {
         editorOpen(taskId, destination, false)
         if (activeAtCompletion && activeAtCompletion !== path) editorActivate(taskId, activeAtCompletion)
         setSaveAsPath('')
-        if (activeAtCompletion === path) { setDiskState(null); setSaveErr('') }
+        if (activeAtCompletion === path) {
+          setDiskState(null)
+          setSaveErr('')
+        }
       }
     } catch (cause) {
       if (live()) setSaveErr(cause instanceof Error ? cause.message : 'Unable to write the file.')
-    } finally { resume() }
+    } finally {
+      resume()
+    }
   }
 
   /** Show the disk next to the draft, or hide it again. */
@@ -809,7 +1064,10 @@ export function createEditorController(input: EditorControllerInput) {
     const shown = renderedPath()
     if (shown) void readRendered(shown)
   }
-  function onFocus() { invalidate(); fileStatus.refresh() }
+  function onFocus() {
+    invalidate()
+    fileStatus.refresh()
+  }
 
   // Reload-on-focus, where there is a window to lose focus. A host without one — the terminal client
   // runs this pane under Node — has nothing to listen to, and reaching for the listener took the whole
@@ -824,16 +1082,33 @@ export function createEditorController(input: EditorControllerInput) {
 
   onMount(() => {
     const offWorktree = wsOnNodeEvent('worktree:status-changed', (event) => {
-      if (event.taskId === taskId && activeNodeId() === nodeId) { invalidate(); fileStatus.refresh() }
+      if (event.taskId === taskId && activeNodeId() === nodeId) {
+        invalidate()
+        fileStatus.refresh()
+      }
     })
-    const offReconnect = wsOnReconnect(() => { if (activeNodeId() === nodeId) { invalidate(); fileStatus.refresh() } })
-    const offPlugins = wsOnPluginsChanged(() => { if (activeNodeId() === nodeId) fileStatus.providerChanged() })
-    onCleanup(() => { offWorktree(); offReconnect(); offPlugins() })
+    const offReconnect = wsOnReconnect(() => {
+      if (activeNodeId() === nodeId) {
+        invalidate()
+        fileStatus.refresh()
+      }
+    })
+    const offPlugins = wsOnPluginsChanged(() => {
+      if (activeNodeId() === nodeId) fileStatus.providerChanged()
+    })
+    onCleanup(() => {
+      offWorktree()
+      offReconnect()
+      offPlugins()
+    })
   })
 
   // ── Closing tabs ──────────────────────────────────────────────────────────────────────────────
 
-  async function close(relPath: string, options: { identity?: object; canCommit?: () => boolean; focus?: boolean } = {}): Promise<boolean> {
+  async function close(
+    relPath: string,
+    options: { identity?: object; canCommit?: () => boolean; focus?: boolean } = {},
+  ): Promise<boolean> {
     const tab = files().find((file) => file.path === relPath)
     if (!tab) return false
     const index = files().indexOf(tab)
@@ -842,9 +1117,16 @@ export function createEditorController(input: EditorControllerInput) {
     scheduleSave.cancel()
     const entry = pool.files.get(relPath)
     const revision = entry?.custody.revision
-    if (entry && !await save(relPath)) return false
-    if (!live() || pool.files.get(relPath) !== entry || entry?.custody.revision !== revision || entry?.custody.dirty
-      || editorTabIdentity(taskId, relPath) !== identity || options.canCommit?.() === false) return false
+    if (entry && !(await save(relPath))) return false
+    if (
+      !live() ||
+      pool.files.get(relPath) !== entry ||
+      entry?.custody.revision !== revision ||
+      entry?.custody.dirty ||
+      editorTabIdentity(taskId, relPath) !== identity ||
+      options.canCommit?.() === false
+    )
+      return false
     noteClosed(nodeId, taskId, { path: relPath, index })
     editorClose(taskId, relPath)
     unwatchCustody(relPath)
@@ -868,12 +1150,19 @@ export function createEditorController(input: EditorControllerInput) {
     if (bulkRun()) return
     const targets = paths.map((path) => ({ path, identity: editorTabIdentity(taskId, path) }))
     let canceled = false
-    const run = { cancel: () => { canceled = true } }
+    const run = {
+      cancel: () => {
+        canceled = true
+      },
+    }
     setBulkRun(run)
     let closed = 0
     try {
       for (const target of targets) {
-        if (canceled || !await close(target.path, { identity: target.identity, canCommit: () => !canceled, focus: false })) {
+        if (
+          canceled ||
+          !(await close(target.path, { identity: target.identity, canCommit: () => !canceled, focus: false }))
+        ) {
           if (live()) {
             const message = `Closed ${closed} of ${targets.length} files. ${canceled ? 'Canceled' : `Stopped at ${target.path}; review its draft or disk state`}.`
             setSaveErr(message)
@@ -916,7 +1205,9 @@ export function createEditorController(input: EditorControllerInput) {
     menuHolds.delete(path)
     held.release()
     if (isDirty(path)) scheduleSave(path)
-    queueMicrotask(() => { if (menuTargets.get(path) === held.target) menuTargets.delete(path) })
+    queueMicrotask(() => {
+      if (menuTargets.get(path) === held.target) menuTargets.delete(path)
+    })
   }
 
   // A closed tab's clean document leaves the pool. A dirty or writing one stays until it settles.
@@ -940,7 +1231,8 @@ export function createEditorController(input: EditorControllerInput) {
   // to it. A contributed view takes the box from CodeMirror the way terminal mode does: the view goes, and
   // the pooled document, its undo history, and any unsaved edits stay for the way back.
   const documentKey = createMemo(() => active()?.split('/').pop()?.toLowerCase())
-  const rendererOffered = () => mode() !== 'terminal' && !!documentKey() && slotFills(EDITOR_DOCUMENT_POINT, documentKey())
+  const rendererOffered = () =>
+    mode() !== 'terminal' && !!documentKey() && slotFills(EDITOR_DOCUMENT_POINT, documentKey())
   const [sourceVersion, setSourceVersion] = createSignal(0)
   const renderedPath = createMemo(() => {
     sourceVersion()
@@ -964,21 +1256,29 @@ export function createEditorController(input: EditorControllerInput) {
     const entry = pool.files.get(path)
     const warmed = warmedText.get(path)
     warmedText.delete(path)
-    const text = entry && (!entry.stale || entry.custody.dirty) ? entry.custody.current.toString()
-      : imageTypeForPath(path) ? undefined
-      : await (warmed ?? api.read(taskId, path)).then((read) => read.text, () => undefined)
+    const text =
+      entry && (!entry.stale || entry.custody.dirty)
+        ? entry.custody.current.toString()
+        : imageTypeForPath(path)
+          ? undefined
+          : await (warmed ?? api.read(taskId, path)).then(
+              (read) => read.text,
+              () => undefined,
+            )
     if (!live() || signal.aborted || renderedPath() !== path) return
     setRendered({ taskId, path, ...(text === undefined ? {} : { text }), revision: ++renderedRevision })
     featureUsable('editor', 'content')
   }
-  createEffect(on(renderedPath, (path) => {
-    renderedRead.abort()
-    setRendered(null)
-    // Assume the contributor that matched will draw, so CodeMirror isn't built and torn down in the
-    // same tick. The slot corrects this at once when a tie leaves the box to the pane.
-    setOccupied(!!path)
-    if (path) void readRendered(path)
-  }))
+  createEffect(
+    on(renderedPath, (path) => {
+      renderedRead.abort()
+      setRendered(null)
+      // Assume the contributor that matched will draw, so CodeMirror isn't built and torn down in the
+      // same tick. The slot corrects this at once when a tie leaves the box to the pane.
+      setOccupied(!!path)
+      if (path) void readRendered(path)
+    }),
+  )
 
   // ── Terminal mode ─────────────────────────────────────────────────────────────────────────────
 
@@ -994,11 +1294,16 @@ export function createEditorController(input: EditorControllerInput) {
     editorSetDirty(taskId, path, false)
   }
 
-  createEffect(on(wantsTerminal, (path, previous) => {
-    if (previous) { pool.externalEditors.delete(previous); forget(previous) } // the PTY stopped owning this path
-    if (path) pool.externalEditors.add(path)
-    setPtyPath(path)
-  }))
+  createEffect(
+    on(wantsTerminal, (path, previous) => {
+      if (previous) {
+        pool.externalEditors.delete(previous)
+        forget(previous)
+      } // the PTY stopped owning this path
+      if (path) pool.externalEditors.add(path)
+      setPtyPath(path)
+    }),
+  )
 
   const onEditorExit = (path: string, code: number) => {
     pool.externalEditors.delete(path)
@@ -1056,14 +1361,26 @@ export function createEditorController(input: EditorControllerInput) {
     const selected = admitted && documentSelection(admitted.state)
     if (!admitted || !path || !custody || !selected) return undefined
     return {
-      location: 'content.selection', nodeId: nodeId ?? '', taskId, projectId: input.task.projectId, ownerId: 'editor',
-      contentKind: 'document', languageId: languageIdForPath(path), readOnly: admitted.state.readOnly,
-      text: selected.text, revision: custody.revision, resource: { kind: 'file', path }, range: selected.range,
+      location: 'content.selection',
+      nodeId: nodeId ?? '',
+      taskId,
+      projectId: input.task.projectId,
+      ownerId: 'editor',
+      contentKind: 'document',
+      languageId: languageIdForPath(path),
+      readOnly: admitted.state.readOnly,
+      text: selected.text,
+      revision: custody.revision,
+      resource: { kind: 'file', path },
+      range: selected.range,
     }
   }
   const selectionIsCurrent = (target: ContentSelectionTarget): boolean =>
-    !!graphicalView() && target.nodeId === (nodeId ?? '') && target.resource?.kind === 'file' && target.resource.path === currentPath
-    && pool.files.get(currentPath)?.custody.revision === target.revision
+    !!graphicalView() &&
+    target.nodeId === (nodeId ?? '') &&
+    target.resource?.kind === 'file' &&
+    target.resource.path === currentPath &&
+    pool.files.get(currentPath)?.custody.revision === target.revision
 
   /** Add the shown file, or the lines the selection spans, to the person's message to the agent. */
   const sendSelectionToAgent = () => {
@@ -1120,18 +1437,22 @@ export function createEditorController(input: EditorControllerInput) {
       if (graphical && mode() === 'graphical' && remembered && !imageTypeForPath(remembered)) {
         const read = api.read(taskId, remembered)
         warmedText.set(remembered, read)
-        void read.catch(() => { if (warmedText.get(remembered) === read) warmedText.delete(remembered) })
+        void read.catch(() => {
+          if (warmedText.get(remembered) === read) warmedText.delete(remembered)
+        })
       }
       // A checkout path already in the cache paints the rectangle in this tick, and the fetch below
       // returns it without a request while it is fresh. An absent root is never painted from the
       // cache: "no checkout yet" is the one thing that changes, so it is always awaited.
       const cached = queryClient.getQueryData<string | null>(editorRootKey(taskId))
       if (cached) setRoot(cached)
-      const r = await queryClient.fetchQuery({
-        queryKey: editorRootKey(taskId),
-        queryFn: () => api.root(taskId),
-        staleTime: EDITOR_ROOT_STALE_MS,
-      }).catch(() => null)
+      const r = await queryClient
+        .fetchQuery({
+          queryKey: editorRootKey(taskId),
+          queryFn: () => api.root(taskId),
+          staleTime: EDITOR_ROOT_STALE_MS,
+        })
+        .catch(() => null)
       if (disposed) return
       setRoot(r) // renders the rectangle synchronously when truthy, and `mountEditor` builds the view
       // Usable now unless a text document is still on its way, which `show()` reports instead

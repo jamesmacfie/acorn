@@ -107,9 +107,7 @@ function slide(rect: Rect, placed: readonly Placed[], axis: 'x' | 'y'): Rect | u
   for (let guard = 0; guard <= placed.length; guard++) {
     const hit = placed.find((entry) => collides(out, entry.rect))
     if (!hit) return out
-    out = axis === 'x'
-      ? { ...out, x: hit.rect.x + hit.rect.w }
-      : { ...out, y: hit.rect.y + hit.rect.h }
+    out = axis === 'x' ? { ...out, x: hit.rect.x + hit.rect.w } : { ...out, y: hit.rect.y + hit.rect.h }
     if (axis === 'x' && out.x + out.w > COLS) return undefined
   }
   return undefined
@@ -178,7 +176,13 @@ export function normalize(layout: PanelLayout, sizeOf: (id: PanelId) => PanelSiz
   for (const id of layout.order) {
     if (layout.rects[id] || placed.some((entry) => entry.id === id)) continue
     const size = sizeOf(id)
-    placed.push({ id, rect: firstFit(placed.map((entry) => entry.rect), size) })
+    placed.push({
+      id,
+      rect: firstFit(
+        placed.map((entry) => entry.rect),
+        size,
+      ),
+    })
   }
 
   return compact(toLayout(layout.order, placed))

@@ -30,10 +30,7 @@ async function comparisonBase(core: MarkerCore, root: string, baseRef: string): 
  * diff translates those PR-head coordinates through later local commits and uncommitted edits before
  * they reach the editor, without incorrectly treating unpushed commits as part of the pull request.
  */
-export const pullRequestEditorLineMarkers = (
-  db: PluginDatabase,
-  core: MarkerCore,
-): EditorLineMarkerProvider => {
+export const pullRequestEditorLineMarkers = (db: PluginDatabase, core: MarkerCore): EditorLineMarkerProvider => {
   // Only active resolutions join. Neither mutable refs nor rejected promises survive a wave.
   const waves = new Map<string, Promise<{ pullHead: string; mergeBase: string } | null>>()
   const resolveComparison = async (root: string, headSha: string, baseRef: string) => {
@@ -56,18 +53,44 @@ export const pullRequestEditorLineMarkers = (
       ])
       if (!root || !comparison?.baseRef || !comparison.headSha || !GIT_SHA.test(comparison.headSha)) return []
       if (source && source.root !== root) throw new Error('Marker worktree changed')
-      const key = JSON.stringify([root, comparison.userId, comparison.repoId, comparison.number, comparison.baseRef, comparison.headSha])
+      const key = JSON.stringify([
+        root,
+        comparison.userId,
+        comparison.repoId,
+        comparison.number,
+        comparison.baseRef,
+        comparison.headSha,
+      ])
       let wave = waves.get(key)
       if (!wave) {
-        wave = resolveComparison(root, comparison.headSha, comparison.baseRef).finally(() => { waves.delete(key) })
+        wave = resolveComparison(root, comparison.headSha, comparison.baseRef).finally(() => {
+          waves.delete(key)
+        })
         waves.set(key, wave)
       }
       const resolved = await wave
       if (!resolved) return []
       const { pullHead, mergeBase } = resolved
       const [pullPatch, worktreePatch] = await Promise.all([
-        gitText(core, root, ['diff', '--no-ext-diff', '--no-textconv', '--unified=0', mergeBase, pullHead, '--', `:(literal)${path}`]),
-        gitText(core, root, ['diff', '--no-ext-diff', '--no-textconv', '--unified=0', pullHead, '--', `:(literal)${path}`]),
+        gitText(core, root, [
+          'diff',
+          '--no-ext-diff',
+          '--no-textconv',
+          '--unified=0',
+          mergeBase,
+          pullHead,
+          '--',
+          `:(literal)${path}`,
+        ]),
+        gitText(core, root, [
+          'diff',
+          '--no-ext-diff',
+          '--no-textconv',
+          '--unified=0',
+          pullHead,
+          '--',
+          `:(literal)${path}`,
+        ]),
       ])
       // A failed translation cannot honestly reuse PR-head coordinates in the working document.
       if (pullPatch === null || worktreePatch === null) throw new Error('Marker comparison unavailable')

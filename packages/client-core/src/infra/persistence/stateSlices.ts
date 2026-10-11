@@ -3,7 +3,13 @@ import { dashboardsSlice } from '../../features/dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../../features/notifications/notifications'
 import { defaultLayout, normalizeLayout, type TaskLayout } from '../../features/tasks/taskLayout'
 import { hydrateTaskLayout, hydrateWorkspaceView, taskLayouts, workspaceViews } from '../../features/tasks/tasks'
-import { currentWorkspaceId, hydrateWorkspaceHistory, MAX_RECENT_WORKSPACES, workspaceHistory, type WorkspaceHistory } from '../../features/workspaces/lastWorkspace'
+import {
+  currentWorkspaceId,
+  hydrateWorkspaceHistory,
+  MAX_RECENT_WORKSPACES,
+  workspaceHistory,
+  type WorkspaceHistory,
+} from '../../features/workspaces/lastWorkspace'
 import type { WorkspaceView } from '../../features/workspaces/workspaceViewTransition'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
@@ -43,7 +49,9 @@ const parseWorkspaceView = (raw: unknown): WorkspaceView => {
   if (value && typeof value === 'object') {
     const candidate = value as { source?: unknown; path?: unknown; taskId?: unknown }
     if (typeof candidate.source === 'string') {
-      return typeof candidate.path === 'string' ? { source: candidate.source, path: candidate.path } : { source: candidate.source }
+      return typeof candidate.path === 'string'
+        ? { source: candidate.source, path: candidate.path }
+        : { source: candidate.source }
     }
     if (typeof candidate.taskId === 'string') return { taskId: candidate.taskId }
   }
@@ -121,10 +129,13 @@ export const lastWorkspaceSlice = (hydrate: (workspaceId: string) => void): Pers
     empty: () => '',
     unknownIds: 'drop',
     maxBytes: 512,
-    binding: appStateBinding(() => currentWorkspaceId() ?? saved, (value) => {
-      saved = value
-      hydrate(value)
-    }),
+    binding: appStateBinding(
+      () => currentWorkspaceId() ?? saved,
+      (value) => {
+        saved = value
+        hydrate(value)
+      },
+    ),
   }
 }
 
@@ -134,12 +145,14 @@ const parseNotices = (raw: unknown): Notice[] => {
   return value.filter((notice): notice is Notice => {
     if (!notice || typeof notice !== 'object') return false
     const candidate = notice as Partial<Notice>
-    return typeof candidate.id === 'string'
-      && typeof candidate.taskId === 'string'
-      && typeof candidate.kind === 'string'
-      && typeof candidate.title === 'string'
-      && typeof candidate.at === 'number'
-      && typeof candidate.read === 'boolean'
+    return (
+      typeof candidate.id === 'string' &&
+      typeof candidate.taskId === 'string' &&
+      typeof candidate.kind === 'string' &&
+      typeof candidate.title === 'string' &&
+      typeof candidate.at === 'number' &&
+      typeof candidate.read === 'boolean'
+    )
   })
 }
 

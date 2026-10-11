@@ -8,7 +8,13 @@ import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createFleetQuery } from '@acorn/client-core/infra/node'
 import {
-  chromeDeps, chromeKey, createSourceSearch, readRailItems, scopedSourceItemsPath, sourceSearchEmpty, sourceSearchNotice,
+  chromeDeps,
+  chromeKey,
+  createSourceSearch,
+  readRailItems,
+  scopedSourceItemsPath,
+  sourceSearchEmpty,
+  sourceSearchNotice,
 } from '@acorn/client-core/host/chrome'
 import { runChromeAction } from '@acorn/client-core/host/chrome'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
@@ -46,7 +52,7 @@ import { openPromotion } from '../chrome/promotionStore'
  *  it sends that instead. The DOM reserves a track per field so the Nth lines up down the list; in
  *  cells they are joined, because a column of aligned tracks in twenty-two cells is one fact wide. */
 const secondary = (item: PluginRailItem): string =>
-  (item.fields?.length ? item.fields.join(' · ') : item.subtitle ?? '')
+  item.fields?.length ? item.fields.join(' · ') : (item.subtitle ?? '')
 
 const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'danger' | undefined =>
   severity === 'info' ? 'accent' : severity
@@ -64,16 +70,12 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   // The same fan-out the DOM panel runs, pinned to one node, with the project in the dependency rather
   // than read inside the fetch so it reaches the cache key too. Both hosts build the key with
   // `chromeKey`, so a list drawn here and the same list drawn there are one cache entry.
-  const projectId = () => props.descriptor.projectScoped ? params.projectId : undefined
+  const projectId = () => (props.descriptor.projectScoped ? params.projectId : undefined)
   const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: projectId() })
   const [result] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
-    (node, { projectId }, signal) => readRailItems(
-      props.pluginId,
-      scopedSourceItemsPath(props.descriptor.items!, projectId),
-      node,
-      signal,
-    ),
+    (node, { projectId }, signal) =>
+      readRailItems(props.pluginId, scopedSourceItemsPath(props.descriptor.items!, projectId), node, signal),
     scope,
     { nodeIds: [nodeId] },
   )
@@ -102,7 +104,10 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
       nodeId,
       item,
       ...(sourceRegistry.get(props.descriptor.id)?.promotion
-        ? { promote: (row: PluginRailItem) => openPromotion({ pluginId: props.descriptor.id, item: row, projectId: params.projectId ?? null }) }
+        ? {
+            promote: (row: PluginRailItem) =>
+              openPromotion({ pluginId: props.descriptor.id, item: row, projectId: params.projectId ?? null }),
+          }
         : {}),
       ...(params.projectId ? { projectId: params.projectId } : {}),
       navigate,
@@ -124,15 +129,22 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   // nothing leaves the caret where it is rather than throwing it into the next region. Escape does
   // not, so the same reader can still climb out of the panel (../keys/regions.ts § moveStop).
   const bindField = (element: Renderable): void => {
-    bindKeys(element, [
-      { key: 'down', cmd: () => moveStop(1) },
-      { key: 'escape', cmd: () => {
-        // The focused renderable, not `element`: the kit's `Input` owns its own box and this is the
-        // wrapper the layer is bound to, which is not itself a stop in the walk.
-        const focused = focusedRenderable()
-        return walkStops(focused, 1)
-      } },
-    ], STOP)
+    bindKeys(
+      element,
+      [
+        { key: 'down', cmd: () => moveStop(1) },
+        {
+          key: 'escape',
+          cmd: () => {
+            // The focused renderable, not `element`: the kit's `Input` owns its own box and this is the
+            // wrapper the layer is bound to, which is not itself a stop in the walk.
+            const focused = focusedRenderable()
+            return walkStops(focused, 1)
+          },
+        },
+      ],
+      STOP,
+    )
   }
 
   return (
@@ -163,17 +175,16 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
       <Show when={unavailable()}>
         {(entry) => <Alert tone="warn">{`${entry().label} unavailable: ${entry().reason}`}</Alert>}
       </Show>
-      <Show
-        when={row()}
-        fallback={<Line role="muted">{unavailable() ? 'No cached items.' : 'Loading…'}</Line>}
-      >
+      <Show when={row()} fallback={<Line role="muted">{unavailable() ? 'No cached items.' : 'Loading…'}</Line>}>
         <Show
           when={items().length}
-          fallback={(
+          fallback={
             <EmptyState title={props.descriptor.label}>
-              {search.status() === 'idle' ? props.descriptor.emptyState?.message ?? 'Nothing to show.' : sourceSearchEmpty(search.status())}
+              {search.status() === 'idle'
+                ? (props.descriptor.emptyState?.message ?? 'Nothing to show.')
+                : sourceSearchEmpty(search.status())}
             </EmptyState>
-          )}
+          }
         >
           <Rows
             virtual
@@ -184,8 +195,11 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
             onActivate={(id) => select(id, true)}
             onMenu={(id) => {
               const item = items().find((entry) => entry.id === id)
-              if (item?.task && props.descriptor.onSelect?.verb !== 'createTask'
-                && sourceRegistry.get(props.descriptor.id)?.promotion) {
+              if (
+                item?.task &&
+                props.descriptor.onSelect?.verb !== 'createTask' &&
+                sourceRegistry.get(props.descriptor.id)?.promotion
+              ) {
                 openPromotion({ pluginId: props.descriptor.id, item, projectId: params.projectId ?? null })
               }
             }}
@@ -197,7 +211,11 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
                 // The DOM reserves a track per field and lines the Nth up down the list; twenty-two
                 // cells has room for one fact, so they are joined above and given their own line here.
                 variant={secondary(entry.item) ? 'stacked' : 'default'}
-                leading={<Show when={entry.item.icon}>{(name) => <Icon name={name()} tone={iconTone(entry.item.severity)} />}</Show>}
+                leading={
+                  <Show when={entry.item.icon}>
+                    {(name) => <Icon name={name()} tone={iconTone(entry.item.severity)} />}
+                  </Show>
+                }
                 meta={<Show when={secondary(entry.item)}>{(text) => <Line role="muted">{text()}</Line>}</Show>}
                 trailing={<Show when={entry.item.badge}>{(badge) => <Badge>{badge()}</Badge>}</Show>}
               >
@@ -205,8 +223,13 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
               </Row>
             )}
           </Rows>
-          <Show when={items().some((item) => item.task) && props.descriptor.onSelect?.verb !== 'createTask'
-            && sourceRegistry.get(props.descriptor.id)?.promotion}>
+          <Show
+            when={
+              items().some((item) => item.task) &&
+              props.descriptor.onSelect?.verb !== 'createTask' &&
+              sourceRegistry.get(props.descriptor.id)?.promotion
+            }
+          >
             <Line role="muted">Shift+F10: create or link task</Line>
           </Show>
         </Show>
@@ -260,12 +283,7 @@ const createSourcePanel = (input: SourcePanelInput): CachedSourcePanel => {
   return {
     panel: {
       regions: {
-        list: () => (
-          <SourceList
-            pluginId={current().pluginId}
-            descriptor={current().descriptor}
-          />
-        ),
+        list: () => <SourceList pluginId={current().pluginId} descriptor={current().descriptor} />,
         detail: () => <SourceDetail descriptor={current().descriptor} />,
       },
     },

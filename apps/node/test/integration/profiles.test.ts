@@ -20,7 +20,13 @@ describe('agent profile registry', () => {
     // `-s read-only` stands in for claude's empty `--tools`, and `--skip-git-repo-check` is what lets
     // it start in the empty directory a one-shot generate runs in.
     expect(codex.aiArgv?.('codex', { prompt: 'choose' }).args).toEqual([
-      'exec', '--json', '--ephemeral', '-s', 'read-only', '--skip-git-repo-check', 'choose',
+      'exec',
+      '--json',
+      '--ephemeral',
+      '-s',
+      'read-only',
+      '--skip-git-repo-check',
+      'choose',
     ])
   })
 

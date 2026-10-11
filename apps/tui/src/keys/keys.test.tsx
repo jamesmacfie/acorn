@@ -62,7 +62,11 @@ const TRUST: PluginTrustRequest = {
     installed: {
       version: '1.0.0',
       apiVersion: '9',
-      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+      permissions: {
+        api: [],
+        events: [],
+        node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      },
       contributions: { frames: [] },
       client: null,
     },
@@ -74,15 +78,24 @@ describe('keys and focus in cells', () => {
     const [open, setOpen] = createSignal(false)
     const [searching, setSearching] = createSignal(false)
     const [text, setText] = createSignal('')
-    let frame = await renderCells(() => <>
-      <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'editor', regionId: 'search' }, 0)}>
-        <Button>Tree controls</Button>
-        <Input autofocus={searching()} value={text()} onInput={setText} />
-      </box>
-      <Show when={open()}><Modal title="Command" onDismiss={() => setOpen(false)}>
-        <ModalBody><Button>Command action</Button></ModalBody>
-      </Modal></Show>
-    </>, { width: 60, height: 12 })
+    let frame = await renderCells(
+      () => (
+        <>
+          <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'editor', regionId: 'search' }, 0)}>
+            <Button>Tree controls</Button>
+            <Input autofocus={searching()} value={text()} onInput={setText} />
+          </box>
+          <Show when={open()}>
+            <Modal title="Command" onDismiss={() => setOpen(false)}>
+              <ModalBody>
+                <Button>Command action</Button>
+              </ModalBody>
+            </Modal>
+          </Show>
+        </>
+      ),
+      { width: 60, height: 12 },
+    )
     try {
       setOpen(true)
       frame = await frame.press('TAB')
@@ -92,27 +105,58 @@ describe('keys and focus in cells', () => {
       frame = await frame.press('ESCAPE')
       frame = await frame.press('n')
       expect(text()).toBe('n')
-    } finally { frame.done() }
+    } finally {
+      frame.done()
+    }
   })
 
   it('keeps a narrow file row alive through F2 and restores focus for the context key', async () => {
     const [editing, setEditing] = createSignal(false)
     const [menu, setMenu] = createSignal('')
     const [create, setCreate] = createSignal(false)
-    const ActionList = () => <Show when={editing()} fallback={
-      <Rows id="files" items={[{ key: 'one', label: 'one' }, { key: 'two', label: 'two' }]} onMenu={setMenu}>
-        {(item, props) => <TreeRow item={props} onRename={() => setEditing(true)} onCreate={() => setCreate(true)}>{item.label}</TreeRow>}
-      </Rows>
-    }>
-      <Modal title="Rename entry" onDismiss={() => setEditing(false)}>
-        <ModalBody><Input label="Name" value="one" onInput={() => {}} /></ModalBody>
-      </Modal>
-    </Show>
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter stateKey="file-actions" label="Editor" regions={{ body: () =>
-        <ListDetail list={<ActionList />}><Text>Document detail</Text></ListDetail>
-      }} />
-    ), { width: 70, height: 24 })
+    const ActionList = () => (
+      <Show
+        when={editing()}
+        fallback={
+          <Rows
+            id="files"
+            items={[
+              { key: 'one', label: 'one' },
+              { key: 'two', label: 'two' },
+            ]}
+            onMenu={setMenu}
+          >
+            {(item, props) => (
+              <TreeRow item={props} onRename={() => setEditing(true)} onCreate={() => setCreate(true)}>
+                {item.label}
+              </TreeRow>
+            )}
+          </Rows>
+        }
+      >
+        <Modal title="Rename entry" onDismiss={() => setEditing(false)}>
+          <ModalBody>
+            <Input label="Name" value="one" onInput={() => {}} />
+          </ModalBody>
+        </Modal>
+      </Show>
+    )
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="file-actions"
+          label="Editor"
+          regions={{
+            body: () => (
+              <ListDetail list={<ActionList />}>
+                <Text>Document detail</Text>
+              </ListDetail>
+            ),
+          }}
+        />
+      ),
+      { width: 70, height: 24 },
+    )
     try {
       expect((await frame.press('F2')).text).toContain('Rename entry')
       const cancelled = await frame.press('ESCAPE')
@@ -122,13 +166,16 @@ describe('keys and focus in cells', () => {
       expect(menu()).toBe('two')
       await frame.press('n', { ctrl: true })
       expect(create()).toBe(true)
-    } finally { frame.done() }
+    } finally {
+      frame.done()
+    }
   }, 30_000)
 
   it('lands the keys on the list when a pane opens, and moves them with next and prev', async () => {
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
-    ), { width: 40, height: 10 })
+    const frame = await renderCells(
+      () => <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />,
+      { width: 40, height: 10 },
+    )
     try {
       // Something has the keys before anything is pressed: a terminal has no pointer, so a pane that
       // opens with focus nowhere is a pane nobody can drive (./regions.ts § regionFocus).
@@ -149,12 +196,15 @@ describe('keys and focus in cells', () => {
 
   it('routes activate to the row the caret is on', async () => {
     const [opened, setOpened] = createSignal('')
-    const frame = await renderCells(() => (
-      <>
-        <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List onActivate={setOpened} /> }} />
-        <Text>{`opened:${opened()}`}</Text>
-      </>
-    ), { width: 40, height: 10 })
+    const frame = await renderCells(
+      () => (
+        <>
+          <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List onActivate={setOpened} /> }} />
+          <Text>{`opened:${opened()}`}</Text>
+        </>
+      ),
+      { width: 40, height: 10 },
+    )
     try {
       await frame.press('j')
       const after = await frame.press('RETURN')
@@ -165,18 +215,23 @@ describe('keys and focus in cells', () => {
   }, 30_000)
 
   it('cycles the regions of a pane, and each remembers where it was', async () => {
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          header: () => <Rows id="header-list" items={[{ key: 'h', label: 'Header row' }]}>
-            {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
-          </Rows>,
-          body: () => <List />,
-        }}
-      />
-    ), { width: 40, height: 10 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            header: () => (
+              <Rows id="header-list" items={[{ key: 'h', label: 'Header row' }]}>
+                {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
+              </Rows>
+            ),
+            body: () => <List />,
+          }}
+        />
+      ),
+      { width: 40, height: 10 },
+    )
     try {
       // The header registers first, so it opens with the keys.
       expect(frame.lines[caretRow(frame.lines)]).toContain('Header row')
@@ -190,16 +245,23 @@ describe('keys and focus in cells', () => {
     }
   }, 30_000)
 
-  it('keeps next inside a modal, on both of this host\'s keys for it, and dismiss closes it', async () => {
+  it("keeps next inside a modal, on both of this host's keys for it, and dismiss closes it", async () => {
     const [open, setOpen] = createSignal(false)
-    const frame = await renderCells(() => (
-      <>
-        <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
-        <Show when={open()}>
-          <Modal onDismiss={() => setOpen(false)} title="Ask"><ModalBody><Text>a question</Text></ModalBody></Modal>
-        </Show>
-      </>
-    ), { width: 40, height: 12 })
+    const frame = await renderCells(
+      () => (
+        <>
+          <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />
+          <Show when={open()}>
+            <Modal onDismiss={() => setOpen(false)} title="Ask">
+              <ModalBody>
+                <Text>a question</Text>
+              </ModalBody>
+            </Modal>
+          </Show>
+        </>
+      ),
+      { width: 40, height: 12 },
+    )
     try {
       const before = caretRow(frame.lines)
       expect(before).toBeGreaterThanOrEqual(0)
@@ -324,21 +386,30 @@ describe('keys and focus in cells', () => {
   it('a pty rectangle takes the keys on enter and gives them back on escape', async () => {
     let terminal: CellTerminal | undefined
     const typed: string[] = []
-    const frame = await renderCells(() => (
-      <>
-        <HeaderBodyFooter
-          stateKey="pane"
-          label="Test"
-          regions={{
-            header: () => <List />,
-            body: () => <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-              terminal = handle as unknown as CellTerminal
-              terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
-            }} />,
-          }}
-        />
-      </>
-    ), { width: 40, height: 20 })
+    const frame = await renderCells(
+      () => (
+        <>
+          <HeaderBodyFooter
+            stateKey="pane"
+            label="Test"
+            regions={{
+              header: () => <List />,
+              body: () => (
+                <Rectangle
+                  kind="pty"
+                  label="Terminal"
+                  mount={(handle) => {
+                    terminal = handle as unknown as CellTerminal
+                    terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
+                  }}
+                />
+              ),
+            }}
+          />
+        </>
+      ),
+      { width: 40, height: 20 },
+    )
     try {
       expect(terminal).toBeDefined()
       // Bytes from the PTY are drawn by a real emulator in cells, which is the thing a terminal does
@@ -384,18 +455,27 @@ describe('keys and focus in cells', () => {
   it('a pty rectangle tells the PTY its size, and again when the terminal is resized', async () => {
     let terminal: CellTerminal | undefined
     const sizes: [number, number][] = []
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          body: () => <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-            terminal = handle as unknown as CellTerminal
-            terminal.onResize((cols, rows) => sizes.push([cols, rows]))
-          }} />,
-        }}
-      />
-    ), { width: 40, height: 12 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            body: () => (
+              <Rectangle
+                kind="pty"
+                label="Terminal"
+                mount={(handle) => {
+                  terminal = handle as unknown as CellTerminal
+                  terminal.onResize((cols, rows) => sizes.push([cols, rows]))
+                }}
+              />
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 12 },
+    )
     try {
       expect(terminal).toBeDefined()
       await frame.resize(100, 30)
@@ -421,23 +501,30 @@ describe('keys and focus in cells', () => {
   it('stops taking the keys the moment an entered rectangle goes off screen', async () => {
     const [shown, setShown] = createSignal(true)
     const typed: string[] = []
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          header: () => <List />,
-          body: () => (
-            <box visible={shown()} flexGrow={1} flexDirection="column">
-              <Rectangle kind="pty" label="Terminal" mount={(handle) => {
-                const terminal = handle as unknown as CellTerminal
-                terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
-              }} />
-            </box>
-          ),
-        }}
-      />
-    ), { width: 40, height: 16 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            header: () => <List />,
+            body: () => (
+              <box visible={shown()} flexGrow={1} flexDirection="column">
+                <Rectangle
+                  kind="pty"
+                  label="Terminal"
+                  mount={(handle) => {
+                    const terminal = handle as unknown as CellTerminal
+                    terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
+                  }}
+                />
+              </box>
+            ),
+          }}
+        />
+      ),
+      { width: 40, height: 16 },
+    )
     try {
       await frame.press('F6')
       const inside = await frame.press('RETURN')
@@ -467,34 +554,44 @@ describe('keys and focus in cells', () => {
     // false asks for a landing pass for exactly this reason (../kit/scrolling.tsx).
     const [tab, setTab] = createSignal('term')
     const typed: string[] = []
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          body: () => (
-            <>
-              <Tabs
-                idPrefix="rect"
-                ariaLabel="Panes"
-                active={tab()}
-                onChange={setTab}
-                tabs={[{ id: 'term', label: 'Terminal' }, { id: 'list', label: 'List' }]}
-              />
-              <TabPanel idPrefix="rect" id="term" active={tab()}>
-                <Rectangle kind="pty" label="Shell" mount={(handle) => {
-                  const terminal = handle as unknown as CellTerminal
-                  terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
-                }} />
-              </TabPanel>
-              <TabPanel idPrefix="rect" id="list" active={tab()}>
-                <List />
-              </TabPanel>
-            </>
-          ),
-        }}
-      />
-    ), { width: 44, height: 18 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            body: () => (
+              <>
+                <Tabs
+                  idPrefix="rect"
+                  ariaLabel="Panes"
+                  active={tab()}
+                  onChange={setTab}
+                  tabs={[
+                    { id: 'term', label: 'Terminal' },
+                    { id: 'list', label: 'List' },
+                  ]}
+                />
+                <TabPanel idPrefix="rect" id="term" active={tab()}>
+                  <Rectangle
+                    kind="pty"
+                    label="Shell"
+                    mount={(handle) => {
+                      const terminal = handle as unknown as CellTerminal
+                      terminal.onData((bytes) => typed.push(new TextDecoder().decode(bytes)))
+                    }}
+                  />
+                </TabPanel>
+                <TabPanel idPrefix="rect" id="list" active={tab()}>
+                  <List />
+                </TabPanel>
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 18 },
+    )
     try {
       // The strip is a parent stop, so entry lands on it and Down goes into the panel it is showing,
       // which is the rectangle's door.
@@ -525,32 +622,38 @@ describe('keys and focus in cells', () => {
     // panel; from there Up used to be a wall and Left used to be the column move, which from any
     // control on the pane put the reader in the rail (./regions.ts § crossParent, § moveStop).
     const [tab, setTab] = createSignal('one')
-    const frame = await renderCells(() => (
-      <HeaderBodyFooter
-        stateKey="pane"
-        label="Test"
-        regions={{
-          body: () => (
-            <>
-              <Tabs
-                idPrefix="ctl"
-                ariaLabel="Sections"
-                active={tab()}
-                onChange={setTab}
-                tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }]}
-              />
-              <TabPanel idPrefix="ctl" id="one" active={tab()}>
-                <Button onPress={() => {}}>Merge</Button>
-                <Button onPress={() => {}}>Close</Button>
-              </TabPanel>
-              <TabPanel idPrefix="ctl" id="two" active={tab()}>
-                <Text>Second panel</Text>
-              </TabPanel>
-            </>
-          ),
-        }}
-      />
-    ), { width: 44, height: 12 })
+    const frame = await renderCells(
+      () => (
+        <HeaderBodyFooter
+          stateKey="pane"
+          label="Test"
+          regions={{
+            body: () => (
+              <>
+                <Tabs
+                  idPrefix="ctl"
+                  ariaLabel="Sections"
+                  active={tab()}
+                  onChange={setTab}
+                  tabs={[
+                    { id: 'one', label: 'One' },
+                    { id: 'two', label: 'Two' },
+                  ]}
+                />
+                <TabPanel idPrefix="ctl" id="one" active={tab()}>
+                  <Button onPress={() => {}}>Merge</Button>
+                  <Button onPress={() => {}}>Close</Button>
+                </TabPanel>
+                <TabPanel idPrefix="ctl" id="two" active={tab()}>
+                  <Text>Second panel</Text>
+                </TabPanel>
+              </>
+            ),
+          }}
+        />
+      ),
+      { width: 44, height: 12 },
+    )
     try {
       const strip = focusedRenderable()
       const second = await (await frame.press('ARROW_DOWN')).press('ARROW_DOWN')
@@ -599,8 +702,9 @@ describe('keys and focus in cells', () => {
  *  point of the typing shadow is this number, and a release that renames it should fail loudly rather
  *  than let the design quietly stop paying (`@opentui/keymap` § createKeymapState). */
 const cacheBlockers = (engine: object): number => {
-  const symbol = Object.getOwnPropertySymbols(Object.getPrototypeOf(engine))
-    .find((candidate) => String(candidate).includes('keymap-extension-context'))
+  const symbol = Object.getOwnPropertySymbols(Object.getPrototypeOf(engine)).find((candidate) =>
+    String(candidate).includes('keymap-extension-context'),
+  )
   expect(symbol, 'the keymap no longer exposes its extension context').toBeDefined()
   const read = (engine as Record<symbol, () => { state: { activeKeyCacheBlockers: number } }>)[symbol!]
   return read.call(engine).state.activeKeyCacheBlockers
@@ -610,19 +714,44 @@ describe('the typing shadow', () => {
   it('keeps a printable command shortcut in the focused search field', async () => {
     const [text, setText] = createSignal('')
     let opened = 0
-    const commands = registerCommands([{ id: 'test.open', title: 'Open', category: 'action', palette: true, run: () => { opened++ } }])
-    const bindings = registerKeybindings([{ id: 'test.open.key', command: 'test.open', description: 'Open', category: 'Global', defaultChord: 'n' }])
+    const commands = registerCommands([
+      {
+        id: 'test.open',
+        title: 'Open',
+        category: 'action',
+        palette: true,
+        run: () => {
+          opened++
+        },
+      },
+    ])
+    const bindings = registerKeybindings([
+      { id: 'test.open.key', command: 'test.open', description: 'Open', category: 'Global', defaultChord: 'n' },
+    ])
     let screen: Awaited<ReturnType<typeof renderCells>> | undefined
     try {
-      screen = await renderCells(() => {
-        onMount(() => installCommandLayer(keymap()!, {
-          prefs: () => ({}), taskActive: () => true, focusedPane: () => undefined,
-        }))
-        return <box flexDirection="column" flexGrow={1}>
-          <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}><Input value={text()} onInput={setText} /></box>
-          <box ref={regionFocus({ paneId: 'test', regionId: 'button' }, 1)}><Button>Next</Button></box>
-        </box>
-      }, { width: 40, height: 8 })
+      screen = await renderCells(
+        () => {
+          onMount(() =>
+            installCommandLayer(keymap()!, {
+              prefs: () => ({}),
+              taskActive: () => true,
+              focusedPane: () => undefined,
+            }),
+          )
+          return (
+            <box flexDirection="column" flexGrow={1}>
+              <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}>
+                <Input value={text()} onInput={setText} />
+              </box>
+              <box ref={regionFocus({ paneId: 'test', regionId: 'button' }, 1)}>
+                <Button>Next</Button>
+              </box>
+            </box>
+          )
+        },
+        { width: 40, height: 8 },
+      )
       screen = await screen.press('n')
       expect(text()).toBe('n')
       expect(opened).toBe(0)
@@ -641,17 +770,20 @@ describe('the typing shadow', () => {
     const [pressed, setPressed] = createSignal('')
     // Two regions, because Tab is how the keys leave a field for something that is not one, and the
     // cycle needs somewhere to go (./regions.ts § moveRegion).
-    let screen = await renderCells(() => (
-      <box flexDirection="column" flexGrow={1}>
-        <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}>
-          <Input value={text()} onInput={setText} />
+    let screen = await renderCells(
+      () => (
+        <box flexDirection="column" flexGrow={1}>
+          <box ref={regionFocus({ paneId: 'test', regionId: 'field' }, 0)}>
+            <Input value={text()} onInput={setText} />
+          </box>
+          <box flexDirection="column" ref={regionFocus({ paneId: 'test', regionId: 'buttons' }, 1)}>
+            <Button onPress={() => setPressed('first')}>First</Button>
+            <Button onPress={() => setPressed('second')}>Second</Button>
+          </box>
         </box>
-        <box flexDirection="column" ref={regionFocus({ paneId: 'test', regionId: 'buttons' }, 1)}>
-          <Button onPress={() => setPressed('first')}>First</Button>
-          <Button onPress={() => setPressed('second')}>Second</Button>
-        </box>
-      </box>
-    ), { width: 40, height: 8 })
+      ),
+      { width: 40, height: 8 },
+    )
     try {
       const { keymap } = await import('@acorn/client-core/kit/keys/keymapHost.ts')
       const engine = keymap()!
@@ -683,16 +815,36 @@ describe('the typing shadow', () => {
 
 it('reaches a preceding panel control from a focused collection row', async () => {
   let presses = 0
-  let screen = await renderCells(() => (
-    <HeaderBodyFooter stateKey="list-controls" label="List" regions={{ body: () => <>
-      <Toolbar><Button onPress={() => { presses++ }}>Collapse all</Button><Button>Reveal active</Button></Toolbar>
-      <Button>Show ignored</Button>
-      <Button>New</Button>
-      <Rows id="test-controls" items={[{ key: 'file', label: 'File' }]}>
-        {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
-      </Rows>
-    </> }} />
-  ), { width: 40, height: 8 })
+  let screen = await renderCells(
+    () => (
+      <HeaderBodyFooter
+        stateKey="list-controls"
+        label="List"
+        regions={{
+          body: () => (
+            <>
+              <Toolbar>
+                <Button
+                  onPress={() => {
+                    presses++
+                  }}
+                >
+                  Collapse all
+                </Button>
+                <Button>Reveal active</Button>
+              </Toolbar>
+              <Button>Show ignored</Button>
+              <Button>New</Button>
+              <Rows id="test-controls" items={[{ key: 'file', label: 'File' }]}>
+                {(item, itemProps) => <Row item={itemProps}>{item.label}</Row>}
+              </Rows>
+            </>
+          ),
+        }}
+      />
+    ),
+    { width: 40, height: 8 },
+  )
   try {
     screen = await screen.press('TAB', { shift: true })
     screen = await screen.press('k')

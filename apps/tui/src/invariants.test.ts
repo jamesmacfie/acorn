@@ -11,15 +11,16 @@ import { describe, expect, it } from 'vitest'
 const ROOT = fileURLToPath(new URL('.', import.meta.url))
 
 const filesIn = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (
-    entry.isDirectory() ? filesIn(join(dir, entry.name)) : [join(dir, entry.name)]
-  )).filter((file) => /\.tsx?$/.test(file))
+  readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => (entry.isDirectory() ? filesIn(join(dir, entry.name)) : [join(dir, entry.name)]))
+    .filter((file) => /\.tsx?$/.test(file))
 
 /** Files under a folder of this package that defer work to a microtask, by their path from `src/`. */
-const deferring = (folder: string): string[] => filesIn(join(ROOT, folder))
-  .filter((file) => /\bqueueMicrotask\s*\(/.test(readFileSync(file, 'utf8')))
-  .map((file) => file.slice(ROOT.length))
-  .sort()
+const deferring = (folder: string): string[] =>
+  filesIn(join(ROOT, folder))
+    .filter((file) => /\bqueueMicrotask\s*\(/.test(readFileSync(file, 'utf8')))
+    .map((file) => file.slice(ROOT.length))
+    .sort()
 
 /** The chord `commandLayer.ts` rewrites away, spelled so this file is not its own counter-example. */
 const PLATFORM_PRIMARY = `super${'+'}`
@@ -77,16 +78,18 @@ describe('the store is the only owner of focus', () => {
   // it to one is to name the files that could hold a second (docs/tui/focus.md § Focus regions).
 
   /** Every non-test source file of this package, by its path from `src/`. */
-  const sources = (): { path: string; text: string }[] => filesIn(ROOT)
-    .filter((file) => file !== fileURLToPath(import.meta.url))
-    .filter((file) => !/\.test\.tsx?$/.test(file))
-    .map((file) => ({ path: file.slice(ROOT.length), text: readFileSync(file, 'utf8') }))
+  const sources = (): { path: string; text: string }[] =>
+    filesIn(ROOT)
+      .filter((file) => file !== fileURLToPath(import.meta.url))
+      .filter((file) => !/\.test\.tsx?$/.test(file))
+      .map((file) => ({ path: file.slice(ROOT.length), text: readFileSync(file, 'utf8') }))
 
   /** The files that say a pattern at all, by their path from `src/`. */
-  const sayers = (pattern: RegExp): string[] => sources()
-    .filter(({ text }) => pattern.test(text))
-    .map(({ path }) => path)
-    .sort()
+  const sayers = (pattern: RegExp): string[] =>
+    sources()
+      .filter(({ text }) => pattern.test(text))
+      .map(({ path }) => path)
+      .sort()
 
   it('writes focus and asks the renderer for it in the region store and nowhere else', () => {
     // The signal is the answer, not a view of one: it is what a row draws its caret from and what the
@@ -107,9 +110,11 @@ describe('the store is the only owner of focus', () => {
 // packages are gone (docs/tui/keys.md § The adapter).
 describe('the new painter is ours', () => {
   it('reaches for nothing from @opentui anywhere under tree, layout, paint or input', () => {
-    const borrowed = ['tree', 'layout', 'paint', 'input'].flatMap((folder) => filesIn(join(ROOT, folder))
-      .filter((file) => /from '@opentui\//.test(readFileSync(file, 'utf8')))
-      .map((file) => file.slice(ROOT.length)))
+    const borrowed = ['tree', 'layout', 'paint', 'input'].flatMap((folder) =>
+      filesIn(join(ROOT, folder))
+        .filter((file) => /from '@opentui\//.test(readFileSync(file, 'utf8')))
+        .map((file) => file.slice(ROOT.length)),
+    )
     expect(borrowed.sort()).toEqual([])
   })
 })

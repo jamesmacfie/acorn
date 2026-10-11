@@ -92,11 +92,15 @@ describe('unknownWhenFacts', () => {
     // Reported rather than ignored: a predicate naming a fact the host never supplies can never match,
     // so the contribution would install and silently do nothing.
     expect(unknownWhenFacts('task.row', { branch: 'main', title: 'x' })).toEqual(['branch', 'title'])
-    expect(unknownWhenFacts('file.row', { extension: 'json', directory: false, readOnly: false, projectId: 'p1' })).toEqual([])
+    expect(
+      unknownWhenFacts('file.row', { extension: 'json', directory: false, readOnly: false, projectId: 'p1' }),
+    ).toEqual([])
     expect(unknownWhenFacts('document.tab', { path: 'a.json', revision: 'abc' })).toEqual(['path', 'revision'])
     expect(unknownWhenFacts('agent.message', { role: 'assistant', status: 'completed', projectId: 'p1' })).toEqual([])
     expect(unknownWhenFacts('agent.turn', { status: 'completed', role: 'user', text: 'hi' })).toEqual(['role', 'text'])
-    expect(unknownWhenFacts('content.selection', { contentKind: 'code', languageId: 'typescript', readOnly: true })).toEqual([])
+    expect(
+      unknownWhenFacts('content.selection', { contentKind: 'code', languageId: 'typescript', readOnly: true }),
+    ).toEqual([])
     expect(unknownWhenFacts('content.selection', { text: 'x', ownerId: 'editor' })).toEqual(['text', 'ownerId'])
   })
 })

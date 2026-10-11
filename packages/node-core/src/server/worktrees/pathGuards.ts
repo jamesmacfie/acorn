@@ -29,4 +29,3 @@ export const isContainedPath = (root: string, candidate: string): boolean => {
   const c = resolve(candidate)
   return c === r || c.startsWith(r + sep)
 }
-

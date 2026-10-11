@@ -69,21 +69,31 @@ const pressListeners = new Set<(box: Renderable) => void>()
  * (client-core host/tree/hostRequests.ts § createGestureClock). Call it once per mount; `dispose`
  * stops listening.
  */
-export function pressedWithin(container: () => Renderable | undefined, windowMs: number): { recent(): boolean; dispose(): void } {
+export function pressedWithin(
+  container: () => Renderable | undefined,
+  windowMs: number,
+): { recent(): boolean; dispose(): void } {
   let at = 0
   const listener = (box: Renderable): void => {
     for (let node: Renderable | null | undefined = box; node; node = node.parent as Renderable | null | undefined) {
-      if (node === container()) { at = Date.now(); return }
+      if (node === container()) {
+        at = Date.now()
+        return
+      }
     }
   }
   pressListeners.add(listener)
   return {
     recent: () => at > 0 && Date.now() - at <= windowMs,
-    dispose: () => { pressListeners.delete(listener) },
+    dispose: () => {
+      pressListeners.delete(listener)
+    },
   }
 }
 
-const notePress = (box: Renderable): void => { for (const listener of pressListeners) listener(box) }
+const notePress = (box: Renderable): void => {
+  for (const listener of pressListeners) listener(box)
+}
 
 /** Make a renderable a stop: focusable, pressed by `activate`, and pressed by the mouse. */
 export function pressable(box: Renderable, options: StopOptions): void {
@@ -91,7 +101,10 @@ export function pressable(box: Renderable, options: StopOptions): void {
   if (options.opens) opening.add(box)
   if (options.on?.expand || options.on?.collapse) crossing.add(box)
   createEffect(() => {
-    if (!off()) { box.focusable = true; return }
+    if (!off()) {
+      box.focusable = true
+      return
+    }
     box.focusable = false
     // The flag is the store's own declaration of what can hold the keys, so a control that goes
     // disabled while it has them is a node the landing rule has to take them off. Nothing else on
@@ -109,7 +122,15 @@ export function pressable(box: Renderable, options: StopOptions): void {
   })
   const given = options.on ?? {}
   const runs: Partial<Record<Intent, () => boolean>> = {
-    ...(options.onPress ? { activate: () => { notePress(box); options.onPress!(); return true } } : {}),
+    ...(options.onPress
+      ? {
+          activate: () => {
+            notePress(box)
+            options.onPress!()
+            return true
+          },
+        }
+      : {}),
     ...given,
     // Every stop moves to the next one beside it, after whatever the node wanted the arrows for.
     // `SegmentedControl` is a whole collection reached through `on` and answers them itself; a node
@@ -122,10 +143,17 @@ export function pressable(box: Renderable, options: StopOptions): void {
     next: () => given.next?.() || moveStop(1),
     prev: () => given.prev?.() || moveStop(-1),
   }
-  onCleanup(registerIntentLayer(box, Object.keys(runs) as Intent[], (intent) => {
-    if (off()) return false
-    return runs[intent]?.() ?? false
-  }, { priority: STOP, mode: 'focus' }))
+  onCleanup(
+    registerIntentLayer(
+      box,
+      Object.keys(runs) as Intent[],
+      (intent) => {
+        if (off()) return false
+        return runs[intent]?.() ?? false
+      },
+      { priority: STOP, mode: 'focus' },
+    ),
+  )
   // Click to focus and then press, which is the whole of this host's pointer model
   // (docs/tui/rectangles.md § What the TUI never does). Only the press is here: the store hit-tests the same
   // mouse-down on its way up to the root and focuses the nearest stop above it, which is this box

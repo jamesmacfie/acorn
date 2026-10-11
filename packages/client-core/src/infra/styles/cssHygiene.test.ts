@@ -22,14 +22,21 @@ describe('no phantom tokens', () => {
       '--term-drawer-h', // TerminalPanel.tsx sets it on documentElement
       '--left-rails-w', // App.tsx publishes the combined left rail width on documentElement
       '--left', // reserved override hook for the left pane width
-      '--l', '--r', // Shiki emits both syntax colours inline per token
-      '--lb', '--rb', // and a terminal background, on an `ansi` CodeBlock's runs
-      '--state-color', '--label-color', // inline per-element props carrying live Linear API colours
+      '--l',
+      '--r', // Shiki emits both syntax colours inline per token
+      '--lb',
+      '--rb', // and a terminal background, on an `ansi` CodeBlock's runs
+      '--state-color',
+      '--label-color', // inline per-element props carrying live Linear API colours
       '--chip-color', // Chip's `color` prop — the shared successor to the two above
       // A brand's own colour and what sits on it, from brandStyle() in ui/brandMarks.ts. Third-party
       // identity rather than a design decision, which is why it comes from the mark and not a token.
-      '--brand', '--brand-on',
-      '--meter-value', '--meter-mark', '--kv-extra-cols', '--task-depth',
+      '--brand',
+      '--brand-on',
+      '--meter-value',
+      '--meter-mark',
+      '--kv-extra-cols',
+      '--task-depth',
       // RailTab sets it from the validated project colour, which is a user's choice about one
       // project rather than a design decision (tabs/RailTab.tsx).
       '--rail-accent',
@@ -37,14 +44,20 @@ describe('no phantom tokens', () => {
       // The kit's space role, written inline from ui/kit/roles.ts. Always a var() into a style
       // token, so it carries a role rather than a value (docs/ui-design/closed-kit.md § The closed kit).
       '--kit-gap',
-      '--dash-cell', '--dash-pitch',
+      '--dash-cell',
+      '--dash-pitch',
     ])
 
     // Local constants scoped to their own block, not tokens for `:root`
     // (docs/ui-design/tokens.md § Runtime-set custom properties).
     const locallyDeclared = new Set([
-      '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w', '--diff-card-inset',
-      '--row-field-w', '--row-owner-inset',
+      '--diff-gutter-w',
+      '--diff-marker-w',
+      '--diff-btn-w',
+      '--diff-chrome-w',
+      '--diff-card-inset',
+      '--row-field-w',
+      '--row-owner-inset',
       '--kit-grid-col',
       '--tab-strip-h',
       '--pane-actions-w',
@@ -107,8 +120,9 @@ describe('literal ratchets (these may only go down)', () => {
   it('classes merged onto Card are compounded with it', () => {
     // Anchored at the start of a selector: a descendant rule like `.dash-slot > .dash-panel`
     // already outranks the primitive and is not the shape at issue.
-    const bare = ['dash-panel', 'dash-card']
-      .filter((name) => new RegExp(`^\\s*(?:[^{}]*,\\s*)?\\.${name}\\s*\\{`, 'm').test(withoutComments(corpus)))
+    const bare = ['dash-panel', 'dash-card'].filter((name) =>
+      new RegExp(`^\\s*(?:[^{}]*,\\s*)?\\.${name}\\s*\\{`, 'm').test(withoutComments(corpus)),
+    )
     expect(bare).toEqual([])
   })
 
@@ -116,8 +130,10 @@ describe('literal ratchets (these may only go down)', () => {
   // so whatever remains is off-scale. Snapping them retroactively would shift about 85 paddings by
   // 1px; do it while authoring a pack that moves the density anyway.
   it('off-scale spacing values', () => {
-    const decls = withoutComments(corpus)
-      .match(/(?:padding|margin|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left))?:[^;]+;/g) ?? []
+    const decls =
+      withoutComments(corpus).match(
+        /(?:padding|margin|gap|row-gap|column-gap)(?:-(?:top|right|bottom|left))?:[^;]+;/g,
+      ) ?? []
     const offScale = decls.flatMap((d) => d.match(/-?\d+px/g) ?? []).length
     expect(offScale).toBeLessThanOrEqual(147)
   })

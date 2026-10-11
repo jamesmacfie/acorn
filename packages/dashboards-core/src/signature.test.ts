@@ -33,15 +33,23 @@ describe('what resets a series and what does not', () => {
     expect(measureSignature(panel({ view: { kind: 'list', trend: 'history' } }))).toBe(base)
     // The display keys are presentation: turning the delta window from a day to a week must not
     // throw away the fortnight of samples the delta is drawn from.
-    expect(measureSignature(panel({ view: { kind: 'stat', trend: 'history', compare: 'week', good: 'down' } }))).toBe(base)
-    expect(measureSignature(panel({ shaping: { sort: [{ field: 'updated', direction: 'desc' }], limit: 5 } }))).toBe(base)
+    expect(measureSignature(panel({ view: { kind: 'stat', trend: 'history', compare: 'week', good: 'down' } }))).toBe(
+      base,
+    )
+    expect(measureSignature(panel({ shaping: { sort: [{ field: 'updated', direction: 'desc' }], limit: 5 } }))).toBe(
+      base,
+    )
   })
 
   it('resets on a filter, a source projection, a mapping or the measure itself', () => {
     const base = measureSignature(panel())
-    expect(measureSignature(panel({ shaping: { filters: [{ field: 'state', op: 'eq', value: 'open' }] } }))).not.toBe(base)
+    expect(measureSignature(panel({ shaping: { filters: [{ field: 'state', op: 'eq', value: 'open' }] } }))).not.toBe(
+      base,
+    )
     expect(measureSignature(panel({ sources: [{ pluginId: 'linear', sourceId: 'pulls-mine' }] }))).not.toBe(base)
-    expect(measureSignature(panel({ sources: [{ pluginId: 'github', sourceId: 'pulls-mine@second-query' }] }))).not.toBe(base)
+    expect(
+      measureSignature(panel({ sources: [{ pluginId: 'github', sourceId: 'pulls-mine@second-query' }] })),
+    ).not.toBe(base)
     expect(measureSignature(panel({ mapping: { unmapped: 'hidden' } }))).not.toBe(base)
     expect(measureSignature(panel({ view: { kind: 'stat', aggregate: 'sum', field: 'additions' } }))).not.toBe(base)
   })
@@ -57,13 +65,57 @@ describe('what resets a series and what does not', () => {
   })
 
   it('resets when a version 2 summary changes without changing its source query', () => {
-    const plan = panelPlanSchema.parse({ version: 2, title: 'Totals', time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
-      sources: [{ id: 'a', label: 'A', role: 'primary', reference: { kind: 'inline', content: { name: 'A', parameters: { type: 'object', additionalProperties: false }, sourceParameters: {}, query: { source: { pluginId: 'core', sourceId: 'tasks' }, scope: { parameters: {} }, sort: [] } }, bindings: {} } }],
+    const plan = panelPlanSchema.parse({
+      version: 2,
+      title: 'Totals',
+      time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+      sources: [
+        {
+          id: 'a',
+          label: 'A',
+          role: 'primary',
+          reference: {
+            kind: 'inline',
+            content: {
+              name: 'A',
+              parameters: { type: 'object', additionalProperties: false },
+              sourceParameters: {},
+              query: { source: { pluginId: 'core', sourceId: 'tasks' }, scope: { parameters: {} }, sort: [] },
+            },
+            bindings: {},
+          },
+        },
+      ],
       columns: [{ id: 'status', label: 'Status', type: 'text', bind: { a: { field: '/status' } } }],
-      stages: [{ op: 'summarize', by: [], measures: [{ id: 'total', label: 'Total', kind: 'count' }] }], view: { kind: 'stat', aggregate: 'sum', field: 'total' } })
+      stages: [{ op: 'summarize', by: [], measures: [{ id: 'total', label: 'Total', kind: 'count' }] }],
+      view: { kind: 'stat', aggregate: 'sum', field: 'total' },
+    })
     const query = [{ id: 'a', digest: 'same', parameters: {}, account: null }]
     const base = measureSignature(panel(), query, plan)
-    expect(measureSignature(panel(), query, { ...plan, stages: [{ op: 'summarize', by: [], measures: [{ id: 'total', label: 'Total', kind: 'count-where', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/status' } }, operator: 'eq', right: { address: { from: 'literal', value: 'open' } } } }] }] })).not.toBe(base)
+    expect(
+      measureSignature(panel(), query, {
+        ...plan,
+        stages: [
+          {
+            op: 'summarize',
+            by: [],
+            measures: [
+              {
+                id: 'total',
+                label: 'Total',
+                kind: 'count-where',
+                where: {
+                  kind: 'comparison',
+                  left: { address: { from: 'item', pointer: '/status' } },
+                  operator: 'eq',
+                  right: { address: { from: 'literal', value: 'open' } },
+                },
+              },
+            ],
+          },
+        ],
+      }),
+    ).not.toBe(base)
     expect(measureSignature(panel(), query, { ...plan, title: 'Renamed' })).toBe(base)
   })
 

@@ -1,5 +1,9 @@
 /** Durable turns cover queued, waiting, retry, and cancellation settlement across restarts. */
-export function agentCheckoutActivity(row: { taskId: string; runtimeState: string; status: string | null }): Array<{ taskId: string; description: string }> {
+export function agentCheckoutActivity(row: {
+  taskId: string
+  runtimeState: string
+  status: string | null
+}): Array<{ taskId: string; description: string }> {
   if (row.status && !['completed', 'failed', 'cancelled', 'interrupted'].includes(row.status)) {
     return [{ taskId: row.taskId, description: `agent turn ${row.status}` }]
   }
@@ -11,8 +15,12 @@ export function agentCheckoutActivity(row: { taskId: string; runtimeState: strin
 
 export async function readAgentCheckoutActivity(store: PluginDatabase, taskIds: readonly string[]) {
   if (!taskIds.length) return []
-  const rows = await store.select({ taskId: schema.agentSessions.taskId,
-    runtimeState: schema.agentSessions.runtimeState, status: schema.agentTurns.status })
+  const rows = await store
+    .select({
+      taskId: schema.agentSessions.taskId,
+      runtimeState: schema.agentSessions.runtimeState,
+      status: schema.agentTurns.status,
+    })
     .from(schema.agentSessions)
     .leftJoin(schema.agentTurns, eq(schema.agentSessions.id, schema.agentTurns.sessionId))
     .where(inArray(schema.agentSessions.taskId, [...taskIds]))

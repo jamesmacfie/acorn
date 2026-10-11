@@ -1,7 +1,12 @@
 import { For, Show, createSignal, onCleanup } from 'solid-js'
 import {
-  LANGUAGE_REQUEST_TOO_LARGE, languageRequestTooLarge, latestSignal, positionAt, requestDiagnostics,
-  type CheckedDiagnostic, type DocumentServiceRoute,
+  LANGUAGE_REQUEST_TOO_LARGE,
+  languageRequestTooLarge,
+  latestSignal,
+  positionAt,
+  requestDiagnostics,
+  type CheckedDiagnostic,
+  type DocumentServiceRoute,
 } from '@acorn/plugin-api/client'
 import { Button, Row, Text } from '@acorn/plugin-api/ui'
 
@@ -50,13 +55,28 @@ export default function FileDiagnostics(props: {
           </Row>
           <Show when={answer()} keyed>
             {(value) => {
-              if (typeof value === 'string') return <Text emphasis="muted" wrap>{value}</Text>
+              if (typeof value === 'string')
+                return (
+                  <Text emphasis="muted" wrap>
+                    {value}
+                  </Text>
+                )
               if ('failed' in value) return <Text emphasis="muted" wrap>{`${value.label} did not answer.`}</Text>
               return (
-                <Show when={value.items.length} fallback={<Text emphasis="muted" wrap>{`No problems, from ${value.label}.`}</Text>}>
+                <Show
+                  when={value.items.length}
+                  fallback={<Text emphasis="muted" wrap>{`No problems, from ${value.label}.`}</Text>}
+                >
                   <Text emphasis="muted" wrap>{`From ${value.label}:`}</Text>
                   <For each={value.items}>
-                    {(item) => <Text tone={item.severity === 'error' ? 'danger' : item.severity === 'warning' ? 'warn' : undefined} wrap>{line(value.text, item)}</Text>}
+                    {(item) => (
+                      <Text
+                        tone={item.severity === 'error' ? 'danger' : item.severity === 'warning' ? 'warn' : undefined}
+                        wrap
+                      >
+                        {line(value.text, item)}
+                      </Text>
+                    )}
                   </For>
                 </Show>
               )

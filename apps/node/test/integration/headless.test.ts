@@ -58,7 +58,11 @@ describe('argv templates (docs/workflows.md — flags verified against installed
 describe('parseStreamJson (pure)', () => {
   it('extracts the final result event and keeps all events', () => {
     const out = parseStreamJson(
-      ['{"type":"system","session_id":"s1"}', 'not json noise', '{"type":"result","result":"done","structured_output":{"a":1},"session_id":"s1","total_cost_usd":0.5}'].join('\n'),
+      [
+        '{"type":"system","session_id":"s1"}',
+        'not json noise',
+        '{"type":"result","result":"done","structured_output":{"a":1},"session_id":"s1","total_cost_usd":0.5}',
+      ].join('\n'),
     )
     expect(out.result).toBe('done')
     expect(out.structuredOutput).toEqual({ a: 1 })

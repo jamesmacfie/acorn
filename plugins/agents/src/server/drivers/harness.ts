@@ -28,12 +28,12 @@ export type HarnessSpawn =
   // through `createRequire`, a contributed one joins its installed package directory. Both resolve at
   // probe time, so a missing adapter is a diagnostic rather than a boot failure.
   | {
-    entry: () => string
-    args?: readonly string[]
-    // The CLI the adapter drives. Its resolved absolute path reaches the child as `env`. Named rather
-    // than templated, so the manifest carries data a person can read.
-    requires?: { command: string; env: string }
-  }
+      entry: () => string
+      args?: readonly string[]
+      // The CLI the adapter drives. Its resolved absolute path reaches the child as `env`. Named rather
+      // than templated, so the manifest carries data a person can read.
+      requires?: { command: string; env: string }
+    }
 
 export type HarnessLaunchSpec = {
   /** Persisted as a session row's `providerId`. Renaming one breaks every stored row. */

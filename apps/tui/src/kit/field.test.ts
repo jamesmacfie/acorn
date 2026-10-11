@@ -11,8 +11,11 @@ import { byChar, byGroup, create, edit, paste, setValue, type Field, type Press 
 // that shipped (./field.ts).
 
 /** A key as the dispatcher hands one over: a name, and the character it types where it types one. */
-const key = (name: string, modifiers: Partial<{ ctrl: boolean; meta: boolean; shift: boolean }> = {}): Press =>
-  ({ name, sequence: name.length === 1 ? name : '', ...modifiers })
+const key = (name: string, modifiers: Partial<{ ctrl: boolean; meta: boolean; shift: boolean }> = {}): Press => ({
+  name,
+  sequence: name.length === 1 ? name : '',
+  ...modifiers,
+})
 
 /** One key against a field, wrapping at a width. Throws rather than returning `false`, because a
  *  case that meant to press a key the table does not take should say so. */
@@ -52,7 +55,10 @@ describe('the wrap', () => {
     expect(wrapRows('', 10)).toEqual([{ from: 0, to: 0 }])
     // Which is where the caret goes when you press Return at the end, and a wrap that dropped the row
     // would have nowhere to draw it.
-    expect(wrapRows('a\n', 10)).toEqual([{ from: 0, to: 1 }, { from: 2, to: 2 }])
+    expect(wrapRows('a\n', 10)).toEqual([
+      { from: 0, to: 1 },
+      { from: 2, to: 2 },
+    ])
   })
 
   it('gives an offset at a soft break two homes, and `assoc` picks one', () => {
@@ -64,7 +70,7 @@ describe('the wrap', () => {
     expect(toVisual(text, rows, 4, -1)).toEqual({ row: 0, col: 4 })
   })
 
-  it('clamps a column past the end of a row to that row\'s end', () => {
+  it("clamps a column past the end of a row to that row's end", () => {
     const text = 'alpha\nab'
     const rows = wrapRows(text, 10)
     expect(fromVisual(text, rows, 1, 4)).toBe(text.length)
@@ -112,7 +118,11 @@ describe('a field', () => {
     expect(byGroup('one   two', 3, true)).toBe(9)
     expect(press(create('one two'), { name: 'w', ctrl: true }).text).toBe('one ')
     expect(press(create('one two', 0), { name: 'd', meta: true }).text).toBe(' two')
-    for (const chord of [{ name: 'left', ctrl: true }, { name: 'left', meta: true }, { name: 'b', meta: true }]) {
+    for (const chord of [
+      { name: 'left', ctrl: true },
+      { name: 'left', meta: true },
+      { name: 'b', meta: true },
+    ]) {
       expect(press(create('one two'), chord).cursor).toBe(4)
     }
   })
@@ -177,7 +187,7 @@ describe('a field', () => {
     expect(setValue(create('abcd', 3), 'a').cursor).toBe(1)
   })
 
-  it('refuses a chord carrying the platform\'s own modifier rather than matching its Ctrl twin', () => {
+  it("refuses a chord carrying the platform's own modifier rather than matching its Ctrl twin", () => {
     // A terminal emulator on macOS keeps that key and never delivers it; where the kitty protocol
     // does, this table binds none of it (docs/tui/keys.md § The adapter).
     expect(took(create('one two'), { name: 'left', super: true })).toBe(false)

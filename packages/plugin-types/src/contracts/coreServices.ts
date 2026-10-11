@@ -15,7 +15,9 @@ import type { CoreTelemetryService } from './telemetry.js'
  * would make every facet optional for the compiled plugins that have all of them. */
 export type CoreServices = {
   /** Available with the `agent-tool-provenance` permission. */
-  agentToolProvenance?: { verify(input: { taskId: string; sessionId: string; tool: string; proof: string }): boolean | Promise<boolean> }
+  agentToolProvenance?: {
+    verify(input: { taskId: string; sessionId: string; tool: string; proof: string }): boolean | Promise<boolean>
+  }
   fs: CoreFsService
   git: CoreGitService
   proc: CoreProcService

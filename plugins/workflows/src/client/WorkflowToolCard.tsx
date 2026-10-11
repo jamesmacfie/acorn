@@ -42,19 +42,28 @@ const count = (items: readonly unknown[] | undefined, word: string): string | nu
   items?.length ? `${items.length} ${word}` : null
 
 const RUN_STATUS: Record<string, string> = {
-  'awaiting-caller': 'starts when this turn ends', running: 'running', gated: 'waiting for a person', cancelling: 'cancelling',
-  done: 'done', 'completed-with-failures': 'done with failures', failed: 'failed', 'safety-rail': 'stopped by a safety rail',
-  cancelled: 'cancelled', 'not-started': "didn't start",
+  'awaiting-caller': 'starts when this turn ends',
+  running: 'running',
+  gated: 'waiting for a person',
+  cancelling: 'cancelling',
+  done: 'done',
+  'completed-with-failures': 'done with failures',
+  failed: 'failed',
+  'safety-rail': 'stopped by a safety rail',
+  cancelled: 'cancelled',
+  'not-started': "didn't start",
 }
 
 const RUN_VERB: Record<string, string> = {
-  workflow_run: 'Started a workflow run', workflow_read: 'Read a workflow run',
-  workflow_wait: 'Waited on a workflow run', workflow_cancel: 'Cancelled a workflow run',
+  workflow_run: 'Started a workflow run',
+  workflow_read: 'Read a workflow run',
+  workflow_wait: 'Waited on a workflow run',
+  workflow_cancel: 'Cancelled a workflow run',
 }
 
 export function WorkflowToolCard(props: AgentToolCardProps) {
   const navigate = useNavigate()
-  const result = createMemo(() => props.tool.status === 'completed' ? answer(props.tool.output) : null)
+  const result = createMemo(() => (props.tool.status === 'completed' ? answer(props.tool.output) : null))
   const target = () => result()?.target
   const isRun = () => props.tool.name !== 'workflow_draft'
 
@@ -62,35 +71,54 @@ export function WorkflowToolCard(props: AgentToolCardProps) {
     const steps = result()?.diff?.steps
     const problems = result()?.problems?.length
     return [
-      count(steps?.added, 'added'), count(steps?.changed, 'changed'), count(steps?.removed, 'removed'),
+      count(steps?.added, 'added'),
+      count(steps?.changed, 'changed'),
+      count(steps?.removed, 'removed'),
       problems ? `${problems} ${problems === 1 ? 'problem' : 'problems'} to fix` : null,
-    ].filter(Boolean).join(' · ')
+    ]
+      .filter(Boolean)
+      .join(' · ')
   }
   const label = () => {
     const saved = result()
-    if (props.tool.status === 'failed') return isRun() ? "The workflow tool call didn't succeed" : "Couldn't save the workflow draft"
+    if (props.tool.status === 'failed')
+      return isRun() ? "The workflow tool call didn't succeed" : "Couldn't save the workflow draft"
     if (!saved) return isRun() ? 'Working with a workflow run' : 'Saving a workflow draft'
     if (isRun()) return `${RUN_VERB[props.tool.name ?? ''] ?? 'Workflow run'}${saved.name ? `: ${saved.name}` : ''}`
     return saved.created ? 'Saved a new workflow draft' : `Saved workflow draft revision ${saved.revision}`
   }
   const open = () => {
     const where = target()
-    if (where?.kind === 'workflow-definition' && where.resourceId && where.projectId) navigate(workflowsSurfacePath(where.projectId, where.resourceId))
-    if (where?.kind === 'workflow-run' && where.resourceId) openPane(where.taskId ?? props.taskId, WORKFLOWS_PANE_ID, { kind: 'workflows:show-run', runId: where.resourceId })
+    if (where?.kind === 'workflow-definition' && where.resourceId && where.projectId)
+      navigate(workflowsSurfacePath(where.projectId, where.resourceId))
+    if (where?.kind === 'workflow-run' && where.resourceId)
+      openPane(where.taskId ?? props.taskId, WORKFLOWS_PANE_ID, { kind: 'workflows:show-run', runId: where.resourceId })
   }
   return (
     <Card>
       <Stack gap="row">
         <Text emphasis="strong">{label()}</Text>
         <Show when={!isRun() && draftSummary()}>{(text) => <Text emphasis="muted">Steps: {text()}</Text>}</Show>
-        <Show when={isRun() && result()?.status}>{(status) => <Text emphasis="muted">The run {RUN_STATUS[status()] ?? status()}.</Text>}</Show>
+        <Show when={isRun() && result()?.status}>
+          {(status) => <Text emphasis="muted">The run {RUN_STATUS[status()] ?? status()}.</Text>}
+        </Show>
         <Show
           when={target()?.resourceId}
-          fallback={<Show when={props.tool.output && !result()}><CodeBlock wrap maxHeight="block">{props.tool.output}</CodeBlock></Show>}
+          fallback={
+            <Show when={props.tool.output && !result()}>
+              <CodeBlock wrap maxHeight="block">
+                {props.tool.output}
+              </CodeBlock>
+            </Show>
+          }
         >
           <Inline>
-            <Button size="sm" onPress={open}>{isRun() ? 'Open run' : 'Open workflow'}</Button>
-            <Show when={!isRun()}><Text emphasis="muted">It won't run until you publish it.</Text></Show>
+            <Button size="sm" onPress={open}>
+              {isRun() ? 'Open run' : 'Open workflow'}
+            </Button>
+            <Show when={!isRun()}>
+              <Text emphasis="muted">It won't run until you publish it.</Text>
+            </Show>
           </Inline>
         </Show>
       </Stack>

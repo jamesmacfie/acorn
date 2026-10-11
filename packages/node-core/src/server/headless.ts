@@ -46,7 +46,14 @@ export const HEADLESS_TIMEOUT_MS = 10 * 60 * 1000
 
 export async function runHeadless(
   argv: HeadlessArgv,
-  opts: { cwd: string; env: Record<string, string>; timeoutMs?: number; signal?: AbortSignal; onEvent?: (event: StreamEvent) => void; adapter?: StreamJsonAdapter },
+  opts: {
+    cwd: string
+    env: Record<string, string>
+    timeoutMs?: number
+    signal?: AbortSignal
+    onEvent?: (event: StreamEvent) => void
+    adapter?: StreamJsonAdapter
+  },
 ): Promise<HeadlessResult> {
   // Same gate as core/proc.ts, and for the same reason: an agent CLI is exactly the kind of command
   // the login-shell PATH probe exists to find (core/loginShellPath.ts).
@@ -55,7 +62,12 @@ export async function runHeadless(
     const adapter = opts.adapter ?? lineDelimitedJsonAdapter
     // detached gives it its own process group, so the timeout kill reaps grandchildren too. A hung
     // agent's own children would otherwise hold the stdio pipes open and stall the 'close' event.
-    const child = spawn(argv.file, argv.args, { cwd: opts.cwd, env: opts.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
+    const child = spawn(argv.file, argv.args, {
+      cwd: opts.cwd,
+      env: opts.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    })
     let stdout = ''
     let lineBuffer = ''
     let stderr = ''
@@ -97,7 +109,12 @@ export async function runHeadless(
       settled = true
       clearTimeout(timer)
       opts.signal?.removeEventListener('abort', abort)
-      resolve({ status: cancelled ? 'cancelled' : 'error', exitCode: null, capture: adapter.parse(''), stderrTail: err.message })
+      resolve({
+        status: cancelled ? 'cancelled' : 'error',
+        exitCode: null,
+        capture: adapter.parse(''),
+        stderrTail: err.message,
+      })
     })
     child.on('close', (exitCode) => {
       if (settled) return
@@ -114,7 +131,8 @@ export async function runHeadless(
       if (timedOut) return resolve({ status: 'timeout', exitCode, capture, stderrTail })
       if (exitCode !== 0) return resolve({ status: 'error', exitCode, capture, stderrTail })
       // Exit 0 with no result event means output that's unusable for edges: a typed error, not a guess.
-      if (capture.result == null && capture.structuredOutput == null) return resolve({ status: 'malformed', exitCode, capture, stderrTail })
+      if (capture.result == null && capture.structuredOutput == null)
+        return resolve({ status: 'malformed', exitCode, capture, stderrTail })
       resolve({ status: 'ok', exitCode, capture, stderrTail })
     })
   })

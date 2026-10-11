@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { ENROLLMENT_PATH, ENROLLMENT_PROTOCOL_VERSION, enrollmentResponseSchema, type EnrollmentRequest } from '@acorn/protocol/enrollment.ts'
+import {
+  ENROLLMENT_PATH,
+  ENROLLMENT_PROTOCOL_VERSION,
+  enrollmentResponseSchema,
+  type EnrollmentRequest,
+} from '@acorn/protocol/enrollment.ts'
 import type { AppDatabase } from './db'
 import type { DeviceService } from './auth/deviceTokens'
 import { recordAudit } from './audit'
@@ -65,7 +70,8 @@ export type EnrollmentDeps = {
  *  No token format is imposed. A control plane mints whatever it likes and this still yields a stable
  *  id both sides can match a record on, which matters because the format is the one part of this
  *  protocol a third party would otherwise have to copy from us. */
-export const enrollmentTokenId = (token: string): string => createHash('sha256').update(token).digest('hex').slice(0, 12)
+export const enrollmentTokenId = (token: string): string =>
+  createHash('sha256').update(token).digest('hex').slice(0, 12)
 
 /** Is this a control-plane URL worth posting a durable credential to?
  *
@@ -83,15 +89,22 @@ export function checkControlPlaneUrl(raw: string): { url: URL } | { reason: stri
   }
   if (url.protocol === 'https:') return { url }
   if (url.protocol !== 'http:') return { reason: `ACORN_CONTROL_PLANE_URL must be http or https, not ${url.protocol}` }
-  const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.hostname === '::1'
+  const loopback =
+    url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.hostname === '::1'
   if (loopback) return { url }
   return { reason: `ACORN_CONTROL_PLANE_URL must use https for a host other than loopback (got ${raw})` }
 }
 
-const enrollmentUrl = (base: URL): string => new URL(`${base.pathname.replace(/\/$/, '')}${ENROLLMENT_PATH}`, base).toString()
+const enrollmentUrl = (base: URL): string =>
+  new URL(`${base.pathname.replace(/\/$/, '')}${ENROLLMENT_PATH}`, base).toString()
 
 /** One attempt. Resolves with the acknowledgement, or throws with something worth writing down. */
-async function post(url: string, token: string, body: EnrollmentRequest, fetchImpl: typeof fetch): Promise<{ controlPlaneName?: string }> {
+async function post(
+  url: string,
+  token: string,
+  body: EnrollmentRequest,
+  fetchImpl: typeof fetch,
+): Promise<{ controlPlaneName?: string }> {
   const response = await fetchImpl(url, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },

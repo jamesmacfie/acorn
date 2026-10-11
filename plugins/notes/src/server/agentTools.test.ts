@@ -74,12 +74,16 @@ describe('notes agent tools', () => {
   // on any of the four tools, so an agent can't make a global note part of every other task's prompt.
   it('exposes no way to set included', () => {
     for (const tool of tools) {
-      expect(Object.keys((tool.input as unknown as { shape: Record<string, unknown> }).shape), tool.name).not.toContain('included')
+      expect(Object.keys((tool.input as unknown as { shape: Record<string, unknown> }).shape), tool.name).not.toContain(
+        'included',
+      )
     }
   })
 
   it('turns a task with no workspace into a tool error rather than a 500', async () => {
-    await expect(byName('notes_list').handler({ scope: 'workspace' }, { ...ctx, taskId: 'task-orphan' })).rejects.toThrow(/no note scope/)
+    await expect(
+      byName('notes_list').handler({ scope: 'workspace' }, { ...ctx, taskId: 'task-orphan' }),
+    ).rejects.toThrow(/no note scope/)
   })
 
   it('reports a missing note as not_found', async () => {

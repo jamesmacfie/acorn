@@ -14,9 +14,7 @@ export const memoryPlugin = (): NodePlugin => {
     name: 'memory',
     label: 'Memory',
     required: true,
-    emits: [
-      { verb: 'memories-changed', description: 'The project or private memory library changed' },
-    ],
+    emits: [{ verb: 'memories-changed', description: 'The project or private memory library changed' }],
     init: (ctx) => {
       registerMemoryEditor(ctx.events)
       const runtime = registerKnowledgeChannel(ctx.core, { emit: ctx.events.send })
@@ -25,20 +23,24 @@ export const memoryPlugin = (): NodePlugin => {
         list: async (scope) => {
           const rows = await runtime.list(scope.scope === 'project' ? scope.projectId : null)
           return rows
-            .filter((row) => scope.scope === 'project'
-              ? row.scope === 'project' && row.projectId === scope.projectId
-              : row.scope === 'private')
-            .map(({ id, scope, projectId, name, type, description, body, createdAt, updatedAt }): MemoryLibraryEntry => ({
-              id,
-              scope,
-              projectId,
-              name,
-              type,
-              description,
-              body,
-              createdAt,
-              updatedAt,
-            }))
+            .filter((row) =>
+              scope.scope === 'project'
+                ? row.scope === 'project' && row.projectId === scope.projectId
+                : row.scope === 'private',
+            )
+            .map(
+              ({ id, scope, projectId, name, type, description, body, createdAt, updatedAt }): MemoryLibraryEntry => ({
+                id,
+                scope,
+                projectId,
+                name,
+                type,
+                description,
+                body,
+                createdAt,
+                updatedAt,
+              }),
+            )
         },
       })
       ctx.capabilities.provide(AGENT_STANDING_CONTEXT, { build: runtime.standingContext })

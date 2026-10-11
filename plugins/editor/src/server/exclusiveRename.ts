@@ -11,16 +11,19 @@ type HelperManifest = { platform: string; arch: string; available: boolean; reas
 
 // Vite places the plugin in dist/chunks; desktop staging and the standalone tarball copy the
 // entire apps/node/dist directory. Tests can point at their own build artifact explicitly.
-const artifactDirectory = (): string => process.env.ACORN_EXCLUSIVE_RENAME_DIR
-  || join(dirname(fileURLToPath(import.meta.url)), '..')
+const artifactDirectory = (): string =>
+  process.env.ACORN_EXCLUSIVE_RENAME_DIR || join(dirname(fileURLToPath(import.meta.url)), '..')
 
 export async function exclusiveRenameAvailability(): Promise<TrashAvailability> {
-  if (platform() !== 'darwin' && platform() !== 'linux') return { available: false, reason: 'Exclusive rename is unavailable on this Node host.' }
+  if (platform() !== 'darwin' && platform() !== 'linux')
+    return { available: false, reason: 'Exclusive rename is unavailable on this Node host.' }
   const directory = artifactDirectory()
   try {
     const manifest = JSON.parse(await readFile(join(directory, 'exclusive-rename.json'), 'utf8')) as HelperManifest
-    if (!manifest.available) return { available: false, reason: manifest.reason || 'This Node build has no exclusive rename helper.' }
-    if (manifest.platform !== platform() || manifest.arch !== arch()) return { available: false, reason: 'This Node build has no exclusive rename helper for this host.' }
+    if (!manifest.available)
+      return { available: false, reason: manifest.reason || 'This Node build has no exclusive rename helper.' }
+    if (manifest.platform !== platform() || manifest.arch !== arch())
+      return { available: false, reason: 'This Node build has no exclusive rename helper for this host.' }
     await access(join(directory, 'exclusive-rename'), constants.X_OK)
     return { available: true }
   } catch {
@@ -33,7 +36,13 @@ export async function exclusiveRename(proc: ProcessRunner, from: string, to: str
   const support = await exclusiveRenameAvailability()
   if (!support.available) throw new Error(support.reason)
   const binary = join(artifactDirectory(), 'exclusive-rename')
-  const result = await proc.runProcess({ file: binary, args: [from, to], cwd: dirname(from), timeoutMs: 30_000, maxOutputBytes: 4_096 })
+  const result = await proc.runProcess({
+    file: binary,
+    args: [from, to],
+    cwd: dirname(from),
+    timeoutMs: 30_000,
+    maxOutputBytes: 4_096,
+  })
   if (result.code === 0) return
   if (result.code === 17) throw new Error('A file or folder already has that name.')
   if (result.code === 18) throw new Error('This Node volume does not support exclusive rename.')

@@ -33,7 +33,10 @@ export function ProjectColorInput(props: {
         onChange={(event) => {
           const well = event.currentTarget
           const write = props.onChange(well.value)
-          if (write instanceof Promise) void write.then((saved) => { if (saved === false) well.value = resolveProjectColor(props.color) ?? PROJECT_COLORS.gray })
+          if (write instanceof Promise)
+            void write.then((saved) => {
+              if (saved === false) well.value = resolveProjectColor(props.color) ?? PROJECT_COLORS.gray
+            })
         }}
       />
       <Show when={props.color}>

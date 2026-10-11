@@ -11,7 +11,7 @@ type ModelPage = { models: ModelCatalogEntry[]; nextCursor: string | null }
 type ModelRpc = Pick<JsonRpcProcess, 'request' | 'notify' | 'stop'>
 
 const asObject = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
 
 export function codexModelPage(value: unknown): ModelPage {
   const response = asObject(value)
@@ -22,17 +22,24 @@ export function codexModelPage(value: unknown): ModelPage {
     if (!id || row?.hidden === true) return []
     return [{ id, label: typeof row?.displayName === 'string' && row.displayName ? row.displayName : id }]
   })
-  return { models, nextCursor: typeof response.nextCursor === 'string' && response.nextCursor ? response.nextCursor : null }
+  return {
+    models,
+    nextCursor: typeof response.nextCursor === 'string' && response.nextCursor ? response.nextCursor : null,
+  }
 }
 
-export async function fetchCodexModels(command: string, open: (command: string) => ModelRpc = (command) => new JsonRpcProcess({
-  command,
-  args: ['app-server', '--stdio'],
-  cwd: tmpdir(),
-  env: brokerEnv({ passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
-  requestTimeoutMs: PROBE_TIMEOUT_MS,
-  maxBufferedBytes: 2 * 1024 * 1024,
-})): Promise<ModelCatalogEntry[]> {
+export async function fetchCodexModels(
+  command: string,
+  open: (command: string) => ModelRpc = (command) =>
+    new JsonRpcProcess({
+      command,
+      args: ['app-server', '--stdio'],
+      cwd: tmpdir(),
+      env: brokerEnv({ passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
+      requestTimeoutMs: PROBE_TIMEOUT_MS,
+      maxBufferedBytes: 2 * 1024 * 1024,
+    }),
+): Promise<ModelCatalogEntry[]> {
   const rpc = open(command)
   const timeout = setTimeout(() => void rpc.stop(), PROBE_TIMEOUT_MS)
   try {
@@ -44,7 +51,9 @@ export async function fetchCodexModels(command: string, open: (command: string) 
     const models = new Map<string, ModelCatalogEntry>()
     let cursor: string | null = null
     for (let pageNumber = 0; pageNumber < MAX_PAGES; pageNumber += 1) {
-      const page = codexModelPage(await rpc.request('model/list', { limit: 100, includeHidden: false, ...(cursor ? { cursor } : {}) }))
+      const page = codexModelPage(
+        await rpc.request('model/list', { limit: 100, includeHidden: false, ...(cursor ? { cursor } : {}) }),
+      )
       for (const model of page.models) models.set(model.id, model)
       if (!page.nextCursor) return [...models.values()]
       cursor = page.nextCursor
@@ -63,11 +72,16 @@ export function codexModels(command: string): Promise<{ models: ModelCatalogEntr
   const now = Date.now()
   if (cached && now - cached.at < CACHE_MS) return Promise.resolve({ models: cached.models })
   if (pending) return pending
-  pending = fetchCodexModels(command).then((models) => {
-    cached = { models, at: Date.now() }
-    return { models }
-  }).catch(() => {
-    return { models: cached?.models ?? [], unavailable: true }
-  }).finally(() => { pending = null })
+  pending = fetchCodexModels(command)
+    .then((models) => {
+      cached = { models, at: Date.now() }
+      return { models }
+    })
+    .catch(() => {
+      return { models: cached?.models ?? [], unavailable: true }
+    })
+    .finally(() => {
+      pending = null
+    })
   return pending
 }

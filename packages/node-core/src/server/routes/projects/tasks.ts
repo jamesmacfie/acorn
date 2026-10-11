@@ -44,9 +44,8 @@ const cleanIcon = (v: unknown): string | null => (typeof v === 'string' && ICON_
 
 function rowToTask(row: Row, links: TaskLink[], project: Awaited<ReturnType<typeof getProject>>): Task | null {
   const projectId = row.projectId
-  const github = project?.githubOwner && project.githubName
-    ? { owner: project.githubOwner, name: project.githubName }
-    : null
+  const github =
+    project?.githubOwner && project.githubName ? { owner: project.githubOwner, name: project.githubName } : null
   return {
     id: row.id,
     title: row.title,
@@ -82,21 +81,35 @@ const taskSeedBody = z.object({
   branchSource: z.enum(['derived', 'exact']).optional(),
   baseBranch: z.string().min(1).optional(),
   baseCommit: z.string().min(1).optional(),
-  targetIdentity: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  targetIdentity: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
   worktreePath: z.string().min(1).optional(),
   skipSetup: z.boolean().optional(),
   pullNumber: z.int().positive().optional(),
-  links: z.array(z.object({
-    connectionId: z.string().min(1),
-    identifier: z.string().min(1),
-    providerId: z.string().optional(),
-    ref: z.record(z.string(), z.unknown()).optional(),
-  })).optional(),
+  links: z
+    .array(
+      z.object({
+        connectionId: z.string().min(1),
+        identifier: z.string().min(1),
+        providerId: z.string().optional(),
+        ref: z.record(z.string(), z.unknown()).optional(),
+      }),
+    )
+    .optional(),
 })
 
-const parseLinkInput = (input: LinkInput): { connectionId: string; identifier: string; ref?: Partial<ExternalRef>; claimedProviderId?: string } | null => {
+const parseLinkInput = (
+  input: LinkInput,
+): { connectionId: string; identifier: string; ref?: Partial<ExternalRef>; claimedProviderId?: string } | null => {
   if (!input.connectionId || !input.identifier) return null
-  return { connectionId: input.connectionId, identifier: input.identifier, ref: input.ref, claimedProviderId: input.providerId }
+  return {
+    connectionId: input.connectionId,
+    identifier: input.identifier,
+    ref: input.ref,
+    claimedProviderId: input.providerId,
+  }
 }
 
 const rowLink = (row: typeof schema.taskLinks.$inferSelect): TaskLink => {
@@ -104,7 +117,8 @@ const rowLink = (row: typeof schema.taskLinks.$inferSelect): TaskLink => {
   try {
     const fallback = { providerId: row.provider, connectionId: row.integrationId, displayId: row.identifier }
     ref = row.refJson
-      ? integrationProviderRegistry.get(row.provider)?.externalIds.parse(JSON.parse(row.refJson), fallback) ?? undefined
+      ? (integrationProviderRegistry.get(row.provider)?.externalIds.parse(JSON.parse(row.refJson), fallback) ??
+        undefined)
       : undefined
   } catch {
     ref = undefined
@@ -114,11 +128,20 @@ const rowLink = (row: typeof schema.taskLinks.$inferSelect): TaskLink => {
 
 async function stampedLink(db: ReturnType<typeof getDb>, userId: string, input: LinkInput) {
   const parsed = parseLinkInput(input)
-  if (!parsed) throw new ProviderOperationError('provider_bad_config', 400, 'A task link needs both a connectionId and an identifier.')
+  if (!parsed)
+    throw new ProviderOperationError(
+      'provider_bad_config',
+      400,
+      'A task link needs both a connectionId and an identifier.',
+    )
   const connection = await getConnection(db, userId, parsed.connectionId)
   if (!connection) throw new ProviderOperationError('provider_not_connected', 403)
   if (parsed.claimedProviderId && parsed.claimedProviderId !== connection.provider) {
-    throw new ProviderOperationError('provider_bad_config', 400, `The link claims provider '${parsed.claimedProviderId}', but connection ${connection.id} is a ${connection.provider} connection.`)
+    throw new ProviderOperationError(
+      'provider_bad_config',
+      400,
+      `The link claims provider '${parsed.claimedProviderId}', but connection ${connection.id} is a ${connection.provider} connection.`,
+    )
   }
   const ref = externalRefForConnection(connection, parsed.identifier, parsed.ref)
   return {
@@ -143,7 +166,11 @@ export const tasks = new Hono<AppEnv>()
     const db = getDb(c.env)
     const archived = c.req.query('status') === 'archived'
     const all = archived
-      ? await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'archived')).orderBy(desc(schema.tasks.archivedAt))
+      ? await db
+          .select()
+          .from(schema.tasks)
+          .where(eq(schema.tasks.status, 'archived'))
+          .orderBy(desc(schema.tasks.archivedAt))
       : await db.select().from(schema.tasks).where(eq(schema.tasks.status, 'active')).orderBy(schema.tasks.sort)
     const rows = isTaskConfined(c) ? all.filter((row) => mayActOnTask(c, row.id)) : all
     if (!rows.length) return c.json([] as Task[])
@@ -166,9 +193,9 @@ export const tasks = new Hono<AppEnv>()
       }
     }
     const list = rows.flatMap((r) => {
-      const task = rowToTask(r, byTask.get(r.id) ?? [], r.projectId ? projects.get(r.projectId) ?? null : null)
+      const task = rowToTask(r, byTask.get(r.id) ?? [], r.projectId ? (projects.get(r.projectId) ?? null) : null)
       if (!task) return []
-      return [archived ? { ...task, archivedAt: r.archivedAt ?? r.updatedAt } satisfies ArchivedTask : task]
+      return [archived ? ({ ...task, archivedAt: r.archivedAt ?? r.updatedAt } satisfies ArchivedTask) : task]
     })
     return c.json(list)
   })
@@ -200,66 +227,109 @@ export const tasks = new Hono<AppEnv>()
     // because resolveTaskCwd only runs it for a worktree it created.
     let worktreePath: string | null = null
     let attachedBranch: string | null = null
-    if (Number(seed.baseBranch !== undefined) + Number(seed.baseCommit !== undefined) + Number(seed.worktreePath !== undefined) > 1) return respondError(c, 400, 'bad_request', ['Choose one starting point or existing worktree.'])
+    if (
+      Number(seed.baseBranch !== undefined) +
+        Number(seed.baseCommit !== undefined) +
+        Number(seed.worktreePath !== undefined) >
+      1
+    )
+      return respondError(c, 400, 'bad_request', ['Choose one starting point or existing worktree.'])
     if (seed.worktreePath && isTaskConfined(c)) return respondError(c, 403, 'forbidden')
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
     const now = Date.now()
     const id = randomUUID()
     let branch = attachedBranch ?? (project.vcs === 'git' ? seed.branch || null : null)
     const projectLabel = project.githubName ?? project.name
-    const title = seed.title?.trim() || (seed.pullNumber ? `#${seed.pullNumber} ${projectLabel}` : branch ? `${project.name} · ${branch}` : project.name)
+    const title =
+      seed.title?.trim() ||
+      (seed.pullNumber ? `#${seed.pullNumber} ${projectLabel}` : branch ? `${project.name} · ${branch}` : project.name)
     const sort = (value ?? -1) + 1
     const icon = cleanIcon(seed.icon)
     const save = (allocatedBranch: string | null) => {
-      db.insert(schema.tasks).values({
-        id,
-        title,
-        icon,
-        origin: seed.origin,
-        projectId: project.id,
-        branch: allocatedBranch,
-        skipSetup: seed.skipSetup ?? false,
-        pullNumber: seed.pullNumber ?? null,
-        worktreePath,
-        status: 'active',
-        sort,
-        createdAt: now,
-        updatedAt: now,
-        archivedAt: null,
-      }).run()
+      db.insert(schema.tasks)
+        .values({
+          id,
+          title,
+          icon,
+          origin: seed.origin,
+          projectId: project.id,
+          branch: allocatedBranch,
+          skipSetup: seed.skipSetup ?? false,
+          pullNumber: seed.pullNumber ?? null,
+          worktreePath,
+          status: 'active',
+          sort,
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+        })
+        .run()
       return allocatedBranch
     }
     const { saveTaskBranch, TaskBranchError, withBranchReservation } = await import('../../worktrees/taskBranch')
     try {
-      branch = await withBranchReservation(db, project, async () => {
-        const currentProject = await getProject(db, seed.projectId)
-        if (!currentProject || currentProject.path !== project.path || currentProject.vcs !== project.vcs) {
-          throw new TaskBranchError(409, 'The project mapping changed. Reopen the task draft.')
-        }
-        if (seed.worktreePath) {
-          let wanted: string
-          try { wanted = realpathSync(seed.worktreePath) }
-          catch { throw new TaskBranchError(409, 'That worktree is no longer registered on this project.') }
-          const match = (await unclaimedWorktrees(db, currentProject)).find((wt) => {
-            try { return realpathSync(wt.path) === wanted }
-            catch { return false }
-          })
-          if (!match) throw new TaskBranchError(409, 'That worktree is not a free worktree of this project.')
-          worktreePath = match.path
-          attachedBranch = match.branch
-          return save(attachedBranch)
-        }
-        return saveTaskBranch(db, currentProject, { branch, branchSource: seed.branchSource, baseBranch: seed.baseBranch,
-          baseCommit: seed.baseCommit, targetIdentity: seed.targetIdentity }, save)
-      }, !seed.baseBranch && !seed.baseCommit && !seed.worktreePath)
+      branch = await withBranchReservation(
+        db,
+        project,
+        async () => {
+          const currentProject = await getProject(db, seed.projectId)
+          if (!currentProject || currentProject.path !== project.path || currentProject.vcs !== project.vcs) {
+            throw new TaskBranchError(409, 'The project mapping changed. Reopen the task draft.')
+          }
+          if (seed.worktreePath) {
+            let wanted: string
+            try {
+              wanted = realpathSync(seed.worktreePath)
+            } catch {
+              throw new TaskBranchError(409, 'That worktree is no longer registered on this project.')
+            }
+            const match = (await unclaimedWorktrees(db, currentProject)).find((wt) => {
+              try {
+                return realpathSync(wt.path) === wanted
+              } catch {
+                return false
+              }
+            })
+            if (!match) throw new TaskBranchError(409, 'That worktree is not a free worktree of this project.')
+            worktreePath = match.path
+            attachedBranch = match.branch
+            return save(attachedBranch)
+          }
+          return saveTaskBranch(
+            db,
+            currentProject,
+            {
+              branch,
+              branchSource: seed.branchSource,
+              baseBranch: seed.baseBranch,
+              baseCommit: seed.baseCommit,
+              targetIdentity: seed.targetIdentity,
+            },
+            save,
+          )
+        },
+        !seed.baseBranch && !seed.baseCommit && !seed.worktreePath,
+      )
     } catch (error) {
-      if (error instanceof TaskBranchError) return respondError(c, error.status, error.status === 400 ? 'bad_request' : 'worktree-unavailable', [error.message])
+      if (error instanceof TaskBranchError)
+        return respondError(c, error.status, error.status === 400 ? 'bad_request' : 'worktree-unavailable', [
+          error.message,
+        ])
       throw error
     }
     if (links.length) {
       await db
         .insert(schema.taskLinks)
-        .values(links.map((l) => ({ taskId: id, integrationId: l.connectionId, provider: l.providerId, identifier: l.identifier, refJson: l.ref ? JSON.stringify(l.ref) : null, createdAt: now })))
+        .values(
+          links.map((l) => ({
+            taskId: id,
+            integrationId: l.connectionId,
+            provider: l.providerId,
+            identifier: l.identifier,
+            refJson: l.ref ? JSON.stringify(l.ref) : null,
+            createdAt: now,
+          })),
+        )
         .onConflictDoNothing()
       warmItemDetails({ db, secrets: c.env.SECRETS }, uid, links)
     }
@@ -270,7 +340,25 @@ export const tasks = new Hono<AppEnv>()
     broadcastTasksChanged({ taskId: id })
     return c.json(
       rowToTask(
-        { id, scriptGeneration: 1, scriptHistoryKnown: true, title, icon, origin: seed.origin, projectId: project.id, branch, skipSetup: seed.skipSetup ?? false, pullNumber: seed.pullNumber ?? null, worktreePath, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
+        {
+          id,
+          scriptGeneration: 1,
+          scriptHistoryKnown: true,
+          title,
+          icon,
+          origin: seed.origin,
+          projectId: project.id,
+          branch,
+          skipSetup: seed.skipSetup ?? false,
+          pullNumber: seed.pullNumber ?? null,
+          worktreePath,
+          status: 'active',
+          parentId: null,
+          sort,
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
+        },
         links,
         project,
       ),
@@ -303,14 +391,17 @@ export const tasks = new Hono<AppEnv>()
     const archiveTree = patch.status === 'archived' ? taskArchiveTree(db, id) : []
     if (archiveTree.some((task) => !mayActOnTask(c, task.id))) return respondError(c, 404, 'not_found')
     const archivedTasks = archiveTree.filter((task) => task.status !== 'archived')
-    const update = async () => db.transaction((tx) => {
-      tx.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id)).run()
-      for (const task of archivedTasks) {
-        if (task.id !== id) tx.update(schema.tasks)
-          .set({ status: 'archived', archivedAt: patch.archivedAt, updatedAt: patch.updatedAt })
-          .where(eq(schema.tasks.id, task.id)).run()
-      }
-    })
+    const update = async () =>
+      db.transaction((tx) => {
+        tx.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id)).run()
+        for (const task of archivedTasks) {
+          if (task.id !== id)
+            tx.update(schema.tasks)
+              .set({ status: 'archived', archivedAt: patch.archivedAt, updatedAt: patch.updatedAt })
+              .where(eq(schema.tasks.id, task.id))
+              .run()
+        }
+      })
     if (patch.status) {
       const admission = checkoutAdmissionFor(db)
       if (admission) await admission.admitWork(id, update)
@@ -326,12 +417,16 @@ export const tasks = new Hono<AppEnv>()
       if (task.id !== id) broadcastTasksChanged({ taskId: task.id })
     }
     const publicStateChanged =
-      (patch.title !== undefined && patch.title !== existing.title)
-      || (patch.icon !== undefined && patch.icon !== existing.icon)
-      || (patch.status !== undefined && patch.status !== existing.status)
-      || (patch.pullNumber !== undefined && patch.pullNumber !== existing.pullNumber)
+      (patch.title !== undefined && patch.title !== existing.title) ||
+      (patch.icon !== undefined && patch.icon !== existing.icon) ||
+      (patch.status !== undefined && patch.status !== existing.status) ||
+      (patch.pullNumber !== undefined && patch.pullNumber !== existing.pullNumber)
     if (publicStateChanged) broadcastTasksChanged({ taskId: id })
-    return c.json({ id, ...patch, ...(archiveTree.length ? { archivedTaskIds: archivedTasks.map((task) => task.id) } : {}) })
+    return c.json({
+      id,
+      ...patch,
+      ...(archiveTree.length ? { archivedTaskIds: archivedTasks.map((task) => task.id) } : {}),
+    })
   })
   // Links grow/shrink after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
   // with its birth links" into "a task that accumulates context as work unfolds". Mirrors the
@@ -351,7 +446,14 @@ export const tasks = new Hono<AppEnv>()
     }
     const [inserted] = await db
       .insert(schema.taskLinks)
-      .values({ taskId: id, integrationId: link.connectionId, provider: link.providerId, identifier: link.identifier, refJson: link.ref ? JSON.stringify(link.ref) : null, createdAt: Date.now() })
+      .values({
+        taskId: id,
+        integrationId: link.connectionId,
+        provider: link.providerId,
+        identifier: link.identifier,
+        refJson: link.ref ? JSON.stringify(link.ref) : null,
+        createdAt: Date.now(),
+      })
       .onConflictDoNothing()
       .returning({ taskId: schema.taskLinks.taskId })
     if (inserted) {
@@ -362,7 +464,9 @@ export const tasks = new Hono<AppEnv>()
   })
   .delete('/:id/links', async (c) => {
     const id = c.req.param('id')
-    const body = (await c.req.json().catch(() => ({}))) as Partial<Pick<TaskLink, 'connectionId' | 'identifier'>> & { integrationId?: string }
+    const body = (await c.req.json().catch(() => ({}))) as Partial<Pick<TaskLink, 'connectionId' | 'identifier'>> & {
+      integrationId?: string
+    }
     const connectionId = body.connectionId ?? body.integrationId
     if (!connectionId || !body.identifier) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)

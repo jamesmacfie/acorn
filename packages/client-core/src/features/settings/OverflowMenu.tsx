@@ -23,12 +23,22 @@ export default function OverflowMenu(props: OverflowMenuProps) {
     >
       {(menu) => (
         <>
-          <Menu.Item context={menu} onSelect={() => props.onSettings()}>Settings</Menu.Item>
-          {props.onCopyLink && <Menu.Item context={menu} onSelect={() => props.onCopyLink?.()}>Copy link</Menu.Item>}
+          <Menu.Item context={menu} onSelect={() => props.onSettings()}>
+            Settings
+          </Menu.Item>
+          {props.onCopyLink && (
+            <Menu.Item context={menu} onSelect={() => props.onCopyLink?.()}>
+              Copy link
+            </Menu.Item>
+          )}
           <Menu.Separator />
-          <Menu.Item context={menu} onSelect={() => void props.onClearCache()}>Clear cache</Menu.Item>
+          <Menu.Item context={menu} onSelect={() => void props.onClearCache()}>
+            Clear cache
+          </Menu.Item>
           {/* ponytail: a plain reload, no prop threaded through — the host has nothing to add to it. */}
-          <Menu.Item context={menu} onSelect={() => window.location.reload()}>Reload window</Menu.Item>
+          <Menu.Item context={menu} onSelect={() => window.location.reload()}>
+            Reload window
+          </Menu.Item>
         </>
       )}
     </Menu>

@@ -35,7 +35,8 @@ export function decodeGitPath(path: string): string {
 }
 
 function validatePath(path: string, decoded = false): string {
-  if (!path || path.includes('\0') || (!decoded && path.includes('\ufffd'))) throw new Error('Unsupported Git path encoding.')
+  if (!path || path.includes('\0') || (!decoded && path.includes('\ufffd')))
+    throw new Error('Unsupported Git path encoding.')
   return path
 }
 

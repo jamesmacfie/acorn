@@ -3,12 +3,39 @@ import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate, useSearchParams } from '@solidjs/router'
 import {
-  clientCapability, deletedTasksOptions, openPane, pathForTask, refreshSessionSources, requestTerminalFocusIntent, setTerminalOpen,
-  type Task, tasksOptions,
+  clientCapability,
+  deletedTasksOptions,
+  openPane,
+  pathForTask,
+  refreshSessionSources,
+  requestTerminalFocusIntent,
+  setTerminalOpen,
+  type Task,
+  tasksOptions,
 } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal,
-  Stack, Table, TableCell, TableHead, TableRow, Text, Textarea, Toolbar,
+  Alert,
+  Badge,
+  Button,
+  CodeBlock,
+  ConfirmButton,
+  EmptyState,
+  Facts,
+  Fold,
+  Heading,
+  Icon,
+  Inline,
+  Link,
+  Log,
+  Modal,
+  Stack,
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+  Text,
+  Textarea,
+  Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
@@ -20,7 +47,16 @@ import type { WorkflowStepProjection } from '../../shared/api'
 import { gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
 import type { WorkflowGateForm } from '../../shared/workflowContracts'
 import TypedValueField from '../editor/TypedValueField'
-import { formatCost, formatDuration, kindLabel, kindRunsAgent, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
+import {
+  formatCost,
+  formatDuration,
+  kindLabel,
+  kindRunsAgent,
+  statusLabel,
+  stepElapsed,
+  stepGlyph,
+  stepTone,
+} from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 import GoalDetails from './GoalDetails'
 import { ChildRuns, RunLineage } from './RunRelationships'
@@ -63,12 +99,19 @@ type StepInputs = { prompt?: string; childTaskId?: string }
 
 /** Which body to draw. The kind's own id, narrowed to the six shapes this pane knows how to read. */
 const shapeOf = (kind: string): 'gate' | 'command' | 'run-target' | 'data' | 'http' | 'agent' | 'other' =>
-  kind === 'gate-human' ? 'gate'
-    : kind === 'terminal:command' ? 'command'
-      : kind === 'terminal:run-target' ? 'run-target'
-        : kind.startsWith('database:') ? 'data'
-          : kind === 'http:request' ? 'http'
-            : kindRunsAgent(kind) ? 'agent' : 'other'
+  kind === 'gate-human'
+    ? 'gate'
+    : kind === 'terminal:command'
+      ? 'command'
+      : kind === 'terminal:run-target'
+        ? 'run-target'
+        : kind.startsWith('database:')
+          ? 'data'
+          : kind === 'http:request'
+            ? 'http'
+            : kindRunsAgent(kind)
+              ? 'agent'
+              : 'other'
 
 const pretty = (value: unknown): string => JSON.stringify(value, null, 2)
 
@@ -76,7 +119,9 @@ const FAILED = new Set(['failed', 'safety-rail'])
 
 /** What a stopped step's error is headed with: its status as a sentence, not "this node stopped". */
 const STOPPED_TITLE: Record<string, string> = {
-  failed: 'This step failed', 'safety-rail': 'This step stopped at a limit', cancelled: 'This step was cancelled',
+  failed: 'This step failed',
+  'safety-rail': 'This step stopped at a limit',
+  cancelled: 'This step was cancelled',
   'completed-with-failures': 'This step finished with failures',
 }
 
@@ -142,14 +187,14 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     const returnTask = searchValue(search.workflowReturnTask)
     const returnRun = searchValue(search.workflowReturnRun)
     const returnRecord = searchValue(search.workflowReturnRecord)
-    const task = (tasks.data ?? []).find(candidate => candidate.id === returnTask)
+    const task = (tasks.data ?? []).find((candidate) => candidate.id === returnTask)
     if (!task || !returnRun || !returnRecord) return
     const query = new URLSearchParams({ pane: 'workflows', item: returnRun, workflowRecord: returnRecord })
     navigate(`${pathForTask(task)}?${query}`)
   }
   const returnTaskAvailable = (): boolean => {
     const returnTask = searchValue(search.workflowReturnTask)
-    return !!returnTask && (tasks.data ?? []).some(candidate => candidate.id === returnTask)
+    return !!returnTask && (tasks.data ?? []).some((candidate) => candidate.id === returnTask)
   }
 
   const resumeInTerminal = async (name: string, profileId: string | null, command: string): Promise<void> => {
@@ -182,8 +227,14 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   // would stop the toolbar moving as the step's status does.
   const meta = (current: () => WorkflowStepRow) => (
     <Text emphasis="muted">
-      {[model.contributedKindLabel(current().kind) ?? kindLabel(current().kind), statusLabel(current().status), formatCost(current().costUsd ?? 0), stepElapsed(current(), model.now())]
-        .filter(Boolean).join(' · ')}
+      {[
+        model.contributedKindLabel(current().kind) ?? kindLabel(current().kind),
+        statusLabel(current().status),
+        formatCost(current().costUsd ?? 0),
+        stepElapsed(current(), model.now()),
+      ]
+        .filter(Boolean)
+        .join(' · ')}
     </Text>
   )
 
@@ -192,7 +243,9 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
       <Show when={model.error()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
       <Show when={current().error}>
         {(message) => (
-          <Alert tone={failed() ? 'danger' : 'warn'} title={STOPPED_TITLE[current().status] ?? 'This step stopped'}>{message()}</Alert>
+          <Alert tone={failed() ? 'danger' : 'warn'} title={STOPPED_TITLE[current().status] ?? 'This step stopped'}>
+            {message()}
+          </Alert>
         )}
       </Show>
     </>
@@ -212,18 +265,26 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           command, and the node has already refused one whose session id is not a plain token. */}
       <Show when={!current().agentSessionId && current().resumeCommand}>
         {(command) => (
-          <Button size="sm" disabled={model.busy()} onPress={() => void resumeInTerminal(current().name, current().profileId, command())}>
+          <Button
+            size="sm"
+            disabled={model.busy()}
+            onPress={() => void resumeInTerminal(current().name, current().profileId, command())}
+          >
             Open in terminal
           </Button>
         )}
       </Show>
       <Show when={shape() === 'run-target' && (structured() as RunTargetOutput | null)?.sessionId}>
         {(sessionId) => (
-          <Button size="sm" disabled={model.busy()} onPress={() => openTerminal(sessionId())}>Open terminal</Button>
+          <Button size="sm" disabled={model.busy()} onPress={() => openTerminal(sessionId())}>
+            Open terminal
+          </Button>
         )}
       </Show>
       <Show when={current().status === 'running'}>
-        <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.kill(current().id)}>Stop step</Button>
+        <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.kill(current().id)}>
+          Stop step
+        </Button>
       </Show>
       <Show when={failed()}>
         <Show when={shape() === 'agent'}>
@@ -235,7 +296,11 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           size="sm"
           variant="solid"
           disabled={model.busy()}
-          title={(current() as WorkflowStepProjection).children?.length ? 'Retry reuses the child tasks and runs. It doesn\'t make new ones.' : undefined}
+          title={
+            (current() as WorkflowStepProjection).children?.length
+              ? "Retry reuses the child tasks and runs. It doesn't make new ones."
+              : undefined
+          }
           onPress={() => void model.retry(current().id)}
         >
           Retry
@@ -258,15 +323,26 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           />
         </Modal.Body>
         <Modal.Actions>
-          <Button variant="ghost" onPress={() => setRetrying(null)}>Cancel</Button>
-          <Button variant="solid" onPress={() => submitRetry(retrying() ?? undefined)}>Retry</Button>
+          <Button variant="ghost" onPress={() => setRetrying(null)}>
+            Cancel
+          </Button>
+          <Button variant="solid" onPress={() => submitRetry(retrying() ?? undefined)}>
+            Retry
+          </Button>
         </Modal.Actions>
       </Modal>
     </Show>
   )
 
   const childTaskLine = () => (
-    <Show when={childTask()} fallback={<Show when={childTaskDeleted()}><Text>Runs in its own task: Deleted task</Text></Show>}>
+    <Show
+      when={childTask()}
+      fallback={
+        <Show when={childTaskDeleted()}>
+          <Text>Runs in its own task: Deleted task</Text>
+        </Show>
+      }
+    >
       {(child) => (
         <Text>
           Runs in its own task: <Link onPress={() => navigate(pathForTask(child()))}>{child().title}</Link>
@@ -283,9 +359,16 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   let revision = 0
   const bodyProps = createMemo(() => {
     const current = step()
-    return current && stepBodyProps({
-      taskId: props.task.id, projectId: props.task.projectId, step: current, tail: model.tailFor(current.id), revision: ++revision,
-    })
+    return (
+      current &&
+      stepBodyProps({
+        taskId: props.task.id,
+        projectId: props.task.projectId,
+        step: current,
+        tail: model.tailFor(current.id),
+        revision: ++revision,
+      })
+    )
   })
   const [contributed, setContributed] = createSignal(false)
   // Said by this pane, because a provider that was given nothing may not say why.
@@ -300,7 +383,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   const stepBody = (current: () => WorkflowStepRow) => (
     <Show
       when={current().kind === 'workflow-map' && model.selectedRunId()}
-      fallback={(
+      fallback={
         <>
           <Slot
             point={WORKFLOW_STEP_BODY_POINT}
@@ -328,7 +411,13 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 <AgentBody step={current()} structured={structured()} />
               </Match>
               <Match when={shape() === 'other'}>
-                <Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>
+                <Show when={structured()}>
+                  {(value) => (
+                    <CodeBlock wrap maxHeight="block">
+                      {pretty(value())}
+                    </CodeBlock>
+                  )}
+                </Show>
               </Match>
             </Switch>
           </Slot>
@@ -336,7 +425,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
             {(explanation) => <Text emphasis="muted">{explanation()}</Text>}
           </Show>
         </>
-      )}
+      }
     >
       {(runId) => (
         <RunRecords
@@ -353,23 +442,28 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
 
   // What a turn sent from here actually does. The step waits on its own turn and nothing else, so a
   // turn typed now queues behind it and runs once the run has already recorded the step as done.
-  const note = (current: () => WorkflowStepRow) => current().status === 'running'
-    ? 'This step is still working. A message you send now runs after it finishes, once the run has moved on.'
-    : undefined
+  const note = (current: () => WorkflowStepRow) =>
+    current().status === 'running'
+      ? 'This step is still working. A message you send now runs after it finishes, once the run has moved on.'
+      : undefined
 
   // Why there is no conversation, when there is none. Only two reasons: the step has not run, or it
   // ran outside a managed session, which is what a profile with no managed driver does. Said here
   // rather than in the conversation, because the reason is this pane's to know.
-  const noSession = (current: () => WorkflowStepRow) => current().status === 'pending'
-    ? 'This step has not started yet.'
-    : 'This step ran without a conversation, so there\'s no transcript. Its output is under Step details.'
+  const noSession = (current: () => WorkflowStepRow) =>
+    current().status === 'pending'
+      ? 'This step has not started yet.'
+      : "This step ran without a conversation, so there's no transcript. Its output is under Step details."
 
   return (
-    <Show when={step()} fallback={<EmptyState title="No step selected">Choose a step to see what it's doing.</EmptyState>}>
+    <Show
+      when={step()}
+      fallback={<EmptyState title="No step selected">Choose a step to see what it's doing.</EmptyState>}
+    >
       {(current) => (
         <Show
           when={drawsConversation()}
-          fallback={(
+          fallback={
             <>
               {/* A fragment, so the bar is the region's own child. The region caps its children at the
                   reading width and lets only a bar reach the edges. Inside the Stack, this one stopped short. */}
@@ -389,46 +483,63 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 <Show when={search.workflowReturnRun && search.workflowReturnRecord}>
                   <Show
                     when={returnTaskAvailable()}
-                    fallback={<Text emphasis="muted">The original task is archived or gone. Its record history is still here.</Text>}
+                    fallback={
+                      <Text emphasis="muted">
+                        The original task is archived or gone. Its record history is still here.
+                      </Text>
+                    }
                   >
-                    <Button size="sm" variant="bare" onPress={returnToRecord}>Back to selected record</Button>
+                    <Button size="sm" variant="bare" onPress={returnToRecord}>
+                      Back to selected record
+                    </Button>
                   </Show>
                 </Show>
                 {alerts(current)}
                 {childTaskLine()}
                 <Show when={current().kind !== 'workflow-map'}>
-                  <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
+                  <ChildRuns
+                    step={current() as WorkflowStepProjection}
+                    tasks={tasks.data ?? []}
+                    onOpen={openTaskTarget}
+                  />
                 </Show>
 
                 <Show when={shape() === 'gate'} fallback={stepBody(current)}>
                   <Show
                     when={model.gateForm(current() as WorkflowStepProjection)}
-                    fallback={(
-                      <Show when={current().status === 'waiting-gate'} fallback={<Text emphasis="muted">{gateOutcome(current().status)}</Text>}>
+                    fallback={
+                      <Show
+                        when={current().status === 'waiting-gate'}
+                        fallback={<Text emphasis="muted">{gateOutcome(current().status)}</Text>}
+                      >
                         <Stack gap="row">
                           <Text>Waiting for you.</Text>
                           <GateAnswer model={model} />
                         </Stack>
                       </Show>
-                    )}
+                    }
                   >
                     {(form) => <GateFormBody step={current()} form={form()} model={model} />}
                   </Show>
                 </Show>
 
                 <Show when={(model.droppedEventsFor?.(current().id) ?? 0) > 0}>
-                  <Text tone="muted">{model.droppedEventsFor(current().id)} earlier live events are outside the display window.</Text>
+                  <Text tone="muted">
+                    {model.droppedEventsFor(current().id)} earlier live events are outside the display window.
+                  </Text>
                 </Show>
                 <Show when={otherEvents().length}>
                   <Fold label="Events" count={otherEvents().length}>
-                    <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
+                    <CodeBlock wrap maxHeight="block">
+                      {otherEvents().map(pretty).join('\n')}
+                    </CodeBlock>
                   </Fold>
                 </Show>
 
                 {retryModal()}
               </Stack>
             </>
-          )}
+          }
         >
           {/* The agent shape. A fragment, because the conversation below owns the scroll and takes
               the height that is left. */}
@@ -464,13 +575,21 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 ]}
               />
               <Show when={structured()}>
-                {(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}
+                {(value) => (
+                  <CodeBlock wrap maxHeight="block">
+                    {pretty(value())}
+                  </CodeBlock>
+                )}
               </Show>
               <Show when={(model.droppedEventsFor?.(current().id) ?? 0) > 0}>
-                <Text tone="muted">{model.droppedEventsFor(current().id)} earlier live events are outside the display window.</Text>
+                <Text tone="muted">
+                  {model.droppedEventsFor(current().id)} earlier live events are outside the display window.
+                </Text>
               </Show>
               <Show when={otherEvents().length}>
-                <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
+                <CodeBlock wrap maxHeight="block">
+                  {otherEvents().map(pretty).join('\n')}
+                </CodeBlock>
               </Show>
             </Stack>
           </Fold>
@@ -506,20 +625,27 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
     props.model.setGateDraft(props.step.id, { ...draft(), [name]: value })
   }
   const edited = (name: string): boolean => encode(draft()[name]) !== encode(proposal()[name])
-  const problems = createMemo(() => gateFormProblems(props.form, Object.fromEntries(
-    Object.entries(draft()).filter(([, value]) => value !== undefined),
-  )))
+  const problems = createMemo(() =>
+    gateFormProblems(
+      props.form,
+      Object.fromEntries(Object.entries(draft()).filter(([, value]) => value !== undefined)),
+    ),
+  )
   const blocked = () => unparsed().size > 0 || Object.keys(problems()).length > 0
   const label = (field: WorkflowGateForm['fields'][number]) => field.label || field.name
 
   return (
     <Show
       when={props.step.status === 'waiting-gate'}
-      fallback={(
+      fallback={
         <Show when={approved()} fallback={<Text emphasis="muted">{gateOutcome(props.step.status)}</Text>}>
           {(output) => (
             <Stack gap="row">
-              <Text emphasis="muted">{output().approved === 'autonomous' ? 'Approved on its own, because this run skips approvals.' : 'Approved.'}</Text>
+              <Text emphasis="muted">
+                {output().approved === 'autonomous'
+                  ? 'Approved on its own, because this run skips approvals.'
+                  : 'Approved.'}
+              </Text>
               <Facts
                 grouping="rows"
                 size="sm"
@@ -531,7 +657,7 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
             </Stack>
           )}
         </Show>
-      )}
+      }
     >
       <Stack gap="row">
         <Text>Check these values, correct any that are wrong, then approve.</Text>
@@ -547,17 +673,28 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
                 disabled={props.model.busy()}
                 value={draft()[field.name]}
                 onChange={(value) => set(field.name, value)}
-                onValidity={(valid) => setUnparsed((names) => {
-                  const next = new Set(names)
-                  if (valid) next.delete(field.name)
-                  else next.add(field.name)
-                  return next
-                })}
+                onValidity={(valid) =>
+                  setUnparsed((names) => {
+                    const next = new Set(names)
+                    if (valid) next.delete(field.name)
+                    else next.add(field.name)
+                    return next
+                  })
+                }
               />
               <Show when={edited(field.name)}>
                 <Inline gap="inline">
-                  <Badge tone="accent" size="xs">Edited</Badge>
-                  <Button size="xs" variant="ghost" disabled={props.model.busy()} onPress={() => set(field.name, proposal()[field.name])}>Reset</Button>
+                  <Badge tone="accent" size="xs">
+                    Edited
+                  </Badge>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    disabled={props.model.busy()}
+                    onPress={() => set(field.name, proposal()[field.name])}
+                  >
+                    Reset
+                  </Button>
                 </Inline>
               </Show>
             </Stack>
@@ -571,24 +708,41 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
 
 /** A gate that is no longer waiting, in a word. */
 const gateOutcome = (status: string): string =>
-  status === 'done' ? 'Approved.' : status === 'cancelled' ? 'Cancelled.' : status === 'failed' ? 'Rejected.' : `${statusLabel(status)}.`
+  status === 'done'
+    ? 'Approved.'
+    : status === 'cancelled'
+      ? 'Cancelled.'
+      : status === 'failed'
+        ? 'Rejected.'
+        : `${statusLabel(status)}.`
 
 /** Approve and Reject, under whatever they answer. Reject fails the run, so it takes a second press. */
 function GateAnswer(props: { model: RunPaneModel; blocked?: boolean; onApprove?: () => void }) {
   return (
     <Inline gap="row">
-      <Button variant="solid" disabled={props.model.busy() || props.blocked} onPress={() => props.onApprove ? props.onApprove() : void props.model.gate(true)}>
+      <Button
+        variant="solid"
+        disabled={props.model.busy() || props.blocked}
+        onPress={() => (props.onApprove ? props.onApprove() : void props.model.gate(true))}
+      >
         Approve
       </Button>
-      <ConfirmButton variant="ghost" tone="danger" confirmLabel="Reject?" disabled={props.model.busy()} onConfirm={() => void props.model.gate(false)}>
+      <ConfirmButton
+        variant="ghost"
+        tone="danger"
+        confirmLabel="Reject?"
+        disabled={props.model.busy()}
+        onConfirm={() => void props.model.gate(false)}
+      >
         Reject
       </ConfirmButton>
     </Inline>
   )
 }
 
-const encode = (value: DataValue | undefined): string | undefined => value === undefined ? undefined : JSON.stringify(value)
-const display = (value: DataValue): string => typeof value === 'string' ? value : JSON.stringify(value)
+const encode = (value: DataValue | undefined): string | undefined =>
+  value === undefined ? undefined : JSON.stringify(value)
+const display = (value: DataValue): string => (typeof value === 'string' ? value : JSON.stringify(value))
 
 /** The provider, the model, and the last thing the agent said. */
 function AgentBody(props: { step: WorkflowStepRow; structured: unknown }) {
@@ -610,11 +764,17 @@ function AgentBody(props: { step: WorkflowStepRow; structured: unknown }) {
       />
       <Show
         when={said()}
-        fallback={<Text emphasis="muted">{props.step.status === 'running' ? 'Working. The transcript is in the Agent pane.' : 'Nothing said yet.'}</Text>}
+        fallback={
+          <Text emphasis="muted">
+            {props.step.status === 'running' ? 'Working. The transcript is in the Agent pane.' : 'Nothing said yet.'}
+          </Text>
+        }
       >
         {(text) => (
           <Fold label="Last said" defaultOpen>
-            <CodeBlock wrap maxHeight="block">{text()}</CodeBlock>
+            <CodeBlock wrap maxHeight="block">
+              {text()}
+            </CodeBlock>
           </Fold>
         )}
       </Show>
@@ -647,7 +807,9 @@ function CommandBody(props: { step: WorkflowStepRow; model: RunPaneModel }) {
       </Show>
       <Show when={output()?.stdout || output()?.stderr}>
         <Fold label="Output">
-          <CodeBlock wrap maxHeight="block">{[output()?.stdout, output()?.stderr].filter(Boolean).join('\n')}</CodeBlock>
+          <CodeBlock wrap maxHeight="block">
+            {[output()?.stdout, output()?.stderr].filter(Boolean).join('\n')}
+          </CodeBlock>
         </Fold>
       </Show>
     </Stack>
@@ -659,7 +821,9 @@ function RunTargetBody(props: { step: WorkflowStepRow; output: RunTargetOutput |
   return (
     <Show
       when={props.output?.url}
-      fallback={<Text emphasis="muted">{props.step.status === 'running' ? 'Starting…' : 'This target reported no URL.'}</Text>}
+      fallback={
+        <Text emphasis="muted">{props.step.status === 'running' ? 'Starting…' : 'This target reported no URL.'}</Text>
+      }
     >
       {(url) => <Facts grouping="rows" size="sm" items={[{ label: 'URL', value: url(), mono: true }]} />}
     </Show>
@@ -706,11 +870,21 @@ function HttpBody(props: { output: HttpOutput | null }) {
           <Show when={output().headers}>
             {(headers) => (
               <Fold label="Headers">
-                <CodeBlock wrap maxHeight="block">{Object.entries(headers()).map(([name, value]) => `${name}: ${value}`).join('\n')}</CodeBlock>
+                <CodeBlock wrap maxHeight="block">
+                  {Object.entries(headers())
+                    .map(([name, value]) => `${name}: ${value}`)
+                    .join('\n')}
+                </CodeBlock>
               </Fold>
             )}
           </Show>
-          <Show when={output().body}>{(body) => <CodeBlock wrap maxHeight="block">{body()}</CodeBlock>}</Show>
+          <Show when={output().body}>
+            {(body) => (
+              <CodeBlock wrap maxHeight="block">
+                {body()}
+              </CodeBlock>
+            )}
+          </Show>
         </Stack>
       )}
     </Show>

@@ -7,11 +7,12 @@ import { createArmedConfirm } from './confirm'
 //
 // createRoot because the hook registers an onCleanup for its timer; outside an owner Solid warns and
 // the timer would outlive the test.
-const withRoot = <T>(fn: () => T): T => createRoot((dispose) => {
-  const result = fn()
-  dispose()
-  return result
-})
+const withRoot = <T>(fn: () => T): T =>
+  createRoot((dispose) => {
+    const result = fn()
+    dispose()
+    return result
+  })
 
 describe('arm-to-confirm', () => {
   it('needs a second request on the same key', () => {

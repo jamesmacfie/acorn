@@ -1,5 +1,8 @@
 export {
-  agentSessionsFor, focusSession, refreshSessionSources, sendToSession,
+  agentSessionsFor,
+  focusSession,
+  refreshSessionSources,
+  sendToSession,
   sessionSummaries,
 } from './agentSessions.ts'
 export type { SessionSubmit, SessionSummary } from './agentSessions.ts'

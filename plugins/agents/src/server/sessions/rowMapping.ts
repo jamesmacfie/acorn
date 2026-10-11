@@ -38,13 +38,16 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   statusAuthority: row.statusAuthority as AgentSession['statusAuthority'],
   title: row.title,
   model: row.model,
-  goal: row.goalObjective && row.goalStatus ? {
-    objective: row.goalObjective,
-    status: row.goalStatus as AgentGoalStatus,
-    continuations: row.goalContinuations,
-    noProgress: row.goalNoProgress,
-    verdict: parseJson<AgentGoalVerdict | null>(row.goalVerdictJson, null),
-  } : null,
+  goal:
+    row.goalObjective && row.goalStatus
+      ? {
+          objective: row.goalObjective,
+          status: row.goalStatus as AgentGoalStatus,
+          continuations: row.goalContinuations,
+          noProgress: row.goalNoProgress,
+          verdict: parseJson<AgentGoalVerdict | null>(row.goalVerdictJson, null),
+        }
+      : null,
   config: parseJson(row.configJson, {}),
   parentSessionId: row.parentSessionId,
   parentTurnId: row.parentTurnId,

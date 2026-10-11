@@ -16,7 +16,14 @@
 //
 // Graphical engine imports and state construction belong to the DOM Rectangle's mount.
 // The terminal host retains the shared text custody API without importing grammars or views.
-export { documentCustody, recoverDocumentCustody, fileDocumentCustodies, reserveDocumentDestinations, reserveFileSourceCustodies, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
+export {
+  documentCustody,
+  recoverDocumentCustody,
+  fileDocumentCustodies,
+  reserveDocumentDestinations,
+  reserveFileSourceCustodies,
+  type DocumentCustody,
+} from '@acorn/client-core/features/editor/documentCustody.ts'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
@@ -51,13 +58,17 @@ export type { LanguageServiceSource }
 export const languageServices = (_source: LanguageServiceSource): Extension => []
 /** Never dispatched here, because this host builds no view to dispatch to. Typed as the real effect
  *  so `editorController.ts` compiles unchanged, with no CodeMirror byte behind it. */
-export const refreshLanguageServices = { of: () => ({}) } as unknown as typeof import('@acorn/client-core/features/editor').refreshLanguageServices
+export const refreshLanguageServices = {
+  of: () => ({}),
+} as unknown as typeof import('@acorn/client-core/features/editor').refreshLanguageServices
 
 export const refreshEditorTheme = (_view: EditorView): void => {}
 
 /** A watcher that has nothing to watch. It still returns the stop function, because the caller stores
  *  it and calls it on cleanup. */
-export const watchEditorTheme = (_view: EditorView): (() => void) => () => {}
+export const watchEditorTheme =
+  (_view: EditorView): (() => void) =>
+  () => {}
 
 export const captureViewState = (_view: EditorView): EditorViewState => ({ anchor: 0, head: 0, scrollTop: 0 })
 

@@ -5,7 +5,12 @@ import { integrationsOptions, prefsOptions } from '../../../infra/queries'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { pluginLabel } from '../../../host/plugins/pluginLabel'
 import {
-  CORE_SLOT_PROVIDER, exclusiveSlotChoices, exclusiveSlotFailed, exclusiveSlotOffers, withExclusiveSlotChoice, type CoreExclusiveSlot,
+  CORE_SLOT_PROVIDER,
+  exclusiveSlotChoices,
+  exclusiveSlotFailed,
+  exclusiveSlotOffers,
+  withExclusiveSlotChoice,
+  type CoreExclusiveSlot,
 } from '../../../host/registries/extensionPoints/exclusiveSlots'
 import { Checkbox, Select } from '../../../kit/components/primitives'
 import { Text } from '../../../kit/components/content/Text'
@@ -42,15 +47,18 @@ function RailSources() {
   // A connection that works, for the one reason a row can name. A source can also wait on a platform
   // capability, a workspace that follows none of the provider's projects, or its own `when`, and the
   // row says nothing then rather than blaming the connection.
-  const connected = (providerId: string) => (integrations.data?.integrations ?? [])
-    .some((row) => row.providerId === providerId && row.status !== 'disabled' && row.status !== 'needs-auth')
-  const providerLabel = (providerId: string) => integrations.data?.providers.find((provider) => provider.id === providerId)?.label ?? providerId
+  const connected = (providerId: string) =>
+    (integrations.data?.integrations ?? []).some(
+      (row) => row.providerId === providerId && row.status !== 'disabled' && row.status !== 'needs-auth',
+    )
+  const providerLabel = (providerId: string) =>
+    integrations.data?.providers.find((provider) => provider.id === providerId)?.label ?? providerId
   type PluginRailSource = ReturnType<typeof sources>[number]
   const saves = new Map<string, SettingSave>()
   const saveFor = (source: PluginRailSource) => {
     const key = `${source.pluginId}:${source.id}`
     let save = saves.get(key)
-    if (!save) saves.set(key, save = createSettingSave())
+    if (!save) saves.set(key, (save = createSettingSave()))
     return save
   }
   // Only the exception, so a row that behaves as the section says has no line at all.
@@ -58,7 +66,9 @@ function RailSources() {
     if (!available().has(source.id) && source.providerId && integrations.data && !connected(source.providerId)) {
       return `Shows once you connect ${providerLabel(source.providerId)}.`
     }
-    return source.showInRailByDefault === false && !visibility.shown(source.id) ? 'Hidden until you show it.' : undefined
+    return source.showInRailByDefault === false && !visibility.shown(source.id)
+      ? 'Hidden until you show it.'
+      : undefined
   }
 
   return (
@@ -74,7 +84,9 @@ function RailSources() {
               switch
               ariaLabel={`Show ${source.label} in left rail`}
               checked={visibility.shown(source.id)}
-              onChange={(on) => saveFor(source).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))}
+              onChange={(on) =>
+                saveFor(source).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))
+              }
             />
           </SettingRow>
         )}
@@ -93,9 +105,14 @@ function ReplacedSurfaces() {
   const rows = () =>
     CORE_EXCLUSIVE_SLOTS.map((slot) => ({ slot, offers: exclusiveSlotOffers(slot) })).filter((row) => row.offers.length)
   // One save state per surface, so a failed write is said beside the picker that made it.
-  const saves = Object.fromEntries(CORE_EXCLUSIVE_SLOTS.map((slot) => [slot, createSettingSave()])) as Record<CoreExclusiveSlot, SettingSave>
+  const saves = Object.fromEntries(CORE_EXCLUSIVE_SLOTS.map((slot) => [slot, createSettingSave()])) as Record<
+    CoreExclusiveSlot,
+    SettingSave
+  >
   const pick = (slot: CoreExclusiveSlot, value: string) =>
-    saves[slot].run(() => savePref(qc, PrefKeys.exclusiveSlots, withExclusiveSlotChoice(stored(), slot, value), { throwOnFailure: true }))
+    saves[slot].run(() =>
+      savePref(qc, PrefKeys.exclusiveSlots, withExclusiveSlotChoice(stored(), slot, value), { throwOnFailure: true }),
+    )
 
   return (
     <SettingsSection
@@ -111,11 +128,15 @@ function ReplacedSurfaces() {
               description={hides(row.slot, row.offers)}
               // A replacement that fell back is the one case where the setting and the screen disagree,
               // and the owner has no other way to find out why.
-              error={saves[row.slot].error()
-                ?? (choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))
+              error={
+                saves[row.slot].error() ??
+                (choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))
                   ? "That plugin's version failed, so acorn's own is showing."
-                  : undefined)}
-              onReset={choice(row.slot) === CORE_SLOT_PROVIDER ? undefined : () => void pick(row.slot, CORE_SLOT_PROVIDER)}
+                  : undefined)
+              }
+              onReset={
+                choice(row.slot) === CORE_SLOT_PROVIDER ? undefined : () => void pick(row.slot, CORE_SLOT_PROVIDER)
+              }
             >
               <Select
                 label={CORE_SLOT_LABEL[row.slot]}
@@ -141,7 +162,8 @@ function ReplacedSurfaces() {
 // the task list or the plugin status items acorn draws there.
 const hides = (slot: CoreExclusiveSlot, offers: ReturnType<typeof exclusiveSlotOffers>): string | undefined => {
   if (slot !== 'rail' && slot !== 'topbar') return undefined
-  const lines = offers.filter((offer) => !offer.placesNestedSlot)
+  const lines = offers
+    .filter((offer) => !offer.placesNestedSlot)
     .map((offer) => `${offer.label} ${slot === 'rail' ? 'hides the task list' : 'hides plugin status items'}.`)
   return lines.join(' ') || undefined
 }

@@ -53,7 +53,10 @@ export function buildGenerateSystemPrompt(args: {
     SECTION_RULES,
     SECTION_EXAMPLES,
     renderWorkspaceExamples(selected),
-  ].filter(Boolean).join('\n\n').slice(0, GENERATE_MAX_SYSTEM_CHARS)
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+    .slice(0, GENERATE_MAX_SYSTEM_CHARS)
 }
 
 const inputLine = (input: WorkflowInput): string =>
@@ -61,9 +64,10 @@ const inputLine = (input: WorkflowInput): string =>
 
 /** Build a replacement brief or edit request. Edit mode shows only the model-visible definition;
  *  grounding restores protected values after the reply. */
-export function buildGenerateUserPrompt(args:
-  | { mode: 'overwrite'; description: string; name?: string; inputs?: readonly WorkflowInput[] }
-  | { mode: 'edit'; description: string; currentDef: WorkflowDef },
+export function buildGenerateUserPrompt(
+  args:
+    | { mode: 'overwrite'; description: string; name?: string; inputs?: readonly WorkflowInput[] }
+    | { mode: 'edit'; description: string; currentDef: WorkflowDef },
 ): string {
   if (args.mode === 'edit') {
     return [
@@ -83,7 +87,11 @@ export function buildGenerateUserPrompt(args:
     ].join('\n')
   }
 
-  const lines = ['Write the workflow definition for this description.', '', args.description.trim().slice(0, GENERATE_MAX_DESCRIPTION_CHARS)]
+  const lines = [
+    'Write the workflow definition for this description.',
+    '',
+    args.description.trim().slice(0, GENERATE_MAX_DESCRIPTION_CHARS),
+  ]
   const name = args.name?.trim()
   const inputs = (args.inputs ?? []).filter((input) => input.name?.trim())
   if (name || inputs.length) {

@@ -94,8 +94,7 @@ export type CoreAuditAction =
 // id, a qualified harness id and an extension point's id follow.
 export type PluginAuditAction = `${string}:${string}`
 
-export const qualifiedAuditAction = (pluginId: string, actionId: string): PluginAuditAction =>
-  `${pluginId}:${actionId}`
+export const qualifiedAuditAction = (pluginId: string, actionId: string): PluginAuditAction => `${pluginId}:${actionId}`
 
 export type AuditAction = CoreAuditAction | PluginAuditAction
 
@@ -116,7 +115,11 @@ export function declareAuditAction(pluginId: string, action: { id: string; label
   }
   const entry = { action: qualified, pluginId, label: action.label }
   declared.set(qualified, entry)
-  return { dispose: () => { if (declared.get(qualified) === entry) declared.delete(qualified) } }
+  return {
+    dispose: () => {
+      if (declared.get(qualified) === entry) declared.delete(qualified)
+    },
+  }
 }
 
 export function clearAuditActions(pluginId: string): void {
@@ -133,8 +136,7 @@ export const auditVocabulary = (): DeclaredAuditAction[] =>
  *  literal in this binary — and a qualified one has to have been declared. Fail closed: an undeclared
  *  action writes nothing, because a trail that accepts arbitrary verbs is one nobody can enumerate,
  *  and enumerability is the whole point of the closed set. */
-export const isKnownAuditAction = (action: string): boolean =>
-  action.includes(':') ? declared.has(action) : true
+export const isKnownAuditAction = (action: string): boolean => (action.includes(':') ? declared.has(action) : true)
 
 /** Whose verb this is. A plugin's actions are `<pluginId>:<actionId>` and no core action contains a
  *  colon, which is the same split `isKnownAuditAction` reads. */
@@ -208,11 +210,19 @@ export type AuditRow = {
 // The read side: most recent first, one page at a time. `before` is a timestamp cursor rather than an
 // offset, because rows are only ever appended and pruned from the far end. An offset would skip or
 // repeat rows as the prune runs underneath a paging reader.
-export async function readAudit(db: AppDatabase, options: { before?: number; limit?: number } = {}): Promise<AuditRow[]> {
+export async function readAudit(
+  db: AppDatabase,
+  options: { before?: number; limit?: number } = {},
+): Promise<AuditRow[]> {
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 500)
   const rows = await (options.before === undefined
     ? db.select().from(schema.audit).orderBy(desc(schema.audit.at)).limit(limit)
-    : db.select().from(schema.audit).where(lt(schema.audit.at, options.before)).orderBy(desc(schema.audit.at)).limit(limit))
+    : db
+        .select()
+        .from(schema.audit)
+        .where(lt(schema.audit.at, options.before))
+        .orderBy(desc(schema.audit.at))
+        .limit(limit))
   return rows.map((row) => ({
     id: row.id,
     at: row.at,

@@ -8,7 +8,6 @@ import { isContainedPath, worktreeBranchDirName } from './pathGuards'
 import { resolveInRoot } from '../core/fs'
 import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from './worktreeStatus'
 
-
 // Workspace worktrees. docs/workspaces-and-tasks/worktrees.md § Worktrees and setup owns why they exist and
 // how their paths are derived and revalidated.
 //
@@ -76,14 +75,24 @@ export async function listWorktrees(checkout: string): Promise<Array<{ path: str
     const fields = entry.split('\0')
     const path = fields.find((f) => f.startsWith('worktree '))?.slice('worktree '.length)
     const branch = fields.find((f) => f.startsWith('branch refs/heads/'))?.slice('branch refs/heads/'.length)
-    if (path && branch && !fields.some((f) => f === 'bare' || f === 'locked' || f.startsWith('locked ') || f.startsWith('prunable'))) out.push({ path, branch })
+    if (
+      path &&
+      branch &&
+      !fields.some((f) => f === 'bare' || f === 'locked' || f.startsWith('locked ') || f.startsWith('prunable'))
+    )
+      out.push({ path, branch })
   }
   return out
 }
 
 // Read structured local metadata after a failed add. Git's stderr can contain credentials, so
 // expose the occupied branch and path without forwarding arbitrary command output.
-async function worktreeCreationFailure(checkout: string, branch: string, summary: string, error: unknown): Promise<string> {
+async function worktreeCreationFailure(
+  checkout: string,
+  branch: string,
+  summary: string,
+  error: unknown,
+): Promise<string> {
   try {
     const roster = await gitText(['worktree', 'list', '--porcelain', '-z'], { cwd: checkout, timeoutMs: 10_000 })
     let path = ''
@@ -135,18 +144,24 @@ export async function ensureWorktree(
     // records what the branch came from.
     const head = `refs/acorn/pull/${pullNumber}`
     try {
-      await prepareWorktreePhase('git.fetch', () => gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], { cwd: checkout, timeoutMs: 60_000 }))
+      await prepareWorktreePhase('git.fetch', () =>
+        gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], {
+          cwd: checkout,
+          timeoutMs: 60_000,
+        }),
+      )
     } catch (error) {
       return { ok: false, reason: gitFailure(`Could not fetch pull/${pullNumber}/head.`, error) }
     }
     const exists = await branchExists(checkout, branch)
-    const args = exists
-      ? ['worktree', 'add', '--', path, branch]
-      : ['worktree', 'add', '-b', branch, '--', path, head]
+    const args = exists ? ['worktree', 'add', '--', path, branch] : ['worktree', 'add', '-b', branch, '--', path, head]
     try {
       await prepareWorktreePhase('git.worktree.add', () => gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 }))
     } catch (error) {
-      return { ok: false, reason: await worktreeCreationFailure(checkout, branch, 'Could not create the worktree.', error) }
+      return {
+        ok: false,
+        reason: await worktreeCreationFailure(checkout, branch, 'Could not create the worktree.', error),
+      }
     }
     invalidateWorktreeStatus(path)
     return { ok: true, path, created: true }
@@ -158,13 +173,14 @@ export async function ensureWorktree(
   // remote-tracking ref is stale. `--` ends option parsing so a branch or path cannot be read as a
   // flag.
   const exists = await branchExists(checkout, branch)
-  const args = exists
-    ? ['worktree', 'add', '--', path, branch]
-    : ['worktree', 'add', '-b', branch, '--', path]
+  const args = exists ? ['worktree', 'add', '--', path, branch] : ['worktree', 'add', '-b', branch, '--', path]
   try {
     await prepareWorktreePhase('git.worktree.add', () => gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 }))
   } catch (error) {
-    return { ok: false, reason: await worktreeCreationFailure(checkout, branch, `Could not create a worktree for ${branch}.`, error) }
+    return {
+      ok: false,
+      reason: await worktreeCreationFailure(checkout, branch, `Could not create a worktree for ${branch}.`, error),
+    }
   }
   invalidateWorktreeStatus(path)
   return { ok: true, path, created: true }
@@ -229,7 +245,12 @@ export async function worktreePorcelain(path: string): Promise<WorktreeStatus> {
 
 // Remove a worktree through the main checkout. Refuses a dirty worktree unless force is set, which
 // discards uncommitted changes. The UI surfaces that, so removal is never quietly destructive.
-export async function removeWorktree(checkout: string, path: string, force = false, worktreesRoot?: string): Promise<WorktreeResult> {
+export async function removeWorktree(
+  checkout: string,
+  path: string,
+  force = false,
+  worktreesRoot?: string,
+): Promise<WorktreeResult> {
   if (isUnlinkedWorktree(path)) return removeUnlinkedWorktree(checkout, path, force, worktreesRoot)
   if (!force && (await worktreeDirty(path))) {
     return { ok: false, reason: 'Worktree has uncommitted changes. Confirm to discard.' }
@@ -260,7 +281,12 @@ function isUnlinkedWorktree(dir: string): boolean {
 // `git worktree remove` refuses a folder git no longer tracks, so a task left with one could never be
 // archived. Prune git's record instead, and delete the leftover folder when it sits inside the
 // worktrees folder Acorn manages. A folder anywhere else belongs to the user, so it stays.
-async function removeUnlinkedWorktree(checkout: string, path: string, force: boolean, worktreesRoot: string | undefined): Promise<WorktreeResult> {
+async function removeUnlinkedWorktree(
+  checkout: string,
+  path: string,
+  force: boolean,
+  worktreesRoot: string | undefined,
+): Promise<WorktreeResult> {
   if (existsSync(path)) {
     if (!force) return { ok: false, reason: 'The worktree folder is no longer linked to git. Confirm to delete it.' }
     if (worktreesRoot && isContainedPath(worktreesRoot, path) && resolve(path) !== resolve(worktreesRoot)) {

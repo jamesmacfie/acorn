@@ -33,9 +33,23 @@ export type AgentAttendance = 'attended' | 'supervised' | 'autonomous'
 // settled result queued back on that owner (docs/managed-agents/delegation.md § Managed delegation).
 // `plugin` is a note a plugin queued through `agents:session-messenger`; its `effectivePolicy.sentBy`
 // names the plugin (docs/managed-agents/session-messages.md).
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin' | 'goal'
+export type AgentTurnSource =
+  | 'interactive'
+  | 'workflow'
+  | 'delegation'
+  | 'delegation_report'
+  | 'automation'
+  | 'import'
+  | 'plugin'
+  | 'goal'
 export type AgentGoalStatus = 'active' | 'satisfied' | 'blocked' | 'paused' | 'exhausted' | 'cleared'
-export type AgentGoalBlocker = 'none' | 'missing_evidence' | 'needs_user_input' | 'run_failed' | 'external_wait' | 'goal_not_met_yet'
+export type AgentGoalBlocker =
+  | 'none'
+  | 'missing_evidence'
+  | 'needs_user_input'
+  | 'run_failed'
+  | 'external_wait'
+  | 'goal_not_met_yet'
 export type AgentGoalVerdict = {
   turnId: string
   satisfied: boolean
@@ -300,8 +314,7 @@ export type AgentSubagent = {
 
 /** A subagent update. Absent means unchanged, the same convention AgentToolCall.status follows, so a
  *  harness that only learns the model at completion does not wipe the title it reported at spawn. */
-export type AgentSubagentUpdate =
-  Partial<Omit<AgentSubagent, 'id' | 'startedAt' | 'updatedAt'>> & { id: string }
+export type AgentSubagentUpdate = Partial<Omit<AgentSubagent, 'id' | 'startedAt' | 'updatedAt'>> & { id: string }
 
 export type AgentArtifact = {
   id: string
@@ -323,7 +336,13 @@ export type AgentPlanEntry = {
 
 export type AgentNormalizedEvent =
   | { type: 'session_state'; state: AgentRuntimeState; detail?: string }
-  | { type: 'session_metadata'; providerSessionRef?: string; configOptions?: AgentConfigOption[]; commands?: AgentCommandDescriptor[]; skills?: AgentSkillDescriptor[] }
+  | {
+      type: 'session_metadata'
+      providerSessionRef?: string
+      configOptions?: AgentConfigOption[]
+      commands?: AgentCommandDescriptor[]
+      skills?: AgentSkillDescriptor[]
+    }
   /** `subagentId` means somebody other than the reader wrote this turn: it is the brief a subagent was
    *  handed, so it belongs in that subagent's stream rather than in the session's. */
   | { type: 'user_message'; text: string; subagentId?: string; automatic?: boolean }
@@ -337,9 +356,26 @@ export type AgentNormalizedEvent =
   | { type: 'usage'; usage: AgentUsage }
   /** `blocked` marks a request refused by unattended policy or a permission policy plugin. The row is written
    *  resolved, never pending, and an older client draws it as an ordinary resolved request. */
-  | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[]; approval?: AgentAppApproval; blocked?: AgentRequestBlocked }
+  | {
+      type: 'request'
+      requestId: string
+      kind: AgentRequestKind
+      title: string
+      detail?: string
+      options?: AgentPermissionOption[]
+      questions?: AgentQuestion[]
+      approval?: AgentAppApproval
+      blocked?: AgentRequestBlocked
+    }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
-  | { type: 'artifact'; artifactId: string; kind: AgentArtifactKind; title: string; mediaType?: string; byteSize?: number }
+  | {
+      type: 'artifact'
+      artifactId: string
+      kind: AgentArtifactKind
+      title: string
+      mediaType?: string
+      byteSize?: number
+    }
   /** `patch` is the unified hunks for `path`, from the first `@@` on, with no file header. A change
    *  with no path is Codex's whole-turn diff, which is a multi-file git patch instead.
    *
@@ -349,9 +385,15 @@ export type AgentNormalizedEvent =
    *  line numbers count from the top of the excerpt. `patchArtifactId` is set when the patch was too
    *  large to keep inline and went to that artifact instead. */
   | {
-    type: 'file_change'; path?: string; patch?: string; summary?: string; subagentId?: string
-    changeId?: string; snippet?: boolean; patchArtifactId?: string
-  }
+      type: 'file_change'
+      path?: string
+      patch?: string
+      summary?: string
+      subagentId?: string
+      changeId?: string
+      snippet?: boolean
+      patchArtifactId?: string
+    }
   | { type: 'terminal'; terminalSessionId: string; title: string }
   | { type: 'turn_completed'; stopReason?: string }
   | { type: 'error'; code: string; message: string; retryable: boolean }
@@ -479,9 +521,7 @@ export type AgentSessionDelegation = {
   sessionId: string
   depth: number
   isolation: 'shared' | 'worktree'
-  owner:
-    | { kind: 'managed'; parentSessionId: string }
-    | { kind: 'terminal'; label: string; profileId: string | null }
+  owner: { kind: 'managed'; parentSessionId: string } | { kind: 'terminal'; label: string; profileId: string | null }
 }
 
 export type AgentSessionList = {
@@ -531,7 +571,9 @@ const webSearchText = (web: AgentWebActivity | undefined): string[] => {
   if (!web) return []
   const action = web.action
   return [
-    ...(action?.type === 'search' ? [...action.queries, ...action.allowedDomains ?? [], ...action.blockedDomains ?? []] : []),
+    ...(action?.type === 'search'
+      ? [...action.queries, ...(action.allowedDomains ?? []), ...(action.blockedDomains ?? [])]
+      : []),
     ...(action && 'url' in action && action.url ? [action.url] : []),
     ...(action?.type === 'find_in_page' && action.pattern ? [action.pattern] : []),
     ...(action?.type === 'fetch_page' && action.prompt ? [action.prompt] : []),
@@ -553,7 +595,9 @@ export const agentEventSearchText = (event: AgentNormalizedEvent): string | null
         event.tool.output,
         ...(event.tool.paths ?? []),
         ...webSearchText(event.tool.web),
-      ].filter(Boolean).join(' ')
+      ]
+        .filter(Boolean)
+        .join(' ')
     case 'subagent':
       return [event.subagent.title, event.subagent.role].filter(Boolean).join(' ') || null
     case 'file_change':

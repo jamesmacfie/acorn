@@ -114,7 +114,11 @@ export class FleetStore {
     this.#nodes = nodes
     const path = join(this.userDataDir, FLEET_FILE)
     mkdirSync(this.userDataDir, { recursive: true, mode: 0o700 })
-    writeFileSync(path, `${JSON.stringify({ version: 1, nodes } satisfies z.input<typeof fleetFileSchema>, null, 2)}\n`, { mode: 0o600 })
+    writeFileSync(
+      path,
+      `${JSON.stringify({ version: 1, nodes } satisfies z.input<typeof fleetFileSchema>, null, 2)}\n`,
+      { mode: 0o600 },
+    )
     chmodSync(path, 0o600)
   }
 }

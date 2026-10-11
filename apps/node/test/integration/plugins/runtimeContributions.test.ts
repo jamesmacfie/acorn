@@ -42,12 +42,17 @@ describe('independently installed runtime contributions', () => {
 
   const token = (taskId = 'task-1', options: { sessionId?: string; maxRisk?: 'read' | 'write' | 'execute' } = {}) =>
     mintInternalToken(INTERNAL, {
-      scope: 'task', taskId,
+      scope: 'task',
+      taskId,
       ...(options.sessionId ? { sessionId: options.sessionId } : {}),
       ...(options.maxRisk ? { toolCeiling: { maxRisk: options.maxRisk } } : {}),
     })
-  const call = (path: string, init: RequestInit = {}) => createApp().fetch(new Request(`http://127.0.0.1${path}`, init), env)
-  const asTask = (body?: unknown, options?: { taskId?: string; sessionId?: string; maxRisk?: 'read' | 'write' | 'execute' }): RequestInit => ({
+  const call = (path: string, init: RequestInit = {}) =>
+    createApp().fetch(new Request(`http://127.0.0.1${path}`, init), env)
+  const asTask = (
+    body?: unknown,
+    options?: { taskId?: string; sessionId?: string; maxRisk?: 'read' | 'write' | 'execute' },
+  ): RequestInit => ({
     method: body === undefined ? 'GET' : 'POST',
     headers: {
       'x-acorn-internal': token(options?.taskId, options),
@@ -61,15 +66,35 @@ describe('independently installed runtime contributions', () => {
     cpSync(FIXTURE, pluginDir(dataRoot, 'runtime-fixture'), { recursive: true })
     core = makeTestDb()
     const now = Date.now()
-    await core.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await core.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await core.db.insert(schema.projects).values({
-      id: 'project-1', name: 'Fixture', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-1',
+      name: 'Fixture',
+      path: null,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await core.db.insert(schema.tasks).values({
-      id: 'task-1', title: 'Fixture task', origin: 'local', projectId: 'project-1', branch: null,
-      status: 'active', sort: 0, createdAt: now, updatedAt: now,
+      id: 'task-1',
+      title: 'Fixture task',
+      origin: 'local',
+      projectId: 'project-1',
+      branch: null,
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
     })
     env = testEnv({
       DB: core.db,
@@ -77,7 +102,8 @@ describe('independently installed runtime contributions', () => {
       INTERNAL_TOKEN: INTERNAL,
       ACTIVE_IDENTITY: { get: () => USER, set: () => {}, clear: () => {} },
       DEVICES: {
-        authenticate: async (candidate: string) => candidate === 'paired-device-token' ? { deviceId: 'device-1' } : null,
+        authenticate: async (candidate: string) =>
+          candidate === 'paired-device-token' ? { deviceId: 'device-1' } : null,
       } as Env['DEVICES'],
     })
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -87,7 +113,12 @@ describe('independently installed runtime contributions', () => {
       const entry = loaded.loaded[0]!
       running = await initPlugins([entry.plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore(USER), ...testCoreSeams() }),
+        core: createCoreServices({
+          db: core.db,
+          secrets: core.secrets,
+          activeIdentity: memoryIdentityStore(USER),
+          ...testCoreSeams(),
+        }),
         dataDir: dataRoot,
         env,
         loaded: new Map([[entry.manifest.id, binding(entry)]]),
@@ -106,37 +137,59 @@ describe('independently installed runtime contributions', () => {
   it('normalizes descriptors into MCP list and direct HTTP call with host-built origin', async () => {
     const listed = await call('/v1/core/tasks/task-1/tools', asTask())
     expect(listed.status).toBe(200)
-    const tools = (await listed.json() as { tools: { name: string; inputSchema: unknown }[] }).tools
-    expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
-      'runtime-fixture_echo', 'runtime-fixture_large', 'runtime-fixture_slow',
-    ]))
+    const tools = ((await listed.json()) as { tools: { name: string; inputSchema: unknown }[] }).tools
+    expect(tools.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining(['runtime-fixture_echo', 'runtime-fixture_large', 'runtime-fixture_slow']),
+    )
     expect(tools.find((tool) => tool.name === 'runtime-fixture_echo')?.inputSchema).toMatchObject({
-      type: 'object', required: ['message'], additionalProperties: false,
+      type: 'object',
+      required: ['message'],
+      additionalProperties: false,
     })
 
-    const response = await call('/v1/core/tasks/task-1/tools/runtime-fixture_echo', asTask({ message: 'hello' }, { sessionId: 'session-1' }))
+    const response = await call(
+      '/v1/core/tasks/task-1/tools/runtime-fixture_echo',
+      asTask({ message: 'hello' }, { sessionId: 'session-1' }),
+    )
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       arguments: { message: 'hello' },
       origin: { taskId: 'task-1', sessionId: 'session-1' },
       principal: { kind: 'internal', scope: 'task', taskId: 'task-1', sessionId: 'session-1' },
     })
-    expect((await call('/v1/core/tasks/task-1/tools/runtime-fixture_echo', asTask({ message: 'x', extra: true }))).status).toBe(400)
+    expect(
+      (await call('/v1/core/tasks/task-1/tools/runtime-fixture_echo', asTask({ message: 'x', extra: true }))).status,
+    ).toBe(400)
   })
 
   it('enforces signed task/session authority and tool ceilings before dispatch', async () => {
-    expect((await call('/v1/core/tasks/task-1/tools/runtime-fixture_mutate', asTask({}, { maxRisk: 'read' }))).status).toBe(404)
+    expect(
+      (await call('/v1/core/tasks/task-1/tools/runtime-fixture_mutate', asTask({}, { maxRisk: 'read' }))).status,
+    ).toBe(404)
     expect((await call('/v1/core/tasks/task-1/tools/runtime-fixture_mutate', asTask({}))).status).toBe(404)
-    expect((await call('/v1/core/tasks/task-1/tools/runtime-fixture_mutate', asTask({}, { sessionId: 'session-1' }))).status).toBe(200)
-    expect((await call('/v1/core/tasks/task-1/tools/runtime-fixture_echo', asTask({ message: 'x' }, { taskId: 'other-task' }))).status).toBe(404)
+    expect(
+      (await call('/v1/core/tasks/task-1/tools/runtime-fixture_mutate', asTask({}, { sessionId: 'session-1' }))).status,
+    ).toBe(200)
+    expect(
+      (
+        await call(
+          '/v1/core/tasks/task-1/tools/runtime-fixture_echo',
+          asTask({ message: 'x' }, { taskId: 'other-task' }),
+        )
+      ).status,
+    ).toBe(404)
     // A real paired-device principal can never enter the MCP/harness route, even though plugin routes
     // receive device principals elsewhere. This is the boundary a descriptor pointing at an approval
     // route cannot cross.
-    expect((await call('/v1/core/tasks/task-1/tools/runtime-fixture_echo', {
-      method: 'POST',
-      headers: { authorization: 'Bearer paired-device-token', 'content-type': 'application/json' },
-      body: JSON.stringify({ message: 'x' }),
-    })).status).toBe(404)
+    expect(
+      (
+        await call('/v1/core/tasks/task-1/tools/runtime-fixture_echo', {
+          method: 'POST',
+          headers: { authorization: 'Bearer paired-device-token', 'content-type': 'application/json' },
+          body: JSON.stringify({ message: 'x' }),
+        })
+      ).status,
+    ).toBe(404)
   })
 
   it('bounds timeout/output and never retries a mutation after a lost reply', async () => {
@@ -152,23 +205,34 @@ describe('independently installed runtime contributions', () => {
     const terminate = vi.spyOn(Worker.prototype, 'terminate')
     const context = await call('/v1/core/tasks/task-1/context?include=issues,runtime-fixture:fixture', asTask())
     expect(context.status).toBe(200)
-    const body = await context.json() as { sections: { id: string; compact: string; absent?: unknown; items: unknown[]; omitted: number }[] }
+    const body = (await context.json()) as {
+      sections: { id: string; compact: string; absent?: unknown; items: unknown[]; omitted: number }[]
+    }
     expect(body.sections.map((section) => section.id)).toEqual(['issues', 'runtime-fixture:fixture'])
     const fixture = body.sections[1]!
     expect(new TextEncoder().encode(fixture.compact).byteLength).toBeLessThanOrEqual(2048)
     expect(fixture.omitted).toBe(7)
-    expect(fixture.items).toEqual([expect.objectContaining({ sources: [{ label: 'fixture source', uri: 'urn:fixture:reference-1' }] })])
+    expect(fixture.items).toEqual([
+      expect.objectContaining({ sources: [{ label: 'fixture source', uri: 'urn:fixture:reference-1' }] }),
+    ])
 
     const sourcePath = join(pluginDir(dataRoot, 'runtime-fixture'), 'node.js')
     const originalSource = readFileSync(sourcePath, 'utf8')
-    writeFileSync(sourcePath, originalSource.replace('  init(ctx) {', "  ready() { throw new Error('candidate ready failed') },\n  init(ctx) {"))
+    writeFileSync(
+      sourcePath,
+      originalSource.replace(
+        '  init(ctx) {',
+        "  ready() { throw new Error('candidate ready failed') },\n  init(ctx) {",
+      ),
+    )
     const failedLoad = await loadExternalPlugins(dataRoot, { builtins: [], reimport: ['runtime-fixture'] })
     expect(failedLoad.failures).toEqual([])
     const failedCandidate = failedLoad.loaded[0]!
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
-      expect(await running!.reload('runtime-fixture', { plugin: failedCandidate.plugin, binding: binding(failedCandidate) }))
-        .toEqual({ ok: false, error: 'candidate ready failed', retained: true })
+      expect(
+        await running!.reload('runtime-fixture', { plugin: failedCandidate.plugin, binding: binding(failedCandidate) }),
+      ).toEqual({ ok: false, error: 'candidate ready failed', retained: true })
     } finally {
       error.mockRestore()
       writeFileSync(sourcePath, originalSource)
@@ -182,22 +246,31 @@ describe('independently installed runtime contributions', () => {
     const manifestPath = join(pluginDir(dataRoot, 'runtime-fixture'), 'acorn-plugin.json')
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as any
     manifest.version = '2.0.0'
-    manifest.contributions.agentTools = manifest.contributions.agentTools.filter((tool: { id: string }) => tool.id === 'echo')
+    manifest.contributions.agentTools = manifest.contributions.agentTools.filter(
+      (tool: { id: string }) => tool.id === 'echo',
+    )
     manifest.contributions.agentTools[0].description = 'Updated echo.'
     manifest.contributions.contextSections[0].read = '/v1/p/runtime-fixture/context/invalid'
     writeFileSync(manifestPath, JSON.stringify(manifest))
     const loaded = await loadExternalPlugins(dataRoot, { builtins: [], reimport: ['runtime-fixture'] })
     const next = loaded.loaded[0]!
-    expect(await running!.reload('runtime-fixture', { plugin: next.plugin, binding: binding(next) })).toEqual({ ok: true })
+    expect(await running!.reload('runtime-fixture', { plugin: next.plugin, binding: binding(next) })).toEqual({
+      ok: true,
+    })
     expect(terminate).toHaveBeenCalledTimes(2)
 
     const after = await call('/v1/core/tasks/task-1/tools', asTask())
-    expect((await after.json() as { tools: { name: string; description: string }[] }).tools.filter((tool) => tool.name.startsWith('runtime-fixture')))
-      .toEqual([expect.objectContaining({ name: 'runtime-fixture_echo', description: 'Updated echo.' })])
+    expect(
+      ((await after.json()) as { tools: { name: string; description: string }[] }).tools.filter((tool) =>
+        tool.name.startsWith('runtime-fixture'),
+      ),
+    ).toEqual([expect.objectContaining({ name: 'runtime-fixture_echo', description: 'Updated echo.' })])
     const failedSection = await call('/v1/core/tasks/task-1/context?include=issues,runtime-fixture:fixture', asTask())
-    const failedBody = await failedSection.json() as { sections: { id: string; absent?: { reason: string } }[] }
+    const failedBody = (await failedSection.json()) as { sections: { id: string; absent?: { reason: string } }[] }
     expect(failedBody.sections.find((section) => section.id === 'issues')).toBeDefined()
-    expect(failedBody.sections.find((section) => section.id === 'runtime-fixture:fixture')?.absent?.reason).toBe('invalid-response')
+    expect(failedBody.sections.find((section) => section.id === 'runtime-fixture:fixture')?.absent?.reason).toBe(
+      'invalid-response',
+    )
 
     await running!.dispose()
     running = null
@@ -211,7 +284,12 @@ describe('independently installed runtime contributions', () => {
     const disabledEntry = disabledLoad.loaded[0]!
     const disabled = await initPlugins([disabledEntry.plugin], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore(USER), ...testCoreSeams() }),
+      core: createCoreServices({
+        db: core.db,
+        secrets: core.secrets,
+        activeIdentity: memoryIdentityStore(USER),
+        ...testCoreSeams(),
+      }),
       dataDir: dataRoot,
       env,
       disabled: ['runtime-fixture'],

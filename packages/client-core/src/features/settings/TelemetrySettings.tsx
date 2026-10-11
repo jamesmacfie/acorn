@@ -68,19 +68,39 @@ export default function TelemetrySettings(props: { nodeId: string | null }) {
 
       {/* What a record may hold is said here, beside the evidence, rather than in a section of its own:
           the two answer one question (docs/telemetry/model.md § What never leaves the machine). */}
-      <SettingsSection id="collected" label="What this node has collected" description="Counts since the node started. The records themselves aren't shown.">
+      <SettingsSection
+        id="collected"
+        label="What this node has collected"
+        description="Counts since the node started. The records themselves aren't shown."
+      >
         <Stack gap="row">
           <Show
             when={summary.data}
-            fallback={summary.isError
-              ? <Text tone="danger" wrap>Couldn't reach the node.</Text>
-              : <EmptyState busy align="start" size="sm">Loading…</EmptyState>}
+            fallback={
+              summary.isError ? (
+                <Text tone="danger" wrap>
+                  Couldn't reach the node.
+                </Text>
+              ) : (
+                <EmptyState busy align="start" size="sm">
+                  Loading…
+                </EmptyState>
+              )
+            }
           >
             {(data) => (
               <>
                 <Text emphasis="muted" wrap>
-                  <Show when={data().collecting} fallback={<>Not collecting. {data().enabled ? 'No plugin is set up to receive it.' : 'Collection is off.'}</>}>
-                    Collecting. {total().toLocaleString()} record{total() === 1 ? '' : 's'} since the node started {formatRelativeTime(data().since)}.
+                  <Show
+                    when={data().collecting}
+                    fallback={
+                      <>
+                        Not collecting. {data().enabled ? 'No plugin is set up to receive it.' : 'Collection is off.'}
+                      </>
+                    }
+                  >
+                    Collecting. {total().toLocaleString()} record{total() === 1 ? '' : 's'} since the node started{' '}
+                    {formatRelativeTime(data().since)}.
                   </Show>
                 </Text>
                 <Show when={rows().length > 0}>
@@ -105,17 +125,25 @@ export default function TelemetrySettings(props: { nodeId: string | null }) {
                   </Show>
                 </Show>
                 <Text emphasis="muted" wrap>
-                  Sent to {data().sinks.length ? data().sinks.map((id) => pluginLabel(id)).join(', ') : 'nothing'}.
-                  <Show when={data().lastFlushAt}>{(at) => <> Last sent {formatRelativeTime(at())}.</>}</Show>
-                  <Show when={data().dropped > 0}>{' '}{data().dropped.toLocaleString()} records were dropped because nothing received them in time.</Show>
+                  Sent to{' '}
+                  {data().sinks.length
+                    ? data()
+                        .sinks.map((id) => pluginLabel(id))
+                        .join(', ')
+                    : 'nothing'}
+                  .<Show when={data().lastFlushAt}>{(at) => <> Last sent {formatRelativeTime(at())}.</>}</Show>
+                  <Show when={data().dropped > 0}>
+                    {' '}
+                    {data().dropped.toLocaleString()} records were dropped because nothing received them in time.
+                  </Show>
                 </Text>
               </>
             )}
           </Show>
           <Text emphasis="muted" wrap>
-            A record holds a name, a time, and a few labels, such as which plugin or pane and whether it
-            worked. It never holds prompts, agent output, file contents, diffs, terminal output, request
-            bodies, or query text. Paths are shortened to your home folder and the data folder.
+            A record holds a name, a time, and a few labels, such as which plugin or pane and whether it worked. It
+            never holds prompts, agent output, file contents, diffs, terminal output, request bodies, or query text.
+            Paths are shortened to your home folder and the data folder.
           </Text>
         </Stack>
       </SettingsSection>

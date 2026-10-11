@@ -1,4 +1,9 @@
-import { distribution, refreshPluginTrust, syncPluginDistribution, type PluginTrustRequest } from '../plugins/distribution'
+import {
+  distribution,
+  refreshPluginTrust,
+  syncPluginDistribution,
+  type PluginTrustRequest,
+} from '../plugins/distribution'
 import { awaitingInputApproval, awaitingNodeApproval, awaitingSkillApproval } from '../plugins/distributionModel'
 import { grantPluginInputs, grantPluginSkills, saveDisabledNodePlugins } from '../../infra/node/nodePlugins'
 import { nextDisabledList } from '../../features/settings/plugins/pluginToggle'
@@ -47,7 +52,11 @@ import type { NodePluginRow, PluginInputGrant } from '@acorn/protocol/api.ts'
 export type TierKey = 'reads' | 'provides' | 'enforced' | 'declared' | 'web'
 
 export const TIER_LABEL: Record<TierKey, string> = {
-  reads: 'Reads your data', provides: 'Provides', enforced: 'Enforced', declared: 'Declared', web: 'Web pages',
+  reads: 'Reads your data',
+  provides: 'Provides',
+  enforced: 'Enforced',
+  declared: 'Declared',
+  web: 'Web pages',
 }
 
 export type TrustLine = PermissionLine & {
@@ -103,14 +112,14 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       ],
       was: previous
         ? [
-          ...uiPermissionLines(previous.permissions, request.row.name),
-          ...nodePermissionLines(previous.permissions),
-          ...keyClaimPermissionLines(previous.keyClaims ?? []),
-          ...navigationDestinationPermissionLines(previous.navigationDestinations ?? []),
-          ...extensionPermissionLines(previous.extensions ?? []),
-          ...harnessPermissionLines(previous.harnesses ?? []),
-          ...agentToolPermissionLines(previous.agentTools ?? []),
-        ]
+            ...uiPermissionLines(previous.permissions, request.row.name),
+            ...nodePermissionLines(previous.permissions),
+            ...keyClaimPermissionLines(previous.keyClaims ?? []),
+            ...navigationDestinationPermissionLines(previous.navigationDestinations ?? []),
+            ...extensionPermissionLines(previous.extensions ?? []),
+            ...harnessPermissionLines(previous.harnesses ?? []),
+            ...agentToolPermissionLines(previous.agentTools ?? []),
+          ]
         : null,
     },
     {
@@ -130,15 +139,16 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         ...customAgentPermissionLines(customAgentGrants(installed.contributions)),
         ...skillPermissionLines(skills?.skills ?? []),
       ],
-      was: previous || skills?.granted
-        ? [
-          ...schedulePermissionLines(previous?.schedules ?? []),
-          ...taskCheckPermissionLines(previous?.taskChecks ?? []),
-          ...contextSectionPermissionLines(previous?.contextSections ?? []),
-          ...customAgentPermissionLines(previous?.customAgents ?? []),
-          ...(skills?.granted ? skillPermissionLines(skills.skills.filter((skill) => skill.approved)) : []),
-        ]
-        : null,
+      was:
+        previous || skills?.granted
+          ? [
+              ...schedulePermissionLines(previous?.schedules ?? []),
+              ...taskCheckPermissionLines(previous?.taskChecks ?? []),
+              ...contextSectionPermissionLines(previous?.contextSections ?? []),
+              ...customAgentPermissionLines(previous?.customAgents ?? []),
+              ...(skills?.granted ? skillPermissionLines(skills.skills.filter((skill) => skill.approved)) : []),
+            ]
+          : null,
     },
     {
       key: 'web',
@@ -146,13 +156,15 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       was: previous ? webviewPermissionLines(previous.webviews ?? []) : null,
     },
   ]
-  return groups.filter(({ key }) => request.source?.kind !== 'device' || key !== 'declared').map(({ key, now, was }) => {
-    const before = was ? new Set(was.map((entry) => entry.key)) : null
-    return {
-      key,
-      lines: now.map((entry) => ({ ...entry, tier: key, added: before ? !before.has(entry.key) : false })),
-    }
-  })
+  return groups
+    .filter(({ key }) => request.source?.kind !== 'device' || key !== 'declared')
+    .map(({ key, now, was }) => {
+      const before = was ? new Set(was.map((entry) => entry.key)) : null
+      return {
+        key,
+        lines: now.map((entry) => ({ ...entry, tier: key, added: before ? !before.has(entry.key) : false })),
+      }
+    })
 }
 
 /**
@@ -163,7 +175,10 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
  * not ask every boot), which is exactly why dismissal must not come through here: Escape is "not now"
  * and records nothing. See the dialog's `dismiss`.
  */
-export async function recordTrustDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
+export async function recordTrustDecision(
+  request: PluginTrustRequest,
+  decision: 'accepted' | 'rejected',
+): Promise<void> {
   const installed = request.row.installed
   if (!installed) return
   await recordPluginTrust({
@@ -208,7 +223,10 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
 export const shownInputs = (row: NodePluginRow): PluginInputGrant['sources'] => {
   const sources: PluginInputGrant['sources'] = {}
   for (const input of row.inputs?.inputs ?? []) {
-    sources[input.sourceId] = { ...sources[input.sourceId], [input.name]: { source: input.source, optional: input.optional } }
+    sources[input.sourceId] = {
+      ...sources[input.sourceId],
+      [input.name]: { source: input.source, optional: input.optional },
+    }
   }
   return sources
 }
@@ -221,7 +239,10 @@ export const shownInputs = (row: NodePluginRow): PluginInputGrant['sources'] => 
  * `recordTrustDecision` when a request carries both, so the re-read roster no longer asks once the
  * bundle answer lands.
  */
-export async function recordNodeDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
+export async function recordNodeDecision(
+  request: PluginTrustRequest,
+  decision: 'accepted' | 'rejected',
+): Promise<void> {
   if (!awaitingNodeApproval(request.row)) return
   const nodeId = request.nodeId
   if (decision === 'accepted') {
@@ -230,6 +251,10 @@ export async function recordNodeDecision(request: PluginTrustRequest, decision: 
       const digests = Object.fromEntries((request.row.skills?.skills ?? []).map((skill) => [skill.name, skill.digest]))
       await grantPluginSkills(request.row.name, digests, nodeId)
     }
-  } else await saveDisabledNodePlugins(nextDisabledList(distribution().byNode.get(nodeId)?.rows ?? [request.row], request.row.name, true), nodeId)
+  } else
+    await saveDisabledNodePlugins(
+      nextDisabledList(distribution().byNode.get(nodeId)?.rows ?? [request.row], request.row.name, true),
+      nodeId,
+    )
   await syncPluginDistribution({ nodeIds: [nodeId] })
 }

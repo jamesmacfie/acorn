@@ -16,18 +16,28 @@ const schema: DashboardDisplaySchema = {
   fields: [
     { id: 'title', name: 'Title', type: 'text', role: 'title' },
     { id: 'size', name: 'Size', type: 'number', unit: 'MB' },
-    { id: 'status', name: 'Status', type: 'enum', role: 'status', values: [
-      { id: 'draft', label: 'Draft', tone: 'muted' },
-      { id: 'open', label: 'Open', tone: 'accent' },
-      { id: 'ready', label: 'Ready', tone: 'ok' },
-    ] },
+    {
+      id: 'status',
+      name: 'Status',
+      type: 'enum',
+      role: 'status',
+      values: [
+        { id: 'draft', label: 'Draft', tone: 'muted' },
+        { id: 'open', label: 'Open', tone: 'accent' },
+        { id: 'ready', label: 'Ready', tone: 'ok' },
+      ],
+    },
     { id: 'updated', name: 'Updated', type: 'datetime', role: 'updated' },
     { id: 'flagged', name: 'Flagged', type: 'boolean' },
   ],
 }
 
-const row = (id: string, values: DashboardDisplayRow['values']): DashboardDisplayRow =>
-  ({ id, values, pluginId: 'github', sourceId: 'pulls-mine' })
+const row = (id: string, values: DashboardDisplayRow['values']): DashboardDisplayRow => ({
+  id,
+  values,
+  pluginId: 'github',
+  sourceId: 'pulls-mine',
+})
 
 const rows: DashboardDisplayRow[] = [
   row('a', { title: 'Alpha', size: 12, status: 'ready', updated: 300, flagged: true }),
@@ -45,7 +55,10 @@ describe('shapeRows: filtering', () => {
 
   it('ANDs every filter', () => {
     const result = shapeRows(rows, schema, {
-      filters: [{ field: 'flagged', op: 'eq', value: true }, { field: 'status', op: 'eq', value: 'open' }],
+      filters: [
+        { field: 'flagged', op: 'eq', value: true },
+        { field: 'status', op: 'eq', value: 'open' },
+      ],
     })
     expect(ids(result)).toEqual(['c'])
   })
@@ -82,7 +95,10 @@ describe('shapeRows: sorting', () => {
 
   it('breaks ties on the next key', () => {
     const sorted = shapeRows(rows, schema, {
-      sort: [{ field: 'flagged', direction: 'desc' }, { field: 'title', direction: 'asc' }],
+      sort: [
+        { field: 'flagged', direction: 'desc' },
+        { field: 'title', direction: 'asc' },
+      ],
     })
     expect(ids(sorted)).toEqual(['a', 'c', 'b'])
   })
@@ -112,11 +128,20 @@ describe('shapeRows: limiting', () => {
 
 describe('projection', () => {
   it('returns every field when nothing is projected', () => {
-    expect(visibleFields(schema, {}).map((field) => field.id)).toEqual(['title', 'size', 'status', 'updated', 'flagged'])
+    expect(visibleFields(schema, {}).map((field) => field.id)).toEqual([
+      'title',
+      'size',
+      'status',
+      'updated',
+      'flagged',
+    ])
   })
 
   it('honours the projected ORDER and drops ids the schema does not declare', () => {
-    expect(visibleFields(schema, { fields: ['status', 'gone', 'title'] }).map((field) => field.id)).toEqual(['status', 'title'])
+    expect(visibleFields(schema, { fields: ['status', 'gone', 'title'] }).map((field) => field.id)).toEqual([
+      'status',
+      'title',
+    ])
   })
 
   it('finds the lead field by role, then by type', () => {

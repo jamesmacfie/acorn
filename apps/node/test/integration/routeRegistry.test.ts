@@ -30,7 +30,9 @@ describe('plugin route registry', () => {
     // The prefix is relative to the namespace: an absolute-looking or namespace-repeating prefix
     // would still mount *inside* /v1/p/<plugin>, i.e. at a URL nothing requests.
     expect(() => registry.register({ plugin: 'github', prefix: 'repos', router })).toThrow("start with '/'")
-    expect(() => registry.register({ plugin: 'github', prefix: '/v1/core/repos', router })).toThrow("must not repeat '/v1'")
+    expect(() => registry.register({ plugin: 'github', prefix: '/v1/core/repos', router })).toThrow(
+      "must not repeat '/v1'",
+    )
     expect(registry.list()).toHaveLength(0)
   })
 })
@@ -94,7 +96,9 @@ const PLUGIN_ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')
 
 describe('assembled routes', () => {
   let plugins: { dispose(): Promise<void> }
-  beforeAll(async () => { plugins = await initCompiledPlugins() })
+  beforeAll(async () => {
+    plugins = await initCompiledPlugins()
+  })
   afterAll(async () => plugins.dispose())
 
   const routes = () => createApp().routes
@@ -126,13 +130,17 @@ describe('assembled routes', () => {
       ACTIVE_IDENTITY: { get: () => 'james' },
     } as unknown as Env
     const call = (path: string, authorization?: string) =>
-      createApp().fetch(new Request(`http://127.0.0.1:4317${path}`, { headers: authorization ? { authorization } : {} }), env)
+      createApp().fetch(
+        new Request(`http://127.0.0.1:4317${path}`, { headers: authorization ? { authorization } : {} }),
+        env,
+      )
     const conflicts = '/v1/p/github/repos/acme/web/pulls/1/conflicts?base=main'
     expect((await call(conflicts)).status).toBe(401)
     // No project maps acme/web here, so the conflicts route answers its own "unavailable" body.
     expect(await (await call(conflicts, 'Bearer d')).json()).toEqual({ available: false, files: [] })
-    expect(((await (await call('/v1/p/github/repos/acme/web/pulls/x/conflicts', 'Bearer d')).json()) as ApiError).error)
-      .toMatchObject({ code: 'bad_number' })
+    expect(
+      ((await (await call('/v1/p/github/repos/acme/web/pulls/x/conflicts', 'Bearer d')).json()) as ApiError).error,
+    ).toMatchObject({ code: 'bad_number' })
     // A path the mirror doesn't serve falls through to the app's 404, as it did when the routers were
     // mounted at boot.
     expect((await call('/v1/p/github/repos/acme/web/nothing-here', 'Bearer d')).status).toBe(404)
@@ -148,11 +156,26 @@ describe('assembled routes', () => {
     // assertion; any of them appearing would mean something in the binary had started registering a
     // provider again.
     const expected = ['github']
-    expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
+    expect(
+      connectionProviderRegistry
+        .list()
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(expected)
     // The integration registry holds only providers with mirrored resources (docs/integrations/contributions.md §
     // Connection and integration contributions). github has them, so the two lists coincide. They are
     // asserted separately because a connection provider need not be an integration one.
-    expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
-    expect(modelProviderRegistry.list().map((a) => a.providerId).sort()).toEqual([])
+    expect(
+      integrationProviderRegistry
+        .list()
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual(expected)
+    expect(
+      modelProviderRegistry
+        .list()
+        .map((a) => a.providerId)
+        .sort(),
+    ).toEqual([])
   })
 })

@@ -28,11 +28,12 @@ export const taskContextAgentContribution: AgentContextContribution = {
     const selectedIds = optionIds
       ? [...optionIds]
       : selection
-        ? Object.entries(selection).flatMap(([id, included]) => included ? [id] : [])
+        ? Object.entries(selection).flatMap(([id, included]) => (included ? [id] : []))
         : undefined
-    const route = selectedIds?.length === 0
-      ? `${taskContextRoute(scope.taskId)}?include=__none__`
-      : taskContextRoute(scope.taskId, selectedIds)
+    const route =
+      selectedIds?.length === 0
+        ? `${taskContextRoute(scope.taskId)}?include=__none__`
+        : taskContextRoute(scope.taskId, selectedIds)
     const context = await readJson<TaskContext>(route)
     const capturedAt = Date.now()
     const assembled = assembleBlockFrom(

@@ -58,13 +58,22 @@ const start = () => {
   const box = document.createElement('div')
   document.body.append(box)
   const editor = createRoot((dispose) => {
-    const controller = createEditorController({ task: { id: taskId, projectId: 'p1' }, api, queryClient: new QueryClient(), prefs: () => ({}) })
+    const controller = createEditorController({
+      task: { id: taskId, projectId: 'p1' },
+      api,
+      queryClient: new QueryClient(),
+      prefs: () => ({}),
+    })
     controller.mountEditor(box)
     // The pane's wiring for the one intent this file needs: a history step arrives as a reveal.
     const off = clientEvents.on('presentation:pane-intent', ({ taskId: target, intent }) => {
       if (target === taskId && intent.kind === 'editor:reveal') controller.reveal(intent)
     })
-    cleanups.push(() => { off(); dispose(); box.remove() })
+    cleanups.push(() => {
+      off()
+      dispose()
+      box.remove()
+    })
     return controller
   })
   const view = () => {
@@ -133,7 +142,9 @@ describe('the editor controller', () => {
     await showing('const b = 2\n')
     let finishBack!: () => void
     read.mockImplementationOnce(async (taskId, path) => {
-      await new Promise<void>((resolve) => { finishBack = resolve })
+      await new Promise<void>((resolve) => {
+        finishBack = resolve
+      })
       return readDisk(taskId, path)
     })
     const back = editor.replay(-1)

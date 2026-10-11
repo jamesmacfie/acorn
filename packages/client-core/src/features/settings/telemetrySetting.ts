@@ -30,7 +30,11 @@ export async function saveTelemetryOn(qc: QueryClient, on: boolean, nodeId: stri
     return true
   } catch (error) {
     if (throwing) throw error
-    pushBackgroundError('', `Could not save ${PrefKeys.telemetry}`, error instanceof Error ? error.message : String(error))
+    pushBackgroundError(
+      '',
+      `Could not save ${PrefKeys.telemetry}`,
+      error instanceof Error ? error.message : String(error),
+    )
     return false
   } finally {
     await qc.invalidateQueries({ queryKey: nodePrefsKey(nodeId) })

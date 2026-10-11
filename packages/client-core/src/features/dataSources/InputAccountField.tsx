@@ -22,20 +22,43 @@ export default function InputAccountField(props: {
   /** An account to bind, or undefined to leave the input unbound, which skips an optional one. */
   onChange: (connectionId: string | undefined) => void
 }) {
-  const label = () => props.optional ? `${props.label} (optional)` : props.label
+  const label = () => (props.optional ? `${props.label} (optional)` : props.label)
   return (
-    <Show when={props.connections.length} fallback={<Field label={label()} group>
-      <Text emphasis="muted" wrap>{`No ${props.provider} account is connected.`}</Text>
-      <Inline gap="inline" wrap>
-        <Button size="sm" disabled={props.disabled} onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>{`Connect ${props.provider}…`}</Button>
-        <Show when={props.optional && props.bound}><Button size="sm" variant="ghost" disabled={props.disabled} onPress={() => props.onChange(undefined)}>Skip this input</Button></Show>
-      </Inline>
-    </Field>}>
+    <Show
+      when={props.connections.length}
+      fallback={
+        <Field label={label()} group>
+          <Text emphasis="muted" wrap>{`No ${props.provider} account is connected.`}</Text>
+          <Inline gap="inline" wrap>
+            <Button
+              size="sm"
+              disabled={props.disabled}
+              onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}
+            >{`Connect ${props.provider}…`}</Button>
+            <Show when={props.optional && props.bound}>
+              <Button size="sm" variant="ghost" disabled={props.disabled} onPress={() => props.onChange(undefined)}>
+                Skip this input
+              </Button>
+            </Show>
+          </Inline>
+        </Field>
+      }
+    >
       <Field label={label()} group>
-        <Select size="sm" label={label()} disabled={props.disabled} value={props.bound ? props.value ?? '' : ''}
-          options={[{ value: '', label: props.optional ? 'Skip' : 'Choose an account…' },
-            ...props.connections.map(connection => ({ value: connection.id, label: connection.name ?? connection.label }))]}
-          onChange={value => props.onChange(value || undefined)} />
+        <Select
+          size="sm"
+          label={label()}
+          disabled={props.disabled}
+          value={props.bound ? (props.value ?? '') : ''}
+          options={[
+            { value: '', label: props.optional ? 'Skip' : 'Choose an account…' },
+            ...props.connections.map((connection) => ({
+              value: connection.id,
+              label: connection.name ?? connection.label,
+            })),
+          ]}
+          onChange={(value) => props.onChange(value || undefined)}
+        />
       </Field>
     </Show>
   )

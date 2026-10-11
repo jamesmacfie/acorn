@@ -9,13 +9,15 @@ export const SAVED_MS = 2000
  *  as one a list rebuilt, shows only what is left of the two seconds. */
 export function createSavedSignal(savedAt: Accessor<number | undefined>): Accessor<boolean> {
   const [saved, setSaved] = createSignal(false)
-  createEffect(on(savedAt, (at) => {
-    setSaved(false)
-    const left = at ? at + SAVED_MS - Date.now() : 0
-    if (left <= 0) return
-    setSaved(true)
-    const timer = setTimeout(() => setSaved(false), left)
-    onCleanup(() => clearTimeout(timer))
-  }))
+  createEffect(
+    on(savedAt, (at) => {
+      setSaved(false)
+      const left = at ? at + SAVED_MS - Date.now() : 0
+      if (left <= 0) return
+      setSaved(true)
+      const timer = setTimeout(() => setSaved(false), left)
+      onCleanup(() => clearTimeout(timer))
+    }),
+  )
   return saved
 }

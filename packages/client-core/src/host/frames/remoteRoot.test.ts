@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import {
-  createNode, createRemoteRoot, createText, firstChild, insertNode, isTextNode, nextSibling,
-  removeNode, setProperty, setText,
+  createNode,
+  createRemoteRoot,
+  createText,
+  firstChild,
+  insertNode,
+  isTextNode,
+  nextSibling,
+  removeNode,
+  setProperty,
+  setText,
 } from './remoteRoot'
 
 // The sandbox half. What matters here is what crosses the port and when: a detached subtree crosses
@@ -73,7 +81,9 @@ describe('the remote root', () => {
     const press = vi.fn()
     const button = createNode('Button')
     setProperty(button, 'onPress', press)
-    setProperty(button, 'onKeyDown', () => { throw new Error('a raw key handler must never cross') })
+    setProperty(button, 'onKeyDown', () => {
+      throw new Error('a raw key handler must never cross')
+    })
     insertNode(root.node, button, null)
     await flush()
 
@@ -248,7 +258,8 @@ describe('the remote root', () => {
   })
 
   it('moves authority between roots without retaining a handler in the old root', async () => {
-    const a = collect(), b = collect()
+    const a = collect(),
+      b = collect()
     const button = createNode('Button')
     const press = vi.fn()
     setProperty(button, 'onPress', press)
@@ -261,7 +272,8 @@ describe('the remote root', () => {
     expect(press).not.toHaveBeenCalled()
     b.root.dispatch(1, 'new root')
     expect(press).toHaveBeenCalledExactlyOnceWith('new root')
-    a.root.dispose(); b.root.dispose()
+    a.root.dispose()
+    b.root.dispose()
   })
 
   it('walks the way a renderer expects', () => {

@@ -13,7 +13,14 @@ import { readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { resolveInRoot } from '../core/fs'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './installer'
-import { contributesNodeData, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
+import {
+  contributesNodeData,
+  PLUGIN_API_MAJOR,
+  readPluginManifestResult,
+  speaksApiVersion,
+  type ManifestUnknown,
+  type PluginManifest,
+} from './manifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
@@ -25,7 +32,13 @@ import type { LoadedPluginBinding } from '../pluginHost/context'
 import { createLogger } from '../telemetry/logger'
 import type { PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 
-import { MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_FILE_BYTES, readPluginFile, streamPluginFile, visitPluginFile } from './packageFiles'
+import {
+  MAX_CLIENT_BUNDLE_BYTES,
+  MAX_PLUGIN_FILE_BYTES,
+  readPluginFile,
+  streamPluginFile,
+  visitPluginFile,
+} from './packageFiles'
 
 const log = createLogger('plugins')
 
@@ -215,7 +228,15 @@ export type ActivePluginSnapshot = {
 /** Retain the manifest and the exact client bytes as one boot or reload candidate. The reported
  * digest is computed from these retained bytes, never from a later disk scan. */
 export async function snapshotActivePlugin(entry: InstalledPlugin): Promise<ActivePluginSnapshot> {
-  const { id, label: _label, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = installedPluginInfo(entry)
+  const {
+    id,
+    label: _label,
+    hasNode,
+    source: _source,
+    installedAt: _installedAt,
+    bundled: _bundled,
+    ...declaration
+  } = installedPluginInfo(entry)
   const bundle = await readClientBundle([entry], id)
   return {
     id,
@@ -358,11 +379,19 @@ function resolveRequires(
       if (builtins.has(dependency.id)) continue
       const version = versions.get(dependency.id)
       if (version === undefined) {
-        unmet.push({ id: entry.manifest.id, dir: entry.dir, reason: `requires the plugin '${dependency.id}', which is not installed on this node` })
+        unmet.push({
+          id: entry.manifest.id,
+          dir: entry.dir,
+          reason: `requires the plugin '${dependency.id}', which is not installed on this node`,
+        })
         break
       }
       if (dependency.version && !speaksApiVersion(dependency.version, majorOf(version))) {
-        unmet.push({ id: entry.manifest.id, dir: entry.dir, reason: `requires '${dependency.id}' version ${dependency.version}; this node has ${version}` })
+        unmet.push({
+          id: entry.manifest.id,
+          dir: entry.dir,
+          reason: `requires '${dependency.id}' version ${dependency.version}; this node has ${version}`,
+        })
         break
       }
     }
@@ -413,7 +442,11 @@ type EntryOutcome = { loaded?: LoadedPlugin; installed?: InstalledPlugin; failur
 
 // Never rejects: every way a package can fail is a failure row, so one bad package cannot stop its
 // siblings from loading.
-async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: ReadonlySet<string>): Promise<EntryOutcome> {
+async function loadEntry(
+  entry: InstalledPlugin,
+  dataRoot: string,
+  builtins: ReadonlySet<string>,
+): Promise<EntryOutcome> {
   const { manifest, dir } = entry
   // Before anything runs: a skill that fails its checks fails the package, with the reason, rather
   // than quietly leaving the agent without a procedure the owner installed for it.
@@ -444,7 +477,11 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
     if (builtins.has(manifest.id)) {
       return {
         installed: entry,
-        failure: { id: manifest.id, dir, reason: `'${manifest.id}' is a built-in plugin; a package with no node half cannot take its name` },
+        failure: {
+          id: manifest.id,
+          dir,
+          reason: `'${manifest.id}' is a built-in plugin; a package with no node half cannot take its name`,
+        },
       }
     }
     return {
@@ -469,7 +506,13 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   if (manifest.migrations) {
     const declared = resolveInRoot(dir, manifest.migrations)
     if (!declared) {
-      return { failure: { id: manifest.id, dir, reason: `migrations path '${manifest.migrations}' resolves outside the plugin directory` } }
+      return {
+        failure: {
+          id: manifest.id,
+          dir,
+          reason: `migrations path '${manifest.migrations}' resolves outside the plugin directory`,
+        },
+      }
     }
     try {
       migrationsFolder = pluginMigrationsChain(manifest.id, declared)
@@ -482,7 +525,13 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   // must not be able to point the loader at a file outside its own directory.
   const entrypoint = resolveInRoot(dir, manifest.node)
   if (!entrypoint) {
-    return { failure: { id: manifest.id, dir, reason: `node entrypoint '${manifest.node}' resolves outside the plugin directory` } }
+    return {
+      failure: {
+        id: manifest.id,
+        dir,
+        reason: `node entrypoint '${manifest.node}' resolves outside the plugin directory`,
+      },
+    }
   }
 
   let plugin: NodePlugin
@@ -499,9 +548,19 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
       permissions: manifest.permissions.node,
     })
   } catch (error) {
-    const code = error instanceof Error && 'code' in error ? `${String((error as Error & { code?: unknown }).code)}: ` : ''
-    const resource = error instanceof Error && 'resource' in error ? ` (${String((error as Error & { resource?: unknown }).resource)})` : ''
-    return { failure: { id: manifest.id, dir, reason: `could not import isolated node entrypoint ${manifest.node}: ${code}${String(error)}${resource}` } }
+    const code =
+      error instanceof Error && 'code' in error ? `${String((error as Error & { code?: unknown }).code)}: ` : ''
+    const resource =
+      error instanceof Error && 'resource' in error
+        ? ` (${String((error as Error & { resource?: unknown }).resource)})`
+        : ''
+    return {
+      failure: {
+        id: manifest.id,
+        dir,
+        reason: `could not import isolated node entrypoint ${manifest.node}: ${code}${String(error)}${resource}`,
+      },
+    }
   }
 
   const storage: PluginStorage = {
@@ -542,19 +601,23 @@ export async function loadExternalPlugins(
   // Every package starts at once, and the results fold back in directory order. A worker's start
   // happens almost entirely off this thread: its bootstrap and the bundle's evaluation take about
   // 45 ms a package. Awaiting them one at a time would make boot wait for the sum.
-  const outcomes = await Promise.all(scan.installed.map((entry) =>
-    // This is shared by boot and live reload. Checking before loadEntry also blocks manifest-only
-    // harness registration; merely setting `disabled` would still import the Node bundle above it.
-    hasPendingPluginReview(dataRoot, basename(entry.dir)) || hasPendingPluginReview(dataRoot, entry.manifest.id)
-      ? Promise.resolve({ installed: entry } as EntryOutcome)
-      : loadEntry(entry, dataRoot, builtins)))
+  const outcomes = await Promise.all(
+    scan.installed.map((entry) =>
+      // This is shared by boot and live reload. Checking before loadEntry also blocks manifest-only
+      // harness registration; merely setting `disabled` would still import the Node bundle above it.
+      hasPendingPluginReview(dataRoot, basename(entry.dir)) || hasPendingPluginReview(dataRoot, entry.manifest.id)
+        ? Promise.resolve({ installed: entry } as EntryOutcome)
+        : loadEntry(entry, dataRoot, builtins),
+    ),
+  )
   for (const outcome of outcomes) {
     if (outcome.failure) failures.push(outcome.failure)
     if (outcome.loaded) {
       // Shadowing a built-in during a staged migration (docs/plugins/dev-loop.md § The dev loop). Loud rather
       // than silent, because "the version running is not the one in this binary" is the single most
       // confusing thing a support thread can fail to mention.
-      if (outcome.loaded.shadowsBuiltin) log.warn(`${outcome.loaded.manifest.id}: loading from ${outcome.loaded.dir} INSTEAD of the built-in`)
+      if (outcome.loaded.shadowsBuiltin)
+        log.warn(`${outcome.loaded.manifest.id}: loading from ${outcome.loaded.dir} INSTEAD of the built-in`)
       loaded.push(outcome.loaded)
     }
     if (outcome.installed) installed.push(outcome.installed)

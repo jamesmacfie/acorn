@@ -20,7 +20,10 @@ import { taskBridge } from './taskBridge'
 // Create from a seed (docs/workspaces-and-tasks.md). Callers invalidate tasksKey after.
 export const createTask = async (seed: TaskSeed, nodeId?: string | null) => {
   const task = await writeJson<Task>(tasksRoute, {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(seed), nodeId,
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(seed),
+    nodeId,
   })
   // Let the node run the repo's setup script now if it's configured to run on task creation (no-op
   // otherwise). Fire-and-forget so task creation isn't blocked on git/worktree.
@@ -28,13 +31,21 @@ export const createTask = async (seed: TaskSeed, nodeId?: string | null) => {
   return task
 }
 
-export async function patchTask(id: string, body: { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null }, nodeId?: string | null) {
-  return writeJson<{ id: string; archivedTaskIds?: string[] }>(taskRoute(id), {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    nodeId,
-  }, (res) => `task ${res.status}`)
+export async function patchTask(
+  id: string,
+  body: { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null },
+  nodeId?: string | null,
+) {
+  return writeJson<{ id: string; archivedTaskIds?: string[] }>(
+    taskRoute(id),
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      nodeId,
+    },
+    (res) => `task ${res.status}`,
+  )
 }
 
 export const renameTask = async (id: string, title: string) => patchTask(id, { title })

@@ -11,9 +11,15 @@ function focus(...args: string[]) {
 
 describe('focused test command', () => {
   it('preserves arguments when pnpm is a JavaScript CLI', () => {
-    const invocation = spawnSync(process.execPath, ['--input-type=module', '-e',
-      "import { pnpmInvocation } from './scripts/run-pnpm.mjs'; console.log(JSON.stringify(pnpmInvocation(['--filter', '@acorn/protocol', '-t', 'two words'])))",
-    ], { cwd: root, encoding: 'utf8', env: { ...process.env, npm_execpath: 'C:\\pnpm\\pnpm.cjs' } })
+    const invocation = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "import { pnpmInvocation } from './scripts/run-pnpm.mjs'; console.log(JSON.stringify(pnpmInvocation(['--filter', '@acorn/protocol', '-t', 'two words'])))",
+      ],
+      { cwd: root, encoding: 'utf8', env: { ...process.env, npm_execpath: 'C:\\pnpm\\pnpm.cjs' } },
+    )
     expect(invocation.status, invocation.stderr).toBe(0)
     expect(JSON.parse(invocation.stdout)).toEqual([
       process.execPath,

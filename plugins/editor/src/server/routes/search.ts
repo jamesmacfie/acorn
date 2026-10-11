@@ -20,44 +20,63 @@ export const setSearchBridge = (bridge: SearchBridge | null): void => setRouteTe
 
 // Search spawns a process, so the body gets zod validation and a malformed-body test. Unknown
 // keys are stripped, and toggles default to off.
-const searchBody = z.object({
-  query: z.string().min(1),
-  opts: z
-    .object({
-      caseSensitive: z.boolean(), wholeWord: z.boolean(), regex: z.boolean(),
-      folder: z.string().min(1).max(4096),
-      include: z.array(z.string().min(1).max(256)).max(20),
-      exclude: z.array(z.string().min(1).max(256)).max(20),
-    })
-    .partial()
-    .optional(),
-}).superRefine((body, ctx) => {
-  const patterns = [...(body.opts?.include ?? []), ...(body.opts?.exclude ?? [])]
-  if (body.opts?.include?.some((pattern) => pattern.startsWith('!')))
-    ctx.addIssue({ code: 'custom', message: 'Negative patterns belong in Files to exclude.' })
-  if (patterns.reduce((bytes, pattern) => bytes + Buffer.byteLength(pattern), 0) > 4096)
-    ctx.addIssue({ code: 'custom', message: 'Search filters exceed 4 KiB.' })
-})
+const searchBody = z
+  .object({
+    query: z.string().min(1),
+    opts: z
+      .object({
+        caseSensitive: z.boolean(),
+        wholeWord: z.boolean(),
+        regex: z.boolean(),
+        folder: z.string().min(1).max(4096),
+        include: z.array(z.string().min(1).max(256)).max(20),
+        exclude: z.array(z.string().min(1).max(256)).max(20),
+      })
+      .partial()
+      .optional(),
+  })
+  .superRefine((body, ctx) => {
+    const patterns = [...(body.opts?.include ?? []), ...(body.opts?.exclude ?? [])]
+    if (body.opts?.include?.some((pattern) => pattern.startsWith('!')))
+      ctx.addIssue({ code: 'custom', message: 'Negative patterns belong in Files to exclude.' })
+    if (patterns.reduce((bytes, pattern) => bytes + Buffer.byteLength(pattern), 0) > 4096)
+      ctx.addIssue({ code: 'custom', message: 'Search filters exceed 4 KiB.' })
+  })
 
 export const search = new Hono<AppEnv>().post('/:id/search', async (c) => {
   const parsed = searchBody.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success) return respondError(c, 400, 'bad_request')
   const { query, opts } = parsed.data
   try {
-    return await viaBridge(c, SEARCH, (bridge) => bridge.findInFiles(c.req.param('id'), query, {
-      caseSensitive: opts?.caseSensitive ?? false,
-      wholeWord: opts?.wholeWord ?? false,
-      regex: opts?.regex ?? false,
-      ...(opts?.folder !== undefined ? { folder: opts.folder } : {}),
-      ...(opts?.include !== undefined ? { include: opts.include } : {}),
-      ...(opts?.exclude !== undefined ? { exclude: opts.exclude } : {}),
-    }, new Request(c.req.url, { signal: c.req.raw.signal })))
+    return await viaBridge(c, SEARCH, (bridge) =>
+      bridge.findInFiles(
+        c.req.param('id'),
+        query,
+        {
+          caseSensitive: opts?.caseSensitive ?? false,
+          wholeWord: opts?.wholeWord ?? false,
+          regex: opts?.regex ?? false,
+          ...(opts?.folder !== undefined ? { folder: opts.folder } : {}),
+          ...(opts?.include !== undefined ? { include: opts.include } : {}),
+          ...(opts?.exclude !== undefined ? { exclude: opts.exclude } : {}),
+        },
+        new Request(c.req.url, { signal: c.req.raw.signal }),
+      ),
+    )
   } catch (error) {
     // RPC errors retain machine codes even when the remote prototype differs.
     const code = error instanceof SearchFailure ? error.code : (error as { code?: string })?.code
     if (!code) throw error
-    const status = code === 'invalid_query' || code === 'invalid_filter' ? 400 : code === 'unavailable_root' || code === 'invalid_scope' ? 404
-      : code === 'cancelled' ? 409 : code === 'timeout' ? 504 : 500
+    const status =
+      code === 'invalid_query' || code === 'invalid_filter'
+        ? 400
+        : code === 'unavailable_root' || code === 'invalid_scope'
+          ? 404
+          : code === 'cancelled'
+            ? 409
+            : code === 'timeout'
+              ? 504
+              : 500
     return respondError(c, status, code)
   }
 })

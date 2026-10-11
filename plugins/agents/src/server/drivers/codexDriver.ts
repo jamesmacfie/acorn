@@ -79,7 +79,12 @@ export class CodexAgentDriver implements AgentDriver {
     }
     try {
       cancellation.signal.throwIfAborted()
-      const handle = await awaitWithSignal(this.startSession(scoped, (stop) => { cleanup = stop }), cancellation.signal)
+      const handle = await awaitWithSignal(
+        this.startSession(scoped, (stop) => {
+          cleanup = stop
+        }),
+        cancellation.signal,
+      )
       cancellation.signal.throwIfAborted()
       return handle
     } catch (error) {

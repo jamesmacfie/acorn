@@ -50,37 +50,98 @@ export function largeSessionTurns(profile: LargeSessionProfile, seed = 1): Large
     const tag = `${seed}-${index}`
     const message = `message-${tag}`
     const list: AgentNormalizedEvent[] = [
-      { type: 'user_message', text: index === 0 ? `${LARGE_SESSION_OLDEST_MARKER}. Start the review.` : `Turn ${index}: continue with the next file.` },
+      {
+        type: 'user_message',
+        text:
+          index === 0
+            ? `${LARGE_SESSION_OLDEST_MARKER}. Start the review.`
+            : `Turn ${index}: continue with the next file.`,
+      },
       { type: 'reasoning', text: `Reading the diff for turn ${index}. `, messageId: `reasoning-${tag}` },
-      { type: 'reasoning', text: 'Checking the queue bound before editing.', messageId: `reasoning-${tag}`, append: true },
+      {
+        type: 'reasoning',
+        text: 'Checking the queue bound before editing.',
+        messageId: `reasoning-${tag}`,
+        append: true,
+      },
     ]
     for (let tool = 0; tool < 3; tool++) {
       const id = `tool-${tag}-${tool}`
       const title = `Read src/pkg-${(index + tool) % 40}/module-${index}.ts`
-      list.push({ type: 'tool', tool: { id, title, kind: 'read', status: 'running', input: `{"path":"src/module-${index}.ts"}` } })
-      list.push({ type: 'tool', tool: { id, title, status: 'completed', output: tool === 2 && index % 5 === 0 ? CODE : `Read ${40 + tool} lines.` } })
+      list.push({
+        type: 'tool',
+        tool: { id, title, kind: 'read', status: 'running', input: `{"path":"src/module-${index}.ts"}` },
+      })
+      list.push({
+        type: 'tool',
+        tool: {
+          id,
+          title,
+          status: 'completed',
+          output: tool === 2 && index % 5 === 0 ? CODE : `Read ${40 + tool} lines.`,
+        },
+      })
     }
     if (index % 5 === 0 || index === shape.turns - 1) {
       const id = `edit-${tag}`
       const path = `src/pkg-${index % 40}/queue.ts`
-      list.push({ type: 'tool', tool: { id, title: `Changed ${path}`, kind: 'edit', status: 'running', paths: [path] } })
-      list.push({ type: 'file_change', changeId: id, path, patch: '@@ -1,3 +1,3 @@\n export function take(queue: string[]) {\n-  return queue.pop()\n+  return queue.shift()\n }' })
+      list.push({
+        type: 'tool',
+        tool: { id, title: `Changed ${path}`, kind: 'edit', status: 'running', paths: [path] },
+      })
+      list.push({
+        type: 'file_change',
+        changeId: id,
+        path,
+        patch:
+          '@@ -1,3 +1,3 @@\n export function take(queue: string[]) {\n-  return queue.pop()\n+  return queue.shift()\n }',
+      })
       list.push({ type: 'tool', tool: { id, title: '', status: 'completed' } })
     }
     if (index % 4 === 1) {
       const requestId = `request-${tag}`
-      list.push({ type: 'request', requestId, kind: 'permission', title: 'Run the test suite?', options: [{ id: 'allow', label: 'Allow once', kind: 'allow_once' }, { id: 'reject', label: 'Reject', kind: 'reject_once' }] })
+      list.push({
+        type: 'request',
+        requestId,
+        kind: 'permission',
+        title: 'Run the test suite?',
+        options: [
+          { id: 'allow', label: 'Allow once', kind: 'allow_once' },
+          { id: 'reject', label: 'Reject', kind: 'reject_once' },
+        ],
+      })
       list.push({ type: 'request_resolved', requestId, resolution: { optionId: 'allow' } })
     }
     if (index % 10 === 3) {
       const id = `subagent-${tag}`
-      list.push({ type: 'subagent', subagent: { id, title: `Explore module ${index}`, status: 'running', role: 'Explore' } })
+      list.push({
+        type: 'subagent',
+        subagent: { id, title: `Explore module ${index}`, status: 'running', role: 'Explore' },
+      })
       list.push({ type: 'subagent', subagent: { id, status: 'completed', toolUseCount: 4, durationMs: 1_200 } })
     }
     list.push({ type: 'assistant_message', text: `Turn ${index} summary. `, messageId: message })
-    list.push({ type: 'assistant_message', text: 'The change keeps the queue bounded, ', messageId: message, append: true })
-    list.push({ type: 'assistant_message', text: index % 5 === 0 ? `and here is the shape:\n\n${CODE}\n` : 'and nothing else moved.', messageId: message, append: true })
-    list.push({ type: 'usage', usage: { inputTokens: 1_000 + index, outputTokens: 200 + index, contextUsed: 20_000 + index * 10, contextSize: 200_000 } })
+    list.push({
+      type: 'assistant_message',
+      text: 'The change keeps the queue bounded, ',
+      messageId: message,
+      append: true,
+    })
+    list.push({
+      type: 'assistant_message',
+      text: index % 5 === 0 ? `and here is the shape:\n\n${CODE}\n` : 'and nothing else moved.',
+      messageId: message,
+      append: true,
+    })
+    list.push({
+      type: 'usage',
+      usage: {
+        inputTokens: 1_000 + index,
+        outputTokens: 200 + index,
+        contextUsed: 20_000 + index * 10,
+        contextSize: 200_000,
+      },
+    })
     list.push({ type: 'turn_completed', stopReason: 'end_turn' })
     events += list.length
     turns.push({ user: list[0]!.type === 'user_message' ? list[0]!.text : '', events: list })
@@ -115,23 +176,52 @@ export async function seedLargeSession(
 ): Promise<{ session: AgentSession; turns: number; events: number }> {
   const store = new AgentStore(db, core)
   const turns = largeSessionTurns(input.profile, input.seed)
-  const session = await store.createSession({
-    taskId: input.taskId,
-    providerId: PROVIDER.id,
-    profileId: PROVIDER.profileId,
-    kind: 'imported',
-    title: input.title ?? `Large-surface fixture (${input.profile})`,
-    config: {
-      imported: true, resumeVerified: false, fixture: 'large-surfaces',
-      // Exercise the terminal composer's compact row and permission omission in the PTY fixture.
-      configOptions: [
-        { id: 'mode', label: 'Mode', category: 'mode', currentValue: 'default', values: [{ value: 'default', label: 'Default' }] },
-        { id: 'model', label: 'Model', category: 'model', currentValue: 'fixture', values: [{ value: 'fixture', label: 'Fixture model' }] },
-        { id: 'reasoning', label: 'Effort', category: 'reasoning', currentValue: 'high', values: [{ value: 'high', label: 'high' }] },
-        { id: 'permissions', label: 'Permissions', category: 'permission', currentValue: 'workspace', values: [{ value: 'workspace', label: 'workspace' }] },
-      ],
+  const session = await store.createSession(
+    {
+      taskId: input.taskId,
+      providerId: PROVIDER.id,
+      profileId: PROVIDER.profileId,
+      kind: 'imported',
+      title: input.title ?? `Large-surface fixture (${input.profile})`,
+      config: {
+        imported: true,
+        resumeVerified: false,
+        fixture: 'large-surfaces',
+        // Exercise the terminal composer's compact row and permission omission in the PTY fixture.
+        configOptions: [
+          {
+            id: 'mode',
+            label: 'Mode',
+            category: 'mode',
+            currentValue: 'default',
+            values: [{ value: 'default', label: 'Default' }],
+          },
+          {
+            id: 'model',
+            label: 'Model',
+            category: 'model',
+            currentValue: 'fixture',
+            values: [{ value: 'fixture', label: 'Fixture model' }],
+          },
+          {
+            id: 'reasoning',
+            label: 'Effort',
+            category: 'reasoning',
+            currentValue: 'high',
+            values: [{ value: 'high', label: 'high' }],
+          },
+          {
+            id: 'permissions',
+            label: 'Permissions',
+            category: 'permission',
+            currentValue: 'workspace',
+            values: [{ value: 'workspace', label: 'workspace' }],
+          },
+        ],
+      },
     },
-  }, PROVIDER)
+    PROVIDER,
+  )
   await store.setController(session.id, 'external')
   let events = 0
   for (const generated of turns) {
@@ -148,6 +238,10 @@ export async function seedLargeSession(
       events++
     }
   }
-  await store.recordEvent(session.id, null, { type: 'session_state', state: 'stopped', detail: 'Large-surface fixture.' })
+  await store.recordEvent(session.id, null, {
+    type: 'session_state',
+    state: 'stopped',
+    detail: 'Large-surface fixture.',
+  })
   return { session: await store.requireSession(session.id), turns: turns.length, events: events + 1 }
 }

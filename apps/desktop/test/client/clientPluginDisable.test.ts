@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { agentContextRegistry } from '@acorn/client-core/host/registries/sources'
-import { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { attentionRegistry } from '@acorn/client-core/host/registries/rail'
 import { commandRegistry } from '@acorn/client-core/host/registries/commands'
 import { nodeStatRegistry } from '@acorn/client-core/host/registries/rail'
@@ -91,7 +94,8 @@ const without = (base: Snapshot, owned: Partial<Snapshot>): Snapshot =>
     // A hand-edited golden claiming an id the full activation never produced would otherwise pass silently:
     // subtracting a ghost removes nothing, so the equality still holds. Only reachable by hand-editing, since
     // the derivation below can only record ids it saw.
-    if (unmatched.length) throw new Error(`golden names ${name} entries the full activation never produced: ${unmatched.join(', ')}`)
+    if (unmatched.length)
+      throw new Error(`golden names ${name} entries the full activation never produced: ${unmatched.join(', ')}`)
     return rest
   })
 
@@ -173,7 +177,10 @@ describe('disabling a client plugin', () => {
     expect(NAMES).not.toContain('browser')
     for (const name of OPTIONAL) {
       const owned = OWNED[name]
-      expect(REGISTRY_NAMES.reduce((sum, key) => sum + (owned[key]?.length ?? 0), 0), name).toBeGreaterThan(0)
+      expect(
+        REGISTRY_NAMES.reduce((sum, key) => sum + (owned[key]?.length ?? 0), 0),
+        name,
+      ).toBeGreaterThan(0)
     }
   })
 

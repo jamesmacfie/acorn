@@ -9,16 +9,30 @@ import capture from './__fixtures__/codexWebSearchWire.json' with { type: 'json'
 
 describe('Codex app-server normalization', () => {
   it('preserves the MCP tool identity for contributed transcript actions', () => {
-    expect(normalizeCodexNotification({ method: 'item/completed', params: {
-      item: { id: 'memory', type: 'mcpToolCall', server: 'acorn', tool: 'memory_delete', arguments: { name: 'stale', scope: 'project', hash: 'hash' }, result: { changeId: 'change' } },
-    } })).toMatchObject([{ type: 'tool', tool: { name: 'memory_delete', status: 'completed' } }])
+    expect(
+      normalizeCodexNotification({
+        method: 'item/completed',
+        params: {
+          item: {
+            id: 'memory',
+            type: 'mcpToolCall',
+            server: 'acorn',
+            tool: 'memory_delete',
+            arguments: { name: 'stale', scope: 'project', hash: 'hash' },
+            result: { changeId: 'change' },
+          },
+        },
+      }),
+    ).toMatchObject([{ type: 'tool', tool: { name: 'memory_delete', status: 'completed' } }])
   })
 
   it('maps protocol readiness without terminal heuristics', () => {
-    expect(normalizeCodexNotification({
-      method: 'thread/status/changed',
-      params: { threadId: 'thread-1', status: { type: 'idle' } },
-    })).toEqual([{ type: 'session_state', state: 'ready' }])
+    expect(
+      normalizeCodexNotification({
+        method: 'thread/status/changed',
+        params: { threadId: 'thread-1', status: { type: 'idle' } },
+      }),
+    ).toEqual([{ type: 'session_state', state: 'ready' }])
   })
 
   it('maps approval identity and advertised choices', () => {
@@ -58,10 +72,8 @@ describe('Codex app-server normalization', () => {
         { id: 'decline', label: 'Decline', kind: 'reject_once' },
       ],
     })
-    expect(codexServerRequestResponse(request, { optionId: 'accept' }))
-      .toEqual({ action: 'accept', content: {} })
-    expect(codexServerRequestResponse(request, { optionId: 'decline' }))
-      .toEqual({ action: 'decline' })
+    expect(codexServerRequestResponse(request, { optionId: 'accept' })).toEqual({ action: 'accept', content: {} })
+    expect(codexServerRequestResponse(request, { optionId: 'decline' })).toEqual({ action: 'decline' })
     expect(codexServerRequestResponse(request, null)).toEqual({ action: 'cancel' })
   })
 
@@ -107,78 +119,132 @@ describe('Codex app-server normalization', () => {
       ],
       options: [{ id: 'decline', label: 'Skip', kind: 'reject_once' }],
     })
-    expect(codexServerRequestResponse(request, {
-      answers: { browser: 'Firefox Developer Edition', retries: '2' },
-    })).toEqual({
+    expect(
+      codexServerRequestResponse(request, {
+        answers: { browser: 'Firefox Developer Edition', retries: '2' },
+      }),
+    ).toEqual({
       action: 'accept',
       content: { browser: 'firefox-dev', retries: 2 },
     })
   })
 
   it('maps message deltas', () => {
-    expect(normalizeCodexNotification({
-      method: 'item/agentMessage/delta',
-      params: { itemId: 'message-1', delta: 'hello' },
-    })).toEqual([{ type: 'assistant_message', text: 'hello', messageId: 'message-1', append: true }])
+    expect(
+      normalizeCodexNotification({
+        method: 'item/agentMessage/delta',
+        params: { itemId: 'message-1', delta: 'hello' },
+      }),
+    ).toEqual([{ type: 'assistant_message', text: 'hello', messageId: 'message-1', append: true }])
   })
 
   it('keeps cumulative billing tokens separate from the latest context usage', () => {
-    expect(normalizeCodexNotification({
-      method: 'thread/tokenUsage/updated',
-      params: {
-        tokenUsage: {
-          total: { inputTokens: 40, outputTokens: 8, cachedInputTokens: 12, cacheWriteInputTokens: 1, totalTokens: 48 },
-          last: { inputTokens: 9, outputTokens: 2, cachedInputTokens: 2, cacheWriteInputTokens: 0, totalTokens: 11 },
-          modelContextWindow: 100,
+    expect(
+      normalizeCodexNotification({
+        method: 'thread/tokenUsage/updated',
+        params: {
+          tokenUsage: {
+            total: {
+              inputTokens: 40,
+              outputTokens: 8,
+              cachedInputTokens: 12,
+              cacheWriteInputTokens: 1,
+              totalTokens: 48,
+            },
+            last: { inputTokens: 9, outputTokens: 2, cachedInputTokens: 2, cacheWriteInputTokens: 0, totalTokens: 11 },
+            modelContextWindow: 100,
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        type: 'usage',
+        usage: {
+          inputTokens: 40,
+          outputTokens: 8,
+          cachedInputTokens: 12,
+          cacheWriteInputTokens: 1,
+          contextUsed: 11,
+          contextSize: 100,
         },
       },
-    })).toEqual([{ type: 'usage', usage: { inputTokens: 40, outputTokens: 8, cachedInputTokens: 12, cacheWriteInputTokens: 1, contextUsed: 11, contextSize: 100 } }])
+    ])
   })
 
   it('does not treat cumulative usage as context when the latest snapshot is absent', () => {
-    expect(normalizeCodexNotification({
-      method: 'thread/tokenUsage/updated',
-      params: {
-        tokenUsage: {
-          total: { inputTokens: 40, outputTokens: 8, totalTokens: 48 },
-          modelContextWindow: 100,
+    expect(
+      normalizeCodexNotification({
+        method: 'thread/tokenUsage/updated',
+        params: {
+          tokenUsage: {
+            total: { inputTokens: 40, outputTokens: 8, totalTokens: 48 },
+            modelContextWindow: 100,
+          },
         },
-      },
-    })[0]).toMatchObject({ type: 'usage', usage: { contextUsed: undefined, contextSize: 100 } })
+      })[0],
+    ).toMatchObject({ type: 'usage', usage: { contextUsed: undefined, contextSize: 100 } })
   })
 
   it('maps each Codex plan snapshot with its structured status intact', () => {
-    expect(normalizeCodexNotification({
-      method: 'turn/plan/updated',
-      params: {
-        plan: [
-          { step: 'Inspect `session/start`', status: 'completed' },
-          { step: 'Update the projection', status: 'inProgress' },
-          { step: 'Verify the UI', status: 'pending' },
+    expect(
+      normalizeCodexNotification({
+        method: 'turn/plan/updated',
+        params: {
+          plan: [
+            { step: 'Inspect `session/start`', status: 'completed' },
+            { step: 'Update the projection', status: 'inProgress' },
+            { step: 'Verify the UI', status: 'pending' },
+          ],
+        },
+      }),
+    ).toEqual([
+      {
+        type: 'plan',
+        entries: [
+          { id: 'plan-0', text: 'Inspect `session/start`', status: 'completed' },
+          { id: 'plan-1', text: 'Update the projection', status: 'in_progress' },
+          { id: 'plan-2', text: 'Verify the UI', status: 'pending' },
         ],
       },
-    })).toEqual([{
-      type: 'plan',
-      entries: [
-        { id: 'plan-0', text: 'Inspect `session/start`', status: 'completed' },
-        { id: 'plan-1', text: 'Update the projection', status: 'in_progress' },
-        { id: 'plan-2', text: 'Verify the UI', status: 'pending' },
-      ],
-    }])
+    ])
   })
 
   it('persists only the authoritative completed proposal, separate from progress and questions', () => {
-    expect(normalizeCodexNotification({ method: 'item/plan/delta', params: {
-      itemId: 'plan-1', turnId: 'codex-turn-1', delta: 'Draft text',
-    } })).toEqual([])
-    expect(normalizeCodexNotification({ method: 'item/completed', params: {
-      turnId: 'codex-turn-1', item: { id: 'plan-1', type: 'plan', text: 'Final **plan**' },
-    } })).toEqual([{
-      type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1', text: 'Final **plan**',
-    }])
-    expect(normalizeCodexServerRequest({ id: 2, method: 'item/tool/requestUserInput', params: {
-      questions: [{ id: 'go', question: 'Shall I plan it?' }],
-    } })).toMatchObject({ type: 'request', kind: 'question' })
+    expect(
+      normalizeCodexNotification({
+        method: 'item/plan/delta',
+        params: {
+          itemId: 'plan-1',
+          turnId: 'codex-turn-1',
+          delta: 'Draft text',
+        },
+      }),
+    ).toEqual([])
+    expect(
+      normalizeCodexNotification({
+        method: 'item/completed',
+        params: {
+          turnId: 'codex-turn-1',
+          item: { id: 'plan-1', type: 'plan', text: 'Final **plan**' },
+        },
+      }),
+    ).toEqual([
+      {
+        type: 'plan_proposal',
+        itemId: 'plan-1',
+        providerTurnId: 'codex-turn-1',
+        text: 'Final **plan**',
+      },
+    ])
+    expect(
+      normalizeCodexServerRequest({
+        id: 2,
+        method: 'item/tool/requestUserInput',
+        params: {
+          questions: [{ id: 'go', question: 'Shall I plan it?' }],
+        },
+      }),
+    ).toMatchObject({ type: 'request', kind: 'question' })
   })
 
   it('extracts completed generated images as transient provider artifacts', async () => {
@@ -204,10 +270,12 @@ describe('Codex app-server normalization', () => {
       mediaType: 'image/png',
     })
     expect(Array.from(artifact?.bytes ?? [])).toEqual(Array.from(Buffer.from(result, 'base64')))
-    expect(normalizeCodexNotification(notification)).toEqual([{
-      type: 'tool',
-      tool: { id: 'image-1', title: 'Generated image', kind: 'image', status: 'completed' },
-    }])
+    expect(normalizeCodexNotification(notification)).toEqual([
+      {
+        type: 'tool',
+        tool: { id: 'image-1', title: 'Generated image', kind: 'image', status: 'completed' },
+      },
+    ])
   })
 })
 
@@ -215,14 +283,20 @@ describe('Codex app-server normalization', () => {
 // `FileChangePatchUpdatedNotification` and `TurnDiffUpdatedNotification`. The `diff` contents follow
 // a real rollout: an update's is headerless hunks, an added file's is the file's text.
 describe('Codex file changes', () => {
-  const update = { path: '/w/src/a.ts', kind: { type: 'update', move_path: null }, diff: '@@ -1,2 +1,2 @@\n keep\n-old\n+new' }
+  const update = {
+    path: '/w/src/a.ts',
+    kind: { type: 'update', move_path: null },
+    diff: '@@ -1,2 +1,2 @@\n keep\n-old\n+new',
+  }
   const added = { path: '/w/src/new.ts', kind: { type: 'add' }, diff: 'one\ntwo\n' }
 
   it('keeps each file’s diff from a patch update, under the item it belongs to', () => {
-    expect(normalizeCodexNotification({
-      method: 'item/fileChange/patchUpdated',
-      params: { threadId: 't', turnId: 'turn-1', itemId: 'item-1', changes: [update, added] },
-    })).toEqual([
+    expect(
+      normalizeCodexNotification({
+        method: 'item/fileChange/patchUpdated',
+        params: { threadId: 't', turnId: 'turn-1', itemId: 'item-1', changes: [update, added] },
+      }),
+    ).toEqual([
       { type: 'file_change', path: '/w/src/a.ts', patch: update.diff, changeId: 'item-1' },
       { type: 'file_change', path: '/w/src/new.ts', patch: '@@ -0,0 +1,2 @@\n+one\n+two', changeId: 'item-1' },
     ])
@@ -231,7 +305,11 @@ describe('Codex file changes', () => {
   it('keeps each file’s diff from a completed item, beside the tool card', () => {
     const events = normalizeCodexNotification({
       method: 'item/completed',
-      params: { threadId: 't', turnId: 'turn-1', item: { type: 'fileChange', id: 'item-1', status: 'completed', changes: [update] } },
+      params: {
+        threadId: 't',
+        turnId: 'turn-1',
+        item: { type: 'fileChange', id: 'item-1', status: 'completed', changes: [update] },
+      },
     })
     expect(events.map((event) => event.type)).toEqual(['tool', 'file_change'])
     expect(events[1]).toEqual({ type: 'file_change', path: '/w/src/a.ts', patch: update.diff, changeId: 'item-1' })
@@ -240,21 +318,30 @@ describe('Codex file changes', () => {
   it('turns a deleted file’s text into removed lines', () => {
     const [event] = normalizeCodexNotification({
       method: 'item/fileChange/patchUpdated',
-      params: { threadId: 't', turnId: 'turn-1', itemId: 'item-1', changes: [{ path: 'gone.ts', kind: { type: 'delete' }, diff: 'bye\n' }] },
+      params: {
+        threadId: 't',
+        turnId: 'turn-1',
+        itemId: 'item-1',
+        changes: [{ path: 'gone.ts', kind: { type: 'delete' }, diff: 'bye\n' }],
+      },
     })
     expect(event).toMatchObject({ patch: '@@ -1,1 +0,0 @@\n-bye' })
   })
 
   it('keys the whole-turn diff by its turn, so each update can replace the last', () => {
-    expect(normalizeCodexNotification({
-      method: 'turn/diff/updated',
-      params: { threadId: 't', turnId: 'turn-1', diff: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b' },
-    })).toEqual([{
-      type: 'file_change',
-      patch: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b',
-      summary: 'All changes this turn',
-      changeId: 'turn:turn-1',
-    }])
+    expect(
+      normalizeCodexNotification({
+        method: 'turn/diff/updated',
+        params: { threadId: 't', turnId: 'turn-1', diff: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b' },
+      }),
+    ).toEqual([
+      {
+        type: 'file_change',
+        patch: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b',
+        summary: 'All changes this turn',
+        changeId: 'turn:turn-1',
+      },
+    ])
   })
 })
 
@@ -266,7 +353,8 @@ describe('Codex file changes', () => {
 // schema and says so, which is the rule this repository holds captures to.
 describe('Codex web activity, against the captured wire', () => {
   const items = capture.notifications.map((notification) =>
-    normalizeCodexNotification(notification as Parameters<typeof normalizeCodexNotification>[0]))
+    normalizeCodexNotification(notification as Parameters<typeof normalizeCodexNotification>[0]),
+  )
   const tools = items.flat().flatMap((event) => (event.type === 'tool' ? [event.tool] : []))
 
   it('reports nothing web-shaped while the call has said nothing', () => {
@@ -305,8 +393,7 @@ describe('Codex web activity, against the captured wire', () => {
   it('drops the fields a ledger has no use for', () => {
     // `ref_id`, `type` and `thumbnail_url` are all on the captured rows. A thumbnail in particular is
     // a fetch this card refuses to make.
-    expect(Object.keys(tools[5].web?.results?.[0] ?? {}).sort())
-      .toEqual(['domain', 'snippet', 'title', 'url'])
+    expect(Object.keys(tools[5].web?.results?.[0] ?? {}).sort()).toEqual(['domain', 'snippet', 'title', 'url'])
   })
 })
 
@@ -318,77 +405,117 @@ describe('Codex web activity, unit cases', () => {
   }
 
   it('prefers the action’s list of queries, in order and without repeats', () => {
-    expect(webTool({
-      id: 'w1',
-      query: 'ignored',
-      action: { type: 'search', query: 'also ignored', queries: ['first', 'second', 'first'] },
-    }).web?.action).toEqual({ type: 'search', queries: ['first', 'second'] })
+    expect(
+      webTool({
+        id: 'w1',
+        query: 'ignored',
+        action: { type: 'search', query: 'also ignored', queries: ['first', 'second', 'first'] },
+      }).web?.action,
+    ).toEqual({ type: 'search', queries: ['first', 'second'] })
   })
 
   it('falls back to the action’s single query, then to the item’s own', () => {
-    expect(webTool({ id: 'w1', query: 'from the item', action: { type: 'search', query: 'from the action', queries: null } })
-      .web?.action).toEqual({ type: 'search', queries: ['from the action'] })
-    expect(webTool({ id: 'w1', query: 'from the item', action: { type: 'search', query: null, queries: [] } })
-      .web?.action).toEqual({ type: 'search', queries: ['from the item'] })
+    expect(
+      webTool({ id: 'w1', query: 'from the item', action: { type: 'search', query: 'from the action', queries: null } })
+        .web?.action,
+    ).toEqual({ type: 'search', queries: ['from the action'] })
+    expect(
+      webTool({ id: 'w1', query: 'from the item', action: { type: 'search', query: null, queries: [] } }).web?.action,
+    ).toEqual({ type: 'search', queries: ['from the item'] })
   })
 
   it('reads a find-in-page action, which the schema declares and no run produced', () => {
     // Written from `codex app-server generate-json-schema --experimental`, WebSearchAction, rather
     // than from a capture: neither live run chose this action.
-    expect(webTool({
-      id: 'w1',
-      query: '',
-      action: { type: 'findInPage', url: 'https://example.com/page', pattern: 'session' },
-    })).toMatchObject({
+    expect(
+      webTool({
+        id: 'w1',
+        query: '',
+        action: { type: 'findInPage', url: 'https://example.com/page', pattern: 'session' },
+      }),
+    ).toMatchObject({
       title: 'Find on page',
       web: { action: { type: 'find_in_page', url: 'https://example.com/page', pattern: 'session' } },
     })
   })
 
   it('treats a query with no action at all as the search it plainly is', () => {
-    expect(webTool({ id: 'w1', query: 'standalone', action: null }).web?.action)
-      .toEqual({ type: 'search', queries: ['standalone'] })
+    expect(webTool({ id: 'w1', query: 'standalone', action: null }).web?.action).toEqual({
+      type: 'search',
+      queries: ['standalone'],
+    })
   })
 
   it('reads past a result row that is malformed, rather than past the whole set', () => {
     // Codex types each row as opaque JSON on purpose, so a row with no URL is a row this card cannot
     // draw, not a reason to lose the ones beside it.
-    expect(webTool({
-      id: 'w1',
-      query: 'q',
-      action: { type: 'search', query: 'q', queries: null },
-      results: [null, 'text', { title: 'no url' }, { url: 'https://example.com', title: 42 }],
-    }).web?.results).toEqual([{ url: 'https://example.com', title: undefined, domain: undefined, snippet: undefined }])
+    expect(
+      webTool({
+        id: 'w1',
+        query: 'q',
+        action: { type: 'search', query: 'q', queries: null },
+        results: [null, 'text', { title: 'no url' }, { url: 'https://example.com', title: 42 }],
+      }).web?.results,
+    ).toEqual([{ url: 'https://example.com', title: undefined, domain: undefined, snippet: undefined }])
   })
 
   it('keeps a failed call’s query and says it failed', () => {
-    expect(webTool({
-      id: 'w1',
-      query: 'q',
-      status: 'failed',
-      action: { type: 'search', query: 'q', queries: null },
-    })).toMatchObject({ status: 'failed', web: { action: { type: 'search', queries: ['q'] } } })
+    expect(
+      webTool({
+        id: 'w1',
+        query: 'q',
+        status: 'failed',
+        action: { type: 'search', query: 'q', queries: null },
+      }),
+    ).toMatchObject({ status: 'failed', web: { action: { type: 'search', queries: ['q'] } } })
   })
 })
 
 describe('Codex permission subjects', () => {
   it('maps commands, file changes and permission grants without inventing data', () => {
-    expect(codexPermissionSubject({ id: 1, method: 'item/commandExecution/requestApproval', params: {
-      itemId: 'item-1', command: 'git push --force', cwd: '/work/task',
-    } })).toEqual({ toolCallId: 'item-1', kind: 'command', command: 'git push --force', paths: ['/work/task'] })
-    expect(codexPermissionSubject({ id: 2, method: 'item/commandExecution/requestApproval', params: {} }))
-      .toEqual({ toolCallId: '', kind: 'command', command: '', paths: [] })
-    expect(codexPermissionSubject({ id: 3, method: 'item/fileChange/requestApproval', params: { itemId: 'item-3', grantRoot: '/etc' } }))
-      .toEqual({ toolCallId: 'item-3', kind: 'edit', command: '', paths: ['/etc'] })
-    expect(codexPermissionSubject({ id: 4, method: 'item/fileChange/requestApproval', params: { reason: 'Write docs' } }))
-      .toEqual({ toolCallId: '', kind: 'edit', command: '', paths: [] })
-    expect(codexPermissionSubject({ id: 5, method: 'item/permissions/requestApproval', params: { permissions: { network: true } } }))
-      .toEqual({ toolCallId: '', kind: 'permissions', command: '', paths: [] })
+    expect(
+      codexPermissionSubject({
+        id: 1,
+        method: 'item/commandExecution/requestApproval',
+        params: {
+          itemId: 'item-1',
+          command: 'git push --force',
+          cwd: '/work/task',
+        },
+      }),
+    ).toEqual({ toolCallId: 'item-1', kind: 'command', command: 'git push --force', paths: ['/work/task'] })
+    expect(codexPermissionSubject({ id: 2, method: 'item/commandExecution/requestApproval', params: {} })).toEqual({
+      toolCallId: '',
+      kind: 'command',
+      command: '',
+      paths: [],
+    })
+    expect(
+      codexPermissionSubject({
+        id: 3,
+        method: 'item/fileChange/requestApproval',
+        params: { itemId: 'item-3', grantRoot: '/etc' },
+      }),
+    ).toEqual({ toolCallId: 'item-3', kind: 'edit', command: '', paths: ['/etc'] })
+    expect(
+      codexPermissionSubject({ id: 4, method: 'item/fileChange/requestApproval', params: { reason: 'Write docs' } }),
+    ).toEqual({ toolCallId: '', kind: 'edit', command: '', paths: [] })
+    expect(
+      codexPermissionSubject({
+        id: 5,
+        method: 'item/permissions/requestApproval',
+        params: { permissions: { network: true } },
+      }),
+    ).toEqual({ toolCallId: '', kind: 'permissions', command: '', paths: [] })
     expect(codexPermissionSubject({ id: 6, method: 'item/tool/requestUserInput', params: {} })).toBeNull()
   })
 
   it('answers a veto with decline, which refuses the call without ending the turn', () => {
-    expect(codexServerRequestResponse({ id: 1, method: 'item/commandExecution/requestApproval', params: {} }, { optionId: 'decline' }))
-      .toEqual({ decision: 'decline' })
+    expect(
+      codexServerRequestResponse(
+        { id: 1, method: 'item/commandExecution/requestApproval', params: {} },
+        { optionId: 'decline' },
+      ),
+    ).toEqual({ decision: 'decline' })
   })
 })

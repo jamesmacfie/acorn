@@ -14,11 +14,7 @@ import type {
   AgentSessionSnapshot,
   AgentTurn,
 } from '../../contract/wire.ts'
-import type {
-  CreateAgentSessionInput,
-  EnqueueAgentTurnInput,
-  ImportAgentTranscriptInput,
-} from '../../shared/schemas'
+import type { CreateAgentSessionInput, EnqueueAgentTurnInput, ImportAgentTranscriptInput } from '../../shared/schemas'
 import type { AgentSessionMcp } from '../../shared/mcpServers'
 import { MAX_INLINE_IMAGE_BYTES } from './inlineImage'
 import { SUMMARY_TIMEOUT_MS, type SessionSummary, type SessionSummaryInput } from '../../shared/sessionSummary'
@@ -26,10 +22,15 @@ import { SUMMARY_TIMEOUT_MS, type SessionSummary, type SessionSummaryInput } fro
 export type AgentOrigin = { nodeId?: string | null; signal?: AbortSignal }
 
 const ROOT = '/v1/p/agents'
-const sessionRoute = (sessionId: string, suffix = '') =>
-  `${ROOT}/sessions/${encodeURIComponent(sessionId)}${suffix}`
+const sessionRoute = (sessionId: string, suffix = '') => `${ROOT}/sessions/${encodeURIComponent(sessionId)}${suffix}`
 
-const jsonWrite = <T>(url: string, method: string, body?: unknown, idempotent: boolean | string = false, options: AgentOrigin = {}): Promise<T> =>
+const jsonWrite = <T>(
+  url: string,
+  method: string,
+  body?: unknown,
+  idempotent: boolean | string = false,
+  options: AgentOrigin = {},
+): Promise<T> =>
   writeJson<T>(url, {
     ...options,
     method,
@@ -53,7 +54,14 @@ export const managedAgentApi = {
     // hand-rolls a boundary and the upload rides the same pinned connection as every other request.
     return sendForm<AgentAttachment>(
       `${ROOT}/attachments?taskId=${encodeURIComponent(taskId)}`,
-      [{ name: 'file', filename: file.name, type: file.type || 'application/octet-stream', bytes: new Uint8Array(await file.arrayBuffer()) }],
+      [
+        {
+          name: 'file',
+          filename: file.name,
+          type: file.type || 'application/octet-stream',
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        },
+      ],
       'Unable to upload attachment.',
       origin,
     )
@@ -61,14 +69,22 @@ export const managedAgentApi = {
   attachment: (attachmentId: string, options: AgentOrigin = {}) =>
     readJson<AgentAttachment>(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}`, options),
   removeAttachment: (attachmentId: string, options: AgentOrigin = {}) =>
-    jsonWrite<{ removed: boolean }>(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}`, 'DELETE', undefined, false, options),
+    jsonWrite<{ removed: boolean }>(
+      `${ROOT}/attachments/${encodeURIComponent(attachmentId)}`,
+      'DELETE',
+      undefined,
+      false,
+      options,
+    ),
   // Bytes, not a URL, for the reason artifactContent gives below.
   attachmentContent: (attachmentId: string, options: AgentOrigin = {}) =>
     readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment.', options),
   attachmentPreview: (attachmentId: string, options: AgentOrigin = {}) =>
-    readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment preview.', { ...options, maxResponseBytes: MAX_INLINE_IMAGE_BYTES }),
-  artifacts: (sessionId: string) =>
-    readJson<AgentArtifact[]>(sessionRoute(sessionId, '/artifacts')),
+    readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment preview.', {
+      ...options,
+      maxResponseBytes: MAX_INLINE_IMAGE_BYTES,
+    }),
+  artifacts: (sessionId: string) => readJson<AgentArtifact[]>(sessionRoute(sessionId, '/artifacts')),
   artifact: (artifactId: string, options: AgentOrigin = {}) =>
     readJson<AgentArtifact>(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}`, options),
   // Bytes, not a URL. There's no origin the browser could fetch an artifact from: under app:// a
@@ -77,13 +93,13 @@ export const managedAgentApi = {
   artifactContent: (artifactId: string, options: AgentOrigin = {}) =>
     readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to download artifact.', options),
   artifactPreview: (artifactId: string, options: AgentOrigin = {}) =>
-    readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to read artifact preview.', { ...options, maxResponseBytes: MAX_INLINE_IMAGE_BYTES }),
+    readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to read artifact preview.', {
+      ...options,
+      maxResponseBytes: MAX_INLINE_IMAGE_BYTES,
+    }),
   // Explicit origin options bind continuation reads and delayed draft/media work to their Node.
   // Omitting the origin retains the active-Node behavior for synchronous surface actions.
-  sessions: (
-    filter: SessionListFilter = {},
-    options: AgentOrigin = {},
-  ) => {
+  sessions: (filter: SessionListFilter = {}, options: AgentOrigin = {}) => {
     const query = new URLSearchParams({ cursorFormat: 'tuple-v1' })
     if (filter.cursor != null) query.set('cursor', String(filter.cursor))
     if (filter.limit != null) query.set('limit', String(filter.limit))
@@ -113,24 +129,24 @@ export const managedAgentApi = {
   snapshot: (sessionId: string, afterSeq = 0, limit = 2_000, options: AgentOrigin = {}) =>
     readJson<AgentSessionSnapshot>(sessionRoute(sessionId, `?afterSeq=${afterSeq}&limit=${limit}&fold=1`), options),
   referenceContext: (sessionId: string, taskId: string, options: AgentOrigin = {}) =>
-    readJson<AgentContextSnapshot>(sessionRoute(sessionId, `/reference-context?taskId=${encodeURIComponent(taskId)}`), options),
+    readJson<AgentContextSnapshot>(
+      sessionRoute(sessionId, `/reference-context?taskId=${encodeURIComponent(taskId)}`),
+      options,
+    ),
   events: (sessionId: string, afterSeq: number, limit = 2_000, options: AgentOrigin = {}) =>
     readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}&fold=1`), options),
-  enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>, idempotencyKey?: string, options: AgentOrigin = {}) =>
-    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, idempotencyKey ?? true, options),
+  enqueue: (
+    sessionId: string,
+    input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>,
+    idempotencyKey?: string,
+    options: AgentOrigin = {},
+  ) => jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, idempotencyKey ?? true, options),
   implementPlan: (sessionId: string, itemId: string) =>
     jsonWrite<AgentTurn>(sessionRoute(sessionId, '/implement-plan'), 'POST', { itemId }),
   patchQueuedTurn: (sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }) =>
-    jsonWrite<AgentTurn>(
-      sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`),
-      'PATCH',
-      patch,
-    ),
+    jsonWrite<AgentTurn>(sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`), 'PATCH', patch),
   removeQueuedTurn: (sessionId: string, turnId: string) =>
-    jsonWrite<{ ok: true }>(
-      sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`),
-      'DELETE',
-    ),
+    jsonWrite<{ ok: true }>(sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`), 'DELETE'),
   cancel: (sessionId: string, turnId?: string) =>
     jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/cancel'), 'POST', turnId ? { turnId } : {}),
   cancelSubagent: (sessionId: string, subagentId: string) =>
@@ -142,31 +158,33 @@ export const managedAgentApi = {
       { resolution },
       true,
     ),
-  patch: (sessionId: string, patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> }, options: AgentOrigin = {}) =>
-    jsonWrite<AgentSession>(sessionRoute(sessionId), 'PATCH', patch, false, options),
+  patch: (
+    sessionId: string,
+    patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
+    options: AgentOrigin = {},
+  ) => jsonWrite<AgentSession>(sessionRoute(sessionId), 'PATCH', patch, false, options),
   remove: (sessionId: string) => jsonWrite<AgentDeleteResult>(sessionRoute(sessionId), 'DELETE'),
   fork: (sessionId: string, title?: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/fork'), 'POST', title ? { title } : {}),
-  compact: (sessionId: string) =>
-    jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/compact'), 'POST'),
+  compact: (sessionId: string) => jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/compact'), 'POST'),
   mcp: (sessionId: string) => readJson<AgentSessionMcp>(sessionRoute(sessionId, '/mcp')),
   setMcp: (sessionId: string, enabled: string[]) =>
     jsonWrite<AgentSessionMcp>(sessionRoute(sessionId, '/mcp'), 'PUT', { enabled }),
-  regenerateTitle: (sessionId: string) =>
-    jsonWrite<AgentSession>(sessionRoute(sessionId, '/regenerate-title'), 'POST'),
+  regenerateTitle: (sessionId: string) => jsonWrite<AgentSession>(sessionRoute(sessionId, '/regenerate-title'), 'POST'),
   summarize: (sessionId: string, input: SessionSummaryInput, options: AgentOrigin = {}) =>
     writeJson<SessionSummary>(sessionRoute(sessionId, '/summarize'), {
-      ...options, method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input), timeoutMs: SUMMARY_TIMEOUT_MS + 10_000,
+      ...options,
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      timeoutMs: SUMMARY_TIMEOUT_MS + 10_000,
     }),
   setGoal: (sessionId: string, objective: string | null, options: AgentOrigin = {}) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal'), 'PUT', { objective }, false, options),
   resumeGoal: (sessionId: string, options: AgentOrigin = {}) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/goal/resume'), 'POST', undefined, false, options),
-  handoff: (sessionId: string) =>
-    jsonWrite<AgentSession>(sessionRoute(sessionId, '/handoff-terminal'), 'POST'),
-  resumeManaged: (sessionId: string) =>
-    jsonWrite<AgentSession>(sessionRoute(sessionId, '/resume-managed'), 'POST'),
+  handoff: (sessionId: string) => jsonWrite<AgentSession>(sessionRoute(sessionId, '/handoff-terminal'), 'POST'),
+  resumeManaged: (sessionId: string) => jsonWrite<AgentSession>(sessionRoute(sessionId, '/resume-managed'), 'POST'),
   verifyImportedResume: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/verify-imported-resume'), 'POST'),
   export: (sessionId: string, format: 'json' | 'markdown', variant: 'original' | 'redacted' = 'original') =>

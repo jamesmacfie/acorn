@@ -84,7 +84,10 @@ export const spaceLines = (space: Space | undefined): number => {
  *  Two things about OpenTUI a caller has to answer for. Its own border colour is opaque white, the
  *  same trap a run of text has; and a `borderColor` handed to a box with no border switches the border
  *  back on, so the colour has to be absent exactly when the box is. */
-export const boxBorder = (border: Border, opts: { when?: boolean; tone?: Tone } = {}): {
+export const boxBorder = (
+  border: Border,
+  opts: { when?: boolean; tone?: Tone } = {},
+): {
   border: boolean
   borderStyle: 'single'
   borderColor: Style['fg'] | undefined
@@ -105,7 +108,8 @@ export function borderCell(border: Border): { box: boolean; glyph: string; attri
 
 /** A rule across a box, which is the `divider` role repeated. Compact density spends nothing, which
  *  is what the role's own sentence says. */
-export const rule = (width: number): string => (isCompact() ? '' : borderCell('divider').glyph.repeat(Math.max(0, width)))
+export const rule = (width: number): string =>
+  isCompact() ? '' : borderCell('divider').glyph.repeat(Math.max(0, width))
 
 /**
  * How a control draws its state: the role and the tone a `Line` inside it takes.

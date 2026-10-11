@@ -21,7 +21,14 @@ const source: SourceContribution<never> = {
 // Applying the node's plugin list runs this a second time. An effect that ran between a plugin's
 // take-back and its re-registration found its source gone, and the shell reset the rail to Home.
 it('never shows an effect a plugin taken back and not yet registered again', () => {
-  const plugins: ClientPlugin[] = [{ name: 'gap', init: (ctx) => { ctx.sources.register(source) } }]
+  const plugins: ClientPlugin[] = [
+    {
+      name: 'gap',
+      init: (ctx) => {
+        ctx.sources.register(source)
+      },
+    },
+  ]
   initClientPlugins(plugins)
   const seen: boolean[] = []
   const dispose = createRoot((dispose) => {

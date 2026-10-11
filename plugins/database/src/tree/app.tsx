@@ -12,10 +12,7 @@ import DatabasePanel from './DatabasePanel'
 // connect to.
 export function DatabasePaneApp(props: { taskId?: string; bridge: AcornBridge }) {
   return (
-    <Show
-      when={props.taskId}
-      fallback={<EmptyState align="start">Open a task to see its database.</EmptyState>}
-    >
+    <Show when={props.taskId} fallback={<EmptyState align="start">Open a task to see its database.</EmptyState>}>
       {(id) => <DatabasePanel bridge={props.bridge} taskId={id()} />}
     </Show>
   )

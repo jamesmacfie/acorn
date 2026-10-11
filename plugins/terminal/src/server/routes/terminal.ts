@@ -2,7 +2,18 @@ import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
 import type { CreateOpts, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import { type AppEnv, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, RUN_TARGETS, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import {
+  type AppEnv,
+  isTaskConfined,
+  mayActOnTask,
+  requireDevice,
+  respondError,
+  routeCapability,
+  routeCapabilityFor,
+  RUN_TARGETS,
+  setRouteTestCapability,
+  viaBridge,
+} from '@acorn/plugin-api/node'
 import type { SendSubmit } from '../../shared/send'
 
 export type { SendSubmit }
@@ -19,7 +30,11 @@ export type TerminalBridge = {
   interrupt(id: string): Promise<boolean>
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
-  sendToAgent(sessionId: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
+  sendToAgent(
+    sessionId: string,
+    text: string,
+    submit: SendSubmit,
+  ): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
   // Start the project's setup script in the task's existing worktree. A refusal throws a BridgeError.
   runSetup(taskId: string): Promise<{ sessionId: string }>
 }
@@ -80,15 +95,23 @@ export const terminal = new Hono<AppEnv>()
     viaBridge(c, RUN_TARGETS, async (b) => {
       // RunBridge answers `unknown` by design — it carries a plugin's shape across the host — so the
       // projection names the two fields it reads rather than trusting the whole row.
-      const result = await b.targets(c.req.param('taskId')) as { targets?: { id: string; command?: string }[] }
-      return { options: (result.targets ?? []).map((target) => ({ value: target.id, label: target.id, ...(target.command ? { description: target.command } : {}) })) }
+      const result = (await b.targets(c.req.param('taskId'))) as { targets?: { id: string; command?: string }[] }
+      return {
+        options: (result.targets ?? []).map((target) => ({
+          value: target.id,
+          label: target.id,
+          ...(target.command ? { description: target.command } : {}),
+        })),
+      }
     }),
   )
   // Running the setup script, opening a terminal, and typing into one each run a command as the person,
   // outside any agent's sandbox, so all three are device-only. An agent starts commands through the
   // run_* tools, which check its tool permissions and signed ceiling. A task token used to open a
   // terminal with any `command` here (docs/security/transport-and-auth.md § Execution routes).
-  .post('/tasks/:taskId/setup', requireDevice, (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.runSetup(c.req.param('taskId'))))
+  .post('/tasks/:taskId/setup', requireDevice, (c) =>
+    viaBridge(c, TERMINAL_ROUTE, (t) => t.runSetup(c.req.param('taskId'))),
+  )
   .post('/sessions', requireDevice, async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')

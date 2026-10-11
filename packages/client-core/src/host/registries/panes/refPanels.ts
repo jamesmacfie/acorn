@@ -7,7 +7,8 @@ import { onScopeEvicted } from '../shell/scopeEviction'
 // A ref a host can actually produce widens `ExternalRef` to make `connectionId` optional.
 // docs/integrations.md explains why an identifier is not always attributed to one connection yet. A
 // caller holding a full `ExternalRef` passes it through unchanged.
-export type RefPanelTarget = Pick<ExternalRef, 'providerId' | 'displayId'> & Partial<Omit<ExternalRef, 'providerId' | 'displayId'>>
+export type RefPanelTarget = Pick<ExternalRef, 'providerId' | 'displayId'> &
+  Partial<Omit<ExternalRef, 'providerId' | 'displayId'>>
 
 // Named `target`, never `ref`. Solid rewrites a component's `ref` prop into a callback
 // (docs/architecture/packages.md § Two renderer traps), so a props member named
@@ -47,8 +48,11 @@ export const refPanelRegistry = new Registry<RefPanelContribution>('ref-panel')
 // host renders nothing rather than failing. That degradation is why this is looked up at render time
 // instead of imported.
 export const refPanelFor = (providerId: string): RefPanelContribution | undefined =>
-  refPanelRegistry.entries().find((entry) =>
-    entry.providerId === providerId && hasHostCapability(entry.requires) && (!entry.when || entry.when()))
+  refPanelRegistry
+    .entries()
+    .find(
+      (entry) => entry.providerId === providerId && hasHostCapability(entry.requires) && (!entry.when || entry.when()),
+    )
 
 // The open panel is shell state, not a signal owned by whichever surface asked. One module-level
 // signal here, one `RefPanelHost` mounted by the composition root, and callers that only say what to

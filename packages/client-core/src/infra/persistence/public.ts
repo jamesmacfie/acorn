@@ -1,6 +1,9 @@
 export { createAppStartupRestore } from './appStartup.ts'
 export {
-  appStateBinding, parseJson, persistedStateRegistry, stringifyPersistedValue,
+  appStateBinding,
+  parseJson,
+  persistedStateRegistry,
+  stringifyPersistedValue,
   utf8Bytes,
 } from './persistedState.ts'
 export type { PersistedStateSlice } from './persistedState.ts'

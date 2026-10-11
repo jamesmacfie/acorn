@@ -17,11 +17,15 @@ export class DeviceConfigStore {
   read(): DeviceConfigState {
     if (!existsSync(this.path)) return { config: this.#last }
     let raw: string
-    try { raw = readFileSync(this.path, 'utf8') }
-    catch (error) { return { config: this.#last, error: { message: String(error), line: 1, column: 1 } } }
+    try {
+      raw = readFileSync(this.path, 'utf8')
+    } catch (error) {
+      return { config: this.#last, error: { message: String(error), line: 1, column: 1 } }
+    }
     if (raw === this.#raw) return { config: this.#last }
     const parsed = parseDeviceConfig(raw)
-    if (!parsed.ok) return { config: this.#last, error: { message: parsed.message, line: parsed.line, column: parsed.column } }
+    if (!parsed.ok)
+      return { config: this.#last, error: { message: parsed.message, line: parsed.line, column: parsed.column } }
     this.#raw = raw
     this.#last = parsed.value
     return { config: this.#last }
@@ -32,9 +36,11 @@ export class DeviceConfigStore {
     const current = this.read()
     // The malformed bytes may contain edits that have not made it into #last. Do not replace the
     // owner's file with the last valid projection while they are fixing a parse error.
-    if (current.error) throw new Error(`Cannot write acorn.json until its parse error is fixed: ${current.error.message}`)
+    if (current.error)
+      throw new Error(`Cannot write acorn.json until its parse error is fixed: ${current.error.message}`)
     const parsed = deviceConfigSchema.safeParse({ ...current.config, ...next })
-    if (!parsed.success) throw new Error(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '))
+    if (!parsed.success)
+      throw new Error(parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join('; '))
     const raw = `${JSON.stringify(parsed.data, null, 2)}\n`
     mkdirSync(this.directory, { recursive: true })
     const temporary = `${this.path}.${process.pid}.tmp`
@@ -51,8 +57,14 @@ export class DeviceConfigStore {
     const watcher: FSWatcher = watch(this.directory, (_, name) => {
       if (name?.toString() !== 'acorn.json') return
       if (pending) clearTimeout(pending)
-      pending = setTimeout(() => { pending = undefined; listener(this.read()) }, 25)
+      pending = setTimeout(() => {
+        pending = undefined
+        listener(this.read())
+      }, 25)
     })
-    return () => { if (pending) clearTimeout(pending); watcher.close() }
+    return () => {
+      if (pending) clearTimeout(pending)
+      watcher.close()
+    }
   }
 }

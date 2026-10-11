@@ -36,8 +36,20 @@ export type RailTabProps = Omit<ComponentProps<'button'>, 'children' | 'color'> 
 
 export function RailTab(props: RailTabProps) {
   const [own, rest] = splitProps(props, [
-    'class', 'children', 'label', 'glyph', 'active', 'tone', 'accent',
-    'busy', 'busyLabel', 'sublabel', 'markers', 'onClick', 'style', 'classList',
+    'class',
+    'children',
+    'label',
+    'glyph',
+    'active',
+    'tone',
+    'accent',
+    'busy',
+    'busyLabel',
+    'sublabel',
+    'markers',
+    'onClick',
+    'style',
+    'classList',
   ])
   const tipLabel = () => (own.busy && own.busyLabel ? own.busyLabel : own.label)
   // Holds its value while the markers say the same thing. Contributors build fresh marker objects on
@@ -62,7 +74,9 @@ export function RailTab(props: RailTabProps) {
       type={props.type ?? 'button'}
       class={cx('tabrail-tab', own.class)}
       classList={{ active: !!own.active, ...(own.classList ?? {}) }}
-      style={own.accent ? { '--rail-accent': own.accent, ...(typeof own.style === 'object' ? own.style : {}) } : own.style}
+      style={
+        own.accent ? { '--rail-accent': own.accent, ...(typeof own.style === 'object' ? own.style : {}) } : own.style
+      }
       data-tone={own.tone && own.tone !== 'neutral' ? own.tone : undefined}
       data-tip={tipLabel()}
       data-tip-legend={legend().length ? JSON.stringify(legend()) : undefined}
@@ -81,13 +95,15 @@ export function RailTab(props: RailTabProps) {
           so they never steal the click. */}
       <For each={resolved().placed}>
         {(marker) => (
-          <span
-            class="tabrail-marker"
-            data-pos={marker.position}
-            data-tone={marker.tone}
-            aria-hidden="true"
-          >
-            <Show when={marker.icon} fallback={<Show when={marker.dotTone}>{(tone) => <StatusDot {...railDotProps(tone())} pulse={marker.busy} />}</Show>}>
+          <span class="tabrail-marker" data-pos={marker.position} data-tone={marker.tone} aria-hidden="true">
+            <Show
+              when={marker.icon}
+              fallback={
+                <Show when={marker.dotTone}>
+                  {(tone) => <StatusDot {...railDotProps(tone())} pulse={marker.busy} />}
+                </Show>
+              }
+            >
               {(name) => <Icon name={name()} spin={marker.busy} />}
             </Show>
           </span>
@@ -95,7 +111,11 @@ export function RailTab(props: RailTabProps) {
       </For>
       {/* The states, in words, without changing the button's accessible name. */}
       <Show when={legend().length}>
-        <span id={describedBy} class="sr-only">{legend().map((item) => item.l).join('. ')}</span>
+        <span id={describedBy} class="sr-only">
+          {legend()
+            .map((item) => item.l)
+            .join('. ')}
+        </span>
       </Show>
     </button>
   )

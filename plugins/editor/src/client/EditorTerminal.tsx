@@ -12,10 +12,11 @@ import { wsEditorPtyInput, wsEditorPtyOpen, wsEditorPtyResize } from './wsChanne
 export default function EditorTerminal(props: { taskId: string; path: string; onExit: (code: number) => void }) {
   const ptyId = crypto.randomUUID()
   const io: PtyIo = {
-    open: ({ cols, rows }, onEvent) => wsEditorPtyOpen(ptyId, props.taskId, props.path, cols, rows, (event) => {
-      if (event.kind === 'out') onEvent({ kind: 'out', data: event.data })
-      else props.onExit(event.code)
-    }),
+    open: ({ cols, rows }, onEvent) =>
+      wsEditorPtyOpen(ptyId, props.taskId, props.path, cols, rows, (event) => {
+        if (event.kind === 'out') onEvent({ kind: 'out', data: event.data })
+        else props.onExit(event.code)
+      }),
     input: (data) => wsEditorPtyInput(ptyId, data),
     resize: ({ cols, rows }) => wsEditorPtyResize(ptyId, cols, rows),
   }

@@ -12,7 +12,9 @@ let byNode = new Map<Renderable, ParentStop>()
 let panelBoxes: Set<Renderable> | null = null
 
 // Panels mount after their strip. Invalidate the derived set whenever that relationship changes.
-export const panelsChanged = (): void => { panelBoxes = null }
+export const panelsChanged = (): void => {
+  panelBoxes = null
+}
 
 export const panelSet = (): Set<Renderable> => {
   if (panelBoxes) return panelBoxes

@@ -10,7 +10,12 @@
 import { isContextMenuLocation, isRailMenuLocation, unknownWhenFacts } from '@acorn/protocol/contextMenus.ts'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import {
-  compileWhen, contextMenuRegistry, type AgentMessageTarget, type AgentTurnTarget, type ContentSelectionTarget, type ContextMenuContribution,
+  compileWhen,
+  contextMenuRegistry,
+  type AgentMessageTarget,
+  type AgentTurnTarget,
+  type ContentSelectionTarget,
+  type ContextMenuContribution,
   type FileMenuTarget,
 } from '../registries/panes/contextMenus'
 import type { Disposable } from '../../kit/lib/state/registry'
@@ -56,7 +61,9 @@ export function pluginContextMenuItem(
   }
   const unknown = unknownWhenFacts(location, descriptor.when ?? {})
   if (unknown.length) {
-    throw new Error(`context menu '${descriptor.id}' matches on facts '${location}' does not have: ${unknown.join(', ')}`)
+    throw new Error(
+      `context menu '${descriptor.id}' matches on facts '${location}' does not have: ${unknown.join(', ')}`,
+    )
   }
   if (isRailMenuLocation(location)) {
     const declared = location === 'rail.source' ? binding.sources : binding.panes
@@ -74,21 +81,33 @@ export function pluginContextMenuItem(
     label: descriptor.label,
     ...(descriptor.icon ? { icon: descriptor.icon } : {}),
     order: descriptor.order,
-    when: (target) => binding.enabled() && (!isRailMenuLocation(location) ||
-      ((target.location === 'rail.source' || target.location === 'rail.pane') && target.id === descriptor.surface && target.location === location &&
-        (location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)) === pluginId)) && matches(target),
+    when: (target) =>
+      binding.enabled() &&
+      (!isRailMenuLocation(location) ||
+        ((target.location === 'rail.source' || target.location === 'rail.pane') &&
+          target.id === descriptor.surface &&
+          target.location === location &&
+          (location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)) ===
+            pluginId)) &&
+      matches(target),
     // The action was already checked against this manifest's declared surfaces by the chrome pass, the
     // same check a command's gets. What is added here is the item, minted from the target the host
     // handed the menu, never from anything the descriptor said.
     run: (target) => {
       if (contextMenuRegistry.get(item.id) !== item || !binding.enabled()) return
       if (isRailMenuLocation(location)) {
-        if (target.location !== location || target.id !== descriptor.surface || target.nodeId !== binding.nodeId()) return
+        if (target.location !== location || target.id !== descriptor.surface || target.nodeId !== binding.nodeId())
+          return
         const owner = location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)
         if (owner !== pluginId) return
       }
-      if (target.location === 'file.row' || target.location === 'document.tab'
-        || target.location === 'agent.message' || target.location === 'agent.turn' || target.location === 'content.selection') {
+      if (
+        target.location === 'file.row' ||
+        target.location === 'document.tab' ||
+        target.location === 'agent.message' ||
+        target.location === 'agent.turn' ||
+        target.location === 'content.selection'
+      ) {
         // The owner checked that the file, message, turn or selected text is still the one the menu
         // opened on. What is checked here is the binding: the menu's Node is still the one being looked
         // at, and its task is still on it in the same project. A path or a session id alone never
@@ -108,17 +127,25 @@ export function pluginContextMenuItem(
         return
       }
       void runChromeAction(descriptor.action, {
-      pluginId,
-      nodeId: binding.nodeId(),
-      ...(isRailMenuLocation(location) ? {
-        rail: target.location === 'rail.source'
-          ? { location: 'rail.source' as const, sourceId: target.id, projectId: target.projectId }
-          : target.location === 'rail.pane'
-            ? { location: 'rail.pane' as const, paneId: target.id, taskId: target.taskId, projectId: target.projectId }
-            : undefined,
-        ...(target.location === 'rail.pane' ? { taskId: target.taskId } : {}),
-      } : { item: { id: target.id, title: target.title } }),
-    })
+        pluginId,
+        nodeId: binding.nodeId(),
+        ...(isRailMenuLocation(location)
+          ? {
+              rail:
+                target.location === 'rail.source'
+                  ? { location: 'rail.source' as const, sourceId: target.id, projectId: target.projectId }
+                  : target.location === 'rail.pane'
+                    ? {
+                        location: 'rail.pane' as const,
+                        paneId: target.id,
+                        taskId: target.taskId,
+                        projectId: target.projectId,
+                      }
+                    : undefined,
+              ...(target.location === 'rail.pane' ? { taskId: target.taskId } : {}),
+            }
+          : { item: { id: target.id, title: target.title } }),
+      })
     },
   }
   return item
@@ -137,7 +164,20 @@ const ownerTargetBody = (
   const { taskId, projectId } = target
   if (target.location === 'agent.message') {
     const { sessionId, itemId, turnId, role, status, text, revision } = target
-    return { message: { taskId, projectId, sessionId, itemId, turnId, role, status, text, ...(target.textTruncated ? { textTruncated: true } : {}), revision } }
+    return {
+      message: {
+        taskId,
+        projectId,
+        sessionId,
+        itemId,
+        turnId,
+        role,
+        status,
+        text,
+        ...(target.textTruncated ? { textTruncated: true } : {}),
+        revision,
+      },
+    }
   }
   if (target.location === 'agent.turn') {
     const { sessionId, turnId, status, revision } = target
@@ -145,7 +185,12 @@ const ownerTargetBody = (
   }
   return {
     resource: {
-      kind: 'file', taskId, projectId, path: target.path, directory: target.directory, readOnly: target.readOnly,
+      kind: 'file',
+      taskId,
+      projectId,
+      path: target.path,
+      directory: target.directory,
+      readOnly: target.readOnly,
       ...(target.revision === undefined ? {} : { revision: target.revision }),
     },
   }

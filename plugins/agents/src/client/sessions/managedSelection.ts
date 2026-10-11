@@ -19,10 +19,8 @@ export function toggleManagedChatsOnly(sessionId: string): void {
 }
 
 export const selectedManagedSession = (taskId: string): string | undefined => selectedByTask()[taskId]
-export const focusedManagedRequest = (sessionId: string): string | undefined =>
-  focusedRequestBySession()[sessionId]
-export const selectedManagedSubagent = (sessionId: string): string | undefined =>
-  selectedSubagentBySession()[sessionId]
+export const focusedManagedRequest = (sessionId: string): string | undefined => focusedRequestBySession()[sessionId]
+export const selectedManagedSubagent = (sessionId: string): string | undefined => selectedSubagentBySession()[sessionId]
 
 // One signal, two readers that agree by construction: it is which subagent's run the main window is
 // showing, and the sidebar row for that subagent is the one drawn as selected. Absent means the

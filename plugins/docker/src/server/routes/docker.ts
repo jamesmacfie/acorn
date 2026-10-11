@@ -3,7 +3,14 @@
 // ref is shape-validated here first (leading-dash guard). Answers 503 when the bridge isn't wired.
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { type AppEnv, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import {
+  type AppEnv,
+  requireDevice,
+  respondError,
+  routeCapability,
+  setRouteTestCapability,
+  viaBridge,
+} from '@acorn/plugin-api/node'
 import type {
   DockerComposeAction,
   DockerContainerAction,
@@ -44,7 +51,9 @@ export const DOCKER = routeCapability<DockerBridge>('docker.route')
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
 export const setDockerBridge = (bridge: DockerBridge | null): void => setRouteTestCapability(DOCKER, bridge)
 
-const actionBody = z.object({ action: z.enum(dockerContainerActions as [DockerContainerAction, ...DockerContainerAction[]]) })
+const actionBody = z.object({
+  action: z.enum(dockerContainerActions as [DockerContainerAction, ...DockerContainerAction[]]),
+})
 const removeBody = z.object({ force: z.boolean().optional() })
 const pruneBody = z.object({ kind: z.enum(dockerPruneKinds as [DockerPruneKind, ...DockerPruneKind[]]) })
 const composeBody = z.object({

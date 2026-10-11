@@ -30,12 +30,22 @@ describe('nodesFileProvider', () => {
   })
 
   it('lists what the file says, filling the absent fields with null', async () => {
-    writeFileSync(path, JSON.stringify({
-      nodes: [
-        { providerNodeId: 'cloud-1', nodeId: '11111111-1111-4111-8111-111111111111', label: 'Big box', endpoint: 'https://big.example:4317', fingerprint: FINGERPRINT, deviceToken: 'acorn_dt_x' },
-        { providerNodeId: 'cloud-2', label: 'Half-built', state: 'provisioning' },
-      ],
-    }))
+    writeFileSync(
+      path,
+      JSON.stringify({
+        nodes: [
+          {
+            providerNodeId: 'cloud-1',
+            nodeId: '11111111-1111-4111-8111-111111111111',
+            label: 'Big box',
+            endpoint: 'https://big.example:4317',
+            fingerprint: FINGERPRINT,
+            deviceToken: 'acorn_dt_x',
+          },
+          { providerNodeId: 'cloud-2', label: 'Half-built', state: 'provisioning' },
+        ],
+      }),
+    )
     const listed = await nodesFileProvider(path).list(signal)
     expect(listed).toEqual([
       {
@@ -49,7 +59,14 @@ describe('nodesFileProvider', () => {
         state: 'ready',
         enrollment: { deviceToken: 'acorn_dt_x' },
       },
-      { providerNodeId: 'cloud-2', nodeId: null, label: 'Half-built', endpoint: null, fingerprint: null, state: 'provisioning' },
+      {
+        providerNodeId: 'cloud-2',
+        nodeId: null,
+        label: 'Half-built',
+        endpoint: null,
+        fingerprint: null,
+        state: 'provisioning',
+      },
     ])
   })
 

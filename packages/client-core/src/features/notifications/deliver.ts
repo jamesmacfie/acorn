@@ -30,7 +30,9 @@ export type DeliveryContext = {
 // installs its DEC 1004 state (apps/tui/src/main.tsx); nothing else calls this, and a host that does
 // not falls back to the page's own answer.
 let hostFocused: (() => boolean) | null = null
-export const setHostFocused = (answer: (() => boolean) | null): void => { hostFocused = answer }
+export const setHostFocused = (answer: (() => boolean) | null): void => {
+  hostFocused = answer
+}
 
 export const defaultDeliveryContext: DeliveryContext = {
   // Unknown counts as focused, which is the quiet answer: a host that cannot say whether it is on
@@ -80,7 +82,12 @@ export function observeAttention(next: Snapshot[], context: DeliveryContext = de
 }
 
 /** Replace one producer's roster, including sessions that disappeared since its last read. */
-export function replaceAttentionSource(sourceId: string, nodeId: string, next: Snapshot[], context: DeliveryContext = defaultDeliveryContext): void {
+export function replaceAttentionSource(
+  sourceId: string,
+  nodeId: string,
+  next: Snapshot[],
+  context: DeliveryContext = defaultDeliveryContext,
+): void {
   const present = new Set(next.map(snapshotKey))
   for (const [key, snapshot] of latest) {
     if (snapshot.sourceId !== sourceId || snapshot.nodeId !== nodeId || present.has(key)) continue
@@ -109,16 +116,25 @@ export function deliver(edge: Edge, context: DeliveryContext = defaultDeliveryCo
   const key = snapshotKey(edge)
   const previous = held.get(key)
   if (previous) clearTimeout(previous)
-  held.set(key, setTimeout(() => {
-    held.delete(key)
-    if (latest.get(key)?.state !== edge.state) return
-    deliverNotice({ taskId: edge.taskId, kind: edge.kind, title: edge.title, at: context.now(), target: targetFor(edge) }, context)
-  }, HOLD_MS))
+  held.set(
+    key,
+    setTimeout(() => {
+      held.delete(key)
+      if (latest.get(key)?.state !== edge.state) return
+      deliverNotice(
+        { taskId: edge.taskId, kind: edge.kind, title: edge.title, at: context.now(), target: targetFor(edge) },
+        context,
+      )
+    }, HOLD_MS),
+  )
 }
 
 /** The seen rule and the channels, for a notice that did not come from a session edge: a workflow
  *  gate, a run finishing, a plugin asking to be installed. */
-export function deliverNotice(input: Omit<Notice, 'id' | 'read'>, context: DeliveryContext = defaultDeliveryContext): Notice {
+export function deliverNotice(
+  input: Omit<Notice, 'id' | 'read'>,
+  context: DeliveryContext = defaultDeliveryContext,
+): Notice {
   const seen = context.focused() && context.activeTaskId() === input.taskId
   const notice = pushNotice({ ...input, read: seen })
   if (!seen) for (const sink of sinks) sink(notice)
@@ -163,10 +179,18 @@ export function pushManagedAgentNotice(input: {
  *  carry an `action` instead, which the bell answers by opening a dialog rather than navigating. */
 export function initWorkflowNotices(): () => void {
   return wsOnNotice((n) => {
-    const actionDetail = n.action === 'review-config' ? 'Review & trust' : n.action === 'review-plugin-request' ? 'Review the request' : undefined
-    const target = n.target
-      ?? (n.runId ? { kind: 'workflow-run', resourceId: n.runId, ...(n.stepId ? { subresourceId: n.stepId } : {}) } : undefined)
-      ?? (n.pluginId ? pluginRowTarget(n.pluginId) : undefined)
+    const actionDetail =
+      n.action === 'review-config'
+        ? 'Review & trust'
+        : n.action === 'review-plugin-request'
+          ? 'Review the request'
+          : undefined
+    const target =
+      n.target ??
+      (n.runId
+        ? { kind: 'workflow-run', resourceId: n.runId, ...(n.stepId ? { subresourceId: n.stepId } : {}) }
+        : undefined) ??
+      (n.pluginId ? pluginRowTarget(n.pluginId) : undefined)
     deliverNotice({
       // `''` for a notice that is about the node rather than a task: a plugin whose connection
       // expired, a proposal whose task has been archived. The ring keeps `taskId` required and no real

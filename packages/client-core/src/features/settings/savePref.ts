@@ -18,12 +18,16 @@ const log = createLogger('prefs')
 // a repo's PR filters, what the agent running there may do. State follows the resource it describes
 // (docs/state-ownership/scope-rules.md § Scope rules), so there's no home node to pick.
 export const setPref = async (key: string, value: string, nodeId: string | null = activeNodeId()) =>
-  writeJson<{ key: string; value: string }>(prefsRoute, {
-    method: 'PUT',
-    nodeId,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, value }),
-  }, (res) => `prefs ${res.status}`)
+  writeJson<{ key: string; value: string }>(
+    prefsRoute,
+    {
+      method: 'PUT',
+      nodeId,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key, value }),
+    },
+    (res) => `prefs ${res.status}`,
+  )
 
 type PrefWriteState = {
   tail: Promise<void>
@@ -66,13 +70,19 @@ export async function savePref(
   requested: SavePrefOptions = {},
 ): Promise<boolean> {
   const options = { ...requested, throwOnFailure: requested.throwOnFailure ?? throwingCallers > 0 }
-  const descriptor = persistedStateRegistry.entries().find((slice) =>
-    key === slice.key || (slice.scope !== 'app' && key.startsWith(`${slice.key}:`)),
-  )
+  const descriptor = persistedStateRegistry
+    .entries()
+    .find((slice) => key === slice.key || (slice.scope !== 'app' && key.startsWith(`${slice.key}:`)))
   if (descriptor?.maxBytes != null && utf8Bytes(value) > descriptor.maxBytes) {
     if (options.throwOnFailure) throw new Error(`The value is larger than ${descriptor.maxBytes} bytes.`)
-    if (options.surfaceFailure === false) log.error(`${key}: value exceeds ${descriptor.maxBytes} bytes`, undefined, { 'pref.key': key })
-    else pushBackgroundError('', `Could not save ${descriptor.id}`, `Persisted value exceeds ${descriptor.maxBytes} bytes.`)
+    if (options.surfaceFailure === false)
+      log.error(`${key}: value exceeds ${descriptor.maxBytes} bytes`, undefined, { 'pref.key': key })
+    else
+      pushBackgroundError(
+        '',
+        `Could not save ${descriptor.id}`,
+        `Persisted value exceeds ${descriptor.maxBytes} bytes.`,
+      )
     return false
   }
   // A device pref never reaches a node (persistence/devicePrefs.ts): it's a property of this
@@ -88,11 +98,14 @@ export async function savePref(
     qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
     const patch = options.skipConfigWrite ? null : configPatchForPref(key, value)
     if (patch) {
-      try { await deviceConfigBridge()?.write(patch) }
-      catch (error) {
+      try {
+        await deviceConfigBridge()?.write(patch)
+      } catch (error) {
         if (options.throwOnFailure) throw error
-        if (options.surfaceFailure === false) log.error(`could not write acorn.json for ${key}`, error, { 'pref.key': key })
-        else pushBackgroundError('', 'Could not write acorn.json', error instanceof Error ? error.message : String(error))
+        if (options.surfaceFailure === false)
+          log.error(`could not write acorn.json for ${key}`, error, { 'pref.key': key })
+        else
+          pushBackgroundError('', 'Could not write acorn.json', error instanceof Error ? error.message : String(error))
         return false
       }
     }
@@ -113,11 +126,13 @@ export async function savePref(
     latestAttempt: latestSignal(),
   }
   const attempt = state.latestAttempt.next()
-  const request = state.tail.catch(() => {}).then(async () => {
-    await setPref(key, value, nodeId)
-    state.confirmed = value
-    state.hadConfirmedValue = true
-  })
+  const request = state.tail
+    .catch(() => {})
+    .then(async () => {
+      await setPref(key, value, nodeId)
+      state.confirmed = value
+      state.hadConfirmedValue = true
+    })
   state.tail = request
   partitionWrites.set(key, state)
   try {

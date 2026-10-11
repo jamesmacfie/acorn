@@ -22,7 +22,7 @@ export const SCRUBBED_WITH_KEYS = ['headers', 'auth']
 const toolsForPrompt = <T extends { allow?: unknown }>(tools: T | undefined): T | undefined => {
   if (!tools || !Object.hasOwn(tools, 'allow')) return tools
   const { allow: _allow, ...rest } = tools
-  return Object.keys(rest).length ? rest as T : undefined
+  return Object.keys(rest).length ? (rest as T) : undefined
 }
 
 /** A definition as a model may see it: no credentials, provider choices, execution target, or
@@ -53,11 +53,23 @@ export function definitionForPrompt(def: WorkflowDef): PromptWorkflowDef {
         : undefined
       return {
         ...safe,
-        ...(hiddenAgent ? { agent: { prompt: hiddenAgent.prompt, goal: hiddenAgent.goal, profileId: hiddenAgent.profileId, schema: hiddenAgent.schema, onFailure: hiddenAgent.onFailure } } : {}),
+        ...(hiddenAgent
+          ? {
+              agent: {
+                prompt: hiddenAgent.prompt,
+                goal: hiddenAgent.goal,
+                profileId: hiddenAgent.profileId,
+                schema: hiddenAgent.schema,
+                onFailure: hiddenAgent.onFailure,
+              },
+            }
+          : {}),
         ...(stepTools ? { tools: stepTools } : {}),
-        ...(hiddenWorkflow ? {
-          childWorkflow: { inputs: hiddenWorkflow.inputs },
-        } : {}),
+        ...(hiddenWorkflow
+          ? {
+              childWorkflow: { inputs: hiddenWorkflow.inputs },
+            }
+          : {}),
         ...(withFields && Object.keys(withFields).length ? { with: withFields } : {}),
       }
     }),
@@ -97,7 +109,7 @@ export function restoreProtectedWorkflowTargets(current: WorkflowDef, changed: W
 }
 
 const restoreTools = <T extends { allow?: unknown }>(current: T | undefined, changed: T | undefined): T | undefined =>
-  current && Object.hasOwn(current, 'allow') ? { ...changed, allow: current.allow } as T : changed
+  current && Object.hasOwn(current, 'allow') ? ({ ...changed, allow: current.allow } as T) : changed
 
 /** Put configuration hidden from the model back onto surviving steps.
  *
@@ -117,7 +129,10 @@ export function restoreProtectedDefinition(current: WorkflowDef, changed: Workfl
       next = { ...next, agent: { ...next.agent, model: before.agent.model, configOptions: before.agent.configOptions } }
     }
     const protectedWith = Object.fromEntries(
-      SCRUBBED_WITH_KEYS.filter((key) => before.with && Object.hasOwn(before.with, key)).map((key) => [key, before.with![key]]),
+      SCRUBBED_WITH_KEYS.filter((key) => before.with && Object.hasOwn(before.with, key)).map((key) => [
+        key,
+        before.with![key],
+      ]),
     )
     if (Object.keys(protectedWith).length) next = { ...next, with: { ...next.with, ...protectedWith } }
     return next

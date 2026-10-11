@@ -14,17 +14,27 @@ import TableView from './TableView'
 export default function PanelBody(props: PanelViewProps) {
   return (
     <Switch
-      fallback={(
+      fallback={
         <EmptyState align="start" size="sm" title="Can't draw this view">
           {`This version of acorn has no ${props.view.kind} view. Edit the panel to choose another.`}
         </EmptyState>
-      )}
+      }
     >
-      <Match when={props.view.kind === 'stat'}><StatView {...props} /></Match>
-      <Match when={props.view.kind === 'list'}><ListView {...props} /></Match>
-      <Match when={props.view.kind === 'table'}><TableView {...props} /></Match>
-      <Match when={props.view.kind === 'board'}><BoardView {...props} /></Match>
-      <Match when={props.view.kind === 'chart'}><ChartView {...props} /></Match>
+      <Match when={props.view.kind === 'stat'}>
+        <StatView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'list'}>
+        <ListView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'table'}>
+        <TableView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'board'}>
+        <BoardView {...props} />
+      </Match>
+      <Match when={props.view.kind === 'chart'}>
+        <ChartView {...props} />
+      </Match>
     </Switch>
   )
 }

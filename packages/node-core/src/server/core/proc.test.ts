@@ -53,7 +53,13 @@ describe('env allowlist', () => {
     // Against the real process env, not a fixture: this is the assertion that would have caught
     // previewUrl passing no env at all.
     const seen = new Set(result.stdout.split('\n').map((line) => line.split('=')[0]))
-    for (const key of ['SESSION_ENC_KEY', 'INTERNAL_TOKEN', 'ACORN_API_TOKEN', 'GITHUB_CLIENT_ID', 'PROVIDER_API_KEY']) {
+    for (const key of [
+      'SESSION_ENC_KEY',
+      'INTERNAL_TOKEN',
+      'ACORN_API_TOKEN',
+      'GITHUB_CLIENT_ID',
+      'PROVIDER_API_KEY',
+    ]) {
       expect(seen.has(key)).toBe(false)
     }
     expect(result.stdout).toContain('PROBE=visible')
@@ -90,7 +96,9 @@ describe('process-group kill', () => {
     })
     let pid = ''
     for (let i = 0; i < 400 && !pid; i++) {
-      pid = await readFile(pidFile, 'utf8').then((value) => value.trim()).catch(() => '')
+      pid = await readFile(pidFile, 'utf8')
+        .then((value) => value.trim())
+        .catch(() => '')
       if (!pid) await new Promise((r) => setTimeout(r, 25))
     }
     expect(pid).toMatch(/^\d+$/)
@@ -116,7 +124,9 @@ describe('process-group kill', () => {
     })
     let pid = ''
     for (let i = 0; i < 400 && !pid; i++) {
-      pid = await readFile(pidFile, 'utf8').then((value) => value.trim()).catch(() => '')
+      pid = await readFile(pidFile, 'utf8')
+        .then((value) => value.trim())
+        .catch(() => '')
       if (!pid) await new Promise((r) => setTimeout(r, 25))
     }
     expect(pid).toMatch(/^\d+$/)
@@ -216,9 +226,13 @@ describe('failure taxonomy', () => {
   })
 
   it('runProcessOrThrow reports the exit code and keeps stderr out of the message when clean', async () => {
-    await expect(runProcessOrThrow({ file: '/bin/sh', args: ['-c', 'exit 0'], cwd: dir })).resolves.toMatchObject({ code: 0 })
+    await expect(runProcessOrThrow({ file: '/bin/sh', args: ['-c', 'exit 0'], cwd: dir })).resolves.toMatchObject({
+      code: 0,
+    })
     await expect(sh('exit 0')).resolves.toMatchObject({ code: 0 })
-    await expect(runProcessOrThrow({ file: '/bin/sh', args: ['-c', 'echo bad >&2; exit 1'], cwd: dir })).rejects.toThrow(/exited 1: bad/)
+    await expect(
+      runProcessOrThrow({ file: '/bin/sh', args: ['-c', 'echo bad >&2; exit 1'], cwd: dir }),
+    ).rejects.toThrow(/exited 1: bad/)
   })
 
   it('feeds stdin without wedging on a process that never reads it', async () => {

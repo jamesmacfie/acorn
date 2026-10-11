@@ -36,9 +36,16 @@ it('upgrades populated legacy history without trusting its ambiguous line and re
     expect(offline.revision).toBeNull()
     expect(offline.threads[0]).toMatchObject({ threadId: 'thread-0', line: null, originalLine: null, outdated: null })
     expect(offline.threads[0]?.comments.map((c) => [c.id, c.body])).toEqual([
-      ['thread-0-comment-0', 'Keep this history'], ['reply', 'Keep this reply'],
+      ['thread-0-comment-0', 'Keep this history'],
+      ['reply', 'Keep this reply'],
     ])
-    expect(upgraded.select().from(syncState).all().map((row) => row.fetchedAt)).toEqual([0, 0])
+    expect(
+      upgraded
+        .select()
+        .from(syncState)
+        .all()
+        .map((row) => row.fetchedAt),
+    ).toEqual([0, 0])
     const pull = makeFakePull({ threads: 1, commentsPerThread: () => 2 })
     pull.threads[0]!.comments[1]!.id = 'reply'
     pull.threads[0]!.line = 12

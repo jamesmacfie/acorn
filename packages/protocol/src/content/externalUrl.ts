@@ -40,7 +40,8 @@ export function safeContentHref(raw: string | undefined): string | null {
     const url = new URL(raw)
     if (url.protocol === 'mailto:') return url.href
     return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname && !url.username && !url.password
-      ? url.href : null
+      ? url.href
+      : null
   } catch {
     return null
   }

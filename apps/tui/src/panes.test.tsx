@@ -41,7 +41,11 @@ const screenFor = async (
   pane: string,
   options: { until: string; width?: number; height?: number },
 ): Promise<string> => {
-  const screen = await renderFixture({ pane, ...(options.width ? { width: options.width } : {}), ...(options.height ? { height: options.height } : {}) })
+  const screen = await renderFixture({
+    pane,
+    ...(options.width ? { width: options.width } : {}),
+    ...(options.height ? { height: options.height } : {}),
+  })
   let frame = await screen.frame()
   for (let tries = 0; tries < 20 && !frame.includes(options.until); tries += 1) {
     // A real wait, not just another flush: what is outstanding is a route and, on a cold worker, the
@@ -87,7 +91,7 @@ describe('every pane at 80 by 24', () => {
     expect(frame).toContain('Description')
   }, 60_000)
 
-  it('git: the Changes tab\'s tracked group, its counts, and the commit line at the foot', async () => {
+  it("git: the Changes tab's tracked group, its counts, and the commit line at the foot", async () => {
     const frame = await screenFor('git', { until: 'Tracked' })
     // Groups by what a file is, not by which staging area it is in: staging is the checkbox on the
     // row now, and the fixture's three files are two tracked edits and one new file.

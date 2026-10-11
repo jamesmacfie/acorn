@@ -3,7 +3,14 @@ import type { NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { nodes, nodeStatus } from '../../../infra/node/fleet'
 import { attachmentOf, createAttachments, detachNode } from '../../../infra/node/attachment'
 import ProvidedNodes from './ProvidedNodes'
-import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, renameNode } from '../../../infra/node/fleetActions'
+import {
+  fleetMutable,
+  pairNode,
+  probeNodeEndpoint,
+  reconnectNode,
+  removeNode,
+  renameNode,
+} from '../../../infra/node/fleetActions'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../../fleet/NodeChip'
@@ -27,7 +34,11 @@ import { useUnsavedChanges } from '../unsavedChanges'
 // the fingerprint against the one the node itself displays is the security of pairing
 // (docs/api-reference/transport.md § Pairing). Making it a deliberate screen with the value in front of the owner,
 // rather than a checkbox next to a URL field, is the point: a checkbox is a thing people tick.
-type Step = { kind: 'idle' } | { kind: 'endpoint' } | { kind: 'confirm'; probe: NodeProbeResult } | { kind: 'code'; probe: NodeProbeResult }
+type Step =
+  | { kind: 'idle' }
+  | { kind: 'endpoint' }
+  | { kind: 'confirm'; probe: NodeProbeResult }
+  | { kind: 'code'; probe: NodeProbeResult }
 
 const defaultDeviceName = (): string => {
   const platform = typeof navigator === 'undefined' ? '' : navigator.platform
@@ -67,17 +78,19 @@ export default function NodesSettings() {
     }
   }
 
-  const probe = () => run(async () => {
-    const result = await probeNodeEndpoint(endpoint().trim())
-    setLabel(new URL(result.endpoint).hostname)
-    setStep({ kind: 'confirm', probe: result })
-  })
+  const probe = () =>
+    run(async () => {
+      const result = await probeNodeEndpoint(endpoint().trim())
+      setLabel(new URL(result.endpoint).hostname)
+      setStep({ kind: 'confirm', probe: result })
+    })
 
-  const pair = (probed: NodeProbeResult) => run(async () => {
-    await pairNode({ code: code().trim(), deviceName: deviceName().trim(), label: label().trim() || probed.endpoint })
-    setStep({ kind: 'idle' })
-    setCode('')
-  })
+  const pair = (probed: NodeProbeResult) =>
+    run(async () => {
+      await pairNode({ code: code().trim(), deviceName: deviceName().trim(), label: label().trim() || probed.endpoint })
+      setStep({ kind: 'idle' })
+      setCode('')
+    })
 
   const cancel = () => {
     setStep({ kind: 'idle' })
@@ -106,7 +119,7 @@ export default function NodesSettings() {
     renameInFlight = true
     try {
       // Only this row's field: a slow save must not close a rename someone has since opened on another.
-      if (await renameSave.run(() => renameNode(node.nodeId, next)) && renaming() === node.nodeId) setRenaming(null)
+      if ((await renameSave.run(() => renameNode(node.nodeId, next))) && renaming() === node.nodeId) setRenaming(null)
     } finally {
       renameInFlight = false
     }
@@ -128,7 +141,7 @@ export default function NodesSettings() {
     const confirmed = await confirmAction({
       title: `Revoke this client on ${node.label}`,
       actionLabel: 'Revoke',
-      goes: 'The node deletes this client\'s credential, and this client forgets the node. Coming back takes a new pairing code.',
+      goes: "The node deletes this client's credential, and this client forgets the node. Coming back takes a new pairing code.",
       stays: 'Everything on the node stays where it is, and its other paired clients keep their access.',
       danger: true,
     })
@@ -155,7 +168,9 @@ export default function NodesSettings() {
         fallback={
           // `dev:node` in a browser: the serving origin is the node, there's no broker to hold a pinned
           // certificate, and so there's no fleet to manage.
-          <EmptyState align="start" size="sm">This window connects to one node directly, so there are no other nodes to add or remove.</EmptyState>
+          <EmptyState align="start" size="sm">
+            This window connects to one node directly, so there are no other nodes to add or remove.
+          </EmptyState>
         }
       >
         {/* One row per node. The rows are the fleet itself, so this section declares no row labels for
@@ -195,12 +210,16 @@ export default function NodesSettings() {
                     <Inline gap="row" wrap>
                       <NodeChip nodeId={node().nodeId} query={{}} />
                       {/* Only when the name is something else, or the row would say it twice. */}
-                      <Show when={node().local && node().label !== 'This computer'}><Badge size="xs">This computer</Badge></Show>
+                      <Show when={node().local && node().label !== 'This computer'}>
+                        <Badge size="xs">This computer</Badge>
+                      </Show>
                       {/* Provenance: this row was adopted through a plugin's node provider rather
                           than paired by hand, so it is a row that goes away if that plugin does. */}
                       <Show when={node().provider}>
                         {/* The id is `<pluginId>:<providerId>`, so the plugin names it. */}
-                        {(provider) => <Badge size="xs">From {pluginLabel(provider().providerId.split(':')[0]!)}</Badge>}
+                        {(provider) => (
+                          <Badge size="xs">From {pluginLabel(provider().providerId.split(':')[0]!)}</Badge>
+                        )}
                       </Show>
                     </Inline>
 
@@ -225,7 +244,9 @@ export default function NodesSettings() {
                         owner must forget and pair the node again after verifying its identity. */}
                     <Show when={mismatch()}>
                       <div class="node-alarm">
-                        <Text emphasis="strong" wrap>This node's identity changed.</Text>
+                        <Text emphasis="strong" wrap>
+                          This node's identity changed.
+                        </Text>
                         <Text emphasis="muted" wrap>
                           acorn has stopped connecting to it. If you rebuilt this node, unpair it and pair again, and
                           check the words it shows. If you didn't, someone may be intercepting the connection.
@@ -233,7 +254,9 @@ export default function NodesSettings() {
                         <dl class="node-fingerprints">
                           <dt>Expected</dt>
                           <dd>
-                            <span class="node-fingerprint-words">{fingerprintPhrase(node().fingerprint) ?? 'unknown'}</span>
+                            <span class="node-fingerprint-words">
+                              {fingerprintPhrase(node().fingerprint) ?? 'unknown'}
+                            </span>
                             <span class="node-fingerprint-hex">{node().fingerprint ?? 'unknown'}</span>
                           </dd>
                           <Show when={status()?.error?.presentedFingerprint}>
@@ -241,7 +264,9 @@ export default function NodesSettings() {
                               <>
                                 <dt>Received</dt>
                                 <dd>
-                                  <span class="node-fingerprint-words">{fingerprintPhrase(presented()) ?? 'unknown'}</span>
+                                  <span class="node-fingerprint-words">
+                                    {fingerprintPhrase(presented()) ?? 'unknown'}
+                                  </span>
                                   <span class="node-fingerprint-hex">{presented()}</span>
                                 </dd>
                               </>
@@ -266,7 +291,9 @@ export default function NodesSettings() {
                               {/* Says the quiet part out loud, where the owner is deciding: whoever runs
                                   that control plane holds a credential for this node until this button
                                   is used. */}
-                              <Text emphasis="muted" wrap>{plane()} can reach this node until you detach it. Detaching changes nothing else.</Text>
+                              <Text emphasis="muted" wrap>
+                                {plane()} can reach this node until you detach it. Detaching changes nothing else.
+                              </Text>
                               <Button
                                 size="sm"
                                 tone="danger"
@@ -300,7 +327,8 @@ export default function NodesSettings() {
                     <Show when={attachmentOf(attachments(), node().nodeId)?.error}>
                       {(failure) => (
                         <Alert tone="warn">
-                          This node couldn't connect to its control plane on {new Date(failure().at).toLocaleString()}: {failure().reason}
+                          This node couldn't connect to its control plane on {new Date(failure().at).toLocaleString()}:{' '}
+                          {failure().reason}
                         </Alert>
                       )}
                     </Show>
@@ -308,11 +336,16 @@ export default function NodesSettings() {
                     {/* Unpair and revoke stay on the row rather than in a danger zone: this page is the
                         whole fleet, and each node's own actions belong beside its name. */}
                     <Inline gap="row" wrap>
-                      <Button size="sm" disabled={busy()} onPress={() => reconnectNode(node().nodeId)}>Reconnect</Button>
+                      <Button size="sm" disabled={busy()} onPress={() => reconnectNode(node().nodeId)}>
+                        Reconnect
+                      </Button>
                       <Button
                         size="sm"
                         disabled={busy()}
-                        onPress={() => { setRenameValue(node().label); setRenaming(node().nodeId) }}
+                        onPress={() => {
+                          setRenameValue(node().label)
+                          setRenaming(node().nodeId)
+                        }}
                       >
                         Rename
                       </Button>
@@ -367,8 +400,12 @@ export default function NodesSettings() {
                 ),
                 actions: (
                   <>
-                    <Button variant="solid" tone="accent" disabled={busy()} onPress={() => void probe()}>{busy() ? 'Contacting…' : 'Continue'}</Button>
-                    <Button variant="ghost" onPress={cancel}>Cancel</Button>
+                    <Button variant="solid" tone="accent" disabled={busy()} onPress={() => void probe()}>
+                      {busy() ? 'Contacting…' : 'Continue'}
+                    </Button>
+                    <Button variant="ghost" onPress={cancel}>
+                      Cancel
+                    </Button>
                   </>
                 ),
               })}
@@ -381,7 +418,9 @@ export default function NodesSettings() {
                   step: 2,
                   children: (
                     <>
-                      <Text emphasis="strong" wrap>Does the node show these words?</Text>
+                      <Text emphasis="strong" wrap>
+                        Does the node show these words?
+                      </Text>
                       <Text emphasis="muted" wrap>
                         Check them against what {probed().endpoint} shows. This is how you know you're pairing with your
                         own node, and acorn can't check it for you.
@@ -412,7 +451,9 @@ export default function NodesSettings() {
                       >
                         They match
                       </Button>
-                      <Button variant="ghost" onPress={cancel}>They don't match</Button>
+                      <Button variant="ghost" onPress={cancel}>
+                        They don't match
+                      </Button>
                     </>
                   ),
                 })
@@ -426,7 +467,10 @@ export default function NodesSettings() {
                   step: 3,
                   children: (
                     <>
-                      <Field label="Pairing code" hint="On the node, choose Pair another client to get a code. It works for a few minutes.">
+                      <Field
+                        label="Pairing code"
+                        hint="On the node, choose Pair another client to get a code. It works for a few minutes."
+                      >
                         <Input
                           label="Pairing code"
                           assist={false}
@@ -446,10 +490,17 @@ export default function NodesSettings() {
                   ),
                   actions: (
                     <>
-                      <Button variant="solid" tone="accent" disabled={busy() || !code().trim()} onPress={() => void pair(probed())}>
+                      <Button
+                        variant="solid"
+                        tone="accent"
+                        disabled={busy() || !code().trim()}
+                        onPress={() => void pair(probed())}
+                      >
                         {busy() ? 'Pairing…' : 'Pair'}
                       </Button>
-                      <Button variant="ghost" onPress={cancel}>Cancel</Button>
+                      <Button variant="ghost" onPress={cancel}>
+                        Cancel
+                      </Button>
                     </>
                   ),
                 })
@@ -460,7 +511,9 @@ export default function NodesSettings() {
 
         {/* Outside the section's rows, because a failed detach, unpair or revoke above lands here as
             well as a failed pairing. */}
-        <Show when={error()}><Alert>{error()}</Alert></Show>
+        <Show when={error()}>
+          <Alert>{error()}</Alert>
+        </Show>
 
         {/* The fleet's other half (./ProvidedNodes.tsx). Draws nothing at all unless some node reports
             a node provider. */}

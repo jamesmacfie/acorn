@@ -16,14 +16,13 @@ import { ownerId } from '../middleware/requireUser'
 // connections client-side. A plugin frame keeps the proxy route its own plugin serves, because
 // `/v1/core/*` has no bridge scope and minting one would hand every installed plugin the whole roster
 // to serve one dropdown.
-export const models = new Hono<AppEnv>()
-  .get('/backends', async (c) => {
-    const service = createModelService(getDb(c.env), c.env.SECRETS)
-    // `available` already answers connections-then-installed-harnesses in list order, so the wizard's
-    // "not found on this machine" rows are the only thing left to ask for separately.
-    const [backends, harnesses] = await Promise.all([service.available(ownerId(c)), harnessBackends()])
-    return c.json({
-      backends,
-      missing: harnesses.missing.map((backend) => ({ id: backend.id, label: backend.label })),
-    } satisfies ModelBackendsResponse)
-  })
+export const models = new Hono<AppEnv>().get('/backends', async (c) => {
+  const service = createModelService(getDb(c.env), c.env.SECRETS)
+  // `available` already answers connections-then-installed-harnesses in list order, so the wizard's
+  // "not found on this machine" rows are the only thing left to ask for separately.
+  const [backends, harnesses] = await Promise.all([service.available(ownerId(c)), harnessBackends()])
+  return c.json({
+    backends,
+    missing: harnesses.missing.map((backend) => ({ id: backend.id, label: backend.label })),
+  } satisfies ModelBackendsResponse)
+})

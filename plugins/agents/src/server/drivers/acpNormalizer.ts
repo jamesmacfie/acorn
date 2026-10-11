@@ -59,7 +59,10 @@ const SUBJECT_KINDS: Record<string, AgentPermissionSubject['kind']> = {
 
 /** The parts of a tool call a permission subject reads. A permission request's `toolCall` is an update to
  *  a call the agent may have announced earlier, so the driver merges the two before reading it. */
-export type AcpToolCallFacts = Pick<RequestPermissionRequest['toolCall'], 'toolCallId' | 'kind' | 'rawInput' | 'locations'>
+export type AcpToolCallFacts = Pick<
+  RequestPermissionRequest['toolCall'],
+  'toolCallId' | 'kind' | 'rawInput' | 'locations'
+>
 
 // What `agents:before-permission` reads. `command` is taken only when the harness sent it as a string,
 // which is Claude Code's and DeepSeek's shell input; anything else stays empty rather than rebuilt from
@@ -71,14 +74,11 @@ export function acpPermissionSubject(toolCall: AcpToolCallFacts): AgentPermissio
     toolCallId: toolCall.toolCallId ?? '',
     kind: SUBJECT_KINDS[toolCall.kind ?? ''] ?? 'other',
     command: typeof command === 'string' ? command : '',
-    paths: (toolCall.locations ?? []).flatMap((location) => typeof location.path === 'string' ? [location.path] : []),
+    paths: (toolCall.locations ?? []).flatMap((location) => (typeof location.path === 'string' ? [location.path] : [])),
   }
 }
 
-export function normalizeAcpElicitation(
-  requestId: string,
-  request: CreateElicitationRequest,
-): AgentNormalizedEvent {
+export function normalizeAcpElicitation(requestId: string, request: CreateElicitationRequest): AgentNormalizedEvent {
   return normalizeFormElicitation(requestId, {
     message: request.message,
     requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
@@ -89,10 +89,13 @@ export function acpElicitationResponse(
   request: CreateElicitationRequest,
   resolution: unknown,
 ): CreateElicitationResponse {
-  return formElicitationResponse({
-    message: request.message,
-    requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
-  }, resolution)
+  return formElicitationResponse(
+    {
+      message: request.message,
+      requestedSchema: 'requestedSchema' in request ? request.requestedSchema : undefined,
+    },
+    resolution,
+  )
 }
 
 const configCategory = (category: string | null | undefined): AgentConfigOption['category'] => {
@@ -124,11 +127,13 @@ export function normalizeAcpConfig(options: readonly SessionConfigOption[] | nul
           description: value.description ?? undefined,
         }))
       }
-      return [{
-        value: entry.value,
-        label: entry.name,
-        description: entry.description ?? undefined,
-      }]
+      return [
+        {
+          value: entry.value,
+          label: entry.name,
+          description: entry.description ?? undefined,
+        },
+      ]
     })
     return {
       id: option.id,
@@ -191,9 +196,9 @@ type ClaudeToolMeta = {
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
-  typeof value === 'object' && value != null && !Array.isArray(value) ? value as Record<string, unknown> : null
+  typeof value === 'object' && value != null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
 
-const str = (value: unknown): string | undefined => typeof value === 'string' && value ? value : undefined
+const str = (value: unknown): string | undefined => (typeof value === 'string' && value ? value : undefined)
 const num = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
@@ -213,14 +218,14 @@ function claudeToolMeta(meta: unknown): ClaudeToolMeta {
     heartbeat: agentId == null && num(response?.elapsedTimeSeconds) != null,
     subagent: agentId
       ? {
-        agentId,
-        agentType: str(response?.agentType),
-        resolvedModel: str(response?.resolvedModel),
-        status: str(response?.status),
-        totalTokens: num(response?.totalTokens),
-        totalToolUseCount: num(response?.totalToolUseCount),
-        totalDurationMs: num(response?.totalDurationMs),
-      }
+          agentId,
+          agentType: str(response?.agentType),
+          resolvedModel: str(response?.resolvedModel),
+          status: str(response?.status),
+          totalTokens: num(response?.totalTokens),
+          totalToolUseCount: num(response?.totalToolUseCount),
+          totalDurationMs: num(response?.totalDurationMs),
+        }
       : undefined,
   }
 }
@@ -280,11 +285,11 @@ function claudeWebActivity(meta: ClaudeToolMeta, rawInput: unknown): AgentWebAct
     // is what keeps the fold from blanking what an earlier update reported.
     const action: AgentWebActivity['action'] | undefined = input
       ? {
-        type: 'search',
-        queries: query ? [query] : [],
-        ...(allowedDomains ? { allowedDomains } : {}),
-        ...(blockedDomains ? { blockedDomains } : {}),
-      }
+          type: 'search',
+          queries: query ? [query] : [],
+          ...(allowedDomains ? { allowedDomains } : {}),
+          ...(blockedDomains ? { blockedDomains } : {}),
+        }
       : undefined
     const results = claudeWebResults(meta.response)
     return action || results ? { ...(action ? { action } : {}), ...(results ? { results } : {}) } : undefined
@@ -300,9 +305,11 @@ function claudeWebActivity(meta: ClaudeToolMeta, rawInput: unknown): AgentWebAct
     const status = code != null ? { code, ...(text ? { text } : {}) } : undefined
     return input || status
       ? {
-        ...(input ? { action: { type: 'fetch_page' as const, ...(url ? { url } : {}), ...(prompt ? { prompt } : {}) } } : {}),
-        ...(status ? { status } : {}),
-      }
+          ...(input
+            ? { action: { type: 'fetch_page' as const, ...(url ? { url } : {}), ...(prompt ? { prompt } : {}) } }
+            : {}),
+          ...(status ? { status } : {}),
+        }
       : undefined
   }
   return undefined
@@ -446,9 +453,10 @@ function acpFileChanges(
     files.set(block.path, file)
     const location = locations[at]
     const line = locations.length === blocks.length && location?.path === block.path ? location.line : null
-    const hunks = line == null
-      ? diffHunks(block.oldText ?? '', block.newText)
-      : diffHunks(block.oldText ?? '', block.newText, { old: line - 1 - file.added, new: line - 1 })
+    const hunks =
+      line == null
+        ? diffHunks(block.oldText ?? '', block.newText)
+        : diffHunks(block.oldText ?? '', block.newText, { old: line - 1 - file.added, new: line - 1 })
     file.hunks.push(...hunks)
     file.added += hunks.reduce((sum, hunk) => sum + hunk.newLines - hunk.oldLines, 0)
     if (line == null && block.oldText != null) file.snippet = true
@@ -474,23 +482,27 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
     // field costs nothing against the day the CLI starts using it.
     case 'agent_message_chunk':
       return update.content.type === 'text'
-        ? [{
-          type: 'assistant_message',
-          text: update.content.text,
-          messageId: update.messageId ?? undefined,
-          append: true,
-          subagentId: claudeToolMeta(update._meta).parentToolUseId,
-        }]
+        ? [
+            {
+              type: 'assistant_message',
+              text: update.content.text,
+              messageId: update.messageId ?? undefined,
+              append: true,
+              subagentId: claudeToolMeta(update._meta).parentToolUseId,
+            },
+          ]
         : []
     case 'agent_thought_chunk':
       return update.content.type === 'text'
-        ? [{
-          type: 'reasoning',
-          text: update.content.text,
-          messageId: update.messageId ?? undefined,
-          append: true,
-          subagentId: claudeToolMeta(update._meta).parentToolUseId,
-        }]
+        ? [
+            {
+              type: 'reasoning',
+              text: update.content.text,
+              messageId: update.messageId ?? undefined,
+              append: true,
+              subagentId: claudeToolMeta(update._meta).parentToolUseId,
+            },
+          ]
         : []
     case 'tool_call':
     case 'tool_call_update': {
@@ -508,12 +520,11 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       // capability, so this is the only place it can be picked up. The card renders it behind a
       // disclosure toggle. `content` replaces rather than appends in ACP, hence no outputAppend.
       const text = blocks
-        .flatMap((content) => content.type === 'content' && content.content.type === 'text'
-          ? [unfenced(content.content.text)]
-          : [])
+        .flatMap((content) =>
+          content.type === 'content' && content.content.type === 'text' ? [unfenced(content.content.text)] : [],
+        )
         .join('\n')
-      const status = toolStatus(update.status)
-        ?? (update.sessionUpdate === 'tool_call' ? 'pending' : undefined)
+      const status = toolStatus(update.status) ?? (update.sessionUpdate === 'tool_call' ? 'pending' : undefined)
       // A spawning call belongs to the subagent it starts, not to the parent. That is what makes the
       // transcript nest it inside the subagent's card, so the prompt and the final report read as the
       // subagent's own rather than as one more tool the parent ran.
@@ -523,69 +534,86 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       // call's input; `subagentFromToolCall` also reads it off the `async_launched` summary.
       const background = asRecord(update.rawInput)?.run_in_background === true
       const roster: AgentNormalizedEvent[] = spawn
-        ? [{ type: 'subagent', subagent: subagentFromToolCall(update.toolCallId, update.title, status, meta, background) }]
+        ? [
+            {
+              type: 'subagent',
+              subagent: subagentFromToolCall(update.toolCallId, update.title, status, meta, background),
+            },
+          ]
         : []
       // A diff belongs to whoever made the edit, the same as the call it arrived on. Left unattributed
       // it rendered in the parent's stream while the Edit call that produced it sat inside the
       // subagent's, so a subagent's run showed the tool and not what it changed.
-      const diffs = acpFileChanges(blocks, update.locations ?? [], update.toolCallId)
-        .map((change) => ({ ...change, summary: `${harness} updated a file.`, subagentId }))
+      const diffs = acpFileChanges(blocks, update.locations ?? [], update.toolCallId).map((change) => ({
+        ...change,
+        summary: `${harness} updated a file.`,
+        subagentId,
+      }))
       const webAction = meta.toolName != null ? CLAUDE_WEB_TOOLS.get(meta.toolName) : undefined
       const web = claudeWebActivity(meta, 'rawInput' in update ? update.rawInput : undefined)
       const prose = toolProse(update, meta)
       const toolSearch = toolSearchTitle(update, meta)
       // After the roster, so a brief lands in the stream the subagent card has just opened.
-      const said: AgentNormalizedEvent[] = prose
-        ? [{ type: prose.as, text: prose.text, subagentId }]
-        : []
-      return [...roster, ...said, {
-        type: 'tool',
-        tool: {
-          id: update.toolCallId,
-          ...(meta.toolName?.startsWith('mcp__') ? { name: meta.toolName.split('__').at(-1) } : {}),
-          // Empty rather than a made-up name: a tool_call always names itself, an update need not,
-          // and the fold keeps the name the call arrived with. A web call is the exception: its row
-          // is named after what it did, so the adapter's `"query" (allowed: host)` title never
-          // reaches a card and a Claude row reads like a Codex one (./webActivity.ts).
-          title: webAction ? webToolTitle(webAction) : toolSearch ?? update.title ?? '',
-          kind: update.kind ?? undefined,
-          status,
-          input: prose || toolSearch != null ? undefined : toolInput(update.rawInput),
-          // A failed load keeps its output, because that is where the error is.
-          output: toolSearch != null && status !== 'failed' ? undefined : text || undefined,
-          subagentId,
-          ...(web ? { web } : {}),
+      const said: AgentNormalizedEvent[] = prose ? [{ type: prose.as, text: prose.text, subagentId }] : []
+      return [
+        ...roster,
+        ...said,
+        {
+          type: 'tool',
+          tool: {
+            id: update.toolCallId,
+            ...(meta.toolName?.startsWith('mcp__') ? { name: meta.toolName.split('__').at(-1) } : {}),
+            // Empty rather than a made-up name: a tool_call always names itself, an update need not,
+            // and the fold keeps the name the call arrived with. A web call is the exception: its row
+            // is named after what it did, so the adapter's `"query" (allowed: host)` title never
+            // reaches a card and a Claude row reads like a Codex one (./webActivity.ts).
+            title: webAction ? webToolTitle(webAction) : (toolSearch ?? update.title ?? ''),
+            kind: update.kind ?? undefined,
+            status,
+            input: prose || toolSearch != null ? undefined : toolInput(update.rawInput),
+            // A failed load keeps its output, because that is where the error is.
+            output: toolSearch != null && status !== 'failed' ? undefined : text || undefined,
+            subagentId,
+            ...(web ? { web } : {}),
+          },
         },
-      }, ...diffs]
+        ...diffs,
+      ]
     }
     case 'plan':
-      return [{
-        type: 'plan',
-        entries: update.entries.map((entry, index) => ({
-          id: `plan-${index}`,
-          text: entry.content,
-          status: entry.status,
-        })),
-      }]
+      return [
+        {
+          type: 'plan',
+          entries: update.entries.map((entry, index) => ({
+            id: `plan-${index}`,
+            text: entry.content,
+            status: entry.status,
+          })),
+        },
+      ]
     case 'available_commands_update':
       return [{ type: 'session_metadata', commands: normalizeAcpCommands(update.availableCommands) }]
     case 'config_option_update':
       return [{ type: 'session_metadata', configOptions: normalizeAcpConfig(update.configOptions) }]
     case 'usage_update':
-      return [{
-        type: 'usage',
-        usage: {
-          contextUsed: update.used,
-          contextSize: update.size,
-          cost: update.cost ? { amount: update.cost.amount, currency: update.cost.currency } : undefined,
+      return [
+        {
+          type: 'usage',
+          usage: {
+            contextUsed: update.used,
+            contextSize: update.size,
+            cost: update.cost ? { amount: update.cost.amount, currency: update.cost.currency } : undefined,
+          },
         },
-      }]
+      ]
     case 'current_mode_update':
-      return [{
-        type: 'diagnostic',
-        level: 'info',
-        message: `${harness} switched to mode ${update.currentModeId}.`,
-      }]
+      return [
+        {
+          type: 'diagnostic',
+          level: 'info',
+          message: `${harness} switched to mode ${update.currentModeId}.`,
+        },
+      ]
     case 'session_info_update':
       return update.title
         ? [{ type: 'diagnostic', level: 'info', message: `${harness} session title: ${update.title}` }]
@@ -609,9 +637,7 @@ function subagentFromToolCall(
   const summary = meta.subagent
   // `contextUsed` rather than input/output tokens: the summary reports one total, and splitting a
   // total across two fields would invent a breakdown the wire never gave us.
-  const usage: AgentUsage | undefined = summary?.totalTokens == null
-    ? undefined
-    : { contextUsed: summary.totalTokens }
+  const usage: AgentUsage | undefined = summary?.totalTokens == null ? undefined : { contextUsed: summary.totalTokens }
   // `async_launched` is the launch receipt of a backgrounded `Agent` call: a summary arrives at the
   // moment the child starts, so reading it as a finish marks the child done before it has done
   // anything. It means running. Any other summary status is a genuine end, so keep the earlier rule.
@@ -620,7 +646,11 @@ function subagentFromToolCall(
     id: toolCallId,
     title: title != null && !SUBAGENT_TOOLS.has(title) ? title : undefined,
     status: summary
-      ? launched ? 'running' : summary.status == null || summary.status === 'completed' ? 'completed' : 'failed'
+      ? launched
+        ? 'running'
+        : summary.status == null || summary.status === 'completed'
+          ? 'completed'
+          : 'failed'
       : status,
     background: background || launched || undefined,
     role: summary?.agentType,

@@ -25,10 +25,18 @@ const resourcePackage = (resources: string, id: string): string => {
   const dir = join(resources, id)
   mkdirSync(dir, { recursive: true })
   writeFileSync(join(dir, 'client.js'), `export default '${id}'`)
-  writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-    id, name: id, version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    client: './client.js', permissions: { api: [], events: [], node: {} },
-  }))
+  writeFileSync(
+    join(dir, 'acorn-plugin.json'),
+    JSON.stringify({
+      id,
+      name: id,
+      version: '1',
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
+      client: './client.js',
+      permissions: { api: [], events: [], node: {} },
+    }),
+  )
   return dir
 }
 
@@ -43,9 +51,17 @@ describe('bundled plugin client trust', () => {
     const userData = temporary('acorn-bundled-trust-user-')
     const ids = Array.from({ length: 7 }, (_, index) => `example-${index}`)
     for (const id of ids) resourcePackage(resources, id)
-    const launch = (version: string) => trustBundledClientPlugins(resources, version,
-      new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } }),
-      new PluginTrustStore(userData))
+    const launch = (version: string) =>
+      trustBundledClientPlugins(
+        resources,
+        version,
+        new PluginCache(userData, {
+          fetch: async () => {
+            throw new Error('network must not be used')
+          },
+        }),
+        new PluginTrustStore(userData),
+      )
 
     expect(launch('1')).toEqual(ids)
     expect(writePrivateAtomic).toHaveBeenCalledTimes(2)
@@ -69,16 +85,37 @@ describe('bundled plugin client trust', () => {
     malformed.permissions.api = [123]
     writeFileSync(join(invalid, 'acorn-plugin.json'), JSON.stringify(malformed))
     resourcePackage(resources, 'last')
-    const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+    const cache = new PluginCache(userData, {
+      fetch: async () => {
+        throw new Error('network must not be used')
+      },
+    })
     const trust = new PluginTrustStore(userData)
     const firstHash = createHash('sha256').update("export default 'first'").digest('hex')
     // Application-resource acceptance continues to replace a rejection about those exact bytes.
     // A rejection about another bundle remains the owner's decision.
     const rejected = {
-      pluginId: 'first', hash: firstHash, nodeId: 'node-a', version: '1',
-      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
-      webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [],
-      harnesses: [], agentTools: [], contextSections: [], customAgents: [], decision: 'rejected' as const, decidedAt: 100,
+      pluginId: 'first',
+      hash: firstHash,
+      nodeId: 'node-a',
+      version: '1',
+      permissions: {
+        api: [],
+        events: [],
+        node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      },
+      webviews: [],
+      keyClaims: [],
+      navigationDestinations: [],
+      extensions: [],
+      schedules: [],
+      taskChecks: [],
+      harnesses: [],
+      agentTools: [],
+      contextSections: [],
+      customAgents: [],
+      decision: 'rejected' as const,
+      decidedAt: 100,
     }
     trust.record(rejected)
     trust.record({ ...rejected, pluginId: 'unrelated', hash: 'a'.repeat(64) })
@@ -90,20 +127,34 @@ describe('bundled plugin client trust', () => {
     expect(persisted.decisionFor('first', firstHash)?.decision).toBe('accepted')
     expect(persisted.decisionFor('unrelated', 'a'.repeat(64))?.decision).toBe('rejected')
     expect(persisted.list()).toHaveLength(3)
-    expect(Object.keys(new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } }).list())).toHaveLength(2)
+    expect(
+      Object.keys(
+        new PluginCache(userData, {
+          fetch: async () => {
+            throw new Error('network must not be used')
+          },
+        }).list(),
+      ),
+    ).toHaveLength(2)
   })
 
   it.each(['cache', 'trust'] as const)('retains retryable state when the %s commit fails', (failedStore) => {
     const resources = temporary('acorn-bundled-trust-failure-')
     const userData = temporary('acorn-bundled-trust-user-')
     resourcePackage(resources, 'example')
-    const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+    const cache = new PluginCache(userData, {
+      fetch: async () => {
+        throw new Error('network must not be used')
+      },
+    })
     const trust = new PluginTrustStore(userData)
     const hash = createHash('sha256').update("export default 'example'").digest('hex')
     if (failedStore === 'trust') {
       vi.mocked(writePrivateAtomic).mockImplementationOnce(vi.mocked(writePrivateAtomic).getMockImplementation()!)
     }
-    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => { throw new Error('disk unavailable') })
+    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => {
+      throw new Error('disk unavailable')
+    })
 
     expect(trustBundledClientPlugins(resources, '1', cache, trust)).toEqual([])
     expect(trust.list()).toEqual([])
@@ -120,21 +171,44 @@ describe('bundled plugin client trust', () => {
     mkdirSync(join(plugin, 'dist'), { recursive: true })
     const bytes = new TextEncoder().encode('export default function activate() {}\n')
     writeFileSync(join(plugin, 'dist/client.js'), bytes)
-    writeFileSync(join(plugin, 'acorn-plugin.json'), JSON.stringify({
-      id: 'rollbar', name: 'Rollbar', version: '1.2.3', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-      client: './dist/client.js',
-      permissions: { api: ['core.tasks:read'], events: [], node: {} },
-      contributions: {
-        frames: [{
-          target: 'pane', id: 'rollbar', label: 'Rollbar', glyph: 'circle-dot', order: 100,
-          layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
-        }],
-        extensions: [{
-          id: 'session-header', point: 'agents:session-header', label: 'Session cost', remote: 'pane',
-        }],
+    writeFileSync(
+      join(plugin, 'acorn-plugin.json'),
+      JSON.stringify({
+        id: 'rollbar',
+        name: 'Rollbar',
+        version: '1.2.3',
+        baseline: 'acorn-1',
+        apiVersion: PLUGIN_API_MAJOR,
+        client: './dist/client.js',
+        permissions: { api: ['core.tasks:read'], events: [], node: {} },
+        contributions: {
+          frames: [
+            {
+              target: 'pane',
+              id: 'rollbar',
+              label: 'Rollbar',
+              glyph: 'circle-dot',
+              order: 100,
+              layout: 'single',
+              regions: { body: { kind: 'remote', entry: 'pane' } },
+            },
+          ],
+          extensions: [
+            {
+              id: 'session-header',
+              point: 'agents:session-header',
+              label: 'Session cost',
+              remote: 'pane',
+            },
+          ],
+        },
+      }),
+    )
+    const cache = new PluginCache(userData, {
+      fetch: async () => {
+        throw new Error('network must not be used')
       },
-    }))
-    const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+    })
     const trust = new PluginTrustStore(userData)
 
     expect(trustBundledClientPlugins(resources, '1.0.0', cache, trust)).toEqual(['rollbar'])
@@ -142,10 +216,18 @@ describe('bundled plugin client trust', () => {
     const hash = createHash('sha256').update(bytes).digest('hex')
     expect(cache.has(hash)).toBe(true)
     expect(trust.decisionFor('rollbar', hash)).toMatchObject({
-      pluginId: 'rollbar', version: '1.2.3', decision: 'accepted', nodeId: 'bundled:acorn-1.0.0',
-      extensions: [{
-        kind: 'extends', pointKind: 'remote', target: 'agents:session-header', label: 'Session cost',
-      }],
+      pluginId: 'rollbar',
+      version: '1.2.3',
+      decision: 'accepted',
+      nodeId: 'bundled:acorn-1.0.0',
+      extensions: [
+        {
+          kind: 'extends',
+          pointKind: 'remote',
+          target: 'agents:session-header',
+          label: 'Session cost',
+        },
+      ],
     })
     expect(trust.decisionFor('rollbar', hash)?.partial).toBeUndefined()
   })
@@ -159,14 +241,25 @@ describe('bundled plugin client trust', () => {
       const dir = join(resources, id)
       mkdirSync(join(dir, 'dist'), { recursive: true })
       writeFileSync(join(dir, 'dist/client.js'), `export default function activate() { return '${id}' }\n`)
-      writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
-        id, name: id, version: '1.2.3', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-        client: './dist/client.js',
-        permissions: { api: [], events: [], node: {} },
-      }))
+      writeFileSync(
+        join(dir, 'acorn-plugin.json'),
+        JSON.stringify({
+          id,
+          name: id,
+          version: '1.2.3',
+          baseline: 'acorn-1',
+          apiVersion: PLUGIN_API_MAJOR,
+          client: './dist/client.js',
+          permissions: { api: [], events: [], node: {} },
+        }),
+      )
     }
     const launch = (): string[] => {
-      const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+      const cache = new PluginCache(userData, {
+        fetch: async () => {
+          throw new Error('network must not be used')
+        },
+      })
       cache.sweep()
       const trust = new PluginTrustStore(userData)
       return trustBundledClientPlugins(resources, '1.0.0', cache, trust)
@@ -193,11 +286,22 @@ describe('bundled plugin client trust', () => {
     const resources = temporary('acorn-bundled-trust-invalid-')
     const userData = temporary('acorn-bundled-trust-user-')
     mkdirSync(join(resources, 'rollbar'), { recursive: true })
-    writeFileSync(join(resources, 'rollbar/acorn-plugin.json'), JSON.stringify({
-      id: 'linear', name: 'Wrong', version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    }))
+    writeFileSync(
+      join(resources, 'rollbar/acorn-plugin.json'),
+      JSON.stringify({
+        id: 'linear',
+        name: 'Wrong',
+        version: '1',
+        baseline: 'acorn-1',
+        apiVersion: PLUGIN_API_MAJOR,
+      }),
+    )
 
-    const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+    const cache = new PluginCache(userData, {
+      fetch: async () => {
+        throw new Error('network must not be used')
+      },
+    })
     const trust = new PluginTrustStore(userData)
     expect(trustBundledClientPlugins(resources, '1.0.0', cache, trust)).toEqual([])
     expect(trust.list()).toEqual([])

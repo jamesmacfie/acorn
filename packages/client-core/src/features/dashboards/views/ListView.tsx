@@ -20,26 +20,51 @@ export default function ListView(props: PanelViewProps) {
   // lead, the status chip, and the source, whose slot is the provenance badge below. A `source`
   // field is an ordinary projected field now (mapping.ts § PANEL_SOURCE_FIELD_ID), so without this
   // it would print beside the badge that already says it.
-  const meta = () => props.fields.filter((field) =>
-    !field.hidden
-    && field.id !== lead()?.id
-    && field.id !== status()?.id
-    && !(props.provenance && field.id === PANEL_SOURCE_FIELD_ID))
+  const meta = () =>
+    props.fields.filter(
+      (field) =>
+        !field.hidden &&
+        field.id !== lead()?.id &&
+        field.id !== status()?.id &&
+        !(props.provenance && field.id === PANEL_SOURCE_FIELD_ID),
+    )
 
-  const list = (rows: typeof props.rows) => <For each={rows} fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}>
+  const list = (rows: typeof props.rows) => (
+    <For
+      each={rows}
+      fallback={
+        <EmptyState align="start" size="sm">
+          Nothing to show.
+        </EmptyState>
+      }
+    >
       {(row) => (
         <Row
           density="compact"
           onPress={rowPress(props, row)}
           onMenu={props.onButton ? () => openRowMenu(props.panelId, row.id) : undefined}
           tip={!rowPress(props, row) && props.onActivate ? 'This row has no available destination.' : undefined}
-          trailing={props.onButton ? <RowControls panelId={props.panelId} row={row} buttons={props.buttons} onButton={props.onButton} onOpenRecord={props.onOpenRecord} /> : undefined}
-          leading={(
+          trailing={
+            props.onButton ? (
+              <RowControls
+                panelId={props.panelId}
+                row={row}
+                buttons={props.buttons}
+                onButton={props.onButton}
+                onOpenRecord={props.onOpenRecord}
+              />
+            ) : undefined
+          }
+          leading={
             <>
-              <Show when={props.provenance}><Provenance pluginId={row.pluginId} /></Show>
-              <Show when={status()}>{(field) => <Cell field={field()} value={row.values[field().id]} unit={row.units?.[field().id]} />}</Show>
+              <Show when={props.provenance}>
+                <Provenance pluginId={row.pluginId} />
+              </Show>
+              <Show when={status()}>
+                {(field) => <Cell field={field()} value={row.values[field().id]} unit={row.units?.[field().id]} />}
+              </Show>
             </>
-          )}
+          }
           meta={
             <For each={meta()}>
               {(field) => (
@@ -56,6 +81,23 @@ export default function ListView(props: PanelViewProps) {
         </Row>
       )}
     </For>
-  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4><Button size="sm" variant="bare" disabled={!props.onDrilldown && !props.onSelectPart} onPress={() => props.onSelectPart ? props.onSelectPart('arrange') : props.onDrilldown?.(group)}>{`${group.label} · ${group.count}`}</Button></h4>{group.children?.length ? sections(group.children) : list(group.rows)}</section>}</For>
+  )
+  const sections = (groups: NonNullable<typeof props.groups>) => (
+    <For each={groups}>
+      {(group) => (
+        <section class="dash-row-group">
+          <h4>
+            <Button
+              size="sm"
+              variant="bare"
+              disabled={!props.onDrilldown && !props.onSelectPart}
+              onPress={() => (props.onSelectPart ? props.onSelectPart('arrange') : props.onDrilldown?.(group))}
+            >{`${group.label} · ${group.count}`}</Button>
+          </h4>
+          {group.children?.length ? sections(group.children) : list(group.rows)}
+        </section>
+      )}
+    </For>
+  )
   return props.groups?.length ? sections(props.groups) : list(props.rows)
 }

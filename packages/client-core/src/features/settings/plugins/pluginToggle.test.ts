@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { NodePluginRow } from '@acorn/protocol/api.ts'
 import { nextDisabledList } from './pluginToggle'
 
-const row = (name: string, over: Partial<NodePluginRow> = {}): NodePluginRow =>
-  ({ name, required: false, disabled: false, running: true, state: 'active', ...over })
+const row = (name: string, over: Partial<NodePluginRow> = {}): NodePluginRow => ({
+  name,
+  required: false,
+  disabled: false,
+  running: true,
+  state: 'active',
+  ...over,
+})
 
 const ROWS: NodePluginRow[] = [
   row('github'),
@@ -21,7 +27,9 @@ describe('nextDisabledList', () => {
 
   it('removes a name without disturbing the rest', () => {
     expect(nextDisabledList(ROWS, 'rollbar', false)).toEqual([])
-    expect(nextDisabledList([...ROWS, row('http', { disabled: true, running: false })], 'rollbar', false)).toEqual(['http'])
+    expect(nextDisabledList([...ROWS, row('http', { disabled: true, running: false })], 'rollbar', false)).toEqual([
+      'http',
+    ])
   })
 
   it('is idempotent, because double-clicking a checkbox is easy', () => {

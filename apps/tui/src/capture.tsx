@@ -16,7 +16,11 @@ import { renderFixture } from './harness'
 const pane = process.argv.slice(2).find((arg) => arg !== '--')
 const screen = await renderFixture(pane ? { pane } : {})
 let frame = await screen.frame()
-const empty = (drawn: string) => drawn.split('\n').slice(2, -2).every((line) => line.replace(/[\s│─◉›]/g, '') === '')
+const empty = (drawn: string) =>
+  drawn
+    .split('\n')
+    .slice(2, -2)
+    .every((line) => line.replace(/[\s│─◉›]/g, '') === '')
 for (let tries = 0; tries < 20 && empty(frame); tries += 1) {
   await new Promise((done) => setTimeout(done, 250))
   frame = await screen.frame()

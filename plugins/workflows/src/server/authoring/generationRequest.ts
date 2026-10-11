@@ -85,7 +85,9 @@ function readAnswer(
  * One call when the first answer passes the checker, which is the common case and half the latency.
  * Two when it does not. Never more.
  */
-export async function generateWorkflowRequest(args: GenerateWorkflowArgs): Promise<WorkflowGenerateResult | { error: string }> {
+export async function generateWorkflowRequest(
+  args: GenerateWorkflowArgs,
+): Promise<WorkflowGenerateResult | { error: string }> {
   const { catalog, request, validation } = args
   const system = buildGenerateSystemPrompt({
     catalog,
@@ -98,7 +100,12 @@ export async function generateWorkflowRequest(args: GenerateWorkflowArgs): Promi
   const ask = (prompt: string) =>
     args.generateText({
       backendId: request.backendId,
-      input: { system, prompt, ...(request.modelId ? { modelId: request.modelId } : {}), maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS },
+      input: {
+        system,
+        prompt,
+        ...(request.modelId ? { modelId: request.modelId } : {}),
+        maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
+      },
     })
 
   const first = await ask(userPrompt)
@@ -107,12 +114,14 @@ export async function generateWorkflowRequest(args: GenerateWorkflowArgs): Promi
   const kept = { ...answer, repaired: false, providerId: first.providerId, modelId: first.modelId }
   if (!answer.problems.length) return kept
 
-  const second = await ask(buildRepairUserPrompt({
-    userPrompt,
-    def: currentDef ? definitionForPrompt(answer.def) : answer.def,
-    notes: answer.notes,
-    problems: answer.problems,
-  }))
+  const second = await ask(
+    buildRepairUserPrompt({
+      userPrompt,
+      def: currentDef ? definitionForPrompt(answer.def) : answer.def,
+      notes: answer.notes,
+      problems: answer.problems,
+    }),
+  )
   const repair = readAnswer(second.text, catalog, validation, currentDef)
   if ('error' in repair) return kept
   // The repair pass's notes alone. A note describes a change made to the reply it came in, and this

@@ -1,7 +1,12 @@
 import { createRoot, createSignal } from 'solid-js'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it } from 'vitest'
-import { segmentContentKey, type DiffDocumentFile, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import {
+  segmentContentKey,
+  type DiffDocumentFile,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import { createDiffSnippets, type DiffSnippets } from './diffSnippets'
 import { residentKey, segmentCacheFor } from './segmentCache'
 
@@ -9,9 +14,21 @@ import { residentKey, segmentCacheFor } from './segmentCache'
 // What is under test is what gets loaded: only the segments a card asked for, never a whole patch,
 // and nothing at all for a file the document does not hold.
 
-const segment = (newFirst: number, newLast: number) => ({ rows: 10, bands: 10, gaps: 0, columns: 20, lines: [newFirst, newLast, newFirst, newLast] as [number, number, number, number] })
+const segment = (newFirst: number, newLast: number) => ({
+  rows: 10,
+  bands: 10,
+  gaps: 0,
+  columns: 20,
+  lines: [newFirst, newLast, newFirst, newLast] as [number, number, number, number],
+})
 const file = (path: string, patchKey: string | null): DiffDocumentFile => ({
-  path, status: 'modified', additions: 1, deletions: 1, sha: `sha-${path}`, viewed: false, patchKey,
+  path,
+  status: 'modified',
+  additions: 1,
+  deletions: 1,
+  sha: `sha-${path}`,
+  viewed: false,
+  patchKey,
   segments: patchKey ? [segment(1, 10), segment(11, 20)] : [],
 })
 const files = [file('a.ts', 'sha256:aa'), file('b.ts', 'sha256:bb'), file('binary.png', null)]
@@ -19,13 +36,19 @@ const files = [file('a.ts', 'sha256:aa'), file('b.ts', 'sha256:bb'), file('binar
 const rowsFor = (request: DiffSegmentRequest) => {
   const first = request.ordinal * 10 + 1
   return Array.from({ length: 10 }, (_, index) => ({
-    kind: 'normal' as const, oldNo: first + index, newNo: first + index, raw: `${request.path} line ${first + index}`,
+    kind: 'normal' as const,
+    oldNo: first + index,
+    newNo: first + index,
+    raw: `${request.path} line ${first + index}`,
   }))
 }
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 let dispose: (() => void) | undefined
-afterEach(() => { dispose?.(); dispose = undefined })
+afterEach(() => {
+  dispose?.()
+  dispose = undefined
+})
 
 function setup(client = new QueryClient(), document: DiffDocumentFile[] | undefined = files) {
   const asked: DiffSegmentRequest[][] = []

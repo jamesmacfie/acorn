@@ -1,10 +1,39 @@
-import { createComputed, createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, type Accessor, type JSX, type Setter } from 'solid-js'
+import {
+  createComputed,
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  untrack,
+  type Accessor,
+  type JSX,
+  type Setter,
+} from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { formatChord, formatRelativeTime } from '@acorn/plugin-api/client'
 import {
-  Badge, Button, Card, CodeBlock, Composer, CopyButton, Inline, Kbd, Link, Stack, Text, Timeline, UserAvatar,
+  Badge,
+  Button,
+  Card,
+  CodeBlock,
+  Composer,
+  CopyButton,
+  Inline,
+  Kbd,
+  Link,
+  Stack,
+  Text,
+  Timeline,
+  UserAvatar,
 } from '@acorn/plugin-api/ui'
-import { createDiffSnippets, type DiffSnippetAnchor, type DiffSnippetLine, type DiffSnippets } from '@acorn/plugin-api/ui/diff'
+import {
+  createDiffSnippets,
+  type DiffSnippetAnchor,
+  type DiffSnippetLine,
+  type DiffSnippets,
+} from '@acorn/plugin-api/ui/diff'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
 import { reviewRevisionsMatch, reviewThreadLocation } from '../reviewThreadLocation'
 import type { PrModel } from './prModel'
@@ -93,12 +122,16 @@ function CommitItem(props: { commit: PullCommit }) {
       <Stack gap="row">
         <Inline>
           <UserAvatar login={props.commit.authorLogin} />
-          <Badge size="xs" tone="accent">{props.commit.sha.slice(0, 7)}</Badge>
+          <Badge size="xs" tone="accent">
+            {props.commit.sha.slice(0, 7)}
+          </Badge>
           <Text>{props.commit.message || 'No commit message.'}</Text>
         </Inline>
         <Inline>
           <Text emphasis="muted">{author()}</Text>
-          <Show when={formatRelativeTime(props.commit.committedAt)}>{(age) => <Text emphasis="muted">{age()}</Text>}</Show>
+          <Show when={formatRelativeTime(props.commit.committedAt)}>
+            {(age) => <Text emphasis="muted">{age()}</Text>}
+          </Show>
         </Inline>
       </Stack>
     </Card>
@@ -117,9 +150,12 @@ function ConversationItem(props: {
   const hasBody = () => hasRenderableBody(props.body)
   const stripe = (): 'accent' | 'ok' | 'danger' => {
     switch ((props.state ?? '').toUpperCase()) {
-      case 'APPROVED': return 'ok'
-      case 'CHANGES_REQUESTED': return 'danger'
-      default: return 'accent'
+      case 'APPROVED':
+        return 'ok'
+      case 'CHANGES_REQUESTED':
+        return 'danger'
+      default:
+        return 'accent'
     }
   }
   let text = ''
@@ -134,7 +170,13 @@ function ConversationItem(props: {
         </Inline>
         <Show when={hasBody()}>
           <Show when={props.near()} fallback={<Text emphasis="muted">{NOT_DRAWN}</Text>}>
-            <ProviderHtml html={props.body!} onLinkClick={props.onLinkClick} onText={(value) => { text = value }} />
+            <ProviderHtml
+              html={props.body!}
+              onLinkClick={props.onLinkClick}
+              onText={(value) => {
+                text = value
+              }}
+            />
           </Show>
         </Show>
       </Stack>
@@ -166,7 +208,8 @@ function FileThreadItem(props: {
   const path = () => props.thread.path ?? 'Unknown file'
   const fileName = () => path().split('/').pop() || path()
   const anchor = createMemo((): DiffSnippetAnchor | null =>
-    props.locationsVerified() ? reviewThreadLocation(props.thread) : null)
+    props.locationsVerified() ? reviewThreadLocation(props.thread) : null,
+  )
   // Its segment is read once the turn comes near, and let go when the turn leaves the DOM.
   createEffect(() => {
     const at = anchor()
@@ -186,21 +229,43 @@ function FileThreadItem(props: {
       <Stack gap="row">
         <Inline>
           <Byline author={first()?.author} action="commented" createdAt={first()?.createdAt ?? null} />
-          <Show when={props.thread.outdated === true}><Badge size="xs" tone="neutral">Outdated</Badge></Show>
-          <Show when={props.thread.outdated !== true && !anchor()}><Badge size="xs" tone="neutral">Location unavailable</Badge></Show>
-          <Show when={props.thread.resolved}><Badge size="xs" tone="ok">Resolved</Badge></Show>
+          <Show when={props.thread.outdated === true}>
+            <Badge size="xs" tone="neutral">
+              Outdated
+            </Badge>
+          </Show>
+          <Show when={props.thread.outdated !== true && !anchor()}>
+            <Badge size="xs" tone="neutral">
+              Location unavailable
+            </Badge>
+          </Show>
+          <Show when={props.thread.resolved}>
+            <Badge size="xs" tone="ok">
+              Resolved
+            </Badge>
+          </Show>
         </Inline>
         {/* The file's name and line, which fit the column; the path is in the tip. */}
-        <Show when={anchor()} fallback={
-          <Text>{fileName()}{props.thread.originalLine != null ? `, Original line ${props.thread.originalLine}` : ''}</Text>
-        }>
+        <Show
+          when={anchor()}
+          fallback={
+            <Text>
+              {fileName()}
+              {props.thread.originalLine != null ? `, Original line ${props.thread.originalLine}` : ''}
+            </Text>
+          }
+        >
           <Link tip={path()} onPress={() => props.onOpenFile(props.thread.path!)}>
             {fileName()}, line {props.thread.line}
           </Link>
         </Show>
         <Show
           when={lines()}
-          fallback={<Show when={snippet()?.state === 'unavailable'}><Text emphasis="muted">Snippet unavailable.</Text></Show>}
+          fallback={
+            <Show when={snippet()?.state === 'unavailable'}>
+              <Text emphasis="muted">Snippet unavailable.</Text>
+            </Show>
+          }
         >
           {(shown) => (
             <CodeBlock size="xs" maxHeight="block">
@@ -210,7 +275,12 @@ function FileThreadItem(props: {
         </Show>
         <For each={comments()}>
           {(comment, index) => (
-            <FileThreadComment comment={comment} compact={index() === 0} near={props.near} onLinkClick={props.onLinkClick} />
+            <FileThreadComment
+              comment={comment}
+              compact={index() === 0}
+              near={props.near}
+              onLinkClick={props.onLinkClick}
+            />
           )}
         </For>
       </Stack>
@@ -218,7 +288,12 @@ function FileThreadItem(props: {
   )
 }
 
-function FileThreadComment(props: { comment: ThreadComment; compact: boolean; near: Accessor<boolean>; onLinkClick: (event: MouseEvent) => void }) {
+function FileThreadComment(props: {
+  comment: ThreadComment
+  compact: boolean
+  near: Accessor<boolean>
+  onLinkClick: (event: MouseEvent) => void
+}) {
   return (
     <Stack gap="row">
       <Show when={!props.compact}>
@@ -258,7 +333,9 @@ export function PrConversation(props: {
   // The diff's document says which segment holds each thread's line, so a thread's snippet reads one
   // segment rather than a parsed patch (docs/github-integration/surfaces.md § Conversation). Only asked for
   // when some thread has a line to quote.
-  const anchored = createMemo(() => entries().some((entry) => entry.kind === 'thread' && reviewThreadLocation(entry.thread) != null))
+  const anchored = createMemo(() =>
+    entries().some((entry) => entry.kind === 'thread' && reviewThreadLocation(entry.thread) != null),
+  )
   const diff = createQuery(() => pullDiffOptions(owner, repo, number, anchored()))
   const locationsVerified = () => reviewRevisionsMatch(model().detail.data, diff.data)
   const snippets = createDiffSnippets({
@@ -289,11 +366,15 @@ export function PrConversation(props: {
               <>
                 {/* Approve is the only verb that works on an empty body, so it cannot be the primary
                     submit — the composer disables that without text. */}
-                <Button busy={model().review.isPending} onPress={() => model().submitReviewWith('APPROVE')}>Approve</Button>
+                <Button busy={model().review.isPending} onPress={() => model().submitReviewWith('APPROVE')}>
+                  Approve
+                </Button>
                 <Button
                   disabled={model().review.isPending || !model().reviewBody().trim()}
                   onPress={() => model().submitReviewWith('REQUEST_CHANGES')}
-                >Request changes</Button>
+                >
+                  Request changes
+                </Button>
               </>
             }
           />
@@ -346,7 +427,11 @@ function ComposerBox(props: {
       busy={props.busy}
       submitLabel={props.submitLabel}
       onSubmit={() => props.onSubmit()}
-      hint={<><Kbd size="xs">{formatChord('meta+enter')}</Kbd> to send</>}
+      hint={
+        <>
+          <Kbd size="xs">{formatChord('meta+enter')}</Kbd> to send
+        </>
+      }
       secondary={props.secondary}
     />
   )

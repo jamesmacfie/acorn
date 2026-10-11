@@ -59,11 +59,14 @@ export class QueueCoordinator {
     if (this.wakeAt != null && this.wakeAt <= at) return
     if (this.wakeTimer) clearTimeout(this.wakeTimer)
     this.wakeAt = at
-    this.wakeTimer = setTimeout(() => {
-      this.wakeTimer = null
-      this.wakeAt = null
-      void this.pump()
-    }, Math.max(0, at - Date.now()))
+    this.wakeTimer = setTimeout(
+      () => {
+        this.wakeTimer = null
+        this.wakeAt = null
+        void this.pump()
+      },
+      Math.max(0, at - Date.now()),
+    )
     this.wakeTimer.unref?.()
   }
 
@@ -107,8 +110,14 @@ export class QueueCoordinator {
             continue
           }
           const existing = this.ports.live(item.session.id)
-          if (failedStarts.has(item.session.id) || existing?.activeTurnId || existing?.admissionTurnId || existing?.stopping) continue
-          const workspaceId = existing?.workspaceId || await this.ports.workspaceId(item.session.taskId)
+          if (
+            failedStarts.has(item.session.id) ||
+            existing?.activeTurnId ||
+            existing?.admissionTurnId ||
+            existing?.stopping
+          )
+            continue
+          const workspaceId = existing?.workspaceId || (await this.ports.workspaceId(item.session.taskId))
           if (this.closed || this.ports.shuttingDown()) return
           if ((workspaceActive.get(workspaceId) ?? 0) >= limits.workspace) continue
           if ((providerActive.get(item.session.providerId) ?? 0) >= limits.provider) continue
@@ -132,22 +141,39 @@ export class QueueCoordinator {
               return null
             })
             const live = generation ? this.ports.live(item.session.id) : null
-            if (!generation || live?.generation !== generation || !live.ready || live.activeTurnId || live.stopping || this.closed || this.ports.shuttingDown()) continue
+            if (
+              !generation ||
+              live?.generation !== generation ||
+              !live.ready ||
+              live.activeTurnId ||
+              live.stopping ||
+              this.closed ||
+              this.ports.shuttingDown()
+            )
+              continue
             const currentSession = await this.ports.requireSession(item.session.id)
             const currentHead = await this.ports.nextQueuedTurn(item.session.id)
-            if (!this.ports.ownsSession(generation) || currentHead?.id !== item.turn.id
-              || currentSession.controller !== 'acorn' || currentSession.archivedAt) continue
+            if (
+              !this.ports.ownsSession(generation) ||
+              currentHead?.id !== item.turn.id ||
+              currentSession.controller !== 'acorn' ||
+              currentSession.archivedAt
+            )
+              continue
             if (currentHead.notBefore != null && currentHead.notBefore > Date.now()) {
               this.wakeAtTime(currentHead.notBefore)
               continue
             }
             item.turn = currentHead
-            const decision = decideAgentCommand({
-              runtimeState: currentSession.runtimeState,
-              attention: currentSession.attention,
-              activeTurnId: live.activeTurnId,
-              pendingRequestIds: [],
-            }, { type: 'dispatch_turn', turnId: item.turn.id })
+            const decision = decideAgentCommand(
+              {
+                runtimeState: currentSession.runtimeState,
+                attention: currentSession.attention,
+                activeTurnId: live.activeTurnId,
+                pendingRequestIds: [],
+              },
+              { type: 'dispatch_turn', turnId: item.turn.id },
+            )
             if (!decision.ok) continue
             if (!this.ports.activate(generation, item.turn.id)) continue
             workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)

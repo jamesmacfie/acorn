@@ -36,8 +36,12 @@ const updated = { id: 'updated', name: 'Updated', type: 'datetime' as const, rol
 const size = { id: 'size', name: 'Size', type: 'number' as const, unit: 'MB' }
 const title = { id: 'title', name: 'Title', type: 'text' as const, role: 'title' as const }
 
-const row = (id: string, values: DashboardDisplayRow['values']): DashboardDisplayRow =>
-  ({ id, values, pluginId: 'github', sourceId: 'pulls-mine' })
+const row = (id: string, values: DashboardDisplayRow['values']): DashboardDisplayRow => ({
+  id,
+  values,
+  pluginId: 'github',
+  sourceId: 'pulls-mine',
+})
 
 describe('what a schema can chart', () => {
   it('offers bar for an enum, line for a datetime, both for both', () => {
@@ -136,11 +140,19 @@ describe('bar charts', () => {
     const plot = buildChart(rows, schema(status, size), { kind: 'chart', shape: 'bar', x: 'state' }, {})
     expect(plot?.shape).toBe('bar')
     if (plot?.shape !== 'bar') return
-    expect(plot.bars.map((bar) => [bar.label, bar.value])).toEqual([['Open', 2], ['Merged', 1]])
+    expect(plot.bars.map((bar) => [bar.label, bar.value])).toEqual([
+      ['Open', 2],
+      ['Merged', 1],
+    ])
   })
 
   it('aggregates a number field instead when the measure names one', () => {
-    const plot = buildChart(rows, schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
+    const plot = buildChart(
+      rows,
+      schema(status, size),
+      { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' },
+      {},
+    )
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.bars.map((bar) => bar.value)).toEqual([4, 6])
   })
@@ -163,20 +175,36 @@ describe('bar charts', () => {
   })
 
   it('grows the bottom pad and the label drop with a larger tick font', () => {
-    const plot = buildChart([row('1', { state: 'open' })], schema(status), { kind: 'chart', shape: 'bar', x: 'state' }, {}, 20)
+    const plot = buildChart(
+      [row('1', { state: 'open' })],
+      schema(status),
+      { kind: 'chart', shape: 'bar', x: 'state' },
+      {},
+      20,
+    )
     expect(plot?.frame.tickFont).toBe(20)
     expect(plot!.frame.height - plot!.frame.baseline).toBeGreaterThanOrEqual(plot!.frame.labelDrop + 20)
   })
 
   it('draws a declared value with no rows as a zero-height bar rather than dropping the column', () => {
-    const plot = buildChart([row('1', { state: 'open' })], schema(status), { kind: 'chart', shape: 'bar', x: 'state' }, {})
+    const plot = buildChart(
+      [row('1', { state: 'open' })],
+      schema(status),
+      { kind: 'chart', shape: 'bar', x: 'state' },
+      {},
+    )
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.bars).toHaveLength(2)
     expect(plot.bars[1].h).toBe(0)
   })
 
   it('keeps every bar inside the plot area', () => {
-    const plot = buildChart(rows, schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
+    const plot = buildChart(
+      rows,
+      schema(status, size),
+      { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' },
+      {},
+    )
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     // Against the plot's own frame, not a module constant. The left gutter is as wide as this chart's
     // labels needed, so a bounds check against a fixed number would pass for the wrong reason.
@@ -189,7 +217,12 @@ describe('bar charts', () => {
   })
 
   it('thins the labels rather than overprinting them', () => {
-    const many = { id: 'kind', name: 'Kind', type: 'enum' as const, values: Array.from({ length: 20 }, (_, index) => ({ id: `v${index}`, label: `V${index}` })) }
+    const many = {
+      id: 'kind',
+      name: 'Kind',
+      type: 'enum' as const,
+      values: Array.from({ length: 20 }, (_, index) => ({ id: `v${index}`, label: `V${index}` })),
+    }
     const plot = buildChart([], schema(many), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.bars).toHaveLength(20)
@@ -199,7 +232,15 @@ describe('bar charts', () => {
   it('gives a value DECLARED WITHOUT A TONE the accent, not the muted default', () => {
     // The plugin declared that the value exists, not what it means, so there is no meaning to keep.
     // Colouring every value of an untoned enum `muted` would draw them all in faint ink.
-    const kind = { id: 'kind', name: 'Kind', type: 'enum' as const, values: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }
+    const kind = {
+      id: 'kind',
+      name: 'Kind',
+      type: 'enum' as const,
+      values: [
+        { id: 'a', label: 'A' },
+        { id: 'b', label: 'B' },
+      ],
+    }
     const plot = buildChart([row('1', { kind: 'a' })], schema(kind), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.bars.map((bar) => bar.tone)).toEqual(['accent', 'accent'])
@@ -217,7 +258,12 @@ describe('bar charts', () => {
   })
 
   it('reads the units off the field, so an axis of MB says MB', () => {
-    const plot = buildChart(rows, schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
+    const plot = buildChart(
+      rows,
+      schema(status, size),
+      { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' },
+      {},
+    )
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     expect(plot.yTicks.some((tick) => tick.label.includes('MB'))).toBe(true)
   })
@@ -228,7 +274,10 @@ describe('the grouped bar', () => {
     id: 'kind',
     name: 'Kind',
     type: 'enum' as const,
-    values: [{ id: 'bug', label: 'Bug' }, { id: 'feat', label: 'Feature' }],
+    values: [
+      { id: 'bug', label: 'Bug' },
+      { id: 'feat', label: 'Feature' },
+    ],
   }
   const rows = [
     row('1', { state: 'open', kind: 'bug' }),
@@ -242,19 +291,25 @@ describe('the grouped bar', () => {
     const plot = buildChart(rows, schema(status, kind), grouped, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
     // Two categories and two series, and the arithmetic is the intersection of both bucketings.
-    expect(plot.bars.map((bar) => [bar.label, bar.value]))
-      .toEqual([['Open', 1], ['Merged', 1], ['Open', 2], ['Merged', 0]])
+    expect(plot.bars.map((bar) => [bar.label, bar.value])).toEqual([
+      ['Open', 1],
+      ['Merged', 1],
+      ['Open', 2],
+      ['Merged', 0],
+    ])
     // The x axis still names the category once, at the centre of its cluster.
     expect(plot.xTicks.map((tick) => tick.label)).toEqual(['Open', 'Merged'])
   })
 
   it('offers the split only where a second enum exists, and never the category axis itself', () => {
-    expect(chartSeriesFields(schema(status, kind), 'bar', { kind: 'chart', x: 'state' }, {}).map((f) => f.id))
-      .toEqual(['kind'])
+    expect(chartSeriesFields(schema(status, kind), 'bar', { kind: 'chart', x: 'state' }, {}).map((f) => f.id)).toEqual([
+      'kind',
+    ])
     expect(chartSeriesFields(schema(status), 'bar', { kind: 'chart', x: 'state' }, {})).toEqual([])
     // A line's axis is a datetime, so every enum is a candidate there.
-    expect(chartSeriesFields(schema(status, updated), 'line', { kind: 'chart', x: 'updated' }, {}).map((f) => f.id))
-      .toEqual(['state'])
+    expect(
+      chartSeriesFields(schema(status, updated), 'line', { kind: 'chart', x: 'updated' }, {}).map((f) => f.id),
+    ).toEqual(['state'])
   })
 
   it('ignores a split naming the category axis rather than drawing one bar per cluster', () => {
@@ -304,11 +359,13 @@ describe('the legend', () => {
   const day = (n: number) => n * DAY + 3_600_000
 
   it('carries the mark’s own colour attribute, so a swatch cannot drift from its mark', () => {
-    const rows = [
-      row('1', { updated: day(1), state: 'open' }),
-      row('2', { updated: day(2), state: 'merged' }),
-    ]
-    const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
+    const rows = [row('1', { updated: day(1), state: 'open' }), row('2', { updated: day(2), state: 'merged' })]
+    const plot = buildChart(
+      rows,
+      schema(updated, status),
+      { kind: 'chart', shape: 'line', x: 'updated', series: 'state' },
+      {},
+    )
     expect(plot?.legend).toEqual([
       { id: 'open', label: 'Open', tone: 'warn' },
       { id: 'merged', label: 'Merged', tone: 'ok' },
@@ -317,14 +374,25 @@ describe('the legend', () => {
 
   it('collapses the fold into one key that says how many went in', () => {
     const rows = ['a', 'b', 'c', 'd', 'e'].map((value, index) =>
-      row(`${index}`, { updated: day(index + 1), kind: value }))
-    const plot = buildChart(rows, schema(updated, kind), { kind: 'chart', shape: 'line', x: 'updated', series: 'kind' }, {})
+      row(`${index}`, { updated: day(index + 1), kind: value }),
+    )
+    const plot = buildChart(
+      rows,
+      schema(updated, kind),
+      { kind: 'chart', shape: 'line', x: 'updated', series: 'kind' },
+      {},
+    )
     expect(plot?.legend?.map((key) => key.label)).toEqual(['a', 'b', 'c', 'Other (2)'])
     expect(plot?.legend?.slice(-1)[0].series).toBe('other')
   })
 
   it('is absent for a single series — one mark has no sibling to be told apart from', () => {
-    const plot = buildChart([row('1', { updated: day(1) })], schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    const plot = buildChart(
+      [row('1', { updated: day(1) })],
+      schema(updated),
+      { kind: 'chart', shape: 'line', x: 'updated' },
+      {},
+    )
     expect(plot?.legend).toBeUndefined()
   })
 
@@ -332,7 +400,12 @@ describe('the legend', () => {
     // `merged` is declared, so `boardColumns` keeps it, but no row carries it and no line is drawn, so
     // a swatch for it would stand for nothing on screen.
     const rows = [row('1', { updated: day(1), state: 'open' })]
-    const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
+    const plot = buildChart(
+      rows,
+      schema(updated, status),
+      { kind: 'chart', shape: 'line', x: 'updated', series: 'state' },
+      {},
+    )
     expect(plot?.legend).toBeUndefined()
   })
 })
@@ -341,11 +414,7 @@ describe('line charts', () => {
   const day = (n: number) => n * DAY + 3_600_000
 
   it('buckets by day and counts within the bucket', () => {
-    const rows = [
-      row('1', { updated: day(1) }),
-      row('2', { updated: day(1) + 1000 }),
-      row('3', { updated: day(3) }),
-    ]
+    const rows = [row('1', { updated: day(1) }), row('2', { updated: day(1) + 1000 }), row('3', { updated: day(3) })]
     const plot = buildChart(rows, schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines).toHaveLength(1)
@@ -362,11 +431,13 @@ describe('line charts', () => {
   })
 
   it('splits into one line per declared enum value when a series is named', () => {
-    const rows = [
-      row('1', { updated: day(1), state: 'open' }),
-      row('2', { updated: day(2), state: 'merged' }),
-    ]
-    const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
+    const rows = [row('1', { updated: day(1), state: 'open' }), row('2', { updated: day(2), state: 'merged' })]
+    const plot = buildChart(
+      rows,
+      schema(updated, status),
+      { kind: 'chart', shape: 'line', x: 'updated', series: 'state' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines.map((line) => line.label)).toEqual(['Open', 'Merged'])
     expect(plot.lines.map((line) => line.tone)).toEqual(['warn', 'ok'])
@@ -376,21 +447,36 @@ describe('line charts', () => {
   it('colours an undeclared series split by identity slot, and folds past the third', () => {
     const kind = { id: 'kind', name: 'Kind', type: 'enum' as const }
     const rows = ['a', 'b', 'c', 'd'].map((value, index) => row(`${index}`, { updated: day(index + 1), kind: value }))
-    const plot = buildChart(rows, schema(updated, kind), { kind: 'chart', shape: 'line', x: 'updated', series: 'kind' }, {})
+    const plot = buildChart(
+      rows,
+      schema(updated, kind),
+      { kind: 'chart', shape: 'line', x: 'updated', series: 'kind' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines.map((line) => line.series)).toEqual([1, 2, 3, 'other'])
     expect(plot.lines.every((line) => line.tone === undefined)).toBe(true)
   })
 
   it('leaves the single unsplit line on accent — one mark has no sibling to be told apart from', () => {
-    const plot = buildChart([row('1', { updated: day(1) })], schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    const plot = buildChart(
+      [row('1', { updated: day(1) })],
+      schema(updated),
+      { kind: 'chart', shape: 'line', x: 'updated' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines[0].tone).toBe('accent')
     expect(plot.lines[0].series).toBeUndefined()
   })
 
   it('draws a single-day series as points with no path, centred rather than dividing by zero', () => {
-    const plot = buildChart([row('1', { updated: day(4) })], schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    const plot = buildChart(
+      [row('1', { updated: day(4) })],
+      schema(updated),
+      { kind: 'chart', shape: 'line', x: 'updated' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines[0].path).toBe('')
     expect(plot.lines[0].points[0].x).toBe(plot.frame.plotLeft + plot.frame.plotWidth / 2)
@@ -404,7 +490,12 @@ describe('line charts', () => {
   })
 
   it('answers an empty plot rather than nothing when no row carries a time', () => {
-    const plot = buildChart([row('1', { updated: null })], schema(updated), { kind: 'chart', shape: 'line', x: 'updated' }, {})
+    const plot = buildChart(
+      [row('1', { updated: null })],
+      schema(updated),
+      { kind: 'chart', shape: 'line', x: 'updated' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines).toEqual([])
     expect(plot.xTicks).toEqual([])
@@ -412,7 +503,12 @@ describe('line charts', () => {
 
   it('keeps every point inside the plot area', () => {
     const rows = Array.from({ length: 12 }, (_, index) => row(String(index), { updated: day(index), size: index }))
-    const plot = buildChart(rows, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated', aggregate: 'max', field: 'size' }, {})
+    const plot = buildChart(
+      rows,
+      schema(updated, size),
+      { kind: 'chart', shape: 'line', x: 'updated', aggregate: 'max', field: 'size' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     for (const point of plot.lines[0].points) {
       expect(point.x).toBeGreaterThanOrEqual(plot.frame.plotLeft - 0.001)
@@ -445,14 +541,24 @@ describe('a day with no rows', () => {
   })
 
   it('is filled for a sum as well as a count — both are additive', () => {
-    const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated', aggregate: 'sum', field: 'size' }, {})
+    const plot = buildChart(
+      gappy,
+      schema(updated, size),
+      { kind: 'chart', shape: 'line', x: 'updated', aggregate: 'sum', field: 'size' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(vertices(plot.lines[0].path)).toBe(3)
   })
 
   it('stays a gap for an average, a minimum or a maximum, which are undefined over no rows', () => {
     for (const aggregate of ['avg', 'min', 'max'] as const) {
-      const plot = buildChart(gappy, schema(updated, size), { kind: 'chart', shape: 'line', x: 'updated', aggregate, field: 'size' }, {})
+      const plot = buildChart(
+        gappy,
+        schema(updated, size),
+        { kind: 'chart', shape: 'line', x: 'updated', aggregate, field: 'size' },
+        {},
+      )
       if (plot?.shape !== 'line') throw new Error('expected a line chart')
       // Two real days, two vertices. A filled zero here would draw a dip to the floor that no row says
       // happened: "the average size on a day with no rows" has no answer, and 0 is not it.
@@ -464,7 +570,12 @@ describe('a day with no rows', () => {
     // `merged` is a declared column `boardColumns` keeps, and filling every day of it would draw a flat
     // line along zero for a series nothing is in.
     const rows = [row('1', { updated: day(1), state: 'open' }), row('2', { updated: day(3), state: 'open' })]
-    const plot = buildChart(rows, schema(updated, status), { kind: 'chart', shape: 'line', x: 'updated', series: 'state' }, {})
+    const plot = buildChart(
+      rows,
+      schema(updated, status),
+      { kind: 'chart', shape: 'line', x: 'updated', series: 'state' },
+      {},
+    )
     if (plot?.shape !== 'line') throw new Error('expected a line chart')
     expect(plot.lines.map((line) => line.label)).toEqual(['Open'])
   })
@@ -481,7 +592,12 @@ describe('the axis gutter', () => {
   const day = (n: number) => n * DAY + 3_600_000
 
   it('widens for the labels it actually has, so a big number is not sliced off at the edge', () => {
-    const small = buildChart([row('1', { state: 'open', size: 2 })], schema(status, size), { kind: 'chart', shape: 'bar', x: 'state' }, {})
+    const small = buildChart(
+      [row('1', { state: 'open', size: 2 })],
+      schema(status, size),
+      { kind: 'chart', shape: 'bar', x: 'state' },
+      {},
+    )
     const big = buildChart(
       Array.from({ length: 40 }, (_, index) => row(String(index), { state: 'open', size: 20_000 })),
       schema(status, size),
@@ -498,7 +614,12 @@ describe('the axis gutter', () => {
   })
 
   it('never squeezes the plot away, however long a field formats its labels', () => {
-    const plot = buildChart([row('1', { state: 'open', size: 987_654_321 })], schema(status, size), { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' }, {})
+    const plot = buildChart(
+      [row('1', { state: 'open', size: 987_654_321 })],
+      schema(status, size),
+      { kind: 'chart', shape: 'bar', x: 'state', aggregate: 'sum', field: 'size' },
+      {},
+    )
     if (!plot) throw new Error('expected a chart')
     expect(plot.frame.plotWidth).toBeGreaterThan(CHART_FRAME.width / 2)
   })

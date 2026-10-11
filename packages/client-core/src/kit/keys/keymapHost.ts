@@ -19,10 +19,10 @@ import type { Intent } from './intents'
 
 /** The engine, at a host's pair of type parameters. The DOM's pair is the default, because it is
  *  what every caller in this package means. */
-export type AcornKeymap<
-  Target extends object = HTMLElement,
-  Event extends KeymapEvent = HtmlKeymapEvent,
-> = Keymap<Target, Event>
+export type AcornKeymap<Target extends object = HTMLElement, Event extends KeymapEvent = HtmlKeymapEvent> = Keymap<
+  Target,
+  Event
+>
 
 // Held at the widest pair the engine allows, because there is one engine per process and the host
 // that installed it is the only thing that knows which pair it is.
@@ -53,10 +53,10 @@ let primary: 'super' | 'ctrl' | null = null
 let shadowsTyping = false
 
 /** The installed keymap, or null before the host's root exists. */
-export const keymap = <
-  Target extends object = HTMLElement,
-  Event extends KeymapEvent = HtmlKeymapEvent,
->(): AcornKeymap<Target, Event> | null => installed as AcornKeymap<Target, Event> | null
+export const keymap = <Target extends object = HTMLElement, Event extends KeymapEvent = HtmlKeymapEvent>(): AcornKeymap<
+  Target,
+  Event
+> | null => installed as AcornKeymap<Target, Event> | null
 
 /** Called by a host's installer only. Returns the teardown that clears the singleton again. */
 export function setKeymap<Target extends object, Event extends KeymapEvent>(
@@ -98,7 +98,7 @@ type DomTarget = {
 const domTarget = (target: object | undefined): DomTarget | null => {
   if (!target || typeof (target as Partial<DomTarget>).isConnected !== 'boolean') return null
   const ownerDocument = (target as Partial<DomTarget>).ownerDocument
-  return ownerDocument ? target as DomTarget : null
+  return ownerDocument ? (target as DomTarget) : null
 }
 
 /**
@@ -177,10 +177,12 @@ export function registerIntentLayer<Target extends object>(
       })
     }
   }
-  return installed ? registerLayerWhenConnected(installed, {
-    target,
-    targetMode: options.mode ?? 'focus-within',
-    priority: options.priority ?? 40,
-    bindings,
-  }) : () => {}
+  return installed
+    ? registerLayerWhenConnected(installed, {
+        target,
+        targetMode: options.mode ?? 'focus-within',
+        priority: options.priority ?? 40,
+        bindings,
+      })
+    : () => {}
 }

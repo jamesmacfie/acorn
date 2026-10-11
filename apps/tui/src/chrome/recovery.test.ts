@@ -7,17 +7,22 @@ it('refetches an inactive failed read after reconnect without sweeping healthy i
   let failedAttempts = 0
   let healthyAttempts = 0
   let reachable = false
-  await expect(client.fetchQuery({
-    queryKey: ['failed-pane'],
-    queryFn: async () => {
-      failedAttempts += 1
-      if (!reachable) throw new Error('connection refused')
-      return 'recovered'
-    },
-  })).rejects.toThrow('connection refused')
+  await expect(
+    client.fetchQuery({
+      queryKey: ['failed-pane'],
+      queryFn: async () => {
+        failedAttempts += 1
+        if (!reachable) throw new Error('connection refused')
+        return 'recovered'
+      },
+    }),
+  ).rejects.toThrow('connection refused')
   await client.fetchQuery({
     queryKey: ['healthy-inactive'],
-    queryFn: async () => { healthyAttempts += 1; return 'unchanged' },
+    queryFn: async () => {
+      healthyAttempts += 1
+      return 'unchanged'
+    },
   })
 
   reachable = true
@@ -44,13 +49,17 @@ it('resets a failed pane after each manual retry, including a persistent failure
   await expect(client.fetchQuery(query)).rejects.toThrow('still offline')
   let resets = 0
 
-  await retryFailedPane(client, () => { resets += 1 })
+  await retryFailedPane(client, () => {
+    resets += 1
+  })
   expect(attempts).toBe(2)
   expect(resets).toBe(1)
   expect(client.getQueryState(query.queryKey)?.status).toBe('error')
 
   reachable = true
-  await retryFailedPane(client, () => { resets += 1 })
+  await retryFailedPane(client, () => {
+    resets += 1
+  })
   expect(attempts).toBe(3)
   expect(resets).toBe(2)
   expect(client.getQueryData(query.queryKey)).toBe('ready')

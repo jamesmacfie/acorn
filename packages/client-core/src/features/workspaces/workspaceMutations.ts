@@ -3,7 +3,11 @@
 import { postJson, writeJson, sendForm } from '../../infra/node/apiClient'
 import type { PickedFile } from '../../infra/platform'
 import { clientFor } from '../../infra/node/fleet'
-import { workspaceIconUploadRoute, type WorkspaceAppearance, type WorkspaceImageCrop } from '@acorn/protocol/workspaceAppearance.ts'
+import {
+  workspaceIconUploadRoute,
+  type WorkspaceAppearance,
+  type WorkspaceImageCrop,
+} from '@acorn/protocol/workspaceAppearance.ts'
 import {
   integrationMappingsRoute,
   type IntegrationMapping,
@@ -25,21 +29,29 @@ import type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 // Replace a workspace's combined external-project set. Provider-specific callers must preserve
 // sibling-provider mappings when assembling the replacement.
 export const setWorkspaceExternalProjects = async (workspaceId: string, projects: WorkspaceExternalProject[]) =>
-  writeJson<{ ok: true }>(workspaceExternalProjectsRoute(workspaceId), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ projects }),
-  }, (response) => `workspace-projects ${response.status}`)
+  writeJson<{ ok: true }>(
+    workspaceExternalProjectsRoute(workspaceId),
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projects }),
+    },
+    (response) => `workspace-projects ${response.status}`,
+  )
 
 // Replace one connection's whole map in a single write. The connection-side twin of the call above:
 // Settings edits an integration rather than a workspace at a time, and scoping the replace to the
 // connection is what keeps a sibling integration's rows out of it.
 export const setIntegrationMappings = async (connectionId: string, mappings: IntegrationMapping[]) =>
-  writeJson<{ ok: true }>(integrationMappingsRoute(connectionId), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mappings }),
-  }, (response) => `integration-mappings ${response.status}`)
+  writeJson<{ ok: true }>(
+    integrationMappingsRoute(connectionId),
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mappings }),
+    },
+    (response) => `integration-mappings ${response.status}`,
+  )
 
 const patchWorkspace = (id: string, body: unknown) =>
   writeJson<{ ok: true }>(
@@ -52,7 +64,11 @@ export const bootstrapWorkspaces = () => postJson<Workspace[]>(workspaceBootstra
 export const createWorkspace = (name: string) => postJson<Workspace>(workspacesRoute, { name })
 export const createProject = (seed: ProjectSeed) => postJson<{ project: Project }>(projectsRoute, seed)
 export const patchProject = (id: string, patch: ProjectPatch) =>
-  writeJson<{ project: Project }>(projectRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }, (res) => `project ${res.status}`)
+  writeJson<{ project: Project }>(
+    projectRoute(id),
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) },
+    (res) => `project ${res.status}`,
+  )
 export const detectProject = (id: string) => postJson<{ project: Project }>(projectDetectRoute(id))
 // Takes the project's tasks with it (server/projectDeletion.ts). Folders and worktrees on disk are untouched.
 export const deleteProject = (id: string) =>
@@ -61,9 +77,15 @@ export const setProjectWorkspace = (id: string, workspaceId: string) => patchPro
 export const setProjectHidden = (id: string, hidden: boolean) => patchProject(id, { hidden })
 export const setWorkspaceProjectOrder = (id: string, projectIds: string[]) => {
   const body: WorkspaceProjectOrder = { projectIds }
-  return writeJson<{ ok: true }>(workspaceProjectOrderRoute(id), {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-  }, (res) => `Could not save project order (${res.status}).`)
+  return writeJson<{ ok: true }>(
+    workspaceProjectOrderRoute(id),
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+    (res) => `Could not save project order (${res.status}).`,
+  )
 }
 export const renameWorkspace = async (id: string, name: string) => patchWorkspace(id, { name })
 // The workspace event may already have started a shared fleet read. Join that read rather than
@@ -75,14 +97,32 @@ async function appearanceWrite<T>(nodeId: string, write: Promise<T>): Promise<T>
   return result
 }
 export const setWorkspaceAppearance = (id: string, appearance: WorkspaceAppearance | null, nodeId: string) =>
-  appearanceWrite(nodeId, writeJson<{ ok: true }>(workspaceRoute(id), {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appearance }), nodeId,
-  }, 'Could not save the workspace icon. Try again.'))
+  appearanceWrite(
+    nodeId,
+    writeJson<{ ok: true }>(
+      workspaceRoute(id),
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appearance }),
+        nodeId,
+      },
+      'Could not save the workspace icon. Try again.',
+    ),
+  )
 export const uploadWorkspaceImage = (id: string, file: PickedFile, crop: WorkspaceImageCrop, nodeId: string) =>
-  appearanceWrite(nodeId, sendForm<{ appearance: WorkspaceAppearance }>(workspaceIconUploadRoute(id), [
-    { name: 'image', filename: file.name, type: file.type, bytes: file.bytes.slice() },
-    { name: 'crop', value: JSON.stringify(crop) },
-  ], 'Could not save the workspace image. Try again.', { nodeId }))
+  appearanceWrite(
+    nodeId,
+    sendForm<{ appearance: WorkspaceAppearance }>(
+      workspaceIconUploadRoute(id),
+      [
+        { name: 'image', filename: file.name, type: file.type, bytes: file.bytes.slice() },
+        { name: 'crop', value: JSON.stringify(crop) },
+      ],
+      'Could not save the workspace image. Try again.',
+      { nodeId },
+    ),
+  )
 // Build/run/db/preview config and project colour are Project-scoped; edit them via the Project API.
 export const deleteWorkspace = async (id: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'DELETE' }, (res) => `workspace ${res.status}`)

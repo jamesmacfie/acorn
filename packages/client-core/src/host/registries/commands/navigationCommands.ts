@@ -59,14 +59,19 @@ export function registerNavigationCommands(host: NavigationHost): Disposable {
       // A fleet search asks once per node and labels each row with the node that answered. On a host
       // with one node it asks that node alone (./sessionStore.ts § searchTargets).
       scope: 'fleet',
-      ...localSearch((context) => host.tasks()
-        .filter((row) => onNode(row, context.nodeId))
-        // The task this session opened over is where the reader already is.
-        .filter((row) => row.task.id !== context.taskId)
-        .map((row): CommandSearchItem => {
-          const subtitle = host.taskSubtitle(row.task)
-          return { id: row.task.id, title: row.task.title, ...(subtitle ? { subtitle } : {}), taskId: row.task.id }
-        }), { cache: false }),
+      ...localSearch(
+        (context) =>
+          host
+            .tasks()
+            .filter((row) => onNode(row, context.nodeId))
+            // The task this session opened over is where the reader already is.
+            .filter((row) => row.task.id !== context.taskId)
+            .map((row): CommandSearchItem => {
+              const subtitle = host.taskSubtitle(row.task)
+              return { id: row.task.id, title: row.task.title, ...(subtitle ? { subtitle } : {}), taskId: row.task.id }
+            }),
+        { cache: false },
+      ),
       select: (item, context): CommandOutcome => {
         const row = host.tasks().find((candidate) => candidate.task.id === item.id && onNode(candidate, context.nodeId))
         if (!row) throw new Error("That task isn't here any more.")
@@ -84,18 +89,25 @@ export function registerNavigationCommands(host: NavigationHost): Disposable {
       order: 200,
       placeholder: () => `Find a ${words().singular}…`,
       scope: 'fleet',
-      ...localSearch((context) => host.workspaces()
-        .filter((entry) => onNode(entry, context.nodeId))
-        // The captured workspace is the active node's, whichever node this search is asking.
-        .filter((entry) => !(entry.workspace.id === context.workspaceId && onNode(entry, activeNodeId())))
-        .map((entry): CommandSearchItem => ({
-          id: entry.workspace.id,
-          title: entry.workspace.name,
-          ...(words().singular === 'workspace' ? { subtitle: projectCount(entry.workspace.projects.length) } : {}),
-          workspaceId: entry.workspace.id,
-        })), { cache: false }),
+      ...localSearch(
+        (context) =>
+          host
+            .workspaces()
+            .filter((entry) => onNode(entry, context.nodeId))
+            // The captured workspace is the active node's, whichever node this search is asking.
+            .filter((entry) => !(entry.workspace.id === context.workspaceId && onNode(entry, activeNodeId())))
+            .map((entry): CommandSearchItem => ({
+              id: entry.workspace.id,
+              title: entry.workspace.name,
+              ...(words().singular === 'workspace' ? { subtitle: projectCount(entry.workspace.projects.length) } : {}),
+              workspaceId: entry.workspace.id,
+            })),
+        { cache: false },
+      ),
       select: (item, context): CommandOutcome => {
-        const entry = host.workspaces().find((candidate) => candidate.workspace.id === item.id && onNode(candidate, context.nodeId))
+        const entry = host
+          .workspaces()
+          .find((candidate) => candidate.workspace.id === item.id && onNode(candidate, context.nodeId))
         if (!entry) throw new Error(`That ${words().singular} isn't here any more.`)
         host.openWorkspace(entry)
         return COMMAND_CLOSED
@@ -130,12 +142,16 @@ export function registerNavigationCommands(host: NavigationHost): Disposable {
       palette: true,
       order: 300,
       placeholder: 'Find a project…',
-      ...localSearch(() => host.projects().map((project): CommandSearchItem => ({
-        id: project.id,
-        title: project.name,
-        ...(project.path ? { subtitle: project.path } : {}),
-        projectId: project.id,
-      })), { cache: false }),
+      ...localSearch(
+        () =>
+          host.projects().map((project): CommandSearchItem => ({
+            id: project.id,
+            title: project.name,
+            ...(project.path ? { subtitle: project.path } : {}),
+            projectId: project.id,
+          })),
+        { cache: false },
+      ),
       select: (item): CommandOutcome => {
         host.openProject(item.id)
         return COMMAND_CLOSED
@@ -153,9 +169,13 @@ export function registerNavigationCommands(host: NavigationHost): Disposable {
       // The roster is this device's, not any one node's, so there is no identity to gate on.
       scope: 'none',
       when: () => nodes().length > 1,
-      ...localSearch(() => nodes()
-        .filter((node) => node.nodeId !== activeNodeId())
-        .map((node): CommandSearchItem => ({ id: node.nodeId, title: node.label })), { cache: false }),
+      ...localSearch(
+        () =>
+          nodes()
+            .filter((node) => node.nodeId !== activeNodeId())
+            .map((node): CommandSearchItem => ({ id: node.nodeId, title: node.label })),
+        { cache: false },
+      ),
       select: (item): CommandOutcome => {
         setActiveNode(item.id)
         return COMMAND_CLOSED

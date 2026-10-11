@@ -36,7 +36,9 @@ beforeEach(async () => {
     loadFailures: () => [],
     pendingReview: () => null,
     pendingReviewIds: () => [],
-    approveReview: () => { throw new Error('not wired in this harness') },
+    approveReview: () => {
+      throw new Error('not wired in this harness')
+    },
     clientBundle: async () => null,
     disabled: () => disabled,
     setDisabled: (names) => {
@@ -49,8 +51,19 @@ beforeEach(async () => {
     },
     reload: () => Promise.reject(new Error('not wired in this harness')),
     inputGrants: () => ({ get: () => undefined, set: () => {}, delete: () => {} }),
-    skillState: () => ({ get: () => ({ approved: {}, disabled: [] }), approve: () => {}, setDisabled: () => {}, forget: () => {} }),
-    development: { state: () => undefined, set: () => {}, logs: () => null, reload: () => Promise.reject(new Error('not under test')), dispose: () => {} },
+    skillState: () => ({
+      get: () => ({ approved: {}, disabled: [] }),
+      approve: () => {},
+      setDisabled: () => {},
+      forget: () => {},
+    }),
+    development: {
+      state: () => undefined,
+      set: () => {},
+      logs: () => null,
+      reload: () => Promise.reject(new Error('not under test')),
+      dispose: () => {},
+    },
   })
   env = {
     DB: harness.db,
@@ -84,7 +97,14 @@ const asOwner = () => ({ ...bearer(), 'content-type': 'application/json' })
 // acorn_dt_<uuid>_<secret>, and the uuid is the device id (auth/deviceTokens.ts).
 const ownerDeviceId = () => deviceToken.split('_')[2]
 
-type Entry = { action: string; actor: string; actorId: string | null; subject: string | null; details: Record<string, unknown> | null; at: number }
+type Entry = {
+  action: string
+  actor: string
+  actorId: string | null
+  subject: string | null
+  details: Record<string, unknown> | null
+  at: number
+}
 
 // recordAudit is fire-and-forget so a logging failure cannot fail the action it describes; the row
 // therefore lands a microtask after the response. Poll rather than sleep a fixed interval: this file
@@ -127,7 +147,9 @@ describe('the audit trail records what security.md says it should', () => {
 
   it('records a revocation against the device that asked for it', async () => {
     const victim = await devices.issue('other machine')
-    expect((await call(`/v1/core/devices/${victim.device.id}`, { method: 'DELETE', headers: asOwner() })).status).toBe(204)
+    expect((await call(`/v1/core/devices/${victim.device.id}`, { method: 'DELETE', headers: asOwner() })).status).toBe(
+      204,
+    )
 
     const rows = await entries((all) => all.some((row) => row.action === 'device.revoked'))
     const revoked = rows.find((row) => row.action === 'device.revoked')
@@ -166,9 +188,11 @@ describe('the trail is owner-readable and paged', () => {
     expect(page.entries[0].at).toBeGreaterThanOrEqual(page.entries[1].at)
     expect(page.nextBefore).toBe(page.entries[1].at)
 
-    const next = (await (await call(`/v1/core/audit?limit=2&before=${page.nextBefore}`, {
-      headers: bearer(),
-    })).json()) as { entries: Entry[] }
+    const next = (await (
+      await call(`/v1/core/audit?limit=2&before=${page.nextBefore}`, {
+        headers: bearer(),
+      })
+    ).json()) as { entries: Entry[] }
     // Strictly older, so the cursor cannot re-serve a row the first page already showed.
     for (const row of next.entries) expect(row.at).toBeLessThan(page.nextBefore!)
   })

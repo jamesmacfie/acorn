@@ -12,7 +12,9 @@ export async function setSessionConfig(
 ): Promise<void> {
   if (session.archivedAt) throw new Error('Archived sessions cannot change options.')
   if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
-  const options = Array.isArray(session.config.configOptions) ? session.config.configOptions as AgentConfigOption[] : []
+  const options = Array.isArray(session.config.configOptions)
+    ? (session.config.configOptions as AgentConfigOption[])
+    : []
   const option = options.find((candidate) => candidate.id === optionId)
   if (!option) throw new Error(`The harness did not advertise option '${optionId}'.`)
   // Stricter than the picker's path, which accepts any value for an option that lists none.
@@ -22,7 +24,14 @@ export async function setSessionConfig(
   if (option.currentValue === value) return
   // The picker's own patch, so the provider, the saved config, and every client's picker agree. A
   // plugin's change isn't the person's choice, so it doesn't become their default.
-  await runtime.patchSession(session.id, {
-    config: { ...session.config, configOptions: options.map((item) => item.id === optionId ? { ...item, currentValue: value } : item) },
-  }, { remember: false, ...(caller ? { changedBy: caller } : {}) })
+  await runtime.patchSession(
+    session.id,
+    {
+      config: {
+        ...session.config,
+        configOptions: options.map((item) => (item.id === optionId ? { ...item, currentValue: value } : item)),
+      },
+    },
+    { remember: false, ...(caller ? { changedBy: caller } : {}) },
+  )
 }

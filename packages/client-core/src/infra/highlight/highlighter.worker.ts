@@ -32,7 +32,9 @@ async function tokenize(lang: string, code: string): Promise<HighlightLines> {
   // One call for the whole document: docs/diff-rendering/loading.md § Syntax highlighting covers why that
   // is what lets Shiki thread grammar state from line to line correctly.
   const lines = hl.codeToTokensWithThemes(code, { lang: lang as never, themes: THEMES })
-  return lines.map((line) => line.map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' })))
+  return lines.map((line) =>
+    line.map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' })),
+  )
 }
 
 const post = (message: HighlightResponse) => (self as unknown as Worker).postMessage(message)
@@ -41,7 +43,7 @@ self.onmessage = (event: MessageEvent<HighlightRequest>) => {
   const { id, lang, code, sentAt } = event.data
   const started = sentAt === undefined ? 0 : performance.now()
   const queueMs = sentAt === undefined ? undefined : Math.max(0, performance.timeOrigin + started - sentAt)
-  const timing = () => sentAt === undefined ? {} : { queueMs, executionMs: performance.now() - started }
+  const timing = () => (sentAt === undefined ? {} : { queueMs, executionMs: performance.now() - started })
   void tokenize(lang, code).then(
     (lines) => post({ id, ok: true, lines, ...timing() }),
     // A grammar that fails to load or a pattern the engine rejects takes out one request, not the

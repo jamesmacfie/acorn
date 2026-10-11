@@ -115,7 +115,13 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   // The reader hit "collapse all" above the composer. `defer`, so mounting is not itself a collapse:
   // the seed above already decided how this card opens, and a new card arriving after a collapse
   // starts collapsed anyway.
-  createEffect(on(() => fold.collapseSignal?.(), () => setOpen(false), { defer: true }))
+  createEffect(
+    on(
+      () => fold.collapseSignal?.(),
+      () => setOpen(false),
+      { defer: true },
+    ),
+  )
   return (
     <Fold
       label={toolLabel(props.tool)}
@@ -134,25 +140,58 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
         when={props.tool.web}
         fallback={
           <Stack gap="row">
-            <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
+            <Show when={props.tool.input}>
+              {(input) => (
+                <CodeBlock wrap maxHeight="block">
+                  {input()}
+                </CodeBlock>
+              )}
+            </Show>
             <Text emphasis="muted">Started {started()}</Text>
             <Show when={output()}>
-              {(output) => <CodeBlock wrap maxHeight="block" ansi>{output()}</CodeBlock>}
+              {(output) => (
+                <CodeBlock wrap maxHeight="block" ansi>
+                  {output()}
+                </CodeBlock>
+              )}
             </Show>
             <Index each={props.fileChanges ?? []}>
-              {(change) => <Show when={change().patch} fallback={
-                <Stack gap="inline">
-                  <Text emphasis="mono" wrap>{change().path}</Text>
-                  <Text emphasis="muted">{change().patchArtifactId ? 'This diff is too large to show here.' : 'No recorded diff is available.'}</Text>
-                </Stack>
-              }>
-                <StackedDiff path={change().path} patch={change().patch ?? ''} lineNumbers={!change().snippet} />
-              </Show>}
+              {(change) => (
+                <Show
+                  when={change().patch}
+                  fallback={
+                    <Stack gap="inline">
+                      <Text emphasis="mono" wrap>
+                        {change().path}
+                      </Text>
+                      <Text emphasis="muted">
+                        {change().patchArtifactId
+                          ? 'This diff is too large to show here.'
+                          : 'No recorded diff is available.'}
+                      </Text>
+                    </Stack>
+                  }
+                >
+                  <StackedDiff path={change().path} patch={change().patch ?? ''} lineNumbers={!change().snippet} />
+                </Show>
+              )}
             </Index>
             <Show when={props.fileChanges?.length}>
-              <Inline><Button variant="bare" size="sm" onPress={() => openPane(props.taskId, 'git', { kind: 'plugin:select', item: 'changes' })}>Open in Changes</Button></Inline>
+              <Inline>
+                <Button
+                  variant="bare"
+                  size="sm"
+                  onPress={() => openPane(props.taskId, 'git', { kind: 'plugin:select', item: 'changes' })}
+                >
+                  Open in Changes
+                </Button>
+              </Inline>
             </Show>
-            <For each={(props.tool.paths ?? []).filter((path) => !props.fileChanges?.some((change) => change.path === path))}>
+            <For
+              each={(props.tool.paths ?? []).filter(
+                (path) => !props.fileChanges?.some((change) => change.path === path),
+              )}
+            >
               {(path) => <Text emphasis="mono">{path}</Text>}
             </For>
           </Stack>
@@ -171,7 +210,9 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
 
 const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   <Show
-    when={props.tool.input || props.tool.output || props.tool.paths?.length || props.tool.web || props.fileChanges?.length}
+    when={
+      props.tool.input || props.tool.output || props.tool.paths?.length || props.tool.web || props.fileChanges?.length
+    }
     fallback={<AgentToolHead {...props} />}
   >
     <AgentToolFold {...props} />

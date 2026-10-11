@@ -4,7 +4,12 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
 import { max } from 'drizzle-orm'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
-import { largeDiffFiles, largeDiffSummary, type LargeDiffFile, type LargeSurfaceProfile } from '@acorn/client-core/testkit/large-diff'
+import {
+  largeDiffFiles,
+  largeDiffSummary,
+  type LargeDiffFile,
+  type LargeSurfaceProfile,
+} from '@acorn/client-core/testkit/large-diff'
 import { activeIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { openDb } from '@acorn/node-core/server/bindings.ts'
 import { writePreference } from '@acorn/node-core/server/core/prefs.ts'
@@ -12,7 +17,12 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 import { createProject } from '@acorn/node-core/server/projects.ts'
 import { openDataRoot } from '@acorn/node-core/server/storage'
 import { makeTestNodeContext } from '@acorn/node-core/testkit'
-import { seedCommandRestart, seedDelegationCheckReport, seedLargeSession, seedUnattendedPolicy } from '@acorn/plugin-agents/testkit'
+import {
+  seedCommandRestart,
+  seedDelegationCheckReport,
+  seedLargeSession,
+  seedUnattendedPolicy,
+} from '@acorn/plugin-agents/testkit'
 import { seedReviewNotes } from '@acorn/plugin-git/testkit'
 
 // Seeds an agent-automation data root before the window starts (docs/local-development/agent-drivers.md
@@ -21,10 +31,12 @@ import { seedReviewNotes } from '@acorn/plugin-git/testkit'
 // adds a second task and a second workspace/project so both UI hosts can exercise navigation over
 // the same scenario (docs/testing/desktop.md § The large-surface fixture). Prints one JSON line the launcher records.
 
-const args = Object.fromEntries(process.argv.slice(2).reduce<string[][]>((pairs, value, index, all) => {
-  if (index % 2 === 0) pairs.push([value, all[index + 1] ?? ''])
-  return pairs
-}, []))
+const args = Object.fromEntries(
+  process.argv.slice(2).reduce<string[][]>((pairs, value, index, all) => {
+    if (index % 2 === 0) pairs.push([value, all[index + 1] ?? ''])
+    return pairs
+  }, []),
+)
 
 const dataDir = args['--data-dir']
 const projectPath = args['--project']
@@ -33,21 +45,30 @@ const workspaces = args['--workspaces']
 const profile = (args['--profile'] || 'small') as LargeSurfaceProfile
 const seed = Number(args['--seed'] || 1)
 if (!dataDir || !projectPath || !isAbsolute(dataDir) || !isAbsolute(projectPath)) {
-  throw new Error('Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation|delegation-checks|unattended-policy --profile small|scale|canonical --seed N]')
+  throw new Error(
+    'Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation|delegation-checks|unattended-policy --profile small|scale|canonical --seed N]',
+  )
 }
-if (fixture && !['large-surfaces', 'tui-navigation', 'delegation-checks', 'unattended-policy', 'command-restart'].includes(fixture)) throw new Error(`Unknown fixture: ${fixture}`)
-if (workspaces !== undefined && workspaces !== 'on' && workspaces !== 'off') throw new Error('--workspaces must be on or off.')
-if (!['small', 'scale', 'canonical'].includes(profile) || !Number.isInteger(seed)) throw new Error('Profile must be small, scale or canonical, and seed an integer.')
+if (
+  fixture &&
+  !['large-surfaces', 'tui-navigation', 'delegation-checks', 'unattended-policy', 'command-restart'].includes(fixture)
+)
+  throw new Error(`Unknown fixture: ${fixture}`)
+if (workspaces !== undefined && workspaces !== 'on' && workspaces !== 'off')
+  throw new Error('--workspaces must be on or off.')
+if (!['small', 'scale', 'canonical'].includes(profile) || !Number.isInteger(seed))
+  throw new Error('Profile must be small, scale or canonical, and seed an integer.')
 
-const git = (cwd: string, ...command: string[]) => execFileSync('git', command, {
-  cwd,
-  stdio: ['ignore', 'ignore', 'inherit'],
-  env: {
-    ...process.env,
-    GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
-    GIT_CONFIG_SYSTEM: process.platform === 'win32' ? 'NUL' : '/dev/null',
-  },
-})
+const git = (cwd: string, ...command: string[]) =>
+  execFileSync('git', command, {
+    cwd,
+    stdio: ['ignore', 'ignore', 'inherit'],
+    env: {
+      ...process.env,
+      GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+      GIT_CONFIG_SYSTEM: process.platform === 'win32' ? 'NUL' : '/dev/null',
+    },
+  })
 
 const write = (root: string, path: string, text: string, binary: boolean) => {
   const target = join(root, path)
@@ -65,7 +86,17 @@ function writeRepository(root: string): void {
   }
   writeFileSync(join(root, 'README.md'), `Generated UI fixture: profile ${profile}, seed ${seed}.\n`)
   git(root, 'add', '-A')
-  git(root, '-c', 'user.name=Acorn fixture', '-c', 'user.email=fixture@acorn.invalid', 'commit', '-q', '-m', 'Fixture base')
+  git(
+    root,
+    '-c',
+    'user.name=Acorn fixture',
+    '-c',
+    'user.email=fixture@acorn.invalid',
+    'commit',
+    '-q',
+    '-m',
+    'Fixture base',
+  )
   const apply = (file: LargeDiffFile) => {
     if (file.oldPath) rmSync(join(root, file.oldPath), { force: true })
     if (file.head == null) rmSync(join(root, file.path), { force: true })
@@ -93,10 +124,30 @@ try {
       const now = Date.now()
       const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
       await db.insert(schema.tasks).values({
-        id: taskId, title: fixture === 'command-restart' ? 'Command restart verification' : fixture === 'tui-navigation' ? 'Review changed files' : fixture === 'delegation-checks' ? 'Delegation check report' : fixture === 'unattended-policy' ? 'Unattended request policy' : `Large surfaces (${profile})`,
-        icon: null, origin: 'local', projectId: result.project.id,
-        branch: null, skipSetup: true, pullNumber: null, worktreePath: null, status: 'active', parentId: null,
-        sort: (value ?? -1) + 1, createdAt: now, updatedAt: now, archivedAt: null,
+        id: taskId,
+        title:
+          fixture === 'command-restart'
+            ? 'Command restart verification'
+            : fixture === 'tui-navigation'
+              ? 'Review changed files'
+              : fixture === 'delegation-checks'
+                ? 'Delegation check report'
+                : fixture === 'unattended-policy'
+                  ? 'Unattended request policy'
+                  : `Large surfaces (${profile})`,
+        icon: null,
+        origin: 'local',
+        projectId: result.project.id,
+        branch: null,
+        skipSetup: true,
+        pullNumber: null,
+        worktreePath: null,
+        status: 'active',
+        parentId: null,
+        sort: (value ?? -1) + 1,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
       })
 
       let otherTaskId: string | undefined
@@ -104,9 +155,21 @@ try {
       if (fixture === 'tui-navigation') {
         otherTaskId = randomUUID()
         await db.insert(schema.tasks).values({
-          id: otherTaskId, title: 'Plan follow-up work', icon: null, origin: 'local', projectId: result.project.id,
-          branch: null, skipSetup: true, pullNumber: null, worktreePath: null, status: 'active', parentId: null,
-          sort: (value ?? -1) + 2, createdAt: now, updatedAt: now, archivedAt: null,
+          id: otherTaskId,
+          title: 'Plan follow-up work',
+          icon: null,
+          origin: 'local',
+          projectId: result.project.id,
+          branch: null,
+          skipSetup: true,
+          pullNumber: null,
+          worktreePath: null,
+          status: 'active',
+          parentId: null,
+          sort: (value ?? -1) + 2,
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
         })
 
         // This project belongs to a separate workspace. The folder stays beside the generated repo,
@@ -115,21 +178,40 @@ try {
         if (workspaces === 'on') {
           otherWorkspaceId = randomUUID()
           await db.insert(schema.workspaces).values({
-            id: otherWorkspaceId, name: 'Side project', isDefault: false, sort: 1,
-            createdAt: now, updatedAt: now,
+            id: otherWorkspaceId,
+            name: 'Side project',
+            isDefault: false,
+            sort: 1,
+            createdAt: now,
+            updatedAt: now,
           })
         }
         const otherPath = join(dirname(projectPath), 'side-project')
         mkdirSync(otherPath, { recursive: true })
         writeFileSync(join(otherPath, 'README.md'), '# Side project\n')
-        const otherProject = await createProject(db, { path: otherPath, ...(otherWorkspaceId ? { workspaceId: otherWorkspaceId } : {}) }, ownerId)
+        const otherProject = await createProject(
+          db,
+          { path: otherPath, ...(otherWorkspaceId ? { workspaceId: otherWorkspaceId } : {}) },
+          ownerId,
+        )
         if (!otherProject.ok) throw new Error(otherProject.reason)
         otherWorkspaceTaskId = randomUUID()
         await db.insert(schema.tasks).values({
-          id: otherWorkspaceTaskId, title: 'Check workspace switch', icon: null, origin: 'local',
-          projectId: otherProject.project.id, branch: null, skipSetup: true, pullNumber: null,
-          worktreePath: null, status: 'active', parentId: null, sort: (value ?? -1) + 3,
-          createdAt: now, updatedAt: now, archivedAt: null,
+          id: otherWorkspaceTaskId,
+          title: 'Check workspace switch',
+          icon: null,
+          origin: 'local',
+          projectId: otherProject.project.id,
+          branch: null,
+          skipSetup: true,
+          pullNumber: null,
+          worktreePath: null,
+          status: 'active',
+          parentId: null,
+          sort: (value ?? -1) + 3,
+          createdAt: now,
+          updatedAt: now,
+          archivedAt: null,
         })
       }
 
@@ -147,7 +229,14 @@ try {
         if (fixture === 'command-restart') {
           session = await seedCommandRestart(agents.storage.open(), agents.core, taskId)
         } else if (fixture === 'unattended-policy') {
-          session = await seedUnattendedPolicy({ db: agents.storage.open(), core: agents.core, secrets: agents.env.SECRETS, dataDir, taskId, taskRoot: projectPath })
+          session = await seedUnattendedPolicy({
+            db: agents.storage.open(),
+            core: agents.core,
+            secrets: agents.env.SECRETS,
+            dataDir,
+            taskId,
+            taskRoot: projectPath,
+          })
         } else if (fixture === 'delegation-checks') {
           session = await seedDelegationCheckReport(agents.storage.open(), agents.core, taskId)
         } else {
@@ -158,13 +247,24 @@ try {
       }
 
       const summary = largeDiffSummary(profile, seed)
-      process.stdout.write(`${JSON.stringify({
-        fixture, profile, seed,
-        projectId: result.project.id, taskId, sessionId: session.session.id,
-        ...(otherTaskId ? { otherTaskId, otherWorkspaceTaskId } : {}),
-        files: summary.files, fixedRows: summary.fixedRows, threads: summary.threads, notes: summary.notes,
-        digest: summary.digest, turns: session.turns, events: session.events,
-      })}\n`)
+      process.stdout.write(
+        `${JSON.stringify({
+          fixture,
+          profile,
+          seed,
+          projectId: result.project.id,
+          taskId,
+          sessionId: session.session.id,
+          ...(otherTaskId ? { otherTaskId, otherWorkspaceTaskId } : {}),
+          files: summary.files,
+          fixedRows: summary.fixedRows,
+          threads: summary.threads,
+          notes: summary.notes,
+          digest: summary.digest,
+          turns: session.turns,
+          events: session.events,
+        })}\n`,
+      )
     }
   } finally {
     db.close()

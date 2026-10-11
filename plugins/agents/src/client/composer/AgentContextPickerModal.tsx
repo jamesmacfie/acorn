@@ -24,9 +24,11 @@ export default function AgentContextPickerModal(props: {
     initialized = true
     const availableIds = new Set(available.map((option) => option.id))
     const restored = props.initialSelectedIds.filter((id) => availableIds.has(id))
-    setSelected(new Set(restored.length
-      ? restored
-      : available.filter((option) => option.defaultSelected).map((option) => option.id)))
+    setSelected(
+      new Set(
+        restored.length ? restored : available.filter((option) => option.defaultSelected).map((option) => option.id),
+      ),
+    )
   })
 
   const toggle = (id: string) => {
@@ -38,27 +40,27 @@ export default function AgentContextPickerModal(props: {
   }
 
   return (
-    <Modal
-      title={`Add ${props.contribution.label}`}
-      size="md"
-      align="center"
-      onDismiss={props.onClose}
-    >
+    <Modal title={`Add ${props.contribution.label}`} size="md" align="center" onDismiss={props.onClose}>
       <Modal.Body>
-        <Text emphasis="muted" wrap>{props.contribution.description}</Text>
+        <Text emphasis="muted" wrap>
+          {props.contribution.description}
+        </Text>
         <Show
           when={!options.loading}
-          fallback={<Text emphasis="muted" wrap>Loading available context…</Text>}
+          fallback={
+            <Text emphasis="muted" wrap>
+              Loading available context…
+            </Text>
+          }
         >
-          <Show
-            when={!options.error}
-            fallback={<Alert>Unable to load available context.</Alert>}
-          >
+          <Show when={!options.error} fallback={<Alert>Unable to load available context.</Alert>}>
             <Stack gap="row">
               <For
                 each={options() ?? []}
                 fallback={
-                  <Text emphasis="muted" wrap>Nothing is currently available from this source.</Text>
+                  <Text emphasis="muted" wrap>
+                    Nothing is currently available from this source.
+                  </Text>
                 }
               >
                 {(option) => (
@@ -75,7 +77,9 @@ export default function AgentContextPickerModal(props: {
         </Show>
       </Modal.Body>
       <Modal.Actions>
-        <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
+        <Button variant="ghost" onPress={props.onClose}>
+          Cancel
+        </Button>
         <Button
           variant="solid"
           tone="accent"

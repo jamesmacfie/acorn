@@ -45,7 +45,10 @@ export function ListDetail(props: {
       flexGrow={1}
       minWidth={0}
       width="100%"
-      ref={(element: Renderable) => { box = element; setWidth(element.parent?.width ?? element.width) }}
+      ref={(element: Renderable) => {
+        box = element
+        setWidth(element.parent?.width ?? element.width)
+      }}
       onSizeChange={() => setWidth(box?.parent?.width ?? box?.width ?? NARROW_AT)}
     >
       {/* `split` is the form where both columns are children — a `ListColumn` and a `DetailColumn` —
@@ -53,16 +56,38 @@ export function ListDetail(props: {
           gated on `list ?? split` and so drew an empty 32-cell gutter beside the pr pane's navigator
           for a `list` nobody passed (docs/tui.md).
           Below 80 cells the two stack instead of sitting side by side. */}
-      <Show when={list !== undefined} fallback={
-        <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1}>{detail}</box>
-      }>
+      <Show
+        when={list !== undefined}
+        fallback={
+          <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1}>
+            {detail}
+          </box>
+        }
+      >
         <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1} minWidth={0}>
-          <box flexDirection="column" width={narrow() ? '100%' : LIST_CELLS}
-            height={narrow() ? 12 : undefined} flexShrink={0} minWidth={0}
-            ref={paneId ? regionFocus({ paneId, regionId: 'list' }, 0) : undefined}>{list}</box>
-          <Show when={!narrow()}><box width={1}><Line>│</Line></box></Show>
-          <box flexDirection="column" flexGrow={1} minWidth={0}
-            ref={paneId ? regionFocus({ paneId, regionId: 'detail' }, 1) : undefined}>{detail}</box>
+          <box
+            flexDirection="column"
+            width={narrow() ? '100%' : LIST_CELLS}
+            height={narrow() ? 12 : undefined}
+            flexShrink={0}
+            minWidth={0}
+            ref={paneId ? regionFocus({ paneId, regionId: 'list' }, 0) : undefined}
+          >
+            {list}
+          </box>
+          <Show when={!narrow()}>
+            <box width={1}>
+              <Line>│</Line>
+            </box>
+          </Show>
+          <box
+            flexDirection="column"
+            flexGrow={1}
+            minWidth={0}
+            ref={paneId ? regionFocus({ paneId, regionId: 'detail' }, 1) : undefined}
+          >
+            {detail}
+          </box>
         </box>
       </Show>
     </box>
@@ -80,7 +105,11 @@ export function ListColumn(props: { label?: string; scroll?: boolean; scrollKey?
           of the label: a one-line run given half a line lands on the line above it, which drew this
           column's own name over the heading under it
           (docs/tui.md). */}
-      <Show when={props.label}><box flexShrink={0}><Line role="eyebrow">{props.label!}</Line></box></Show>
+      <Show when={props.label}>
+        <box flexShrink={0}>
+          <Line role="eyebrow">{props.label!}</Line>
+        </box>
+      </Show>
       {/* The label sits above the viewport and not inside it. It is the column's own name, so it
           stays put while the rows under it move; scrolling a heading off its own list leaves a
           reader looking at rows that belong to nothing. */}

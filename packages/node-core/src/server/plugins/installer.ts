@@ -14,7 +14,17 @@
 // runs it at the node's next start (pluginLoader.ts), which is why every result says
 // `installed-restart-required` rather than pretending the plugin is live.
 import { createHash, randomUUID } from 'node:crypto'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+} from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
@@ -24,12 +34,23 @@ import type {
   PluginUninstallResult,
   PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
-import { describePluginSource, guardPluginUrl, resolvePluginSource, RELEASE_ASSET } from '@acorn/protocol/plugin/source.ts'
+import {
+  describePluginSource,
+  guardPluginUrl,
+  resolvePluginSource,
+  RELEASE_ASSET,
+} from '@acorn/protocol/plugin/source.ts'
 import { writePrivateAtomic } from '../storage/dataRoot'
 import { unpackPluginArchive } from './archive'
 import { assertPluginPackageTree } from './packageTree'
 import { hashPluginFile, visitPluginFile, MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_FILE_BYTES } from './packageFiles'
-import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type PluginManifest } from './manifest'
+import {
+  MANIFEST_FILE,
+  PLUGIN_API_MAJOR,
+  readPluginManifestResult,
+  speaksApiVersion,
+  type PluginManifest,
+} from './manifest'
 import { pluginDbPath, PLUGIN_DB_DIR } from './storage'
 import { markPluginRemoved, markPluginUserManaged } from './bundledState'
 import { hasPendingPluginReview, pluginReviewFingerprint, removePluginReview, stagePluginReview } from './pendingReview'
@@ -75,10 +96,12 @@ const checkedPluginId = (id: string): string => {
   if (!/^[a-z][a-z0-9-]{1,31}$/.test(id)) fail('Invalid plugin id.')
   return id
 }
-export const pluginDir = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), checkedPluginId(id))
+export const pluginDir = (dataRoot: string, id: string): string =>
+  join(pluginInstallRoot(dataRoot), checkedPluginId(id))
 // Beside `<id>/` and `<id>.sqlite`, and unable to collide with either: the manifest id regex forbids a
 // dot, so no plugin directory can be named `<id>.lock.json`.
-export const lockfilePath = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), `${checkedPluginId(id)}.lock.json`)
+export const lockfilePath = (dataRoot: string, id: string): string =>
+  join(pluginInstallRoot(dataRoot), `${checkedPluginId(id)}.lock.json`)
 
 /** Never throws. A missing or corrupt lockfile means "installed before lockfiles, or hand-copied", which
  * is a plugin with no known source rather than an error. */
@@ -114,7 +137,10 @@ const SRI_ALGORITHMS = ['sha512', 'sha384', 'sha256'] as const
 
 export function parseIntegrity(integrity: string | undefined): { algorithm: string; digest: string } | null {
   if (!integrity) return null
-  const entries = integrity.trim().split(/\s+/).map((entry) => entry.split('-'))
+  const entries = integrity
+    .trim()
+    .split(/\s+/)
+    .map((entry) => entry.split('-'))
   for (const algorithm of SRI_ALGORITHMS) {
     const match = entries.find(([name, digest]) => name === algorithm && digest)
     if (match) return { algorithm, digest: match.slice(1).join('-') }
@@ -128,7 +154,10 @@ export function parseIntegrity(integrity: string | undefined): { algorithm: stri
 // the host choosing what runs.
 async function download(url: string, dest: string, expectIntegrity?: string): Promise<string> {
   guardUrl(url)
-  const res = await fetch(url, { headers: { accept: 'application/octet-stream' }, signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+  const res = await fetch(url, {
+    headers: { accept: 'application/octet-stream' },
+    signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+  })
   if (!res.ok) fail(`${url} answered ${res.status}.`)
   // Again, on the final URL. fetch follows redirects itself and does not expose the hops, so this is
   // the only place a redirect off https can be caught.
@@ -147,7 +176,8 @@ async function download(url: string, dest: string, expectIntegrity?: string): Pr
   const meter = new Transform({
     transform(chunk: Buffer, _encoding, done) {
       total += chunk.byteLength
-      if (total > MAX_ARCHIVE_BYTES) return done(new PluginInstallError(`That package is larger than the ${MAX_ARCHIVE_BYTES} byte limit.`))
+      if (total > MAX_ARCHIVE_BYTES)
+        return done(new PluginInstallError(`That package is larger than the ${MAX_ARCHIVE_BYTES} byte limit.`))
       hash.update(chunk)
       integrity?.update(chunk)
       done(null, chunk)
@@ -155,7 +185,9 @@ async function download(url: string, dest: string, expectIntegrity?: string): Pr
   })
   await pipeline(Readable.fromWeb(res.body as never), meter, createWriteStream(dest, { mode: 0o600 }))
   if (expected && integrity!.digest('base64') !== expected.digest) {
-    fail(`That package does not match the ${expected.algorithm} digest the registry published for it. Nothing was installed.`)
+    fail(
+      `That package does not match the ${expected.algorithm} digest the registry published for it. Nothing was installed.`,
+    )
   }
   return hash.digest('hex')
 }
@@ -184,7 +216,9 @@ const digestOf = (root: string, relPath: string | undefined, maxBytes = MAX_PLUG
   try {
     return hashPluginFile(root, relPath, maxBytes)
   } catch (error) {
-    return fail(`The package does not contain a readable regular entrypoint '${relPath}': ${error instanceof Error ? error.message : String(error)}`)
+    return fail(
+      `The package does not contain a readable regular entrypoint '${relPath}': ${error instanceof Error ? error.message : String(error)}`,
+    )
   }
 }
 
@@ -201,8 +235,11 @@ async function validateSkills(root: string, manifest: PluginManifest): Promise<v
 }
 
 function validate(root: string, expectId: string | null): PluginManifest {
-  try { assertPluginPackageTree(root) }
-  catch (error) { fail(error instanceof Error ? error.message : 'The package could not be validated.') }
+  try {
+    assertPluginPackageTree(root)
+  } catch (error) {
+    fail(error instanceof Error ? error.message : 'The package could not be validated.')
+  }
   const parsed = readPluginManifestResult(root)
   if (!parsed.ok) return fail(parsed.reason)
   const manifest = parsed.manifest
@@ -210,8 +247,13 @@ function validate(root: string, expectId: string | null): PluginManifest {
     fail(`That package is built for acorn plugin API ${manifest.apiVersion}; this node speaks ${PLUGIN_API_MAJOR}.`)
   }
   if (manifest.node) {
-    try { visitPluginFile(root, manifest.node, MAX_PLUGIN_FILE_BYTES, () => undefined) }
-    catch (error) { fail(`The package does not contain a readable regular entrypoint '${manifest.node}': ${error instanceof Error ? error.message : String(error)}`) }
+    try {
+      visitPluginFile(root, manifest.node, MAX_PLUGIN_FILE_BYTES, () => undefined)
+    } catch (error) {
+      fail(
+        `The package does not contain a readable regular entrypoint '${manifest.node}': ${error instanceof Error ? error.message : String(error)}`,
+      )
+    }
   }
   // Custody retains its established too-large projection; its callback reads client bytes with
   // the shared descriptor guard. Node placement hashes with the client ceiling below.
@@ -329,11 +371,19 @@ export type InstallOptions = {
   reviewRequestId?: string
 }
 
-export async function installPlugin(dataRoot: string, source: PluginInstallSource, options: InstallOptions = {}): Promise<PluginInstallResult> {
+export async function installPlugin(
+  dataRoot: string,
+  source: PluginInstallSource,
+  options: InstallOptions = {},
+): Promise<PluginInstallResult> {
   return await place(dataRoot, source, null, options)
 }
 
-export async function updatePlugin(dataRoot: string, id: string, options: InstallOptions = {}): Promise<PluginUpdateResult> {
+export async function updatePlugin(
+  dataRoot: string,
+  id: string,
+  options: InstallOptions = {},
+): Promise<PluginUpdateResult> {
   if (hasPendingPluginReview(dataRoot, id)) fail(`'${id}' has an unreviewed package. Review or remove it first.`)
   const lock = readLockfile(dataRoot, id)
   if (!lock) fail(`acorn does not know where '${id}' came from, so it cannot update it. Reinstall it from its source.`)
@@ -341,7 +391,12 @@ export async function updatePlugin(dataRoot: string, id: string, options: Instal
   return { id, fromVersion: lock!.resolvedVersion, toVersion: result.version, state: result.state }
 }
 
-async function place(dataRoot: string, source: PluginInstallSource, expectId: string | null, options: InstallOptions): Promise<PluginInstallResult> {
+async function place(
+  dataRoot: string,
+  source: PluginInstallSource,
+  expectId: string | null,
+  options: InstallOptions,
+): Promise<PluginInstallResult> {
   if ('path' in source) return await linkLocal(dataRoot, source, expectId, options)
   const root = pluginInstallRoot(dataRoot)
   mkdirSync(root, { recursive: true, mode: 0o700 })
@@ -358,7 +413,8 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
     const pkg = packageRoot(unpacked)
     const manifest = validate(pkg, expectId)
     await validateSkills(pkg, manifest)
-    if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
+    if (hasPendingPluginReview(dataRoot, manifest.id))
+      fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
 
     const existing = readLockfile(dataRoot, manifest.id)
     guardDowngrade(existing, manifest.version, options)
@@ -367,7 +423,8 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
       ...(manifest.client ? { client: digestOf(pkg, manifest.client, MAX_CLIENT_BUNDLE_BYTES)! } : {}),
     }
 
-    if (options.reviewRequestId) stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(pkg))
+    if (options.reviewRequestId)
+      stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(pkg))
     placeAtomically(dataRoot, manifest.id, pkg)
     writeLockfile(dataRoot, manifest.id, {
       source,
@@ -387,17 +444,24 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
 // A folder install (docs/security/plugin-install.md § Installing from a folder). The directory is symlinked rather
 // than copied, so whatever is in that tree at the node's next start is what runs, and the lockfile
 // below records no archive hash and no entrypoint digests because there is nothing to pin.
-async function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): Promise<PluginInstallResult> {
+async function linkLocal(
+  dataRoot: string,
+  source: { path: string },
+  expectId: string | null,
+  options: InstallOptions,
+): Promise<PluginInstallResult> {
   if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
   const manifest = validate(source.path, expectId)
   await validateSkills(source.path, manifest)
-  if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
+  if (hasPendingPluginReview(dataRoot, manifest.id))
+    fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
   guardDowngrade(readLockfile(dataRoot, manifest.id), manifest.version, options)
 
   mkdirSync(pluginInstallRoot(dataRoot), { recursive: true, mode: 0o700 })
   sweepDebris(dataRoot)
   const target = pluginDir(dataRoot, manifest.id)
-  if (options.reviewRequestId) stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(source.path))
+  if (options.reviewRequestId)
+    stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(source.path))
   rmSync(target, { recursive: true, force: true })
   symlinkSync(source.path, target)
   writeLockfile(dataRoot, manifest.id, {
@@ -417,13 +481,20 @@ async function linkLocal(dataRoot: string, source: { path: string }, expectId: s
 function guardDowngrade(existing: PluginLockfile | null, next: string, options: InstallOptions): void {
   if (!existing || options.allowDowngrade) return
   if (compareVersions(next, existing.resolvedVersion) === -1) {
-    fail(`That source resolves to ${next}, which is older than the installed ${existing.resolvedVersion}. Reinstall with "allow downgrade" if that is what you want.`)
+    fail(
+      `That source resolves to ${next}, which is older than the installed ${existing.resolvedVersion}. Reinstall with "allow downgrade" if that is what you want.`,
+    )
   }
 }
 
-export function uninstallPlugin(dataRoot: string, id: string, options: { purgeData?: boolean } = {}): PluginUninstallResult {
+export function uninstallPlugin(
+  dataRoot: string,
+  id: string,
+  options: { purgeData?: boolean } = {},
+): PluginUninstallResult {
   const target = pluginDir(dataRoot, id)
-  if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id)) && !hasPendingPluginReview(dataRoot, id)) fail(`'${id}' is not installed on this node.`)
+  if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id)) && !hasPendingPluginReview(dataRoot, id))
+    fail(`'${id}' is not installed on this node.`)
   markPluginRemoved(dataRoot, id)
   // lstat, so a `{ path }` folder symlink is unlinked rather than followed into the owner's directory.
   rmSync(target, { recursive: true, force: true })

@@ -8,17 +8,22 @@ export type WebviewState = { key: string; url: string; loading: boolean; canGoBa
 // even though Tauri's listener registration crosses an asynchronous boundary.
 const observers = new Set<(state: WebviewState) => void>()
 let listening: Promise<unknown> | undefined
-const stateReady = () => listening ??= listen<WebviewState>('acorn:webview-state', ({ payload }) => {
-  for (const observer of observers) observer(payload)
-}).catch((error) => {
-  listening = undefined
-  throw error
-})
+const stateReady = () =>
+  (listening ??= listen<WebviewState>('acorn:webview-state', ({ payload }) => {
+    for (const observer of observers) observer(payload)
+  }).catch((error) => {
+    listening = undefined
+    throw error
+  }))
 
 export function onWebviewState(cb: (state: WebviewState) => void, matches: (key: string) => boolean): () => void {
-  const observer = (state: WebviewState) => { if (matches(state.key)) cb(state) }
+  const observer = (state: WebviewState) => {
+    if (matches(state.key)) cb(state)
+  }
   observers.add(observer)
-  return () => { observers.delete(observer) }
+  return () => {
+    observers.delete(observer)
+  }
 }
 
 // One page's owner. Evicting the page aborts it, and so does evicting every preview.
@@ -28,7 +33,7 @@ const previewOwner = latestSignal()
 let previewRetirement: Promise<unknown> = Promise.resolve()
 const lifetime = (key: string) => {
   let entry = lifetimes.get(key)
-  if (!entry) lifetimes.set(key, entry = { owner: latestSignal(), tail: Promise.resolve() })
+  if (!entry) lifetimes.set(key, (entry = { owner: latestSignal(), tail: Promise.resolve() }))
   return entry
 }
 

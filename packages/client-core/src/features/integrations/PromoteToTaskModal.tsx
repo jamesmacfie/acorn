@@ -42,7 +42,9 @@ export function PromoteToTaskModal(props: {
 }) {
   const nodeId = activeNodeId()
   let live = true
-  onCleanup(() => { live = false })
+  onCleanup(() => {
+    live = false
+  })
   const ownsPromotion = () => live && activeNodeId() === nodeId
   const params = useParams()
   const projects = createQuery(() => projectsOptions(true))
@@ -93,7 +95,15 @@ export function PromoteToTaskModal(props: {
   onMount(() => {
     const projectId = params.projectId
     if (!projectId) return
-    void Promise.resolve(promotion().prepare(props.item, { projectId, owner: github()?.owner ?? '', repo: github()?.name ?? '', branch: '', existingBranches: props.existingBranches }))
+    void Promise.resolve(
+      promotion().prepare(props.item, {
+        projectId,
+        owner: github()?.owner ?? '',
+        repo: github()?.name ?? '',
+        branch: '',
+        existingBranches: props.existingBranches,
+      }),
+    )
       .then((seed) => {
         if (!ownsPromotion()) return
         if (!titleTouched()) setTitle(seed.title ?? '')
@@ -128,7 +138,13 @@ export function PromoteToTaskModal(props: {
     setBusy(true)
     setError('')
     try {
-      const context = { projectId, owner: github()?.owner ?? '', repo: github()?.name ?? '', branch: isGitProject ? b : undefined, existingBranches: props.existingBranches }
+      const context = {
+        projectId,
+        owner: github()?.owner ?? '',
+        repo: github()?.name ?? '',
+        branch: isGitProject ? b : undefined,
+        existingBranches: props.existingBranches,
+      }
       let current = retry
       if (!current) {
         const base = await Promise.resolve(promotion().prepare(props.item, context))
@@ -185,81 +201,136 @@ export function PromoteToTaskModal(props: {
 
   return (
     <Portal>
-    <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
-      <div ref={dialog} class="overlay" role="dialog" aria-modal="true" onClick={dismiss.onContainerClick} onKeyDown={dismiss.onKeyDown}>
-        <div class="overlay-title">{props.headerLabel}</div>
-        <Show when={props.action}>{(action) => <div class="overlay-body">{action().content}</div>}</Show>
-        <Show when={canAttach() && !prepared()}>
-          <Tabs
-            tabs={[{ id: 'new', label: 'New task' }, { id: 'attach', label: 'Attach to task', count: props.attachTasks.length }]}
-            active={mode()}
-            onChange={(id) => setMode(id as 'new' | 'attach')}
-            idPrefix="promote"
-            ariaLabel="Create a task or attach to an existing one"
-          />
-        </Show>
-        <div class="overlay-body">
-          <p class="muted">{props.itemTitle}</p>
-          <Show when={error()}><Alert>{error()}</Alert></Show>
+      <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
+        <div
+          ref={dialog}
+          class="overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={dismiss.onContainerClick}
+          onKeyDown={dismiss.onKeyDown}
+        >
+          <div class="overlay-title">{props.headerLabel}</div>
+          <Show when={props.action}>{(action) => <div class="overlay-body">{action().content}</div>}</Show>
+          <Show when={canAttach() && !prepared()}>
+            <Tabs
+              tabs={[
+                { id: 'new', label: 'New task' },
+                { id: 'attach', label: 'Attach to task', count: props.attachTasks.length },
+              ]}
+              active={mode()}
+              onChange={(id) => setMode(id as 'new' | 'attach')}
+              idPrefix="promote"
+              ariaLabel="Create a task or attach to an existing one"
+            />
+          </Show>
+          <div class="overlay-body">
+            <p class="muted">{props.itemTitle}</p>
+            <Show when={error()}>
+              <Alert>{error()}</Alert>
+            </Show>
 
-          <Show when={mode() === 'new'}>
-            <form id="promote-panel-new" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitNew}>
-              <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
-              <Field label="Title">
-                <Input value={title()} disabled={!!prepared()} onInput={(value) => {
-                  setTitleTouched(true)
-                  setTitle(value)
-                }} />
-              </Field>
-              <Show when={project()?.vcs === 'git'}>
-                <Field label="Branch">
+            <Show when={mode() === 'new'}>
+              <form
+                id="promote-panel-new"
+                role="tabpanel"
+                class="integration-key-row"
+                style={formStyle}
+                onSubmit={submitNew}
+              >
+                <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
+                <Field label="Title">
                   <Input
-                    value={branchTouched() || branch().trim() ? branch() : defaultBranch()}
+                    value={title()}
                     disabled={!!prepared()}
                     onInput={(value) => {
-                      setBranch(value)
-                      setBranchTouched(true)
+                      setTitleTouched(true)
+                      setTitle(value)
                     }}
                   />
                 </Field>
-                <Checkbox
-                  size="sm"
-                  label="Skip setup script"
-                  checked={skipSetup()}
-                  disabled={!!prepared()}
-                  onChange={setSkipSetup}
-                />
-              </Show>
-              <Inline gap="row">
-                <ToolbarSpacer />
-                <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
-                <Button variant="solid" submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && (!title().trim() || (project()?.vcs === 'git' && !effectiveBranch())))}>
-                  {prepared() ? `Retry ${props.action?.label ?? 'action'}` : props.action ? `Create & ${props.action.label}` : 'Create task'}
-                </Button>
-              </Inline>
-            </form>
-          </Show>
+                <Show when={project()?.vcs === 'git'}>
+                  <Field label="Branch">
+                    <Input
+                      value={branchTouched() || branch().trim() ? branch() : defaultBranch()}
+                      disabled={!!prepared()}
+                      onInput={(value) => {
+                        setBranch(value)
+                        setBranchTouched(true)
+                      }}
+                    />
+                  </Field>
+                  <Checkbox
+                    size="sm"
+                    label="Skip setup script"
+                    checked={skipSetup()}
+                    disabled={!!prepared()}
+                    onChange={setSkipSetup}
+                  />
+                </Show>
+                <Inline gap="row">
+                  <ToolbarSpacer />
+                  <Button variant="ghost" onPress={props.onClose}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="solid"
+                    submit
+                    disabled={
+                      busy() ||
+                      (props.action ? !props.action.ready() : false) ||
+                      (!prepared() && (!title().trim() || (project()?.vcs === 'git' && !effectiveBranch())))
+                    }
+                  >
+                    {prepared()
+                      ? `Retry ${props.action?.label ?? 'action'}`
+                      : props.action
+                        ? `Create & ${props.action.label}`
+                        : 'Create task'}
+                  </Button>
+                </Inline>
+              </form>
+            </Show>
 
-          <Show when={mode() === 'attach'}>
-            <form id="promote-panel-attach" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitAttach}>
-              <p class="muted">Attach this item to an existing task.</p>
-              <Select
-                value={attachId()}
-                options={props.attachTasks.map((task) => ({ value: task.id, label: `${task.title} · ${task.branch}` }))}
-                onChange={(value) => setAttachId(value)}
-              />
-              <Inline gap="row">
-                <ToolbarSpacer />
-                <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
-                <Button variant="solid" submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && !attachId())}>
-                  {prepared() ? `Retry ${props.action?.label ?? 'action'}` : props.action ? `Attach & ${props.action.label}` : 'Attach to task'}
-                </Button>
-              </Inline>
-            </form>
-          </Show>
+            <Show when={mode() === 'attach'}>
+              <form
+                id="promote-panel-attach"
+                role="tabpanel"
+                class="integration-key-row"
+                style={formStyle}
+                onSubmit={submitAttach}
+              >
+                <p class="muted">Attach this item to an existing task.</p>
+                <Select
+                  value={attachId()}
+                  options={props.attachTasks.map((task) => ({
+                    value: task.id,
+                    label: `${task.title} · ${task.branch}`,
+                  }))}
+                  onChange={(value) => setAttachId(value)}
+                />
+                <Inline gap="row">
+                  <ToolbarSpacer />
+                  <Button variant="ghost" onPress={props.onClose}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="solid"
+                    submit
+                    disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && !attachId())}
+                  >
+                    {prepared()
+                      ? `Retry ${props.action?.label ?? 'action'}`
+                      : props.action
+                        ? `Attach & ${props.action.label}`
+                        : 'Attach to task'}
+                  </Button>
+                </Inline>
+              </form>
+            </Show>
+          </div>
         </div>
       </div>
-    </div>
     </Portal>
   )
 }

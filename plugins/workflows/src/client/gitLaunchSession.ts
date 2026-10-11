@@ -28,8 +28,20 @@ export function gitLaunchSession(request: WorkflowGitLaunchRequest): Session {
     const [runId, setRunId] = createSignal<string | null>(null)
     const [pending, setPending] = createSignal(false)
     const [invocation, setInvocation] = createSignal<ReturnType<Session['invocation']>>(null)
-    session = { task, setTask, runId, setRunId, pending, setPending, invocation, setInvocation,
-      targetIdentity: null, values: {}, defId: '', launchId: crypto.randomUUID() }
+    session = {
+      task,
+      setTask,
+      runId,
+      setRunId,
+      pending,
+      setPending,
+      invocation,
+      setInvocation,
+      targetIdentity: null,
+      values: {},
+      defId: '',
+      launchId: crypto.randomUUID(),
+    }
     sessions.set(id, session)
   }
   return session

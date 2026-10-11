@@ -6,7 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from './db'
 import { taskRunConfig } from './worktrees/taskWorktree'
-import { acknowledgeRepoConfig, assertProjectRepoConfigTrusted, assertRepoConfigTrusted, readRepoConfigSnapshot, RepoConfigTrustError, repoConfigTrustReview } from './repoConfigTrust'
+import {
+  acknowledgeRepoConfig,
+  assertProjectRepoConfigTrusted,
+  assertRepoConfigTrusted,
+  readRepoConfigSnapshot,
+  RepoConfigTrustError,
+  repoConfigTrustReview,
+} from './repoConfigTrust'
 
 describe('repo config trust', () => {
   let testDb: TestDb
@@ -19,15 +26,39 @@ describe('repo config trust', () => {
     repo = join(dir, 'repo')
     mkdirSync(join(repo, '.acorn', 'workflows'), { recursive: true })
     const now = Date.now()
-    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await testDb.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: repo, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-widget',
+      name: 'widget',
+      path: repo,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'widget',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await testDb.db.insert(schema.tasks).values({
-      id: 'task1', title: 'Task', origin: 'local', projectId: 'project-widget', branch: 'main',
-      worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+      id: 'task1',
+      title: 'Task',
+      origin: 'local',
+      projectId: 'project-widget',
+      branch: 'main',
+      worktreePath: null,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
     })
   })
 
@@ -38,7 +69,10 @@ describe('repo config trust', () => {
 
   it('hashes config and workflow files deterministically and requires an acknowledgement', async () => {
     writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "pnpm dev"\n')
-    writeFileSync(join(repo, '.acorn', 'workflows', 'verify.toml'), '[[steps]]\nname = "verify"\nprompt = "Run tests"\n')
+    writeFileSync(
+      join(repo, '.acorn', 'workflows', 'verify.toml'),
+      '[[steps]]\nname = "verify"\nprompt = "Run tests"\n',
+    )
 
     const snapshot = readRepoConfigSnapshot(repo)!
     expect(snapshot.files.map((file) => file.path)).toEqual(['.acorn/config.toml', '.acorn/workflows/verify.toml'])
@@ -60,21 +94,30 @@ describe('repo config trust', () => {
     const loaded = await taskRunConfig(testDb.db, 'task1')
     expect(loaded).toMatchObject({
       targets: [{ id: 'dev', command: 'approved-command' }],
-      repoTargetIds: ['dev'], repoConfigHash: approved.hash,
+      repoTargetIds: ['dev'],
+      repoConfigHash: approved.hash,
     })
     await expect(assertRepoConfigTrusted(testDb.db, 'task1', approved.hash)).resolves.toBeUndefined()
 
     writeFileSync(config, '[scripts.run.dev]\ncommand = "unreviewed-command"\n')
     const selected = await taskRunConfig(testDb.db, 'task1')
     if ('error' in selected || !selected.repoConfigHash) throw new Error('Missing selected snapshot')
-    await expect(assertRepoConfigTrusted(testDb.db, 'task1', selected.repoConfigHash)).rejects.toBeInstanceOf(RepoConfigTrustError)
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1', selected.repoConfigHash)).rejects.toBeInstanceOf(
+      RepoConfigTrustError,
+    )
     // Restoring acknowledged bytes must not authorize the previously selected unreviewed command.
     writeFileSync(config, approvedText)
-    await expect(assertRepoConfigTrusted(testDb.db, 'task1', selected.repoConfigHash)).rejects.toBeInstanceOf(RepoConfigTrustError)
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1', selected.repoConfigHash)).rejects.toBeInstanceOf(
+      RepoConfigTrustError,
+    )
     await expect(assertRepoConfigTrusted(testDb.db, 'task1')).resolves.toBeUndefined()
     rmSync(config)
-    await expect(assertRepoConfigTrusted(testDb.db, 'task1', approved.hash)).rejects.toBeInstanceOf(RepoConfigTrustError)
-    await expect(assertRepoConfigTrusted(testDb.db, 'unknown-task', approved.hash)).rejects.toBeInstanceOf(RepoConfigTrustError)
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1', approved.hash)).rejects.toBeInstanceOf(
+      RepoConfigTrustError,
+    )
+    await expect(assertRepoConfigTrusted(testDb.db, 'unknown-task', approved.hash)).rejects.toBeInstanceOf(
+      RepoConfigTrustError,
+    )
   })
 
   it('returns a configuration error and refuses trust for special snapshot files', async () => {
@@ -115,7 +158,7 @@ describe('repo config trust', () => {
   // The project row is untrusted input too, since the premise the gate started on — checkout untrusted,
   // database trusted — only holds while nothing but the owner can write the row. Changing a script
   // through the settings UI has to move the hash, or a compromised write would run unseen.
-  it('hashes the project row\'s script columns and invalidates trust when one changes', async () => {
+  it("hashes the project row's script columns and invalidates trust when one changes", async () => {
     writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "pnpm dev"\n')
     const setScript = (value: string | null) => testDb.db.update(schema.projects).set({ setupScript: value })
 
@@ -156,9 +199,14 @@ describe('repo config trust', () => {
     const config = join(repo, '.acorn', 'config.toml')
     writeFileSync(config, '[scripts.run.dev]\ncommand = "pnpm dev"\n')
     const snapshot = readRepoConfigSnapshot(repo)!
-    await testDb.db.insert(schema.configAcks).values({ projectId: null, hash: snapshot.hash, snapshot: snapshot.text, ackedAt: Date.now() })
+    await testDb.db
+      .insert(schema.configAcks)
+      .values({ projectId: null, hash: snapshot.hash, snapshot: snapshot.text, ackedAt: Date.now() })
 
-    await expect(repoConfigTrustReview(testDb.db, 'task1')).resolves.toMatchObject({ projectId: 'project-widget', trusted: false })
+    await expect(repoConfigTrustReview(testDb.db, 'task1')).resolves.toMatchObject({
+      projectId: 'project-widget',
+      trusted: false,
+    })
     await expect(assertRepoConfigTrusted(testDb.db, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
   })
 })

@@ -44,7 +44,9 @@ describe('closeListener', () => {
     // every connection to end, and a keep-alive one from an idle renderer never does on its own.
     const idle = createConnection({ port, host: '127.0.0.1' })
     await new Promise((resolve) => idle.once('connect', resolve))
-    await new Promise((resolve) => httpGet({ port, host: '127.0.0.1', agent: false }, (res) => res.resume().once('end', resolve)))
+    await new Promise((resolve) =>
+      httpGet({ port, host: '127.0.0.1', agent: false }, (res) => res.resume().once('end', resolve)),
+    )
 
     await closeListener(server as unknown as ServerType)
 

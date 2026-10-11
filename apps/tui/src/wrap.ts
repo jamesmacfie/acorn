@@ -85,9 +85,7 @@ export function wrapRows(text: string, width: number): Row[] {
  *
  *  `assoc` of -1 asks for the row that *ends* at the offset rather than the row that starts there,
  *  which is the only thing that tells a caret at a soft break which of its two homes it is in. */
-export function toVisual(
-  text: string, rows: readonly Row[], pos: number, assoc = 0,
-): { row: number; col: number } {
+export function toVisual(text: string, rows: readonly Row[], pos: number, assoc = 0): { row: number; col: number } {
   let row = 0
   while (row + 1 < rows.length && rows[row + 1]!.from <= pos) row += 1
   if (assoc < 0 && row > 0 && rows[row]!.from === pos && rows[row - 1]!.to === pos) row -= 1

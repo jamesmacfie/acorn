@@ -6,35 +6,75 @@ import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 vi.mock('./wsChannel', () => ({ wsOnAgentFrame: () => () => {} }))
 const requests: { nodeId: string; path: string; resolve: (body: unknown) => void }[] = []
 const snapshot = (node: string, seq = 1, id = 'same'): AgentSessionSnapshot => ({
-  session: { id, taskId: 'task', title: node, updatedAt: 1, lastEventSeq: seq, subagents: [], attention: 'none' } as unknown as AgentSession,
-  events: [{ id: `${node}-1`, sessionId: id, seq: 1, event: { type: 'assistant_message', text: node }, createdAt: 1 } as AgentSessionSnapshot['events'][number]],
-  turns: [], requests: [],
+  session: {
+    id,
+    taskId: 'task',
+    title: node,
+    updatedAt: 1,
+    lastEventSeq: seq,
+    subagents: [],
+    attention: 'none',
+  } as unknown as AgentSession,
+  events: [
+    {
+      id: `${node}-1`,
+      sessionId: id,
+      seq: 1,
+      event: { type: 'assistant_message', text: node },
+      createdAt: 1,
+    } as AgentSessionSnapshot['events'][number],
+  ],
+  turns: [],
+  requests: [],
 })
 const reply = (body: unknown) => ({ status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify(body)) })
-const tick = () => new Promise(resolve => setTimeout(resolve, 0))
-const switchTo = (node: string) => { setActiveNode(node); managedAgentStore.clear() }
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+const switchTo = (node: string) => {
+  setActiveNode(node)
+  managedAgentStore.clear()
+}
 beforeEach(async () => {
   requests.length = 0
-  Object.assign(window, { acorn: { desktop: true, fleetList: async () => ({ nodes: ['A', 'B'].map(nodeId => ({ nodeId, label: nodeId, endpoint: 'https://localhost', local: true })), statuses: ['A', 'B'].map(nodeId => ({ nodeId, state: 'online' })) }), onNodeStatus: () => () => {},
-    nodeFetch: (nodeId: string, request: { path: string }) => new Promise(resolve => requests.push({
-      nodeId, path: request.path, resolve: body => resolve(reply(body)),
-    })),
-  } })
+  Object.assign(window, {
+    acorn: {
+      desktop: true,
+      fleetList: async () => ({
+        nodes: ['A', 'B'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: 'https://localhost', local: true })),
+        statuses: ['A', 'B'].map((nodeId) => ({ nodeId, state: 'online' })),
+      }),
+      onNodeStatus: () => () => {},
+      nodeFetch: (nodeId: string, request: { path: string }) =>
+        new Promise((resolve) =>
+          requests.push({
+            nodeId,
+            path: request.path,
+            resolve: (body) => resolve(reply(body)),
+          }),
+        ),
+    },
+  })
   await refreshFleet()
   switchTo('A')
 })
-afterEach(() => { managedAgentStore.clear(); setActiveNode(null); delete window.acorn })
-
-it.each(['loadTask', 'loadAll', 'loadAttention'] as const)('rejects stale %s publication across colliding Node ids', async (method) => {
-  const old = method === 'loadTask' ? managedAgentStore.loadTask('task') : managedAgentStore[method]()
-  const rejected = expect(old).rejects.toThrow(/no longer owns/)
-  switchTo('B')
-  managedAgentStore.upsertSession(snapshot('B').session)
-  requests[0].resolve({ sessions: [snapshot('A').session], delegations: [] })
-  await rejected
-  expect(managedAgentStore.sessions().map(row => row.title)).toEqual(['B'])
-  expect(requests[0].nodeId).toBe('A')
+afterEach(() => {
+  managedAgentStore.clear()
+  setActiveNode(null)
+  delete window.acorn
 })
+
+it.each(['loadTask', 'loadAll', 'loadAttention'] as const)(
+  'rejects stale %s publication across colliding Node ids',
+  async (method) => {
+    const old = method === 'loadTask' ? managedAgentStore.loadTask('task') : managedAgentStore[method]()
+    const rejected = expect(old).rejects.toThrow(/no longer owns/)
+    switchTo('B')
+    managedAgentStore.upsertSession(snapshot('B').session)
+    requests[0].resolve({ sessions: [snapshot('A').session], delegations: [] })
+    await rejected
+    expect(managedAgentStore.sessions().map((row) => row.title)).toEqual(['B'])
+    expect(requests[0].nodeId).toBe('A')
+  },
+)
 
 it('keeps pages on their origin and stops after deletion while a page is pending', async () => {
   const reading = managedAgentStore.loadSnapshot('same')

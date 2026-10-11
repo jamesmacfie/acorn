@@ -1,6 +1,11 @@
 import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { segmentContentKey, type DiffDocumentFile, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import {
+  segmentContentKey,
+  type DiffDocumentFile,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import { isCodeRow } from '../../kit/diff/diffModel'
 import { segmentOfLine, type SegmentRef } from './documentView'
 import { segmentCacheFor } from './segmentCache'
@@ -21,7 +26,12 @@ import { createSegmentLoader } from './segmentLoader'
 
 /** A line on one side of a file's diff. `old` is GitHub's LEFT. */
 export type DiffSnippetAnchor = { path: string; side: 'old' | 'new'; line: number }
-export type DiffSnippetLine = { kind: 'normal' | 'insert' | 'delete'; oldNo: number | null; newNo: number | null; text: string }
+export type DiffSnippetLine = {
+  kind: 'normal' | 'insert' | 'delete'
+  oldNo: number | null
+  newNo: number | null
+  text: string
+}
 /** `unavailable` is a file the document does not hold (capped, binary, or with no patch), a line in
  *  no segment, or a segment that failed to load. It never causes anything else to load. */
 export type DiffSnippet = { state: 'loading' } | { state: 'unavailable' } | { state: 'ready'; lines: DiffSnippetLine[] }
@@ -82,7 +92,8 @@ export function createDiffSnippets(options: {
       if (at < 0) return UNAVAILABLE
       return {
         state: 'ready',
-        lines: code.slice(Math.max(0, at - CONTEXT), at + CONTEXT + 1)
+        lines: code
+          .slice(Math.max(0, at - CONTEXT), at + CONTEXT + 1)
           .map((row) => ({ kind: row.kind, oldNo: row.oldNo, newNo: row.newNo, text: row.raw })),
       }
     },

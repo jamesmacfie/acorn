@@ -4,7 +4,17 @@ import type { DocumentHandle } from '../../features/editor/documentModel'
 import type { FrameBinding } from '../frames/broker'
 import { refreshTreeDocumentGrant, treeAuthorityKey, treeDocumentGrant, treeModelAuthorityKey } from './bridgeAuthority'
 
-const binding = (): FrameBinding => ({ pluginId: 'http', surface: 'http', target: 'pane', nodeId: 'node-a', api: ['/v1/p/http/*'], events: [], panes: [], destinations: [], claimsKeys: [] })
+const binding = (): FrameBinding => ({
+  pluginId: 'http',
+  surface: 'http',
+  target: 'pane',
+  nodeId: 'node-a',
+  api: ['/v1/p/http/*'],
+  events: [],
+  panes: [],
+  destinations: [],
+  claimsKeys: [],
+})
 const context = { surface: 'http', target: 'remote' as const, theme: 'light', style: 'terminal', nodeId: 'node-a' }
 const handle = (): DocumentHandle => ({ read: () => 'sql', write: () => {}, flush: async () => {} }) as DocumentHandle
 
@@ -13,16 +23,30 @@ describe('tree model identity and permanent structural grant generations', () =>
     const qc = {} as QueryClient
     const first = { ...context, item: 'first' }
     const second = { ...context, item: 'second' }
-    expect(treeModelAuthorityKey('hash', qc, binding(), first, undefined)).toBe(treeModelAuthorityKey('hash', qc, binding(), second, undefined))
-    expect(treeAuthorityKey('hash', qc, binding(), first, undefined)).not.toBe(treeAuthorityKey('hash', qc, binding(), second, undefined))
-    expect(treeModelAuthorityKey('hash', {} as QueryClient, binding(), first, undefined)).not.toBe(treeModelAuthorityKey('hash', qc, binding(), first, undefined))
+    expect(treeModelAuthorityKey('hash', qc, binding(), first, undefined)).toBe(
+      treeModelAuthorityKey('hash', qc, binding(), second, undefined),
+    )
+    expect(treeAuthorityKey('hash', qc, binding(), first, undefined)).not.toBe(
+      treeAuthorityKey('hash', qc, binding(), second, undefined),
+    )
+    expect(treeModelAuthorityKey('hash', {} as QueryClient, binding(), first, undefined)).not.toBe(
+      treeModelAuthorityKey('hash', qc, binding(), first, undefined),
+    )
   })
 
   it('includes all effective permissions and target in immutable affinity', () => {
     const qc = {} as QueryClient
     const original = binding()
     const key = treeAuthorityKey('hash', qc, original, context, undefined)
-    for (const change of [{ target: 'overlay' }, { hosts: ['host'] }, { destinations: [{ id: 'other', targetKind: 'task' }] }, { claimsKeys: ['escape'] }, { api: ['other'] }, { events: ['tasks:changed'] }, { panes: ['other'] }]) {
+    for (const change of [
+      { target: 'overlay' },
+      { hosts: ['host'] },
+      { destinations: [{ id: 'other', targetKind: 'task' }] },
+      { claimsKeys: ['escape'] },
+      { api: ['other'] },
+      { events: ['tasks:changed'] },
+      { panes: ['other'] },
+    ]) {
       expect(treeAuthorityKey('hash', qc, { ...original, ...change } as FrameBinding, context, undefined)).not.toBe(key)
     }
   })

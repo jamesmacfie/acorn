@@ -13,18 +13,36 @@ export function readExecutionCapture(db: Reader, sessionId: string, turnIds: rea
   const events: AgentEventRecord[] = []
   let cursor = 0
   while (turnIds.length) {
-    const page = db.select().from(agentEvents).where(and(
-      eq(agentEvents.sessionId, sessionId), inArray(agentEvents.turnId, [...turnIds]),
-      gt(agentEvents.seq, cursor), lte(agentEvents.seq, row.lastEventSeq),
-    )).orderBy(asc(agentEvents.seq)).limit(500).all()
+    const page = db
+      .select()
+      .from(agentEvents)
+      .where(
+        and(
+          eq(agentEvents.sessionId, sessionId),
+          inArray(agentEvents.turnId, [...turnIds]),
+          gt(agentEvents.seq, cursor),
+          lte(agentEvents.seq, row.lastEventSeq),
+        ),
+      )
+      .orderBy(asc(agentEvents.seq))
+      .limit(500)
+      .all()
     for (const event of page) events.push(mapAgentEvent(event))
     if (page.length < 500) break
     cursor = page.at(-1)!.seq
   }
   return {
-    session: mapAgentSession(row), events, requests: [],
-    turns: turnIds.length ? db.select().from(agentTurns).where(and(
-      eq(agentTurns.sessionId, sessionId), inArray(agentTurns.id, [...turnIds]),
-    )).orderBy(asc(agentTurns.ordinal)).all().map(mapAgentTurn) : [],
+    session: mapAgentSession(row),
+    events,
+    requests: [],
+    turns: turnIds.length
+      ? db
+          .select()
+          .from(agentTurns)
+          .where(and(eq(agentTurns.sessionId, sessionId), inArray(agentTurns.id, [...turnIds])))
+          .orderBy(asc(agentTurns.ordinal))
+          .all()
+          .map(mapAgentTurn)
+      : [],
   }
 }

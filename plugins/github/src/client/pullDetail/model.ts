@@ -3,7 +3,12 @@ import type { Comment, PullCommit, PullDetail, Review, Thread } from '../../shar
 export function hasRenderableBody(body: string | null | undefined): boolean {
   if (!body) return false
   if (/<(img|pre|code|table|ul|ol|blockquote)\b/i.test(body)) return true
-  return body.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length > 0
+  return (
+    body
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim().length > 0
+  )
 }
 
 export function reviewAction(state: string | null): string {
@@ -79,10 +84,24 @@ type Unkeyed<T> = T extends unknown ? Omit<T, 'key'> : never
 export function buildConversationEntries(data: PullDetail | undefined): ConversationEntry[] {
   if (!data) return []
   const entries: Unkeyed<ConversationEntry>[] = [
-    ...data.reviews.filter(shouldShowReviewSummary).map((review) => ({ kind: 'review' as const, id: review.id, createdAt: review.submittedAt, review })),
-    ...data.comments.map((comment) => ({ kind: 'comment' as const, id: comment.id, createdAt: comment.createdAt, comment })),
-    ...data.commits.map((commit) => ({ kind: 'commit' as const, id: commit.sha, createdAt: commit.committedAt, commit })),
-    ...data.threads.filter((thread) => thread.comments.length > 0).map((thread) => ({ kind: 'thread' as const, id: thread.threadId, createdAt: threadCreatedAt(thread), thread })),
+    ...data.reviews
+      .filter(shouldShowReviewSummary)
+      .map((review) => ({ kind: 'review' as const, id: review.id, createdAt: review.submittedAt, review })),
+    ...data.comments.map((comment) => ({
+      kind: 'comment' as const,
+      id: comment.id,
+      createdAt: comment.createdAt,
+      comment,
+    })),
+    ...data.commits.map((commit) => ({
+      kind: 'commit' as const,
+      id: commit.sha,
+      createdAt: commit.committedAt,
+      commit,
+    })),
+    ...data.threads
+      .filter((thread) => thread.comments.length > 0)
+      .map((thread) => ({ kind: 'thread' as const, id: thread.threadId, createdAt: threadCreatedAt(thread), thread })),
   ]
   const seen = new Map<string, number>()
   const keyed = entries.map((entry) => {

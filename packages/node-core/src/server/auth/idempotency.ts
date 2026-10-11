@@ -38,7 +38,15 @@ export function idempotencyStore(db: AppDatabase, now: () => number = () => Date
       const at = now()
       await db
         .insert(schema.idempotency)
-        .values({ deviceId, key, requestHash: hash, responseStatus, responseBody, createdAt: at, expiresAt: at + TTL_MS })
+        .values({
+          deviceId,
+          key,
+          requestHash: hash,
+          responseStatus,
+          responseBody,
+          createdAt: at,
+          expiresAt: at + TTL_MS,
+        })
         // A concurrent duplicate may have stored first. Its response is the one already returned to the
         // other caller, so keeping it is what makes the replay consistent.
         .onConflictDoNothing()

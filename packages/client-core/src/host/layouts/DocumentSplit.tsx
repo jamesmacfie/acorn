@@ -58,10 +58,13 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
   const drag = createSplitDrag({
     axis,
     label: `Resize ${props.label} editor`,
-    onStart: () => { dragStart = size() },
-    onDelta: (deltaPx) =>
-      setSize(Math.min(Math.max((dragStart ?? size()) + deltaPx, MIN_DOCUMENT_SIZE), ceiling())),
-    onCommit: () => { dragStart = null },
+    onStart: () => {
+      dragStart = size()
+    },
+    onDelta: (deltaPx) => setSize(Math.min(Math.max((dragStart ?? size()) + deltaPx, MIN_DOCUMENT_SIZE), ceiling())),
+    onCommit: () => {
+      dragStart = null
+    },
   })
 
   return (
@@ -74,7 +77,9 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
         {props.regions.document?.()}
       </div>
       <div {...drag.handleProps} class="ui-split-handle" data-axis={axis} />
-      <div class="layout-region-frame" use:regionFocus={{ paneId: props.stateKey, regionId: 'frame' }}>{props.regions.frame?.()}</div>
+      <div class="layout-region-frame" use:regionFocus={{ paneId: props.stateKey, regionId: 'frame' }}>
+        {props.regions.frame?.()}
+      </div>
     </div>
   )
 }

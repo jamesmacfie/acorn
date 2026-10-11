@@ -21,10 +21,14 @@ export const diffHunks = (
 // An empty side is written as starting one line earlier, the line it follows, which is how a new
 // file comes out as `-0,0`. jsdiff's own formatPatch makes the same adjustment.
 export const hunksText = (hunks: readonly StructuredPatchHunk[]): string =>
-  hunks.map((hunk) => [
-    `@@ -${hunk.oldLines ? hunk.oldStart : hunk.oldStart - 1},${hunk.oldLines} +${hunk.newLines ? hunk.newStart : hunk.newStart - 1},${hunk.newLines} @@`,
-    ...hunk.lines,
-  ].join('\n')).join('\n')
+  hunks
+    .map((hunk) =>
+      [
+        `@@ -${hunk.oldLines ? hunk.oldStart : hunk.oldStart - 1},${hunk.oldLines} +${hunk.newLines ? hunk.newStart : hunk.newStart - 1},${hunk.newLines} @@`,
+        ...hunk.lines,
+      ].join('\n'),
+    )
+    .join('\n')
 
 // An excerpt usually stops mid-file with no newline at the end. Without one on both sides, every
 // diff ends in a pair of "\ No newline at end of file" markers that say nothing about the file.

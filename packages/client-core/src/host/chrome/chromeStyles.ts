@@ -38,12 +38,15 @@ export function registerPluginStyle(pluginId: string, descriptor: PluginStyleDes
   const id = pluginStyleId(pluginId, descriptor.id)
   const css = pluginStyleBlock(id, descriptor)
   const families = [...new Set(Object.keys(descriptor.tokens).map((token) => STYLE_TOKEN_FAMILIES[token]))]
-  const entry = styleRegistry.register({
-    id,
-    label: `${descriptor.label} (${pluginId})`,
-    description: descriptor.description,
-    families,
-  }, pluginId)
+  const entry = styleRegistry.register(
+    {
+      id,
+      label: `${descriptor.label} (${pluginId})`,
+      description: descriptor.description,
+      families,
+    },
+    pluginId,
+  )
   blocks.set(id, css)
   flush()
   return {

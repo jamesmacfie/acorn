@@ -25,16 +25,21 @@ export class ManifestReferences {
   private readonly actionPanes: Set<string>
   private readonly ownRoute: string
 
-  constructor(readonly manifest: ManifestInput, readonly issues: IssueSink) {
+  constructor(
+    readonly manifest: ManifestInput,
+    readonly issues: IssueSink,
+  ) {
     const { frames } = manifest.contributions
     this.ownRoute = `/v1/p/${manifest.id}/`
     this.taskPanes = new Set(frames.filter(isTaskPaneSurface).map((frame) => frame.id))
     this.projectPanes = new Set(frames.filter(isProjectPaneSurface).map((frame) => frame.id))
     this.overlays = new Set(frames.filter(isOverlaySurface).map((frame) => frame.id))
     // A surface action needs a plugin-drawn region to receive the bridge message.
-    this.actionPanes = new Set(frames
-      .filter((frame) => frame.target === 'pane' && (hasFrameRegion(frame) || hasRemoteRegion(frame)))
-      .map((frame) => frame.id))
+    this.actionPanes = new Set(
+      frames
+        .filter((frame) => frame.target === 'pane' && (hasFrameRegion(frame) || hasRemoteRegion(frame)))
+        .map((frame) => frame.id),
+    )
   }
 
   confine = (path: string, prefix: string, at: (string | number)[]): void => {
@@ -52,18 +57,32 @@ export class ManifestReferences {
 
   action = (value: PluginChromeAction, at: (string | number)[]): void => {
     if (value.verb === 'openPane' && !this.taskPanes.has(value.pane)) {
-      this.issues.addIssue({ code: 'custom', path: [...at, 'pane'], message: `openPane names '${value.pane}', which this manifest does not declare as a task-scoped pane` })
+      this.issues.addIssue({
+        code: 'custom',
+        path: [...at, 'pane'],
+        message: `openPane names '${value.pane}', which this manifest does not declare as a task-scoped pane`,
+      })
     }
     if (value.verb === 'navigate' && !this.projectPanes.has(value.surface)) {
-      this.issues.addIssue({ code: 'custom', path: [...at, 'surface'], message: `navigate names '${value.surface}', which this manifest does not declare as a project-scoped pane` })
+      this.issues.addIssue({
+        code: 'custom',
+        path: [...at, 'surface'],
+        message: `navigate names '${value.surface}', which this manifest does not declare as a project-scoped pane`,
+      })
     }
     if (value.verb === 'openOverlay') {
       if (this.overlays.has(value.overlay)) this.openedOverlays.add(value.overlay)
-      else this.issues.addIssue({ code: 'custom', path: [...at, 'overlay'], message: `openOverlay names '${value.overlay}', which this manifest does not declare as an overlay surface` })
+      else
+        this.issues.addIssue({
+          code: 'custom',
+          path: [...at, 'overlay'],
+          message: `openOverlay names '${value.overlay}', which this manifest does not declare as an overlay surface`,
+        })
     }
     if (value.verb === 'surfaceAction' && !this.actionPanes.has(value.surface)) {
       this.issues.addIssue({
-        code: 'custom', path: [...at, 'surface'],
+        code: 'custom',
+        path: [...at, 'surface'],
         message: `surfaceAction names '${value.surface}', which this manifest does not declare as a pane drawing a region of its own`,
       })
     }
@@ -77,26 +96,65 @@ export class ManifestReferences {
 export function validateContributionIds(refs: ManifestReferences): void {
   const { issues, manifest } = refs
   const {
-    frames, sources, slots, commands, attention, nodeStats, contentLinks, agentContexts,
-    refResolvers, routes, themes, contextMenus, extensionPoints, extensions, schedules,
-    taskChecks, harnesses, agentTools, contextSections, documentServices,
+    frames,
+    sources,
+    slots,
+    commands,
+    attention,
+    nodeStats,
+    contentLinks,
+    agentContexts,
+    refResolvers,
+    routes,
+    themes,
+    contextMenus,
+    extensionPoints,
+    extensions,
+    schedules,
+    taskChecks,
+    harnesses,
+    agentTools,
+    contextSections,
+    documentServices,
   } = manifest.contributions
   // The client uses ids for query keys and disposal across contribution registries.
   const seen = new Set<string>()
   for (const entry of [
-    ...frames, ...sources, ...slots, ...commands, ...attention, ...nodeStats, ...contentLinks,
-    ...agentContexts, ...refResolvers, ...routes, ...themes, ...contextMenus, ...extensionPoints,
-    ...extensions, ...schedules, ...taskChecks, ...harnesses, ...agentTools, ...contextSections,
+    ...frames,
+    ...sources,
+    ...slots,
+    ...commands,
+    ...attention,
+    ...nodeStats,
+    ...contentLinks,
+    ...agentContexts,
+    ...refResolvers,
+    ...routes,
+    ...themes,
+    ...contextMenus,
+    ...extensionPoints,
+    ...extensions,
+    ...schedules,
+    ...taskChecks,
+    ...harnesses,
+    ...agentTools,
+    ...contextSections,
     ...documentServices,
   ]) {
-    if (seen.has(entry.id)) issues.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
+    if (seen.has(entry.id))
+      issues.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }
   // Skills have their own namespace, `<pluginId>:<id>`, and never reach a client registry, so they only
   // have to differ from each other.
   const skills = new Set<string>()
   for (const skill of manifest.contributions.skills) {
-    if (skills.has(skill.id)) issues.addIssue({ code: 'custom', path: ['contributions', 'skills'], message: `duplicate skill id '${skill.id}'` })
+    if (skills.has(skill.id))
+      issues.addIssue({
+        code: 'custom',
+        path: ['contributions', 'skills'],
+        message: `duplicate skill id '${skill.id}'`,
+      })
     skills.add(skill.id)
   }
 }

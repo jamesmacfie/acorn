@@ -150,62 +150,62 @@ export default function Picker<T>(props: PickerProps<T>) {
       <Show when={open()}>
         {/* A control a caller puts in `tools` is not the one the caption names. */}
         <FieldProvider value={NO_FIELD}>
-        <Portal>
-          <div
-            ref={(el) => popover.setSurface(el)}
-            class="repo-picker-popover repo-picker-popover-fixed"
-            role="listbox"
-            style={popover.surfaceStyle()}
-          >
-            <div class="repo-picker-tools">
-              <input
-                ref={inputRef}
-                class="repo-picker-filter"
-                placeholder={props.placeholder}
-                value={filter()}
-                onInput={(e) => {
-                  setFilter(e.currentTarget.value)
-                  props.onSearch?.(e.currentTarget.value)
-                }}
-              />
-              {props.tools}
+          <Portal>
+            <div
+              ref={(el) => popover.setSurface(el)}
+              class="repo-picker-popover repo-picker-popover-fixed"
+              role="listbox"
+              style={popover.surfaceStyle()}
+            >
+              <div class="repo-picker-tools">
+                <input
+                  ref={inputRef}
+                  class="repo-picker-filter"
+                  placeholder={props.placeholder}
+                  value={filter()}
+                  onInput={(e) => {
+                    setFilter(e.currentTarget.value)
+                    props.onSearch?.(e.currentTarget.value)
+                  }}
+                />
+                {props.tools}
+              </div>
+              {props.status}
+              <Show when={rows().length} fallback={<p class="repo-picker-empty">{props.emptyText}</p>}>
+                <ul class="repo-picker-list">
+                  <For each={rows()}>
+                    {(row, index) => (
+                      <PickerRow
+                        label={row.label}
+                        description={row.note}
+                        active={row.active}
+                        disabled={row.disabled}
+                        leading={
+                          row.removable ? (
+                            <ConfirmButton
+                              variant="bare"
+                              size="xs"
+                              iconOnly
+                              label={props.removeLabel ?? 'Remove'}
+                              tip={props.removeLabel ?? 'Remove'}
+                              confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
+                              onConfirm={() => props.onRemove?.(row.id)}
+                            >
+                              <Icon name="x" />
+                            </ConfirmButton>
+                          ) : (
+                            props.leading?.((props.results?.(filter()) ?? [])[index()] as T)
+                          )
+                        }
+                        onSelect={() => choose(row)}
+                      />
+                    )}
+                  </For>
+                </ul>
+              </Show>
+              <Show when={props.footer}>{(footer) => <div class="repo-picker-footer">{footer()(close)}</div>}</Show>
             </div>
-            {props.status}
-            <Show when={rows().length} fallback={<p class="repo-picker-empty">{props.emptyText}</p>}>
-              <ul class="repo-picker-list">
-                <For each={rows()}>
-                  {(row, index) => (
-                    <PickerRow
-                      label={row.label}
-                      description={row.note}
-                      active={row.active}
-                      disabled={row.disabled}
-                      leading={row.removable
-                        ? (
-                          <ConfirmButton
-                            variant="bare"
-                            size="xs"
-                            iconOnly
-                            label={props.removeLabel ?? 'Remove'}
-                            tip={props.removeLabel ?? 'Remove'}
-                            confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
-                            onConfirm={() => props.onRemove?.(row.id)}
-                          >
-                            <Icon name="x" />
-                          </ConfirmButton>
-                        )
-                        : props.leading?.((props.results?.(filter()) ?? [])[index()] as T)}
-                      onSelect={() => choose(row)}
-                    />
-                  )}
-                </For>
-              </ul>
-            </Show>
-            <Show when={props.footer}>
-              {(footer) => <div class="repo-picker-footer">{footer()(close)}</div>}
-            </Show>
-          </div>
-        </Portal>
+          </Portal>
         </FieldProvider>
       </Show>
     </div>

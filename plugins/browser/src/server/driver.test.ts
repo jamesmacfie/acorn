@@ -7,14 +7,18 @@ vi.mock('playwright-core', () => ({ chromium: launcher }))
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
 class FakePage extends EventEmitter {
   closed = false
   goto = vi.fn(async () => {})
-  isClosed() { return this.closed }
+  isClosed() {
+    return this.closed
+  }
 }
 
 class FakeContext {
@@ -22,7 +26,10 @@ class FakeContext {
   closed = false
   newPage = vi.fn(async () => this.page)
   newCDPSession = vi.fn(async () => ({ send: vi.fn() }))
-  close = vi.fn(async () => { this.closed = true; this.page.closed = true })
+  close = vi.fn(async () => {
+    this.closed = true
+    this.page.closed = true
+  })
 }
 
 class FakeBrowser extends EventEmitter {
@@ -35,7 +42,9 @@ class FakeBrowser extends EventEmitter {
     this.maxAlive = Math.max(this.maxAlive, this.contexts.filter((item) => !item.closed).length)
     return context
   })
-  isConnected() { return this.connected }
+  isConnected() {
+    return this.connected
+  }
   close = vi.fn(async () => {
     this.connected = false
     await Promise.all(this.contexts.map((context) => context.close()))
@@ -50,12 +59,15 @@ beforeEach(() => {
   launcher.launch.mockReset().mockResolvedValue(browser)
   pool = new BrowserPool({ put: async () => ({ id: 'synthetic-capture' }) })
 })
-afterEach(async () => { await pool.dispose() })
+afterEach(async () => {
+  await pool.dispose()
+})
 
 describe('browser session accounting', () => {
   it('deduplicates simultaneous same-task allocations', async () => {
-    expect(await Promise.all([pool.navigate('a', 'http://fixture.test'), pool.navigate('a', 'http://fixture.test')]))
-      .toEqual([{ ok: true }, { ok: true }])
+    expect(
+      await Promise.all([pool.navigate('a', 'http://fixture.test'), pool.navigate('a', 'http://fixture.test')]),
+    ).toEqual([{ ok: true }, { ok: true }])
     expect(launcher.launch).toHaveBeenCalledTimes(1)
     expect(browser.newContext).toHaveBeenCalledTimes(1)
     expect(browser.contexts[0].page.goto).toHaveBeenCalledTimes(2)
@@ -118,7 +130,9 @@ describe('browser session accounting', () => {
   it('retries failed partial cleanup before creating another context', async () => {
     const context = new FakeContext()
     context.newPage.mockRejectedValueOnce(new Error('page failed'))
-    context.close.mockRejectedValueOnce(new Error('close failed')).mockRejectedValueOnce(new Error('close still failed'))
+    context.close
+      .mockRejectedValueOnce(new Error('close failed'))
+      .mockRejectedValueOnce(new Error('close still failed'))
     browser.newContext.mockResolvedValueOnce(context)
     expect(await pool.navigate('a', 'http://fixture.test')).toEqual({ ok: false, reason: 'page failed' })
     expect(await pool.navigate('b', 'http://fixture.test')).toEqual({ ok: false, reason: 'close still failed' })
@@ -139,7 +153,10 @@ describe('browser session accounting', () => {
   it('cancels release during allocation and permits a fresh request afterward', async () => {
     const pending = deferred<FakeContext>()
     const started = deferred<void>()
-    browser.newContext.mockImplementationOnce(() => { started.resolve(); return pending.promise })
+    browser.newContext.mockImplementationOnce(() => {
+      started.resolve()
+      return pending.promise
+    })
     const opening = pool.navigate('a', 'http://fixture.test')
     await started.promise
     const released = pool.release('a')
@@ -157,7 +174,10 @@ describe('browser session accounting', () => {
   it('cancels queued requests before allocating their contexts', async () => {
     const pending = deferred<FakeContext>()
     const started = deferred<void>()
-    browser.newContext.mockImplementationOnce(() => { started.resolve(); return pending.promise })
+    browser.newContext.mockImplementationOnce(() => {
+      started.resolve()
+      return pending.promise
+    })
     const opening = pool.navigate('a', 'http://fixture.test')
     await started.promise
     const queued = pool.navigate('b', 'http://fixture.test')
@@ -172,7 +192,10 @@ describe('browser session accounting', () => {
   it('closes a browser that launches after disposal and never publishes a context', async () => {
     const pending = deferred<FakeBrowser>()
     const started = deferred<void>()
-    launcher.launch.mockImplementationOnce(() => { started.resolve(); return pending.promise })
+    launcher.launch.mockImplementationOnce(() => {
+      started.resolve()
+      return pending.promise
+    })
     const opening = pool.navigate('a', 'http://fixture.test')
     await started.promise
     const disposed = pool.dispose()
@@ -181,14 +204,20 @@ describe('browser session accounting', () => {
     await disposed
     expect(browser.close).toHaveBeenCalledTimes(1)
     expect(browser.newContext).not.toHaveBeenCalled()
-    expect(await pool.navigate('a', 'http://fixture.test')).toMatchObject({ ok: false, reason: expect.stringContaining('disposed') })
+    expect(await pool.navigate('a', 'http://fixture.test')).toMatchObject({
+      ok: false,
+      reason: expect.stringContaining('disposed'),
+    })
   })
 
   it('closes a context whose page finishes allocating after disposal', async () => {
     const pending = deferred<FakePage>()
     const started = deferred<void>()
     const context = new FakeContext()
-    context.newPage.mockImplementationOnce(() => { started.resolve(); return pending.promise })
+    context.newPage.mockImplementationOnce(() => {
+      started.resolve()
+      return pending.promise
+    })
     browser.newContext.mockResolvedValueOnce(context)
     const opening = pool.navigate('a', 'http://fixture.test')
     await started.promise
@@ -218,8 +247,10 @@ describe('browser session accounting', () => {
     await pool.navigate('a', 'http://fixture.test')
     const page = browser.contexts[0].page
     for (let index = 0; index < 210; index++) {
-      page.emit(index % 2 ? 'pageerror' : 'console', index % 2 ? new Error('🙂'.repeat(2200)) :
-        { type: () => 'log', text: () => '🙂'.repeat(2200) })
+      page.emit(
+        index % 2 ? 'pageerror' : 'console',
+        index % 2 ? new Error('🙂'.repeat(2200)) : { type: () => 'log', text: () => '🙂'.repeat(2200) },
+      )
     }
     const { lines } = await pool.console('a')
     expect(lines.length).toBeLessThanOrEqual(200)

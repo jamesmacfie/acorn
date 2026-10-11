@@ -25,14 +25,22 @@ export function workflowDraftCustody(input: {
     status: 'saved' as 'saved' | 'saving' | 'unsaved' | 'conflict',
     message: undefined as string | undefined,
     conflicts: [] as WorkflowMergeConflict[],
-    merge: undefined as { base: WorkflowDef; local: WorkflowDef; external: WorkflowDef; choices: Record<string, 'local' | 'external'> } | undefined,
+    merge: undefined as
+      | { base: WorkflowDef; local: WorkflowDef; external: WorkflowDef; choices: Record<string, 'local' | 'external'> }
+      | undefined,
   }
   const dirty = () => JSON.stringify(state.local) !== JSON.stringify(state.base)
   const copy = (local: WorkflowDef): WorkflowRecovery => ({
-    nodeId: input.nodeId, entityId: input.entityId, baseRevision: state.revision,
-    base: state.base, local, savedAt: Date.now(),
+    nodeId: input.nodeId,
+    entityId: input.entityId,
+    baseRevision: state.revision,
+    base: state.base,
+    local,
+    savedAt: Date.now(),
   })
-  const retain = () => { if (dirty()) input.recovery.save(copy(state.local)) }
+  const retain = () => {
+    if (dirty()) input.recovery.save(copy(state.local))
+  }
   const deliver = async (request: Request): Promise<void> => {
     running = request
     state.status = 'saving'
@@ -40,7 +48,9 @@ export function workflowDraftCustody(input: {
     const key = JSON.stringify([input.nodeId, input.entityId])
     const previous = deliveries.get(key)
     let release!: () => void
-    const delivery = new Promise<void>(resolve => { release = resolve })
+    const delivery = new Promise<void>((resolve) => {
+      release = resolve
+    })
     deliveries.set(key, delivery)
     if (previous) await previous
     const submitted = copy(request.def)
@@ -78,16 +88,17 @@ export function workflowDraftCustody(input: {
     release()
     if (deliveries.get(key) === delivery) deliveries.delete(key)
     input.changed()
-    request.settle.forEach(resolve => resolve(saved))
+    request.settle.forEach((resolve) => resolve(saved))
     const next = pending
     pending = undefined
     if (next) {
-      if (!saved || state.conflicts.length) next.settle.forEach(resolve => resolve(false))
+      if (!saved || state.conflicts.length) next.settle.forEach((resolve) => resolve(false))
       else void deliver(next)
     }
   }
   return {
-    state, dirty,
+    state,
+    dirty,
     edit(def: WorkflowDef): void {
       state.local = def
       retain()
@@ -96,14 +107,18 @@ export function workflowDraftCustody(input: {
     save(def = state.local): Promise<boolean> {
       if (state.conflicts.length) return Promise.resolve(false)
       if (!running && JSON.stringify(def) === JSON.stringify(state.base)) return Promise.resolve(true)
-      return new Promise(resolve => {
+      return new Promise((resolve) => {
         if (running) {
           if (!pending && JSON.stringify(running.def) === JSON.stringify(def)) running.settle.push(resolve)
-          else if (pending) { pending.def = def; pending.settle.push(resolve) }
-          else pending = { def, settle: [resolve] }
+          else if (pending) {
+            pending.def = def
+            pending.settle.push(resolve)
+          } else pending = { def, settle: [resolve] }
         } else void deliver({ def, settle: [resolve] })
       })
     },
-    get busy(): boolean { return !!running },
+    get busy(): boolean {
+      return !!running
+    },
   }
 }

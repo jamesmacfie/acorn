@@ -88,7 +88,10 @@ export class SessionTitleGeneration {
     const timeout = setTimeout(() => controller.abort(new Error('session_title_timeout')), SESSION_TITLE_TIMEOUT_MS)
     const work = this.generate(session, userId, text, expectedTitle, excludedTitle, controller)
     const promise = work
-      .then(() => undefined, () => undefined)
+      .then(
+        () => undefined,
+        () => undefined,
+      )
       .finally(() => {
         clearTimeout(timeout)
         this.operations.delete(session.id)

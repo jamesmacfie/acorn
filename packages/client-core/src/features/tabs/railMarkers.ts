@@ -21,11 +21,15 @@ export type RailMarkerPosition =
   // sits under the main glyph rather than in a corner, and two things there read as one broken one.
   | 'bottom-center'
 
-export const RAIL_MARKER_POSITIONS: readonly RailMarkerPosition[] =
-  ['top-start', 'top-end', 'bottom-start', 'bottom-end', 'bottom-center']
+export const RAIL_MARKER_POSITIONS: readonly RailMarkerPosition[] = [
+  'top-start',
+  'top-end',
+  'bottom-start',
+  'bottom-end',
+  'bottom-center',
+]
 
-export const RAIL_MARKER_CORNERS: readonly RailMarkerPosition[] =
-  ['top-end', 'top-start', 'bottom-end', 'bottom-start']
+export const RAIL_MARKER_CORNERS: readonly RailMarkerPosition[] = ['top-end', 'top-start', 'bottom-end', 'bottom-start']
 
 export type RailMarker = {
   id: string
@@ -88,15 +92,23 @@ export function resolveRailMarkers(markers: readonly RailMarker[]): ResolvedRail
  *  compared, and nothing else, so a control can keep the elements it has when a re-render changed
  *  nothing (RailTab.tsx). */
 export function sameRailMarkers(a: ResolvedRailMarkers, b: ResolvedRailMarkers): boolean {
-  return a.placed.length === b.placed.length
-    && a.legend.length === b.legend.length
-    && a.placed.every((marker, index) => {
+  return (
+    a.placed.length === b.placed.length &&
+    a.legend.length === b.legend.length &&
+    a.placed.every((marker, index) => {
       const other = b.placed[index]!
-      return marker.id === other.id && marker.position === other.position && marker.icon === other.icon
-        && marker.dotTone === other.dotTone && marker.tone === other.tone && marker.busy === other.busy
-    })
-    && a.legend.every((item, index) => {
+      return (
+        marker.id === other.id &&
+        marker.position === other.position &&
+        marker.icon === other.icon &&
+        marker.dotTone === other.dotTone &&
+        marker.tone === other.tone &&
+        marker.busy === other.busy
+      )
+    }) &&
+    a.legend.every((item, index) => {
       const other = b.legend[index]!
       return item.g === other.g && item.d === other.d && item.t === other.t && item.l === other.l
     })
+  )
 }

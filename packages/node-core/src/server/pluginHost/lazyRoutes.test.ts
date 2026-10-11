@@ -16,11 +16,16 @@ const ENV = {
 } as unknown as Env
 
 const call = (path: string, init?: RequestInit) =>
-  createApp().fetch(new Request(`http://127.0.0.1:4317${path}`, { headers: { authorization: 'Bearer d' }, ...init }), ENV)
+  createApp().fetch(
+    new Request(`http://127.0.0.1:4317${path}`, { headers: { authorization: 'Bearer d' }, ...init }),
+    ENV,
+  )
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((settle) => { resolve = settle })
+  const promise = new Promise<T>((settle) => {
+    resolve = settle
+  })
   return { promise, resolve }
 }
 
@@ -42,7 +47,8 @@ describe('lazyFetch', () => {
   })
 
   it('retries a load that failed', async () => {
-    const load = vi.fn()
+    const load = vi
+      .fn()
       .mockRejectedValueOnce(new Error('module threw'))
       .mockResolvedValueOnce(() => new Response('ok'))
     const handler = lazyFetch(load)
@@ -67,7 +73,11 @@ describe('lazyFetch', () => {
   })
 
   it('answers the error envelope through the plugin host when the load fails', async () => {
-    registerRoute({ plugin: 'lazy', prefix: '/data', fetch: lazyFetch(() => Promise.reject(new Error('module threw'))) })
+    registerRoute({
+      plugin: 'lazy',
+      prefix: '/data',
+      fetch: lazyFetch(() => Promise.reject(new Error('module threw'))),
+    })
     const res = await call('/v1/p/lazy/data')
     expect(res.status).toBe(500)
     expect(((await res.json()) as ApiError).error).toMatchObject({ code: 'internal' })
@@ -80,18 +90,30 @@ describe('lazyRouter', () => {
   }
 
   it('serves the loaded router with the host request: principal, path, parameters and body', async () => {
-    install(async () => new Hono<AppEnv>()
-      .get('/', (c) => c.json({ owner: ownerId(c), at: 'root' }))
-      .post('/:owner/:repo', async (c) => c.json({ owner: ownerId(c), params: c.req.param(), body: await c.req.json() })))
+    install(async () =>
+      new Hono<AppEnv>()
+        .get('/', (c) => c.json({ owner: ownerId(c), at: 'root' }))
+        .post('/:owner/:repo', async (c) =>
+          c.json({ owner: ownerId(c), params: c.req.param(), body: await c.req.json() }),
+        ),
+    )
     expect(await (await call('/v1/p/lazy/repos')).json()).toEqual({ owner: 'james', at: 'root' })
     const res = await call('/v1/p/lazy/repos/acme/web', { method: 'POST', body: JSON.stringify({ title: 'Fix' }) })
     expect(await res.json()).toEqual({ owner: 'james', params: { owner: 'acme', repo: 'web' }, body: { title: 'Fix' } })
   })
 
   it('keeps the first registered route ahead of a later overlapping one', async () => {
-    install(async () => new Hono<AppEnv>()
-      .route('/', new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', (c) => c.text('detail')))
-      .route('/', new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', (c) => c.text('later'))))
+    install(async () =>
+      new Hono<AppEnv>()
+        .route(
+          '/',
+          new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', (c) => c.text('detail')),
+        )
+        .route(
+          '/',
+          new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', (c) => c.text('later')),
+        ),
+    )
     expect(await (await call('/v1/p/lazy/repos/acme/web/pulls/1')).text()).toBe('detail')
   })
 
@@ -111,9 +133,16 @@ describe('lazyRouter', () => {
   })
 
   it('answers a handler error and a load failure with the error envelope, then retries the load', async () => {
-    const load = vi.fn()
+    const load = vi
+      .fn()
       .mockRejectedValueOnce(new Error('module threw'))
-      .mockResolvedValue(new Hono<AppEnv>().get('/boom', () => { throw new Error('handler threw') }).get('/', (c) => c.text('ok')))
+      .mockResolvedValue(
+        new Hono<AppEnv>()
+          .get('/boom', () => {
+            throw new Error('handler threw')
+          })
+          .get('/', (c) => c.text('ok')),
+      )
     install(load)
     const failed = await call('/v1/p/lazy/repos')
     expect(failed.status).toBe(500)
@@ -130,7 +159,8 @@ describe('lazyRouter', () => {
     const load = vi.fn(() => loaded.promise)
     install(load)
     const app = createApp()
-    const request = () => app.fetch(new Request('http://127.0.0.1:4317/v1/p/lazy/repos', { headers: { authorization: 'Bearer d' } }), ENV)
+    const request = () =>
+      app.fetch(new Request('http://127.0.0.1:4317/v1/p/lazy/repos', { headers: { authorization: 'Bearer d' } }), ENV)
     const pending = [request(), request()]
     loaded.resolve(new Hono<AppEnv>().get('/', (c) => c.text('ok')))
     expect(await Promise.all((await Promise.all(pending)).map((res) => res.text()))).toEqual(['ok', 'ok'])

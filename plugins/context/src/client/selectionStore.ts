@@ -55,7 +55,9 @@ onScopeEvicted((e) => {
 const parseContextSelection = (raw: unknown): TraySelection => {
   const value = parseJson(raw)
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([, v]) => typeof v === 'boolean')) as TraySelection
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(([, v]) => typeof v === 'boolean'),
+  ) as TraySelection
 }
 
 export const contextSelectionSlice: PersistedStateSlice<TraySelection> = {

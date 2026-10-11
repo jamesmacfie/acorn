@@ -31,8 +31,11 @@ export type PlacementScope = {
 /** A Home tab is the scope `{ surface: 'home', ownerId: tabId, workspaceId }`, keyed `home/<tab>/<ws>`
  *  — the default tab's id is `''`, so its key is `home//<ws>`. With no workspace known the encoder
  *  drops both trailing segments and the key is the bare `home`. */
-export const homeTabScope = (tabId: string, workspaceId?: string): PlacementScope =>
-  ({ surface: 'home', ownerId: tabId, workspaceId })
+export const homeTabScope = (tabId: string, workspaceId?: string): PlacementScope => ({
+  surface: 'home',
+  ownerId: tabId,
+  workspaceId,
+})
 
 /** Segments are encoded so an owner id containing the separator, as `pluginId:regionId` does, can never
  *  be read as two. Trailing empties are dropped, so a home key with no workspace is just `home`. */
@@ -278,7 +281,10 @@ export function placePanelAt(scope: PlacementScope, id: PanelId, size: { w: numb
 export const unplacePanel = (scope: PlacementScope, id: PanelId): void =>
   void setDashboards((state) => {
     const key = placementScopeKey(scope)
-    return { ...state, placements: { ...state.placements, [key]: (state.placements[key] ?? []).filter((candidate) => candidate !== id) } }
+    return {
+      ...state,
+      placements: { ...state.placements, [key]: (state.placements[key] ?? []).filter((candidate) => candidate !== id) },
+    }
   })
 
 /** Create, rename and reorder, all the same write: names and order are the whole of what `tabs` holds.
@@ -344,7 +350,9 @@ export function adoptUnscopedHome(state: DashboardState, workspaceId: string): D
     ...state,
     placements: moved(state.placements),
     layouts: moved(state.layouts),
-    ...(named.length ? { tabs: named.map((tab) => (tab.workspaceId === undefined ? { ...tab, workspaceId } : tab)) } : {}),
+    ...(named.length
+      ? { tabs: named.map((tab) => (tab.workspaceId === undefined ? { ...tab, workspaceId } : tab)) }
+      : {}),
   }
 }
 

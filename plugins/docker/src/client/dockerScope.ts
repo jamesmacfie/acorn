@@ -16,13 +16,19 @@ export const dockerScopeKey = (...ids: (string | null | undefined)[]): string =>
 
 export function onDockerRetired(retire: () => void): () => void {
   retirements.add(retire)
-  return () => { retirements.delete(retire) }
+  return () => {
+    retirements.delete(retire)
+  }
 }
 
 export function retireDockerClient(): void {
   clientLifetime.next()
   for (const retire of retirements) {
-    try { retire() } catch (error) { log.error('Docker retirement failed', error) }
+    try {
+      retire()
+    } catch (error) {
+      log.error('Docker retirement failed', error)
+    }
   }
 }
 

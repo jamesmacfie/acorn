@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CORE_TASK_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { clearAnnotations } from './annotations'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+} from '../registries/extensionPoints/extensionPoints'
 import { markersFor } from '../registries/rail/railMarkerFeed'
 import { resolveRailMarkers } from '../../features/tabs/railMarkers'
 import type { Disposable } from '../../kit/lib/state/registry'
@@ -16,16 +20,21 @@ vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))
 
 const registered: Disposable[] = []
 
-const contributor = (pluginId: string, marks: { key: { task: string }; severity: 'info' | 'warn' | 'danger'; text: string; icon?: string }[]) => {
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:tasks`,
-    pluginId,
-    point: CORE_TASK_POINT,
-    label: `${pluginId} task marks`,
-    order: 500,
-    carrier: 'items',
-    marks: async () => marks,
-  } as ExtensionContribution))
+const contributor = (
+  pluginId: string,
+  marks: { key: { task: string }; severity: 'info' | 'warn' | 'danger'; text: string; icon?: string }[],
+) => {
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:tasks`,
+      pluginId,
+      point: CORE_TASK_POINT,
+      label: `${pluginId} task marks`,
+      order: 500,
+      carrier: 'items',
+      marks: async () => marks,
+    } as ExtensionContribution),
+  )
 }
 
 afterEach(() => {
@@ -50,7 +59,7 @@ describe('core:task', () => {
     // send a first mark without colliding.
     expect(marker!.id).toBe('core:task:deploys:0')
     // Clamped into the plugin band, so a mark can never take a corner from a core lifecycle state.
-    expect(resolveRailMarkers([...marker ? [marker] : []]).placed[0]!.position).toBe('top-end')
+    expect(resolveRailMarkers([...(marker ? [marker] : [])]).placed[0]!.position).toBe('top-end')
   })
 
   it('gives a mark with no icon a dot, so nothing a contributor sends is invisible', async () => {
@@ -70,11 +79,14 @@ describe('core:task', () => {
   })
 
   it('retains at most 256 accepted marks from one contributor and request', async () => {
-    contributor('deploys', Array.from({ length: 300 }, (_, index) => ({
-      key: { task: 't1' },
-      severity: 'info',
-      text: `Deployment ${index}`,
-    })))
+    contributor(
+      'deploys',
+      Array.from({ length: 300 }, (_, index) => ({
+        key: { task: 't1' },
+        severity: 'info',
+        text: `Deployment ${index}`,
+      })),
+    )
 
     requestTaskAnnotations(['t1'])
     await vi.waitFor(() => expect(markersFor({ kind: 'task', id: 't1' })).toHaveLength(256))

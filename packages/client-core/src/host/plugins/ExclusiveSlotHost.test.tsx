@@ -2,7 +2,12 @@ import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Disposable } from '../../kit/lib/state/registry'
-import { clearExclusiveSlotFailures, exclusiveSlotFailed, exclusiveSlotRegistry, registerCoreExclusiveSlot } from '../registries/extensionPoints/exclusiveSlots'
+import {
+  clearExclusiveSlotFailures,
+  exclusiveSlotFailed,
+  exclusiveSlotRegistry,
+  registerCoreExclusiveSlot,
+} from '../registries/extensionPoints/exclusiveSlots'
 import ExclusiveSlotHost from './ExclusiveSlotHost'
 import { TreeHost, type TreeTransport } from '../tree/TreeHost'
 
@@ -92,7 +97,10 @@ describe('ExclusiveSlotHost', () => {
     offer('rival', () => <span data-mark="rival" />)
     prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
 
-    coreDraw = () => { evaluated(); return core() }
+    coreDraw = () => {
+      evaluated()
+      return core()
+    }
     mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
 
     // `core` is a function, not a JSX prop, so a replaced surface costs nothing. If this ever fires,
@@ -120,7 +128,10 @@ describe('ExclusiveSlotHost', () => {
     let fail: ((message: string) => void) | undefined
     const transport: TreeTransport = {
       onBatch: () => () => {},
-      onFailed: (listener) => { fail = listener; return () => {} },
+      onFailed: (listener) => {
+        fail = listener
+        return () => {}
+      },
       send: () => {},
     }
     offer('rival', () => <TreeHost pluginId="rival" transport={transport} />)
@@ -132,7 +143,9 @@ describe('ExclusiveSlotHost', () => {
   })
 
   it('stops mounting a provider after three failures in the session', async () => {
-    const broken = vi.fn(() => { throw new Error('broken') })
+    const broken = vi.fn(() => {
+      throw new Error('broken')
+    })
     offer('rival', broken)
     prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -150,7 +163,9 @@ describe('ExclusiveSlotHost', () => {
   })
 
   it('retries a failed provider after contribution state is synchronized', async () => {
-    offer('rival', () => { throw new Error('old bundle failed') })
+    offer('rival', () => {
+      throw new Error('old bundle failed')
+    })
     prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
     mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
     await Promise.resolve()

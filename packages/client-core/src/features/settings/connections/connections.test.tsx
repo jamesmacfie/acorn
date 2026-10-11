@@ -5,12 +5,41 @@ import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 
 // Services and AI models: a refused connection is listed first and its page leads with the fix, a
 // provider at its limit still shows in the gallery as connected, and model keys sit beside CLIs.
-const provider = (id: string, label: string, extra: Partial<PublicIntegrationProvider['connection']> = {}, kind: PublicIntegrationProvider['kind'] = 'issue-tracker'): PublicIntegrationProvider => ({
-  id, label, kind, glyph: label[0]!, capabilities: {},
-  connection: { authKind: 'api-key', fields: [{ id: 'token', label: 'Personal API key', type: 'password', required: true }], connectable: true, disconnectable: true, ...extra },
+const provider = (
+  id: string,
+  label: string,
+  extra: Partial<PublicIntegrationProvider['connection']> = {},
+  kind: PublicIntegrationProvider['kind'] = 'issue-tracker',
+): PublicIntegrationProvider => ({
+  id,
+  label,
+  kind,
+  glyph: label[0]!,
+  capabilities: {},
+  connection: {
+    authKind: 'api-key',
+    fields: [{ id: 'token', label: 'Personal API key', type: 'password', required: true }],
+    connectable: true,
+    disconnectable: true,
+    ...extra,
+  },
 })
-const connection = (id: string, providerId: string, label: string, status: Integration['status'] = 'connected'): Integration => ({
-  id, providerId, label, status, authKind: 'api-key', account: null, scopes: [], capabilities: {}, createdAt: 1, updatedAt: 1,
+const connection = (
+  id: string,
+  providerId: string,
+  label: string,
+  status: Integration['status'] = 'connected',
+): Integration => ({
+  id,
+  providerId,
+  label,
+  status,
+  authKind: 'api-key',
+  account: null,
+  scopes: [],
+  capabilities: {},
+  createdAt: 1,
+  updatedAt: 1,
 })
 const PROVIDERS = [
   provider('github', 'GitHub', { kind: 'device-flow', fields: [], maxConnections: 1 }),
@@ -22,7 +51,10 @@ const INTEGRATIONS = [
   connection('c-linear', 'linear', 'Linear · Acme', 'needs-auth'),
   connection('c-anthropic', 'anthropic', 'Anthropic'),
 ]
-const BACKENDS = { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [], defaultModelId: '' }], missing: [] }
+const BACKENDS = {
+  backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [], defaultModelId: '' }],
+  missing: [],
+}
 
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { key: string }) => ({
@@ -64,8 +96,10 @@ afterEach(() => {
   host.remove()
 })
 
-const labels = (section: string) => [...host.querySelectorAll(`[data-settings-section="${section}"] .ui-setting-label`)].map((label) => label.textContent)
-const press = (text: string) => [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === text)!.click()
+const labels = (section: string) =>
+  [...host.querySelectorAll(`[data-settings-section="${section}"] .ui-setting-label`)].map((label) => label.textContent)
+const press = (text: string) =>
+  [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === text)!.click()
 
 describe('Services', () => {
   it('lists a refused connection first with a badge, and its page leads with the fix', () => {
@@ -80,7 +114,10 @@ describe('Services', () => {
     const alert = host.querySelector('.ui-alert')!
     expect(alert.textContent).toContain('Linear rejected the key')
     // The fix sits above everything else the page draws.
-    expect(alert.compareDocumentPosition(host.querySelector('[data-settings-section="connection"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(
+      alert.compareDocumentPosition(host.querySelector('[data-settings-section="connection"]')!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     press('Replace key')
     expect(host.querySelector('[data-settings-section="credential"]')?.textContent).toContain('Personal API key')
     expect(host.querySelector('[data-settings-section="danger"]')?.textContent).toContain('Disconnect…')
@@ -90,7 +127,11 @@ describe('Services', () => {
     dispose = render(() => <ServicesSettings context={context} />, host)
     press('Add connection')
     const cards = [...host.querySelectorAll('.ui-card')]
-    expect(cards.map((card) => card.querySelector('.connection-card-title')?.textContent)).toEqual(['GitHub', 'Linear', 'Anthropic'])
+    expect(cards.map((card) => card.querySelector('.connection-card-title')?.textContent)).toEqual([
+      'GitHub',
+      'Linear',
+      'Anthropic',
+    ])
     const github = cards[0]!
     expect(github.textContent).toContain('Connected, one allowed')
     expect(github.getAttribute('data-stripe')).toBe('ok')
@@ -101,13 +142,13 @@ describe('Services', () => {
 
     press('‹ Services')
     press('Add connection')
-    ;([...host.querySelectorAll<HTMLButtonElement>('.ui-card')][1]!).click()
+    ;[...host.querySelectorAll<HTMLButtonElement>('.ui-card')][1]!.click()
     expect(host.querySelector('[data-settings-section="steps"]')?.textContent).toContain('Personal API key')
   })
 })
 
 describe('AI models', () => {
-  it('lists the node\'s keys and CLIs', () => {
+  it("lists the node's keys and CLIs", () => {
     dispose = render(() => <AiModelsSettings context={context} />, host)
     expect(labels('keys')).toEqual(['Anthropic'])
     expect(labels('clis')).toEqual(['Claude Code'])

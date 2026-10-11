@@ -46,7 +46,8 @@ function placeBlocks(heights: readonly number[], next: () => number, count = 400
 
 /** The obvious implementation: sum everything, every time. */
 function reference(heights: readonly number[], blocks: ReadonlyMap<number, readonly DiffLayoutBlock[]>) {
-  const size = (index: number) => heights[index]! + (blocks.get(index) ?? []).reduce((total, block) => total + block.height, 0)
+  const size = (index: number) =>
+    heights[index]! + (blocks.get(index) ?? []).reduce((total, block) => total + block.height, 0)
   const top = (index: number) => {
     let total = 0
     for (let at = 0; at < index; at++) total += size(at)
@@ -57,13 +58,20 @@ function reference(heights: readonly number[], blocks: ReadonlyMap<number, reado
 
 /** Every place a point can be in: fixed coordinates short of each item's end, and offsets inside
  *  each block. */
-function somePoints(heights: readonly number[], blocks: ReadonlyMap<number, readonly DiffLayoutBlock[]>, next: () => number, count: number): DiffLayoutPoint[] {
+function somePoints(
+  heights: readonly number[],
+  blocks: ReadonlyMap<number, readonly DiffLayoutBlock[]>,
+  next: () => number,
+  count: number,
+): DiffLayoutPoint[] {
   const points: DiffLayoutPoint[] = []
   const withBlocks = [...blocks.entries()].filter(([, list]) => list.some((block) => block.height > 0))
   for (let n = 0; n < count; n++) {
     if (n % 2 && withBlocks.length) {
       const [index, list] = withBlocks[Math.floor(next() * withBlocks.length)]!
-      const block = list.filter((candidate) => candidate.height > 0)[Math.floor(next() * list.filter((candidate) => candidate.height > 0).length)]!
+      const block = list.filter((candidate) => candidate.height > 0)[
+        Math.floor(next() * list.filter((candidate) => candidate.height > 0).length)
+      ]!
       points.push({ index, block: block.id, offset: Math.floor(next() * block.height) })
     } else {
       const index = Math.floor(next() * heights.length)
@@ -113,9 +121,10 @@ describe('the diff layout index', () => {
       expect(offset).not.toBeNull()
       expect(index.pointAt(offset!)).toEqual(point)
       // Moving down inside the same place stays in it, by the same distance.
-      const room = 'fixed' in point
-        ? heights[point.index]! - point.fixed
-        : blocks.get(point.index)!.find((block) => block.id === point.block)!.height - point.offset
+      const room =
+        'fixed' in point
+          ? heights[point.index]! - point.fixed
+          : blocks.get(point.index)!.find((block) => block.id === point.block)!.height - point.offset
       const step = Math.min(room - 1, 7)
       if (step <= 0) continue
       const moved = index.pointAt(offset! + step)!
@@ -153,7 +162,11 @@ describe('the diff layout index', () => {
         const action = next()
         if (action < 0.3) {
           // Insert: a composer opening, or a thread arriving.
-          list.push({ id: `new:${round}:${step}`, at: Math.floor(next() * (heights[at]! / 20 + 1)) * 20, height: Math.floor(next() * 200) })
+          list.push({
+            id: `new:${round}:${step}`,
+            at: Math.floor(next() * (heights[at]! / 20 + 1)) * 20,
+            height: Math.floor(next() * 200),
+          })
           list.sort((a, b) => a.at - b.at)
         } else if (action < 0.6 && list.length) {
           list[0] = { ...list[0]!, height: Math.floor(next() * 400) }
@@ -164,7 +177,9 @@ describe('the diff layout index', () => {
           const from = Math.floor(next() * heights.length)
           const gone = Math.min(heights.length - 1, from + 1 + Math.floor(next() * 3))
           heights = heights.filter((_, n) => n <= from || n > gone)
-          blocks = new Map([...blocks].flatMap(([n, own]) => (n <= from ? [[n, own]] : n > gone ? [[n - (gone - from), own]] : [])))
+          blocks = new Map(
+            [...blocks].flatMap(([n, own]) => (n <= from ? [[n, own]] : n > gone ? [[n - (gone - from), own]] : [])),
+          )
           index.rebuild(heights, (n) => blocks.get(n))
           check()
           continue
@@ -179,8 +194,10 @@ describe('the diff layout index', () => {
           continue
         } else {
           // Split has fewer, differently sized rows: a new fixed side, the same blocks.
-          heights = heights.map((height) => Math.max(20, Math.ceil(height * 0.8 / 20) * 20))
-          blocks = new Map([...blocks].map(([n, own]) => [n, own.map((block) => ({ ...block, at: Math.min(block.at, heights[n]!) }))]))
+          heights = heights.map((height) => Math.max(20, Math.ceil((height * 0.8) / 20) * 20))
+          blocks = new Map(
+            [...blocks].map(([n, own]) => [n, own.map((block) => ({ ...block, at: Math.min(block.at, heights[n]!) }))]),
+          )
           index.rebuild(heights, (n) => blocks.get(n))
           check()
           continue

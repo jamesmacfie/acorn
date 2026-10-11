@@ -20,14 +20,24 @@ const run = (dir: string): { code: number; output: string } => {
 
 describe('check-service-budget', () => {
   let dir: string
-  let chunks: Record<string, { imports: string[]; dynamicImports: string[]; requires: string[]; modules: string[]; bytes: number }>
+  let chunks: Record<
+    string,
+    { imports: string[]; dynamicImports: string[]; requires: string[]; modules: string[]; bytes: number }
+  >
   // One minified line, as Oxc writes it: the check must not care how the imports are formatted.
-  const chunk = (file: string, bytes: number, edges: { imports?: string[]; dynamicImports?: string[]; requires?: string[] } = {}) => {
+  const chunk = (
+    file: string,
+    bytes: number,
+    edges: { imports?: string[]; dynamicImports?: string[]; requires?: string[] } = {},
+  ) => {
     writeFileSync(join(dir, file), 'x'.repeat(bytes))
     chunks[file] = { imports: [], dynamicImports: [], requires: [], modules: [], ...edges, bytes }
   }
   const check = () => {
-    writeFileSync(join(dir, 'startup-graph.json'), JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }))
+    writeFileSync(
+      join(dir, 'startup-graph.json'),
+      JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }),
+    )
     return run(dir)
   }
 
@@ -52,7 +62,9 @@ describe('check-service-budget', () => {
     const result = check()
     expect(result.code).toBe(0)
     expect(result.output).toContain('and 2 chunk(s): 1301000B')
-    expect(result.output).toContain('resolved at run time: node-pty; on first use: playwright-core; through createRequire: @xterm/headless')
+    expect(result.output).toContain(
+      'resolved at run time: node-pty; on first use: playwright-core; through createRequire: @xterm/headless',
+    )
   })
 
   it('counts a lazy chunk once a static import reaches it', () => {

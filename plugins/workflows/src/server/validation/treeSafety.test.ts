@@ -3,12 +3,7 @@ import { eq } from 'drizzle-orm'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import * as schema from '../../node/schema'
 import type { WorkflowRunRow } from '../../shared/workflowContracts'
-import {
-  childSafetyEnvelope,
-  parseEffectiveTools,
-  WorkflowSafetyRailError,
-  WorkflowTreeSafety,
-} from './treeSafety'
+import { childSafetyEnvelope, parseEffectiveTools, WorkflowSafetyRailError, WorkflowTreeSafety } from './treeSafety'
 
 const at = Date.now()
 
@@ -23,7 +18,14 @@ describe('workflow tree safety', () => {
 
   const insertRun = async (
     id: string,
-    options: { rootRunId?: string; parentRunId?: string; depth?: number; budget?: object; tools?: object; deadlineAt?: number } = {},
+    options: {
+      rootRunId?: string
+      parentRunId?: string
+      depth?: number
+      budget?: object
+      tools?: object
+      deadlineAt?: number
+    } = {},
   ): Promise<WorkflowRunRow> => {
     await store.db.insert(schema.workflowRuns).values({
       id,
@@ -32,7 +34,12 @@ describe('workflow tree safety', () => {
       status: 'running',
       posture: 'gated',
       trigger: 'manual',
-      defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: id, steps: [{ name: 'work' }] }),
+      defJson: JSON.stringify({
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
+        name: id,
+        steps: [{ name: 'work' }],
+      }),
       rootRunId: options.rootRunId ?? id,
       parentRunId: options.parentRunId ?? null,
       parentStepId: options.parentRunId ? 'parent-step' : null,
@@ -78,7 +85,13 @@ describe('workflow tree safety', () => {
 
     expect(envelope).toEqual({
       tools: { allow: ['read'], maxRisk: 'read' },
-      budget: { maxWallTimeMs: 20_000, maxCostUsd: 2, maxInputTokens: undefined, maxOutputTokens: undefined, maxTurns: 4 },
+      budget: {
+        maxWallTimeMs: 20_000,
+        maxCostUsd: 2,
+        maxInputTokens: undefined,
+        maxOutputTokens: undefined,
+        maxTurns: 4,
+      },
       deadlineAt: at + 10_000,
     })
   })
@@ -92,10 +105,13 @@ describe('workflow tree safety', () => {
   })
 
   it('atomically admits only the final available turn across concurrent steps', async () => {
-    const safety = new WorkflowTreeSafety(store.db, (() => {
-      let id = 0
-      return () => `turn-${++id}`
-    })())
+    const safety = new WorkflowTreeSafety(
+      store.db,
+      (() => {
+        let id = 0
+        return () => `turn-${++id}`
+      })(),
+    )
     const run = await insertRun('root', { budget: { maxTurns: 1 } })
     const left = await insertStep(run.id, 'left')
     const right = await insertStep(run.id, 'right')
@@ -123,7 +139,9 @@ describe('workflow tree safety', () => {
     // A check takes no turn. A turn takes the second admission, and a third is refused.
     expect(safety.admitAutomatic(opening, run, step, {}, 'check', { costUsd: 0.25 })).toBeNull()
     expect(safety.admitAutomatic(opening, run, step, {}, 'turn', { costUsd: 0.5 })).toBeNull()
-    expect(safety.admitAutomatic(opening, run, step, {}, 'turn', { costUsd: 0.5 })).toMatch(/turn budget exhausted \(2 of 2/)
+    expect(safety.admitAutomatic(opening, run, step, {}, 'turn', { costUsd: 0.5 })).toMatch(
+      /turn budget exhausted \(2 of 2/,
+    )
     // The opening admission holds the step's usage so far, replaced each time rather than added.
     expect(await safety.usage(run.id)).toMatchObject({ costUsd: 0.5 })
     expect(safety.admitAutomatic(opening, run, step, {}, 'check', { costUsd: 1 })).toMatch(/cost budget exhausted/)
@@ -132,21 +150,27 @@ describe('workflow tree safety', () => {
   })
 
   it('refuses a second agent turn for a step allowed one', async () => {
-    const safety = new WorkflowTreeSafety(store.db, (() => { let id = 0; return () => `turn-${++id}` })())
+    const safety = new WorkflowTreeSafety(
+      store.db,
+      (() => {
+        let id = 0
+        return () => `turn-${++id}`
+      })(),
+    )
     const run = await insertRun('root')
     const step = await insertStep(run.id, 'work')
     const opening = safety.reserveTurn(run, step, { maxTurns: 1 })
-    expect(safety.admitAutomatic(opening, run, step, { maxTurns: 1 }, 'turn', {})).toMatch(/step turn budget exhausted \(1 of 1/)
+    expect(safety.admitAutomatic(opening, run, step, { maxTurns: 1 }, 'turn', {})).toMatch(
+      /step turn budget exhausted \(1 of 1/,
+    )
   })
 
   it('admits an active sibling turn while another branch keeps the run gated', async () => {
     const safety = new WorkflowTreeSafety(store.db, () => 'turn')
     const run = await insertRun('root', { budget: { maxTurns: 2 } })
-    await store.db.update(schema.workflowRuns).set({ status: 'gated' })
-      .where(eq(schema.workflowRuns.id, run.id))
+    await store.db.update(schema.workflowRuns).set({ status: 'gated' }).where(eq(schema.workflowRuns.id, run.id))
     const step = await insertStep(run.id, 'active-step')
-    const [gatedRun] = await store.db.select().from(schema.workflowRuns)
-      .where(eq(schema.workflowRuns.id, run.id))
+    const [gatedRun] = await store.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, run.id))
 
     expect(safety.reserveTurn(gatedRun!, step, {})).toBe('turn')
   })
@@ -158,11 +182,13 @@ describe('workflow tree safety', () => {
     const step = await insertStep(child.id, 'child-step')
     const admission = safety.reserveTurn(child, step, {})
 
-    expect(await safety.settleTurn(
-      admission,
-      { costUsd: 1.25, inputTokens: 10, outputTokens: 5 },
-      'provider failed after reporting usage',
-    )).toBeNull()
+    expect(
+      await safety.settleTurn(
+        admission,
+        { costUsd: 1.25, inputTokens: 10, outputTokens: 5 },
+        'provider failed after reporting usage',
+      ),
+    ).toBeNull()
     expect(await safety.settleTurn(admission, { costUsd: 99, inputTokens: 99, outputTokens: 99 })).toBeNull()
     expect(await safety.usage('root')).toEqual({ costUsd: 1.25, inputTokens: 10, outputTokens: 5 })
   })
@@ -174,8 +200,9 @@ describe('workflow tree safety', () => {
     safety.reserveTurn(run, step, {})
 
     expect(await safety.recover()).toBe(1)
-    await expect(Promise.resolve().then(() => safety.reserveTurn(run, step, {})))
-      .rejects.toThrow('turn budget exhausted')
+    await expect(Promise.resolve().then(() => safety.reserveTurn(run, step, {}))).rejects.toThrow(
+      'turn budget exhausted',
+    )
     const [admission] = await store.db.select().from(schema.workflowTurnAdmissions)
     expect(admission).toMatchObject({
       state: 'settled',
@@ -187,7 +214,12 @@ describe('workflow tree safety', () => {
     let next = 0
     const safety = new WorkflowTreeSafety(store.db, () => `turn-${++next}`)
     await insertRun('root', { budget: { maxCostUsd: 10 } })
-    await insertRun('parent', { rootRunId: 'root', parentRunId: 'root', depth: 1, budget: { maxCostUsd: 1, maxTurns: 2 } })
+    await insertRun('parent', {
+      rootRunId: 'root',
+      parentRunId: 'root',
+      depth: 1,
+      budget: { maxCostUsd: 1, maxTurns: 2 },
+    })
     const left = await insertRun('left', { rootRunId: 'root', parentRunId: 'parent', depth: 2 })
     const right = await insertRun('right', { rootRunId: 'root', parentRunId: 'parent', depth: 2 })
     const independent = await insertRun('independent', { rootRunId: 'root', parentRunId: 'root', depth: 1 })
@@ -209,6 +241,8 @@ describe('workflow tree safety', () => {
     await insertRun('parent', { rootRunId: 'root', parentRunId: 'root', depth: 1, budget: { maxCostUsd: 1 } })
     const leaf = await insertRun('leaf', { rootRunId: 'root', parentRunId: 'parent', depth: 2 })
     const step = await insertStep(leaf.id, 'leaf-step')
-    expect(await safety.settleTurn(safety.reserveTurn(leaf, step, {}), { costUsd: 2 })).toContain('cost budget exceeded')
+    expect(await safety.settleTurn(safety.reserveTurn(leaf, step, {}), { costUsd: 2 })).toContain(
+      'cost budget exceeded',
+    )
   })
 })

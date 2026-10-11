@@ -5,8 +5,12 @@ type Entry = { taskId: string | null; signal: [Accessor<unknown>, Setter<unknown
 const entries = new Map<string, Entry>()
 
 // Presentation state lives outside mounted views. See docs/state-ownership/scope-rules.md § The scope table.
-export function createGitViewSignal<T>(projectId: Accessor<string>, name: Accessor<string>, initial: Accessor<T>,
-  taskId: Accessor<string | null> = () => null): [Accessor<T>, Setter<T>] {
+export function createGitViewSignal<T>(
+  projectId: Accessor<string>,
+  name: Accessor<string>,
+  initial: Accessor<T>,
+  taskId: Accessor<string | null> = () => null,
+): [Accessor<T>, Setter<T>] {
   const signal = createMemo(() => {
     const task = taskId()
     const key = JSON.stringify([activeNodeId(), projectId(), task, name()])

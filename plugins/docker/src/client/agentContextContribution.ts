@@ -21,8 +21,10 @@ export const dockerAgentContextContribution: AgentContextContribution = {
       const content = [
         `# Docker service: ${container.name}`,
         `- ${container.image} · ${container.state} (${container.status})`,
-        ...container.ports.map((port) =>
-          `  - ${port.hostIp ?? 'localhost'}:${port.hostPort ?? '?'} → ${port.containerPort}/${port.protocol}`),
+        ...container.ports.map(
+          (port) =>
+            `  - ${port.hostIp ?? 'localhost'}:${port.hostPort ?? '?'} → ${port.containerPort}/${port.protocol}`,
+        ),
       ].join('\n')
       return contextSnapshot({
         contextId: `docker:${container.id}:${Date.now()}`,

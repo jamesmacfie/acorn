@@ -33,9 +33,13 @@ export type Workspace = {
   projects: WorkspaceProjectRef[]
 }
 export type WorkspaceSeed = { name: string }
-export const workspaceProjectOrderBody = z.object({
-  projectIds: z.array(z.string().min(1)).refine((ids) => new Set(ids).size === ids.length, 'Project IDs must be unique.'),
-}).strict()
+export const workspaceProjectOrderBody = z
+  .object({
+    projectIds: z
+      .array(z.string().min(1))
+      .refine((ids) => new Set(ids).size === ids.length, 'Project IDs must be unique.'),
+  })
+  .strict()
 export type WorkspaceProjectOrder = z.infer<typeof workspaceProjectOrderBody>
 
 // A project is a folder on the node's machine, the unit a workspace groups
@@ -57,7 +61,14 @@ export type Project = {
   github: { owner: string; name: string; repoId: number | null } | null
 }
 export type ProjectSeed = { path: string; workspaceId?: string; name?: string }
-export type ProjectPatch = Partial<{ name: string; workspaceId: string; hidden: boolean; color: string | null; sort: number; path: string }>
+export type ProjectPatch = Partial<{
+  name: string
+  workspaceId: string
+  hidden: boolean
+  color: string | null
+  sort: number
+  path: string
+}>
 export type ProjectsResponse = { projects: Project[] }
 export type WorkspaceProjectRef = { id: string; name: string; sort: number }
 export type ProjectConfig = {
@@ -122,7 +133,12 @@ export type ProjectConfigResponse = { projectId: string; config: ProjectConfig; 
 // Tasks are the project-level units of work and appear as rail rows (docs/workspaces-and-tasks.md).
 // connectionId pins the link to a specific credential. providerId is stamped by core from that row.
 export type TaskLink = { connectionId: string; providerId: string; identifier: string; ref?: ExternalRef }
-export type TaskLinkSeed = { connectionId: string; identifier: string; ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>; providerId?: string }
+export type TaskLinkSeed = {
+  connectionId: string
+  identifier: string
+  ref?: Omit<ExternalRef, 'providerId' | 'connectionId'>
+  providerId?: string
+}
 // A workspace's linked provider projects (docs/workspaces-and-tasks.md): (integrationId, externalId)
 // pairs. `projectId` narrows the link to one project in that workspace; leave it off and the link
 // covers every project there.
@@ -195,9 +211,16 @@ export type ProjectBranches = {
   tasks: Array<{ branch: string; taskId: string; title: string }>
   other: Array<{ name: string; committedAt: number }>
 }
-export const projectWorktreeAvailabilityRoute = (id: string, branch: string, options?: { branchSource?: 'derived' | 'exact'; baseBranch?: string; baseCommit?: string }) =>
+export const projectWorktreeAvailabilityRoute = (
+  id: string,
+  branch: string,
+  options?: { branchSource?: 'derived' | 'exact'; baseBranch?: string; baseCommit?: string },
+) =>
   `${projectRoute(id)}/worktree-availability?branch=${encodeURIComponent(branch)}${options?.branchSource ? `&branchSource=${options.branchSource}` : ''}${options?.baseBranch ? `&baseBranch=${encodeURIComponent(options.baseBranch)}` : ''}${options?.baseCommit ? `&baseCommit=${encodeURIComponent(options.baseCommit)}` : ''}`
-export type WorktreeAvailability = ({ available: true } | { available: false; reason: string }) & { branch?: string; targetIdentity?: string }
+export type WorktreeAvailability = ({ available: true } | { available: false; reason: string }) & {
+  branch?: string
+  targetIdentity?: string
+}
 // The MCP config files the agents in this project load, and the empty .mcp.json Settings can seed
 // (docs/mcp.md § Configuration).
 export const projectMcpRoute = (id: string) => `${projectRoute(id)}/mcp`

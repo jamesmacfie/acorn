@@ -4,7 +4,7 @@ import type { FormElicitationResponse } from './formElicitation'
 type JsonObject = Record<string, unknown>
 
 const asObject = (value: unknown): JsonObject | null =>
-  typeof value === 'object' && value != null && !Array.isArray(value) ? value as JsonObject : null
+  typeof value === 'object' && value != null && !Array.isArray(value) ? (value as JsonObject) : null
 
 // Computer Use's app-access request, as the installed integration sends it through Codex's
 // `mcpServer/elicitation/request`. The shape is that integration's, read from its own source and
@@ -32,8 +32,7 @@ const MAX_WARNING = 2_000
 const boundedString = (value: unknown, max: number): string | null =>
   typeof value === 'string' && value.trim() !== '' && value.length <= max ? value.trim() : null
 
-const hasFormFields = (schema: unknown): boolean =>
-  Object.keys(asObject(asObject(schema)?.properties) ?? {}).length > 0
+const hasFormFields = (schema: unknown): boolean => Object.keys(asObject(asObject(schema)?.properties) ?? {}).length > 0
 
 /** The approval a Codex elicitation asks for, or null when it is not one Acorn recognises. */
 export function codexAppApproval(params: JsonObject): AgentAppApproval | null {

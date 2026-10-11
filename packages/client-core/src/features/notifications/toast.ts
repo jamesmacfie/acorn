@@ -33,13 +33,16 @@ const DEFAULT_MS: Record<ToastTone, number> = { neutral: 4000, success: 4000, da
 export function toast(message: string, opts?: { tone?: ToastTone; durationMs?: number; action?: ToastAction }): void {
   if (!message) return
   const tone = opts?.tone ?? 'neutral'
-  setToasts((current) => [...current, {
-    id: ++nextId,
-    message,
-    tone,
-    durationMs: opts?.durationMs ?? DEFAULT_MS[tone],
-    ...(opts?.action ? { action: opts.action } : {}),
-  }])
+  setToasts((current) => [
+    ...current,
+    {
+      id: ++nextId,
+      message,
+      tone,
+      durationMs: opts?.durationMs ?? DEFAULT_MS[tone],
+      ...(opts?.action ? { action: opts.action } : {}),
+    },
+  ])
 }
 
 export const activeToasts = toasts

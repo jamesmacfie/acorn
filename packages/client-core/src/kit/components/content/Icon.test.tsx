@@ -11,7 +11,13 @@ describe('Icon', () => {
     const host = document.createElement('div')
     document.body.append(host)
     const dispose = render(() => <Icon name={name} />, host)
-    return { host, dispose: () => { dispose(); host.remove() } }
+    return {
+      host,
+      dispose: () => {
+        dispose()
+        host.remove()
+      },
+    }
   }
 
   it('draws an eager name as an SVG on the first pass, with no await', () => {

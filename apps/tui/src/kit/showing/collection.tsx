@@ -110,7 +110,10 @@ export function Rows<T extends CollectionItem>(props: {
     let next = current
     if (!props.virtual || !fit || all.length <= fit) next = 0
     else if (active !== lastActive) {
-      const at = Math.max(0, all.findIndex((item) => item.key === active))
+      const at = Math.max(
+        0,
+        all.findIndex((item) => item.key === active),
+      )
       next = Math.max(0, Math.min(Math.max(current, at - fit + 1), at, all.length - fit))
     }
     lastActive = active
@@ -196,7 +199,9 @@ export function Rows<T extends CollectionItem>(props: {
     >
       <box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
         <For each={window().items}>
-          {(item) => props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)}
+          {(item) =>
+            props.children(item, collection.itemProps(item.key), () => collection.selected() === item.key, NO_PLACE)
+          }
         </For>
       </box>
       <Show when={bar()}>

@@ -12,9 +12,22 @@
 
 import { batch, createEffect, createMemo, type Accessor } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { integrationsOptions, projectsOptions, tasksOptions, workspacesOptions, type Project, type Task, type Workspace } from '@acorn/client-core/infra/queries.ts'
 import {
-  activeTaskId, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, workspaceView,
+  integrationsOptions,
+  projectsOptions,
+  tasksOptions,
+  workspacesOptions,
+  type Project,
+  type Task,
+  type Workspace,
+} from '@acorn/client-core/infra/queries.ts'
+import {
+  activeTaskId,
+  rememberWorkspaceView,
+  selectedSource,
+  setActiveTaskId,
+  setSelectedSource,
+  workspaceView,
 } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { availableSources, type SourceEntry } from '@acorn/client-core/features/tabs'
@@ -58,7 +71,9 @@ export function createShellModel(): ShellModel {
   const allTasks = createMemo(() => tasksQuery.data ?? [])
   const workspaces = createMemo(() => workspacesQuery.data ?? [])
   const ready = createMemo(() => !!workspacesQuery.data && !!tasksQuery.data)
-  const task = createMemo(() => (selectedSource() ? null : allTasks().find((row) => row.id === activeTaskId()) ?? null))
+  const task = createMemo(() =>
+    selectedSource() ? null : (allTasks().find((row) => row.id === activeTaskId()) ?? null),
+  )
 
   // An explicit choice wins; otherwise follow the open task, and fall back to the first workspace so
   // the rail has something to draw before anything has been opened. The desktop's derivation is the
@@ -101,9 +116,9 @@ export function createShellModel(): ShellModel {
     const scoped = scope()
     return !!integrationsQuery.data && scoped.providers !== undefined && scoped.linked !== undefined
   })
-  const sources = createMemo(() => (sourcesReady()
-    ? availableSources(integrationsQuery.data?.integrations, scope())
-    : []))
+  const sources = createMemo(() =>
+    sourcesReady() ? availableSources(integrationsQuery.data?.integrations, scope()) : [],
+  )
 
   // Where a workspace starts: the first source the Menu actually draws. One truth rather than two
   // components agreeing because one of them waited for the other — the Rail used to hold this effect
@@ -162,9 +177,8 @@ export function createShellModel(): ShellModel {
   const chooseWorkspace = (workspaceId: string): void => {
     const entering = workspaces().find((entry) => entry.id === workspaceId)
     const remembered = entering ? workspaceView(entering.id) : undefined
-    const task = remembered && 'taskId' in remembered
-      ? allTasks().find((row) => row.id === remembered.taskId)
-      : undefined
+    const task =
+      remembered && 'taskId' in remembered ? allTasks().find((row) => row.id === remembered.taskId) : undefined
     batch(() => {
       setActiveTaskId(null)
       setSelectedSource(null)
@@ -179,7 +193,15 @@ export function createShellModel(): ShellModel {
   }
 
   return {
-    workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready, sourcesReady,
-    projects: () => projectsQuery.isSuccess && !projectsQuery.isFetching ? projectsQuery.data : undefined,
+    workspaces,
+    allTasks,
+    workspace,
+    tasks,
+    task,
+    sources,
+    chooseWorkspace,
+    ready,
+    sourcesReady,
+    projects: () => (projectsQuery.isSuccess && !projectsQuery.isFetching ? projectsQuery.data : undefined),
   }
 }

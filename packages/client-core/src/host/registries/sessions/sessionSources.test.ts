@@ -2,14 +2,38 @@
 import { afterEach, expect, it } from 'vitest'
 import { createSignal } from 'solid-js'
 import { setActiveNode } from '../../../infra/node/activeNode'
-import { agentSessionsFor, focusSession, isSettingUp, refreshSessionSources, registerSessionSource, sendToSession, sessionSummaries, type SessionSummary, type SessionSource } from './sessionSources'
+import {
+  agentSessionsFor,
+  focusSession,
+  isSettingUp,
+  refreshSessionSources,
+  registerSessionSource,
+  sendToSession,
+  sessionSummaries,
+  type SessionSummary,
+  type SessionSource,
+} from './sessionSources'
 
 const disposals: { dispose(): void }[] = []
-afterEach(() => { for (const disposal of disposals.splice(0)) disposal.dispose(); setActiveNode(null) })
-const row = (nodeId: string, sessionId = 'same'): Omit<SessionSummary, 'sourceId'> => ({
-  nodeId, sessionId, taskId: 'task', title: 'Agent', running: true, createdAt: 1, agent: true, idle: false,
+afterEach(() => {
+  for (const disposal of disposals.splice(0)) disposal.dispose()
+  setActiveNode(null)
 })
-function source(id: string, value: ReturnType<typeof createSignal<Omit<SessionSummary, 'sourceId'>[]>>, actions: Partial<SessionSource> = {}): void {
+const row = (nodeId: string, sessionId = 'same'): Omit<SessionSummary, 'sourceId'> => ({
+  nodeId,
+  sessionId,
+  taskId: 'task',
+  title: 'Agent',
+  running: true,
+  createdAt: 1,
+  agent: true,
+  idle: false,
+})
+function source(
+  id: string,
+  value: ReturnType<typeof createSignal<Omit<SessionSummary, 'sourceId'>[]>>,
+  actions: Partial<SessionSource> = {},
+): void {
   disposals.push(registerSessionSource(id, { summaries: value[0], ...actions }))
 }
 
@@ -23,7 +47,13 @@ it('keeps identical IDs on two nodes separate and refuses a stale action after s
   setActiveNode('n1')
   const rows = createSignal([row('n1'), row('n2')])
   const sent: string[] = []
-  source('terminal', rows, { send: async (id) => { sent.push(id); return { ok: true } }, focus: (id) => sent.push(`focus:${id}`) })
+  source('terminal', rows, {
+    send: async (id) => {
+      sent.push(id)
+      return { ok: true }
+    },
+    focus: (id) => sent.push(`focus:${id}`),
+  })
   const first = agentSessionsFor('task')[0]!
   expect(first.nodeId).toBe('n1')
   expect(await sendToSession(first, 'hello', 'now')).toEqual({ ok: true })
@@ -37,7 +67,12 @@ it('keeps identical IDs on two nodes separate and refuses a stale action after s
 it('removes actions on source disposal and when a refresh removes the row', async () => {
   setActiveNode('n1')
   const rows = createSignal([row('n1')])
-  source('terminal', rows, { refresh: async () => { rows[1]([]) }, send: async () => ({ ok: true }) })
+  source('terminal', rows, {
+    refresh: async () => {
+      rows[1]([])
+    },
+    send: async () => ({ ok: true }),
+  })
   const selected = sessionSummaries()[0]!
   await refreshSessionSources()
   expect(sessionSummaries()).toEqual([])

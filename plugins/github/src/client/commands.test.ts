@@ -4,7 +4,7 @@ import type { Pull, PullFile } from '../shared/api'
 
 const mocks = vi.hoisted(() => ({ readJson: vi.fn(), setSelectedSource: vi.fn() }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   readJson: mocks.readJson,
   setSelectedSource: mocks.setSelectedSource,
 }))
@@ -16,26 +16,56 @@ import { githubCommands, type GithubCommandDeps } from './commands'
 // the pull request's own file order, picking one writes `?file=`, and every PR command is gated on a
 // pull request actually being open.
 
-const file = (path: string): PullFile => ({ path, status: 'modified', additions: 1, deletions: 0, sha: null, viewed: false, position: 0, patchState: 'unavailable', patchKey: null, patch: null })
+const file = (path: string): PullFile => ({
+  path,
+  status: 'modified',
+  additions: 1,
+  deletions: 0,
+  sha: null,
+  viewed: false,
+  position: 0,
+  patchState: 'unavailable',
+  patchKey: null,
+  patch: null,
+})
 
 const pull = (number: number, title: string, author: string | null = 'ada', draft = false): Pull => ({
-  number, title, state: 'open', draft, author, headRef: null, baseRef: null,
-  updatedAt: null, mergeable: null, mergeStateStatus: null, autoMergeEnabled: false,
+  number,
+  title,
+  state: 'open',
+  draft,
+  author,
+  headRef: null,
+  baseRef: null,
+  updatedAt: null,
+  mergeable: null,
+  mergeStateStatus: null,
+  autoMergeEnabled: false,
 })
 
 const context = (projectId: string | null): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId, taskId: null, paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId,
+  taskId: null,
+  paneId: null,
+  surfaceId: null,
 })
 const signal = (): AbortSignal => new AbortController().signal
 
 let deps: GithubCommandDeps
 let commands: ContributedCommand[]
 const spies = {
-  selectFile: vi.fn(), cycleFile: vi.fn(), navigate: vi.fn(), openShortcuts: vi.fn(),
+  selectFile: vi.fn(),
+  cycleFile: vi.fn(),
+  navigate: vi.fn(),
+  openShortcuts: vi.fn(),
 }
 const at = (id: string): ContributedCommand => commands.find((command) => command.id === id)!
 const search = (id: string): SearchCommand => at(id) as SearchCommand
-const runAction = (id: string): void => void (at(id) as { run: (context: CommandExecutionContext) => void }).run(context('project-1'))
+const runAction = (id: string): void =>
+  void (at(id) as { run: (context: CommandExecutionContext) => void }).run(context('project-1'))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -52,17 +82,30 @@ beforeEach(() => {
 describe('the github plugin catalogue', () => {
   it('registers the six commands the router needs, and puts three of them in the palette', () => {
     expect(commands.map((command) => command.id)).toEqual([
-      'help.shortcuts.open', 'github.files.find', 'github.files.next', 'github.files.previous',
-      'github.pull.find', 'github.pull.create',
+      'help.shortcuts.open',
+      'github.files.find',
+      'github.files.next',
+      'github.files.previous',
+      'github.pull.find',
+      'github.pull.create',
     ])
-    expect(commands.filter((command) => command.palette).map((command) => command.id))
-      .toEqual(['github.files.find', 'github.pull.find', 'github.pull.create'])
+    expect(commands.filter((command) => command.palette).map((command) => command.id)).toEqual([
+      'github.files.find',
+      'github.pull.find',
+      'github.pull.create',
+    ])
     // Every PR command is gone when no pull request is open, which is the gate the `/`, `[`, `]` and
     // `c` bindings carry as `active` too.
     deps.route = () => null
     deps.github = () => undefined
     const closed = githubCommands(deps)
-    for (const id of ['github.files.find', 'github.files.next', 'github.files.previous', 'github.pull.find', 'github.pull.create']) {
+    for (const id of [
+      'github.files.find',
+      'github.files.next',
+      'github.files.previous',
+      'github.pull.find',
+      'github.pull.create',
+    ]) {
       expect(closed.find((command) => command.id === id)!.when?.(), id).toBe(false)
     }
   })
@@ -88,8 +131,9 @@ describe('the github plugin catalogue', () => {
   })
 
   it('refuses a file the pull request no longer changes', () => {
-    expect(() => search('github.files.find').select({ id: 'gone.ts', title: 'gone.ts', ref: 'gone.ts' }, context('project-1')))
-      .toThrow('no longer in this pull request')
+    expect(() =>
+      search('github.files.find').select({ id: 'gone.ts', title: 'gone.ts', ref: 'gone.ts' }, context('project-1')),
+    ).toThrow('no longer in this pull request')
     expect(spies.selectFile).not.toHaveBeenCalled()
   })
 

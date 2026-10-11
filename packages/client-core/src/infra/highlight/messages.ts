@@ -22,4 +22,7 @@ export type HighlightRequest = {
   code: string
 }
 
-export type HighlightResponse = ({ id: number; ok: true; lines: HighlightLines } | { id: number; ok: false; error: string }) & { queueMs?: number; executionMs?: number }
+export type HighlightResponse = (
+  | { id: number; ok: true; lines: HighlightLines }
+  | { id: number; ok: false; error: string }
+) & { queueMs?: number; executionMs?: number }

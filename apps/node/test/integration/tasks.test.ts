@@ -24,7 +24,11 @@ const makeApp = () => {
 }
 
 const jsonReq = (url: string, method: string, body: unknown) =>
-  new Request(`http://acorn.test${url}`, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  new Request(`http://acorn.test${url}`, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 
 describe('task links grow/shrink', () => {
   let t: TestDb
@@ -35,16 +39,52 @@ describe('task links grow/shrink', () => {
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()
     const now = Date.now()
-    void t.db.insert(schema.integrations).values([
-      { id: 'int-1', userId: 'james', provider: 'linear', label: 'Linear', encryptedCredentials: 'encrypted', createdAt: now, updatedAt: now },
-      { id: 'int-2', userId: 'james', provider: 'rollbar', label: 'Rollbar', encryptedCredentials: 'encrypted', createdAt: now, updatedAt: now },
-    ]).run()
-    void t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now }).run()
-    void t.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/widget.git', githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-      createdAt: now, updatedAt: now,
-    }).run()
+    void t.db
+      .insert(schema.integrations)
+      .values([
+        {
+          id: 'int-1',
+          userId: 'james',
+          provider: 'linear',
+          label: 'Linear',
+          encryptedCredentials: 'encrypted',
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 'int-2',
+          userId: 'james',
+          provider: 'rollbar',
+          label: 'Rollbar',
+          encryptedCredentials: 'encrypted',
+          createdAt: now,
+          updatedAt: now,
+        },
+      ])
+      .run()
+    void t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+      .run()
+    void t.db
+      .insert(schema.projects)
+      .values({
+        id: 'project-widget',
+        name: 'widget',
+        path: null,
+        workspaceId: 'workspace-1',
+        sort: 0,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: 'https://github.com/acme/widget.git',
+        githubOwner: 'acme',
+        githubName: 'widget',
+        githubRepoId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run()
   })
 
   afterEach(() => t.cleanup())
@@ -68,12 +108,19 @@ describe('task links grow/shrink', () => {
 
   it('add → link appears in the task GET payload', async () => {
     const task = await createTask()
-    const res = await app.fetch(jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-1', identifier: 'ENG-42' }), {} as Env)
+    const res = await app.fetch(
+      jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-1', identifier: 'ENG-42' }),
+      {} as Env,
+    )
     expect(res.status).toBe(200)
-    expect(await listLinks(task.id)).toEqual([{
-      connectionId: 'int-1', providerId: 'linear', identifier: 'ENG-42',
-      ref: { providerId: 'linear', connectionId: 'int-1', displayId: 'ENG-42' },
-    }])
+    expect(await listLinks(task.id)).toEqual([
+      {
+        connectionId: 'int-1',
+        providerId: 'linear',
+        identifier: 'ENG-42',
+        ref: { providerId: 'linear', connectionId: 'int-1', displayId: 'ENG-42' },
+      },
+    ])
   })
 
   it('duplicate add is a no-op', async () => {
@@ -87,18 +134,34 @@ describe('task links grow/shrink', () => {
 
   it('delete removes exactly one link', async () => {
     const task = await createTask()
-    await app.fetch(jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-1', identifier: 'ENG-42' }), {} as Env)
-    await app.fetch(jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-2', identifier: '142' }), {} as Env)
-    const res = await app.fetch(jsonReq(`/api/tasks/${task.id}/links`, 'DELETE', { connectionId: 'int-1', identifier: 'ENG-42' }), {} as Env)
+    await app.fetch(
+      jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-1', identifier: 'ENG-42' }),
+      {} as Env,
+    )
+    await app.fetch(
+      jsonReq(`/api/tasks/${task.id}/links`, 'POST', { connectionId: 'int-2', identifier: '142' }),
+      {} as Env,
+    )
+    const res = await app.fetch(
+      jsonReq(`/api/tasks/${task.id}/links`, 'DELETE', { connectionId: 'int-1', identifier: 'ENG-42' }),
+      {} as Env,
+    )
     expect(res.status).toBe(200)
-    expect(await listLinks(task.id)).toEqual([{
-      connectionId: 'int-2', providerId: 'rollbar', identifier: '142',
-      ref: { providerId: 'rollbar', connectionId: 'int-2', displayId: '142' },
-    }])
+    expect(await listLinks(task.id)).toEqual([
+      {
+        connectionId: 'int-2',
+        providerId: 'rollbar',
+        identifier: '142',
+        ref: { providerId: 'rollbar', connectionId: 'int-2', displayId: '142' },
+      },
+    ])
   })
 
   it('unknown task → 404 on add', async () => {
-    const res = await app.fetch(jsonReq('/api/tasks/nope/links', 'POST', { integrationId: 'int-1', provider: 'linear', identifier: 'ENG-42' }), {} as Env)
+    const res = await app.fetch(
+      jsonReq('/api/tasks/nope/links', 'POST', { integrationId: 'int-1', provider: 'linear', identifier: 'ENG-42' }),
+      {} as Env,
+    )
     expect(res.status).toBe(404)
   })
 
@@ -110,29 +173,44 @@ describe('task links grow/shrink', () => {
 
   it('rejects a caller-supplied provider that mismatches the connection', async () => {
     const task = await createTask()
-    const res = await app.fetch(jsonReq(`/api/tasks/${task.id}/links`, 'POST', {
-      connectionId: 'int-1', providerId: 'rollbar', identifier: 'ENG-42',
-    }), {} as Env)
+    const res = await app.fetch(
+      jsonReq(`/api/tasks/${task.id}/links`, 'POST', {
+        connectionId: 'int-1',
+        providerId: 'rollbar',
+        identifier: 'ENG-42',
+      }),
+      {} as Env,
+    )
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ error: { code: 'provider_bad_config' } })
     expect(await listLinks(task.id)).toEqual([])
   })
 
   it('stamps provider identity on links supplied at task creation', async () => {
-    const res = await app.fetch(jsonReq('/api/tasks', 'POST', {
-      origin: 'linear', projectId: 'project-widget', branch: 'eng-42',
-      links: [{ connectionId: 'int-1', identifier: 'ENG-42' }],
-    }), {} as Env)
+    const res = await app.fetch(
+      jsonReq('/api/tasks', 'POST', {
+        origin: 'linear',
+        projectId: 'project-widget',
+        branch: 'eng-42',
+        links: [{ connectionId: 'int-1', identifier: 'ENG-42' }],
+      }),
+      {} as Env,
+    )
     expect(res.status).toBe(200)
     const task = (await res.json()) as Task
     expect(task.links[0]).toMatchObject({ connectionId: 'int-1', providerId: 'linear', identifier: 'ENG-42' })
   })
 
   it('validates birth links before creating the task row', async () => {
-    const res = await app.fetch(jsonReq('/api/tasks', 'POST', {
-      origin: 'linear', projectId: 'project-widget', branch: 'eng-42',
-      links: [{ connectionId: 'int-1', providerId: 'rollbar', identifier: 'ENG-42' }],
-    }), {} as Env)
+    const res = await app.fetch(
+      jsonReq('/api/tasks', 'POST', {
+        origin: 'linear',
+        projectId: 'project-widget',
+        branch: 'eng-42',
+        links: [{ connectionId: 'int-1', providerId: 'rollbar', identifier: 'ENG-42' }],
+      }),
+      {} as Env,
+    )
     expect(res.status).toBe(400)
     expect(await t.db.select().from(schema.tasks)).toEqual([])
   })

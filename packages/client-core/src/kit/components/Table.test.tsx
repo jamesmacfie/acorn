@@ -21,12 +21,20 @@ afterEach(() => {
 
 describe('the kit table', () => {
   it('puts a head row in a thead and a body row outside one', () => {
-    dispose = render(() => (
-      <Table stickyHead>
-        <TableRow head><TableHead>Model</TableHead></TableRow>
-        <TableRow><TableCell header>Sonnet</TableCell><TableCell>3</TableCell></TableRow>
-      </Table>
-    ), host)
+    dispose = render(
+      () => (
+        <Table stickyHead>
+          <TableRow head>
+            <TableHead>Model</TableHead>
+          </TableRow>
+          <TableRow>
+            <TableCell header>Sonnet</TableCell>
+            <TableCell>3</TableCell>
+          </TableRow>
+        </Table>
+      ),
+      host,
+    )
     expect(host.querySelector('thead th[scope="col"]')?.textContent).toBe('Model')
     expect(host.querySelector('tbody')).toBeNull()
     const body = [...host.querySelectorAll('tr')].filter((row) => !row.closest('thead'))
@@ -36,12 +44,21 @@ describe('the kit table', () => {
   })
 
   it('spends alignment and truncation priority as attributes, never as a length', () => {
-    dispose = render(() => (
-      <Table>
-        <TableRow head><TableHead align="end" priority="low">Cost</TableHead></TableRow>
-        <TableRow><TableCell align="end">1.50</TableCell></TableRow>
-      </Table>
-    ), host)
+    dispose = render(
+      () => (
+        <Table>
+          <TableRow head>
+            <TableHead align="end" priority="low">
+              Cost
+            </TableHead>
+          </TableRow>
+          <TableRow>
+            <TableCell align="end">1.50</TableCell>
+          </TableRow>
+        </Table>
+      ),
+      host,
+    )
     const head = host.querySelector<HTMLElement>('th[scope="col"]')!
     expect(head.dataset.align).toBe('end')
     expect(head.dataset.priority).toBe('low')
@@ -51,12 +68,19 @@ describe('the kit table', () => {
 
   it('gives a row with an action a keyboard as well as a click', () => {
     const presses: string[] = []
-    dispose = render(() => (
-      <Table>
-        <TableRow onPress={() => presses.push('press')}><TableCell>a</TableCell></TableRow>
-        <TableRow><TableCell>b</TableCell></TableRow>
-      </Table>
-    ), host)
+    dispose = render(
+      () => (
+        <Table>
+          <TableRow onPress={() => presses.push('press')}>
+            <TableCell>a</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell>b</TableCell>
+          </TableRow>
+        </Table>
+      ),
+      host,
+    )
     const [pressable, inert] = host.querySelectorAll('tr')
     expect(pressable.getAttribute('role')).toBe('button')
     expect(pressable.getAttribute('tabindex')).toBe('0')
@@ -72,14 +96,19 @@ describe('the kit table', () => {
 
   it('leaves a click on a control in a cell to that control', () => {
     const presses: string[] = []
-    dispose = render(() => (
-      <Table>
-        <TableRow onPress={() => presses.push('row')}>
-          <TableCell><Checkbox ariaLabel="Select" /></TableCell>
-          <TableCell>name</TableCell>
-        </TableRow>
-      </Table>
-    ), host)
+    dispose = render(
+      () => (
+        <Table>
+          <TableRow onPress={() => presses.push('row')}>
+            <TableCell>
+              <Checkbox ariaLabel="Select" />
+            </TableCell>
+            <TableCell>name</TableCell>
+          </TableRow>
+        </Table>
+      ),
+      host,
+    )
     host.querySelector('input')!.click()
     expect(presses).toEqual([])
     host.querySelectorAll('td')[1]!.click()

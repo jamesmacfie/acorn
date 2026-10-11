@@ -87,21 +87,35 @@ export function InstallPlugin(props: {
   }
 
   return (
-    <form onSubmit={(event) => { event.preventDefault(); void submit() }}>
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        void submit()
+      }}
+    >
       <Show when={!hostDrawsBack}>
-        <Inline><Button variant="bare" size="sm" onPress={props.onClose}>‹ Installed</Button></Inline>
+        <Inline>
+          <Button variant="bare" size="sm" onPress={props.onClose}>
+            ‹ Installed
+          </Button>
+        </Inline>
       </Show>
       <SettingsSection id="install" label="Package">
         <SettingRow
           label="Install on"
-          help={target() === 'node'
-            ? "Its server code runs on the node with only the permissions it asks for. This computer asks you again before it runs any of the plugin's screens."
-            : 'A plugin on this computer has no server code. You approve every new version.'}
+          help={
+            target() === 'node'
+              ? "Its server code runs on the node with only the permissions it asks for. This computer asks you again before it runs any of the plugin's screens."
+              : 'A plugin on this computer has no server code. You approve every new version.'
+          }
         >
           <Select
             label="Install on"
             value={target()}
-            options={[{ value: 'node', label: `Node: ${props.nodeLabel}` }, { value: 'device', label: 'This device' }]}
+            options={[
+              { value: 'node', label: `Node: ${props.nodeLabel}` },
+              { value: 'device', label: 'This device' },
+            ]}
             onChange={(value) => pickTarget(value as InstallTarget)}
           />
         </SettingRow>
@@ -109,21 +123,37 @@ export function InstallPlugin(props: {
           <Select label="Source" value={kind()} options={kinds()} onChange={(value) => setKind(value as SourceKind)} />
           <Input label="Package" value={spec()} placeholder={PLACEHOLDER[kind()]} disabled={busy()} onInput={setSpec} />
           <Show when={canBrowse()}>
-            <Button variant="ghost" disabled={busy()} onPress={() => void pickFolder().then((path) => { if (path) setSpec(path) })}>Choose…</Button>
+            <Button
+              variant="ghost"
+              disabled={busy()}
+              onPress={() =>
+                void pickFolder().then((path) => {
+                  if (path) setSpec(path)
+                })
+              }
+            >
+              Choose…
+            </Button>
           </Show>
         </SettingRow>
         {/* A folder is linked, not copied, so it is the one install whose bytes keep changing after the
             fact (docs/security/plugin-install.md § Installing from a folder). */}
         <Show when={kind() === 'path' && target() === 'node'}>
           <Alert tone="warn">
-            acorn links to this folder instead of copying it. Whatever is in it when the node starts is what runs, so acorn
-            can't check it the way it checks a download.
+            acorn links to this folder instead of copying it. Whatever is in it when the node starts is what runs, so
+            acorn can't check it the way it checks a download.
           </Alert>
         </Show>
-        <Show when={error()}><Alert>{error()}</Alert></Show>
+        <Show when={error()}>
+          <Alert>{error()}</Alert>
+        </Show>
         <Inline gap="row">
-          <Button submit variant="solid" tone="accent" busy={busy()} disabled={!spec().trim()}>Install</Button>
-          <Button variant="ghost" disabled={busy()} onPress={props.onClose}>Cancel</Button>
+          <Button submit variant="solid" tone="accent" busy={busy()} disabled={!spec().trim()}>
+            Install
+          </Button>
+          <Button variant="ghost" disabled={busy()} onPress={props.onClose}>
+            Cancel
+          </Button>
         </Inline>
       </SettingsSection>
     </form>

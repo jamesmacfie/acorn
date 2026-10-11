@@ -8,7 +8,11 @@ export const ID_RE = /^[a-z][a-z0-9-]{1,31}$/
 // Node-half permissions shape the host RPC context and the isolated worker's runtime grants. They are
 // shown under Enforced in the trust UI; scheduled/check behavior remains separately declared.
 // See docs/security.md.
-const nodeEnvironmentName = z.string().min(1).max(128).regex(/^[A-Z_][A-Z0-9_]*$/, 'environment names must be uppercase identifiers')
+const nodeEnvironmentName = z
+  .string()
+  .min(1)
+  .max(128)
+  .regex(/^[A-Z_][A-Z0-9_]*$/, 'environment names must be uppercase identifiers')
 const nodeFilePermission = z.object({
   // The host resolves the path from its own environment at worker launch. A package cannot bake one
   // machine's absolute path into a distributable manifest.
@@ -37,7 +41,6 @@ export const nodePermissions = z.object({
   files: z.array(nodeFilePermission).max(16).optional(),
 })
 
-
 // The plugin's logo, as one SVG path's `d` attribute rather than an SVG document, so the regex below is
 // the whole check. See docs/ui-design/icons.md § Icons.
 const PATH_D_RE = /^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\s+-]+$/
@@ -48,24 +51,35 @@ export const brandMark = z.object({
   // The brand's own colour, which the mark's surfaces read as `--brand`. Six-digit hex rather than any
   // CSS colour on purpose: this string reaches a `style` attribute, and a colour slot accepts `url()`,
   // which would let a manifest make an outbound request. See docs/ui-design.md section Icons.
-  color: z.string().regex(/^#[0-9a-f]{6}$/i, 'icon colour must be a six-digit hex, such as #24292f').optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9a-f]{6}$/i, 'icon colour must be a six-digit hex, such as #24292f')
+    .optional(),
 })
 
 // Relative only. Rejecting `/` and `..` here keeps hostile paths away from the loader's confinement
 // check.
-export const entry = z.string().min(1).max(256).refine(
-  (value) => !value.startsWith('/') && !value.split(/[\\/]/).includes('..'),
-  'entrypoint must be a relative path inside the plugin directory',
-)
+export const entry = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine(
+    (value) => !value.startsWith('/') && !value.split(/[\\/]/).includes('..'),
+    'entrypoint must be a relative path inside the plugin directory',
+  )
 
 // A webview host is a device grant. The surface schema uses this parser before the host records consent.
-export const webviewHost = z.string().min(1).max(WEBVIEW_HOST_MAX_LENGTH).superRefine((value, ctx) => {
-  try {
-    normalizeWebviewHost(value)
-  } catch (error) {
-    ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
-  }
-})
+export const webviewHost = z
+  .string()
+  .min(1)
+  .max(WEBVIEW_HOST_MAX_LENGTH)
+  .superRefine((value, ctx) => {
+    try {
+      normalizeWebviewHost(value)
+    } catch (error) {
+      ctx.addIssue({ code: 'custom', message: error instanceof Error ? error.message : String(error) })
+    }
+  })
 
 // A path the host will GET or POST for this plugin. The node's manifest refinement confines it to
 // the plugin's route namespace, where the plugin id is available.

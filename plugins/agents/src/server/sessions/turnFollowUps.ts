@@ -8,7 +8,11 @@
 // one under a new turn. What recovery needs is durable: each note's turn records `followUpOf`, and each
 // review window's outcome is an `agent_operations` row.
 import { createLogger, describeError } from '@acorn/plugin-api/node'
-import { TURN_FOLLOW_UP_DEADLINE_MS, type TurnFollowUpContribution, type TurnFollowUpWindow } from '../../contract/turnFollowUp.ts'
+import {
+  TURN_FOLLOW_UP_DEADLINE_MS,
+  type TurnFollowUpContribution,
+  type TurnFollowUpWindow,
+} from '../../contract/turnFollowUp.ts'
 import type { AgentTurn } from '../../contract/wire.ts'
 import type { ManagedAgentRuntime } from './runtime'
 
@@ -57,7 +61,14 @@ export class TurnFollowUps {
   open(origin: AgentTurn, owner: FollowUpOperation['owner'], onAccepted?: (turnId: string) => void): FollowUpOperation {
     let operation = this.#operations.get(origin.id)
     if (!operation) {
-      operation = { origin, owner, open: true, lateReviewers: new Set(), admitting: new Set(), controller: new AbortController() }
+      operation = {
+        origin,
+        owner,
+        open: true,
+        lateReviewers: new Set(),
+        admitting: new Set(),
+        controller: new AbortController(),
+      }
       this.#operations.set(origin.id, operation)
     }
     if (onAccepted) operation.onAccepted = onAccepted
@@ -104,9 +115,10 @@ export class TurnFollowUps {
     const session = await store.getSession(operation.origin.sessionId)
     if (!session) return null
     const windowMs = Math.min(this.ports.deadlineMs ?? TURN_FOLLOW_UP_DEADLINE_MS, remainingMs)
-    const outcome: ReviewOutcome = windowMs > 0
-      ? await this.#window(operation, reviewers, { taskId: session.taskId, sessionId: session.id, turnId }, windowMs)
-      : { turnId, outcome: 'skipped', reviewers: [] }
+    const outcome: ReviewOutcome =
+      windowMs > 0
+        ? await this.#window(operation, reviewers, { taskId: session.taskId, sessionId: session.id, turnId }, windowMs)
+        : { turnId, outcome: 'skipped', reviewers: [] }
     await store.saveOperation(key, REVIEW_OPERATION, outcome, operation.origin.sessionId)
     return outcome
   }
@@ -144,14 +156,15 @@ export class TurnFollowUps {
     const named = await store.turn(originTurnId)
     if (!named || named.sessionId !== sessionId) return null
     const policy = named.effectivePolicy
-    const rootId = [policy.followUpOf, policy.continuationOf].find((id): id is string => typeof id === 'string') ?? named.id
+    const rootId =
+      [policy.followUpOf, policy.continuationOf].find((id): id is string => typeof id === 'string') ?? named.id
     const origin = rootId === named.id ? named : await store.turn(rootId)
     if (!origin || origin.sessionId !== sessionId) return null
     const existing = this.#operations.get(origin.id)
     if (existing?.owner === 'workflow') return existing
     // A workflow step opens its own operation while it runs. A delegated turn's owner is durable, so its
     // operation opens on the first note and is checked again on every one.
-    if (origin.source !== 'delegation' || !await this.ports.delegationLive(origin)) return null
+    if (origin.source !== 'delegation' || !(await this.ports.delegationLive(origin))) return null
     return this.#operations.get(origin.id) ?? this.open(origin, 'delegation')
   }
 
@@ -165,18 +178,33 @@ export class TurnFollowUps {
     const stop = () => controller.abort()
     operation.controller.signal.addEventListener('abort', stop, { once: true })
     const timer = setTimeout(stop, windowMs)
-    const closed = new Promise<'timed-out' | 'cancelled'>((resolve) => controller.signal.addEventListener('abort', () =>
-      resolve(operation.controller.signal.aborted ? 'cancelled' : 'timed-out'), { once: true }))
-    const window: TurnFollowUpWindow = { ...turn, owner: operation.owner, deadline: Date.now() + windowMs, signal: controller.signal }
-    const results = await Promise.all(reviewers.map(async (entry) => {
-      const run = Promise.resolve()
-        .then(() => entry.value.review(window))
-        .then(() => 'done' as const, (error: unknown) => {
-          log.warn(`turn reviewer '${entry.id}' failed: ${describeError(error).message}`)
-          return 'failed' as const
-        })
-      return { pluginId: entry.pluginId, outcome: await Promise.race([run, closed]) }
-    }))
+    const closed = new Promise<'timed-out' | 'cancelled'>((resolve) =>
+      controller.signal.addEventListener(
+        'abort',
+        () => resolve(operation.controller.signal.aborted ? 'cancelled' : 'timed-out'),
+        { once: true },
+      ),
+    )
+    const window: TurnFollowUpWindow = {
+      ...turn,
+      owner: operation.owner,
+      deadline: Date.now() + windowMs,
+      signal: controller.signal,
+    }
+    const results = await Promise.all(
+      reviewers.map(async (entry) => {
+        const run = Promise.resolve()
+          .then(() => entry.value.review(window))
+          .then(
+            () => 'done' as const,
+            (error: unknown) => {
+              log.warn(`turn reviewer '${entry.id}' failed: ${describeError(error).message}`)
+              return 'failed' as const
+            },
+          )
+        return { pluginId: entry.pluginId, outcome: await Promise.race([run, closed]) }
+      }),
+    )
     clearTimeout(timer)
     operation.controller.signal.removeEventListener('abort', stop)
     // From here a reviewer's note is late: its signal is aborted and the host refuses it.
@@ -185,7 +213,11 @@ export class TurnFollowUps {
     controller.abort()
     return {
       turnId: turn.turnId,
-      outcome: cancelled ? 'cancelled' : results.some((result) => result.outcome === 'timed-out') ? 'timed-out' : 'reviewed',
+      outcome: cancelled
+        ? 'cancelled'
+        : results.some((result) => result.outcome === 'timed-out')
+          ? 'timed-out'
+          : 'reviewed',
       reviewers: results,
     }
   }

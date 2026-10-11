@@ -42,19 +42,22 @@ describe('scoring one saved query', () => {
 
 describe('the rows a search answers with', () => {
   it('sorts by tier and keeps the incoming order inside one, which is the pane’s own order', () => {
-    const items = savedQuerySearchItems([
-      query({ id: 'a', name: 'Alpha orders' }),
-      query({ id: 'b', name: 'orders' }),
-      query({ id: 'c', name: 'Beta orders' }),
-    ], 'orders')
+    const items = savedQuerySearchItems(
+      [
+        query({ id: 'a', name: 'Alpha orders' }),
+        query({ id: 'b', name: 'orders' }),
+        query({ id: 'c', name: 'Beta orders' }),
+      ],
+      'orders',
+    )
     expect(items.map((item) => item.id)).toEqual(['b', 'a', 'c'])
   })
 
   it('shows the note when there is one and the SQL when there is not', () => {
-    const [withNote, withoutNote] = savedQuerySearchItems([
-      query({ id: 'a', notes: 'Everything since Monday' }),
-      query({ id: 'b', notes: null, sql: 'select\n  1' }),
-    ], '')
+    const [withNote, withoutNote] = savedQuerySearchItems(
+      [query({ id: 'a', notes: 'Everything since Monday' }), query({ id: 'b', notes: null, sql: 'select\n  1' })],
+      '',
+    )
     expect(withNote.subtitle).toBe('Everything since Monday')
     // Collapsed, because a subtitle is one line and stored SQL is not.
     expect(withoutNote.subtitle).toBe('select 1')

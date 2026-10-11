@@ -22,7 +22,9 @@ export type ReviewNote = {
   sentAt: number | null // stamped on delivery; cleared on edit
   createdAt: number
 }
-export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & { snippet?: string | null }
+export type ReviewNoteSeed = Pick<ReviewNote, 'path' | 'side' | 'startLine' | 'endLine' | 'body'> & {
+  snippet?: string | null
+}
 
 export const reviewNotesRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/review-notes`
 export const reviewNoteRoute = (taskId: string, noteId: string) => `/v1/p/git/tasks/${taskId}/review-notes/${noteId}`
@@ -35,7 +37,14 @@ export const localStatusRoute = (taskId: string) => `/v1/p/git/tasks/${taskId}/l
 /** A clean tree with nothing known about the branch: what a task with no worktree yet looks like, and
  *  what the pane renders before its first read returns. A function rather than a constant so no two
  *  callers share one `changes` array. */
-export const emptyLocalStatus = (): LocalStatus => ({ branch: null, upstream: null, ahead: null, behind: null, operation: null, changes: [] })
+export const emptyLocalStatus = (): LocalStatus => ({
+  branch: null,
+  upstream: null,
+  ahead: null,
+  behind: null,
+  operation: null,
+  changes: [],
+})
 // The stacked diff as a document (docs/diff-rendering/document.md § The document). One staging area at a time:
 // the same path can be in both, and a document keys a file by its path. `key` is the pane's status key
 // for the file, which is how the node knows a file has not moved and need not be diffed again.
@@ -71,7 +80,9 @@ export type DependencyReview = {
 }
 export type LocalDocumentRequest = { scope: LocalScope; files: { path: string; key: string }[] }
 /** Per file: the patch's digest, null for no diff, and how it cuts. The pane holds the rest. */
-export type LocalDocumentResponse = { files: { path: string; patchKey: string | null; segments: DiffSegmentDescriptor[] }[] }
+export type LocalDocumentResponse = {
+  files: { path: string; patchKey: string | null; segments: DiffSegmentDescriptor[] }[]
+}
 export type LocalSegmentsRequest = { scope: LocalScope; requests: DiffSegmentRequest[] }
 export type LocalSearchRequest = DiffSearchRequest & { scope: LocalScope; files: { path: string; patchKey: string }[] }
 // The new side of a file's diff, for filling a gap the reader expands. Scoped like the diff itself:
@@ -80,7 +91,18 @@ export const localNewSideRoute = (taskId: string, path: string, scope: 'unstaged
   `/v1/p/git/tasks/${taskId}/local/new-side?path=${encodeURIComponent(path)}&scope=${scope}`
 export const localActionRoute = (
   taskId: string,
-  action: 'stage' | 'unstage' | 'discard' | 'commit' | 'stage-all' | 'unstage-all' | 'discard-all' | 'fetch' | 'pull' | 'push' | 'abort',
+  action:
+    | 'stage'
+    | 'unstage'
+    | 'discard'
+    | 'commit'
+    | 'stage-all'
+    | 'unstage-all'
+    | 'discard-all'
+    | 'fetch'
+    | 'pull'
+    | 'push'
+    | 'abort',
 ) => `/v1/p/git/tasks/${taskId}/local/${action}`
 /** What the commit menu offers, as the body a commit POST carries.
  *

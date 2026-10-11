@@ -13,23 +13,42 @@ import { dashboardStore } from './store'
 export function pluginInputUsage(db: AppDatabase, pluginId: string): PluginInputGrantState['usage'] {
   const panels = new Map<string, { sourceId: string; name: string; panels: Set<string>; connectionIds: Set<string> }>()
   const store = dashboardStore(db)
-  const ids = db.select({ id: dashboardDrafts.id }).from(dashboardDrafts).where(isNotNull(dashboardDrafts.publishedRevision)).all()
+  const ids = db
+    .select({ id: dashboardDrafts.id })
+    .from(dashboardDrafts)
+    .where(isNotNull(dashboardDrafts.publishedRevision))
+    .all()
   for (const { id } of ids) {
     let revision
-    try { revision = store.publishedById(id) } catch { continue }
-    const scope = { workspaceId: revision.workspaceId, ...(revision.projectId ? { projectId: revision.projectId } : {}) }
+    try {
+      revision = store.publishedById(id)
+    } catch {
+      continue
+    }
+    const scope = {
+      workspaceId: revision.workspaceId,
+      ...(revision.projectId ? { projectId: revision.projectId } : {}),
+    }
     for (const entry of revision.content.sources) {
       let content: QueryContent
       try {
-        content = entry.reference.kind === 'inline'
-          ? entry.reference.content
-          : queryStore(db).published(scope, entry.reference.queryId, entry.reference.revision).content
-      } catch { continue }
+        content =
+          entry.reference.kind === 'inline'
+            ? entry.reference.content
+            : queryStore(db).published(scope, entry.reference.queryId, entry.reference.revision).content
+      } catch {
+        continue
+      }
       const { source, scope: bound } = content.query
       if (source.pluginId !== pluginId) continue
       for (const [name, binding] of Object.entries(bound.inputs ?? {})) {
         const key = JSON.stringify([source.sourceId, name])
-        const usage = panels.get(key) ?? { sourceId: source.sourceId, name, panels: new Set(), connectionIds: new Set() }
+        const usage = panels.get(key) ?? {
+          sourceId: source.sourceId,
+          name,
+          panels: new Set(),
+          connectionIds: new Set(),
+        }
         usage.panels.add(id)
         if (binding.connectionId) usage.connectionIds.add(binding.connectionId)
         panels.set(key, usage)

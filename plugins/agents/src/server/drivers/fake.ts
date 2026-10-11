@@ -28,7 +28,10 @@ export class FakeAgentDriver implements AgentDriver {
     const providerSessionRef = options.session.providerSessionRef ?? `fake-${randomUUID()}`
     let active = false
     let stopped = false
-    await options.onEvent({ type: 'session_state', state: options.session.providerSessionRef ? 'replaying' : 'connecting' })
+    await options.onEvent({
+      type: 'session_state',
+      state: options.session.providerSessionRef ? 'replaying' : 'connecting',
+    })
     await options.onEvent({ type: 'session_metadata', providerSessionRef })
     await options.onEvent({ type: 'session_state', state: 'ready' })
     return {

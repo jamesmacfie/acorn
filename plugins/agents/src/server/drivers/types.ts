@@ -50,7 +50,12 @@ export type AgentDriverInputRequest = {
   respond(resolution: unknown): void
 }
 
-export type AgentDriverEvent = (AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest | AgentDriverInputRequest) & {
+export type AgentDriverEvent = (
+  | AgentNormalizedEvent
+  | AgentDriverGeneratedArtifact
+  | AgentDriverPermissionRequest
+  | AgentDriverInputRequest
+) & {
   /** Driver-owned attribution. Null explicitly means no managed turn; absent uses the live turn. */
   acornTurnId?: string | null
 }
@@ -132,13 +137,16 @@ export type AgentDriverStartOptions = {
 export type AgentDriverTurnOptions = {
   turn: AgentTurn
   input: AgentInputPart[]
-  attachments: Record<string, {
-    id: string
-    filename: string
-    mediaType: string
-    byteSize: number
-    localPath: string
-  }>
+  attachments: Record<
+    string,
+    {
+      id: string
+      filename: string
+      mediaType: string
+      byteSize: number
+      localPath: string
+    }
+  >
 }
 
 export interface AgentDriverSession {

@@ -24,7 +24,10 @@ export type MemoryKnowledge = {
   store: MemoryStoreAccess
 }
 
-export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
+export function registerKnowledgeChannel(
+  core: KnowledgeCoreServices,
+  deps: KnowledgeDeps,
+): MemoryKnowledge & { route: KnowledgeBridge } {
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
     try {
       return await fn()
@@ -33,14 +36,18 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
     }
   }
 
-  const announceMemories = (projectId: string | null) => deps.emit?.({
-    channel: pluginChannel('memory', 'memories-changed'),
-    ...(projectId ? { scope: 'project' as const, projectId } : { scope: 'private' as const, projectId: null }),
-  })
+  const announceMemories = (projectId: string | null) =>
+    deps.emit?.({
+      channel: pluginChannel('memory', 'memories-changed'),
+      ...(projectId ? { scope: 'project' as const, projectId } : { scope: 'private' as const, projectId: null }),
+    })
 
   // Writes and session prompts are first-use work, outside the Node's cold-boot graph.
   let storePromise: Promise<MemoryStoreAccess> | undefined
-  const loadStore = () => storePromise ??= import('./memoryStore').then(({ MemoryStore }) => new MemoryStore(privateMemoryRoot(homedir()), announceMemories))
+  const loadStore = () =>
+    (storePromise ??= import('./memoryStore').then(
+      ({ MemoryStore }) => new MemoryStore(privateMemoryRoot(homedir()), announceMemories),
+    ))
   const store: MemoryStoreAccess = {
     list: async (...args) => (await loadStore()).list(...args),
     get: async (...args) => (await loadStore()).get(...args),
@@ -53,12 +60,13 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
     restore: async (...args) => (await loadStore()).restore(...args),
     feed: async (...args) => (await loadStore()).feed(...args),
   }
-  const list = async (projectId: string | null, scope?: MemoryScope): Promise<MemoryRow[]> => (await store.list(projectId, scope)).map((memory) => ({
-    ...memory,
-    id: `${memory.scope}:${memory.projectId ?? ''}:${contentHashId(memory.name, memory.body, memory.description)}`,
-    createdAt: memory.createdAt || Math.round(memory.updatedAt),
-    updatedAt: Math.round(memory.updatedAt),
-  }))
+  const list = async (projectId: string | null, scope?: MemoryScope): Promise<MemoryRow[]> =>
+    (await store.list(projectId, scope)).map((memory) => ({
+      ...memory,
+      id: `${memory.scope}:${memory.projectId ?? ''}:${contentHashId(memory.name, memory.body, memory.description)}`,
+      createdAt: memory.createdAt || Math.round(memory.updatedAt),
+      updatedAt: Math.round(memory.updatedAt),
+    }))
   const standingContext = async (taskId: string) => {
     const { standingContextBuilder } = await import('./standingContext')
     return standingContextBuilder(store, core)(taskId)
@@ -101,13 +109,18 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
       const project = await core.projects.byId(task.projectId)
       return project ? { projectId: project.id } : null
     },
-    memoryList: (projectId, scope) =>
-      guard(() => list(projectId ?? null, scope)),
+    memoryList: (projectId, scope) => guard(() => list(projectId ?? null, scope)),
     memorySearch: (query, projectId, type, scope) =>
       guard(async () => {
         const rows = await list(projectId ?? null, scope)
-        const filtered = type && MEMORY_TYPES.includes(type as MemoryType) ? rows.filter((row) => row.type === normalizeMemoryType(type)) : rows
-        return searchMemoryFiles(filtered.filter((row) => !row.supersededBy), query)
+        const filtered =
+          type && MEMORY_TYPES.includes(type as MemoryType)
+            ? rows.filter((row) => row.type === normalizeMemoryType(type))
+            : rows
+        return searchMemoryFiles(
+          filtered.filter((row) => !row.supersededBy),
+          query,
+        )
       }),
     // Manual add: both scopes write under the owner's private root, so a memory never turns up in the
     // repo's diff. Project scope is keyed by the task's project id; private scope applies everywhere.
@@ -115,22 +128,36 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
       guard(async () => {
         const t = await core.tasks.load(taskId)
         if (p.scope === 'project' && !t?.projectId) throw new Error('Project memory needs a task that names a project.')
-        return store.write({ scope: p.scope, projectId: p.scope === 'project' ? t!.projectId! : null, name: p.name.trim() }, {
-          name: p.name.trim(),
-          description: p.description.trim(),
-          type: normalizeMemoryType(p.type),
-          body: p.body,
-        }, { by: 'owner', taskId })
+        return store.write(
+          { scope: p.scope, projectId: p.scope === 'project' ? t!.projectId! : null, name: p.name.trim() },
+          {
+            name: p.name.trim(),
+            description: p.description.trim(),
+            type: normalizeMemoryType(p.type),
+            body: p.body,
+          },
+          { by: 'owner', taskId },
+        )
       }),
-    memoryProjectAdd: (projectId, input) => guard(async () => {
-      if (!await core.projects.byId(projectId)) throw new Error('No such project.')
-      return store.write({ scope: input.scope, projectId: input.scope === 'project' ? projectId : null, name: input.name },
-        { ...input, type: normalizeMemoryType(input.type) }, { by: 'owner' })
-    }),
+    memoryProjectAdd: (projectId, input) =>
+      guard(async () => {
+        if (!(await core.projects.byId(projectId))) throw new Error('No such project.')
+        return store.write(
+          { scope: input.scope, projectId: input.scope === 'project' ? projectId : null, name: input.name },
+          { ...input, type: normalizeMemoryType(input.type) },
+          { by: 'owner' },
+        )
+      }),
     memoryUndo: async (changeId) => {
-      try { return await store.undo(changeId) }
-      catch (error) {
-        if (error instanceof ToolError) throw new BridgeError(error.kind === 'conflict' ? 409 : error.kind === 'not_found' ? 404 : 400, error.kind, error.message)
+      try {
+        return await store.undo(changeId)
+      } catch (error) {
+        if (error instanceof ToolError)
+          throw new BridgeError(
+            error.kind === 'conflict' ? 409 : error.kind === 'not_found' ? 404 : 400,
+            error.kind,
+            error.message,
+          )
         throw error
       }
     },

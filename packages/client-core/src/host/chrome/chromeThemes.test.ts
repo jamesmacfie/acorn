@@ -9,8 +9,10 @@ import { pluginThemeBlock, pluginThemeId, pluginThemeStyleSheet, registerPluginT
 // Everything below is about that: what the host will write, what it refuses to write, and what
 // happens to a person's stored preference when the plugin that owned their theme goes away.
 
-const tokens = (over: Record<string, string> = {}): Record<string, string> =>
-  ({ ...Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [name, '#123456'])), ...over })
+const tokens = (over: Record<string, string> = {}): Record<string, string> => ({
+  ...Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [name, '#123456'])),
+  ...over,
+})
 
 const theme = (over: Partial<PluginThemeDescriptor> = {}): PluginThemeDescriptor => ({
   id: 'nightfall',
@@ -51,15 +53,18 @@ describe('generating a theme block', () => {
   })
 
   it('accepts the colour spellings a theme author actually reaches for', () => {
-    const css = pluginThemeBlock('plugin:board:mixed', theme({
-      tokens: tokens({
-        '--bg': '#fff',
-        '--bg-subtle': '#ffffffcc',
-        '--shadow-popover': 'rgba(0, 0, 0, 0.42)',
-        '--accent': 'oklch(0.7 0.15 250)',
-        '--focus': 'hsl(210 100% 50%)',
+    const css = pluginThemeBlock(
+      'plugin:board:mixed',
+      theme({
+        tokens: tokens({
+          '--bg': '#fff',
+          '--bg-subtle': '#ffffffcc',
+          '--shadow-popover': 'rgba(0, 0, 0, 0.42)',
+          '--accent': 'oklch(0.7 0.15 250)',
+          '--focus': 'hsl(210 100% 50%)',
+        }),
       }),
-    }))
+    )
     expect(css).toContain('--accent: oklch(0.7 0.15 250);')
     expect(css).toContain('--shadow-popover: rgba(0, 0, 0, 0.42);')
   })
@@ -67,40 +72,47 @@ describe('generating a theme block', () => {
   it('refuses a map that is missing a palette token', () => {
     const partial = tokens()
     delete partial['--hunk-text']
-    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: partial })))
-      .toThrow(/no usable colour for --hunk-text/)
+    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: partial }))).toThrow(
+      /no usable colour for --hunk-text/,
+    )
   })
 
   it('refuses an unknown token name', () => {
-    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--totally-made-up': '#fff' }) })))
-      .toThrow(/may not set: --totally-made-up/)
+    expect(() =>
+      pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--totally-made-up': '#fff' }) })),
+    ).toThrow(/may not set: --totally-made-up/)
   })
 
   it('refuses a DERIVED token, because restating one breaks the var() it exists for', () => {
     // --danger is `var(--del-marker)` on :root. A theme block that set it would keep its own value
     // while every other theme kept following the palette, which is the whole point of the split.
-    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--danger': '#ff0000' }) })))
-      .toThrow(/may not set: --danger/)
-    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--surface-sunken': '#111' }) })))
-      .toThrow(/may not set: --surface-sunken/)
+    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--danger': '#ff0000' }) }))).toThrow(
+      /may not set: --danger/,
+    )
+    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--surface-sunken': '#111' }) }))).toThrow(
+      /may not set: --surface-sunken/,
+    )
   })
 
   it('refuses a style-axis token, so a theme can never touch shape or density', () => {
-    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--radius': '0' }) })))
-      .toThrow(/may not set: --radius/)
+    expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--radius': '0' }) }))).toThrow(
+      /may not set: --radius/,
+    )
   })
 
   it('refuses the three self-description tokens: a theme states `dark`, the host states the rest', () => {
     for (const name of ['--is-dark', '--color-scheme']) {
-      expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ [name]: '1' }) })), name)
-        .toThrow(/may not set/)
+      expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ [name]: '1' }) })), name).toThrow(
+        /may not set/,
+      )
     }
   })
 
   it('refuses a value that is not a colour', () => {
     for (const value of ['red', 'inherit', 'currentColor', 'var(--bg)', '', '  #fff  ']) {
-      expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--bg': value }) })), value)
-        .toThrow(/no usable colour for --bg/)
+      expect(() => pluginThemeBlock('plugin:board:x', theme({ tokens: tokens({ '--bg': value }) })), value).toThrow(
+        /no usable colour for --bg/,
+      )
     }
   })
 })
@@ -153,8 +165,11 @@ describe('registering one', () => {
   it("keeps two plugins' identically named themes apart", () => {
     register('board', theme())
     register('other', theme())
-    expect(THEMES().filter(([id]) => id.startsWith('plugin:')).map(([id]) => id))
-      .toEqual(['plugin:board:nightfall', 'plugin:other:nightfall'])
+    expect(
+      THEMES()
+        .filter(([id]) => id.startsWith('plugin:'))
+        .map(([id]) => id),
+    ).toEqual(['plugin:board:nightfall', 'plugin:other:nightfall'])
   })
 
   it('takes the generated CSS with it on dispose', () => {

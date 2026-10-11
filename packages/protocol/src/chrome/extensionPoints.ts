@@ -1,4 +1,3 @@
-
 // Where one plugin may open itself to another, and where a plugin may stand in for a core surface. A
 // contract both sides read, for the same reason `contextMenus.ts` is one: the node has to reject a bad
 // `extensionPoints`, `extensions` or `coreSlot` entry at parse time, the client has to re-check the same
@@ -84,7 +83,12 @@ export const isExtensionPointKind = (value: unknown): value is ExtensionPointKin
  * the owner's pane, below it or beside it. Same rule as the layout template family — the name says
  * where, so there is nothing to get the wrong way round at runtime.
  */
-export const EXTENSION_POINT_LOCATIONS = ['pane.footer', 'pane.aside', 'pane.inline-below', 'pane.inline-beside'] as const
+export const EXTENSION_POINT_LOCATIONS = [
+  'pane.footer',
+  'pane.aside',
+  'pane.inline-below',
+  'pane.inline-beside',
+] as const
 
 /** Does this location take rows from other plugins, or panels from the user? One predicate rather than a
  *  second list, so a location added below cannot forget to answer the question. */
@@ -143,7 +147,8 @@ export function parseExtensionPointRef(value: string): { owner: string; point: s
  */
 export const DISCLOSED_NODE_POINTS: Readonly<Record<string, string>> = {
   'agents:session-messenger': 'Send notes to your agent sessions, which starts a turn on your agent provider',
-  'agents:turn-follow-up': 'Review your workflow and delegated agents’ finished turns before they report, which can hold their results and add turns on your agent provider',
+  'agents:turn-follow-up':
+    'Review your workflow and delegated agents’ finished turns before they report, which can hold their results and add turns on your agent provider',
 }
 
 /**
@@ -297,7 +302,13 @@ export type HookVerdict<T extends HookPayload = HookPayload> = {
  * declaration. Same shape as `CORE_EXCLUSIVE_SLOTS` below and for the same reason: a designated list
  * a plugin may name but not extend.
  */
-export const CORE_HOOK_POINTS = ['core:worktree-created', 'core:task-archiving', 'core:task-deleted', 'core:before-tool-call', 'core:before-snapshot'] as const
+export const CORE_HOOK_POINTS = [
+  'core:worktree-created',
+  'core:task-archiving',
+  'core:task-deleted',
+  'core:before-tool-call',
+  'core:before-snapshot',
+] as const
 
 export type CoreHookPoint = (typeof CORE_HOOK_POINTS)[number]
 

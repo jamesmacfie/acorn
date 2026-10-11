@@ -93,11 +93,15 @@ let minted = 0
 const removed = new WeakSet<Node>()
 
 /** Solid took this subtree out. Called by `removeNode`. */
-export const markRemoved = (node: Node): void => { removed.add(node) }
+export const markRemoved = (node: Node): void => {
+  removed.add(node)
+}
 
 /** …and put it back, which is what `Suspense` resolving looks like. Called by `insertNode`, which is
  *  also where a *move* lands, so a node that was only relocated is never left marked. */
-export const markInserted = (node: Node): void => { removed.delete(node) }
+export const markInserted = (node: Node): void => {
+  removed.delete(node)
+}
 
 /** Is this node the top of a subtree that is no longer in the tree? Asked of the end of a parent
  *  walk, and false for anything the old painter drew, because nothing ever marks one of those. */
@@ -105,22 +109,46 @@ export const isRemoved = (node: unknown): boolean => removed.has(node as Node)
 
 const accessors = {
   // The last layout, under the four names the store reads it by.
-  x: { get(this: Node) { return this.rect.x } },
-  y: { get(this: Node) { return this.rect.y } },
-  width: { get(this: Node) { return this.rect.w } },
-  height: { get(this: Node) { return this.rect.h } },
+  x: {
+    get(this: Node) {
+      return this.rect.x
+    },
+  },
+  y: {
+    get(this: Node) {
+      return this.rect.y
+    },
+  },
+  width: {
+    get(this: Node) {
+      return this.rect.w
+    },
+  },
+  height: {
+    get(this: Node) {
+      return this.rect.h
+    },
+  },
   // A prop the layout pass turns into `DISPLAY_NONE` and paint skips, read here as the flag the store
   // walks with (`onScreen`). Absent means visible, which is what every box that says nothing means.
   visible: {
-    get(this: Node) { return this.props.visible !== false },
+    get(this: Node) {
+      return this.props.visible !== false
+    },
     // Nothing in the app writes it — the shell and the tab panels hide a subtree through the prop —
     // and the setter is here so that if something ever does, the write lands where the prop is
     // instead of throwing or shadowing it.
-    set(this: Node, value: boolean) { this.props.visible = value },
+    set(this: Node, value: boolean) {
+      this.props.visible = value
+    },
   },
   // Nothing is ever destroyed here, which is the fault class this painter exists to end: a plain
   // object has no lifecycle to be on the wrong side of (./node.ts).
-  isDestroyed: { get() { return false } },
+  isDestroyed: {
+    get() {
+      return false
+    },
+  },
   // What can hold the keys. An ordinary property everywhere else — `../keys/stops.ts` and five
   // components write it on the node they built, and `../invariants.test.ts` counts those places — and
   // an accessor here for the three kinds that arrive with a default of their own. OpenTUI's
@@ -138,7 +166,9 @@ const accessors = {
       const said = this.props.focusable as boolean | undefined
       return said ?? (this.kind === 'scrollbox' || isFieldKind(this.kind))
     },
-    set(this: Node, value: boolean) { this.props.focusable = value },
+    set(this: Node, value: boolean) {
+      this.props.focusable = value
+    },
   },
   // The caret, which is the one thing about focus the store still asks a renderable for
   // (`../keys/regions.ts § paintCaret`). Still no-ops rather than absences, because the store calls
@@ -179,6 +209,6 @@ export function makeNode(kind: Kind): Renderable {
   node.children = []
   node.yoga = null
   node.rect = { x: 0, y: 0, w: 0, h: 0 }
-  node.id = (minted += 1)
+  node.id = minted += 1
   return node
 }

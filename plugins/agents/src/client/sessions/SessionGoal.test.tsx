@@ -5,16 +5,27 @@ import { refreshFleet, setActiveNode } from '@acorn/plugin-api/testkit/client'
 import type { AgentSession } from '../../contract/wire.ts'
 
 let resolveGoal!: (session: AgentSession) => void
-const setGoal = vi.fn(() => new Promise<AgentSession>((resolve) => { resolveGoal = resolve }))
+const setGoal = vi.fn(
+  () =>
+    new Promise<AgentSession>((resolve) => {
+      resolveGoal = resolve
+    }),
+)
 vi.mock('./managedClient', () => ({ managedAgentApi: { setGoal } }))
 
 const { default: SessionGoal } = await import('./SessionGoal')
 const { managedAgentStore } = await import('./managedStore')
 
-const session = (title: string): AgentSession => ({
-  id: 'same-session', taskId: 'task', title, kind: 'interactive', controller: 'acorn',
-  archivedAt: null, goal: null,
-} as AgentSession)
+const session = (title: string): AgentSession =>
+  ({
+    id: 'same-session',
+    taskId: 'task',
+    title,
+    kind: 'interactive',
+    controller: 'acorn',
+    archivedAt: null,
+    goal: null,
+  }) as AgentSession
 
 afterEach(() => {
   managedAgentStore.clear()
@@ -24,10 +35,16 @@ afterEach(() => {
 })
 
 it('keeps a pending goal write on its origin and ignores its reply after switching Node', async () => {
-  Object.assign(window, { acorn: { desktop: true, onNodeStatus: () => () => {},
-    fleetList: async () => ({ nodes: ['A', 'B'].map(nodeId => ({ nodeId, label: nodeId,
-      endpoint: 'https://localhost', local: true })), statuses: ['A', 'B'].map(nodeId => ({ nodeId, state: 'online' })) }),
-  } })
+  Object.assign(window, {
+    acorn: {
+      desktop: true,
+      onNodeStatus: () => () => {},
+      fleetList: async () => ({
+        nodes: ['A', 'B'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: 'https://localhost', local: true })),
+        statuses: ['A', 'B'].map((nodeId) => ({ nodeId, state: 'online' })),
+      }),
+    },
+  })
   await refreshFleet()
   setActiveNode('A')
   const [selected, setSelected] = createSignal(session('From A'))
@@ -35,10 +52,14 @@ it('keeps a pending goal write on its origin and ignores its reply after switchi
   managedAgentStore.upsertSession(selected())
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => <SessionGoal session={selected()} openToken={openToken()}
-    onUpdate={managedAgentStore.upsertSession} />, host)
-  const button = (label: string) => [...document.querySelectorAll('button')]
-    .findLast((element) => element.textContent?.trim() === label) as HTMLButtonElement | undefined
+  const dispose = render(
+    () => <SessionGoal session={selected()} openToken={openToken()} onUpdate={managedAgentStore.upsertSession} />,
+    host,
+  )
+  const button = (label: string) =>
+    [...document.querySelectorAll('button')].findLast((element) => element.textContent?.trim() === label) as
+      | HTMLButtonElement
+      | undefined
   try {
     expect(button('Set goal')).toBeUndefined()
     setOpenToken((token) => token + 1)
@@ -59,8 +80,10 @@ it('keeps a pending goal write on its origin and ignores its reply after switchi
     nextInput.value = 'Finish B'
     nextInput.dispatchEvent(new Event('input', { bubbles: true }))
 
-    resolveGoal({ ...session('From A'), goal: { objective: 'Finish A', status: 'active', continuations: 0,
-      noProgress: 0, verdict: null } })
+    resolveGoal({
+      ...session('From A'),
+      goal: { objective: 'Finish A', status: 'active', continuations: 0, noProgress: 0, verdict: null },
+    })
     await Promise.resolve()
     expect(managedAgentStore.sessions().map((row) => row.title)).toEqual(['From B'])
     expect(document.querySelector('input')?.value).toBe('Finish B')

@@ -12,7 +12,9 @@ describe('pane layout reducer', () => {
   })
 
   it('adds once and closes the last unpinned pane back to the default', () => {
-    expect(applyLayoutAction(layout({ panes: ['pr'] }), { type: 'add', pane: 'changes' })).toEqual(layout({ panes: ['pr', 'changes'] }))
+    expect(applyLayoutAction(layout({ panes: ['pr'] }), { type: 'add', pane: 'changes' })).toEqual(
+      layout({ panes: ['pr', 'changes'] }),
+    )
     const current = layout({ panes: ['pr', 'changes'] })
     expect(applyLayoutAction(current, { type: 'add', pane: 'changes' })).toBe(current)
     expect(applyLayoutAction(layout({ panes: ['editor'] }), { type: 'close', pane: 'editor' })).toEqual(defaultLayout())
@@ -22,22 +24,35 @@ describe('pane layout reducer', () => {
     const current = layout({ panes: ['pr', 'editor'], pinned: ['editor'], weights: { editor: 2 } })
     const unpinned = applyLayoutAction(current, { type: 'close', pane: 'editor' })
     expect(unpinned).toEqual(layout({ panes: ['pr', 'editor'], pinned: [], weights: { editor: 2 } }))
-    expect(applyLayoutAction(unpinned, { type: 'close', pane: 'editor' })).toEqual(layout({ panes: ['pr'], pinned: [], weights: { editor: 2 } }))
-    expect(applyLayoutAction(layout({ panes: ['pr'], weights: { editor: 2 } }), { type: 'add', pane: 'editor' }).weights?.editor).toBe(2)
+    expect(applyLayoutAction(unpinned, { type: 'close', pane: 'editor' })).toEqual(
+      layout({ panes: ['pr'], pinned: [], weights: { editor: 2 } }),
+    )
+    expect(
+      applyLayoutAction(layout({ panes: ['pr'], weights: { editor: 2 } }), { type: 'add', pane: 'editor' }).weights
+        ?.editor,
+    ).toBe(2)
   })
 
   it('pins, reorders, and keeps weights attached to ids', () => {
     let current = layout({ panes: ['pr', 'editor', 'changes'], weights: { editor: 3, changes: 2 } })
     current = applyLayoutAction(current, { type: 'pin', pane: 'editor' })
     current = applyLayoutAction(current, { type: 'move', pane: 'editor', direction: 1 })
-    expect(current).toEqual(layout({ panes: ['pr', 'changes', 'editor'], pinned: ['editor'], weights: { editor: 3, changes: 2 } }))
+    expect(current).toEqual(
+      layout({ panes: ['pr', 'changes', 'editor'], pinned: ['editor'], weights: { editor: 3, changes: 2 } }),
+    )
   })
 
   it('clamps a neighbor resize to both contributed minimum widths', () => {
     const current = layout({ panes: ['pr', 'editor'] })
     const resized = applyLayoutAction(current, {
-      type: 'resize', pane: 'pr', adjacent: 'editor', deltaPx: 500,
-      paneWidth: 400, adjacentWidth: 400, paneMinWidth: 300, adjacentMinWidth: 260,
+      type: 'resize',
+      pane: 'pr',
+      adjacent: 'editor',
+      deltaPx: 500,
+      paneWidth: 400,
+      adjacentWidth: 400,
+      paneMinWidth: 300,
+      adjacentMinWidth: 260,
     })
     expect(resized.weights).toEqual({ pr: 540, editor: 260 })
   })
@@ -50,16 +65,20 @@ describe('pane layout reducer', () => {
 
 describe('pane layout persistence', () => {
   it('retains unknown ids, weights, and pins so they remain inert rather than lost', () => {
-    expect(normalizeLayout({
-      panes: ['pr', 'future.pane', 'pr'],
-      pinned: ['future.pane'],
-      weights: { pr: 1.5, 'future.pane': 4, bad: 0 },
-      maximized: 'future.pane',
-    })).toEqual(layout({ panes: ['pr', 'future.pane'], pinned: ['future.pane'], weights: { pr: 1.5, 'future.pane': 4 } }))
+    expect(
+      normalizeLayout({
+        panes: ['pr', 'future.pane', 'pr'],
+        pinned: ['future.pane'],
+        weights: { pr: 1.5, 'future.pane': 4, bad: 0 },
+        maximized: 'future.pane',
+      }),
+    ).toEqual(layout({ panes: ['pr', 'future.pane'], pinned: ['future.pane'], weights: { pr: 1.5, 'future.pane': 4 } }))
   })
 
   it('requires canonical panes and ignores malformed optional fields', () => {
-    expect(normalizeLayout({ panes: ['editor', 'pr'], pinned: 'pr', ratio: 0.6 })).toEqual(layout({ panes: ['editor', 'pr'] }))
+    expect(normalizeLayout({ panes: ['editor', 'pr'], pinned: 'pr', ratio: 0.6 })).toEqual(
+      layout({ panes: ['editor', 'pr'] }),
+    )
     expect(normalizeLayout({ active: 'pr', pinned: ['changes', 'future.pane'] })).toBeNull()
     expect(normalizeLayout({ panes: [] })).toBeNull()
   })

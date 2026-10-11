@@ -49,36 +49,44 @@ const { setDocumentSurface, _resetDocumentSurface } = await import('./documentSu
 
 const HASH = 'a'.repeat(64)
 
-const row = (): NodePluginRow => ({
-  name: 'database',
-  required: false,
-  disabled: false,
-  running: true,
-  state: 'active',
-  installed: {
-    version: '1.0.0',
-    baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
-    client: { hash: HASH, bytes: 12 },
-    contributions: {
-      frames: [{
-        target: 'pane',
-        id: 'database',
-        label: 'Database',
-        glyph: 'database',
-        order: 70,
-        scope: 'task',
-        formFactor: ['desktop'],
-        claimsKeys: [],
-        layout: 'document-over-frame',
-        regions: {
-          document: { kind: 'document', languageId: 'sql', read: '/v1/p/database/tasks/:taskId/scratch' },
-          frame: { kind: 'remote', entry: 'panel' },
-        },
-      }],
+const row = (): NodePluginRow =>
+  ({
+    name: 'database',
+    required: false,
+    disabled: false,
+    running: true,
+    state: 'active',
+    installed: {
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
+      permissions: {
+        api: [],
+        events: [],
+        node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      },
+      client: { hash: HASH, bytes: 12 },
+      contributions: {
+        frames: [
+          {
+            target: 'pane',
+            id: 'database',
+            label: 'Database',
+            glyph: 'database',
+            order: 70,
+            scope: 'task',
+            formFactor: ['desktop'],
+            claimsKeys: [],
+            layout: 'document-over-frame',
+            regions: {
+              document: { kind: 'document', languageId: 'sql', read: '/v1/p/database/tasks/:taskId/scratch' },
+              frame: { kind: 'remote', entry: 'panel' },
+            },
+          },
+        ],
+      },
     },
-  },
-} as unknown as NodePluginRow)
+  }) as unknown as NodePluginRow
 
 describe('a composed pane’s remote region', () => {
   beforeEach(() => {
@@ -108,10 +116,16 @@ describe('a composed pane’s remote region', () => {
     const pane = paneRegistry.entries().find((entry) => entry.id === 'database')!
     const qc = new QueryClient()
     registerQueryOwner(qc, 'origin-a')
-    const dispose = render(() => createComponent(QueryClientProvider, {
-      client: qc,
-      get children() { return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never) },
-    }), document.createElement('div'))
+    const dispose = render(
+      () =>
+        createComponent(QueryClientProvider, {
+          client: qc,
+          get children() {
+            return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never)
+          },
+        }),
+      document.createElement('div'),
+    )
     setActiveNode('ambient-b')
 
     // The layout and both region components are lazy, so the regions arrive a microtask later.
@@ -139,17 +153,26 @@ describe('a composed pane’s remote region', () => {
     _resetFrameContributions()
     const declaration = row()
     const surface = declaration.installed!.contributions.frames![0]
-    Object.assign(surface, { layout: 'list-detail', regions: { list: { kind: 'remote', entry: 'list' }, detail: { kind: 'remote', entry: 'detail' } } })
+    Object.assign(surface, {
+      layout: 'list-detail',
+      regions: { list: { kind: 'remote', entry: 'list' }, detail: { kind: 'remote', entry: 'detail' } },
+    })
     _seedPluginDistribution([['node-a', [declaration]]], [`database ${HASH}`])
     syncFrameContributions()
     openPane('task-1', 'database', { kind: 'plugin:select', item: 'request-9' })
     const pane = paneRegistry.entries().find((entry) => entry.id === 'database')!
     const qc = new QueryClient()
     registerQueryOwner(qc, null)
-    const dispose = render(() => createComponent(QueryClientProvider, {
-      client: qc,
-      get children() { return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never) },
-    }), document.createElement('div'))
+    const dispose = render(
+      () =>
+        createComponent(QueryClientProvider, {
+          client: qc,
+          get children() {
+            return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never)
+          },
+        }),
+      document.createElement('div'),
+    )
     await vi.waitFor(() => expect(remoteProps).toHaveLength(2))
     for (const region of remoteProps) {
       expect(region.openingItem).toBe('request-9')

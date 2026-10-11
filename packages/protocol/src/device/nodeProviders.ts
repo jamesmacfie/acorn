@@ -28,7 +28,10 @@ export const providedNodeSchema = z.strictObject({
   nodeId: z.string().nullable(),
   label: z.string().min(1),
   endpoint: z.string().url().nullable(),
-  fingerprint: z.string().regex(/^[0-9a-f]{64}$/).nullable(),
+  fingerprint: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .nullable(),
   state: providedNodeStateSchema,
 })
 export type ProvidedNode = z.infer<typeof providedNodeSchema>

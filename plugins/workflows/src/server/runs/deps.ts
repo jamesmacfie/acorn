@@ -1,5 +1,8 @@
 import type { HeadlessOpts, PluginHookRegistry, PluginTelemetry, StreamEvent } from '@acorn/plugin-api/node'
-import type { AgentSessionExecuteRequest, AgentSessionExecuteResult } from '@acorn/plugin-agents/contract/sessionExecute.ts'
+import type {
+  AgentSessionExecuteRequest,
+  AgentSessionExecuteResult,
+} from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import type { ToolCeiling, WorkflowStepDef } from '../../shared/workflowContracts'
 import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus } from '../../contract/events'
 import type { WorkflowDispatchRequest, WorkflowDispatchResult } from '../dispatch/dispatcher'
@@ -49,7 +52,12 @@ export type RunnerDeps = {
   evaluatePolicy(taskId: string, policy: string): Promise<{ pass: boolean; detail?: string }>
   failingChecks(taskId: string): Promise<string | null>
   // Every notification carries a run reference and, when applicable, a step reference.
-  notify(taskId: string, kind: 'gate' | 'run-done' | 'run-failed', title: string, ref?: { runId: string; stepId?: string }): void
+  notify(
+    taskId: string,
+    kind: 'gate' | 'run-done' | 'run-failed',
+    title: string,
+    ref?: { runId: string; stepId?: string },
+  ): void
   /** A status edge for one step, used by the run pane. */
   stepChanged?(runId: string, stepId: string, status: string): void
   statusChanged?(): void
@@ -66,7 +74,10 @@ export type RunnerDeps = {
   cancelChildTask?(taskId: string): Promise<void>
   cancelAgentSession?(taskId: string, sessionId: string): Promise<void>
   dispatchChildWorkflow?(request: WorkflowDispatchRequest, signal?: AbortSignal): Promise<WorkflowDispatchResult>
-  dispatchChildWorkflows?(requests: readonly WorkflowDispatchRequest[], signal?: AbortSignal): Promise<WorkflowDispatchResult[]>
+  dispatchChildWorkflows?(
+    requests: readonly WorkflowDispatchRequest[],
+    signal?: AbortSignal,
+  ): Promise<WorkflowDispatchResult[]>
   selectWorkflowRecords?: import('../processing/store').WorkflowProcessingStore['dispatch']
   childChanged?(event: WorkflowChildChangedEvent): void
   authorizeRepoConfig?(taskId: string): Promise<void>

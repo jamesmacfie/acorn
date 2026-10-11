@@ -117,12 +117,7 @@ async function fetchPullSummaries(
   }
 }
 
-function seedIfNotNewer<T>(
-  qc: QueryClient,
-  queryKey: readonly unknown[],
-  data: T,
-  requestStartedAt: number,
-) {
+function seedIfNotNewer<T>(qc: QueryClient, queryKey: readonly unknown[], data: T, requestStartedAt: number) {
   const state = qc.getQueryState(queryKey)
   if ((state?.dataUpdatedAt ?? 0) > requestStartedAt) return
   qc.setQueryData(queryKey, data)

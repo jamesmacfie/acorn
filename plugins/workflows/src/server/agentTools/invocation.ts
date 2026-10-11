@@ -8,8 +8,12 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { workflowInvocationPolicies } from '../../node/schema'
 import type { ResolvedWorkflowGraph, WorkflowDef } from '../../shared/workflowContracts'
 import {
-  DEFAULT_INVOCATION_STARTS, MAX_INVOCATION_STARTS,
-  type WorkflowInvocationApproval, type WorkflowInvocationLimits, type WorkflowInvocationPolicy, type WorkflowInvocationReview,
+  DEFAULT_INVOCATION_STARTS,
+  MAX_INVOCATION_STARTS,
+  type WorkflowInvocationApproval,
+  type WorkflowInvocationLimits,
+  type WorkflowInvocationPolicy,
+  type WorkflowInvocationReview,
 } from '../../shared/workflowInvocation'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
@@ -30,7 +34,7 @@ const DEFAULT_MAX_TURNS = 20
 const DEFAULT_MAX_WALL_TIME_MS = 60 * 60 * 1000
 
 /** `db:<id>` names a database row; `repo:` and `user:` keys are what the start service already takes. */
-export const definitionIdForKey = (key: string): string => key.startsWith('db:') ? key.slice(3) : key
+export const definitionIdForKey = (key: string): string => (key.startsWith('db:') ? key.slice(3) : key)
 
 // What a person reads rather than what runs: workflow and step names, input and output labels and
 // descriptions, and the root's input values, which differ per launch. Step names stay where a step
@@ -40,21 +44,24 @@ function executableShape(def: WorkflowDef, root: boolean): unknown {
   return {
     ...rest,
     inputs: inputs?.map(({ label: _label, description: _description, default: value, required, ...input }) =>
-      root ? input : { ...input, default: value, required }),
+      root ? input : { ...input, default: value, required },
+    ),
     outputs: outputs?.map(({ label: _label, ...output }) => output),
-    steps: steps.map(({ name, ...step }) => step.id ? step : { name, ...step }),
+    steps: steps.map(({ name, ...step }) => (step.id ? step : { name, ...step })),
   }
 }
 
 /** The digest an approval binds. Every node, its provenance and dependency revisions, and the child
  *  defaults are in it; labels and the caller's input values are not. */
 export function executableGraphDigest(graph: ResolvedWorkflowGraph): string {
-  return workflowContentFingerprint(graph.nodes.map((node, index) => ({
-    path: node.path,
-    provenance: node.provenance,
-    defaultInputs: index === 0 ? null : node.defaultInputs,
-    definition: executableShape(node.definition, index === 0),
-  })))
+  return workflowContentFingerprint(
+    graph.nodes.map((node, index) => ({
+      path: node.path,
+      provenance: node.provenance,
+      defaultInputs: index === 0 ? null : node.defaultInputs,
+      definition: executableShape(node.definition, index === 0),
+    })),
+  )
 }
 
 const INPUT_TOKEN = /\$\{inputs\.([A-Za-z][A-Za-z0-9_]*)\}/g
@@ -104,15 +111,25 @@ function approvalProblems(approval: WorkflowInvocationApproval, root: WorkflowDe
     if (!declared.has(name)) problems.push(`The workflow has no input '${name}'.`)
   }
   for (const name of approval.callerInputs) {
-    if (Object.hasOwn(approval.fixedInputs, name)) problems.push(`Input '${name}' cannot be both fixed and set by the agent.`)
+    if (Object.hasOwn(approval.fixedInputs, name))
+      problems.push(`Input '${name}' cannot be both fixed and set by the agent.`)
   }
   const { limits } = approval
   if (!positive(limits.maxTurns, true) || limits.maxTurns === undefined) problems.push('Set a maximum number of turns.')
-  if (!positive(limits.maxWallTimeMs, true) || limits.maxWallTimeMs === undefined) problems.push('Set a maximum run time.')
-  if (!positive(limits.maxCostUsd, false) || !positive(limits.maxInputTokens, true) || !positive(limits.maxOutputTokens, true)) {
+  if (!positive(limits.maxWallTimeMs, true) || limits.maxWallTimeMs === undefined)
+    problems.push('Set a maximum run time.')
+  if (
+    !positive(limits.maxCostUsd, false) ||
+    !positive(limits.maxInputTokens, true) ||
+    !positive(limits.maxOutputTokens, true)
+  ) {
     problems.push('Cost and token limits must be positive numbers.')
   }
-  if (!Number.isSafeInteger(approval.startsPerSession) || approval.startsPerSession < 1 || approval.startsPerSession > MAX_INVOCATION_STARTS) {
+  if (
+    !Number.isSafeInteger(approval.startsPerSession) ||
+    approval.startsPerSession < 1 ||
+    approval.startsPerSession > MAX_INVOCATION_STARTS
+  ) {
     problems.push(`Starts per agent session must be from 1 to ${MAX_INVOCATION_STARTS}.`)
   }
   return problems
@@ -139,8 +156,16 @@ export class WorkflowInvocationPolicies {
   }
 
   find(projectId: string, definitionKey: string): WorkflowInvocationPolicy | null {
-    const row = this.db.select().from(workflowInvocationPolicies)
-      .where(and(eq(workflowInvocationPolicies.projectId, projectId), eq(workflowInvocationPolicies.definitionKey, definitionKey))).get()
+    const row = this.db
+      .select()
+      .from(workflowInvocationPolicies)
+      .where(
+        and(
+          eq(workflowInvocationPolicies.projectId, projectId),
+          eq(workflowInvocationPolicies.definitionKey, definitionKey),
+        ),
+      )
+      .get()
     return row ? view(row) : null
   }
 
@@ -165,13 +190,18 @@ export class WorkflowInvocationPolicies {
         name: node.definition.name,
         provenance: node.provenance,
         steps: node.definition.steps.map((step) => ({
-          id: stepIdentity(step), name: step.name, kind: step.kind ?? 'agent',
+          id: stepIdentity(step),
+          name: step.name,
+          kind: step.kind ?? 'agent',
           ...(step.profileId ? { profileId: step.profileId } : {}),
           ...(step.model ? { model: step.model } : {}),
           ...(step.configOptions ? { configOptions: step.configOptions } : {}),
         })),
       })),
-      inputs: (graph.root.inputs ?? []).map(({ default: value, ...input }) => ({ ...input, hasDefault: value !== undefined })),
+      inputs: (graph.root.inputs ?? []).map(({ default: value, ...input }) => ({
+        ...input,
+        hasDefault: value !== undefined,
+      })),
       inputUses: inputUses(graph.root),
       defaults: {
         limits: {
@@ -187,9 +217,15 @@ export class WorkflowInvocationPolicies {
   }
 
   async approve(approval: WorkflowInvocationApproval): Promise<WorkflowInvocationPolicy> {
-    const { graph, scope } = await this.deps.prepare({ projectId: approval.projectId }, definitionIdForKey(approval.definitionKey), {}, 'review')
+    const { graph, scope } = await this.deps.prepare(
+      { projectId: approval.projectId },
+      definitionIdForKey(approval.definitionKey),
+      {},
+      'review',
+    )
     const graphDigest = executableGraphDigest(graph)
-    if (graphDigest !== approval.graphDigest) throw new Error('The workflow changed while you were reviewing it. Review it again.')
+    if (graphDigest !== approval.graphDigest)
+      throw new Error('The workflow changed while you were reviewing it. Review it again.')
     const problems = approvalProblems(approval, graph.root)
     if (problems.length) throw new Error(problems.join(' '))
     // Fixed values are checked against the input schemas now, so a bad one fails here and not at
@@ -211,12 +247,28 @@ export class WorkflowInvocationPolicies {
       updatedAt: at,
     }
     // Replacing a grant updates the same row, so the starts a session spent against it stay spent.
-    if (existing) this.db.update(workflowInvocationPolicies).set(values).where(eq(workflowInvocationPolicies.id, existing.id)).run()
-    else this.db.insert(workflowInvocationPolicies).values({ id: randomUUID(), projectId: approval.projectId, definitionKey: approval.definitionKey, createdAt: at, ...values }).run()
+    if (existing)
+      this.db.update(workflowInvocationPolicies).set(values).where(eq(workflowInvocationPolicies.id, existing.id)).run()
+    else
+      this.db
+        .insert(workflowInvocationPolicies)
+        .values({
+          id: randomUUID(),
+          projectId: approval.projectId,
+          definitionKey: approval.definitionKey,
+          createdAt: at,
+          ...values,
+        })
+        .run()
     const policy = this.find(approval.projectId, approval.definitionKey)!
     this.deps.audit('agent-invocation-approved', {
       subject: policy.id,
-      details: { projectId: policy.projectId, definition: policy.definitionKey, graphDigest, startsPerSession: policy.startsPerSession },
+      details: {
+        projectId: policy.projectId,
+        definition: policy.definitionKey,
+        graphDigest,
+        startsPerSession: policy.startsPerSession,
+      },
     })
     return policy
   }
@@ -225,8 +277,15 @@ export class WorkflowInvocationPolicies {
   revoke(projectId: string, definitionKey: string): WorkflowInvocationPolicy | null {
     const existing = this.find(projectId, definitionKey)
     if (!existing || existing.state === 'revoked') return existing
-    this.db.update(workflowInvocationPolicies).set({ state: 'revoked', updatedAt: Date.now() }).where(eq(workflowInvocationPolicies.id, existing.id)).run()
-    this.deps.audit('agent-invocation-revoked', { subject: existing.id, details: { projectId, definition: definitionKey } })
+    this.db
+      .update(workflowInvocationPolicies)
+      .set({ state: 'revoked', updatedAt: Date.now() })
+      .where(eq(workflowInvocationPolicies.id, existing.id))
+      .run()
+    this.deps.audit('agent-invocation-revoked', {
+      subject: existing.id,
+      details: { projectId, definition: definitionKey },
+    })
     return this.find(projectId, definitionKey)
   }
 }

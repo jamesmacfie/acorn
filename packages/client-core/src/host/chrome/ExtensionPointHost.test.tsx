@@ -1,7 +1,11 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+} from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 import ExtensionPointHost from './ExtensionPointHost'
 
@@ -23,7 +27,10 @@ const rows = vi.hoisted(() => new Map<string, PluginExtensionItem[]>())
 vi.mock('../../infra/node/fanout', () => ({
   createFleetQuery: (key: () => readonly unknown[]) => [() => ({ rows: [{ data: rows.get(String(key()[1])) ?? [] }] })],
 }))
-vi.mock('./chromeData', () => ({ chromeDeps: () => 0, chromeKey: (pluginId: string, id: string) => ['chrome', id, pluginId] }))
+vi.mock('./chromeData', () => ({
+  chromeDeps: () => 0,
+  chromeKey: (pluginId: string, id: string) => ['chrome', id, pluginId],
+}))
 
 let host: HTMLElement
 let dispose: () => void
@@ -44,7 +51,9 @@ const point = (id: string, when?: () => boolean) =>
     }),
   )
 
-const delivery = (contribution: Partial<ExtensionContribution> & Pick<ExtensionContribution, 'id' | 'pluginId' | 'point'>) =>
+const delivery = (
+  contribution: Partial<ExtensionContribution> & Pick<ExtensionContribution, 'id' | 'pluginId' | 'point'>,
+) =>
   registered.push(
     extensionRegistry.register({
       label: 'Preview',
@@ -113,7 +122,10 @@ describe('ExtensionPointHost', () => {
 
     mount('docker:containers')
 
-    expect([...host.querySelectorAll('.extension-group-owner')].map((node) => node.textContent)).toEqual(['http', 'preview'])
+    expect([...host.querySelectorAll('.extension-group-owner')].map((node) => node.textContent)).toEqual([
+      'http',
+      'preview',
+    ])
     // The stamp is drawn, not merely recorded: a reader has to be able to see whose rows these are.
     expect(host.textContent).toContain('Saved requests')
     expect(host.textContent).toContain('GET /health')
@@ -130,14 +142,18 @@ describe('ExtensionPointHost', () => {
     expect(host.innerHTML).toBe('')
   })
 
-  it('runs the contributor\'s verb when a row is activated', () => {
+  it("runs the contributor's verb when a row is activated", () => {
     const ran = vi.fn()
     point('docker:containers')
     delivery({ id: 'preview:ports', pluginId: 'preview', point: 'docker:containers', run: ran })
     rows.set('preview:ports', [{ id: 'p1', title: 'localhost:3000' }])
 
     mount('docker:containers')
-    host.querySelector<HTMLElement>('.extension-group [data-mark], .extension-group button, .extension-group [role="button"]')?.click()
+    host
+      .querySelector<HTMLElement>(
+        '.extension-group [data-mark], .extension-group button, .extension-group [role="button"]',
+      )
+      ?.click()
 
     expect(ran).toHaveBeenCalledTimes(1)
     expect(ran.mock.calls[0][0]).toMatchObject({ id: 'p1' })

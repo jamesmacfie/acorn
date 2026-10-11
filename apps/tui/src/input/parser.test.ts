@@ -33,9 +33,16 @@ const keys = (...chunks: string[]): KeyEvent[] =>
   read(...chunks).filter((event): event is KeyEvent => event.type === 'key')
 
 /** A press with no modifiers, which is most of what this file expects. */
-const press = (name: string, text = ''): InputEvent => (
-  { type: 'key', name, text, action: 'press', ctrl: false, shift: false, alt: false, super: false }
-)
+const press = (name: string, text = ''): InputEvent => ({
+  type: 'key',
+  name,
+  text,
+  action: 'press',
+  ctrl: false,
+  shift: false,
+  alt: false,
+  super: false,
+})
 
 const one = (...chunks: string[]): InputEvent => {
   const events = read(...chunks)
@@ -45,13 +52,16 @@ const one = (...chunks: string[]): InputEvent => {
 
 /** A key event as the four things a binding is matched on, which is what the keymap engine reads off
  *  it (`@opentui/keymap` § defaultEventMatchResolver). */
-const chord = (event: KeyEvent): string => [
-  event.ctrl ? 'ctrl' : '',
-  event.alt ? 'meta' : '',
-  event.super ? 'super' : '',
-  event.shift ? 'shift' : '',
-  event.name,
-].filter(Boolean).join('+')
+const chord = (event: KeyEvent): string =>
+  [
+    event.ctrl ? 'ctrl' : '',
+    event.alt ? 'meta' : '',
+    event.super ? 'super' : '',
+    event.shift ? 'shift' : '',
+    event.name,
+  ]
+    .filter(Boolean)
+    .join('+')
 
 describe('the legacy forms', () => {
   it('reads the cursor and editing keys', () => {
@@ -201,7 +211,15 @@ describe('the kitty forms', () => {
 describe('the mouse', () => {
   it('reads an SGR press and release, zero based', () => {
     expect(one('\x1b[<0;10;5M')).toEqual({
-      type: 'mouse', x: 9, y: 4, button: 'left', action: 'press', ctrl: false, shift: false, alt: false, super: false,
+      type: 'mouse',
+      x: 9,
+      y: 4,
+      button: 'left',
+      action: 'press',
+      ctrl: false,
+      shift: false,
+      alt: false,
+      super: false,
     })
     expect(one('\x1b[<0;10;5m')).toMatchObject({ button: 'left', action: 'release' })
     expect(one('\x1b[<2;1;1M')).toMatchObject({ button: 'right', action: 'press', x: 0, y: 0 })
@@ -240,25 +258,18 @@ describe('a paste', () => {
   })
 
   it('survives arriving in pieces', () => {
-    expect(read('\x1b[200~one', ' two', ' three\x1b[201~')).toEqual([
-      { type: 'paste', text: 'one two three' },
-    ])
+    expect(read('\x1b[200~one', ' two', ' three\x1b[201~')).toEqual([{ type: 'paste', text: 'one two three' }])
   })
 
   it('is content and not keys, whatever is in it', () => {
     // The whole point of the bracket. A pasted newline is not Return pressed, and a pasted escape
     // sequence is not a key: paste it into a composer and it is text, which is why this state reads
     // raw bytes rather than running the machine over them.
-    expect(read('\x1b[200~a\rb\x1b[Ac\x1b[201~')).toEqual([
-      { type: 'paste', text: 'a\rb\x1b[Ac' },
-    ])
+    expect(read('\x1b[200~a\rb\x1b[Ac\x1b[201~')).toEqual([{ type: 'paste', text: 'a\rb\x1b[Ac' }])
   })
 
   it('leaves the keys after it as keys', () => {
-    expect(read('\x1b[200~hi\x1b[201~j')).toEqual([
-      { type: 'paste', text: 'hi' },
-      press('j', 'j'),
-    ])
+    expect(read('\x1b[200~hi\x1b[201~j')).toEqual([{ type: 'paste', text: 'hi' }, press('j', 'j')])
   })
 
   it('reads an empty paste as an empty paste', () => {
@@ -267,7 +278,9 @@ describe('a paste', () => {
 })
 
 describe('a lone Escape', () => {
-  afterEach(() => { vi.useRealTimers() })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it('is the key once the wait is over, and nothing before it', () => {
     vi.useFakeTimers()
@@ -324,7 +337,9 @@ describe('the terminal', () => {
   function fake(size: { columns: number; rows: number } = { columns: 100, rows: 30 }) {
     const stdin = new EventEmitter() as EventEmitter & { setRawMode?: (mode: boolean) => void }
     const raw: boolean[] = []
-    stdin.setRawMode = (mode: boolean) => { raw.push(mode) }
+    stdin.setRawMode = (mode: boolean) => {
+      raw.push(mode)
+    }
     const written: string[] = []
     const stdout = { write: (text: string) => written.push(text), ...size }
     return { stdin, stdout, written, raw }
@@ -441,16 +456,13 @@ const RECORDED: Record<string, { legacy?: string; kitty: string }> = {
   '/': { legacy: '/', kitty: '\x1b[47u' },
 }
 
-
 describe('no key is respelled', () => {
   // `intentKeys` is the table both hosts read, so a spelling here is a spelling the desktop shares;
   // `BARE_KEYS` is the set the typing shadow goes quiet for. Read, not copied: a test with its own
   // copy of the table is a test that passes while the app is broken.
-  const bound = [...new Set([
-    ...Object.values(intentKeys('ctrl')).flat(),
-    ...BARE_KEYS,
-    ...Object.values(HOST_KEYS).flat(),
-  ])].sort()
+  const bound = [
+    ...new Set([...Object.values(intentKeys('ctrl')).flat(), ...BARE_KEYS, ...Object.values(HOST_KEYS).flat()]),
+  ].sort()
 
   it('has a recorded sequence for every key the app binds', () => {
     expect(bound.filter((key) => RECORDED[key] === undefined)).toEqual([])

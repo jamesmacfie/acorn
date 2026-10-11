@@ -8,9 +8,7 @@ import type { ModelProviderAdapter } from './types'
 export class ModelProviderRegistry {
   readonly #adapters = new Map<string, ModelProviderAdapter>()
 
-  constructor(
-    private readonly connectionProviders: ConnectionProviderRegistry,
-  ) {}
+  constructor(private readonly connectionProviders: ConnectionProviderRegistry) {}
 
   register(adapter: ModelProviderAdapter, owner?: string): Disposable {
     if (this.#adapters.has(adapter.providerId)) {

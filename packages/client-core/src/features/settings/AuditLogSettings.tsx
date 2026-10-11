@@ -102,8 +102,16 @@ export default function AuditLogSettings(props: { nodeId: string | null }) {
   const label = (action: string): string => ACTION_LABELS[action] ?? pluginLabels()[action] ?? action
 
   const rows = () => [...firstPage(), ...older()]
-  const deviceNames = createMemo((): DeviceNames => new Map(rows().flatMap((entry) =>
-    entry.action === 'device.paired' && entry.subject && typeof entry.details?.name === 'string' ? [[entry.subject, entry.details.name] as const] : [])))
+  const deviceNames = createMemo(
+    (): DeviceNames =>
+      new Map(
+        rows().flatMap((entry) =>
+          entry.action === 'device.paired' && entry.subject && typeof entry.details?.name === 'string'
+            ? [[entry.subject, entry.details.name] as const]
+            : [],
+        ),
+      ),
+  )
 
   const loadOlder = async () => {
     const last = rows().at(-1)
@@ -125,14 +133,26 @@ export default function AuditLogSettings(props: { nodeId: string | null }) {
       id="trail"
       label="Recent activity"
       help="Pairings, revoked devices, credential changes, trusted repo settings, and plugin changes on this node. Entries are kept for 90 days."
-      actions={<Button size="sm" disabled={firstPage.loading} onPress={() => void refetch()}>Refresh</Button>}
+      actions={
+        <Button size="sm" disabled={firstPage.loading} onPress={() => void refetch()}>
+          Refresh
+        </Button>
+      }
     >
-      <Show when={error()}><Alert>{error()}</Alert></Show>
-      <Show when={firstPage.loading && !rows().length}><EmptyState busy align="start" size="sm">Loading…</EmptyState></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
+      <Show when={firstPage.loading && !rows().length}>
+        <EmptyState busy align="start" size="sm">
+          Loading…
+        </EmptyState>
+      </Show>
       {/* An empty trail is a real state on a fresh node, and saying so beats rendering nothing — which
           reads as a page that failed to load. */}
       <Show when={!firstPage.loading && !rows().length && !error()}>
-        <EmptyState align="start" size="sm">Nothing recorded on this node.</EmptyState>
+        <EmptyState align="start" size="sm">
+          Nothing recorded on this node.
+        </EmptyState>
       </Show>
 
       <ul class="audit-list">
@@ -154,7 +174,9 @@ export default function AuditLogSettings(props: { nodeId: string | null }) {
           older" there would be a button that does nothing. */}
       <Show when={rows().length >= PAGE}>
         <div class="settings-actions">
-          <Button size="sm" disabled={loadingMore()} onPress={() => void loadOlder()}>Load older</Button>
+          <Button size="sm" disabled={loadingMore()} onPress={() => void loadOlder()}>
+            Load older
+          </Button>
         </div>
       </Show>
     </SettingsSection>

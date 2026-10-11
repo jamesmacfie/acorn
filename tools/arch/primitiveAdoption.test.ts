@@ -22,12 +22,19 @@ const SRC = (() => {
 const walk = (dir: string, ext: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
     e.isDirectory()
-      ? (e.name === 'node_modules' || e.name === 'dist' || e.name === '.acorn' ? [] : walk(join(dir, e.name), ext))
-      : e.name.endsWith(ext) ? [join(dir, e.name)] : [])
+      ? e.name === 'node_modules' || e.name === 'dist' || e.name === '.acorn'
+        ? []
+        : walk(join(dir, e.name), ext)
+      : e.name.endsWith(ext)
+        ? [join(dir, e.name)]
+        : [],
+  )
 
 const ROOTS = ['packages/client-core/src', 'plugins', 'apps/desktop/src']
 const under = (ext: string) => () =>
-  ROOTS.map((r) => join(SRC, r)).filter(existsSync).flatMap((d) => walk(d, ext))
+  ROOTS.map((r) => join(SRC, r))
+    .filter(existsSync)
+    .flatMap((d) => walk(d, ext))
 const tsx = under('.tsx')
 const allCss = under('.css')
 const rel = (p: string) => p.slice(SRC.length + 1)
@@ -37,22 +44,27 @@ describe('primitive adoption', () => {
     // `action-error` was the worst of the retired classes; see docs/ui-design/kit-internals.md § How the
     // kit is built. Alert owns it.
     const retired = /class="[^"]*\b(overlay-btn|integration-key-input|ui-form-field|query-gate-\w+|action-error)\b/
-    const offenders = tsx().filter((f) => retired.test(readFileSync(f, 'utf8'))).map(rel)
+    const offenders = tsx()
+      .filter((f) => retired.test(readFileSync(f, 'utf8')))
+      .map(rel)
     expect(offenders).toEqual([])
   })
 
   // See docs/ui-design/closed-kit.md § The closed kit for why a primitive spreads its own
   // data-attributes after `rest`, and the bug this test caught.
   it('no call site passes a primitive its own data-attribute instead of the prop', () => {
-    const owned = /<(?:Button|Badge|Chip|Row|Input|Select|Textarea|Spinner|Toolbar|SegmentedControl|ToggleButton|Card|Alert)\b[^>]*\sdata-(?:size|tone|variant|shape|dashed|icon-only|width|kind|invalid)=/
-    const offenders = tsx().filter((f) => owned.test(readFileSync(f, 'utf8'))).map(rel)
+    const owned =
+      /<(?:Button|Badge|Chip|Row|Input|Select|Textarea|Spinner|Toolbar|SegmentedControl|ToggleButton|Card|Alert)\b[^>]*\sdata-(?:size|tone|variant|shape|dashed|icon-only|width|kind|invalid)=/
+    const offenders = tsx()
+      .filter((f) => owned.test(readFileSync(f, 'utf8')))
+      .map(rel)
     expect(offenders).toEqual([])
   })
 
   // See docs/ui-design/closed-kit.md § The closed kit for the specificity clash this guards
   // against. cssHygiene.test.ts already bans the bare shape for Card; this is the general rule,
   // checked against what each call site actually renders.
-  const CSS_CLASH = (() => {
+  const CSS_CLASH = () => {
     // What the kit components emit unconditionally from their default props.
     const DEFAULTS: Record<string, Record<string, string>> = {
       'ui-btn': { variant: 'outline', tone: 'neutral', size: 'md' },
@@ -64,11 +76,23 @@ describe('primitive adoption', () => {
       'section-header': { level: 'pane' },
     }
     const COMPONENT: Record<string, string> = {
-      Button: 'ui-btn', Input: 'ui-input', Select: 'ui-input', Textarea: 'ui-input',
-      Toolbar: 'ui-toolbar', Alert: 'ui-alert', Badge: 'ui-badge', Chip: 'ui-chip',
-      Card: 'ui-card', Row: 'ui-row', EmptyState: 'ui-empty', Table: 'ui-table',
-      CodeBlock: 'ui-code', Meter: 'ui-meter', SegmentedControl: 'ui-segments',
-      Tabs: 'ui-tabs', SectionHeader: 'section-header',
+      Button: 'ui-btn',
+      Input: 'ui-input',
+      Select: 'ui-input',
+      Textarea: 'ui-input',
+      Toolbar: 'ui-toolbar',
+      Alert: 'ui-alert',
+      Badge: 'ui-badge',
+      Chip: 'ui-chip',
+      Card: 'ui-card',
+      Row: 'ui-row',
+      EmptyState: 'ui-empty',
+      Table: 'ui-table',
+      CodeBlock: 'ui-code',
+      Meter: 'ui-meter',
+      SegmentedControl: 'ui-segments',
+      Tabs: 'ui-tabs',
+      SectionHeader: 'section-header',
     }
     const FLAGS = ['iconOnly', 'dashed', 'invalid', 'mono', 'busy']
     const VALUED = ['variant', 'tone', 'size', 'width', 'kind', 'shape', 'level']
@@ -105,7 +129,9 @@ describe('primitive adoption', () => {
       for (const selector of rule[1].split(',')) {
         const m = /^\s*\.(ui-[\w-]+|section-header)((?:\[data-[\w-]+(?:='[^']*')?\])+)\s*$/.exec(selector)
         if (!m) continue
-        const needs = [...m[2].matchAll(/\[data-([\w-]+)(?:='([^']*)')?\]/g)].map((a) => [a[1], a[2]] as [string, string | undefined])
+        const needs = [...m[2].matchAll(/\[data-([\w-]+)(?:='([^']*)')?\]/g)].map(
+          (a) => [a[1], a[2]] as [string, string | undefined],
+        )
         attrRules.push({ base: m[1], needs, props })
       }
     }
@@ -121,16 +147,18 @@ describe('primitive adoption', () => {
           for (const site of sites.get(m[1]) ?? []) {
             for (const attrRule of attrRules) {
               if (attrRule.base !== site.base) continue
-              if (!attrRule.needs.every(([a, v]) => a in site.attrs && (v === undefined || site.attrs[a] === v))) continue
+              if (!attrRule.needs.every(([a, v]) => a in site.attrs && (v === undefined || site.attrs[a] === v)))
+                continue
               const clash = [...props].filter((prop) => attrRule.props.has(prop))
-              if (clash.length) offenders.push(`${rel(file)} .${m[1]} loses ${clash.sort().join(', ')} to .${site.base}`)
+              if (clash.length)
+                offenders.push(`${rel(file)} .${m[1]} loses ${clash.sort().join(', ')} to .${site.base}`)
             }
           }
         }
       }
     }
     return [...new Set(offenders)].sort()
-  })
+  }
 
   it('a class handed to a primitive is compounded with it, so the primitive cannot outrank it', () => {
     expect(CSS_CLASH()).toEqual([])
@@ -176,8 +204,7 @@ describe('primitive adoption', () => {
   // `.test.tsx` in a plugin package renders a region under jsdom and stubs its neighbours
   // (plugins/vitest.shared.ts § hosts), and a stub's job is to be identifiable on screen rather than
   // to be a kit node. Nothing a test file draws ever reaches a user.
-  const pluginTsx = () =>
-    tsx().filter((file) => rel(file).startsWith('plugins/') && !/\.test\.tsx?$/.test(file))
+  const pluginTsx = () => tsx().filter((file) => rel(file).startsWith('plugins/') && !/\.test\.tsx?$/.test(file))
 
   it('no plugin draws a raw div or span', () => {
     // Anti-vacuity first: this rule reads a file list, and a list that came back empty — a renamed
@@ -191,7 +218,9 @@ describe('primitive adoption', () => {
     // `div` and `span` only. A `section`, a `table` or an `input` inside a host component is markup
     // with meaning; a div is markup with a class.
     const raw = /<(?:div|span)[\s>/]/
-    const offenders = pluginTsx().filter((file) => raw.test(readFileSync(file, 'utf8'))).map(rel)
+    const offenders = pluginTsx()
+      .filter((file) => raw.test(readFileSync(file, 'utf8')))
+      .map(rel)
     expect(offenders).toEqual([])
   })
 

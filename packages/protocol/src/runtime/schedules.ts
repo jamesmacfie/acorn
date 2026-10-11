@@ -83,13 +83,15 @@ export type SchedulesResponse = {
  *  `risk` is the tier the host draws the arming confirmation from and stamps onto the row. It is
  *  never absent: an action that declares nothing is reported as `execute`, the strongest, because the
  *  direction that cannot be wrong in a way that matters is the safe one. */
-export type ScheduleTargetOption = {
-  kind: 'node-action'
-  pluginId: string
-  actionId: string
-  name: string
-  risk: ToolRisk
-} | { kind: 'dataset-capture'; datasetId: string; name: string; risk: ToolRisk }
+export type ScheduleTargetOption =
+  | {
+      kind: 'node-action'
+      pluginId: string
+      actionId: string
+      name: string
+      risk: ToolRisk
+    }
+  | { kind: 'dataset-capture'; datasetId: string; name: string; risk: ToolRisk }
 
 export type ScheduleTargetsResponse = { targets: ScheduleTargetOption[] }
 

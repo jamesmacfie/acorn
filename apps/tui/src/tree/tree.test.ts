@@ -31,8 +31,9 @@ const tagged = (mark: number) => {
   return node
 }
 
-const yogaOrder = (parent: { yoga: { getChildCount(): number; getChild(index: number): { getFlexGrow(): number } } | null }) =>
-  Array.from({ length: parent.yoga!.getChildCount() }, (_, index) => parent.yoga!.getChild(index).getFlexGrow())
+const yogaOrder = (parent: {
+  yoga: { getChildCount(): number; getChild(index: number): { getFlexGrow(): number } } | null
+}) => Array.from({ length: parent.yoga!.getChildCount() }, (_, index) => parent.yoga!.getChild(index).getFlexGrow())
 
 describe('the node operations', () => {
   it('makes a node with a Yoga node for the kinds that lay out, and none for the kinds that do not', () => {

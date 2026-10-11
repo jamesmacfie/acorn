@@ -6,7 +6,7 @@ import { installPluginWorkers } from './workerFactory'
 import { bundlePath } from './custody'
 
 vi.mock('node:fs', async (original) => ({
-  ...await original<typeof import('node:fs')>(),
+  ...(await original<typeof import('node:fs')>()),
   existsSync: vi.fn(),
   realpathSync: vi.fn(),
 }))
@@ -21,7 +21,8 @@ afterEach(() => {
 })
 
 it.each(['22.23.1', '24.18.0', '26.5.0', '25.99.0', '28.0.0'])(
-  'refuses loaded TUI workers on %s before custody, filesystem, or realm side effects', (version) => {
+  'refuses loaded TUI workers on %s before custody, filesystem, or realm side effects',
+  (version) => {
     Object.defineProperty(process.versions, 'node', { ...versionDescriptor, value: version })
     installPluginWorkers()
     const factory = vi.mocked(_setWorkerFactory).mock.calls[0]![0]

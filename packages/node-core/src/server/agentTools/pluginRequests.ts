@@ -58,7 +58,9 @@ export function raisePluginRequest(input: RaiseInput): RaiseResult {
   }
   if (existing) return { state: 'pending', request: existing.request, raised: false }
   if (entries.size >= MAX_PENDING) {
-    throw new Error(`There are already ${MAX_PENDING} plugin requests waiting for the owner. Ask them to answer those first.`)
+    throw new Error(
+      `There are already ${MAX_PENDING} plugin requests waiting for the owner. Ask them to answer those first.`,
+    )
   }
   const request: PluginApprovalRequest = { ...input, requestId: randomUUID(), requestedAt: Date.now() }
   entries.set(request.requestId, { request, key })
@@ -101,12 +103,23 @@ const installSource = z.union([
 ])
 
 const toolInput = z.object({
-  action: z.enum(['install', 'update', 'uninstall']).describe('install a new plugin, update an installed one, or remove one'),
+  action: z
+    .enum(['install', 'update', 'uninstall'])
+    .describe('install a new plugin, update an installed one, or remove one'),
   source: installSource.optional().describe('install only: where the package comes from'),
   pluginId: z.string().min(1).max(120).optional().describe('update/uninstall only: the installed plugin id'),
-  dev: z.boolean().optional().describe('ask for development mode: bundle changes are auto-trusted on the approving device until the owner ends it'),
+  dev: z
+    .boolean()
+    .optional()
+    .describe(
+      'ask for development mode: bundle changes are auto-trusted on the approving device until the owner ends it',
+    ),
   purgeData: z.boolean().optional().describe('uninstall only: also delete the plugin’s database'),
-  reason: z.string().max(MAX_REASON_CHARS).optional().describe('one line telling the owner why; shown verbatim in the approval prompt'),
+  reason: z
+    .string()
+    .max(MAX_REASON_CHARS)
+    .optional()
+    .describe('one line telling the owner why; shown verbatim in the approval prompt'),
 })
 
 type ToolArgs = z.infer<typeof toolInput>
@@ -127,7 +140,9 @@ const shapeProblem = (args: ToolArgs): string | null => {
  * `notify` is injected rather than imported so the handler is testable without a WebSocket hub, the
  * same shape the terminal plugin's repo-config-trust notice uses.
  */
-export function pluginRequestTool(notify: (taskId: string, action: PluginApprovalRequest['action']) => void = () => {}): AgentToolContribution {
+export function pluginRequestTool(
+  notify: (taskId: string, action: PluginApprovalRequest['action']) => void = () => {},
+): AgentToolContribution {
   return {
     name: 'plugin_request',
     description:

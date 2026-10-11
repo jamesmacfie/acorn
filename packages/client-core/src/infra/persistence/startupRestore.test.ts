@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { PERSISTED_STATE_TOMBSTONE, restorePersistedSlices } from './startupRestore'
-import { scopeIdFromStorageKey, storageKeyFor, stringifyPersistedValue, utf8Bytes, type PersistedStateSlice } from './persistedState'
+import {
+  scopeIdFromStorageKey,
+  storageKeyFor,
+  stringifyPersistedValue,
+  utf8Bytes,
+  type PersistedStateSlice,
+} from './persistedState'
 
-const slice = <T>(overrides: Partial<PersistedStateSlice<T>> & Pick<PersistedStateSlice<T>, 'id' | 'key' | 'codec' | 'empty'>): PersistedStateSlice<T> => ({
+const slice = <T>(
+  overrides: Partial<PersistedStateSlice<T>> & Pick<PersistedStateSlice<T>, 'id' | 'key' | 'codec' | 'empty'>,
+): PersistedStateSlice<T> => ({
   scope: 'app',
   restore: 'workspace',
   version: 1,
@@ -13,18 +21,20 @@ const slice = <T>(overrides: Partial<PersistedStateSlice<T>> & Pick<PersistedSta
 describe('persisted state descriptors', () => {
   it('restores in declared phase order, independent of registration order', () => {
     const restored: string[] = []
-    const make = (id: string, phase: 'workspace' | 'view' | 'panes') => slice<string>({
-      id,
-      key: id,
-      restore: phase,
-      codec: { parse: String, serialize: String },
-      empty: () => '',
-      binding: { values: () => ({}), hydrate: () => restored.push(id) },
+    const make = (id: string, phase: 'workspace' | 'view' | 'panes') =>
+      slice<string>({
+        id,
+        key: id,
+        restore: phase,
+        codec: { parse: String, serialize: String },
+        empty: () => '',
+        binding: { values: () => ({}), hydrate: () => restored.push(id) },
+      })
+    restorePersistedSlices([make('panes', 'panes'), make('workspace', 'workspace'), make('view', 'view')], {
+      panes: 'p',
+      workspace: 'w',
+      view: 'v',
     })
-    restorePersistedSlices(
-      [make('panes', 'panes'), make('workspace', 'workspace'), make('view', 'view')],
-      { panes: 'p', workspace: 'w', view: 'v' },
-    )
     expect(restored).toEqual(['workspace', 'view', 'panes'])
   })
 
@@ -44,7 +54,10 @@ describe('persisted state descriptors', () => {
     expect(key).toBe('core:layout:task%2Fone')
     expect(scopeIdFromStorageKey(descriptor, key)).toBe('task/one')
     restorePersistedSlices([descriptor], { [key]: 'new', [other]: 'also', unrelated: 'ignored' })
-    expect(hydrated).toEqual([['task/one', 'new'], ['task/two', 'also']])
+    expect(hydrated).toEqual([
+      ['task/one', 'new'],
+      ['task/two', 'also'],
+    ])
   })
 
   it('serializes only codec output and exposes a UTF-8 byte guard', () => {
@@ -62,8 +75,12 @@ describe('persisted state descriptors', () => {
   it('skips a tombstoned scope instead of parsing the marker as a value', () => {
     const hydrated: string[] = []
     const descriptor = slice<string>({
-      id: 'filter', key: 'filter', scope: 'workspace', restore: 'view',
-      codec: { parse: String, serialize: String }, empty: () => '',
+      id: 'filter',
+      key: 'filter',
+      scope: 'workspace',
+      restore: 'view',
+      codec: { parse: String, serialize: String },
+      empty: () => '',
       binding: { values: () => ({}), hydrate: (id) => hydrated.push(id) },
     })
     restorePersistedSlices([descriptor], {

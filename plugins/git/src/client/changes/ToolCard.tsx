@@ -21,10 +21,11 @@ export const ChangesToolCard: Component<AgentToolCardProps> = (props) => {
   // the next event, since the transcript rebuilds its rows on every snapshot.
   const [open, setOpen] = createSignal(props.defaultOpen)
   const status = () => props.tool.status ?? 'running'
-  const label = () => (props.tool.paths ?? []).reduce(
-    (title, path) => title.replaceAll(path, path.split(/[/\\]/).slice(-2).join('/')),
-    props.tool.title || 'Tool',
-  )
+  const label = () =>
+    (props.tool.paths ?? []).reduce(
+      (title, path) => title.replaceAll(path, path.split(/[/\\]/).slice(-2).join('/')),
+      props.tool.title || 'Tool',
+    )
   const openChanges = () => openChangesTab(props.taskId)
   // Badge has no `muted`, which is what a pending call's dot is. `neutral` is the same meaning in
   // the tone set a Badge does have.
@@ -44,23 +45,36 @@ export const ChangesToolCard: Component<AgentToolCardProps> = (props) => {
               while the call is still going. A Badge rather than a bare span, because the kit has no
               inline text node and this is a state word, which is what a Badge is. */}
           <Show when={status() !== 'completed'}>
-            <Badge tone={badgeTone()} size="xs">{status()}</Badge>
+            <Badge tone={badgeTone()} size="xs">
+              {status()}
+            </Badge>
           </Show>
         </Inline>
       }
     >
       <Stack gap="row">
-        <Show when={props.tool.input}>{(input) => <CodeBlock copy maxHeight="block">{input()}</CodeBlock>}</Show>
-        <Show when={props.tool.output}>{(output) => <CodeBlock copy maxHeight="block">{output()}</CodeBlock>}</Show>
+        <Show when={props.tool.input}>
+          {(input) => (
+            <CodeBlock copy maxHeight="block">
+              {input()}
+            </CodeBlock>
+          )}
+        </Show>
+        <Show when={props.tool.output}>
+          {(output) => (
+            <CodeBlock copy maxHeight="block">
+              {output()}
+            </CodeBlock>
+          )}
+        </Show>
         <Show when={props.fileChanges?.length}>
           <RecordedDiffs changes={props.fileChanges ?? []} onOpenChanges={openChanges} />
         </Show>
-        <For each={(props.tool.paths ?? []).filter((path) => !props.fileChanges?.some((change) => change.path === path))}>
+        <For
+          each={(props.tool.paths ?? []).filter((path) => !props.fileChanges?.some((change) => change.path === path))}
+        >
           {(path) => (
-            <Button
-              variant="bare"
-              onPress={openChanges}
-            >
+            <Button variant="bare" onPress={openChanges}>
               {path}
             </Button>
           )}

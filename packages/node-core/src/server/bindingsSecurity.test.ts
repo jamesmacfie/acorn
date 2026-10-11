@@ -59,7 +59,9 @@ describe('local data permissions', () => {
     expect(() => openDb(path)).toThrow(/Core has tables without a migration history.*recoverable reset/)
     const unchanged = new DatabaseSync(path)
     expect(unchanged.prepare("SELECT name FROM sqlite_master WHERE name = 'preserved'").get()).toBeTruthy()
-    expect(unchanged.prepare("SELECT name FROM sqlite_master WHERE name = '__drizzle_migrations'").get()).toBeUndefined()
+    expect(
+      unchanged.prepare("SELECT name FROM sqlite_master WHERE name = '__drizzle_migrations'").get(),
+    ).toBeUndefined()
     unchanged.close()
   })
 

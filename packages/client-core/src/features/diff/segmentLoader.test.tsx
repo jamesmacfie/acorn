@@ -1,6 +1,11 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { segmentContentKey, type DiffDocumentFile, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import {
+  segmentContentKey,
+  type DiffDocumentFile,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import type { SegmentRef } from './documentView'
 import { createSegmentCache, residentKey } from './segmentCache'
 import { createSegmentLoader } from './segmentLoader'
@@ -10,13 +15,33 @@ import { createSegmentLoader } from './segmentLoader'
 // exactly what some pane holds.
 
 const file: DiffDocumentFile = {
-  path: 'a.ts', status: 'modified', additions: 1, deletions: 0, sha: 'head', viewed: false, patchKey: 'sha256:aa',
-  segments: Array.from({ length: 4 }, () => ({ rows: 1, bands: 1, gaps: 0, columns: 1, lines: [0, 0, 1, 1] as [number, number, number, number] })),
+  path: 'a.ts',
+  status: 'modified',
+  additions: 1,
+  deletions: 0,
+  sha: 'head',
+  viewed: false,
+  patchKey: 'sha256:aa',
+  segments: Array.from({ length: 4 }, () => ({
+    rows: 1,
+    bands: 1,
+    gaps: 0,
+    columns: 1,
+    lines: [0, 0, 1, 1] as [number, number, number, number],
+  })),
 }
-const ref = (ordinal: number): SegmentRef => ({ file, ordinal, descriptor: file.segments[ordinal]!, contentKey: segmentContentKey(file.patchKey!, ordinal) })
+const ref = (ordinal: number): SegmentRef => ({
+  file,
+  ordinal,
+  descriptor: file.segments[ordinal]!,
+  contentKey: segmentContentKey(file.patchKey!, ordinal),
+})
 const keyOf = (ordinal: number) => residentKey(ref(ordinal).contentKey, file.path, file.sha)
 const answer = (requests: DiffSegmentRequest[]): DiffSegmentPayload[] =>
-  requests.map((request) => ({ ...request, rows: [{ kind: 'insert', oldNo: null, newNo: 1, raw: `line ${request.ordinal}` }] }))
+  requests.map((request) => ({
+    ...request,
+    rows: [{ kind: 'insert', oldNo: null, newNo: 1, raw: `line ${request.ordinal}` }],
+  }))
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 type Pending = { requests: DiffSegmentRequest[]; signal: AbortSignal; resolve: () => void; reject: () => void }
@@ -29,9 +54,15 @@ function setup() {
     dispose,
     loader: createSegmentLoader({
       cache,
-      load: (requests, signal) => new Promise<DiffSegmentPayload[]>((resolve, reject) => {
-        pending.push({ requests, signal, resolve: () => resolve(answer(requests)), reject: () => reject(new Error('gone')) })
-      }),
+      load: (requests, signal) =>
+        new Promise<DiffSegmentPayload[]>((resolve, reject) => {
+          pending.push({
+            requests,
+            signal,
+            resolve: () => resolve(answer(requests)),
+            reject: () => reject(new Error('gone')),
+          })
+        }),
       enrich: async (rows) => ({ rows: [...rows], provisional: false }),
       firstPlain: (outcome) => outcomes.push(outcome),
     }),
@@ -99,7 +130,16 @@ describe('the segment loader', () => {
     const roomy = createSegmentCache()
     const load = (requests: DiffSegmentRequest[]) => Promise.resolve(answer(requests))
     const outcomes: string[] = []
-    const make = () => createRoot((dispose) => ({ dispose, loader: createSegmentLoader({ cache: roomy, load, enrich: async (rows) => ({ rows: [...rows], provisional: false }), firstPlain: (outcome) => outcomes.push(outcome) }) }))
+    const make = () =>
+      createRoot((dispose) => ({
+        dispose,
+        loader: createSegmentLoader({
+          cache: roomy,
+          load,
+          enrich: async (rows) => ({ rows: [...rows], provisional: false }),
+          firstPlain: (outcome) => outcomes.push(outcome),
+        }),
+      }))
     const first = make()
     first.loader.demand([ref(0)], [])
     await flush()
@@ -127,7 +167,10 @@ describe('the segment loader', () => {
     const twin: DiffDocumentFile = { ...file, path: 'b.ts', sha: 'other' }
     const twinRef: SegmentRef = { file: twin, ordinal: 0, descriptor: twin.segments[0]!, contentKey: ref(0).contentKey }
     const roomy = createSegmentCache()
-    const { loader } = createRoot((dispose) => ({ dispose, loader: createSegmentLoader({ cache: roomy, load: async (requests) => answer(requests) }) }))
+    const { loader } = createRoot((dispose) => ({
+      dispose,
+      loader: createSegmentLoader({ cache: roomy, load: async (requests) => answer(requests) }),
+    }))
     loader.demand([ref(0), twinRef], [])
     await flush()
     expect(loader.status(twinRef)).toBeUndefined()
@@ -139,10 +182,15 @@ describe('the segment loader', () => {
     const roomy = createSegmentCache()
     const load = (requests: DiffSegmentRequest[]) => Promise.resolve(answer(requests))
     let attempts = 0
-    const make = (provisional: boolean) => createRoot((dispose) => ({
-      dispose,
-      loader: createSegmentLoader({ cache: roomy, load, enrich: async (rows) => (attempts++, { rows: [...rows], provisional }) }),
-    }))
+    const make = (provisional: boolean) =>
+      createRoot((dispose) => ({
+        dispose,
+        loader: createSegmentLoader({
+          cache: roomy,
+          load,
+          enrich: async (rows) => (attempts++, { rows: [...rows], provisional }),
+        }),
+      }))
     const first = make(true)
     first.loader.demand([ref(0)], [])
     await flush()

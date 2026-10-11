@@ -38,9 +38,11 @@ export default function TerminalSettings() {
           label="Text size"
           error={fontSize.error()}
           // The default is the style's own size, which is what the terminal draws with nothing stored.
-          onReset={terminalFontSize(prefs.data) === termFontSize()
-            ? undefined
-            : () => void fontSize.run(() => saveTerminalFontSize(qc, String(termFontSize())))}
+          onReset={
+            terminalFontSize(prefs.data) === termFontSize()
+              ? undefined
+              : () => void fontSize.run(() => saveTerminalFontSize(qc, String(termFontSize())))
+          }
         >
           <Select
             label="Text size"

@@ -39,7 +39,11 @@ export const rememberDockerSelection = (taskId: string, containerId: string): vo
 
 export const dockerSelection = (taskId: string): string | undefined => selectedByTask.get(dockerScopeKey(taskId))
 
-export const rememberDockerDetailState = (taskId: string | undefined, target: string, state: DockerDetailViewState): void => {
+export const rememberDockerDetailState = (
+  taskId: string | undefined,
+  target: string,
+  state: DockerDetailViewState,
+): void => {
   detailStates.set(detailKey(taskId, target), state)
 }
 
@@ -98,7 +102,10 @@ clientEvents.on('runtime:task-archived', ({ taskId }) => {
 // A container state's StatusDot tone. One mapping for the browse list, the task pane, and the detail
 // header, which otherwise each render `.docker-dot[data-state]` and rely on one stylesheet agreeing.
 export const containerTone = (state: string): 'ok' | 'warn' | 'danger' | 'muted' =>
-  state === 'running' ? 'ok'
-  : state === 'paused' || state === 'restarting' ? 'warn'
-  : state === 'exited' || state === 'dead' ? 'danger'
-  : 'muted'
+  state === 'running'
+    ? 'ok'
+    : state === 'paused' || state === 'restarting'
+      ? 'warn'
+      : state === 'exited' || state === 'dead'
+        ? 'danger'
+        : 'muted'

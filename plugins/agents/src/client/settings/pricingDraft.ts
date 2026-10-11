@@ -51,10 +51,7 @@ const numberPrice = (price: AgentPriceDraft): AgentModelPrice => ({
   cacheRead: price.cacheRead.trim() === '' ? Number.NaN : Number(price.cacheRead),
 })
 
-export function pricingDraftFromPreferences(
-  preferences: AgentPricingPreferences,
-  at = Date.now(),
-): AgentPricingDraft {
+export function pricingDraftFromPreferences(preferences: AgentPricingPreferences, at = Date.now()): AgentPricingDraft {
   const providerDraft = (
     provider: AgentPricingProvider,
     catalog: typeof claudePriceCatalog,
@@ -84,14 +81,19 @@ export function preferencesFromPricingDraft(
 ): ReturnType<typeof validateAgentPricingPreferences> {
   return validateAgentPricingPreferences({
     version: 1,
-    ...Object.fromEntries((['claude', 'codex'] as const).map((provider) => [provider, {
-      overrides: draft[provider].catalog
-        .filter((entry) => entry.overridden)
-        .map((entry) => ({ catalogId: entry.catalogId, price: numberPrice(entry.price) })),
-      customModels: draft[provider].customModels.map((entry) => ({
-        model: entry.model,
-        price: numberPrice(entry.price),
-      })),
-    }])),
+    ...Object.fromEntries(
+      (['claude', 'codex'] as const).map((provider) => [
+        provider,
+        {
+          overrides: draft[provider].catalog
+            .filter((entry) => entry.overridden)
+            .map((entry) => ({ catalogId: entry.catalogId, price: numberPrice(entry.price) })),
+          customModels: draft[provider].customModels.map((entry) => ({
+            model: entry.model,
+            price: numberPrice(entry.price),
+          })),
+        },
+      ]),
+    ),
   })
 }

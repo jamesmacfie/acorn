@@ -4,13 +4,14 @@ import { PLUGIN_API_MAJOR } from './apiVersion.ts'
 import { pluginManifestShape } from './contract.ts'
 import { clientDeclaration } from './declaration.ts'
 
-const manifest = () => pluginManifestShape.parse({
-  id: 'board',
-  name: 'Board',
-  version: '1.0.0',
-  baseline: ACORN_BASELINE,
-  apiVersion: PLUGIN_API_MAJOR,
-})
+const manifest = () =>
+  pluginManifestShape.parse({
+    id: 'board',
+    name: 'Board',
+    version: '1.0.0',
+    baseline: ACORN_BASELINE,
+    apiVersion: PLUGIN_API_MAJOR,
+  })
 
 describe('clientDeclaration', () => {
   it('gives the same consent identity to equivalent declarations in different key orders', () => {
@@ -33,13 +34,17 @@ describe('clientDeclaration', () => {
     const offer = manifest()
     const accepted = clientDeclaration(offer)
 
-    expect(clientDeclaration({
-      ...offer,
-      permissions: { ...offer.permissions, api: ['tasks:write'] },
-    })).not.toBe(accepted)
-    expect(clientDeclaration({
-      ...offer,
-      emits: [{ verb: 'changed', description: 'Board changed' }],
-    })).not.toBe(accepted)
+    expect(
+      clientDeclaration({
+        ...offer,
+        permissions: { ...offer.permissions, api: ['tasks:write'] },
+      }),
+    ).not.toBe(accepted)
+    expect(
+      clientDeclaration({
+        ...offer,
+        emits: [{ verb: 'changed', description: 'Board changed' }],
+      }),
+    ).not.toBe(accepted)
   })
 })

@@ -6,7 +6,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from './db'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import { makeTestDb, type TestDb } from '../testkit/db'
-import { createProject, createProjectRef, detectProject, parseGithubRemote, patchProject, projectByGithub } from './projects'
+import {
+  createProject,
+  createProjectRef,
+  detectProject,
+  parseGithubRemote,
+  patchProject,
+  projectByGithub,
+} from './projects'
 import { deleteProject } from './projectDeletion'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' })
@@ -73,7 +80,12 @@ describe('createProject / detectProject', () => {
     const c = await createProject(testDb.db, { path: gitlab })
     expect(a.ok && a.project.vcs === 'git' && a.project.githubOwner === null).toBe(true)
     expect(b.ok && b.project.githubOwner === 'acme' && b.project.githubName === 'web').toBe(true)
-    expect(c.ok && c.project.vcs === 'git' && c.project.githubOwner === null && c.project.remoteUrl === 'https://gitlab.com/acme/api.git').toBe(true)
+    expect(
+      c.ok &&
+        c.project.vcs === 'git' &&
+        c.project.githubOwner === null &&
+        c.project.remoteUrl === 'https://gitlab.com/acme/api.git',
+    ).toBe(true)
     // Eleven real git processes: three inits, two remote adds, and two probes per detect. That fits in
     // the 5s default alone but not while the whole monorepo's suites run in parallel.
   }, 20_000)
@@ -96,7 +108,13 @@ describe('createProject / detectProject', () => {
     const first = await createProject(testDb.db, { path: folder })
     const second = await createProject(testDb.db, { path: alias })
     const third = await createProject(testDb.db, { path: join(dir, 'canonical', '..', 'canonical') })
-    expect(first.ok && second.ok && third.ok && first.project.id === second.project.id && second.project.id === third.project.id).toBe(true)
+    expect(
+      first.ok &&
+        second.ok &&
+        third.ok &&
+        first.project.id === second.project.id &&
+        second.project.id === third.project.id,
+    ).toBe(true)
   })
 
   it('rejects an unknown workspace and does not map two projects onto one folder', async () => {
@@ -105,16 +123,28 @@ describe('createProject / detectProject', () => {
     mkdirSync(firstFolder)
     mkdirSync(secondFolder)
 
-    expect(await createProject(testDb.db, { path: firstFolder, workspaceId: 'missing' })).toEqual({ ok: false, reason: 'No such workspace.' })
+    expect(await createProject(testDb.db, { path: firstFolder, workspaceId: 'missing' })).toEqual({
+      ok: false,
+      reason: 'No such workspace.',
+    })
     const first = await createProject(testDb.db, { path: firstFolder })
     const second = await createProject(testDb.db, { path: secondFolder })
     if (!first.ok || !second.ok) throw new Error('project setup failed')
 
-    expect(await patchProject(testDb.db, second.project.id, { path: firstFolder })).toEqual({ ok: false, reason: 'Another project already uses that path.' })
+    expect(await patchProject(testDb.db, second.project.id, { path: firstFolder })).toEqual({
+      ok: false,
+      reason: 'Another project already uses that path.',
+    })
     const alias = join(dir, 'first-alias')
     symlinkSync(firstFolder, alias)
-    expect(await patchProject(testDb.db, second.project.id, { path: alias })).toEqual({ ok: false, reason: 'Another project already uses that path.' })
-    expect(await createProject(testDb.db, { path: secondFolder })).toMatchObject({ ok: true, project: { id: second.project.id } })
+    expect(await patchProject(testDb.db, second.project.id, { path: alias })).toEqual({
+      ok: false,
+      reason: 'Another project already uses that path.',
+    })
+    expect(await createProject(testDb.db, { path: secondFolder })).toMatchObject({
+      ok: true,
+      project: { id: second.project.id },
+    })
   })
 
   it('detectProject picks up a git init that happened after the project was added', async () => {
@@ -176,20 +206,43 @@ describe('createProject / detectProject', () => {
     if (!a.ok || !b.ok) throw new Error('fixture projects were not created')
 
     const task = (id: string, projectId: string) => ({
-      id, title: id, origin: 'local', projectId, status: 'active' as const, sort: 0, createdAt: 1, updatedAt: 1,
+      id,
+      title: id,
+      origin: 'local',
+      projectId,
+      status: 'active' as const,
+      sort: 0,
+      createdAt: 1,
+      updatedAt: 1,
     })
-    await testDb.db.insert(schema.tasks).values([
-      task('doomed-1', a.project.id),
-      task('doomed-2', a.project.id),
-      task('keeper', b.project.id),
-    ])
+    await testDb.db
+      .insert(schema.tasks)
+      .values([task('doomed-1', a.project.id), task('doomed-2', a.project.id), task('keeper', b.project.id)])
     await testDb.db.insert(schema.taskLinks).values([
       { taskId: 'doomed-1', integrationId: 'linear', provider: 'linear', identifier: 'ENG-1', createdAt: 1 },
       { taskId: 'keeper', integrationId: 'linear', provider: 'linear', identifier: 'ENG-2', createdAt: 1 },
     ])
     await testDb.db.insert(schema.taskPulls).values([
-      { taskId: 'doomed-2', repoOwner: 'acme', repoName: 'web', pullNumber: 10, role: 'related', provenance: 'agent', sessionId: 'session-a', createdAt: 1 },
-      { taskId: 'keeper', repoOwner: 'acme', repoName: 'api', pullNumber: 20, role: 'related', provenance: 'agent', sessionId: 'session-b', createdAt: 1 },
+      {
+        taskId: 'doomed-2',
+        repoOwner: 'acme',
+        repoName: 'web',
+        pullNumber: 10,
+        role: 'related',
+        provenance: 'agent',
+        sessionId: 'session-a',
+        createdAt: 1,
+      },
+      {
+        taskId: 'keeper',
+        repoOwner: 'acme',
+        repoName: 'api',
+        pullNumber: 20,
+        role: 'related',
+        provenance: 'agent',
+        sessionId: 'session-b',
+        createdAt: 1,
+      },
     ])
 
     await deleteProject(testDb.db, a.project.id)
@@ -199,5 +252,4 @@ describe('createProject / detectProject', () => {
     expect((await testDb.db.select().from(schema.taskLinks)).map((row) => row.taskId)).toEqual(['keeper'])
     expect((await testDb.db.select().from(schema.taskPulls)).map((row) => row.taskId)).toEqual(['keeper'])
   })
-
 })

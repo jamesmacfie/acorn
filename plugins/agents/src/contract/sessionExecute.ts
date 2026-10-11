@@ -12,7 +12,14 @@ export type AgentExecuteUsage = { costUsd: number | null; usage: HeadlessResult[
 /** Where a step's completion condition stands (docs/workflows/agent-steps.md § Completion conditions).
  *  `checking` and `continuing` are progress. The rest are terminal: `stopped` means the step ended for
  *  a reason of its own (a refusal, `BLOCKED:`, a failed turn, cancellation, a timeout, or the budget). */
-export type AgentExecuteGoalStatus = 'checking' | 'continuing' | 'satisfied' | 'blocked' | 'exhausted' | 'unavailable' | 'stopped'
+export type AgentExecuteGoalStatus =
+  | 'checking'
+  | 'continuing'
+  | 'satisfied'
+  | 'blocked'
+  | 'exhausted'
+  | 'unavailable'
+  | 'stopped'
 
 export type AgentExecuteGoalSummary = {
   objective: string

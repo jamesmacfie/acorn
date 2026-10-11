@@ -17,9 +17,13 @@ export function startupGraph(): Plugin {
       const imports = new Set<string>()
       const visit = (node: unknown): void => {
         if (!node || typeof node !== 'object') return
-        if (Array.isArray(node)) { for (const child of node) visit(child); return }
+        if (Array.isArray(node)) {
+          for (const child of node) visit(child)
+          return
+        }
         const fields = node as Record<string, unknown>
-        if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(String(fields.type))) return
+        if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(String(fields.type)))
+          return
         if (fields.type === 'ImportExpression') {
           const source = fields.source as { value?: unknown }
           if (typeof source?.value !== 'string') throw new Error('Startup imports must name a literal module.')
@@ -45,7 +49,11 @@ export function startupGraph(): Plugin {
         roots.add(chunk)
       }
       const chunks = describeChunks(this, bundle, repo)
-      this.emitFile({ type: 'asset', fileName: 'startup-graph.json', source: JSON.stringify({ entry: entryFile, roots: [...roots], chunks }) })
+      this.emitFile({
+        type: 'asset',
+        fileName: 'startup-graph.json',
+        source: JSON.stringify({ entry: entryFile, roots: [...roots], chunks }),
+      })
     },
   }
 }

@@ -7,7 +7,10 @@ describe('raw terminal session channel', () => {
     let receive!: (message: ServerMsg) => void
     const detach = vi.fn()
     const api: SessionPtyApi = {
-      attach: vi.fn((_id, on) => { receive = on; return detach }),
+      attach: vi.fn((_id, on) => {
+        receive = on
+        return detach
+      }),
       write: vi.fn(),
       resize: vi.fn(async () => true),
     }
@@ -35,9 +38,14 @@ describe('raw terminal session channel', () => {
   it('reports stream errors and rejected resize without losing the session', async () => {
     let receive!: (message: ServerMsg) => void
     const api: SessionPtyApi = {
-      attach: (_id, on) => { receive = on; return () => {} },
+      attach: (_id, on) => {
+        receive = on
+        return () => {}
+      },
       write: vi.fn(),
-      resize: async () => { throw new Error('resize refused') },
+      resize: async () => {
+        throw new Error('resize refused')
+      },
     }
     const error = vi.fn()
     const io = sessionPty(api, 'session-2', error, vi.fn())
@@ -50,7 +58,9 @@ describe('raw terminal session channel', () => {
 
   it('reports a refused resize result', async () => {
     const api: SessionPtyApi = {
-      attach: () => () => {}, write: vi.fn(), resize: async () => false,
+      attach: () => () => {},
+      write: vi.fn(),
+      resize: async () => false,
     }
     const error = vi.fn()
     const io = sessionPty(api, 'session-3', error, vi.fn())

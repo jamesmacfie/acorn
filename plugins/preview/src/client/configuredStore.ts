@@ -5,7 +5,13 @@
 // frames below refresh it. Nothing reports a hand edit to `.acorn/config.toml`, so the interval and
 // window focus pick that up, as they do for the run-target buttons.
 import { createSignal } from 'solid-js'
-import { clientEvents, onPluginFrame, readJson, wsOnReconnect, type ClientScheduleContribution } from '@acorn/plugin-api/client'
+import {
+  clientEvents,
+  onPluginFrame,
+  readJson,
+  wsOnReconnect,
+  type ClientScheduleContribution,
+} from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { previewConfiguredRoute } from '../shared/api'
 

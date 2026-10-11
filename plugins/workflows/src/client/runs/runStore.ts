@@ -10,8 +10,16 @@
 // one would mean a count query per task.
 import { createSignal } from 'solid-js'
 import {
-  activateTaskSignals, activeNodeId, clientEvents, latestSignal, onPluginFrame, openPane, pathForTask, wsOnReconnect,
-  type ClientScheduleContribution, type Task,
+  activateTaskSignals,
+  activeNodeId,
+  clientEvents,
+  latestSignal,
+  onPluginFrame,
+  openPane,
+  pathForTask,
+  wsOnReconnect,
+  type ClientScheduleContribution,
+  type Task,
 } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { createWorkflowApi } from '../workflowsClient'
@@ -20,17 +28,22 @@ import type { WorkflowTaskGroup } from '../../shared/api'
 
 const [runCounts, setRunCounts] = createSignal<Record<string, number>>({})
 const [taskGroups, setTaskGroups] = createSignal<Record<string, WorkflowTaskGroup>>({})
-export const workflowTaskGroups = () => cacheNodeId === activeNodeId() ? taskGroups() : {}
+export const workflowTaskGroups = () => (cacheNodeId === activeNodeId() ? taskGroups() : {})
 
 let cacheNodeId = activeNodeId()
-export const taskHasWorkflowRuns = (taskId: string): boolean => cacheNodeId === activeNodeId() && (runCounts()[taskId] ?? 0) > 0
+export const taskHasWorkflowRuns = (taskId: string): boolean =>
+  cacheNodeId === activeNodeId() && (runCounts()[taskId] ?? 0) > 0
 
 // A confirmed start or run link proves that this task has a run. Make its pane available before
 // navigation; a later node read replaces the hint with authoritative counts. Each hint aborts the
 // counts of reads sent before it.
 const sinceLastHint = latestSignal()
 export const rememberWorkflowRun = (taskId: string): void => {
-  if (cacheNodeId !== activeNodeId()) { cacheNodeId = activeNodeId(); setRunCounts({}); setTaskGroups({}) }
+  if (cacheNodeId !== activeNodeId()) {
+    cacheNodeId = activeNodeId()
+    setRunCounts({})
+    setTaskGroups({})
+  }
   if (runCounts()[taskId]) return
   sinceLastHint.next()
   setRunCounts((current) => ({ ...current, [taskId]: 1 }))
@@ -67,27 +80,35 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
       reader?.queue.stop()
       const lifetime = readerLifetime.signal
       const api = createWorkflowApi()
-      reader = { nodeId, lifetime, queue: workflowRefreshQueue(async () => {
-        const counts = sinceLastHint.signal
-        const [runList, navigation] = await Promise.all([
-          api.allRuns().catch(() => null),
-          api.taskNavigation().catch(() => null),
-        ])
-        if (activeNodeId() !== nodeId || lifetime.aborted || (everSubscribed && !subscribers)) return
-        if (cacheNodeId !== nodeId) { cacheNodeId = nodeId; setRunCounts({}); setTaskGroups({}) }
-        // A read sent before a start cannot erase the confirmed run when its older answer arrives later.
-        if (runList && !counts.aborted) {
-          const next: Record<string, number> = {}
-          for (const run of runList.runs) if (run.taskId) next[run.taskId] = (next[run.taskId] ?? 0) + 1
-          // Same counts, same object: `when` is read on every pane-strip render, and a fresh object every
-          // two minutes would rebuild the strip for nothing.
-          setRunCounts((current) => (same(current, next) ? current : next))
-        }
-        if (navigation) {
-          const groups = Object.fromEntries(navigation.groups.map(group => [group.rootTaskId, group]))
-          setTaskGroups(current => JSON.stringify(current) === JSON.stringify(groups) ? current : groups)
-        }
-      }) }
+      reader = {
+        nodeId,
+        lifetime,
+        queue: workflowRefreshQueue(async () => {
+          const counts = sinceLastHint.signal
+          const [runList, navigation] = await Promise.all([
+            api.allRuns().catch(() => null),
+            api.taskNavigation().catch(() => null),
+          ])
+          if (activeNodeId() !== nodeId || lifetime.aborted || (everSubscribed && !subscribers)) return
+          if (cacheNodeId !== nodeId) {
+            cacheNodeId = nodeId
+            setRunCounts({})
+            setTaskGroups({})
+          }
+          // A read sent before a start cannot erase the confirmed run when its older answer arrives later.
+          if (runList && !counts.aborted) {
+            const next: Record<string, number> = {}
+            for (const run of runList.runs) if (run.taskId) next[run.taskId] = (next[run.taskId] ?? 0) + 1
+            // Same counts, same object: `when` is read on every pane-strip render, and a fresh object every
+            // two minutes would rebuild the strip for nothing.
+            setRunCounts((current) => (same(current, next) ? current : next))
+          }
+          if (navigation) {
+            const groups = Object.fromEntries(navigation.groups.map((group) => [group.rootTaskId, group]))
+            setTaskGroups((current) => (JSON.stringify(current) === JSON.stringify(groups) ? current : groups))
+          }
+        }),
+      }
     }
     return reader.queue.refresh()
   },
@@ -110,7 +131,10 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
       if (stopped) return
       stopped = true
       subscribers -= 1
-      if (!subscribers) { readerLifetime.next(); reader?.queue.stop() }
+      if (!subscribers) {
+        readerLifetime.next()
+        reader?.queue.stop()
+      }
       offNode()
       offReconnect()
       offChild()

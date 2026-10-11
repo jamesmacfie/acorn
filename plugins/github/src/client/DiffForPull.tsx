@@ -4,7 +4,14 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
 import { clientCapability, openPane } from '@acorn/plugin-api/client'
 import { pullKey } from '../shared/api'
-import { fetchDiffSegments, fileBlobOptions, mentionsOptions, pullDetailOptions, pullDiffOptions, searchDiff } from './queries'
+import {
+  fetchDiffSegments,
+  fileBlobOptions,
+  mentionsOptions,
+  pullDetailOptions,
+  pullDiffOptions,
+  searchDiff,
+} from './queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { Alert, DiffPane } from '@acorn/plugin-api/ui'
 import { loadDiffLineContext, type CodeRow, type DiffLineAnchor } from '@acorn/plugin-api/ui/diff'
@@ -43,18 +50,22 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
   const topology = () => diff.data?.document
   const inline = () => clientCapability(AGENTS_INLINE_DIFF)
-  createEffect(() => { if (taskId) inline()?.prime(taskId) })
+  createEffect(() => {
+    if (taskId) inline()?.prime(taskId)
+  })
   createEffect(() => {
     const files = topology()?.files
-    if (taskId && files) inline()?.reportPatches(
-      { taskId, source: 'pull-request', pull: { owner, repo, number } },
-      Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
-    )
+    if (taskId && files)
+      inline()?.reportPatches(
+        { taskId, source: 'pull-request', pull: { owner, repo, number } },
+        Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
+      )
   })
   const [openInline, setOpenInline] = createSignal<InlineDiffOrigin | null>(null)
   createEffect(() => {
     const opened = openInline()
-    if (opened && topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey) setOpenInline(null)
+    if (opened && topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey)
+      setOpenInline(null)
   })
   const inlineOrigin = (row: CodeRow): InlineDiffOrigin | null => {
     if (!taskId) return null
@@ -62,8 +73,13 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     const line = row.kind === 'delete' ? row.oldNo : row.newNo
     if (!patchKey || line == null) return null
     return {
-      kind: 'inline-diff', source: 'pull-request', taskId, path: row.path,
-      side: row.kind === 'delete' ? 'old' : 'new', line, patchKey,
+      kind: 'inline-diff',
+      source: 'pull-request',
+      taskId,
+      path: row.path,
+      side: row.kind === 'delete' ? 'old' : 'new',
+      line,
+      patchKey,
       quote: row.raw.slice(0, 2_000),
       pull: { owner, repo, number },
     }
@@ -72,8 +88,15 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     if (!taskId) return []
     const visible = (inline()?.sessionsForTask(taskId) ?? []).flatMap((session) => {
       const origin = session.origin
-      if (!origin || origin.source !== 'pull-request' || session.archivedAt ||
-          origin.pull?.owner !== owner || origin.pull.repo !== repo || origin.pull.number !== number) return []
+      if (
+        !origin ||
+        origin.source !== 'pull-request' ||
+        session.archivedAt ||
+        origin.pull?.owner !== owner ||
+        origin.pull.repo !== repo ||
+        origin.pull.number !== number
+      )
+        return []
       if (topology()?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
       return [{ path: origin.path, side: origin.side, line: origin.line }]
     })
@@ -90,7 +113,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     // drop expanded gaps, the remembered scroll offset, and any collapsed files. A patch's key is its
     // own digest, so a base change that leaves the head blob alone still moves it.
     signature: () => topology()?.revision ?? '',
-    selectedPath: () => typeof searchParams.file === 'string' ? searchParams.file : '',
+    selectedPath: () => (typeof searchParams.file === 'string' ? searchParams.file : ''),
     threads: () => inlineReviewThreads(detail.data, diff.data),
     mentions: () => mentionsQuery.data ?? [],
     loadSegments: (requests, signal) => fetchDiffSegments(owner, repo, requests, signal),
@@ -101,40 +124,67 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     // Immutable by sha, so one fetch per blob serves every gap in that file.
     fileText: async ({ sha }) => (await queryClient.fetchQuery(fileBlobOptions(owner, repo, sha))).text,
     canComment: () => !props.readOnly && detail.data?.pull?.headSha != null,
-    ...(!props.readOnly ? {
-      addComment: (body: string, { row, side, lineNo }: Parameters<NonNullable<DiffSource['addComment']>>[1]) =>
-        addReviewComment(owner, repo, number, body, row.path, lineNo, side),
-      reply: (databaseId: number, body: string) =>
-        sayOnFailure(replyReview(owner, repo, number, databaseId, body), "Couldn't save your reply."),
-      resolveThread: (threadId: string, resolved: boolean) =>
-        sayOnFailure(resolveThread(owner, repo, number, threadId, resolved), resolved ? "Couldn't resolve the thread." : "Couldn't unresolve the thread."),
-    } : {}),
+    ...(!props.readOnly
+      ? {
+          addComment: (body: string, { row, side, lineNo }: Parameters<NonNullable<DiffSource['addComment']>>[1]) =>
+            addReviewComment(owner, repo, number, body, row.path, lineNo, side),
+          reply: (databaseId: number, body: string) =>
+            sayOnFailure(replyReview(owner, repo, number, databaseId, body), "Couldn't save your reply."),
+          resolveThread: (threadId: string, resolved: boolean) =>
+            sayOnFailure(
+              resolveThread(owner, repo, number, threadId, resolved),
+              resolved ? "Couldn't resolve the thread." : "Couldn't unresolve the thread.",
+            ),
+        }
+      : {}),
     invalidate: () => void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) }),
     draftPrefix: `${owner}/${repo}/${number}`,
-    ...(taskId ? { inlineChat: {
-      anchors: inlineAnchors,
-      open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
-      render: (row: CodeRow) => {
-        // Memoised for the reason plugins/git/src/client/changes/changesModel.tsx gives: read directly,
-        // every session update rebuilt the card and blurred its textarea.
-        const shown = createMemo(() => {
-          const origin = inlineOrigin(row)
-          if (!origin || !inline()?.Card) return null
-          const exists = inline()?.sessionsForTask(taskId).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
-          return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
-        }, null, { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) })
-        return <Show when={shown()} keyed>{(origin) => {
-          const Card = inline()!.Card
-          return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
-        }}</Show>
-      },
-    } } : {}),
-    ...(taskId ? {
-      openLine: (row: Parameters<NonNullable<DiffSource['openLine']>>[0]) => {
-        if (row.newNo == null) return
-        openPane(taskId, 'editor', { kind: 'editor:reveal', path: row.path, line: row.newNo }, 'add')
-      },
-    } : {}),
+    ...(taskId
+      ? {
+          inlineChat: {
+            anchors: inlineAnchors,
+            open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
+            render: (row: CodeRow) => {
+              // Memoised for the reason plugins/git/src/client/changes/changesModel.tsx gives: read directly,
+              // every session update rebuilt the card and blurred its textarea.
+              const shown = createMemo(
+                () => {
+                  const origin = inlineOrigin(row)
+                  if (!origin || !inline()?.Card) return null
+                  const exists = inline()
+                    ?.sessionsForTask(taskId)
+                    .some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+                  return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
+                },
+                null,
+                { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) },
+              )
+              return (
+                <Show when={shown()} keyed>
+                  {(origin) => {
+                    const Card = inline()!.Card
+                    return (
+                      <Card
+                        origin={origin}
+                        loadContext={() => loadDiffLineContext(source, row)}
+                        onClose={() => setOpenInline(null)}
+                      />
+                    )
+                  }}
+                </Show>
+              )
+            },
+          },
+        }
+      : {}),
+    ...(taskId
+      ? {
+          openLine: (row: Parameters<NonNullable<DiffSource['openLine']>>[0]) => {
+            if (row.newNo == null) return
+            openPane(taskId, 'editor', { kind: 'editor:reveal', path: row.path, line: row.newNo }, 'add')
+          },
+        }
+      : {}),
     // In router mode this pane owns the route, so the chord is claimed globally; in a task it is one
     // pane among several and has to be scoped to win only when the reader is looking at it.
     find: {
@@ -152,7 +202,9 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   // the warning stays above it whichever file is on screen.
   return (
     <>
-      <Show when={incompleteFilesMessage(diff.data?.completeness)}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
+      <Show when={incompleteFilesMessage(diff.data?.completeness)}>
+        {(message) => <Alert tone="warn">{message()}</Alert>}
+      </Show>
       <DiffPane source={source} annotations={DIFF_LINE_POINT} />
     </>
   )

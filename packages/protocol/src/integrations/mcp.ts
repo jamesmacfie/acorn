@@ -56,8 +56,10 @@ export function inspectMcpConfig(jsonText: string): McpServerSummary[] {
     const url = typeof s.url === 'string' ? s.url : undefined
     const command = typeof s.command === 'string' ? s.command : undefined
     const args = Array.isArray(s.args) ? s.args.filter((a): a is string => typeof a === 'string') : []
-    const typeField = typeof s.type === 'string' ? s.type : typeof s.transport === 'string' ? (s.transport as string) : undefined
-    const transport: McpServerSummary['transport'] = url || typeField === 'http' || typeField === 'sse' ? 'http' : command ? 'stdio' : 'unknown'
+    const typeField =
+      typeof s.type === 'string' ? s.type : typeof s.transport === 'string' ? (s.transport as string) : undefined
+    const transport: McpServerSummary['transport'] =
+      url || typeField === 'http' || typeField === 'sse' ? 'http' : command ? 'stdio' : 'unknown'
     const disabled = s.disabled === true || s.enabled === false
     out.push({
       name,

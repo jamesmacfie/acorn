@@ -70,7 +70,10 @@ export type PluginsBridge = {
   // The installer (server/plugins/installer.ts), reached the same way everything else here is: it needs the
   // data root, which the server layer has no handle on. Each throws a plain Error carrying a sentence for
   // the owner; the handlers turn that into one 400.
-  install(source: PluginInstallSource, options: { allowDowngrade?: boolean; reviewRequestId?: string }): Promise<PluginInstallResult>
+  install(
+    source: PluginInstallSource,
+    options: { allowDowngrade?: boolean; reviewRequestId?: string },
+  ): Promise<PluginInstallResult>
   update(id: string, options: { allowDowngrade?: boolean; reviewRequestId?: string }): Promise<PluginUpdateResult>
   // Async because a purge reaches the core database as well as the disk (server/db/cascade.ts). The
   // route already awaits it.
@@ -111,11 +114,22 @@ const DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW: Exact<keyof DeclaredRow, keyof Insta
 void DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW
 
 type RuntimeDeclaration = Omit<InstalledPluginInfo, 'id' | 'label' | 'hasNode' | 'source' | 'installedAt' | 'bundled'>
-const RUNTIME_DECLARATION_IS_EXACTLY_THE_WIRE_ROW: Exact<keyof RuntimeDeclaration, keyof Omit<PluginRuntimeIdentity, 'activation'>> = true
+const RUNTIME_DECLARATION_IS_EXACTLY_THE_WIRE_ROW: Exact<
+  keyof RuntimeDeclaration,
+  keyof Omit<PluginRuntimeIdentity, 'activation'>
+> = true
 void RUNTIME_DECLARATION_IS_EXACTLY_THE_WIRE_ROW
 
 const runtimeFromInstalled = (entry: InstalledPluginInfo): PluginRuntimeIdentity => {
-  const { id: _id, label: _label, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = entry
+  const {
+    id: _id,
+    label: _label,
+    hasNode,
+    source: _source,
+    installedAt: _installedAt,
+    bundled: _bundled,
+    ...declaration
+  } = entry
   return {
     ...declaration,
     activation: hasNode || contributesNodeData(declaration.contributions) ? 'node' : 'client-only',
@@ -137,7 +151,9 @@ const trimReason = (reason: string | undefined): { reason?: string } => {
 
 // The running plugin set, plus the pending one. They differ exactly when a toggle has been saved and the
 // node has not restarted, which is the state the UI has to render.
-export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; restartRequired: boolean; requests: PluginApprovalRequest[] } => {
+export const pluginState = (
+  bridge: PluginsBridge,
+): { plugins: NodePluginRow[]; restartRequired: boolean; requests: PluginApprovalRequest[] } => {
   const pending = new Set(bridge.disabled())
   const loadFailed = new Map(bridge.loadFailures().map((failure) => [failure.id, failure]))
   const installed = new Map(bridge.installed().map((entry) => [entry.id, entry]))
@@ -149,7 +165,9 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     const pending = bridge.pendingReview(id)
     if (!pending) return {}
     if ('corrupt' in pending) return { pendingReview: { corrupt: true } }
-    return { pendingReview: { reviewId: pending.reviewId, fingerprint: pending.fingerprint, stagedAt: pending.stagedAt } }
+    return {
+      pendingReview: { reviewId: pending.reviewId, fingerprint: pending.fingerprint, stagedAt: pending.stagedAt },
+    }
   }
   const activeFor = (id: string): PluginRuntimeIdentity | null => {
     // A process that booted a node half keeps serving it until restart or successful reload,
@@ -188,7 +206,12 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   const describeInput = (source: string): { plural?: string; provider?: string } => {
     const ref = parseDataSourceInputRef(source)
     const registered = registeredDataSource(ref)
-    const owner = ref.pluginId === 'core' ? 'Acorn' : installed.has(ref.pluginId) ? ref.pluginId : roster.get(ref.pluginId)?.label ?? ref.pluginId
+    const owner =
+      ref.pluginId === 'core'
+        ? 'Acorn'
+        : installed.has(ref.pluginId)
+          ? ref.pluginId
+          : (roster.get(ref.pluginId)?.label ?? ref.pluginId)
     return {
       ...(registered ? { plural: registered.plural } : {}),
       ...(!registered || registered.providerId ? { provider: owner } : {}),
@@ -204,14 +227,24 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     const skills = pluginSkills(name, skillState)
     const development = entry.hasNode ? bridge.development.state(name) : undefined
     return {
-      installed: row satisfies DeclaredRow, ...(inputs ? { inputs } : {}), ...(skills ? { skills } : {}),
-      ...(development ? { development: { on: development.on, ...(development.reloadedAt ? { reloadedAt: development.reloadedAt } : {}) } } : {}),
+      installed: row satisfies DeclaredRow,
+      ...(inputs ? { inputs } : {}),
+      ...(skills ? { skills } : {}),
+      ...(development
+        ? {
+            development: {
+              on: development.on,
+              ...(development.reloadedAt ? { reloadedAt: development.reloadedAt } : {}),
+            },
+          }
+        : {}),
     }
   }
   // A reload in development mode that the loader refused never reached the host, so the roster entry
   // still says active. It shows as a failed load does, while the previous version keeps serving.
   const reloadFailure = (row: NodePluginRow): void => {
-    const failure = row.development?.on && row.state === 'active' ? bridge.development.state(row.name)?.failure : undefined
+    const failure =
+      row.development?.on && row.state === 'active' ? bridge.development.state(row.name)?.failure : undefined
     if (!failure) return
     Object.assign(row, { state: 'failed', stage: 'load', failedAt: failure.at }, trimReason(failure.reason))
   }
@@ -241,7 +274,13 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
       // with outranks it. A failed row still reports `running: true` on purpose (see the note on
       // NodePluginRow), and 'failed' is deliberately not overridden: a restart cannot fix a plugin whose init
       // throws, so it must not raise the banner even if its directory also changed.
-      state: review(entry.name).pendingReview ? 'pending-review' : entry.state === 'failed' ? 'failed' : stale(entry.name) ? 'pending-restart' : entry.state,
+      state: review(entry.name).pendingReview
+        ? 'pending-review'
+        : entry.state === 'failed'
+          ? 'failed'
+          : stale(entry.name)
+            ? 'pending-restart'
+            : entry.state,
       ...(entry.failedAt === undefined ? {} : { failedAt: entry.failedAt }),
       ...(entry.state === 'failed' ? trimReason(entry.reason) : {}),
       ...(entry.stage === undefined ? {} : { stage: entry.stage }),
@@ -340,13 +379,24 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   const listed = new Set(rows.map((entry) => entry.name))
   for (const id of bridge.pendingReviewIds()) {
     if (listed.has(id)) continue
-    rows.push({ name: id, required: false, disabled: false, running: false, active: null, state: 'pending-review', ...review(id) })
+    rows.push({
+      name: id,
+      required: false,
+      disabled: false,
+      running: false,
+      active: null,
+      state: 'pending-review',
+      ...review(id),
+    })
   }
   // A restart is needed exactly where what would run differs from what is running. That covers the toggle
   // in both directions, a plugin just turned off but still serving, one turned back on that has not
   // loaded, and, since phase 5, every way the install directory can disagree with this process.
-  const restartRequired = rows.some((row) =>
-    !row.pendingReview && (!row.disabled !== row.running || row.state === 'pending-restart' || (row.active !== null && stale(row.name))))
+  const restartRequired = rows.some(
+    (row) =>
+      !row.pendingReview &&
+      (!row.disabled !== row.running || row.state === 'pending-restart' || (row.active !== null && stale(row.name))),
+  )
   // The agent-raised approval queue rides the roster rather than getting a GET of its own: it is read by
   // the same device-only mount, refreshed by the same `plugins:changed` reconcile, and a second route
   // would be a second thing to remember to gate (docs/plugins/agent-install.md § Approval-mediated install).

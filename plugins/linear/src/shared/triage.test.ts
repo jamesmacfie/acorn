@@ -54,8 +54,13 @@ describe('linear priority projection', () => {
   })
 
   it('tones a state by its type and a priority by its level', () => {
-    expect([stateTone('triage'), stateTone('started'), stateTone('completed'), stateTone('canceled'), stateTone(undefined)])
-      .toEqual(['warn', 'accent', 'ok', 'neutral', 'neutral'])
+    expect([
+      stateTone('triage'),
+      stateTone('started'),
+      stateTone('completed'),
+      stateTone('canceled'),
+      stateTone(undefined),
+    ]).toEqual(['warn', 'accent', 'ok', 'neutral', 'neutral'])
     expect([priorityTone('urgent'), priorityTone('high'), priorityTone('low')]).toEqual(['danger', 'warn', 'neutral'])
   })
 })

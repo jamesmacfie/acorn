@@ -27,8 +27,12 @@ export function watchConnectionChanges(): () => void {
     // The bell's row and the settings rail's dot for a refused credential are a fan-out, which hears
     // an invalidation of its own key and nothing else (../../infra/node/fanout.ts).
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: ['attention', CONNECTION_ATTENTION_ID] })
-    void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId(), { connectionId: event.integrationId })
-    void invalidatePublishedPanels(clientFor(activeCacheId()).client, activeCacheId(), { connectionId: event.integrationId })
+    void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId(), {
+      connectionId: event.integrationId,
+    })
+    void invalidatePublishedPanels(clientFor(activeCacheId()).client, activeCacheId(), {
+      connectionId: event.integrationId,
+    })
     clientEvents.emit('connection:changed', event)
   })
 }

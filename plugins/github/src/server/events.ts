@@ -6,15 +6,12 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 export type GithubVerb = 'pr-synced' | 'checks-changed' | 'pulls-changed' | 'repos-changed'
 export type GithubEmit = (verb: GithubVerb, payload?: Record<string, unknown>) => void
 
-export const githubEmitter = (send: PluginBroadcast['send']): GithubEmit =>
-  (verb, payload = {}) => send({ channel: pluginChannel('github', verb), ...payload })
+export const githubEmitter =
+  (send: PluginBroadcast['send']): GithubEmit =>
+  (verb, payload = {}) =>
+    send({ channel: pluginChannel('github', verb), ...payload })
 
-export const prChangedPayload = (scope: {
-  owner: string
-  repo: string
-  number: number
-  headSha: string | null
-}) => ({
+export const prChangedPayload = (scope: { owner: string; repo: string; number: number; headSha: string | null }) => ({
   repoOwner: scope.owner,
   repoName: scope.repo,
   pullNumber: scope.number,

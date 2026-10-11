@@ -58,7 +58,8 @@ export function paneLayoutFor(pluginId: string, surface: PluginFrameSurface): Re
     // of the object the plugin passed to `mountTree`, and a key with no renderer behind it draws the
     // labelled placeholder rather than reaching anything (plugins/tree/TreeHost.tsx).
     if (region.kind === 'remote') continue
-    if (!ownsRoute(pluginId, region.read)) throw new Error(`document read route '${region.read}' is outside ${pluginId}'s namespace`)
+    if (!ownsRoute(pluginId, region.read))
+      throw new Error(`document read route '${region.read}' is outside ${pluginId}'s namespace`)
     if (region.write && !ownsRoute(pluginId, region.write)) {
       throw new Error(`document write route '${region.write}' is outside ${pluginId}'s namespace`)
     }
@@ -69,7 +70,8 @@ export function paneLayoutFor(pluginId: string, surface: PluginFrameSurface): Re
     }
     // Hover and diagnostics are POSTed the live buffer, so they are confined on the same terms.
     for (const service of [region.hover, region.diagnostics]) {
-      if (service && !ownsRoute(pluginId, service.route)) throw new Error(`document route '${service.route}' is outside ${pluginId}'s namespace`)
+      if (service && !ownsRoute(pluginId, service.route))
+        throw new Error(`document route '${service.route}' is outside ${pluginId}'s namespace`)
     }
   }
   return { layout: surface.layout, regions }

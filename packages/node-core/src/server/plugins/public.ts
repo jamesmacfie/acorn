@@ -1,13 +1,28 @@
 export { DEV_BUILD_MARKER, reconcileBundledPlugins } from './bundled.ts'
 export {
-  bundledPluginStatePath, markPluginUserManaged, readBundledPluginState, userManagedPluginIds,
+  bundledPluginStatePath,
+  markPluginUserManaged,
+  readBundledPluginState,
+  userManagedPluginIds,
 } from './bundledState.ts'
 export { disabledPluginsStore } from './disabled.ts'
 export { inputGrantsStore } from './inputGrants.ts'
 export { skillStateStore } from './skillState.ts'
-export { installPlugin, pluginDir, pluginInstallRoot, uninstallPlugin, updatePlugin, withPluginPackage } from './installer.ts'
 export {
-  installedPluginInfo, loadedPluginBinding, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin,
+  installPlugin,
+  pluginDir,
+  pluginInstallRoot,
+  uninstallPlugin,
+  updatePlugin,
+  withPluginPackage,
+} from './installer.ts'
+export {
+  installedPluginInfo,
+  loadedPluginBinding,
+  loadExternalPlugins,
+  pluginInstallDir,
+  readClientBundle,
+  snapshotActivePlugin,
   scanInstalled,
 } from './loader.ts'
 export type { ActivePluginSnapshot, InstalledPlugin, LoadedPlugin, PluginLoadFailure } from './loader.ts'
@@ -15,7 +30,18 @@ export { PLUGIN_API_MAJOR, parsePluginManifest, readPluginManifest } from './man
 export { createPluginReloader } from './reload.ts'
 export { createPluginDevelopment } from './development.ts'
 export { adoptRenamedPluginDb, pluginDbPath } from './storage.ts'
-export { approvePluginReview, hasPendingPluginReview, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from './pendingReview.ts'
+export {
+  approvePluginReview,
+  hasPendingPluginReview,
+  pendingPluginReviewIds,
+  pluginReviewFingerprint,
+  readPendingPluginReview,
+} from './pendingReview.ts'
 export type { PluginDatabase } from './storage.ts'
 
-export { MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError, readPluginFile } from './packageFiles.ts'
+export {
+  MAX_CLIENT_BUNDLE_BYTES,
+  MAX_PLUGIN_MANIFEST_BYTES,
+  PluginPackageFileError,
+  readPluginFile,
+} from './packageFiles.ts'

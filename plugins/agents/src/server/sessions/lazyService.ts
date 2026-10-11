@@ -9,7 +9,7 @@ export class LazyService<T> {
 
   /** The service, built by the first call. */
   get(): Promise<T> {
-    return this.service ??= this.load()
+    return (this.service ??= this.load())
   }
 
   /** The service if a caller already built it. Diagnostics and shutdown read this, so they never build one. */

@@ -9,13 +9,15 @@ export function childWorkflowDefinition(parentName: string, itemSchema: DataSche
     baseline: ACORN_BASELINE,
     formatVersion: 1,
     name: `${parentName} item`,
-    inputs: [{
-      name: CHILD_RECORD_INPUT,
-      label: 'Current record',
-      description: 'The typed record selected by the parent workflow.',
-      schema: itemSchema,
-      required: true,
-    }],
+    inputs: [
+      {
+        name: CHILD_RECORD_INPUT,
+        label: 'Current record',
+        description: 'The typed record selected by the parent workflow.',
+        schema: itemSchema,
+        required: true,
+      },
+    ],
     steps: [],
   }
 }

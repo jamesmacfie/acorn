@@ -21,33 +21,53 @@ describe('session roster pagination through the managed route', () => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     vi.spyOn(ctx.core.tasks, 'active').mockResolvedValue([{ id: taskId }] as never)
     vi.spyOn(ctx.core.tasks, 'idsForWorkspace').mockResolvedValue([taskId])
-    runtime = new ManagedAgentRuntime({ db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core,
-      internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => null })
+    runtime = new ManagedAgentRuntime({
+      db: ctx.storage.open(),
+      dataDir: ctx.dataDir,
+      core: ctx.core,
+      internalEnv: () => ({}),
+      secrets: ctx.env.SECRETS,
+      currentUserId: () => null,
+    })
     setManagedAgentsBridge(managedAgentsBridge(runtime))
     app = new Hono<AppEnv>()
-    app.use('*', async (c, next) => { c.set('principal', { kind: 'device', userId: 'owner' } as never); await next() })
+    app.use('*', async (c, next) => {
+      c.set('principal', { kind: 'device', userId: 'owner' } as never)
+      await next()
+    })
     app.route('/api', managedAgents)
     const provider = await new FakeAgentDriver().probe()
     ids = []
     for (let n = 0; n < 205; n++) {
-      const session = await runtime.store.createSession({ taskId, providerId: 'fake', profileId: 'fake',
-        kind: 'interactive', title: 'Synthetic', config: {} }, provider)
-      await ctx.storage.open().update(schema.agentSessions).set({ updatedAt: n < 103 ? 1000 : 2000 })
+      const session = await runtime.store.createSession(
+        { taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', title: 'Synthetic', config: {} },
+        provider,
+      )
+      await ctx.storage
+        .open()
+        .update(schema.agentSessions)
+        .set({ updatedAt: n < 103 ? 1000 : 2000 })
         .where(eq(schema.agentSessions.id, session.id))
       ids.push(session.id)
     }
   })
-  afterEach(async () => { setManagedAgentsBridge(null); await runtime.stop(); ctx.cleanup(); vi.restoreAllMocks() })
+  afterEach(async () => {
+    setManagedAgentsBridge(null)
+    await runtime.stop()
+    ctx.cleanup()
+    vi.restoreAllMocks()
+  })
 
   async function read(query: URLSearchParams) {
     const result = await app.request(`/api/sessions?${query}`)
     expect(result.status).toBe(200)
-    return await result.json() as AgentSessionList
+    return (await result.json()) as AgentSessionList
   }
   const query = (limit: number) => new URLSearchParams({ taskId, limit: String(limit), cursorFormat: 'tuple-v1' })
 
   it.each([1, 5, 100])('reaches all tied and mixed timestamps exactly once with limit %i', async (limit) => {
-    const params = query(limit), seen: string[] = []
+    const params = query(limit),
+      seen: string[] = []
     do {
       const page = await read(params)
       seen.push(...page.sessions.map((session) => session.id))
@@ -62,8 +82,10 @@ describe('session roster pagination through the managed route', () => {
     const db = ctx.storage.open()
     await db.update(schema.agentSessions).set({ archivedAt: 99, attention: 'error' })
     const params = query(5)
-    params.set('workspaceId', workspaceId); params.set('archived', 'true')
-    params.set('attention', 'true'); params.set('search', 'Synthetic')
+    params.set('workspaceId', workspaceId)
+    params.set('archived', 'true')
+    params.set('attention', 'true')
+    params.set('search', 'Synthetic')
     const first = await read(params)
     const anchor = first.sessions.at(-1)!
     await db.delete(schema.agentSessions).where(eq(schema.agentSessions.id, anchor.id))
@@ -80,7 +102,8 @@ describe('session roster pagination through the managed route', () => {
     expect(first.nextCursor).toBe('2000')
     legacy.set('cursor', first.nextCursor!)
     expect((await read(legacy)).sessions.every((session) => session.updatedAt === 1000)).toBe(true)
-    const opted = query(5); opted.set('cursor', '2000')
+    const opted = query(5)
+    opted.set('cursor', '2000')
     expect((await read(opted)).nextCursor).toMatch(/^v1:1000:/)
     for (const cursor of [`v1:2000:${ids[0]}`, 'v1:NaN:x', 'v1:9007199254740992:' + ids[0], 'x'.repeat(200)]) {
       const params = new URLSearchParams({ taskId, cursor })

@@ -41,9 +41,18 @@ export type OpenedNode = {
 /** Open the node this run talks to. With no target that is the node for this machine's data root,
  *  attached if one is running and started if not; with one it is a remembered node or a new endpoint
  *  to pair with. */
-export async function openNode(target: string | undefined, at: Custody = custody(), allowPair = true): Promise<OpenedNode> {
+export async function openNode(
+  target: string | undefined,
+  at: Custody = custody(),
+  allowPair = true,
+): Promise<OpenedNode> {
   const { tokens, fleet } = at
-  const done = (nodeId: string, supervised = false, stop: () => Promise<void> = async () => {}): OpenedNode => ({ nodeId, fleet, supervised, stop })
+  const done = (nodeId: string, supervised = false, stop: () => Promise<void> = async () => {}): OpenedNode => ({
+    nodeId,
+    fleet,
+    supervised,
+    stop,
+  })
 
   if (target) return done((await remoteNode(target, fleet, allowPair)).nodeId)
 
@@ -55,7 +64,8 @@ export async function openNode(target: string | undefined, at: Custody = custody
   if (running) {
     const token = tokens.read(LOCAL_TOKEN_SCOPE)
     if (!token) {
-      if (!allowPair) throw new Error('acorn has no token for the local node. Pair the terminal client before opening this link.')
+      if (!allowPair)
+        throw new Error('acorn has no token for the local node. Pair the terminal client before opening this link.')
       // A node this TUI has never met, running under a launcher that is not us — the desktop app,
       // usually. Its token is that launcher's, so the way in is the same one a stranger gets: a
       // pairing code the owner asks the node for. A desktop-supervised service has no SIGUSR1
@@ -120,7 +130,9 @@ async function remoteNode(target: string, fleet: FleetStore, allowPair: boolean)
   if (known) return known
   if (!allowPair || !target.startsWith('https://')) {
     const names = fleet.list().map((node) => node.label)
-    throw new Error(`acorn knows no node called "${target}". Pair one with an https:// endpoint${names.length ? `, or name one of: ${names.join(', ')}` : ''}.`)
+    throw new Error(
+      `acorn knows no node called "${target}". Pair one with an https:// endpoint${names.length ? `, or name one of: ${names.join(', ')}` : ''}.`,
+    )
   }
   return pairInteractively(target, fleet, { label: new URL(target).host, local: false })
 }

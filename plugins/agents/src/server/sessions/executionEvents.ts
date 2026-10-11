@@ -8,11 +8,17 @@ export class ExecutionEvents {
   private lastSeq: number
   private readonly turnIds = new Set<string>()
 
-  constructor(private readonly sessionId: string, afterSeq: number, private readonly onEvent?: (event: StreamEvent) => void) {
+  constructor(
+    private readonly sessionId: string,
+    afterSeq: number,
+    private readonly onEvent?: (event: StreamEvent) => void,
+  ) {
     this.lastSeq = afterSeq
   }
 
-  beginEnqueue(): void { this.pending = true }
+  beginEnqueue(): void {
+    this.pending = true
+  }
 
   acceptTurn(turnId: string): void {
     this.turnIds.add(turnId)

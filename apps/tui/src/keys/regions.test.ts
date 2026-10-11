@@ -3,10 +3,32 @@ import { createMemo, createRoot, getOwner, onCleanup, runWithOwner, type Owner }
 import type { Renderable } from '../tree/compat'
 import type { Renderer } from '../renderer'
 import {
-  _resetRegions, activationEntersMain, bubbledCrossWord, crossParent, focusRenderable, focusedInScope,
-  focusedRenderable, installRegions, markCollection, markItem, markParent, moveBack, moveColumn, movePane, moveRegion,
-  moveStop, onScreen, panelsChanged, parentOf, pushScope, regionsInScope, registerRegion,
-  scheduleSettle, setTopology, stopsIn, walkSteps,
+  _resetRegions,
+  activationEntersMain,
+  bubbledCrossWord,
+  crossParent,
+  focusRenderable,
+  focusedInScope,
+  focusedRenderable,
+  installRegions,
+  markCollection,
+  markItem,
+  markParent,
+  moveBack,
+  moveColumn,
+  movePane,
+  moveRegion,
+  moveStop,
+  onScreen,
+  panelsChanged,
+  parentOf,
+  pushScope,
+  regionsInScope,
+  registerRegion,
+  scheduleSettle,
+  setTopology,
+  stopsIn,
+  walkSteps,
 } from './regions'
 
 // Fakes rather than a rendered shell, because what is under test is bookkeeping: which node holds the
@@ -51,14 +73,21 @@ const fakeRenderer = () => {
     // there is none here, so `../kit/scrolling.test.tsx` owns that case (./regions.ts § The reveal).
     on: (): void => {},
     off: (): void => {},
-    get currentFocusedRenderable(): Renderable | null { reads += 1; return held },
+    get currentFocusedRenderable(): Renderable | null {
+      reads += 1
+      return held
+    },
     held: () => held,
-    draw: (node: Renderable | null): void => { held = node },
+    draw: (node: Renderable | null): void => {
+      held = node
+    },
     /** How many times anything has asked the renderer what has the keys. */
     reads: () => reads,
     /** How many times the store has told the renderer to let a caret go. */
     blurs: () => blurs,
-    blurred: (): void => { blurs += 1 },
+    blurred: (): void => {
+      blurs += 1
+    },
   }
 }
 
@@ -127,7 +156,12 @@ const drawn = <T>(build: () => T): T => runWithOwner(owner, build) as T
  *  goes with it, exactly as a `Modal`'s does (../kit/grouping.tsx). */
 const opened = (box: Renderable): (() => void) => {
   let close = () => {}
-  runWithOwner(owner, () => createRoot((stop) => { close = stop; onCleanup(pushScope(box)) }))
+  runWithOwner(owner, () =>
+    createRoot((stop) => {
+      close = stop
+      onCleanup(pushScope(box))
+    }),
+  )
   return close
 }
 
@@ -144,10 +178,12 @@ const row = (parent: Renderable, children: Renderable[], identity?: string): (()
   asFake(box).parent = parent
   children.push(box)
   let disposeRow = () => {}
-  runWithOwner(owner, () => createRoot((stop) => {
-    disposeRow = stop
-    markItem(box, undefined, identity)
-  }))
+  runWithOwner(owner, () =>
+    createRoot((stop) => {
+      disposeRow = stop
+      markItem(box, undefined, identity)
+    }),
+  )
   return () => {
     disposeRow()
     const at = children.indexOf(box)
@@ -168,7 +204,10 @@ const fresh = (): void => {
   _resetRegions()
   renderer = fakeRenderer()
   installRegions(renderer as unknown as Renderer)
-  createRoot((stop) => { dispose = stop; owner = getOwner() })
+  createRoot((stop) => {
+    dispose = stop
+    owner = getOwner()
+  })
 }
 
 describe('focus regions', () => {
@@ -207,17 +246,28 @@ describe('focus regions', () => {
       const mounted: (() => void)[] = []
       let close: (() => void) | null = null
       return {
-        mount: () => { mounted.push(row(regionA, rowsA, `a${mounted.length}`)) },
-        unmount: () => { mounted.pop()?.() },
-        open: () => { if (!close) close = opened(node([control()])) },
-        close: () => { close?.(); close = null },
-        tab: () => { moveRegion(1) },
+        mount: () => {
+          mounted.push(row(regionA, rowsA, `a${mounted.length}`))
+        },
+        unmount: () => {
+          mounted.pop()?.()
+        },
+        open: () => {
+          if (!close) close = opened(node([control()]))
+        },
+        close: () => {
+          close?.()
+          close = null
+        },
+        tab: () => {
+          moveRegion(1)
+        },
       }
     }
     const names = ['mount', 'unmount', 'open', 'close', 'tab'] as const
-    const sequences: (typeof names[number])[][] = [[]]
+    const sequences: (typeof names)[number][][] = [[]]
     for (let length = 0; length < 4; length += 1) {
-      const grown: (typeof names[number])[][] = []
+      const grown: (typeof names)[number][][] = []
       for (const so_far of sequences.filter((entry) => entry.length === length)) {
         for (const name of names) grown.push([...so_far, name])
       }
@@ -330,7 +380,10 @@ describe('focus regions', () => {
     setTopology({
       home: () => null,
       skips: () => false,
-      opensOn: () => { asked += 1; return { paneId: 'chrome', regionId: 'tasks' } },
+      opensOn: () => {
+        asked += 1
+        return { paneId: 'chrome', regionId: 'tasks' }
+      },
     })
 
     // Three callers in one turn — a region registering, a list arriving, a row going — are one pass.
@@ -349,12 +402,7 @@ describe('focus regions', () => {
     const main = node()
     let picked = 0
     registerRegion(menu, { paneId: 'chrome', regionId: 'menu' }, -130, { x: 0 })
-    registerRegion(
-      browse,
-      { paneId: 'chrome', regionId: 'browse' },
-      -120,
-      { x: 0, pickOnEnter: true },
-    )
+    registerRegion(browse, { paneId: 'chrome', regionId: 'browse' }, -120, { x: 0, pickOnEnter: true })
     registerRegion(main, { paneId: 'chrome', regionId: 'source' }, 0)
 
     // Browse opens before its query has produced a row, so its frame holds the keys for want of
@@ -365,7 +413,11 @@ describe('focus regions', () => {
     const chosen = item()
     asFake(chosen).parent = browse
     rows.push(chosen)
-    drawn(() => markItem(chosen, () => { picked += 1 }))
+    drawn(() =>
+      markItem(chosen, () => {
+        picked += 1
+      }),
+    )
     await settle()
     expect(focusedRenderable()).toBe(chosen)
     expect(picked).toBe(1)
@@ -715,12 +767,7 @@ describe('focus regions', () => {
     const main = node([mainRow])
     drawn(() => markItem(menuRow))
     drawn(() => markItem(mainRow))
-    registerRegion(
-      menu,
-      { paneId: 'chrome', regionId: 'menu' },
-      -130,
-      { x: 0, enterMainOnActivate: true },
-    )
+    registerRegion(menu, { paneId: 'chrome', regionId: 'menu' }, -130, { x: 0, enterMainOnActivate: true })
     registerRegion(main, { paneId: 'chrome', regionId: 'source' }, 0)
 
     expect(focusRenderable(menuRow)).toBe(true)
@@ -867,7 +914,16 @@ describe('focus regions', () => {
     const inPanel = control()
     const panel = node([inPanel])
     const region = node([strip, panel])
-    drawn(() => markParent(strip, () => [panel], (delta) => { stepped.push(delta); return delta > 0 }))
+    drawn(() =>
+      markParent(
+        strip,
+        () => [panel],
+        (delta) => {
+          stepped.push(delta)
+          return delta > 0
+        },
+      ),
+    )
     registerRegion(region, { paneId: 'pr', regionId: 'body' }, 0)
 
     // Nothing to hand it to from the strip itself or from outside any panel.
@@ -898,7 +954,16 @@ describe('focus regions', () => {
     const dialog = node([inDialog])
     const panel = node([dialog])
     const region = node([strip, panel])
-    drawn(() => markParent(strip, () => [panel], (delta) => { stepped.push(delta); return true }))
+    drawn(() =>
+      markParent(
+        strip,
+        () => [panel],
+        (delta) => {
+          stepped.push(delta)
+          return true
+        },
+      ),
+    )
     registerRegion(region, { paneId: 'pr', regionId: 'body' }, 0)
 
     const close = opened(dialog)
@@ -910,7 +975,7 @@ describe('focus regions', () => {
     close()
   })
 
-  it('moves between the pane\'s own columns from inside a panel, and never into the rail', () => {
+  it("moves between the pane's own columns from inside a panel, and never into the rail", () => {
     const stepped: number[] = []
     const railRow = item()
     const rail = node([railRow])
@@ -921,7 +986,16 @@ describe('focus regions', () => {
     const inDetail = control()
     const detail = node([inDetail])
     drawn(() => markItem(railRow))
-    drawn(() => markParent(strip, () => [panel], (delta) => { stepped.push(delta); return true }))
+    drawn(() =>
+      markParent(
+        strip,
+        () => [panel],
+        (delta) => {
+          stepped.push(delta)
+          return true
+        },
+      ),
+    )
     registerRegion(rail, { paneId: 'chrome', regionId: 'tasks' }, -100, { x: 0 })
     registerRegion(list, { paneId: 'editor', regionId: 'list' }, 0, { x: 1 })
     registerRegion(detail, { paneId: 'editor', regionId: 'detail' }, 1, { x: 2 })

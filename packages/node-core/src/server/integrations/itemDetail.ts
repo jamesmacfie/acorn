@@ -16,7 +16,16 @@ export const providerDetailContext = (
   force?: boolean,
 ): ProviderDetailContext => ({
   resource: (resourceId, input, forceThis) =>
-    runProviderResource({ db: deps.db, userId, secrets: deps.secrets, providerId, connectionId, resourceId, input, force: forceThis ?? force }),
+    runProviderResource({
+      db: deps.db,
+      userId,
+      secrets: deps.secrets,
+      providerId,
+      connectionId,
+      resourceId,
+      input,
+      force: forceThis ?? force,
+    }),
 })
 
 // Fill the cache for items a task has just linked, so the task context an agent starts from names
@@ -31,6 +40,8 @@ export function warmItemDetails(
     const detail = integrationProviderRegistry.get(link.providerId)?.detail
     if (!detail) continue
     const context = providerDetailContext(deps, userId, link.providerId, link.connectionId)
-    void Promise.resolve().then(() => detail(context, link.identifier)).catch(() => {})
+    void Promise.resolve()
+      .then(() => detail(context, link.identifier))
+      .catch(() => {})
   }
 }

@@ -29,7 +29,9 @@ export function buildCommentsBody(pr: PrComposite): string {
   const sections: string[] = []
   for (const r of pr.reviews) {
     if (!r.body?.trim() && (!r.state || r.state === 'COMMENTED')) continue
-    sections.push(`**Review by ${r.author ?? 'unknown'} — ${r.state ?? 'COMMENTED'}**\n\n${r.body?.trim() ?? ''}`.trim())
+    sections.push(
+      `**Review by ${r.author ?? 'unknown'} — ${r.state ?? 'COMMENTED'}**\n\n${r.body?.trim() ?? ''}`.trim(),
+    )
   }
   for (const c of [...pr.comments].sort(byCreated)) {
     if (!c.body?.trim()) continue
@@ -58,7 +60,12 @@ async function fetchJson<T>(url: string, token: string): Promise<T | null> {
 // Seed the PR + ticket notes for a freshly created task. Silent no-op when there's no PR/links or
 // the task was already seeded.
 /** Resolves to whether anything was written, so the caller can announce the seeding once. */
-export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesStoreCapability, internalApiEnv: Record<string, string>, task: SeedTask): Promise<boolean> {
+export async function seedTaskNotes(
+  core: SeedCoreServices,
+  notesStore: NotesStoreCapability,
+  internalApiEnv: Record<string, string>,
+  task: SeedTask,
+): Promise<boolean> {
   const base = internalApiEnv.ACORN_API_URL
   const token = internalApiEnv.ACORN_API_TOKEN ?? ''
   if (!base) return false
@@ -69,14 +76,23 @@ export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesSto
   // See docs/notes-and-memory.md § Notes for why these are stamped author 'workflow' kind 'scratch'.
   let seeded = 0
   const seed = async (title: string, body: string) => {
-    await notesStore.create(location, title, { author: 'workflow', kind: 'scratch', originTaskId: task.id, included: true, body })
+    await notesStore.create(location, title, {
+      author: 'workflow',
+      kind: 'scratch',
+      originTaskId: task.id,
+      included: true,
+      body,
+    })
     seeded++
   }
 
   const project = await core.projects.byId(task.projectId)
   if (task.pullNumber != null && project?.github) {
     // pullDetail refreshes the mirror on staleness before returning the composite (serve-then-revalidate).
-    const pr = await fetchJson<PrComposite>(`${base}/v1/p/github/repos/${project.github.owner}/${project.github.name}/pulls/${task.pullNumber}`, token)
+    const pr = await fetchJson<PrComposite>(
+      `${base}/v1/p/github/repos/${project.github.owner}/${project.github.name}/pulls/${task.pullNumber}`,
+      token,
+    )
     if (pr?.pull) {
       await seed(`PR #${pr.pull.number}: ${pr.pull.title}`, pr.pull.body?.trim() || '_(no description)_')
       const comments = buildCommentsBody(pr)
@@ -88,7 +104,8 @@ export async function seedTaskNotes(core: SeedCoreServices, notesStore: NotesSto
   for (const link of links.filter((l) => l.provider === 'linear')) {
     // refresh=1 forces a live refetch so the description is current at seed time.
     const issue = await fetchJson<LinearDetail>(linearIssueSeedUrl(base, link), token)
-    if (issue) await seed(`${issue.identifier}: ${issue.title ?? ''}`.trim(), issue.description?.trim() || '_(no description)_')
+    if (issue)
+      await seed(`${issue.identifier}: ${issue.title ?? ''}`.trim(), issue.description?.trim() || '_(no description)_')
   }
   return seeded > 0
 }

@@ -9,10 +9,16 @@ export type WorkspaceWords = {
 }
 
 const PROJECT_WORDS: WorkspaceWords = Object.freeze({
-  singular: 'project', plural: 'projects', capitalized: 'Project', capitalizedPlural: 'Projects',
+  singular: 'project',
+  plural: 'projects',
+  capitalized: 'Project',
+  capitalizedPlural: 'Projects',
 })
 const WORKSPACE_WORDS: WorkspaceWords = Object.freeze({
-  singular: 'workspace', plural: 'workspaces', capitalized: 'Workspace', capitalizedPlural: 'Workspaces',
+  singular: 'workspace',
+  plural: 'workspaces',
+  capitalized: 'Workspace',
+  capitalizedPlural: 'Workspaces',
 })
 
 /** Use the active Node's mode at read time, so a fleet switch cannot retain another Node's label. */

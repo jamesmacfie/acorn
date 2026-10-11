@@ -1,13 +1,13 @@
 import type { CommandSettingOption } from '@acorn/protocol/commands.ts'
 import { fuzzyScore } from '../../../kit/lib/controls/fuzzy'
-import {
-  isActionCommand,
-  type CommandExecutionContext, type CommandOutcome, type SettingCommand,
-} from './commands'
+import { isActionCommand, type CommandExecutionContext, type CommandOutcome, type SettingCommand } from './commands'
 import type { CommandGraph, CommandNode } from './graph'
 import type { SessionRow, SessionSearchResult, SessionSearchState, SessionSettingState } from './sessionStore'
 
-type Execute = (commandId: string, context: CommandExecutionContext) => Promise<CommandOutcome | void> | CommandOutcome | void
+type Execute = (
+  commandId: string,
+  context: CommandExecutionContext,
+) => Promise<CommandOutcome | void> | CommandOutcome | void
 
 const commandRow = (node: CommandNode, trail: boolean, execute: Execute): SessionRow => ({
   id: node.id,
@@ -28,7 +28,8 @@ export const rootRows = (graph: CommandGraph, query: string, execute: Execute): 
 export const groupRows = (graph: CommandGraph, commandId: string, query: string, execute: Execute): SessionRow[] => {
   const trimmed = query.trim()
   if (!trimmed) return graph.children(commandId).map((node) => commandRow(node, false, execute))
-  return graph.ranked(trimmed)
+  return graph
+    .ranked(trimmed)
     .filter((hit) => hit.node.parentId === commandId)
     .map((hit) => commandRow(hit.node, false, execute))
 }
@@ -53,11 +54,13 @@ export const searchRows = (
   return state.message ? [{ id: 'search:message', label: state.message, action: { effect: 'none' } }] : []
 }
 
-export const inputRows = (submitting: boolean): SessionRow[] => [{
-  id: 'input:hint',
-  label: submitting ? 'Submitting…' : 'Press Enter to submit.',
-  action: { effect: 'none' },
-}]
+export const inputRows = (submitting: boolean): SessionRow[] => [
+  {
+    id: 'input:hint',
+    label: submitting ? 'Submitting…' : 'Press Enter to submit.',
+    action: { effect: 'none' },
+  },
+]
 
 const settingRow = (
   option: CommandSettingOption,

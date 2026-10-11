@@ -18,20 +18,40 @@ beforeEach(() => {
   client.setQueryData(projectsKey, [])
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <QueryClientProvider client={client}>
-    {(() => {
-      const mode = createWorkspacesMode()
-      return <><output>{workspaceWords(mode()).capitalizedPlural}</output><GroupProjectsSection /></>
-    })()}
-  </QueryClientProvider>, host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        {(() => {
+          const mode = createWorkspacesMode()
+          return (
+            <>
+              <output>{workspaceWords(mode()).capitalizedPlural}</output>
+              <GroupProjectsSection />
+            </>
+          )
+        })()}
+      </QueryClientProvider>
+    ),
+    host,
+  )
 })
-afterEach(() => { dispose(); host.remove(); client.clear(); vi.unstubAllGlobals() })
+afterEach(() => {
+  dispose()
+  host.remove()
+  client.clear()
+  vi.unstubAllGlobals()
+})
 
 const button = () => host.querySelector('button')!
 
 it('requires confirmation, disables the pending write, and changes wording only after success', async () => {
   let finish!: (response: Response) => void
-  const fetch = vi.fn((_path: string, _request: RequestInit) => new Promise<Response>((resolve) => { finish = resolve }))
+  const fetch = vi.fn(
+    (_path: string, _request: RequestInit) =>
+      new Promise<Response>((resolve) => {
+        finish = resolve
+      }),
+  )
   vi.stubGlobal('fetch', fetch)
   button().click()
   expect(fetch).not.toHaveBeenCalled()
@@ -43,7 +63,10 @@ it('requires confirmation, disables the pending write, and changes wording only 
   const [path, request] = fetch.mock.calls[0]!
   expect(path).toBe('/v1/core/prefs')
   expect(request.method).toBe('PUT')
-  expect(JSON.parse(new TextDecoder().decode(request.body as Uint8Array))).toEqual({ key: 'core.workspaces', value: 'on' })
+  expect(JSON.parse(new TextDecoder().decode(request.body as Uint8Array))).toEqual({
+    key: 'core.workspaces',
+    value: 'on',
+  })
   button().click()
   expect(fetch).toHaveBeenCalledOnce()
   finish(new Response(JSON.stringify({ key: 'core.workspaces', value: 'on' })))
@@ -52,7 +75,12 @@ it('requires confirmation, disables the pending write, and changes wording only 
 })
 
 it('shows the Node message after failure and requires confirmation again to retry', async () => {
-  const fetch = vi.fn(async () => new Response(JSON.stringify({ error: { code: 'write_failed', message: 'Could not save grouping.' } }), { status: 500 }))
+  const fetch = vi.fn(
+    async () =>
+      new Response(JSON.stringify({ error: { code: 'write_failed', message: 'Could not save grouping.' } }), {
+        status: 500,
+      }),
+  )
   vi.stubGlobal('fetch', fetch)
   button().click()
   button().click()

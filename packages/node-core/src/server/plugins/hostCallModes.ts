@@ -11,24 +11,44 @@ const modes = {
   routes: { fetch: 'sync' },
   schedules: { register: 'sync' },
   dataSources: {
-    register: 'sync', discover: 'sync', list: 'async', discoverAvailable: 'async',
-    invoke: 'async', resolveQuery: 'async', setQueryConsumer: 'async', queryPublication: 'async',
+    register: 'sync',
+    discover: 'sync',
+    list: 'async',
+    discoverAvailable: 'async',
+    invoke: 'async',
+    resolveQuery: 'async',
+    setQueryConsumer: 'async',
+    queryPublication: 'async',
   },
   taskChecks: { register: 'sync' },
   runs: { register: 'sync' },
   audit: { declare: 'sync', record: 'sync' },
   extensionPoints: {
-    declare: 'sync', handle: 'sync', handlers: 'sync',
+    declare: 'sync',
+    handle: 'sync',
+    handlers: 'sync',
   },
   hooks: { declare: 'sync', handle: 'sync', run: 'async', handlers: 'async' },
   providers: { integration: 'sync', connection: 'sync', model: 'sync', nodes: 'sync', withConnection: 'async' },
   capabilities: { provide: 'sync', get: 'sync', require: 'sync', ids: 'sync' },
   storage: { open: 'sync' },
   events: {
-    send: 'sync', status: 'sync', worktreeStatus: 'sync', repoConfigTrustNotice: 'sync',
-    notice: 'sync', on: 'sync',
+    send: 'sync',
+    status: 'sync',
+    worktreeStatus: 'sync',
+    repoConfigTrustNotice: 'sync',
+    notice: 'sync',
+    on: 'sync',
   },
-  telemetry: { enabled: 'sync', event: 'sync', count: 'sync', gauge: 'sync', error: 'sync', measure: 'sync', startSpan: 'sync' },
+  telemetry: {
+    enabled: 'sync',
+    event: 'sync',
+    count: 'sync',
+    gauge: 'sync',
+    error: 'sync',
+    measure: 'sync',
+    startSpan: 'sync',
+  },
   log: { debug: 'sync', info: 'sync', warn: 'sync', error: 'sync' },
   core: {
     agentToolProvenance: { verify: 'async' },
@@ -37,19 +57,47 @@ const modes = {
     proc: { brokerEnv: 'sync', runProcess: 'async', runProcessOrThrow: 'async' },
     secrets: { use: 'async', useOptional: 'async', seal: 'async', reveal: 'async' },
     tasks: {
-      load: 'async', root: 'async', requireRoot: 'async', resolveCwd: 'async', runConfig: 'async', active: 'async', branchClaims: 'async',
-      workspaceId: 'async', workspaceIdOrNull: 'async', idsForWorkspace: 'async', links: 'async',
-      pulls: 'async', attachPull: 'async', adoptPullNumbers: 'async', createChild: 'async', cancel: 'async', deleted: 'async',
+      load: 'async',
+      root: 'async',
+      requireRoot: 'async',
+      resolveCwd: 'async',
+      runConfig: 'async',
+      active: 'async',
+      branchClaims: 'async',
+      workspaceId: 'async',
+      workspaceIdOrNull: 'async',
+      idsForWorkspace: 'async',
+      links: 'async',
+      pulls: 'async',
+      attachPull: 'async',
+      adoptPullNumbers: 'async',
+      createChild: 'async',
+      cancel: 'async',
+      deleted: 'async',
     },
     context: { injectionEnabled: 'async', assemble: 'async' },
     models: { generateText: 'async', available: 'async' },
-    data: { configured: 'async', connect: 'async', disconnect: 'async', query: 'async', catalog: 'async', schema: 'async' },
+    data: {
+      configured: 'async',
+      connect: 'async',
+      disconnect: 'async',
+      query: 'async',
+      catalog: 'async',
+      schema: 'async',
+    },
     prefs: { read: 'async', write: 'async' },
     identity: { active: 'sync' },
     projects: {
-      byId: 'async', byGithub: 'async', checkouts: 'async', byWorkspace: 'async',
-      externalProjects: 'async', create: 'async', update: 'async', config: 'async',
-      assertConfigTrusted: 'async', setup: 'async',
+      byId: 'async',
+      byGithub: 'async',
+      checkouts: 'async',
+      byWorkspace: 'async',
+      externalProjects: 'async',
+      create: 'async',
+      update: 'async',
+      config: 'async',
+      assertConfigTrusted: 'async',
+      setup: 'async',
     },
     telemetry: { enabled: 'sync', onBatch: 'sync' },
   },
@@ -61,8 +109,11 @@ export function hostFunctionMode(path: string): Mode {
   // The provider fetch handler is the second argument to providers.integration. Its request context
   // lends a provider-owned item store synchronously; the store's reads still cross as async RPC.
   if (path === 'remote.sync.args[1].args[1].providers.items') return 'sync'
-  const prefix = path.startsWith('plugin.init.args[0].') ? 'plugin.init.args[0].'
-    : path.startsWith('plugin.ready.args[0].') ? 'plugin.ready.args[0].' : null
+  const prefix = path.startsWith('plugin.init.args[0].')
+    ? 'plugin.init.args[0].'
+    : path.startsWith('plugin.ready.args[0].')
+      ? 'plugin.ready.args[0].'
+      : null
   if (!prefix) return 'async'
   const method = path.slice(prefix.length)
   // A constructor is exposed as an opaque value in the published declarations. RPC cannot lend its
@@ -71,8 +122,13 @@ export function hostFunctionMode(path: string): Mode {
   // A host result may contain a registered handle or a dynamic capability implementation. Keep
   // known handle methods synchronous; every other result callback remains asynchronous.
   if (method.includes('.result')) {
-    if (method === 'events.on.result.dispose' || method === 'capabilities.provide.result.dispose'
-      || method === 'core.telemetry.onBatch.result.dispose' || method === 'telemetry.startSpan.result.end') return 'sync'
+    if (
+      method === 'events.on.result.dispose' ||
+      method === 'capabilities.provide.result.dispose' ||
+      method === 'core.telemetry.onBatch.result.dispose' ||
+      method === 'telemetry.startSpan.result.end'
+    )
+      return 'sync'
     return 'async'
   }
   const parts = method.split('.')

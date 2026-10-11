@@ -87,7 +87,8 @@ const connect = (): Promise<WebSocket> => {
         ws.onopen = () => {
           liveSocket = ws
           // Reopening the helper socket creates a fresh viewer. Declare interest before queued calls.
-          if (eventInterest !== undefined) ws.send(JSON.stringify({ id: nextId++, method: 'node-interest', params: { nodeId: eventInterest } }))
+          if (eventInterest !== undefined)
+            ws.send(JSON.stringify({ id: nextId++, method: 'node-interest', params: { nodeId: eventInterest } }))
           resolve(ws)
         }
         ws.onerror = () => reject(new Error('acorn could not reach its desktop helper.'))
@@ -130,8 +131,7 @@ const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
     else if (message.push === 'node-transport-error') {
       if (!transportErrorListeners.size) pendingTransportErrors.set(message.nodeId, message.error)
       else for (const cb of transportErrorListeners) cb(message.nodeId, message.error)
-    }
-    else if (message.push === 'config-changed') for (const cb of configListeners) cb(message.state)
+    } else if (message.push === 'config-changed') for (const cb of configListeners) cb(message.state)
     // The node this renderer was talking to has been replaced by a restart or crash recovery. Its
     // endpoint, certificate and token are all new, so everything in memory is about a process that is
     // gone. Electron reloads the window from main; here the page reloads itself.
@@ -189,7 +189,9 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
         if (telemetryEnabled()) recordDuration('core', 'bridge.call', receivedMs, { 'helper.method': method })
         if (receipt && receivedMs >= 1_000) {
           const deliveryMs = helper ? Math.max(0, receipt.receivedAt - helper.repliedAt) : -1
-          log.info(`slow bridge error id=${id} method=${method}${context} total=${Math.round(receivedMs)}ms helper=${Math.round(helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(receipt.parseMs)}ms payload=${receipt.payloadChars} chars`)
+          log.info(
+            `slow bridge error id=${id} method=${method}${context} total=${Math.round(receivedMs)}ms helper=${Math.round(helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(receipt.parseMs)}ms payload=${receipt.payloadChars} chars`,
+          )
         }
         reject(error)
       },
@@ -199,10 +201,10 @@ const call = async <T>(method: HelperMethod, params?: unknown): Promise<T> => {
   const continuationMs = performance.now() - completion.resolvedAt
   const totalMs = completion.receivedMs + continuationMs
   if (totalMs >= 1_000) {
-    const deliveryMs = completion.helper
-      ? Math.max(0, completion.receipt.receivedAt - completion.helper.repliedAt)
-      : -1
-    log.info(`slow bridge call id=${id} method=${method}${context} total=${Math.round(totalMs)}ms helper=${Math.round(completion.helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(completion.receipt.parseMs)}ms continuation=${Math.round(continuationMs)}ms payload=${completion.receipt.payloadChars} chars`)
+    const deliveryMs = completion.helper ? Math.max(0, completion.receipt.receivedAt - completion.helper.repliedAt) : -1
+    log.info(
+      `slow bridge call id=${id} method=${method}${context} total=${Math.round(totalMs)}ms helper=${Math.round(completion.helper?.handlerMs ?? -1)}ms delivery=${Math.round(deliveryMs)}ms parse=${Math.round(completion.receipt.parseMs)}ms continuation=${Math.round(continuationMs)}ms payload=${completion.receipt.payloadChars} chars`,
+    )
   }
   return completion.value
 }
@@ -237,16 +239,27 @@ const previewKey = (taskId: string): string => `preview:${taskId}`
 
 // CSS viewport dimensions let the shell convert zoomed CSS pixels into native logical points.
 const setBounds = (key: string, rect: { x: number; y: number; width: number; height: number }): void =>
-  void webviewOperation(key, 'webview_bounds', { rect, viewport: { width: window.innerWidth, height: window.innerHeight } }).catch(() => undefined)
+  void webviewOperation(key, 'webview_bounds', {
+    rect,
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+  }).catch(() => undefined)
 
 const toWireBody = (body: unknown): WireFetchBody | undefined => {
-  const value = body as { kind: 'bytes'; bytes: Uint8Array } | { kind: 'form'; parts: Record<string, unknown>[] } | undefined
+  const value = body as
+    | { kind: 'bytes'; bytes: Uint8Array }
+    | { kind: 'form'; parts: Record<string, unknown>[] }
+    | undefined
   if (!value) return undefined
   if (value.kind === 'bytes') return { kind: 'bytes', bytes: encodeBytes(value.bytes) }
   return {
     kind: 'form',
     parts: value.parts.map((part) =>
-      'filename' in part ? { ...(part as { name: string; filename: string; type: string }), bytes: encodeBytes(part.bytes as Uint8Array) } : (part as { name: string; value: string }),
+      'filename' in part
+        ? {
+            ...(part as { name: string; filename: string; type: string }),
+            bytes: encodeBytes(part.bytes as Uint8Array),
+          }
+        : (part as { name: string; value: string }),
     ),
   }
 }
@@ -258,7 +271,8 @@ const acorn = {
   },
   // No async boundary: the context leaves before the renderer starts synchronous work.
   reportResponsiveness: (params: ResponsivenessPulse) => {
-    if (liveSocket?.readyState === WebSocket.OPEN) liveSocket.send(JSON.stringify({ id: nextId++, method: 'renderer-pulse', params }))
+    if (liveSocket?.readyState === WebSocket.OPEN)
+      liveSocket.send(JSON.stringify({ id: nextId++, method: 'renderer-pulse', params }))
   },
   desktop: true,
   // Rust writes this into the page before any script runs, because the seam reads it synchronously
@@ -281,23 +295,47 @@ const acorn = {
     }),
   openConfigFile: () => invoke<void>('open_config_file'),
   cli: {
-    status: () => invoke<{ available: boolean; installed: boolean; outdated?: boolean; location: string | null; message: string }>('cli_install_status'),
-    install: () => invoke<{ available: boolean; installed: boolean; outdated?: boolean; location: string | null; message: string }>('cli_install'),
+    status: () =>
+      invoke<{ available: boolean; installed: boolean; outdated?: boolean; location: string | null; message: string }>(
+        'cli_install_status',
+      ),
+    install: () =>
+      invoke<{ available: boolean; installed: boolean; outdated?: boolean; location: string | null; message: string }>(
+        'cli_install',
+      ),
   },
 
   nodeFetch: async (nodeId: string, request: unknown) => {
     const { body, ...rest } = request as { body?: unknown }
-    const wire: WireFetchRequest = { ...(rest as Omit<WireFetchRequest, 'body'>), ...(body ? { body: toWireBody(body) } : {}) }
-    const response = await call<{ status: number; headers: Record<string, string>; body: string }>('node-fetch', { nodeId, request: wire })
+    const wire: WireFetchRequest = {
+      ...(rest as Omit<WireFetchRequest, 'body'>),
+      ...(body ? { body: toWireBody(body) } : {}),
+    }
+    const response = await call<{ status: number; headers: Record<string, string>; body: string }>('node-fetch', {
+      nodeId,
+      request: wire,
+    })
     const decodeFrom = performance.now()
     const decoded = decodeBytes(response.body)
     const decodeMs = performance.now() - decodeFrom
-    if (decodeMs >= 250) log.info(`slow bridge body decode duration=${Math.round(decodeMs)}ms encoded=${response.body.length} chars decoded=${decoded.byteLength} bytes`)
+    if (decodeMs >= 250)
+      log.info(
+        `slow bridge body decode duration=${Math.round(decodeMs)}ms encoded=${response.body.length} chars decoded=${decoded.byteLength} bytes`,
+      )
     return { status: response.status, headers: response.headers, body: decoded }
   },
   nodeAbort: (requestId: string) => tell('node-abort', { requestId }),
-  nodeSend: (nodeId: string, frame: unknown, options?: WsSendOptions) => tell('node-send', { nodeId, frame, ...(options?.intent ? { intent: options.intent } : {}), ...(options?.cleanup === undefined ? {} : { cleanup: options.cleanup }) }),
-  nodeInterest: (nodeId: string | null) => { eventInterest = nodeId; tell('node-interest', { nodeId }) },
+  nodeSend: (nodeId: string, frame: unknown, options?: WsSendOptions) =>
+    tell('node-send', {
+      nodeId,
+      frame,
+      ...(options?.intent ? { intent: options.intent } : {}),
+      ...(options?.cleanup === undefined ? {} : { cleanup: options.cleanup }),
+    }),
+  nodeInterest: (nodeId: string | null) => {
+    eventInterest = nodeId
+    tell('node-interest', { nodeId })
+  },
   onNodeTransportError: (cb: (nodeId: string, error: NodeTransportError) => void) => {
     const off = subscribe(transportErrorListeners, cb)
     for (const [nodeId, error] of pendingTransportErrors) cb(nodeId, error)
@@ -336,7 +374,10 @@ const acorn = {
   config: {
     read: () => call('config-read'),
     write: (patch: unknown) => call('config-write', patch),
-    onChange: (cb: (state: unknown) => void) => { configListeners.add(cb); return () => void configListeners.delete(cb) },
+    onChange: (cb: (state: unknown) => void) => {
+      configListeners.add(cb)
+      return () => void configListeners.delete(cb)
+    },
     location: () => call('config-location'),
   },
 
@@ -354,7 +395,9 @@ const acorn = {
   // socket uses, because Tauri's channel is JSON and a byte array through it is an array of numbers.
   files: {
     pick: async (options: { accept?: readonly string[] }) => {
-      const picked = await invoke<{ name: string; type: string; bytes: string }[]>('pick_files', { accept: options.accept ?? [] })
+      const picked = await invoke<{ name: string; type: string; bytes: string }[]>('pick_files', {
+        accept: options.accept ?? [],
+      })
       return picked.map((file) => ({ name: file.name, type: file.type, bytes: decodeBytes(file.bytes) }))
     },
     save: (request: { bytes: Uint8Array; suggestedName: string; mimeType: string }) =>
@@ -376,28 +419,45 @@ const acorn = {
 
   // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
   // and cleanup hides only its task so a late hide cannot cover the incoming task.
-  rendererLayer: ((globalThis as { __ACORN_PLATFORM__?: string; __ACORN_NATIVE_OVERLAYS__?: boolean }).__ACORN_PLATFORM__ ?? 'darwin') === 'darwin'
-    && (globalThis as { __ACORN_NATIVE_OVERLAYS__?: boolean }).__ACORN_NATIVE_OVERLAYS__ !== false ? {
-    update: (presentation: OverlayPresentation) => overlayEpoch.then((epoch) => epoch === null ? false : invoke<boolean>('overlay_update', { epoch, presentation })),
-  } : undefined,
+  rendererLayer:
+    ((globalThis as { __ACORN_PLATFORM__?: string; __ACORN_NATIVE_OVERLAYS__?: boolean }).__ACORN_PLATFORM__ ??
+      'darwin') === 'darwin' &&
+    (globalThis as { __ACORN_NATIVE_OVERLAYS__?: boolean }).__ACORN_NATIVE_OVERLAYS__ !== false
+      ? {
+          update: (presentation: OverlayPresentation) =>
+            overlayEpoch.then((epoch) =>
+              epoch === null ? false : invoke<boolean>('overlay_update', { epoch, presentation }),
+            ),
+        }
+      : undefined,
   preview: {
     ensure: (taskId: string, url: string) => webviewOperation<boolean>(previewKey(taskId), 'webview_ensure', { url }),
-    setBounds: (taskId: string, rect: { x: number; y: number; width: number; height: number }) => setBounds(previewKey(taskId), rect),
-    show: (taskId: string) => void webviewOperation(previewKey(taskId), 'webview_show', { exclusive: true }).catch(() => undefined),
+    setBounds: (taskId: string, rect: { x: number; y: number; width: number; height: number }) =>
+      setBounds(previewKey(taskId), rect),
+    show: (taskId: string) =>
+      void webviewOperation(previewKey(taskId), 'webview_show', { exclusive: true }).catch(() => undefined),
     hide: (taskId: string) => void webviewOperation(previewKey(taskId), 'webview_hide').catch(() => undefined),
-    load: (taskId: string, url: string) => void webviewOperation(previewKey(taskId), 'webview_load', { url }).catch(() => undefined),
-    command: (taskId: string, action: string) => void webviewOperation(previewKey(taskId), 'webview_command', { action }).catch(() => undefined),
+    load: (taskId: string, url: string) =>
+      void webviewOperation(previewKey(taskId), 'webview_load', { url }).catch(() => undefined),
+    command: (taskId: string, action: string) =>
+      void webviewOperation(previewKey(taskId), 'webview_command', { action }).catch(() => undefined),
     evict: (taskId: string) => evictWebview(previewKey(taskId)),
     evictAll: evictPreviews,
-    onEvent: (cb: (state: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) =>
-      onWebviewState(({ key, ...rest }) => cb({ taskId: key.slice('preview:'.length), ...rest }), (key) => key.startsWith('preview:')),
+    onEvent: (
+      cb: (state: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void,
+    ) =>
+      onWebviewState(
+        ({ key, ...rest }) => cb({ taskId: key.slice('preview:'.length), ...rest }),
+        (key) => key.startsWith('preview:'),
+      ),
   },
 
   // Host-owned page surfaces for accepted loaded plugins. The manifest host allowlist rides on
   // `ensure` and is checked again in Rust, which is the second of the two independent checks
   // docs/shell/webviews.md § Host-owned webviews asks for.
   webview: {
-    ensure: (key: string, url: string, hosts: readonly string[]) => webviewOperation<boolean>(key, 'webview_ensure', { url, hosts: [...hosts] }),
+    ensure: (key: string, url: string, hosts: readonly string[]) =>
+      webviewOperation<boolean>(key, 'webview_ensure', { url, hosts: [...hosts] }),
     setBounds,
     show: (key: string) => void webviewOperation(key, 'webview_show', { exclusive: false }).catch(() => undefined),
     hide: (key: string) => void webviewOperation(key, 'webview_hide').catch(() => undefined),
@@ -442,6 +502,7 @@ function followThemeBackground(): void {
 // the seam-contract suite, which imports this file in a node environment and has no page at all.
 if (typeof document !== 'undefined') {
   installExternalLinks(window, (url) => invoke<void>('open_external_url', { url }))
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', followThemeBackground, { once: true })
+  if (document.readyState === 'loading')
+    document.addEventListener('DOMContentLoaded', followThemeBackground, { once: true })
   else followThemeBackground()
 }

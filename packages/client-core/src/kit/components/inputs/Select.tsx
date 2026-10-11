@@ -39,7 +39,9 @@ function SelectList(props: {
   const filtered = () => {
     const text = query().trim().toLowerCase()
     if (!text) return props.options()
-    return props.options().filter((option) => `${option.label}\n${option.description ?? ''}`.toLowerCase().includes(text))
+    return props
+      .options()
+      .filter((option) => `${option.label}\n${option.description ?? ''}`.toLowerCase().includes(text))
   }
   // Measured against the whole list, not the filtered one: a box that disappeared once you had
   // narrowed the list to seven rows would take the text you typed with it.
@@ -50,18 +52,20 @@ function SelectList(props: {
   // while the list is open, and a collected array keeps handing the arrow keys rows that have been
   // detached since. That is also why this is a DOM collection: the rows are the kit's, but their
   // membership is only knowable at the moment a key arrives (../../keys/collection.ts).
-  const enabled = () => [...listRef?.querySelectorAll<HTMLButtonElement>('.ui-menu-item:not([disabled])') ?? []]
+  const enabled = () => [...(listRef?.querySelectorAll<HTMLButtonElement>('.ui-menu-item:not([disabled])') ?? [])]
   const collection = createDomCollection({ selector: '.ui-menu-item' })
   // Opening on the current value is what the native control does, and it is what makes the arrow
   // keys mean "the next one" rather than "the second one". A filtered list skips this: typing is the
   // first thing you want to do there, so the box takes the caret from its own ref and the rows keep
   // the current value marked without holding focus.
-  onMount(() => queueMicrotask(() => {
-    if (filterable()) return
-    const rows = enabled()
-    const chosen = rows.findIndex((row) => row.dataset.value === props.value())
-    rows[chosen < 0 ? 0 : chosen]?.focus()
-  }))
+  onMount(() =>
+    queueMicrotask(() => {
+      if (filterable()) return
+      const rows = enabled()
+      const chosen = rows.findIndex((row) => row.dataset.value === props.value())
+      rows[chosen < 0 ? 0 : chosen]?.focus()
+    }),
+  )
 
   return (
     <Portal>
@@ -91,7 +95,10 @@ function SelectList(props: {
       >
         <Show when={filterable()}>
           <Input
-            ref={(el) => { filterRef = el; queueMicrotask(() => el.focus()) }}
+            ref={(el) => {
+              filterRef = el
+              queueMicrotask(() => el.focus())
+            }}
             kind="filter"
             placeholder="Filter…"
             label={props.ariaLabel ? `Filter ${props.ariaLabel}` : 'Filter the list'}
@@ -104,7 +111,9 @@ function SelectList(props: {
             {(option, index) => (
               <>
                 <Show when={option.group && (index() === 0 || filtered()[index() - 1]?.group !== option.group)}>
-                  <div class="ui-select-group muted" role="presentation">{option.group}</div>
+                  <div class="ui-select-group muted" role="presentation">
+                    {option.group}
+                  </div>
                 </Show>
                 <button
                   type="button"
@@ -184,7 +193,11 @@ export function Select(props: SelectProps) {
         onChange={(event) => props.onChange?.(event.currentTarget.value)}
       >
         <For each={props.options}>
-          {(option) => <option value={option.value} disabled={option.disabled}>{option.label}</option>}
+          {(option) => (
+            <option value={option.value} disabled={option.disabled}>
+              {option.label}
+            </option>
+          )}
         </For>
       </select>
       <button
@@ -202,7 +215,9 @@ export function Select(props: SelectProps) {
         }}
       >
         <span class="ui-select-value">{label()}</span>
-        <span class="ui-select-chevron" aria-hidden="true">▾</span>
+        <span class="ui-select-chevron" aria-hidden="true">
+          ▾
+        </span>
       </button>
       <Show when={popover.open()}>
         {/* The list's filter box is not the control a caption names. */}

@@ -14,11 +14,34 @@ export function validateExtensions(refs: ManifestReferences): void {
   const claimedMounts = new Set<string>()
   // Each kind lists fields it requires and fields the host would ignore.
   const kindFields: Record<ExtensionPointKind, { required: readonly string[]; refused: readonly string[] }> = {
-    rows: { required: ['location', 'surface'], refused: ['key', 'mode', 'selector', 'accepts', 'actions', 'mounts', 'payload', 'allows'] },
-    annotation: { required: ['key'], refused: ['location', 'surface', 'panels', 'mode', 'selector', 'accepts', 'actions', 'mounts', 'payload', 'allows'] },
+    rows: {
+      required: ['location', 'surface'],
+      refused: ['key', 'mode', 'selector', 'accepts', 'actions', 'mounts', 'payload', 'allows'],
+    },
+    annotation: {
+      required: ['key'],
+      refused: [
+        'location',
+        'surface',
+        'panels',
+        'mode',
+        'selector',
+        'accepts',
+        'actions',
+        'mounts',
+        'payload',
+        'allows',
+      ],
+    },
     remote: { required: ['mode'], refused: ['location', 'surface', 'panels', 'key', 'payload', 'allows'] },
-    rectangle: { required: ['location', 'surface', 'mode'], refused: ['panels', 'key', 'actions', 'mounts', 'payload', 'allows'] },
-    hook: { required: ['payload', 'allows'], refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts', 'actions', 'mounts'] },
+    rectangle: {
+      required: ['location', 'surface', 'mode'],
+      refused: ['panels', 'key', 'actions', 'mounts', 'payload', 'allows'],
+    },
+    hook: {
+      required: ['payload', 'allows'],
+      refused: ['location', 'surface', 'panels', 'key', 'mode', 'selector', 'accepts', 'actions', 'mounts'],
+    },
   }
   extensionPoints.forEach((entry, i) => {
     const at = ['contributions', 'extensionPoints', i] as (string | number)[]
@@ -26,47 +49,83 @@ export function validateExtensions(refs: ManifestReferences): void {
     const declared = entry as unknown as Record<string, unknown>
     for (const field of fields.required) {
       if (declared[field] === undefined) {
-        ctx.addIssue({ code: 'custom', path: [...at, field], message: `a '${entry.kind}' extension point declares ${field}` })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, field],
+          message: `a '${entry.kind}' extension point declares ${field}`,
+        })
       }
     }
     for (const field of fields.refused) {
       if (declared[field] !== undefined) {
-        ctx.addIssue({ code: 'custom', path: [...at, field], message: `${field} is not read on a '${entry.kind}' extension point` })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, field],
+          message: `${field} is not read on a '${entry.kind}' extension point`,
+        })
       }
     }
     entry.mounts?.forEach((mount, j) => {
       const mountAt = [...at, 'mounts', j]
       const frame = detailSurfaces.get(mount.surface)
       if (!frame || (frame.target !== 'refPanel' && frame.target !== 'pane')) {
-        ctx.addIssue({ code: 'custom', path: [...mountAt, 'surface'], message: `mounts names '${mount.surface}', which this manifest does not declare as a pane or reference panel` })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...mountAt, 'surface'],
+          message: `mounts names '${mount.surface}', which this manifest does not declare as a pane or reference panel`,
+        })
         return
       }
       if (frame.target === 'pane' && frame.scope !== 'project') {
-        ctx.addIssue({ code: 'custom', path: [...mountAt, 'surface'], message: `'${mount.surface}' is a task pane; detail regions mount on project panes and reference panels` })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...mountAt, 'surface'],
+          message: `'${mount.surface}' is a task pane; detail regions mount on project panes and reference panels`,
+        })
       }
       const claim = `${mount.surface}\0${mount.region}`
       if (claimedMounts.has(claim)) {
-        ctx.addIssue({ code: 'custom', path: mountAt, message: `'${mount.surface}' already has an extension point mounted at '${mount.region}'` })
+        ctx.addIssue({
+          code: 'custom',
+          path: mountAt,
+          message: `'${mount.surface}' already has an extension point mounted at '${mount.region}'`,
+        })
       }
       claimedMounts.add(claim)
     })
     if (entry.location === undefined || entry.surface === undefined) return
     if (!pointSurfaces.has(entry.surface)) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `extension point names '${entry.surface}', which this manifest does not declare as a pane surface` })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'surface'],
+        message: `extension point names '${entry.surface}', which this manifest does not declare as a pane surface`,
+      })
     }
     // The host has one location for each point on a surface.
     const claim = `${entry.surface}\0${entry.location}`
     if (claimedPoints.has(claim)) {
-      ctx.addIssue({ code: 'custom', path: at, message: `'${entry.surface}' already has an extension point at '${entry.location}'` })
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `'${entry.surface}' already has an extension point at '${entry.location}'`,
+      })
     }
     claimedPoints.add(claim)
     // Inline and row locations use different hosts.
     if (isInlineLocation(entry.location) !== (entry.kind === 'rectangle')) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'location'], message: `'${entry.location}' is not a location a '${entry.kind}' extension point can take` })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'location'],
+        message: `'${entry.location}' is not a location a '${entry.kind}' extension point can take`,
+      })
     }
     // Only the aside reads panel composition.
     if (entry.panels && entry.location !== 'pane.aside') {
-      ctx.addIssue({ code: 'custom', path: [...at, 'panels'], message: "panels is only valid on a 'pane.aside' extension point" })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'panels'],
+        message: "panels is only valid on a 'pane.aside' extension point",
+      })
     }
   })
   // Inline frames draw inside another plugin's extension point.
@@ -98,18 +157,31 @@ export function validateExtensions(refs: ManifestReferences): void {
     if (entry.onSelect) action(entry.onSelect, [...at, 'onSelect'])
     // A remote entry names a tree in the client bundle.
     if (entry.remote !== undefined && !manifest.client) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'remote'], message: 'a remote contribution runs this plugin\u2019s client bundle; declare `client` in the manifest' })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'remote'],
+        message: 'a remote contribution runs this plugin\u2019s client bundle; declare `client` in the manifest',
+      })
     }
     if (entry.frame !== undefined) {
       if (!inlineFrames.has(entry.frame)) {
-        ctx.addIssue({ code: 'custom', path: [...at, 'frame'], message: `extension names frame '${entry.frame}', which this manifest does not declare with target 'inline'` })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'frame'],
+          message: `extension names frame '${entry.frame}', which this manifest does not declare with target 'inline'`,
+        })
       }
       placedInlineFrames.add(entry.frame)
     }
     // Companion extensions can open an overlay without an action descriptor.
     if (entry.overlay !== undefined) {
       if (overlays.has(entry.overlay)) openedOverlays.add(entry.overlay)
-      else ctx.addIssue({ code: 'custom', path: [...at, 'overlay'], message: `extension names overlay '${entry.overlay}', which this manifest does not declare as an overlay surface` })
+      else
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'overlay'],
+          message: `extension names overlay '${entry.overlay}', which this manifest does not declare as an overlay surface`,
+        })
     }
   })
   // An unplaced inline frame has nowhere to draw.

@@ -15,7 +15,13 @@
 // nothing: the paths worth hiding are the owner's home directory and the data root, and those two
 // are named (docs/telemetry/model.md § What never leaves the machine).
 import { homedir } from 'node:os'
-import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, type TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
+import {
+  ATTRS_MAX,
+  ATTR_KEY_MAX,
+  ATTR_VALUE_MAX,
+  LOG_BODY_MAX,
+  type TelemetryAttrs,
+} from '@acorn/protocol/telemetry.ts'
 
 const TOKEN_PATTERNS = [
   /\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b/g,
@@ -79,7 +85,8 @@ export function scrub(value: unknown, fallback = '', max = LOG_BODY_MAX): string
     // happened to sit at index 6 would come back as `6<redacted>`. The copy in
     // `plugins/agents/src/server/drivers/diagnostics.ts` had that bug.
     message = message.replace(pattern, (_match, prefix?: unknown) =>
-      typeof prefix === 'string' ? `${prefix}<redacted>` : '<redacted>')
+      typeof prefix === 'string' ? `${prefix}<redacted>` : '<redacted>',
+    )
   }
   const bounded = message.trim().slice(0, max)
   return bounded || fallback

@@ -1,7 +1,25 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, For, Show } from 'solid-js'
-import { createSettingSave, effectiveModelPick, modelBackendsOptions, prefsOptions, readGeneratePick, saveGeneratePick } from '@acorn/plugin-api/client'
-import { Alert, Badge, Checkbox, Inline, Link, ModelBackendPicker, Select, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
+import {
+  createSettingSave,
+  effectiveModelPick,
+  modelBackendsOptions,
+  prefsOptions,
+  readGeneratePick,
+  saveGeneratePick,
+} from '@acorn/plugin-api/client'
+import {
+  Alert,
+  Badge,
+  Checkbox,
+  Inline,
+  Link,
+  ModelBackendPicker,
+  Select,
+  SettingRow,
+  SettingsSection,
+  Text,
+} from '@acorn/plugin-api/ui'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   AGENT_ARCHIVED_HISTORY_CHOICES,
@@ -13,10 +31,7 @@ import {
 import { managedAgentApi } from '../sessions/managedClient'
 import ProviderGlyph from '../sessions/ProviderGlyph'
 import { advertisedOptionsByProvider } from './agentConfigOptions'
-import {
-  agentSessionDefaultsOptions,
-  writeAgentSessionDefaults,
-} from './sessionDefaultsClient'
+import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from './sessionDefaultsClient'
 import {
   AGENT_TOOL_FOLD_CHOICES,
   defaultAgentToolFoldPrefs,
@@ -31,7 +46,10 @@ import SpawnedAgentDefaultsSettings from './SpawnedAgentDefaultsSettings'
  *  whether it is installed. */
 const harnessState = (provider: AgentProviderDescriptor): string | undefined => {
   if (!provider.installed) return provider.diagnostics[0]
-  const parts = [provider.executableVersion ? `Version ${provider.executableVersion}.` : '', provider.authenticated === false ? 'Not signed in.' : '']
+  const parts = [
+    provider.executableVersion ? `Version ${provider.executableVersion}.` : '',
+    provider.authenticated === false ? 'Not signed in.' : '',
+  ]
   return parts.filter(Boolean).join(' ') || undefined
 }
 
@@ -70,7 +88,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   // Not before the record is read: a patch carries whole `pinned` and `inline` objects built from it, and
   // built from the defaults it would wipe every other harness's pins on the node.
   const save = async (patch: Partial<AgentSessionDefaults>) => {
-    if (!stored.data) throw new Error('This node\'s defaults have not been read yet. Try again in a moment.')
+    if (!stored.data) throw new Error("This node's defaults have not been read yet. Try again in a moment.")
     return writeAgentSessionDefaults(queryClient, record(), patch)
   }
   const continueAfterLimit = createSettingSave()
@@ -86,7 +104,8 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   // Like the generation pick, the fold setting is a device preference. It controls how transcripts
   // are drawn, separate from the defaults the Node keeps for launching sessions.
   const fold = () => readAgentToolFoldPrefs(prefs.data)
-  const chooseFold = (mode: AgentToolFoldMode) => void foldSave.run(() => saveAgentToolFoldMode(queryClient, prefs.data, mode))
+  const chooseFold = (mode: AgentToolFoldMode) =>
+    void foldSave.run(() => saveAgentToolFoldMode(queryClient, prefs.data, mode))
 
   const choose = (providerId: string, optionId: string, value: string) => {
     const forProvider = { ...record().pinned[providerId] }
@@ -94,17 +113,21 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
     else delete forProvider[optionId]
     return save({ pinned: { ...record().pinned, [providerId]: forProvider } })
   }
-  const inlineProvider = createMemo(() => record().inline.providerId ?? providers()?.find((provider) => provider.installed)?.id ?? '')
+  const inlineProvider = createMemo(
+    () => record().inline.providerId ?? providers()?.find((provider) => provider.installed)?.id ?? '',
+  )
   const chooseInlineProvider = (providerId: string) =>
     void inlineProviderSave.run(() => save({ inline: { ...record().inline, providerId } }))
   const chooseInlineOption = (providerId: string, optionId: string, value: string) => {
     const current = { ...record().inline.pinned[providerId] }
     if (value) current[optionId] = value
     else delete current[optionId]
-    return save({ inline: {
-      ...record().inline,
-      pinned: { ...record().inline.pinned, [providerId]: current },
-    } })
+    return save({
+      inline: {
+        ...record().inline,
+        pinned: { ...record().inline.pinned, [providerId]: current },
+      },
+    })
   }
 
   return (
@@ -120,12 +143,19 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
         label="Harnesses"
         help="The agent command-line tools this computer can run. Plugins can add more."
       >
-        <For each={providers() ?? []} fallback={<Text emphasis="muted">{providers.loading ? 'Loading harnesses…' : 'No harnesses on this node.'}</Text>}>
+        <For
+          each={providers() ?? []}
+          fallback={
+            <Text emphasis="muted">{providers.loading ? 'Loading harnesses…' : 'No harnesses on this node.'}</Text>
+          }
+        >
           {(provider) => (
             <SettingRow label={provider.label} description={harnessState(provider)}>
               <Inline>
                 <ProviderGlyph glyph={provider.glyph} label={provider.label} />
-                <Badge tone={provider.installed ? 'ok' : 'neutral'}>{provider.installed ? 'Installed' : 'Not installed'}</Badge>
+                <Badge tone={provider.installed ? 'ok' : 'neutral'}>
+                  {provider.installed ? 'Installed' : 'Not installed'}
+                </Badge>
               </Inline>
             </SettingRow>
           )}
@@ -171,7 +201,10 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
           <Select
             label="Warn when an agent repeats a tool call"
             value={String(record().warnRepeatedToolCallsAfter)}
-            options={AGENT_REPEATED_TOOL_CALL_CHOICES.map((choice) => ({ value: String(choice.calls), label: choice.label }))}
+            options={AGENT_REPEATED_TOOL_CALL_CHOICES.map((choice) => ({
+              value: String(choice.calls),
+              label: choice.label,
+            }))}
             onChange={(value) => void repeatedCalls.run(() => save({ warnRepeatedToolCallsAfter: Number(value) }))}
           />
         </SettingRow>
@@ -187,7 +220,10 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
           <Select
             label="Keep agent history for archived tasks"
             value={String(record().keepArchivedHistoryDays)}
-            options={AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => ({ value: String(choice.days), label: choice.label }))}
+            options={AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => ({
+              value: String(choice.days),
+              label: choice.label,
+            }))}
             onChange={(value) => void archivedHistory.run(() => save({ keepArchivedHistoryDays: Number(value) }))}
           />
         </SettingRow>
@@ -199,11 +235,27 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
         help="acorn writes commit messages, SQL, and workflow drafts with the model you pick. An API key is billed to that key. An agent CLI uses its own sign-in."
       >
         {/* Stacked when there are two selects, which do not fit the control column side by side. */}
-        <SettingRow label="Generate with" scope="device" layout={backends().length > 1 ? 'stacked' : 'inline'} error={generateSave.error()}>
+        <SettingRow
+          label="Generate with"
+          scope="device"
+          layout={backends().length > 1 ? 'stacked' : 'inline'}
+          error={generateSave.error()}
+        >
           {/* The one place the default is changed outside a dialog. The picker hides its backend
               select when there is a single choice: there is no choice to make, and the model select
               beside it still is one. */}
-          <Show when={backends().length} fallback={<Text emphasis="muted">{modelStatus.isError ? "Couldn't ask this node what it can generate with." : modelStatus.isPending ? 'Reading what this node can generate with…' : 'Nothing to generate with. Add a key, or install an agent CLI.'}</Text>}>
+          <Show
+            when={backends().length}
+            fallback={
+              <Text emphasis="muted">
+                {modelStatus.isError
+                  ? "Couldn't ask this node what it can generate with."
+                  : modelStatus.isPending
+                    ? 'Reading what this node can generate with…'
+                    : 'Nothing to generate with. Add a key, or install an agent CLI.'}
+              </Text>
+            }
+          >
             <ModelBackendPicker
               backends={backends()}
               backendId={generatePick()?.backendId ?? ''}
@@ -283,7 +335,11 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
                           value={record().pinned[provider.id]?.[option.id] ?? ''}
                           options={[
                             { value: '', label: `Whatever ${provider.label} picks` },
-                            ...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description })),
+                            ...option.values.map((value) => ({
+                              value: value.value,
+                              label: value.label,
+                              title: value.description,
+                            })),
                           ]}
                           onChange={(value) => void pin.run(() => choose(provider.id, option.id, value))}
                         />
@@ -297,24 +353,42 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
         </For>
       </Show>
 
-      <SpawnedAgentDefaultsSettings value={record().spawned} providers={providers() ?? []}
-        advertised={advertised()} onSave={(spawned) => save({ spawned })} />
+      <SpawnedAgentDefaultsSettings
+        value={record().spawned}
+        providers={providers() ?? []}
+        advertised={advertised()}
+        onSave={(spawned) => save({ spawned })}
+      />
 
       <SettingsSection id="inline" label="Inline diff chats">
         <SettingRow label="Provider" error={inlineProviderSave.error()}>
-          <Select label="Inline chat provider" value={inlineProvider()}
-            options={(providers() ?? []).filter((provider) => provider.installed).map((provider) => ({ value: provider.id, label: provider.label }))}
-            onChange={chooseInlineProvider} />
+          <Select
+            label="Inline chat provider"
+            value={inlineProvider()}
+            options={(providers() ?? [])
+              .filter((provider) => provider.installed)
+              .map((provider) => ({ value: provider.id, label: provider.label }))}
+            onChange={chooseInlineProvider}
+          />
         </SettingRow>
-        <For each={(advertised()[inlineProvider()] ?? []).filter((option) => option.category === 'model' || option.category === 'reasoning')}>
+        <For
+          each={(advertised()[inlineProvider()] ?? []).filter(
+            (option) => option.category === 'model' || option.category === 'reasoning',
+          )}
+        >
           {(option) => {
             const pin = createSettingSave()
             return (
               <SettingRow label={option.label} error={pin.error()}>
-                <Select label={`Inline chat ${option.label}`}
+                <Select
+                  label={`Inline chat ${option.label}`}
                   value={record().inline.pinned[inlineProvider()]?.[option.id] ?? ''}
-                  options={[{ value: '', label: 'Provider default' }, ...option.values.map((value) => ({ value: value.value, label: value.label }))]}
-                  onChange={(value) => void pin.run(() => chooseInlineOption(inlineProvider(), option.id, value))} />
+                  options={[
+                    { value: '', label: 'Provider default' },
+                    ...option.values.map((value) => ({ value: value.value, label: value.label })),
+                  ]}
+                  onChange={(value) => void pin.run(() => chooseInlineOption(inlineProvider(), option.id, value))}
+                />
               </SettingRow>
             )
           }}
@@ -328,7 +402,11 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
           scope="device"
           error={foldSave.error()}
           // The default is what a transcript draws with nothing stored.
-          onReset={fold().mode === defaultAgentToolFoldPrefs.mode ? undefined : () => chooseFold(defaultAgentToolFoldPrefs.mode)}
+          onReset={
+            fold().mode === defaultAgentToolFoldPrefs.mode
+              ? undefined
+              : () => chooseFold(defaultAgentToolFoldPrefs.mode)
+          }
         >
           <Select
             label="Tool call display"

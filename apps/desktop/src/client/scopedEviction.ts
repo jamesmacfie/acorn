@@ -16,7 +16,8 @@ import { dropNode } from '@acorn/client-core/infra/node/fleet.ts'
 export function activateScopedStateEviction(): () => void {
   const offTask = clientEvents.on('runtime:task-archived', ({ taskId }) => evictScope({ scope: 'task', taskId }))
   const offWorkspace = clientEvents.on('runtime:workspace-removed', ({ workspaceId }) =>
-    evictScope({ scope: 'workspace', workspaceId }))
+    evictScope({ scope: 'workspace', workspaceId }),
+  )
   // One call, where task-archival fans out to ten listeners. That is the per-node QueryClient paying
   // off: every piece of a node's cached data lives in that node's client and nowhere else, so there is
   // exactly one thing to drop.
@@ -24,7 +25,9 @@ export function activateScopedStateEviction(): () => void {
   // And this is where that payoff stops. Feature state held in module-level signals sits outside the
   // QueryClient partition and survived a node switch. Only live rosters clear; durable per-task and
   // per-workspace memory is keyed by node instead, so switching back restores it.
-  const offSwitch = clientEvents.on('runtime:node-switched', ({ from, to }) => evictScope({ scope: 'node-switched', from, to }))
+  const offSwitch = clientEvents.on('runtime:node-switched', ({ from, to }) =>
+    evictScope({ scope: 'node-switched', from, to }),
+  )
   return () => {
     offSwitch()
     offNode()

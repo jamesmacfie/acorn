@@ -24,9 +24,19 @@ class RepeatingDriver implements AgentDriver {
 
   async probe(): Promise<AgentProviderDescriptor> {
     return {
-      id: this.providerId, profileId: this.profileId, label: 'Repeat test', driverKind: 'acp',
-      driverVersion: 'test-1', installed: true, authenticated: true, statusAuthority: 'protocol',
-      capabilities: ['streaming_messages'], configOptions: [], commands: [], skills: [], diagnostics: [],
+      id: this.providerId,
+      profileId: this.profileId,
+      label: 'Repeat test',
+      driverKind: 'acp',
+      driverVersion: 'test-1',
+      installed: true,
+      authenticated: true,
+      statusAuthority: 'protocol',
+      capabilities: ['streaming_messages'],
+      configOptions: [],
+      commands: [],
+      skills: [],
+      diagnostics: [],
     }
   }
 
@@ -36,7 +46,9 @@ class RepeatingDriver implements AgentDriver {
     let active = false
     return {
       providerSessionRef: randomUUID(),
-      get ready() { return !active },
+      get ready() {
+        return !active
+      },
       sendTurn: async () => {
         active = true
         for (const tool of this.calls) await options.onEvent({ type: 'tool', tool })
@@ -53,7 +65,11 @@ class RepeatingDriver implements AgentDriver {
 
 const bash = (count: number, command = 'gh pr checks'): AgentToolCall[] =>
   Array.from({ length: count }, (_, index) => ({
-    id: `call-${index}-${randomUUID()}`, title: command, kind: 'execute', status: 'completed', input: command,
+    id: `call-${index}-${randomUUID()}`,
+    title: command,
+    kind: 'execute',
+    status: 'completed',
+    input: command,
   }))
 
 describe('warning about repeated tool calls', () => {
@@ -72,13 +88,31 @@ describe('warning about repeated tool calls', () => {
     taskId = randomUUID()
     await ctx.db.insert(schema.workspaces).values({ id: workspaceId, name: 'W', createdAt: at, updatedAt: at })
     await ctx.db.insert(schema.projects).values({
-      id: 'project-repeat', name: 'repeat', path: worktree, workspaceId, sort: 0, hidden: false, vcs: 'git',
-      defaultBranch: 'main', remoteUrl: null, githubOwner: 'acorn', githubName: 'repeat', githubRepoId: null,
-      createdAt: at, updatedAt: at,
+      id: 'project-repeat',
+      name: 'repeat',
+      path: worktree,
+      workspaceId,
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acorn',
+      githubName: 'repeat',
+      githubRepoId: null,
+      createdAt: at,
+      updatedAt: at,
     })
     await ctx.db.insert(schema.tasks).values({
-      id: taskId, title: 'Repeat test', origin: 'local', projectId: 'project-repeat', branch: 'test',
-      worktreePath: worktree, status: 'active', createdAt: at, updatedAt: at,
+      id: taskId,
+      title: 'Repeat test',
+      origin: 'local',
+      projectId: 'project-repeat',
+      branch: 'test',
+      worktreePath: worktree,
+      status: 'active',
+      createdAt: at,
+      updatedAt: at,
     })
     driver = new RepeatingDriver()
     notices = []
@@ -103,19 +137,34 @@ describe('warning about repeated tool calls', () => {
 
   const runTurn = async () => {
     const session = await runtime.createSession({
-      taskId, providerId: driver.providerId, profileId: driver.profileId, kind: 'interactive', config: {},
+      taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
     })
     await runtime.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: 'Wait for CI.' }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
+      input: [{ type: 'text', text: 'Wait for CI.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
     })
-    await vi.waitFor(async () => expect((await runtime.store.snapshot(session.id)).turns.every((turn) =>
-      !['queued', 'dispatching', 'active'].includes(turn.status))).toBe(true))
+    await vi.waitFor(async () =>
+      expect(
+        (await runtime.store.snapshot(session.id)).turns.every(
+          (turn) => !['queued', 'dispatching', 'active'].includes(turn.status),
+        ),
+      ).toBe(true),
+    )
     const { events } = await runtime.store.snapshot(session.id)
     return {
       // Titled from the first prompt by now.
       session: await runtime.store.requireSession(session.id),
       warnings: events.flatMap((record) =>
-        record.event.type === 'diagnostic' && record.event.message.includes('times in a row') ? [record.event.message] : []),
+        record.event.type === 'diagnostic' && record.event.message.includes('times in a row')
+          ? [record.event.message]
+          : [],
+      ),
     }
   }
 
@@ -123,14 +172,16 @@ describe('warning about repeated tool calls', () => {
     driver.calls = bash(6)
     const { session, warnings } = await runTurn()
     expect(warnings).toEqual([
-      'The agent has run “gh pr checks” 3 times in a row with the same input. It may be stuck. If it isn\'t making progress, stop the turn.',
+      "The agent has run “gh pr checks” 3 times in a row with the same input. It may be stuck. If it isn't making progress, stop the turn.",
     ])
-    expect(notices).toEqual([{
-      taskId,
-      title: 'An agent may be stuck',
-      detail: `“${session.title}” has made the same tool call 3 times in a row.`,
-      target: { kind: 'managed-agent', resourceId: session.id },
-    }])
+    expect(notices).toEqual([
+      {
+        taskId,
+        title: 'An agent may be stuck',
+        detail: `“${session.title}” has made the same tool call 3 times in a row.`,
+        target: { kind: 'managed-agent', resourceId: session.id },
+      },
+    ])
   })
 
   it('says nothing when the calls differ', async () => {
@@ -139,14 +190,20 @@ describe('warning about repeated tool calls', () => {
     expect(notices).toEqual([])
   })
 
-  it('follows the owner\'s setting, including off', async () => {
-    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), warnRepeatedToolCallsAfter: 5 })
+  it("follows the owner's setting, including off", async () => {
+    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, {
+      ...defaultAgentSessionDefaults(),
+      warnRepeatedToolCallsAfter: 5,
+    })
     driver.calls = bash(4)
     expect((await runTurn()).warnings).toEqual([])
     driver.calls = bash(5)
     expect((await runTurn()).warnings).toHaveLength(1)
 
-    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), warnRepeatedToolCallsAfter: 0 })
+    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, {
+      ...defaultAgentSessionDefaults(),
+      warnRepeatedToolCallsAfter: 0,
+    })
     driver.calls = bash(12)
     expect((await runTurn()).warnings).toEqual([])
     expect(notices).toHaveLength(1)

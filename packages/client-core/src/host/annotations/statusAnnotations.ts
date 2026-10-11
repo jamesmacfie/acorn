@@ -22,8 +22,24 @@ import { railMarkerRegistry } from '../registries/rail/railMarkerFeed'
 import { sourceRegistry } from '../registries/sources/sources'
 
 // Four corners, as on a task row. A fifth mark stays in the legend.
-extensionPointRegistry.register({ id: CORE_SOURCE_POINT, ownerId: 'core', label: 'Rail source', kind: 'annotation', key: CORE_SOURCE_KEY, max: 4, acceptedMarks: 256 })
-extensionPointRegistry.register({ id: CORE_PANE_POINT, ownerId: 'core', label: 'Task pane button', kind: 'annotation', key: CORE_PANE_KEY, max: 4, acceptedMarks: 256 })
+extensionPointRegistry.register({
+  id: CORE_SOURCE_POINT,
+  ownerId: 'core',
+  label: 'Rail source',
+  kind: 'annotation',
+  key: CORE_SOURCE_KEY,
+  max: 4,
+  acceptedMarks: 256,
+})
+extensionPointRegistry.register({
+  id: CORE_PANE_POINT,
+  ownerId: 'core',
+  label: 'Task pane button',
+  kind: 'annotation',
+  key: CORE_PANE_KEY,
+  max: 4,
+  acceptedMarks: 256,
+})
 
 /** The project each asked source was keyed with. A source missing here was not asked about. */
 const [askedSources, setAskedSources] = createSignal<ReadonlyMap<string, string>>(new Map())
@@ -36,7 +52,8 @@ const askedOwners = new Map<string, readonly object[]>()
 
 function ask(pointId: string, owners: readonly object[], keys: readonly PluginAnnotationKey[]): void {
   const previous = askedOwners.get(pointId) ?? []
-  if (previous.length !== owners.length || previous.some((owner, index) => owner !== owners[index])) clearAnnotations(pointId)
+  if (previous.length !== owners.length || previous.some((owner, index) => owner !== owners[index]))
+    clearAnnotations(pointId)
   askedOwners.set(pointId, owners)
   // No empty batch: nothing could draw its answer.
   if (keys.length) requestAnnotations(pointId, keys)
@@ -46,7 +63,10 @@ function ask(pointId: string, owners: readonly object[], keys: readonly PluginAn
  * Ask about the sources the rail draws. A project-scoped source is keyed by the routed project and
  * skipped while there is none; any other source is keyed by `''`. Idempotent for an unchanged set.
  */
-export function requestSourceAnnotations(sourceIds: readonly string[], routedProjectId: string | null | undefined): void {
+export function requestSourceAnnotations(
+  sourceIds: readonly string[],
+  routedProjectId: string | null | undefined,
+): void {
   const owners: object[] = []
   const keys: PluginAnnotationKey[] = []
   const asked = new Map<string, string>()
@@ -64,9 +84,16 @@ export function requestSourceAnnotations(sourceIds: readonly string[], routedPro
 }
 
 /** Ask about the panes one task's switcher draws. Pass the pane registrations it draws. */
-export function requestPaneAnnotations(taskId: string, panes: readonly { id: string; statusAnnotations?: boolean }[]): void {
+export function requestPaneAnnotations(
+  taskId: string,
+  panes: readonly { id: string; statusAnnotations?: boolean }[],
+): void {
   const consenting = panes.filter((pane) => pane.statusAnnotations)
-  ask(CORE_PANE_POINT, consenting, consenting.map((pane) => ({ paneId: pane.id, taskId })))
+  ask(
+    CORE_PANE_POINT,
+    consenting,
+    consenting.map((pane) => ({ paneId: pane.id, taskId })),
+  )
   setAskedPanes(consenting.length ? { taskId, paneIds: new Set(consenting.map((pane) => pane.id)) } : null)
 }
 
@@ -81,7 +108,9 @@ railMarkerRegistry.register({
   markers: (target) => {
     if (target.kind !== 'source') return []
     const projectId = askedSources().get(target.id)
-    return projectId === undefined ? [] : annotationRailMarkers(annotationsFor(CORE_SOURCE_POINT, { sourceId: target.id, projectId }))
+    return projectId === undefined
+      ? []
+      : annotationRailMarkers(annotationsFor(CORE_SOURCE_POINT, { sourceId: target.id, projectId }))
   },
 })
 

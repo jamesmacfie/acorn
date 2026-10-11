@@ -12,9 +12,15 @@ const as = (principal: Record<string, unknown> | null) => {
   })
   return app.route('/api/agents', agentLoopHooks)
 }
-const post = (app: Hono<AppEnv>, body: unknown) => app.fetch(new Request('http://acorn.test/api/agents/loop-hook', {
-  method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-}), {} as Env)
+const post = (app: Hono<AppEnv>, body: unknown) =>
+  app.fetch(
+    new Request('http://acorn.test/api/agents/loop-hook', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+    {} as Env,
+  )
 
 const call = { version: LOOP_HOOK_VERSION, harness: 'claude', event: 'PreToolUse', input: { tool_name: 'Bash' } }
 // An agent session's own ACORN_API_TOKEN, which names its task and its session.
@@ -26,7 +32,10 @@ describe('the bridge ingress', () => {
   it('answers for the session the token names, never one the body names', async () => {
     const callers: unknown[] = []
     setAgentLoopHooksBridge({
-      answer: async (caller) => { callers.push(caller); return { version: LOOP_HOOK_VERSION, output: 'deny' } },
+      answer: async (caller) => {
+        callers.push(caller)
+        return { version: LOOP_HOOK_VERSION, output: 'deny' }
+      },
       coverage: async () => ({ harnesses: [] }),
     })
     const response = await post(as(agent), { ...call, sessionId: 'someone-else' })
@@ -37,7 +46,10 @@ describe('the bridge ingress', () => {
   it('gives no decision to a device, a token with no session, or a body it does not recognise', async () => {
     const callers: unknown[] = []
     setAgentLoopHooksBridge({
-      answer: async (caller) => { callers.push(caller); return { version: LOOP_HOOK_VERSION, output: 'deny' } },
+      answer: async (caller) => {
+        callers.push(caller)
+        return { version: LOOP_HOOK_VERSION, output: 'deny' }
+      },
       coverage: async () => ({ harnesses: [] }),
     })
     const none = { version: LOOP_HOOK_VERSION, output: '' }
@@ -53,8 +65,11 @@ describe('the bridge ingress', () => {
       answer: async () => ({ version: LOOP_HOOK_VERSION, output: '' }),
       coverage: async () => ({ harnesses: [{ label: 'Claude Code', beforeTool: 'every', afterTool: true }] }),
     })
-    const read = (principal: Record<string, unknown>) => as(principal).fetch(new Request('http://acorn.test/api/agents/loop-coverage/policy'), {} as Env)
+    const read = (principal: Record<string, unknown>) =>
+      as(principal).fetch(new Request('http://acorn.test/api/agents/loop-coverage/policy'), {} as Env)
     expect((await read(agent)).status).toBe(403)
-    expect(await (await read({ kind: 'device', userId: 'james' })).json()).toEqual({ harnesses: [{ label: 'Claude Code', beforeTool: 'every', afterTool: true }] })
+    expect(await (await read({ kind: 'device', userId: 'james' })).json()).toEqual({
+      harnesses: [{ label: 'Claude Code', beforeTool: 'every', afterTool: true }],
+    })
   })
 })

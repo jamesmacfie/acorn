@@ -1,5 +1,11 @@
 import type { InternalClaims } from '../auth/internalTokens'
-import { WS_MAX_VIEWERS, wsFrameSchema, wsViewerFrameSchema, wsViewerCloseSchema, type WsServerFrame } from '@acorn/protocol/ws.ts'
+import {
+  WS_MAX_VIEWERS,
+  wsFrameSchema,
+  wsViewerFrameSchema,
+  wsViewerCloseSchema,
+  type WsServerFrame,
+} from '@acorn/protocol/ws.ts'
 import type { StreamHandlers, StreamSink, WsChannelHandler } from './wsHub'
 import type { EventViewer, WsViewers } from './wsViewers'
 
@@ -11,10 +17,16 @@ type Outputs = {
   invoke(action: () => unknown): void
 }
 
-export const isTaskConfinedWs = (parent: { internal?: InternalClaims }): boolean => !!parent.internal && parent.internal.scope !== 'service'
+export const isTaskConfinedWs = (parent: { internal?: InternalClaims }): boolean =>
+  !!parent.internal && parent.internal.scope !== 'service'
 
 /** Dispatches viewer-owned resources using the authenticated physical parent's authority. */
-export function createWsViewerDispatch(parent: Parent, streams: () => StreamHandlers | null, channels: ReadonlyMap<string, WsChannelHandler>, output: Outputs) {
+export function createWsViewerDispatch(
+  parent: Parent,
+  streams: () => StreamHandlers | null,
+  channels: ReadonlyMap<string, WsChannelHandler>,
+  output: Outputs,
+) {
   const retire = (owner: EventViewer) => {
     for (const [id, sink] of owner.sinks) {
       owner.sinks.delete(id)
@@ -28,7 +40,11 @@ export function createWsViewerDispatch(parent: Parent, streams: () => StreamHand
     close: () => parent.viewers.clear(retire),
     receive(raw: string): unknown {
       let parsed: unknown
-      try { parsed = JSON.parse(raw) } catch { return }
+      try {
+        parsed = JSON.parse(raw)
+      } catch {
+        return
+      }
       const envelope = wsFrameSchema.safeParse(parsed)
       if (!envelope.success) return
       let frame = envelope.data
@@ -46,7 +62,12 @@ export function createWsViewerDispatch(parent: Parent, streams: () => StreamHand
         if (!nested.success) return
         const held = parent.viewers.acquire(nested.data.viewerId)
         if (!held) {
-          output.send({ channel: 'ws:viewer-error', viewerId: nested.data.viewerId, code: 'viewer_limit', message: `This Node connection has reached its ${WS_MAX_VIEWERS}-viewer limit.` })
+          output.send({
+            channel: 'ws:viewer-error',
+            viewerId: nested.data.viewerId,
+            code: 'viewer_limit',
+            message: `This Node connection has reached its ${WS_MAX_VIEWERS}-viewer limit.`,
+          })
           return
         }
         owner = held
@@ -57,14 +78,22 @@ export function createWsViewerDispatch(parent: Parent, streams: () => StreamHand
         const { id, data, cols, rows } = frame
         if (!handlers || typeof id !== 'string') return
         // The viewer carries no claims. Read the physical parent's claims on every dispatch.
-        if (isTaskConfinedWs(parent) && (!parent.internal?.taskId || handlers.streamTaskId(id) !== parent.internal.taskId)) return
+        if (
+          isTaskConfinedWs(parent) &&
+          (!parent.internal?.taskId || handlers.streamTaskId(id) !== parent.internal.taskId)
+        )
+          return
         if (frame.channel === 'term:input') {
           if (typeof data === 'string') return handlers.input(id, data)
         } else if (frame.channel === 'term:attach') {
           if (owner.sinks.has(id)) return
           const sink: StreamSink = (message) => output.stream(owner, id, message)
           owner.sinks.set(id, sink)
-          return handlers.attach(id, sink, typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined)
+          return handlers.attach(
+            id,
+            sink,
+            typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined,
+          )
         } else if (frame.channel === 'term:detach') {
           const sink = owner.sinks.get(id)
           if (sink) {
@@ -76,7 +105,13 @@ export function createWsViewerDispatch(parent: Parent, streams: () => StreamHand
         return
       }
       if (isTaskConfinedWs(parent)) return
-      return channels.get(frame.channel.split(':', 1)[0])?.onFrame(frame, (reply) => { if (owner.active) output.send(reply, owner.id) }, owner)
+      return channels.get(frame.channel.split(':', 1)[0])?.onFrame(
+        frame,
+        (reply) => {
+          if (owner.active) output.send(reply, owner.id)
+        },
+        owner,
+      )
     },
   }
 }

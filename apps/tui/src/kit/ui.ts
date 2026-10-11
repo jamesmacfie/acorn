@@ -9,24 +9,94 @@
 // being the same. A pane that names something missing here fails to build, which is this host's way
 // of saying which node has not been drawn yet.
 export {
-  Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
-  Toolbar, FilterBar, ToolbarSpacer,
+  Card,
+  DetailColumn,
+  DocumentTabs,
+  Fold,
+  Inline,
+  ListColumn,
+  ListDetail,
+  Menu,
+  Modal,
+  ModalActions,
+  ModalBody,
+  Popover,
+  Section,
+  SectionHeader,
+  Sections,
+  SettingRow,
+  SettingsSection,
+  SplitHandle,
+  Stack,
+  TabPanel,
+  Tabs,
+  Timeline,
+  Toolbar,
+  FilterBar,
+  ToolbarSpacer,
 } from './grouping'
 export {
-  Alert, Badge, ChipRow, Chip, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
-  FileHead, Grid, Heading, Icon, Kbd, Link, Log, Markdown, Meter, NonCodeRow, Row, RowActions, Rows,
-  Spinner, SplitCell, StackedDiff, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
+  Alert,
+  Badge,
+  ChipRow,
+  Chip,
+  CodeBlock,
+  DescriptionList,
+  DiffLine,
+  DiffPane,
+  EmptyState,
+  Facts,
+  FileHead,
+  Grid,
+  Heading,
+  Icon,
+  Kbd,
+  Link,
+  Log,
+  Markdown,
+  Meter,
+  NonCodeRow,
+  Row,
+  RowActions,
+  Rows,
+  Spinner,
+  SplitCell,
+  StackedDiff,
+  StatusDot,
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+  Text,
+  TreeRow,
+  UserAvatar,
 } from './showing'
 export {
-  Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,
-  MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  Button,
+  Checkbox,
+  Composer,
+  ConfirmButton,
+  CopyButton,
+  Field,
+  FindBar,
+  IconButton,
+  Input,
+  KeyValueEditor,
+  MentionTextarea,
+  ModelBackendPicker,
+  Picker,
+  PickerRow,
+  SegmentedControl,
+  Select,
+  Textarea,
   ToggleButton,
 } from './asking'
 export { Fallback, Only, Rectangle } from './pixels'
 import { copyToTerminal } from './copy'
 /** OSC 52 where the terminal advertises support; otherwise the caller shows the path. */
-export async function copyText(text: string): Promise<boolean> { return copyToTerminal(text) }
+export async function copyText(text: string): Promise<boolean> {
+  return copyToTerminal(text)
+}
 // The canvas, as the indented list. Its own file because it reaches into two of the three above.
 export { Graph } from './graph'
 export { HistoryMark } from './historyMark'
@@ -42,7 +112,12 @@ export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'
 export type { ItemProps } from '../keys/collection'
 // The prop-shape types a pane names in its own signatures. Types only, from the kit's own
 // declarations, so the two hosts cannot disagree about what a node takes.
-export type { ButtonProps, InputProps, SelectOption, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
+export type {
+  ButtonProps,
+  InputProps,
+  SelectOption,
+  SelectProps,
+} from '@acorn/client-core/kit/components/primitives.tsx'
 export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
 export type { PickerItem, PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 export type { KitSection } from '@acorn/client-core/kit/components/layout'
@@ -54,7 +129,10 @@ export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 export { createTimelineWindow } from '@acorn/client-core/kit/lib'
 export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export type {
-  MentionSegment, MentionSource, MentionSuggestion, MentionTextareaProps,
+  MentionSegment,
+  MentionSource,
+  MentionSuggestion,
+  MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 
 // Not components, and not the DOM ones either. Each is a rule rather than a rendering, and every rule

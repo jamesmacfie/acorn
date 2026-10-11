@@ -24,9 +24,15 @@ describe('dashboardSharedRead', () => {
   it('passes any other failure of a shared read to every caller', async () => {
     const failure = new Error('provider-failure')
     let loads = 0
-    const load = () => { loads++; return Promise.reject(failure) }
-    const results = await Promise.allSettled([dashboardSharedRead('key', load, isCancelled), dashboardSharedRead('key', load, isCancelled)])
-    expect(results.map(result => result.status === 'rejected' && result.reason)).toEqual([failure, failure])
+    const load = () => {
+      loads++
+      return Promise.reject(failure)
+    }
+    const results = await Promise.allSettled([
+      dashboardSharedRead('key', load, isCancelled),
+      dashboardSharedRead('key', load, isCancelled),
+    ])
+    expect(results.map((result) => result.status === 'rejected' && result.reason)).toEqual([failure, failure])
     expect(loads).toBe(1)
   })
 })

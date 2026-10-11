@@ -3,14 +3,28 @@
 
 /** The palette a theme block must state in full. Colour values only. */
 export const THEME_PALETTE_TOKENS = [
-  '--bg', '--bg-subtle', '--bg-hover', '--bg-selected',
-  '--border', '--border-strong',
-  '--text', '--text-muted', '--text-faint',
-  '--accent', '--focus',
-  '--add-bg', '--add-marker', '--del-bg', '--del-marker',
-  '--add-word-bg', '--del-word-bg',
-  '--hunk-bg', '--hunk-text',
-  '--warn', '--badge-border', '--shadow-popover',
+  '--bg',
+  '--bg-subtle',
+  '--bg-hover',
+  '--bg-selected',
+  '--border',
+  '--border-strong',
+  '--text',
+  '--text-muted',
+  '--text-faint',
+  '--accent',
+  '--focus',
+  '--add-bg',
+  '--add-marker',
+  '--del-bg',
+  '--del-marker',
+  '--add-word-bg',
+  '--del-word-bg',
+  '--hunk-bg',
+  '--hunk-text',
+  '--warn',
+  '--badge-border',
+  '--shadow-popover',
 ] as const
 
 /** Room for `oklch(0.7 0.15 250 / 0.42)` and nothing like a stylesheet. */

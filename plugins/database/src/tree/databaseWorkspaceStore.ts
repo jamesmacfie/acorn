@@ -41,13 +41,34 @@ export function rememberDatabaseWorkspace(nodeId: string, taskId: string, worksp
 const table = z.object({ schema: z.string(), name: z.string() })
 const cell = z.string().nullable()
 const workspaceSchema = z.object({
-  dbName: z.string(), tables: z.array(table), filter: z.string(), selected: table.nullable(),
+  dbName: z.string(),
+  tables: z.array(table),
+  filter: z.string(),
+  selected: table.nullable(),
   columns: z.array(z.object({ name: z.string(), dataType: z.string(), nullable: z.boolean(), isPk: z.boolean() })),
-  result: z.object({ columns: z.array(z.string()), rows: z.array(z.array(cell)), rowCount: z.number().nullable(), command: z.string() }).nullable(),
-  resultTable: table.nullable(), footer: z.string(), activeRow: z.number().int().nonnegative().nullable(),
-  loadedName: z.string(), inserting: z.boolean(),
+  result: z
+    .object({
+      columns: z.array(z.string()),
+      rows: z.array(z.array(cell)),
+      rowCount: z.number().nullable(),
+      command: z.string(),
+    })
+    .nullable(),
+  resultTable: table.nullable(),
+  footer: z.string(),
+  activeRow: z.number().int().nonnegative().nullable(),
+  loadedName: z.string(),
+  inserting: z.boolean(),
   rowDraft: z.record(z.string(), z.object({ value: z.string(), isNull: z.boolean() })).nullable(),
-  savedQueries: z.array(z.object({ id: z.string(), name: z.string(), notes: z.string().nullable(), sql: z.string(), updatedAt: z.number() })),
+  savedQueries: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      notes: z.string().nullable(),
+      sql: z.string(),
+      updatedAt: z.number(),
+    }),
+  ),
 })
 
 // Even JSON escaping every character fits below the bridge's 1 MiB value limit. Result sets can be
@@ -60,7 +81,10 @@ const storedSchema = z.union([
 ])
 let revisionSequence = 0
 
-export async function loadDatabaseWorkspace(state: AcornBridge['state'], taskId: string): Promise<DatabaseWorkspace | undefined> {
+export async function loadDatabaseWorkspace(
+  state: AcornBridge['state'],
+  taskId: string,
+): Promise<DatabaseWorkspace | undefined> {
   const id = stateKey(taskId)
   const stored = storedSchema.safeParse(await state.get(id))
   if (!stored.success) return undefined
@@ -68,23 +92,45 @@ export async function loadDatabaseWorkspace(state: AcornBridge['state'], taskId:
   if ('text' in stored.data) text = stored.data.text
   else {
     const manifest = stored.data
-    const parts = await Promise.all(Array.from({ length: manifest.chunks }, (_, i) => state.get<{ revision: string; text: string }>(`${id}:part:${i}`)))
+    const parts = await Promise.all(
+      Array.from({ length: manifest.chunks }, (_, i) =>
+        state.get<{ revision: string; text: string }>(`${id}:part:${i}`),
+      ),
+    )
     // A held or interrupted save must never combine rows from different snapshots.
-    if (parts.some((part) => !part || part.revision !== manifest.revision || typeof part.text !== 'string' || part.text.length > CHUNK_CHARS)) return undefined
+    if (
+      parts.some(
+        (part) =>
+          !part ||
+          part.revision !== manifest.revision ||
+          typeof part.text !== 'string' ||
+          part.text.length > CHUNK_CHARS,
+      )
+    )
+      return undefined
     text = parts.map((part) => part!.text).join('')
   }
   if (new TextEncoder().encode(text).byteLength > 32 * 1024 * 1024) return undefined
   let value: unknown
-  try { value = JSON.parse(text) } catch { return undefined }
+  try {
+    value = JSON.parse(text)
+  } catch {
+    return undefined
+  }
   const parsed = workspaceSchema.safeParse(value)
   if (!parsed.success) return undefined
   const workspace = parsed.data
-  if (workspace.activeRow !== null && (!workspace.result || workspace.activeRow >= workspace.result.rows.length)) return undefined
+  if (workspace.activeRow !== null && (!workspace.result || workspace.activeRow >= workspace.result.rows.length))
+    return undefined
   // Provider availability is refreshed from the Node, rather than restored from an old snapshot.
   return { ...workspace, modelBackends: [] }
 }
 
-export async function saveDatabaseWorkspace(state: AcornBridge['state'], taskId: string, workspace: DatabaseWorkspace): Promise<void> {
+export async function saveDatabaseWorkspace(
+  state: AcornBridge['state'],
+  taskId: string,
+  workspace: DatabaseWorkspace,
+): Promise<void> {
   const id = stateKey(taskId)
   const text = JSON.stringify(workspace)
   if (text.length <= CHUNK_CHARS) {
@@ -93,11 +139,14 @@ export async function saveDatabaseWorkspace(state: AcornBridge['state'], taskId:
   }
   const revision = `${Date.now()}:${++revisionSequence}:${Math.random()}`
   const chunks = Math.ceil(text.length / CHUNK_CHARS)
-  if (chunks > 256 || new TextEncoder().encode(text).byteLength > 32 * 1024 * 1024) throw new Error('The database view exceeds the 32 MiB restoration limit.')
+  if (chunks > 256 || new TextEncoder().encode(text).byteLength > 32 * 1024 * 1024)
+    throw new Error('The database view exceeds the 32 MiB restoration limit.')
   // Admit every write while this mount's bridge is live. The host processes messages in order and
   // saves values through its own preference queue; no later callback borrows a retired bridge.
   await Promise.all([
-    ...Array.from({ length: chunks }, (_, i) => state.set(`${id}:part:${i}`, { revision, text: text.slice(i * CHUNK_CHARS, (i + 1) * CHUNK_CHARS) })),
+    ...Array.from({ length: chunks }, (_, i) =>
+      state.set(`${id}:part:${i}`, { revision, text: text.slice(i * CHUNK_CHARS, (i + 1) * CHUNK_CHARS) }),
+    ),
     state.set(id, { version: 1, revision, chunks }),
   ])
 }
@@ -117,19 +166,62 @@ export function createDatabaseWorkspace(initial?: DatabaseWorkspace) {
   const [rowDraft, setRowDraft] = createSignal<RowDraft | null>(initial?.rowDraft ?? null)
   const [loadedName, setLoadedName] = createSignal(initial?.loadedName ?? '')
   const snapshot = (savedQueries: DbSavedQuery[], modelBackends: ModelBackend[]): DatabaseWorkspace => ({
-    dbName: dbName(), tables: tables(), filter: filter(), selected: selected(), columns: columns(),
-    result: result(), resultTable: resultTable(), footer: footer(), activeRow: activeRow(), loadedName: loadedName(),
-    savedQueries, modelBackends, inserting: inserting(), rowDraft: rowDraft(),
+    dbName: dbName(),
+    tables: tables(),
+    filter: filter(),
+    selected: selected(),
+    columns: columns(),
+    result: result(),
+    resultTable: resultTable(),
+    footer: footer(),
+    activeRow: activeRow(),
+    loadedName: loadedName(),
+    savedQueries,
+    modelBackends,
+    inserting: inserting(),
+    rowDraft: rowDraft(),
   })
-  const restore = (workspace: DatabaseWorkspace) => batch(() => {
-    setDbName(workspace.dbName); setTables(workspace.tables); setFilter(workspace.filter)
-    setSelected(workspace.selected); setColumns(workspace.columns); setResult(workspace.result)
-    setResultTable(workspace.resultTable); setFooter(workspace.footer); setActiveRow(workspace.activeRow)
-    setLoadedName(workspace.loadedName); setInserting(workspace.inserting); setRowDraft(workspace.rowDraft)
-  })
+  const restore = (workspace: DatabaseWorkspace) =>
+    batch(() => {
+      setDbName(workspace.dbName)
+      setTables(workspace.tables)
+      setFilter(workspace.filter)
+      setSelected(workspace.selected)
+      setColumns(workspace.columns)
+      setResult(workspace.result)
+      setResultTable(workspace.resultTable)
+      setFooter(workspace.footer)
+      setActiveRow(workspace.activeRow)
+      setLoadedName(workspace.loadedName)
+      setInserting(workspace.inserting)
+      setRowDraft(workspace.rowDraft)
+    })
   return {
-    dbName, setDbName, tables, setTables, filter, setFilter, selected, setSelected, columns, setColumns,
-    result, setResult, resultTable, setResultTable, footer, setFooter, activeRow, setActiveRow,
-    inserting, setInserting, rowDraft, setRowDraft, loadedName, setLoadedName, snapshot, restore,
+    dbName,
+    setDbName,
+    tables,
+    setTables,
+    filter,
+    setFilter,
+    selected,
+    setSelected,
+    columns,
+    setColumns,
+    result,
+    setResult,
+    resultTable,
+    setResultTable,
+    footer,
+    setFooter,
+    activeRow,
+    setActiveRow,
+    inserting,
+    setInserting,
+    rowDraft,
+    setRowDraft,
+    loadedName,
+    setLoadedName,
+    snapshot,
+    restore,
   }
 }

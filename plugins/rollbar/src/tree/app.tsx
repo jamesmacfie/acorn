@@ -1,7 +1,5 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import {
-  Button, DetailColumn, EmptyState, ListColumn, ListDetail, Row,
-} from '@acorn/plugin-api/ui/tree'
+import { Button, DetailColumn, EmptyState, ListColumn, ListDetail, Row } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
 import {
@@ -76,7 +74,11 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
       ])
       if (request.aborted) return
       const currentOccurrence = occurrence()
-      if (!keepView || currentOccurrence.kind !== 'ready' || !occurrences.occurrences.some((entry) => entry.id === currentOccurrence.detail.id)) {
+      if (
+        !keepView ||
+        currentOccurrence.kind !== 'ready' ||
+        !occurrences.occurrences.some((entry) => entry.id === currentOccurrence.detail.id)
+      ) {
         setOccurrence({ kind: 'empty' })
       }
       setView({ target, item, occurrences: occurrences.occurrences })
@@ -86,7 +88,13 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
     } catch (error) {
       if (request.aborted) return
       if (keepView) setRefreshError(failureReason(error))
-      else setPage({ kind: 'error', title: "Couldn't load this error", detail: failureReason(error), retry: () => void load(target) })
+      else
+        setPage({
+          kind: 'error',
+          title: "Couldn't load this error",
+          detail: failureReason(error),
+          retry: () => void load(target),
+        })
     } finally {
       if (!request.aborted) setRefreshing(false)
     }
@@ -94,7 +102,12 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
 
   // The same cached occurrence route the Occurrences tab reads, so Overview adds no new request shape.
   // A refresh keeps the old one on screen until the new one lands.
-  const loadLatest = async (target: RollbarRailTarget, id: string, request: AbortSignal, keep: boolean): Promise<void> => {
+  const loadLatest = async (
+    target: RollbarRailTarget,
+    id: string,
+    request: AbortSignal,
+    keep: boolean,
+  ): Promise<void> => {
     if (!keep) setLatest({ kind: 'loading', id })
     try {
       const detail = await props.bridge.api.get<RollbarOccurrenceDetail>(
@@ -191,15 +204,17 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
     <Show when={linkedTargets().length > 1} fallback={body()}>
       <ListDetail split listWidth="narrow">
         <ListColumn label="Linked Rollbar errors">
-          <For each={linkedTargets()}>{(target) => (
-            <Row
-              density="compact"
-              selected={view() ? targetKey(view()!.target) === targetKey(target) : false}
-              onPress={() => void load(target)}
-            >
-              #{target.identifier}
-            </Row>
-          )}</For>
+          <For each={linkedTargets()}>
+            {(target) => (
+              <Row
+                density="compact"
+                selected={view() ? targetKey(view()!.target) === targetKey(target) : false}
+                onPress={() => void load(target)}
+              >
+                #{target.identifier}
+              </Row>
+            )}
+          </For>
         </ListColumn>
         <DetailColumn scroll>{body()}</DetailColumn>
       </ListDetail>
@@ -217,17 +232,35 @@ function PageStatus(props: { state: PageState }) {
   const failure = () => (props.state.kind === 'error' ? props.state : undefined)
   const empty = () => (props.state.kind === 'empty' ? props.state : undefined)
   return (
-    <Show when={failure()} fallback={(
-      <Show when={empty()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
-        {(state) => <EmptyState title={state().title} />}
-      </Show>
-    )}
+    <Show
+      when={failure()}
+      fallback={
+        <Show
+          when={empty()}
+          fallback={
+            <EmptyState busy align="start" size="sm">
+              Loading…
+            </EmptyState>
+          }
+        >
+          {(state) => <EmptyState title={state().title} />}
+        </Show>
+      }
     >
       {(error) => (
         <EmptyState title={error().title}>
           {error().detail}
           {/* A child, not `action`: a tree's props are JSON, so an element-valued prop never arrives. */}
-          <Show when={error().retry}>{(retry) => <> <Button size="sm" variant="ghost" onPress={retry()}>Try again</Button></>}</Show>
+          <Show when={error().retry}>
+            {(retry) => (
+              <>
+                {' '}
+                <Button size="sm" variant="ghost" onPress={retry()}>
+                  Try again
+                </Button>
+              </>
+            )}
+          </Show>
         </EmptyState>
       )}
     </Show>

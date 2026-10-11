@@ -13,7 +13,10 @@ import { requiredRuntimePackages } from '../../scripts/nodeRuntimePackages'
 const RUNTIME_RESOLVED = [
   ...requiredRuntimePackages,
   // Optional native accelerators and platform packages that can be absent.
-  'fsevents', 'bufferutil', 'utf-8-validate', 'pg-native',
+  'fsevents',
+  'bufferutil',
+  'utf-8-validate',
+  'pg-native',
 ]
 
 const builtins = new Set(builtinModules)
@@ -21,4 +24,6 @@ const builtins = new Set(builtinModules)
 // A bare `import 'path'` with no node: prefix is a builtin too. Some builtins, node:sqlite among them,
 // exist only with the prefix and are listed that way.
 export const isRuntimeResolved = (id: string): boolean =>
-  builtins.has(id) || builtins.has(id.replace(/^node:/, '')) || RUNTIME_RESOLVED.some((name) => id === name || id.startsWith(`${name}/`))
+  builtins.has(id) ||
+  builtins.has(id.replace(/^node:/, '')) ||
+  RUNTIME_RESOLVED.some((name) => id === name || id.startsWith(`${name}/`))

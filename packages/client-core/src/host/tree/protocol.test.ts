@@ -41,15 +41,30 @@ describe('props are sanitized before anything sees them', () => {
   })
 
   it('drops nested host handles before kit components can spread them onto DOM', () => {
-    const row = sanitizeProps('Row', { label: 'safe', item: { innerHTML: '<img src=x onerror=run()>', onClick: 'run()' } })
+    const row = sanitizeProps('Row', {
+      label: 'safe',
+      item: { innerHTML: '<img src=x onerror=run()>', onClick: 'run()' },
+    })
     expect(row).toEqual({ props: { label: 'safe' }, dropped: ['item'] })
-    const split = sanitizeProps('SplitHandle', { axis: 'x', drag: { handleProps: { innerHTML: '<script>run()</script>', style: 'position:fixed' } } })
+    const split = sanitizeProps('SplitHandle', {
+      axis: 'x',
+      drag: { handleProps: { innerHTML: '<script>run()</script>', style: 'position:fixed' } },
+    })
     expect(split).toEqual({ props: { axis: 'x' }, dropped: ['drag'] })
   })
 
   it('allows only explicit HTTPS destinations in sandboxed tree href props', () => {
-    expect(sanitizeProps('Button', { href: 'https://example.test/', label: 'Open' }).props).toEqual({ href: 'https://example.test/', label: 'Open' })
-    for (const href of ['javascript:alert(1)', 'data:text/html,evil', 'file:///tmp/x', '/settings', 'http://example.test/']) {
+    expect(sanitizeProps('Button', { href: 'https://example.test/', label: 'Open' }).props).toEqual({
+      href: 'https://example.test/',
+      label: 'Open',
+    })
+    for (const href of [
+      'javascript:alert(1)',
+      'data:text/html,evil',
+      'file:///tmp/x',
+      '/settings',
+      'http://example.test/',
+    ]) {
       expect(sanitizeProps('Button', { href }).props).toEqual({})
     }
   })
@@ -94,7 +109,9 @@ describe('the mutation schema', () => {
   it('accepts the five ops and refuses anything else', () => {
     expect(mutation.safeParse({ op: 'remove', id: 'n1' }).success).toBe(true)
     expect(mutation.safeParse({ op: 'text', id: 'n1', value: 'x' }).success).toBe(true)
-    expect(mutation.safeParse({ op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Card' } }).success).toBe(true)
+    expect(mutation.safeParse({ op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Card' } }).success).toBe(
+      true,
+    )
     expect(mutation.safeParse({ op: 'replaceEverything', id: 'n1' }).success).toBe(false)
     expect(mutation.safeParse({ op: 'remove' }).success).toBe(false)
   })
@@ -111,19 +128,39 @@ describe('the mutation schema', () => {
     expect(boundedSandboxMessage(prop)).toBe(false)
     expect(sandboxMessage.safeParse(prop).success).toBe(false)
 
-    const huge = { kind: 'tree:batch', slot: 's1', ops: [{ op: 'text', id: 'n1', value: 'x'.repeat(TREE_LIMITS.batchBytes + 1) }], bytes: 0 }
+    const huge = {
+      kind: 'tree:batch',
+      slot: 's1',
+      ops: [{ op: 'text', id: 'n1', value: 'x'.repeat(TREE_LIMITS.batchBytes + 1) }],
+      bytes: 0,
+    }
     expect(boundedSandboxMessage(huge)).toBe(false)
   })
 
   it('survives a fuzz of malformed messages without throwing', () => {
     const junk: unknown[] = [
-      null, undefined, 0, '', [], {}, { kind: 'tree:batch' }, { kind: 'tree:batch', slot: 's', ops: null },
+      null,
+      undefined,
+      0,
+      '',
+      [],
+      {},
+      { kind: 'tree:batch' },
+      { kind: 'tree:batch', slot: 's', ops: null },
       { kind: 'tree:batch', slot: 's', ops: [{ op: 'insert' }] },
       { kind: 'tree:batch', slot: 's', ops: [{ op: 'patch', id: 'n1', props: { onPress: () => {} } }] },
-      { kind: 'tree:event' }, { kind: 42 }, { kind: 'tree:pong', extra: Number.NaN },
+      { kind: 'tree:event' },
+      { kind: 42 },
+      { kind: 'tree:pong', extra: Number.NaN },
     ]
     for (const value of junk) expect(() => sandboxMessage.safeParse(value)).not.toThrow()
     // And a function never survives the parse, whatever it is called.
-    expect(sandboxMessage.safeParse({ kind: 'tree:batch', slot: 's', ops: [{ op: 'patch', id: 'n1', props: { onPress: () => {} } }] }).success).toBe(false)
+    expect(
+      sandboxMessage.safeParse({
+        kind: 'tree:batch',
+        slot: 's',
+        ops: [{ op: 'patch', id: 'n1', props: { onPress: () => {} } }],
+      }).success,
+    ).toBe(false)
   })
 })

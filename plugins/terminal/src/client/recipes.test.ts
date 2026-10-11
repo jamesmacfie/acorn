@@ -4,10 +4,19 @@ import { paneRegistry } from '@acorn/plugin-api/testkit/client'
 
 const paneRegistrations: { dispose(): void }[] = []
 beforeAll(() => {
-  for (const [id, order] of [['pr', 1], ['changes', 2]] as const) {
-    paneRegistrations.push(paneRegistry.register({
-      id, order, label: id, glyph: id, component: () => null,
-    }))
+  for (const [id, order] of [
+    ['pr', 1],
+    ['changes', 2],
+  ] as const) {
+    paneRegistrations.push(
+      paneRegistry.register({
+        id,
+        order,
+        label: id,
+        glyph: id,
+        component: () => null,
+      }),
+    )
   }
 })
 afterAll(() => paneRegistrations.splice(0).forEach((registration) => registration.dispose()))
@@ -32,7 +41,11 @@ describe('recipeToLayout', () => {
 describe('invokeLayoutRecipe (13 §C example)', () => {
   it('seeds the layout, starts the terminal target, resolves the browser URL', async () => {
     const svc = stubSvc()
-    const res = await invokeLayoutRecipe('t1', { id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }, svc)
+    const res = await invokeLayoutRecipe(
+      't1',
+      { id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' },
+      svc,
+    )
     expect(res).toEqual({ ok: true })
     expect(svc.setLayout).toHaveBeenCalledWith('t1', { panes: ['pr', 'changes'] })
     expect(svc.startTarget).toHaveBeenCalledTimes(1) // browser target === terminal target → one start

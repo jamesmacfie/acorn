@@ -30,16 +30,24 @@ export function startClientSchedules(): () => void {
     // the window stays open. Keep the active set in sync instead of filtering it once at startup.
     const active = createMemo((previous: readonly ClientScheduleContribution[] = []) => {
       const next = clientScheduleRegistry.entries().filter((entry) => hasHostCapability(entry.requires))
-      return next.length === previous.length && next.every((entry, index) => entry === previous[index]) ? previous : next
+      return next.length === previous.length && next.every((entry, index) => entry === previous[index])
+        ? previous
+        : next
     })
     const owners = new Map<ClientScheduleContribution, () => void>()
     let previousNode = activeNodeId()
-    onCleanup(() => { [...owners.values()].reverse().forEach(stop => stop()); owners.clear() })
+    onCleanup(() => {
+      ;[...owners.values()].reverse().forEach((stop) => stop())
+      owners.clear()
+    })
     createEffect(() => {
       const nodeId = activeNodeId()
       const entries = active()
       for (const [entry, stop] of owners) {
-        if (nodeId !== previousNode || !entries.includes(entry)) { stop(); owners.delete(entry) }
+        if (nodeId !== previousNode || !entries.includes(entry)) {
+          stop()
+          owners.delete(entry)
+        }
       }
       previousNode = nodeId
       for (const entry of entries) {
@@ -49,16 +57,30 @@ export function startClientSchedules(): () => void {
         let dirty = false
         const refresh = () => {
           if (stopped || activeNodeId() !== nodeId || hostHidden() || !hasHostCapability(entry.requires)) return
-          if (running) { dirty = true; return }
+          if (running) {
+            dirty = true
+            return
+          }
           running = true
           void (async () => {
             try {
               do {
                 dirty = false
-                try { await entry.run() }
-                catch (error) { log.error(entry.id, error, { 'schedule.id': entry.id }) }
-              } while (dirty && !stopped && activeNodeId() === nodeId && !hostHidden() && hasHostCapability(entry.requires))
-            } finally { running = false }
+                try {
+                  await entry.run()
+                } catch (error) {
+                  log.error(entry.id, error, { 'schedule.id': entry.id })
+                }
+              } while (
+                dirty &&
+                !stopped &&
+                activeNodeId() === nodeId &&
+                !hostHidden() &&
+                hasHostCapability(entry.requires)
+              )
+            } finally {
+              running = false
+            }
           })()
         }
         const timer = setInterval(refresh, entry.intervalMs)

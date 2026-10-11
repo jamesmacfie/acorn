@@ -43,7 +43,8 @@ function selectedContent(root: HTMLElement): SelectedContent | undefined {
   if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return undefined
   const text = selection.toString()
   if (!text.trim()) return undefined
-  const fence = (node: Node) => (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>('.ui-code-wrap')
+  const fence = (node: Node) =>
+    (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>('.ui-code-wrap')
   const code = fence(range.startContainer)
   return code && code === fence(range.endContainer)
     ? { text, contentKind: 'code', languageId: fenceLanguage(code.dataset.language) }
@@ -67,7 +68,8 @@ export function SelectionActions(props: SelectionActionsProps) {
   const [opening, setOpening] = createSignal<Opening | null>(null)
   const onContextMenu = (event: MouseEvent) => {
     // Option + right-click keeps the platform's menu, and a link keeps its own.
-    if (!root || event.defaultPrevented || event.altKey || (event.target as Element | null)?.closest?.('a[href]')) return
+    if (!root || event.defaultPrevented || event.altKey || (event.target as Element | null)?.closest?.('a[href]'))
+      return
     const target = props.select(selectedContent(root))
     // With nothing to offer, the platform's menu is the right answer.
     if (!target || !contextMenuItems('content.selection', target).length) return
@@ -75,14 +77,21 @@ export function SelectionActions(props: SelectionActionsProps) {
     const active = root.ownerDocument.activeElement
     const selection = root.ownerDocument.getSelection()
     setOpening({
-      at: { x: event.clientX, y: event.clientY }, target,
+      at: { x: event.clientX, y: event.clientY },
+      target,
       ...(active instanceof HTMLElement && root.contains(active) ? { returnTo: active } : {}),
       ...(selection?.rangeCount ? { range: selection.getRangeAt(0).cloneRange() } : {}),
     })
   }
   return (
     // `display: contents`, so wrapping an owner's content changes none of its layout.
-    <div ref={(element) => { root = element }} style={{ display: 'contents' }} onContextMenu={onContextMenu}>
+    <div
+      ref={(element) => {
+        root = element
+      }}
+      style={{ display: 'contents' }}
+      onContextMenu={onContextMenu}
+    >
       {props.children}
       <ContextMenu
         at={() => opening()?.at ?? null}
@@ -96,9 +105,7 @@ export function SelectionActions(props: SelectionActionsProps) {
       >
         {(menu) => (
           <Show when={opening()}>
-            {(open) => (
-              <SelectionMenuRows context={menu} target={open().target} isCurrent={props.isCurrent} />
-            )}
+            {(open) => <SelectionMenuRows context={menu} target={open().target} isCurrent={props.isCurrent} />}
           </Show>
         )}
       </ContextMenu>
@@ -116,17 +123,24 @@ function SelectionMenuRows(props: {
   return (
     <>
       {/* The platform's menu this replaced had Copy, so this one keeps it. */}
-      <Menu.Item context={props.context} onSelect={() => void navigator.clipboard?.writeText(props.target.text)}>Copy</Menu.Item>
+      <Menu.Item context={props.context} onSelect={() => void navigator.clipboard?.writeText(props.target.text)}>
+        Copy
+      </Menu.Item>
       <Menu.Separator />
       {/* Refused whole rather than cut: an action on part of what the person chose is not what they
           asked for. */}
-      <Show when={!selectionTooLarge(props.target.text)} fallback={<Menu.Label>This selection is over 64 KiB. Select less to use an action.</Menu.Label>}>
+      <Show
+        when={!selectionTooLarge(props.target.text)}
+        fallback={<Menu.Label>This selection is over 64 KiB. Select less to use an action.</Menu.Label>}
+      >
         <For each={rows()}>
           {(row) => (
             <Menu.Item
               context={props.context}
               leading={row.icon ? <Icon name={row.icon} /> : undefined}
-              onSelect={() => { if (props.isCurrent(props.target)) runContextMenuItem(row, props.target) }}
+              onSelect={() => {
+                if (props.isCurrent(props.target)) runContextMenuItem(row, props.target)
+              }}
             >
               {row.label}
             </Menu.Item>

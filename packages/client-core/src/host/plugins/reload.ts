@@ -4,8 +4,12 @@ import { clientFor, nodes, nodeState } from '../../infra/node/fleet'
 import { refreshNodePlugins } from '../../infra/node/nodePlugins'
 import { wsOnFleetPluginsChanged } from '../../infra/node/wsClient'
 import {
-  distribution, forgetPluginNode, markPluginNodeStale, notifyActivePluginNodeChanged,
-  onPluginDistributionCommit, syncPluginDistribution,
+  distribution,
+  forgetPluginNode,
+  markPluginNodeStale,
+  notifyActivePluginNodeChanged,
+  onPluginDistributionCommit,
+  syncPluginDistribution,
 } from './distribution'
 import { syncPluginContributions, syncPluginContributionsInBackground } from './syncContributions'
 import { createLogger } from '../../infra/telemetry/logger'
@@ -73,8 +77,10 @@ export function watchPluginChanges(): () => void {
         if (nextSelected && !observation?.reachable && current.get(nextSelected) !== 'offline') reads.push(nextSelected)
       }
       previous = current
-      if (reads.length) void syncPluginDistribution({ nodeIds: [...new Set(reads)] })
-        .catch((error) => log.warn("could not read the fleet's plugins", error))
+      if (reads.length)
+        void syncPluginDistribution({ nodeIds: [...new Set(reads)] }).catch((error) =>
+          log.warn("could not read the fleet's plugins", error),
+        )
     })
     return dispose
   })

@@ -50,17 +50,37 @@ describe('the active-task list route', () => {
 
   const seed = async (projectCount: number, tasksPerProject: number) => {
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'w1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'w1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     for (let p = 0; p < projectCount; p++) {
       await t.db.insert(schema.projects).values({
-        id: `project-${p}`, name: `p${p}`, path: `/tmp/p${p}`, workspaceId: 'w1', sort: p, hidden: false,
-        vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: `p${p}`, githubRepoId: null,
-        createdAt: now, updatedAt: now,
+        id: `project-${p}`,
+        name: `p${p}`,
+        path: `/tmp/p${p}`,
+        workspaceId: 'w1',
+        sort: p,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: null,
+        githubOwner: 'acme',
+        githubName: `p${p}`,
+        githubRepoId: null,
+        createdAt: now,
+        updatedAt: now,
       })
       for (let i = 0; i < tasksPerProject; i++) {
         await t.db.insert(schema.tasks).values({
-          id: `task-${p}-${i}`, title: `T${p}${i}`, origin: 'local', projectId: `project-${p}`,
-          branch: `feat-${p}-${i}`, status: 'active', sort: p * 100 + i, createdAt: now, updatedAt: now,
+          id: `task-${p}-${i}`,
+          title: `T${p}${i}`,
+          origin: 'local',
+          projectId: `project-${p}`,
+          branch: `feat-${p}-${i}`,
+          status: 'active',
+          sort: p * 100 + i,
+          createdAt: now,
+          updatedAt: now,
         })
       }
     }
@@ -133,11 +153,12 @@ describe('the active-task list route', () => {
     expect(broadcasts).toEqual([{ channel: 'tasks:changed', taskId: task.id }])
     broadcasts.length = 0
 
-    const patch = (title: string) => app.request(`http://acorn.test/api/tasks/${task.id}`, {
-      method: 'PATCH',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ title }),
-    })
+    const patch = (title: string) =>
+      app.request(`http://acorn.test/api/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
     expect((await patch('New task')).status).toBe(200)
     expect((await patch('Renamed task')).status).toBe(200)
 
@@ -156,17 +177,21 @@ describe('the active-task list route', () => {
       mode: 'transform',
       priority: 500,
       call: async (payload) => {
-        const [row] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, payload.taskId as string))
+        const [row] = await t.db
+          .select()
+          .from(schema.tasks)
+          .where(eq(schema.tasks.id, payload.taskId as string))
         archiving.push(`${payload.taskId as string}:${row?.status}`)
         return { payload }
       },
     })
     try {
-      const patch = (status: 'active' | 'archived') => app.request('http://acorn.test/api/tasks/task-0-0', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
+      const patch = (status: 'active' | 'archived') =>
+        app.request('http://acorn.test/api/tasks/task-0-0', {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ status }),
+        })
       const result = await patch('archived')
       expect(result.status).toBe(200)
       expect(await result.json()).toMatchObject({ archivedTaskIds: ['task-0-2', 'task-0-1', 'task-0-0'] })
@@ -192,7 +217,9 @@ describe('the active-task list route', () => {
       })
       .route('/api/tasks', tasks)
     const response = await confined.request('http://acorn.test/api/tasks/task-0-0', {
-      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'archived' }),
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'archived' }),
     })
     expect(response.status).toBe(404)
     expect((await t.db.select().from(schema.tasks)).every((row) => row.status === 'active')).toBe(true)
@@ -200,11 +227,12 @@ describe('the active-task list route', () => {
 
   it('stores setup opt-out per task and defaults other task seeds to setup enabled', async () => {
     await seed(1, 0)
-    const create = (body: Record<string, unknown>) => app.request('http://acorn.test/api/tasks', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ origin: 'local', projectId: 'project-0', branch: 'feature', ...body }),
-    })
+    const create = (body: Record<string, unknown>) =>
+      app.request('http://acorn.test/api/tasks', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ origin: 'local', projectId: 'project-0', branch: 'feature', ...body }),
+      })
 
     const skipped = await create({ title: 'Skip setup', skipSetup: true })
     const ordinary = await create({ title: 'Run setup', branch: 'other-feature' })
@@ -212,7 +240,9 @@ describe('the active-task list route', () => {
     expect(ordinary.status).toBe(200)
     const skippedId = ((await skipped.json()) as Task).id
     const ordinaryId = ((await ordinary.json()) as Task).id
-    const rows = await t.db.select({ id: schema.tasks.id, skipSetup: schema.tasks.skipSetup }).from(schema.tasks)
+    const rows = await t.db
+      .select({ id: schema.tasks.id, skipSetup: schema.tasks.skipSetup })
+      .from(schema.tasks)
       .where(eq(schema.tasks.projectId, 'project-0'))
     expect(rows).toContainEqual({ id: skippedId, skipSetup: true })
     expect(rows).toContainEqual({ id: ordinaryId, skipSetup: false })
@@ -243,11 +273,24 @@ describe('creating a task on an existing worktree', () => {
     git(checkout, 'worktree', 'add', '-q', '-b', 'feat/elsewhere', worktree)
     git(checkout, 'worktree', 'add', '-q', '--detach', join(dir, 'detached'))
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'w1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'w1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'p', name: 'p', path: checkout, workspaceId: 'w1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'p',
+      name: 'p',
+      path: checkout,
+      workspaceId: 'w1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
   })
 
@@ -258,16 +301,17 @@ describe('creating a task on an existing worktree', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  const create = (worktreePath: string) => app.request('http://acorn.test/api/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Adopted', worktreePath, branch: 'ignored' }),
-  })
+  const create = (worktreePath: string) =>
+    app.request('http://acorn.test/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Adopted', worktreePath, branch: 'ignored' }),
+    })
 
   it('groups local task branches separately and reports the checkout branch', async () => {
     const project = (await t.db.select().from(schema.projects))[0]!
     const [free] = await unclaimedWorktrees(t.db, project)
-    const adopted = await (await create(free!.path)).json() as Task
+    const adopted = (await (await create(free!.path)).json()) as Task
     const response = await app.request('http://acorn.test/api/projects/p/branches')
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
@@ -276,7 +320,10 @@ describe('creating a task on an existing worktree', () => {
       other: [{ name: 'main', committedAt: expect.any(Number) }],
     })
     await t.db.update(schema.tasks).set({ status: 'archived' }).where(eq(schema.tasks.id, adopted.id))
-    const after = await (await app.request('http://acorn.test/api/projects/p/branches')).json() as { tasks: unknown[]; other: Array<{ name: string }> }
+    const after = (await (await app.request('http://acorn.test/api/projects/p/branches')).json()) as {
+      tasks: unknown[]
+      other: Array<{ name: string }>
+    }
     expect(after.tasks).toEqual([])
     expect(after.other.map((branch) => branch.name).sort()).toEqual(['feat/elsewhere', 'main'])
   })
@@ -293,7 +340,11 @@ describe('creating a task on an existing worktree', () => {
 
   it('returns no branches for a non-Git project and rejects a base there', async () => {
     await t.db.update(schema.projects).set({ vcs: null }).where(eq(schema.projects.id, 'p'))
-    expect(await (await app.request('http://acorn.test/api/projects/p/branches')).json()).toEqual({ current: null, tasks: [], other: [] })
+    expect(await (await app.request('http://acorn.test/api/projects/p/branches')).json()).toEqual({
+      current: null,
+      tasks: [],
+      other: [],
+    })
     expect((await createSeed({ branch: 'child', baseBranch: 'main' })).status).toBe(400)
   })
 
@@ -304,7 +355,7 @@ describe('creating a task on an existing worktree', () => {
 
     const res = await create(free[0]!.path)
     expect(res.status).toBe(200)
-    const task = await res.json() as Task
+    const task = (await res.json()) as Task
     expect(task.branch).toBe('feat/elsewhere')
     expect(task.worktreePath).toBe(free[0]!.path)
 
@@ -318,12 +369,32 @@ describe('creating a task on an existing worktree', () => {
     expect(await unclaimedWorktrees(t.db, originalProject)).toHaveLength(1)
     const now = Date.now()
     await t.db.insert(schema.projects).values({
-      id: 'alias', name: 'alias', path: worktree, workspaceId: 'w1', sort: 1, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'alias',
+      name: 'alias',
+      path: worktree,
+      workspaceId: 'w1',
+      sort: 1,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
-    await t.db.insert(schema.tasks).values({ id: 'owned-by-alias', title: 'Folder task', origin: 'local', projectId: 'alias',
-      branch: null, worktreePath: null, status: 'active', createdAt: now, updatedAt: now })
+    await t.db.insert(schema.tasks).values({
+      id: 'owned-by-alias',
+      title: 'Folder task',
+      origin: 'local',
+      projectId: 'alias',
+      branch: null,
+      worktreePath: null,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    })
     const project = (await t.db.select().from(schema.projects).where(eq(schema.projects.id, 'p')))[0]!
     expect(await unclaimedWorktrees(t.db, project)).toEqual([])
     expect((await create(worktree)).status).toBe(409)
@@ -332,7 +403,10 @@ describe('creating a task on an existing worktree', () => {
   it('serializes competing attachments to one registration', async () => {
     expect(await unclaimedWorktrees(t.db, (await t.db.select().from(schema.projects))[0]!)).toHaveLength(1)
     const responses = await Promise.all([create(worktree), create(worktree)])
-    expect(responses.map((response) => response.status).sort(), JSON.stringify(await Promise.all(responses.map((response) => response.clone().json())))).toEqual([200, 409])
+    expect(
+      responses.map((response) => response.status).sort(),
+      JSON.stringify(await Promise.all(responses.map((response) => response.clone().json()))),
+    ).toEqual([200, 409])
     expect(await t.db.select().from(schema.tasks)).toHaveLength(1)
   })
 
@@ -358,14 +432,25 @@ describe('creating a task on an existing worktree', () => {
 
   it('keeps an archiving task claim even if its row has changed status', async () => {
     const now = Date.now()
-    await t.db.insert(schema.tasks).values({ id: 'archiving-owner', title: 'Old owner', origin: 'local', projectId: 'p',
-      branch: 'feat/elsewhere', worktreePath: worktree, status: 'archived', createdAt: now, updatedAt: now })
+    await t.db.insert(schema.tasks).values({
+      id: 'archiving-owner',
+      title: 'Old owner',
+      origin: 'local',
+      projectId: 'p',
+      branch: 'feat/elsewhere',
+      worktreePath: worktree,
+      status: 'archived',
+      createdAt: now,
+      updatedAt: now,
+    })
     expect(beginTaskArchive('archiving-owner')).toBe(true)
     try {
       const project = (await t.db.select().from(schema.projects))[0]!
       expect(await unclaimedWorktrees(t.db, project)).toEqual([])
       expect((await create(worktree)).status).toBe(409)
-    } finally { finishTaskArchive('archiving-owner') }
+    } finally {
+      finishTaskArchive('archiving-owner')
+    }
   })
 
   it('rejects an attachment when the project points to a different repository after preview', async () => {
@@ -378,46 +463,59 @@ describe('creating a task on an existing worktree', () => {
     expect(await t.db.select().from(schema.tasks)).toHaveLength(0)
   })
 
-  const createBranch = (branch: string) => app.request('http://acorn.test/api/tasks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Local task', branch }),
-  })
-  const availability = (branch: string) => app.request(`http://acorn.test/api/projects/p/worktree-availability?branch=${encodeURIComponent(branch)}`)
+  const createBranch = (branch: string) =>
+    app.request('http://acorn.test/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Local task', branch }),
+    })
+  const availability = (branch: string) =>
+    app.request(`http://acorn.test/api/projects/p/worktree-availability?branch=${encodeURIComponent(branch)}`)
 
-  it.each(['git', 'filesystem'])('allows creation when the %s worktree check fails, but still rejects task reservations', async (failure) => {
-    const root = getWorktreesRoot()
-    if (failure === 'git') vi.spyOn(git, 'gitText').mockRejectedValue(new Error('Git is unavailable.'))
-    else {
-      mkdirSync(root, { recursive: true })
-      chmodSync(root, 0)
-    }
-    try {
-      expect(await (await availability('cannot-check')).json()).toEqual({ available: true })
-      const response = await createBranch('cannot-check')
-      expect(response.status).toBe(200)
-      expect((await response.json() as Task).worktreePath).toBeNull()
-      expect(await t.db.select().from(schema.tasks)).toHaveLength(1)
-      expect((await createBranch('cannot-check')).status).toBe(409)
-    } finally {
-      if (failure === 'filesystem') chmodSync(root, 0o700)
-    }
-  })
+  it.each(['git', 'filesystem'])(
+    'allows creation when the %s worktree check fails, but still rejects task reservations',
+    async (failure) => {
+      const root = getWorktreesRoot()
+      if (failure === 'git') vi.spyOn(git, 'gitText').mockRejectedValue(new Error('Git is unavailable.'))
+      else {
+        mkdirSync(root, { recursive: true })
+        chmodSync(root, 0)
+      }
+      try {
+        expect(await (await availability('cannot-check')).json()).toEqual({ available: true })
+        const response = await createBranch('cannot-check')
+        expect(response.status).toBe(200)
+        expect(((await response.json()) as Task).worktreePath).toBeNull()
+        expect(await t.db.select().from(schema.tasks)).toHaveLength(1)
+        expect((await createBranch('cannot-check')).status).toBe(409)
+      } finally {
+        if (failure === 'filesystem') chmodSync(root, 0o700)
+      }
+    },
+  )
 
-  it.each(['main', 'feat/elsewhere', 'folder-taken'])('refuses occupied worktree %s before inserting a task', async (branch) => {
-    mkdirSync(join(getWorktreesRoot(), 'p-p-folder-taken'), { recursive: true })
-    expect(await (await availability(branch)).json()).toMatchObject({ available: false, reason: 'This branch name already exists in another worktree' })
-    const response = await createBranch(branch)
-    expect(response.status).toBe(409)
-    expect(await response.json()).toMatchObject({ error: { code: 'worktree-unavailable', message: 'This branch name already exists in another worktree' } })
-    expect(await t.db.select().from(schema.tasks)).toEqual([])
-    expect(broadcasts).toEqual([])
-  })
+  it.each(['main', 'feat/elsewhere', 'folder-taken'])(
+    'refuses occupied worktree %s before inserting a task',
+    async (branch) => {
+      mkdirSync(join(getWorktreesRoot(), 'p-p-folder-taken'), { recursive: true })
+      expect(await (await availability(branch)).json()).toMatchObject({
+        available: false,
+        reason: 'This branch name already exists in another worktree',
+      })
+      const response = await createBranch(branch)
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({
+        error: { code: 'worktree-unavailable', message: 'This branch name already exists in another worktree' },
+      })
+      expect(await t.db.select().from(schema.tasks)).toEqual([])
+      expect(broadcasts).toEqual([])
+    },
+  )
 
   it('reserves lazy worktree names, including branches that map to the same directory, until archive', async () => {
     const created = await createBranch('feature/login')
     expect(created.status).toBe(200)
-    const task = await created.json() as Task
+    const task = (await created.json()) as Task
     expect(task.worktreePath).toBeNull()
     expect((await createBranch('feature/login')).status).toBe(409)
     expect((await createBranch('feature-login')).status).toBe(409)
@@ -443,61 +541,92 @@ describe('creating a task on an existing worktree', () => {
 
   const createSeed = async (seed: Record<string, unknown>) => {
     let targetIdentity = seed.targetIdentity
-    if (typeof seed.baseCommit === 'string' && /^[0-9a-f]{40,64}$/.test(seed.baseCommit) && targetIdentity === undefined) {
+    if (
+      typeof seed.baseCommit === 'string' &&
+      /^[0-9a-f]{40,64}$/.test(seed.baseCommit) &&
+      targetIdentity === undefined
+    ) {
       const query = new URLSearchParams({ branch: String(seed.branch ?? 'preview'), baseCommit: seed.baseCommit })
       const preview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${query}`)
-      if (preview.ok) targetIdentity = (await preview.json() as { targetIdentity?: string }).targetIdentity
+      if (preview.ok) targetIdentity = ((await preview.json()) as { targetIdentity?: string }).targetIdentity
     }
     return app.request('http://acorn.test/api/tasks', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'From base', ...seed, targetIdentity }),
     })
   }
-  const revision = (branch: string) => execFileSync('git', ['rev-parse', `refs/heads/${branch}`], { cwd: join(dir, 'checkout'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const revision = (branch: string) =>
+    execFileSync('git', ['rev-parse', `refs/heads/${branch}`], {
+      cwd: join(dir, 'checkout'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
 
   it('captures the chosen local base commit and leaves the worktree lazy', async () => {
-    execFileSync('git', ['-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'base work'], { cwd: worktree })
+    execFileSync(
+      'git',
+      ['-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'base work'],
+      { cwd: worktree },
+    )
     const created = await createSeed({ branch: 'new-child', baseBranch: 'feat/elsewhere' })
     expect(created.status).toBe(200)
     expect(await created.json()).toMatchObject({ branch: 'new-child', worktreePath: null })
     expect(revision('new-child')).toBe(revision('feat/elsewhere'))
     expect(revision('new-child')).not.toBe(revision('main'))
-    expect((await unclaimedWorktrees(t.db, (await t.db.select().from(schema.projects))[0]!)).map((tree) => tree.branch)).not.toContain('new-child')
+    expect(
+      (await unclaimedWorktrees(t.db, (await t.db.select().from(schema.projects))[0]!)).map((tree) => tree.branch),
+    ).not.toContain('new-child')
   })
 
   it('pins a historical commit even when its source branch moves, including the root', async () => {
     const root = revision('main')
-    execFileSync('git', ['-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'new tip'], { cwd: join(dir, 'checkout') })
+    execFileSync(
+      'git',
+      ['-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'new tip'],
+      { cwd: join(dir, 'checkout') },
+    )
     const tip = revision('main')
     expect(tip).not.toBe(root)
     const created = await createSeed({ branch: 'historical', baseCommit: root })
     expect(created.status).toBe(200)
     expect(revision('historical')).toBe(root)
     expect(await created.json()).toMatchObject({ worktreePath: null })
-    const retryPreview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${new URLSearchParams({ branch: 'historical', baseCommit: root })}`)
-    expect(await retryPreview.json()).toMatchObject({ available: false, targetIdentity: expect.stringMatching(/^[0-9a-f]{64}$/) })
+    const retryPreview = await app.request(
+      `http://acorn.test/api/projects/p/worktree-availability?${new URLSearchParams({ branch: 'historical', baseCommit: root })}`,
+    )
+    expect(await retryPreview.json()).toMatchObject({
+      available: false,
+      targetIdentity: expect.stringMatching(/^[0-9a-f]{64}$/),
+    })
   })
 
   it('refuses a pinned commit after a project remap even when both repositories contain it', async () => {
     const root = revision('main')
     const query = new URLSearchParams({ branch: 'mapped-child', baseCommit: root })
     const preview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${query}`)
-    const { targetIdentity } = await preview.json() as { targetIdentity: string }
+    const { targetIdentity } = (await preview.json()) as { targetIdentity: string }
     const second = join(dir, 'second-repository')
     execFileSync('git', ['clone', '-q', join(dir, 'checkout'), second])
     expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: second, encoding: 'utf8' }).trim()).toBe(root)
     await t.db.update(schema.projects).set({ path: second }).where(eq(schema.projects.id, 'p'))
     const movedPreview = await app.request(`http://acorn.test/api/projects/p/worktree-availability?${query}`)
-    expect((await movedPreview.json() as { targetIdentity: string }).targetIdentity).not.toBe(targetIdentity)
+    expect(((await movedPreview.json()) as { targetIdentity: string }).targetIdentity).not.toBe(targetIdentity)
     const refused = await createSeed({ branch: 'mapped-child', baseCommit: root, targetIdentity })
     expect(refused.status).toBe(409)
-    expect((await refused.json() as { error: { message: string } }).error.message).toContain('repository changed')
-    expect(() => execFileSync('git', ['rev-parse', 'refs/heads/mapped-child'], { cwd: second, stdio: 'ignore' })).toThrow()
+    expect(((await refused.json()) as { error: { message: string } }).error.message).toContain('repository changed')
+    expect(() =>
+      execFileSync('git', ['rev-parse', 'refs/heads/mapped-child'], { cwd: second, stdio: 'ignore' }),
+    ).toThrow()
   })
 
   it('validates full available commit objects and one starting mode before saving', async () => {
     const root = revision('main')
-    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: join(dir, 'checkout'), input: 'not a commit', encoding: 'utf8' }).trim()
+    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], {
+      cwd: join(dir, 'checkout'),
+      input: 'not a commit',
+      encoding: 'utf8',
+    }).trim()
     for (const baseCommit of ['abc', '0'.repeat(root.length), root.toUpperCase(), blob]) {
       expect((await createSeed({ branch: 'invalid-commit', baseCommit })).status).toBe(400)
     }
@@ -522,11 +651,14 @@ describe('creating a task on an existing worktree', () => {
     expect(() => revision('lazy-child')).toThrow()
   })
 
-  it.each(['missing', 'origin/remote-only', '--force', '../main'])('rejects an invalid or absent local base %s', async (baseBranch) => {
-    expect((await createSeed({ branch: 'new-child', baseBranch })).status).toBe(400)
-    expect(await t.db.select().from(schema.tasks)).toEqual([])
-    expect(() => revision('new-child')).toThrow()
-  })
+  it.each(['missing', 'origin/remote-only', '--force', '../main'])(
+    'rejects an invalid or absent local base %s',
+    async (baseBranch) => {
+      expect((await createSeed({ branch: 'new-child', baseBranch })).status).toBe(400)
+      expect(await t.db.select().from(schema.tasks)).toEqual([])
+      expect(() => revision('new-child')).toThrow()
+    },
+  )
 
   it('rejects a base for project-folder and existing-worktree tasks', async () => {
     expect((await createSeed({ baseBranch: 'main' })).status).toBe(400)
@@ -537,7 +669,9 @@ describe('creating a task on an existing worktree', () => {
     execFileSync('git', ['branch', '--', 'feature/child'], { cwd: join(dir, 'checkout') })
     expect((await createBranch('feature-child-2')).status).toBe(200)
     mkdirSync(join(getWorktreesRoot(), 'p-p-feature-child-3'), { recursive: true })
-    const preview = await app.request('http://acorn.test/api/projects/p/worktree-availability?branch=feature%2Fchild&branchSource=derived&baseBranch=main')
+    const preview = await app.request(
+      'http://acorn.test/api/projects/p/worktree-availability?branch=feature%2Fchild&branchSource=derived&baseBranch=main',
+    )
     expect(await preview.json()).toEqual({ available: true, branch: 'feature/child-4' })
     const created = await createSeed({ branch: 'feature/child', branchSource: 'derived', baseBranch: 'main' })
     expect(created.status).toBe(200)
@@ -548,18 +682,28 @@ describe('creating a task on an existing worktree', () => {
   it('rejects exact names on unused Git branches when a base is supplied', async () => {
     execFileSync('git', ['branch', '--', 'unused-base-name'], { cwd: join(dir, 'checkout') })
     const original = revision('unused-base-name')
-    const created = await createSeed({ branch: 'unused-base-name', branchSource: 'exact', baseBranch: 'feat/elsewhere' })
+    const created = await createSeed({
+      branch: 'unused-base-name',
+      branchSource: 'exact',
+      baseBranch: 'feat/elsewhere',
+    })
     expect(created.status).toBe(409)
     expect(revision('unused-base-name')).toBe(original)
     expect(await t.db.select().from(schema.tasks)).toEqual([])
   })
 
-  it.each([undefined, 'main'])('allocates different derived names for simultaneous requests (base: %s)', async (baseBranch) => {
-    const responses = await Promise.all([createSeed({ branch: 'racing-child', branchSource: 'derived', baseBranch }), createSeed({ branch: 'racing-child', branchSource: 'derived', baseBranch })])
-    expect(responses.map((response) => response.status)).toEqual([200, 200])
-    const bodies = await Promise.all(responses.map((response) => response.json() as Promise<Task>))
-    expect(bodies.map((task) => task.branch).sort()).toEqual(['racing-child', 'racing-child-2'])
-  })
+  it.each([undefined, 'main'])(
+    'allocates different derived names for simultaneous requests (base: %s)',
+    async (baseBranch) => {
+      const responses = await Promise.all([
+        createSeed({ branch: 'racing-child', branchSource: 'derived', baseBranch }),
+        createSeed({ branch: 'racing-child', branchSource: 'derived', baseBranch }),
+      ])
+      expect(responses.map((response) => response.status)).toEqual([200, 200])
+      const bodies = await Promise.all(responses.map((response) => response.json() as Promise<Task>))
+      expect(bodies.map((task) => task.branch).sort()).toEqual(['racing-child', 'racing-child-2'])
+    },
+  )
 
   it('retries a derived name when an external Git writer takes the previewed branch', async () => {
     execFileSync('git', ['branch', '--', 'external-race-2', 'feat/elsewhere'], { cwd: join(dir, 'checkout') })
@@ -580,17 +724,24 @@ describe('creating a task on an existing worktree', () => {
     expect(revision('external-race-3')).toBe(revision('main'))
   })
 
-  it.each([true, false])('removes only a branch created by this request if the row insert fails (base: %s)', async (withBase) => {
-    if (!withBase) execFileSync('git', ['branch', '--', 'save-fails'], { cwd: join(dir, 'checkout') })
-    vi.spyOn(t.db, 'insert').mockImplementation(() => { throw new Error('insert failed') })
-    const created = await createSeed({ branch: 'save-fails', ...(withBase ? { baseBranch: 'main' } : {}) })
-    expect(created.status).toBe(500)
-    if (withBase) expect(() => revision('save-fails')).toThrow()
-    else expect(revision('save-fails')).toBe(revision('main'))
-  })
+  it.each([true, false])(
+    'removes only a branch created by this request if the row insert fails (base: %s)',
+    async (withBase) => {
+      if (!withBase) execFileSync('git', ['branch', '--', 'save-fails'], { cwd: join(dir, 'checkout') })
+      vi.spyOn(t.db, 'insert').mockImplementation(() => {
+        throw new Error('insert failed')
+      })
+      const created = await createSeed({ branch: 'save-fails', ...(withBase ? { baseBranch: 'main' } : {}) })
+      expect(created.status).toBe(500)
+      if (withBase) expect(() => revision('save-fails')).toThrow()
+      else expect(revision('save-fails')).toBe(revision('main'))
+    },
+  )
 
   it('rolls back a pinned branch when the task row cannot be saved', async () => {
-    vi.spyOn(t.db, 'insert').mockImplementation(() => { throw new Error('insert failed') })
+    vi.spyOn(t.db, 'insert').mockImplementation(() => {
+      throw new Error('insert failed')
+    })
     const created = await createSeed({ branch: 'pinned-save-fails', baseCommit: revision('main') })
     expect(created.status).toBe(500)
     expect(() => revision('pinned-save-fails')).toThrow()

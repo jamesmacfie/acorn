@@ -30,7 +30,8 @@ describe('the attachment record over HTTP', () => {
   let env: Env
   let ownerToken = ''
 
-  const call = (path: string, init: RequestInit = {}) => createApp().fetch(new Request(`http://127.0.0.1${path}`, init), env)
+  const call = (path: string, init: RequestInit = {}) =>
+    createApp().fetch(new Request(`http://127.0.0.1${path}`, init), env)
   const asOwner = (method = 'GET'): RequestInit => ({ method, headers: { authorization: `Bearer ${ownerToken}` } })
 
   beforeEach(async () => {
@@ -81,7 +82,10 @@ describe('the attachment record over HTTP', () => {
     })
 
     const shown = (await (await call('/v1/core/attachment', asOwner())).json()) as NodeAttachmentState
-    expect(shown.attachment).toMatchObject({ controlPlaneUrl: 'https://control.example/', enrollmentTokenId: 'abc123abc123' })
+    expect(shown.attachment).toMatchObject({
+      controlPlaneUrl: 'https://control.example/',
+      enrollmentTokenId: 'abc123abc123',
+    })
 
     expect((await call('/v1/core/attachment', asOwner('DELETE'))).status).toBe(204)
     // The credential the control plane held stops working immediately. This is the difference between
@@ -105,7 +109,9 @@ describe('the attachment record over HTTP', () => {
       enrollmentTokenId: 'abc123abc123',
       deviceId: 'device-1',
     })
-    const asAgent: RequestInit = { headers: { 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) } }
+    const asAgent: RequestInit = {
+      headers: { 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' }) },
+    }
     const read = await call('/v1/core/attachment', asAgent)
     expect(read.status).toBe(403)
     // It names a control plane and a device row, which is reconnaissance, and the delete would revoke a

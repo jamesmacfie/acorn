@@ -13,10 +13,11 @@ import { InstructionAdmissionError } from './instructionAdmissionError'
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
-
 
 describe('durable queue admission', () => {
   let ctx: TestNodeContext
@@ -33,58 +34,115 @@ describe('durable queue admission', () => {
     vi.spyOn(ctx.core.tasks, 'requireRoot').mockResolvedValue(ctx.dataDir)
     vi.spyOn(ctx.core.tasks, 'workspaceId').mockResolvedValue('workspace')
     vi.spyOn(ctx.core.prefs, 'read').mockResolvedValue(JSON.stringify({ provider: 2, workspace: 2 }))
-    starts = []; sends = []; stops = []
+    starts = []
+    sends = []
+    stops = []
     launch = async (options) => {
       await options.onEvent({ type: 'session_state', state: 'ready' })
       return {
-        providerSessionRef: options.session.id, ready: true,
-        sendTurn: async ({ turn }) => { sends.push(turn.id); return {} },
-        cancel: async () => {}, resolveRequest: async () => {},
-        stop: async () => { stops.push(options.session.id) },
+        providerSessionRef: options.session.id,
+        ready: true,
+        sendTurn: async ({ turn }) => {
+          sends.push(turn.id)
+          return {}
+        },
+        cancel: async () => {},
+        resolveRequest: async () => {},
+        stop: async () => {
+          stops.push(options.session.id)
+        },
       }
     }
     registry = new AgentDriverRegistry()
-    registry.registerNative('fake', () => ({ providerId: 'fake', profileId: 'fake',
+    registry.registerNative('fake', () => ({
+      providerId: 'fake',
+      profileId: 'fake',
       probe: () => new FakeAgentDriver().probe(),
-      start: async (options) => { starts.push(options); return launch(options) },
+      start: async (options) => {
+        starts.push(options)
+        return launch(options)
+      },
     }))
     build()
   })
-  afterEach(async () => { await runtime.stop(); ctx.cleanup(); vi.restoreAllMocks() })
+  afterEach(async () => {
+    await runtime.stop()
+    ctx.cleanup()
+    vi.restoreAllMocks()
+  })
 
   // The engine is built here and handed to the runtime, so a test can pump the queue and count the
   // provider processes directly.
   const build = () => {
-    const options: AgentRuntimeOptions = { db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core, registry,
-      internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => 'owner' }
+    const options: AgentRuntimeOptions = {
+      db: ctx.storage.open(),
+      dataDir: ctx.dataDir,
+      core: ctx.core,
+      registry,
+      internalEnv: () => ({}),
+      secrets: ctx.env.SECRETS,
+      currentUserId: () => 'owner',
+    }
     engine = new ManagedAgentEngine(options)
     runtime = new ManagedAgentRuntime(options, engine)
   }
-  const counts = () => engine.processes.occupancy().reduce((total, live) => ({
-    active: total.active + Number(!!live.activeTurnId),
-    reserved: total.reserved + Number(!!live.admissionTurnId),
-  }), { active: 0, reserved: 0 })
+  const counts = () =>
+    engine.processes.occupancy().reduce(
+      (total, live) => ({
+        active: total.active + Number(!!live.activeTurnId),
+        reserved: total.reserved + Number(!!live.admissionTurnId),
+      }),
+      { active: 0, reserved: 0 },
+    )
 
-  const session = async (kind: 'interactive' | 'workflow' = 'interactive') => runtime.store.createSession({
-    taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind, config: {},
-  }, await new FakeAgentDriver().probe())
-  const enqueue = (sessionId: string, text = 'Synthetic') => runtime.enqueueTurn(sessionId, {
-    input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
-  })
+  const session = async (kind: 'interactive' | 'workflow' = 'interactive') =>
+    runtime.store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind,
+        config: {},
+      },
+      await new FakeAgentDriver().probe(),
+    )
+  const enqueue = (sessionId: string, text = 'Synthetic') =>
+    runtime.enqueueTurn(sessionId, {
+      input: [{ type: 'text', text }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
 
   it('applies required admission at the shared dispatch point for every queued source', async () => {
     const admission = await runtime.instructionAdmission.get()
-    const gate = vi.spyOn(admission, 'admit').mockRejectedValue(new InstructionAdmissionError('instruction_review_required', 'Instruction review required.'))
-    for (const source of ['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import', 'plugin', 'goal'] as const) {
+    const gate = vi
+      .spyOn(admission, 'admit')
+      .mockRejectedValue(new InstructionAdmissionError('instruction_review_required', 'Instruction review required.'))
+    for (const source of [
+      'interactive',
+      'workflow',
+      'delegation',
+      'delegation_report',
+      'automation',
+      'import',
+      'plugin',
+      'goal',
+    ] as const) {
       const item = await session(source === 'workflow' ? 'workflow' : 'interactive')
       const { turn } = await runtime.store.enqueueTurn(item.id, {
-        source, input: [{ type: 'text', text: source }], effectivePolicy: {}, idempotencyKey: randomUUID(),
+        source,
+        input: [{ type: 'text', text: source }],
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
       })
       await engine.pump()
       await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('failed'))
-      expect((await runtime.store.snapshot(item.id)).events).toContainEqual(expect.objectContaining({
-        event: expect.objectContaining({ type: 'error', code: 'instruction_review_required' }),
-      }))
+      expect((await runtime.store.snapshot(item.id)).events).toContainEqual(
+        expect.objectContaining({
+          event: expect.objectContaining({ type: 'error', code: 'instruction_review_required' }),
+        }),
+      )
     }
     expect(gate).toHaveBeenCalledTimes(8)
     expect(sends).toEqual([])
@@ -96,7 +154,9 @@ describe('durable queue admission', () => {
       enabled: async () => true,
       admit: async ({ operation, report }) => {
         reports.push(report)
-        return report.counts.high || !report.complete ? { decisionId: 'd'.repeat(64), operation, reason: report.counts.high ? 'findings' : 'incomplete', report } : null
+        return report.counts.high || !report.complete
+          ? { decisionId: 'd'.repeat(64), operation, reason: report.counts.high ? 'findings' : 'incomplete', report }
+          : null
       },
     }
     const item = await session()
@@ -106,18 +166,25 @@ describe('durable queue admission', () => {
     const send = async (filename: string, mediaType: string, bytes: Uint8Array) => {
       const attachment = await runtime.attachments.upload(item.taskId, filename, mediaType, bytes)
       const { turn } = await runtime.store.enqueueTurn(item.id, {
-        source: 'interactive', input: [{ type: 'attachment', attachmentId: attachment.id }], effectivePolicy: {}, idempotencyKey: randomUUID(),
+        source: 'interactive',
+        input: [{ type: 'attachment', attachmentId: attachment.id }],
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
       })
       await engine.pump()
       return turn.id
     }
-    const failed = async (turnId: string) => vi.waitFor(async () => expect((await runtime.store.turn(turnId))?.status).toBe('failed'))
+    const failed = async (turnId: string) =>
+      vi.waitFor(async () => expect((await runtime.store.turn(turnId))?.status).toBe('failed'))
 
     await failed(await send('notes.txt', 'text/plain', new TextEncoder().encode(`key ${token}\n`)))
     expect(reports.at(-1)).toMatchObject({ counts: { high: 1 }, findings: [{ rule: 'npm-token', line: 1, column: 5 }] })
     const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])
     await failed(await send('shot.png', 'image/png', png))
-    expect(reports.at(-1)).toMatchObject({ complete: false, unscanned: [{ reason: 'Images, PDFs, and other non-text formats are not scanned.' }] })
+    expect(reports.at(-1)).toMatchObject({
+      complete: false,
+      unscanned: [{ reason: 'Images, PDFs, and other non-text formats are not scanned.' }],
+    })
     expect(sends).toEqual([])
     expect(JSON.stringify(reports)).not.toContain(token.slice(4))
 
@@ -131,14 +198,23 @@ describe('durable queue admission', () => {
     let aborted = false
     vi.spyOn(admission, 'admit').mockImplementation(async (_taskId, signal) => {
       entered = true
-      await new Promise<void>((_resolve, reject) => signal?.addEventListener('abort', () => {
-        aborted = true
-        reject(new Error('Turn cancelled.'))
-      }, { once: true }))
+      await new Promise<void>((_resolve, reject) =>
+        signal?.addEventListener(
+          'abort',
+          () => {
+            aborted = true
+            reject(new Error('Turn cancelled.'))
+          },
+          { once: true },
+        ),
+      )
     })
     const item = await session()
     const { turn } = await runtime.store.enqueueTurn(item.id, {
-      source: 'interactive', input: [{ type: 'text', text: 'Cancel' }], effectivePolicy: {}, idempotencyKey: randomUUID(),
+      source: 'interactive',
+      input: [{ type: 'text', text: 'Cancel' }],
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
     })
     void engine.pump()
     await vi.waitFor(() => expect(entered).toBe(true))
@@ -159,9 +235,16 @@ describe('durable queue admission', () => {
   it('blocks a goal when dispatch fails', async () => {
     launch = async (options) => {
       await options.onEvent({ type: 'session_state', state: 'ready' })
-      return { providerSessionRef: options.session.id, ready: true,
-        sendTurn: async () => { throw new Error('Dispatch failed') },
-        cancel: async () => {}, resolveRequest: async () => {}, stop: async () => {} }
+      return {
+        providerSessionRef: options.session.id,
+        ready: true,
+        sendTurn: async () => {
+          throw new Error('Dispatch failed')
+        },
+        cancel: async () => {},
+        resolveRequest: async () => {},
+        stop: async () => {},
+      }
     }
     const item = await session()
     await runtime.setGoal(item.id, 'Finish the task')
@@ -181,8 +264,12 @@ describe('durable queue admission', () => {
   })
 
   it('acknowledges 20 public enqueues during startup and starts only admitted providers', async () => {
-    const held = deferred<void>(), start = launch
-    launch = async (options) => { await held.promise; return start(options) }
+    const held = deferred<void>(),
+      start = launch
+    launch = async (options) => {
+      await held.promise
+      return start(options)
+    }
     const sessions = await Promise.all(Array.from({ length: 20 }, session))
     const turns = await Promise.all(sessions.map((item) => enqueue(item.id)))
     await vi.waitFor(() => expect(starts).toHaveLength(1))
@@ -195,26 +282,39 @@ describe('durable queue admission', () => {
   })
 
   it('joins cancellation to a late startup handle and releases admission for the next head', async () => {
-    const held = deferred<void>(), start = launch
-    launch = async (options) => { if (starts.length === 1) await held.promise; return start(options) }
-    const item = await session(), first = await enqueue(item.id), next = await enqueue(item.id)
+    const held = deferred<void>(),
+      start = launch
+    launch = async (options) => {
+      if (starts.length === 1) await held.promise
+      return start(options)
+    }
+    const item = await session(),
+      first = await enqueue(item.id),
+      next = await enqueue(item.id)
     await vi.waitFor(() => expect(starts).toHaveLength(1))
     let cancelled = false
-    const cancelling = runtime.cancelTurn(item.id, first.id).then(() => { cancelled = true })
+    const cancelling = runtime.cancelTurn(item.id, first.id).then(() => {
+      cancelled = true
+    })
     await vi.waitFor(() => expect(starts[0]!.signal?.aborted).toBe(true))
     expect(cancelled).toBe(false)
     held.resolve()
     await cancelling
     await vi.waitFor(() => expect(sends).toEqual([next.id]))
     expect(stops).toEqual([item.id])
-    expect((await runtime.store.snapshot(item.id)).events.some((record) => record.turnId === first.id && record.event.type === 'user_message')).toBe(false)
+    expect(
+      (await runtime.store.snapshot(item.id)).events.some(
+        (record) => record.turnId === first.id && record.event.type === 'user_message',
+      ),
+    ).toBe(false)
     expect(counts()).toEqual({ active: 1, reserved: 0 })
   })
 
   it('rechecks cancellation after a held workspace read before starting any provider', async () => {
     const workspace = deferred<string>()
     vi.mocked(ctx.core.tasks.workspaceId).mockReturnValue(workspace.promise)
-    const item = await session(), turn = await enqueue(item.id)
+    const item = await session(),
+      turn = await enqueue(item.id)
     await vi.waitFor(() => expect(ctx.core.tasks.workspaceId).toHaveBeenCalledOnce())
     await runtime.cancelTurn(item.id, turn.id)
     workspace.resolve('workspace')
@@ -226,8 +326,9 @@ describe('durable queue admission', () => {
   it('cancels an active turn even when the provider reports reconnecting', async () => {
     const cancel = vi.fn(async () => {})
     const start = launch
-    launch = async (options) => ({ ...await start(options), cancel })
-    const item = await session(), turn = await enqueue(item.id)
+    launch = async (options) => ({ ...(await start(options)), cancel })
+    const item = await session(),
+      turn = await enqueue(item.id)
     await vi.waitFor(() => expect(sends).toEqual([turn.id]))
     await starts[0]!.onEvent({ type: 'session_state', state: 'reconnecting' })
 
@@ -237,40 +338,45 @@ describe('durable queue admission', () => {
     expect((await runtime.store.turn(turn.id))?.status).toBe('cancelled')
   })
 
-  it.each(['disconnect', 'incorrect status'] as const)('stops recovery after %s and resumes when another turn is sent', async (reason) => {
-    const item = await session(), turn = await enqueue(item.id)
-    await vi.waitFor(() => expect(sends).toEqual([turn.id]))
-    vi.useFakeTimers()
-    try {
-      if (reason === 'disconnect') {
-        await starts[0]!.onClosed(new Error('Synthetic disconnect'))
-      } else {
-        await starts[0]!.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
-        await starts[0]!.onEvent({ type: 'session_state', state: 'reconnecting' })
+  it.each(['disconnect', 'incorrect status'] as const)(
+    'stops recovery after %s and resumes when another turn is sent',
+    async (reason) => {
+      const item = await session(),
+        turn = await enqueue(item.id)
+      await vi.waitFor(() => expect(sends).toEqual([turn.id]))
+      vi.useFakeTimers()
+      try {
+        if (reason === 'disconnect') {
+          await starts[0]!.onClosed(new Error('Synthetic disconnect'))
+        } else {
+          await starts[0]!.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+          await starts[0]!.onEvent({ type: 'session_state', state: 'reconnecting' })
+        }
+        expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('reconnecting')
+        expect((await runtime.store.turn(turn.id))?.status).toBe(reason === 'disconnect' ? 'interrupted' : 'completed')
+
+        await runtime.cancelTurn(item.id)
+        expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
+        await vi.advanceTimersByTimeAsync(6_000)
+        expect(starts).toHaveLength(1)
+        expect(stops).toContain(item.id)
+        await starts[0]!.onEvent({ type: 'session_state', state: 'ready' })
+        expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
+      } finally {
+        vi.useRealTimers()
       }
-      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('reconnecting')
-      expect((await runtime.store.turn(turn.id))?.status).toBe(reason === 'disconnect' ? 'interrupted' : 'completed')
 
-      await runtime.cancelTurn(item.id)
-      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
-      await vi.advanceTimersByTimeAsync(6_000)
-      expect(starts).toHaveLength(1)
-      expect(stops).toContain(item.id)
-      await starts[0]!.onEvent({ type: 'session_state', state: 'ready' })
-      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
-    } finally {
-      vi.useRealTimers()
-    }
-
-    const next = await enqueue(item.id)
-    await vi.waitFor(() => expect(sends).toEqual([turn.id, next.id]))
-    expect(starts).toHaveLength(2)
-  })
+      const next = await enqueue(item.id)
+      await vi.waitFor(() => expect(sends).toEqual([turn.id, next.id]))
+      expect(starts).toHaveLength(2)
+    },
+  )
 
   it('scans again for a public enqueue that arrives during a held workspace read', async () => {
     const workspace = deferred<string>()
     vi.mocked(ctx.core.tasks.workspaceId).mockReturnValueOnce(workspace.promise)
-    const first = await session(), second = await session()
+    const first = await session(),
+      second = await session()
     const firstTurn = await enqueue(first.id)
     await vi.waitFor(() => expect(ctx.core.tasks.workspaceId).toHaveBeenCalledOnce())
     const secondTurn = await enqueue(second.id)
@@ -280,21 +386,39 @@ describe('durable queue admission', () => {
   })
 
   it('keeps a completed dispatch scan after a later preparation loses its provider generation', async () => {
-    const open = () => runtime.createSession({
-      taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {},
-    })
-    const first = await open(), later = await open()
-    const queued = (sessionId: string, input: Array<{ type: 'text'; text: string } | { type: 'attachment'; attachmentId: string }>) =>
+    const open = () =>
+      runtime.createSession({
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      })
+    const first = await open(),
+      later = await open()
+    const queued = (
+      sessionId: string,
+      input: Array<{ type: 'text'; text: string } | { type: 'attachment'; attachmentId: string }>,
+    ) =>
       runtime.store.enqueueTurn(sessionId, {
-        input, source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
+        input,
+        source: 'interactive',
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
       })
     const firstTurn = await queued(first.id, [{ type: 'text', text: 'First' }])
     const pending = await queued(first.id, [{ type: 'text', text: 'Next' }])
     const attachmentId = randomUUID()
     const db = ctx.storage.open()
     await db.insert(schema.agentAttachments).values({
-      id: attachmentId, taskId: later.taskId, storageKey: attachmentId, contentHash: attachmentId,
-      filename: 'held.txt', mediaType: 'text/plain', byteSize: 1, createdAt: 1,
+      id: attachmentId,
+      taskId: later.taskId,
+      storageKey: attachmentId,
+      contentHash: attachmentId,
+      filename: 'held.txt',
+      mediaType: 'text/plain',
+      byteSize: 1,
+      createdAt: 1,
     })
     const stale = await queued(later.id, [{ type: 'attachment', attachmentId }])
     await db.update(schema.agentTurns).set({ createdAt: 1 }).where(eq(schema.agentTurns.id, firstTurn.turn.id))
@@ -304,8 +428,13 @@ describe('durable queue admission', () => {
     const resolveAttachment = vi.spyOn(runtime.attachments, 'resolve').mockImplementation(async () => {
       await held.promise
       return {
-        id: attachmentId, taskId: later.taskId, filename: 'held.txt', mediaType: 'text/plain',
-        byteSize: 1, createdAt: 1, localPath: '/held.txt',
+        id: attachmentId,
+        taskId: later.taskId,
+        filename: 'held.txt',
+        mediaType: 'text/plain',
+        byteSize: 1,
+        createdAt: 1,
+        localPath: '/held.txt',
       }
     })
     runtime.drainQueue()
@@ -329,8 +458,10 @@ describe('durable queue admission', () => {
     await vi.waitFor(() => expect(ctx.core.tasks.workspaceId).toHaveBeenCalledOnce())
     for (const item of interactive.slice(1)) turns.push(await enqueue(item.id))
     const workflowTurn = await runtime.enqueueTurn(workflow.id, {
-      input: [{ type: 'text', text: 'Workflow' }], source: 'workflow',
-      effectivePolicy: {}, idempotencyKey: randomUUID(),
+      input: [{ type: 'text', text: 'Workflow' }],
+      source: 'workflow',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
     })
     workspace.resolve('workspace')
 
@@ -344,14 +475,22 @@ describe('durable queue admission', () => {
   })
 
   it('sends the edited durable input after a held startup', async () => {
-    const held = deferred<void>(), start = launch
+    const held = deferred<void>(),
+      start = launch
     const input: unknown[] = []
     launch = async (options) => {
       await held.promise
       const handle = await start(options)
-      return { ...handle, sendTurn: async (turn) => { input.push(turn.input); return handle.sendTurn(turn) } }
+      return {
+        ...handle,
+        sendTurn: async (turn) => {
+          input.push(turn.input)
+          return handle.sendTurn(turn)
+        },
+      }
     }
-    const item = await session(), turn = await enqueue(item.id)
+    const item = await session(),
+      turn = await enqueue(item.id)
     await vi.waitFor(() => expect(starts).toHaveLength(1))
     await runtime.patchQueuedTurn(item.id, turn.id, { input: [{ type: 'text', text: 'Edited' }] })
     held.resolve()
@@ -359,9 +498,15 @@ describe('durable queue admission', () => {
   })
 
   it('rechecks the durable head after a reorder during startup', async () => {
-    const held = deferred<void>(), start = launch
-    launch = async (options) => { await held.promise; return start(options) }
-    const item = await session(), first = await enqueue(item.id), second = await enqueue(item.id)
+    const held = deferred<void>(),
+      start = launch
+    launch = async (options) => {
+      await held.promise
+      return start(options)
+    }
+    const item = await session(),
+      first = await enqueue(item.id),
+      second = await enqueue(item.id)
     await vi.waitFor(() => expect(starts).toHaveLength(1))
     await runtime.patchQueuedTurn(item.id, second.id, { ordinal: 0 })
     held.resolve()
@@ -370,22 +515,39 @@ describe('durable queue admission', () => {
   })
 
   it('selects only the earliest queued ordinal for each eligible session, including a deferred head', async () => {
-    const eligible = await session(), archived = await session(), external = await session()
-    const queue = (id: string) => runtime.store.enqueueTurn(id, { source: 'interactive',
-      input: [{ type: 'text', text: 'Synthetic' }], effectivePolicy: {}, idempotencyKey: randomUUID() })
-    const first = await queue(eligible.id), second = await queue(eligible.id)
-    await queue(archived.id); await queue(external.id)
+    const eligible = await session(),
+      archived = await session(),
+      external = await session()
+    const queue = (id: string) =>
+      runtime.store.enqueueTurn(id, {
+        source: 'interactive',
+        input: [{ type: 'text', text: 'Synthetic' }],
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
+      })
+    const first = await queue(eligible.id),
+      second = await queue(eligible.id)
+    await queue(archived.id)
+    await queue(external.id)
     const db = ctx.storage.open()
     await db.update(schema.agentSessions).set({ archivedAt: 1 }).where(eq(schema.agentSessions.id, archived.id))
-    await db.update(schema.agentSessions).set({ controller: 'terminal' }).where(eq(schema.agentSessions.id, external.id))
-    await db.update(schema.agentTurns).set({ notBefore: Date.now() + 60_000 }).where(eq(schema.agentTurns.id, first.turn.id))
+    await db
+      .update(schema.agentSessions)
+      .set({ controller: 'terminal' })
+      .where(eq(schema.agentSessions.id, external.id))
+    await db
+      .update(schema.agentTurns)
+      .set({ notBefore: Date.now() + 60_000 })
+      .where(eq(schema.agentTurns.id, first.turn.id))
     expect((await runtime.store.queuedHeads()).map((item) => item.turn.id)).toEqual([first.turn.id])
     await runtime.store.cancelTurn(first.turn.id)
     expect((await runtime.store.queuedHeads()).map((item) => item.turn.id)).toEqual([second.turn.id])
   })
 
   it('records startup failure against the accepted turn and admits another session', async () => {
-    launch = async () => { throw new Error('Synthetic startup failure') }
+    launch = async () => {
+      throw new Error('Synthetic startup failure')
+    }
     const items = await Promise.all([session(), session()])
     const turns = await Promise.all(items.map((item) => enqueue(item.id)))
     expect(turns.every((turn) => turn.status === 'queued')).toBe(true)
@@ -394,18 +556,27 @@ describe('durable queue admission', () => {
       const sessions = await Promise.all(items.map((item) => runtime.store.snapshot(item.id)))
       expect(sessions.map((snapshot) => snapshot.session.runtimeState)).toEqual(['failed', 'failed'])
       expect(stored.map((turn) => turn?.status)).toEqual(['queued', 'queued'])
-      expect(sessions[0]?.events.some((record) => record.turnId === turns[0]?.id && record.event.type === 'error')).toBe(true)
+      expect(
+        sessions[0]?.events.some((record) => record.turnId === turns[0]?.id && record.event.type === 'error'),
+      ).toBe(true)
     })
     expect(counts()).toEqual({ active: 0, reserved: 0 })
   })
 
   it('shutdown joins the reserved process generation and leaves its durable turn queued', async () => {
-    const held = deferred<void>(), start = launch
-    launch = async (options) => { await held.promise; return start(options) }
-    const item = await session(), turn = await enqueue(item.id)
+    const held = deferred<void>(),
+      start = launch
+    launch = async (options) => {
+      await held.promise
+      return start(options)
+    }
+    const item = await session(),
+      turn = await enqueue(item.id)
     await vi.waitFor(() => expect(starts).toHaveLength(1))
     let stopped = false
-    const stopping = runtime.stop().then(() => { stopped = true })
+    const stopping = runtime.stop().then(() => {
+      stopped = true
+    })
     await new Promise((resolve) => setImmediate(resolve))
     expect(stopped).toBe(false)
     held.resolve()
@@ -418,9 +589,14 @@ describe('durable queue admission', () => {
 
   it('survives repeated start and cancel, then admits accepted work from a new runtime', async () => {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const held = deferred<void>(), start = launch
-      launch = async (options) => { await held.promise; return start(options) }
-      const item = await session(), turn = await enqueue(item.id)
+      const held = deferred<void>(),
+        start = launch
+      launch = async (options) => {
+        await held.promise
+        return start(options)
+      }
+      const item = await session(),
+        turn = await enqueue(item.id)
       await vi.waitFor(() => expect(starts).toHaveLength(attempt + 1))
       const cancelling = runtime.cancelTurn(item.id, turn.id)
       held.resolve()
@@ -429,9 +605,14 @@ describe('durable queue admission', () => {
       launch = start
     }
 
-    const held = deferred<void>(), start = launch
-    launch = async (options) => { await held.promise; return start(options) }
-    const item = await session(), accepted = await enqueue(item.id)
+    const held = deferred<void>(),
+      start = launch
+    launch = async (options) => {
+      await held.promise
+      return start(options)
+    }
+    const item = await session(),
+      accepted = await enqueue(item.id)
     await vi.waitFor(() => expect(starts).toHaveLength(3))
     const oldCallback = starts[2]!.onEvent
     const stopping = runtime.stop()

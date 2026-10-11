@@ -17,11 +17,25 @@ it('sends setup to the task origin when the active Node changes while creation i
     { nodeId: 'node-b', label: 'Node B', endpoint: 'https://127.0.0.1:9444', local: false },
   ]
   const task: Task = {
-    id: 'task-a', title: 'From A', icon: null, origin: 'manual', projectId: 'project-a',
-    branch: null, github: null, worktreePath: null, pullNumber: null, status: 'active',
-    parentId: null, sort: 0, links: [],
+    id: 'task-a',
+    title: 'From A',
+    icon: null,
+    origin: 'manual',
+    projectId: 'project-a',
+    branch: null,
+    github: null,
+    worktreePath: null,
+    pullNumber: null,
+    status: 'active',
+    parentId: null,
+    sort: 0,
+    links: [],
   }
-  const response = (body: unknown) => ({ status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify(body)) })
+  const response = (body: unknown) => ({
+    status: 200,
+    headers: {},
+    body: new TextEncoder().encode(JSON.stringify(body)),
+  })
   let finishCreate!: () => void
   const heldCreate = new Promise<ReturnType<typeof response>>((resolve) => {
     finishCreate = () => resolve(response(task))
@@ -49,9 +63,11 @@ it('sends setup to the task origin when the active Node changes while creation i
   setActiveNode('node-b')
   finishCreate()
   await expect(creating).resolves.toEqual(task)
-  await vi.waitFor(() => expect(requests).toEqual([
-    { nodeId: 'node-a', path: tasksRoute, method: 'POST' },
-    { nodeId: 'node-a', path: taskOnCreatedRoute(task.id), method: 'POST' },
-  ]))
+  await vi.waitFor(() =>
+    expect(requests).toEqual([
+      { nodeId: 'node-a', path: tasksRoute, method: 'POST' },
+      { nodeId: 'node-a', path: taskOnCreatedRoute(task.id), method: 'POST' },
+    ]),
+  )
   expect(activeNodeId()).toBe('node-b')
 })

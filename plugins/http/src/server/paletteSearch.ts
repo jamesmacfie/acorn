@@ -78,6 +78,9 @@ export function savedRequestSearchItems(rows: readonly SavedRequestSummary[], te
  */
 export function importedRequestName(method: string, url: string): string {
   const withoutQuery = url.split(/[?#]/)[0] ?? ''
-  const segment = withoutQuery.split('/').filter((part) => part && !part.startsWith('{{')).pop()
+  const segment = withoutQuery
+    .split('/')
+    .filter((part) => part && !part.startsWith('{{'))
+    .pop()
   return `${method} ${segment ?? url}`.slice(0, 200)
 }

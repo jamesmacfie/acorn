@@ -138,7 +138,11 @@ export async function compactSessionLedger(
  */
 export async function compactLedgers(
   db: PluginDatabase,
-  options: { signal?: AbortSignal; onError?: (sessionId: string, error: unknown) => void; steps?: LedgerCompactionSteps } = {},
+  options: {
+    signal?: AbortSignal
+    onError?: (sessionId: string, error: unknown) => void
+    steps?: LedgerCompactionSteps
+  } = {},
 ): Promise<LedgerCompaction> {
   const steps = options.steps ?? STEPS
   const totals: LedgerCompaction = { sessions: 0, deleted: 0, rewritten: 0 }
@@ -169,7 +173,11 @@ export async function compactLedgers(
 // 63 MB. FTS5 would merge them on its own as rows are written, but slowly. A negative page count
 // merges every level, and a step that changes fewer than two rows means there is nothing left. The
 // history retention pass calls it too (runtime.ts § removeArchivedHistory).
-export async function mergeSearchIndex(db: PluginDatabase, pages = STEPS.mergePages, signal?: AbortSignal): Promise<void> {
+export async function mergeSearchIndex(
+  db: PluginDatabase,
+  pages = STEPS.mergePages,
+  signal?: AbortSignal,
+): Promise<void> {
   const changes = () => db.get<{ n: number }>(sql`SELECT total_changes() AS n`)?.n ?? 0
   while (!signal?.aborted) {
     const before = changes()

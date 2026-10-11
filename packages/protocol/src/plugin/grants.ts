@@ -1,4 +1,16 @@
-import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '../transport/api'
+import type {
+  PluginAgentToolGrant,
+  PluginContextSectionGrant,
+  PluginContributions,
+  PluginCustomAgentGrant,
+  PluginExtensionGrant,
+  PluginHarnessGrant,
+  PluginKeyClaimGrant,
+  PluginNavigationDestinationGrant,
+  PluginScheduleGrant,
+  PluginTaskCheckGrant,
+  PluginWebviewGrant,
+} from '../transport/api'
 import {
   isCoreExclusiveSlot,
   isExtensionPointKind,
@@ -18,11 +30,13 @@ export const pluginWebviewGrants = (contributions: PluginContributions): PluginW
     .filter((surface) => surface.target === 'webview' && surface.hosts?.length)
     .flatMap((surface) => {
       try {
-        return [{
-          surface: surface.id,
-          label: surface.label,
-          hosts: [...new Set(surface.hosts!.map((host) => normalizeWebviewHost(host)))].sort(),
-        }]
+        return [
+          {
+            surface: surface.id,
+            label: surface.label,
+            hosts: [...new Set(surface.hosts!.map((host) => normalizeWebviewHost(host)))].sort(),
+          },
+        ]
       } catch {
         return []
       }
@@ -54,38 +68,45 @@ const contributedPointKind = (entry: { remote?: string; frame?: string; route?: 
  * minted from the plugin the manifest was read from. A manifest that could state it could open a
  * point in another package's name.
  */
-export const pluginExtensionGrants = (pluginId: string, contributions: PluginContributions): PluginExtensionGrant[] => [
-  ...(contributions.extensionPoints ?? []).flatMap((point): PluginExtensionGrant[] =>
-    // A kind this build has no sentence for is dropped rather than disclosed with a guess. Same rule
-    // as the unparseable reference below: better a missing line than one that describes the wrong
-    // thing, and the roster row already records what this shell could not read.
-    isExtensionPointKind(point.kind)
-      ? [{
-        kind: 'hosts',
-        pointKind: point.kind,
-        target: qualifiedExtensionPointId(pluginId, point.id),
-        label: point.label,
-      }]
-      : []),
-  ...(contributions.extensions ?? []).flatMap((entry): PluginExtensionGrant[] => {
-    // An unparseable reference is dropped rather than disclosed. The node refused it at parse and the
-    // client refuses it again, so it will never deliver anything. A consent line about a grant that
-    // cannot exist is noise in the one list that must not have any.
-    const ref = parseExtensionPointRef(entry.point)
-    if (!ref) return []
-    return [{
-      kind: 'extends',
-      pointKind: contributedPointKind(entry),
-      ...(isHookMode(entry.mode) ? { mode: entry.mode } : {}),
-      target: entry.point,
-      label: entry.label,
-    }]
-  }),
-  ...(contributions.frames ?? []).flatMap((frame): PluginExtensionGrant[] =>
-    frame.target === 'coreSlot' && isCoreExclusiveSlot(frame.coreSlot)
-      ? [{ kind: 'replaces', target: frame.coreSlot, label: frame.label }]
-      : []),
-].sort((a, b) => a.kind.localeCompare(b.kind) || a.target.localeCompare(b.target))
+export const pluginExtensionGrants = (pluginId: string, contributions: PluginContributions): PluginExtensionGrant[] =>
+  [
+    ...(contributions.extensionPoints ?? []).flatMap((point): PluginExtensionGrant[] =>
+      // A kind this build has no sentence for is dropped rather than disclosed with a guess. Same rule
+      // as the unparseable reference below: better a missing line than one that describes the wrong
+      // thing, and the roster row already records what this shell could not read.
+      isExtensionPointKind(point.kind)
+        ? [
+            {
+              kind: 'hosts',
+              pointKind: point.kind,
+              target: qualifiedExtensionPointId(pluginId, point.id),
+              label: point.label,
+            },
+          ]
+        : [],
+    ),
+    ...(contributions.extensions ?? []).flatMap((entry): PluginExtensionGrant[] => {
+      // An unparseable reference is dropped rather than disclosed. The node refused it at parse and the
+      // client refuses it again, so it will never deliver anything. A consent line about a grant that
+      // cannot exist is noise in the one list that must not have any.
+      const ref = parseExtensionPointRef(entry.point)
+      if (!ref) return []
+      return [
+        {
+          kind: 'extends',
+          pointKind: contributedPointKind(entry),
+          ...(isHookMode(entry.mode) ? { mode: entry.mode } : {}),
+          target: entry.point,
+          label: entry.label,
+        },
+      ]
+    }),
+    ...(contributions.frames ?? []).flatMap((frame): PluginExtensionGrant[] =>
+      frame.target === 'coreSlot' && isCoreExclusiveSlot(frame.coreSlot)
+        ? [{ kind: 'replaces', target: frame.coreSlot, label: frame.label }]
+        : [],
+    ),
+  ].sort((a, b) => a.kind.localeCompare(b.kind) || a.target.localeCompare(b.target))
 
 /** What this package will run on its own, and how often. See docs/plugins/client-half.md § Loaded plugins: the
  *  client half (the `schedules` entry) for why the `run` route itself is not part of the grant. */
@@ -125,14 +146,16 @@ export const pluginHarnessGrants = (contributions: PluginContributions): PluginH
       // it is disclosed with a placeholder standing in for the value. The prompt has no placeholder at
       // all, because it is what the owner typed rather than what the plugin declared.
       const oneShotArgs = oneShot ? [...oneShot.args, ...(oneShot.modelFlag ? [oneShot.modelFlag, 'MODEL'] : [])] : []
-      return [{
-        id: harness.id,
-        label: harness.label,
-        kind: harness.spawn.command ? 'command' : 'entry',
-        run: args ? `${target} ${args}` : target,
-        env: [...new Set(harness.envPassthrough ?? [])].sort(),
-        ...(oneShot && oneShotCommand ? { oneShot: [oneShotCommand, ...oneShotArgs].join(' ') } : {}),
-      }]
+      return [
+        {
+          id: harness.id,
+          label: harness.label,
+          kind: harness.spawn.command ? 'command' : 'entry',
+          run: args ? `${target} ${args}` : target,
+          env: [...new Set(harness.envPassthrough ?? [])].sort(),
+          ...(oneShot && oneShotCommand ? { oneShot: [oneShotCommand, ...oneShotArgs].join(' ') } : {}),
+        },
+      ]
     })
     .sort((a, b) => a.id.localeCompare(b.id))
 
@@ -184,11 +207,13 @@ export const pluginNavigationDestinationGrants = (
   contributions: PluginContributions,
 ): PluginNavigationDestinationGrant[] =>
   (contributions.frames ?? [])
-    .flatMap((surface) => (surface.destinations ?? []).map((destination) => ({
-      surface: surface.id,
-      label: destination.label,
-      destination: destination.id,
-      targetKind: destination.targetKind,
-      ...(destination.noticeKind ? { noticeKind: destination.noticeKind } : {}),
-    })))
+    .flatMap((surface) =>
+      (surface.destinations ?? []).map((destination) => ({
+        surface: surface.id,
+        label: destination.label,
+        destination: destination.id,
+        targetKind: destination.targetKind,
+        ...(destination.noticeKind ? { noticeKind: destination.noticeKind } : {}),
+      })),
+    )
     .sort((a, b) => a.surface.localeCompare(b.surface) || a.destination.localeCompare(b.destination))

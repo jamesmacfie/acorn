@@ -39,9 +39,10 @@ const KINDS: Array<{ id: keyof SentryKindSwitches; label: string; hint: string }
 
 /** The nearest offered rate, so a value written by an older build still shows a selected row. */
 const rateValue = (rate: number): string =>
-  RATES.reduce((best, option) =>
-    Math.abs(Number(option.value) - rate) < Math.abs(Number(best.value) - rate) ? option : best,
-  RATES[0]).value
+  RATES.reduce(
+    (best, option) => (Math.abs(Number(option.value) - rate) < Math.abs(Number(best.value) - rate) ? option : best),
+    RATES[0],
+  ).value
 
 /** Which row a write came from, so its error is drawn beside that row and nowhere else. */
 type RowId = 'rate' | keyof SentryKindSwitches | 'stacks' | 'taskIds'
@@ -52,7 +53,8 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
   // change would put the round trip between the click and the checkbox moving.
   const [edited, setEdited] = createSignal<SentrySettings | null>(null)
   const [failure, setFailure] = createSignal<{ row: RowId; message: string } | null>(null)
-  const settings = (): SentrySettings => edited() ?? (loaded.state === 'ready' ? parseSettings(loaded()) : DEFAULT_SETTINGS)
+  const settings = (): SentrySettings =>
+    edited() ?? (loaded.state === 'ready' ? parseSettings(loaded()) : DEFAULT_SETTINGS)
   const errorOn = (row: RowId) => {
     const failed = failure()
     return failed?.row === row ? failed.message : undefined
@@ -95,7 +97,9 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
               switch
               ariaLabel={kind.label}
               checked={settings().kinds[kind.id]}
-              onChange={(checked: boolean) => void write(kind.id, { ...settings(), kinds: { ...settings().kinds, [kind.id]: checked } })}
+              onChange={(checked: boolean) =>
+                void write(kind.id, { ...settings(), kinds: { ...settings().kinds, [kind.id]: checked } })
+              }
             />
           </SettingRow>
         ))}

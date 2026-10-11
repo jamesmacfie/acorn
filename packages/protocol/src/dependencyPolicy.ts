@@ -15,4 +15,6 @@ export type StaticDependencyPolicy = {
   sourcePolicyKeys: string[]
   limits: string[]
 }
-export const STATIC_DEPENDENCY_POLICY = capabilityId<{ read(root: string, signal?: AbortSignal): Promise<StaticDependencyPolicy> }>('git.staticDependencyPolicy')
+export const STATIC_DEPENDENCY_POLICY = capabilityId<{
+  read(root: string, signal?: AbortSignal): Promise<StaticDependencyPolicy>
+}>('git.staticDependencyPolicy')

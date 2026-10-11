@@ -15,7 +15,7 @@ describe('node extension points', () => {
     for (const name of ['owner', 'other', 'thief']) clearRegistrations(name)
   })
 
-  it('refuses a point outside the opening plugin\'s namespace', () => {
+  it("refuses a point outside the opening plugin's namespace", () => {
     const thief = context('thief')
     try {
       expect(() => thief.extensionPoints.declare(POINT, 'Things')).toThrow(/only open points under 'thief:'/)
@@ -24,7 +24,7 @@ describe('node extension points', () => {
     }
   })
 
-  it('delivers other plugins\' entries in order, under host-minted ids', () => {
+  it("delivers other plugins' entries in order, under host-minted ids", () => {
     const owner = context('owner')
     const other = context('other')
     try {

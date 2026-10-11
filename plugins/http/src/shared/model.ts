@@ -193,9 +193,35 @@ export function toCurl(req: Pick<HttpRequest, 'method' | 'url' | 'headers' | 'bo
 
 // Value-taking curl flags we understand. Anything else is skipped (with its value, when it takes
 // one) rather than guessed at.
-const CURL_VALUE_FLAGS = new Set(['-X', '--request', '-H', '--header', '-d', '--data', '--data-raw', '--data-binary', '--data-ascii', '-u', '--user', '--url', '-A', '--user-agent', '-b', '--cookie', '-e', '--referer'])
+const CURL_VALUE_FLAGS = new Set([
+  '-X',
+  '--request',
+  '-H',
+  '--header',
+  '-d',
+  '--data',
+  '--data-raw',
+  '--data-binary',
+  '--data-ascii',
+  '-u',
+  '--user',
+  '--url',
+  '-A',
+  '--user-agent',
+  '-b',
+  '--cookie',
+  '-e',
+  '--referer',
+])
 
-export type ParsedCurl = { method: string; url: string; headers: KeyValue[]; bodyMode: BodyMode; body: string; auth: AuthConfig }
+export type ParsedCurl = {
+  method: string
+  url: string
+  headers: KeyValue[]
+  bodyMode: BodyMode
+  body: string
+  auth: AuthConfig
+}
 
 export function fromCurl(input: string): ParsedCurl | null {
   const tokens = tokenizeShell(input.replace(/\\\r?\n/g, ' '))
@@ -231,7 +257,8 @@ export function fromCurl(input: string): ParsedCurl | null {
       case '-H':
       case '--header': {
         const colon = value.indexOf(':')
-        if (colon > 0) headers.push({ name: value.slice(0, colon).trim(), value: value.slice(colon + 1).trim(), enabled: true })
+        if (colon > 0)
+          headers.push({ name: value.slice(0, colon).trim(), value: value.slice(colon + 1).trim(), enabled: true })
         break
       }
       case '-A':
@@ -249,7 +276,11 @@ export function fromCurl(input: string): ParsedCurl | null {
       case '-u':
       case '--user': {
         const colon = value.indexOf(':')
-        auth = { mode: 'basic', username: colon < 0 ? value : value.slice(0, colon), password: colon < 0 ? '' : value.slice(colon + 1) }
+        auth = {
+          mode: 'basic',
+          username: colon < 0 ? value : value.slice(0, colon),
+          password: colon < 0 ? '' : value.slice(colon + 1),
+        }
         break
       }
       default:
@@ -259,7 +290,13 @@ export function fromCurl(input: string): ParsedCurl | null {
 
   if (!url) return null
   const contentType = headers.find((h) => h.name.toLowerCase() === 'content-type')?.value ?? ''
-  const bodyMode: BodyMode = !body ? 'none' : contentType.includes('form-urlencoded') ? 'form' : looksLikeJson(body) || contentType.includes('json') ? 'json' : 'text'
+  const bodyMode: BodyMode = !body
+    ? 'none'
+    : contentType.includes('form-urlencoded')
+      ? 'form'
+      : looksLikeJson(body) || contentType.includes('json')
+        ? 'json'
+        : 'text'
   return {
     method: method || (body ? 'POST' : 'GET'),
     url,
@@ -355,7 +392,9 @@ export const defaultContentType = (mode: BodyMode): string | null => {
 
 const projectScope = (projectId: string) => `/v1/p/http/projects/${encodeURIComponent(projectId)}`
 export const httpRequestsRoute = (projectId: string): string => `${projectScope(projectId)}/requests`
-export const httpRequestRoute = (projectId: string, id: string): string => `${projectScope(projectId)}/requests/${encodeURIComponent(id)}`
+export const httpRequestRoute = (projectId: string, id: string): string =>
+  `${projectScope(projectId)}/requests/${encodeURIComponent(id)}`
 export const httpVariablesRoute = (projectId: string): string => `${projectScope(projectId)}/vars`
-export const httpVariableRoute = (projectId: string, id: string): string => `${projectScope(projectId)}/vars/${encodeURIComponent(id)}`
+export const httpVariableRoute = (projectId: string, id: string): string =>
+  `${projectScope(projectId)}/vars/${encodeURIComponent(id)}`
 export const httpSendRoute = (projectId: string): string => `${projectScope(projectId)}/send`

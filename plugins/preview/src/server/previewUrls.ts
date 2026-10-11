@@ -14,7 +14,12 @@ const validPortUrl = (value: string): string | null => {
 // importing the worktree helper would cross the plugin boundary this runtime exists to preserve.
 const taskSlug = (branch: string): string => branch.replace(/[^A-Za-z0-9._-]/g, '-')
 
-const scriptUrl = async (core: PreviewCore, taskId: string, script: string, current: () => boolean): Promise<string | null> => {
+const scriptUrl = async (
+  core: PreviewCore,
+  taskId: string,
+  script: string,
+  current: () => boolean,
+): Promise<string | null> => {
   const task = await core.tasks.load(taskId)
   if (!task) return null
   const project = await core.projects.byId(task.projectId)
@@ -36,7 +41,13 @@ const scriptUrl = async (core: PreviewCore, taskId: string, script: string, curr
     timeoutMs: 10_000,
   })
   if (result.spawnError || result.timedOut || result.code !== 0) return null
-  return result.stdout.split('\n').map((line) => line.trim()).filter(Boolean).pop() ?? null
+  return (
+    result.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .pop() ?? null
+  )
 }
 
 export type PreviewUrlRuntime = {
@@ -78,14 +89,21 @@ export function createPreviewUrlRuntime(
     const recipe = recipeUrls.get(taskId)
     if (recipe) return { taskId, url: recipe, source: 'recipe' }
 
-    const loaded = await core.tasks.load(taskId).then((task) => ({ task, error: undefined }), (error: unknown) => ({ task: undefined, error }))
+    const loaded = await core.tasks.load(taskId).then(
+      (task) => ({ task, error: undefined }),
+      (error: unknown) => ({ task: undefined, error }),
+    )
     const task = loaded.task
     if (disposed || wave.retired) return null
     if (task) {
       wave.projectId = task.projectId
       taskProjects.set(taskId, task.projectId)
     }
-    const runUrl = (await runTargets()?.defaultUrl(taskId).catch(() => undefined))?.trim()
+    const runUrl = (
+      await runTargets()
+        ?.defaultUrl(taskId)
+        .catch(() => undefined)
+    )?.trim()
     if (disposed || wave.retired) return null
     if (runUrl) return { taskId, url: runUrl, source: 'run-target' }
 
@@ -112,7 +130,9 @@ export function createPreviewUrlRuntime(
   // false while a dev server restarted would close the pane the reader was looking at.
   const configuredFor = async (taskId: string): Promise<boolean> => {
     if (recipeUrls.has(taskId)) return true
-    const listed = await runTargets()?.targets(taskId).catch(() => undefined)
+    const listed = await runTargets()
+      ?.targets(taskId)
+      .catch(() => undefined)
     if (listed && 'targets' in listed) {
       const target = listed.targets.find((t) => t.default) ?? listed.targets[0]
       if (target?.url || target?.urlCommand) return true
@@ -130,18 +150,21 @@ export function createPreviewUrlRuntime(
     if (previous) previous.retired = true
     authorities.set(taskId, wave)
     waves.set(taskId, wave)
-    wave.pending = (disposed ? Promise.resolve(null) : resolve(taskId, wave)).then((state) => {
-      // A retired caller receives null; it cannot treat its candidate as current authority.
-      if (disposed || wave.retired) return null
-      observed.set(taskId, state)
-      return state
-    }).finally(() => {
-      if (waves.get(taskId) === wave) waves.delete(taskId)
-    })
+    wave.pending = (disposed ? Promise.resolve(null) : resolve(taskId, wave))
+      .then((state) => {
+        // A retired caller receives null; it cannot treat its candidate as current authority.
+        if (disposed || wave.retired) return null
+        observed.set(taskId, state)
+        return state
+      })
+      .finally(() => {
+        if (waves.get(taskId) === wave) waves.delete(taskId)
+      })
     return wave
   }
 
-  const forTask = (taskId: string): Promise<PreviewUrlState | null> => disposed ? Promise.resolve(null) : read(taskId).pending
+  const forTask = (taskId: string): Promise<PreviewUrlState | null> =>
+    disposed ? Promise.resolve(null) : read(taskId).pending
 
   const announce = async (taskId: string): Promise<void> => {
     if (disposed) return
@@ -152,9 +175,11 @@ export function createPreviewUrlRuntime(
     if (disposed || wave.retired) return
     if (!hadBefore && !next) return
     if (before?.url === next?.url && before?.source === next?.source) return
-    emit(next
-      ? { channel: 'plugin:preview:url-changed', ...next }
-      : { channel: 'plugin:preview:url-changed', taskId, url: null, source: null })
+    emit(
+      next
+        ? { channel: 'plugin:preview:url-changed', ...next }
+        : { channel: 'plugin:preview:url-changed', taskId, url: null, source: null },
+    )
   }
 
   const refresh = (taskId: string): Promise<void> => {
@@ -167,7 +192,9 @@ export function createPreviewUrlRuntime(
     configured: async () => {
       if (disposed) return {}
       const tasks = await core.tasks.active()
-      return Object.fromEntries(await Promise.all(tasks.map(async (task) => [task.id, await configuredFor(task.id)] as const)))
+      return Object.fromEntries(
+        await Promise.all(tasks.map(async (task) => [task.id, await configuredFor(task.id)] as const)),
+      )
     },
     refresh,
     refreshProject: async (projectId) => {
@@ -191,7 +218,12 @@ export function createPreviewUrlRuntime(
       if (disposed || taskSweeps.get(taskId) !== sweep) return
       taskSweeps.delete(taskId)
       const active = new Set(tasks.map((task) => task.id))
-      for (const id of new Set([...recipeUrls.keys(), ...observed.keys(), ...taskProjects.keys(), ...authorities.keys()])) {
+      for (const id of new Set([
+        ...recipeUrls.keys(),
+        ...observed.keys(),
+        ...taskProjects.keys(),
+        ...authorities.keys(),
+      ])) {
         if ((taskId !== null && id !== taskId) || active.has(id)) continue
         retire(id)
         recipeUrls.delete(id)

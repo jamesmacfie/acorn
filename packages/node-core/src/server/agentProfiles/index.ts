@@ -38,5 +38,11 @@ agentProfileRegistry.register(shellProfile)
 // an import of the claude plugin, and the plugin that supplies the id registers itself at boot.
 export const DEFAULT_PROFILE_ID = 'claude-code'
 
-export type { AgentProfileContribution, HeadlessArgv, HeadlessCapture, HeadlessOpts, StreamEvent, StreamJsonAdapter } from './types'
-
+export type {
+  AgentProfileContribution,
+  HeadlessArgv,
+  HeadlessCapture,
+  HeadlessOpts,
+  StreamEvent,
+  StreamJsonAdapter,
+} from './types'

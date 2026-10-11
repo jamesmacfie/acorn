@@ -40,7 +40,8 @@ export async function deleteTask(db: AppDatabase, id: string, deps: DeleteDeps):
   const claimed: string[] = []
   try {
     for (const taskId of taskIds) {
-      if (!beginTaskArchive(taskId)) return { ok: false, reason: 'The task is being archived. Try again when that finishes.', busy: true }
+      if (!beginTaskArchive(taskId))
+        return { ok: false, reason: 'The task is being archived. Try again when that finishes.', busy: true }
       claimed.push(taskId)
     }
     if (tree.some((task) => task.status !== 'archived')) {
@@ -71,8 +72,13 @@ function removeTaskRows(db: AppDatabase, taskIds: string[]): void {
     // Scans every preference row, a few hundred on a real node. Index the task id if that grows.
     for (const pref of tx.select({ userId: schema.prefs.userId, key: schema.prefs.key }).from(schema.prefs).all()) {
       if (!suffixes.some((suffix) => pref.key.endsWith(suffix))) continue
-      tx.delete(schema.prefs).where(and(eq(schema.prefs.userId, pref.userId), eq(schema.prefs.key, pref.key))).run()
+      tx.delete(schema.prefs)
+        .where(and(eq(schema.prefs.userId, pref.userId), eq(schema.prefs.key, pref.key)))
+        .run()
     }
-    tx.insert(schema.deletedTasks).values(taskIds.map((taskId) => ({ id: taskId, deletedAt }))).onConflictDoNothing().run()
+    tx.insert(schema.deletedTasks)
+      .values(taskIds.map((taskId) => ({ id: taskId, deletedAt })))
+      .onConflictDoNothing()
+      .run()
   })
 }

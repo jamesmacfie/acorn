@@ -15,7 +15,12 @@ import { localGit, setLocalGitBridge, type GitActionResult } from './localGit'
 import { _resetLocalDocuments } from '../localDocument'
 import type { LocalDocumentResponse } from '../../../shared/changes/api'
 import type { DiffSearchPage, DiffSegmentPayload } from '@acorn/diff-document/document'
-import { ProviderOperationError, type CompiledCoreServices, type CoreServices, type GenerateTextRequest } from '@acorn/plugin-api/node'
+import {
+  ProviderOperationError,
+  type CompiledCoreServices,
+  type CoreServices,
+  type GenerateTextRequest,
+} from '@acorn/plugin-api/node'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { Env } from '@acorn/plugin-api/testkit'
 
@@ -35,8 +40,11 @@ const noModels = {
   generateText: () => Promise.reject(new Error('no provider in this test')),
   available: () => Promise.resolve([]),
 }
-const withAdmission = <T extends { tasks: CoreServices['tasks'] }>(core: T) => ({ ...core,
-  checkoutAdmission: { write: async <R>(taskId: string, action: (path: string) => Promise<R>) => action((await core.tasks.root(taskId))!) } as CompiledCoreServices['checkoutAdmission'],
+const withAdmission = <T extends { tasks: CoreServices['tasks'] }>(core: T) => ({
+  ...core,
+  checkoutAdmission: {
+    write: async <R>(taskId: string, action: (path: string) => Promise<R>) => action((await core.tasks.root(taskId))!),
+  } as CompiledCoreServices['checkoutAdmission'],
 })
 
 const authed = () => {
@@ -65,15 +73,38 @@ describe('local-git routes over a real worktree', () => {
     t = makeTestDb()
     setLocalGitBridge(localGitBridge(withAdmission({ tasks: createTaskService(t.db), models: noModels })))
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: work, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-widget',
+      name: 'widget',
+      path: work,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'widget',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({
-      id: 'task1', title: 'T', origin: 'local', projectId: 'project-widget', branch: 'main',
-      worktreePath: work, pullNumber: null, status: 'active', sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+      id: 'task1',
+      title: 'T',
+      origin: 'local',
+      projectId: 'project-widget',
+      branch: 'main',
+      worktreePath: work,
+      pullNumber: null,
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
     })
   })
   afterEach(() => {
@@ -88,10 +119,21 @@ describe('local-git routes over a real worktree', () => {
     const app = authed()
     const status = await statusOf(app)
     // The branch facts travel with the file list, which is the point of the one read.
-    expect(Object.keys(status).sort()).toEqual(['ahead', 'behind', 'branch', 'changes', 'operation', 'pullPolicy', 'upstream', 'upstreamId'])
+    expect(Object.keys(status).sort()).toEqual([
+      'ahead',
+      'behind',
+      'branch',
+      'changes',
+      'operation',
+      'pullPolicy',
+      'upstream',
+      'upstreamId',
+    ])
     expect(status.changes.find((c) => c.path === 'new.txt')?.status).toBe('untracked')
 
-    const staged = await (await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { paths: ['new.txt'] }), {} as Env)).json()
+    const staged = await (
+      await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { paths: ['new.txt'] }), {} as Env)
+    ).json()
     expect(staged).toMatchObject({ ok: true })
     expect((await statusOf(app)).changes.find((c) => c.path === 'new.txt')?.staged).toBe(true)
   })
@@ -109,27 +151,47 @@ describe('local-git routes over a real worktree', () => {
     expect((await app.fetch(req('/api/tasks/task1/local/secret-check?operation=export'), {} as Env)).status).toBe(400)
     const response = await app.fetch(req('/api/tasks/task1/local/secret-check?operation=commit'), {} as Env)
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ operation: 'commit', report: { detectorVersion: 'acorn-secrets/1', counts: { high: 0 } } })
+    expect(await response.json()).toMatchObject({
+      operation: 'commit',
+      report: { detectorVersion: 'acorn-secrets/1', counts: { high: 0 } },
+    })
   })
 
   it('400s an empty path list, the old single-path body, and a document with no scope', async () => {
     const app = authed()
     expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { paths: [] }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { path: 'new.txt' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/tasks/task1/local/unstage', 'POST', { path: 'new.txt' }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { path: 'new.txt' }), {} as Env)).status).toBe(
+      400,
+    )
+    expect(
+      (await app.fetch(req('/api/tasks/task1/local/unstage', 'POST', { path: 'new.txt' }), {} as Env)).status,
+    ).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', {}), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/local/document', 'POST', { files: [] }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/tasks/task1/local/document/segments', 'POST', { scope: 'unstaged', requests: [] }), {} as Env)).status).toBe(400)
+    expect(
+      (
+        await app.fetch(
+          req('/api/tasks/task1/local/document/segments', 'POST', { scope: 'unstaged', requests: [] }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(400)
   })
 
   // Each commit flag is strictly a boolean. `'yes'` is a caller bug, and coercing it would amend a
   // commit nobody asked to amend.
   it('400s a commit whose flags are not booleans, or whose body has no message', async () => {
     const app = authed()
-    expect((await app.fetch(req('/api/tasks/task1/local/commit', 'POST', { message: 'x', amend: 'yes' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/tasks/task1/local/commit', 'POST', { message: 'x', all: 1 }), {} as Env)).status).toBe(400)
+    expect(
+      (await app.fetch(req('/api/tasks/task1/local/commit', 'POST', { message: 'x', amend: 'yes' }), {} as Env)).status,
+    ).toBe(400)
+    expect(
+      (await app.fetch(req('/api/tasks/task1/local/commit', 'POST', { message: 'x', all: 1 }), {} as Env)).status,
+    ).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/local/commit', 'POST', { amend: true }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/tasks/task1/local/commit', 'POST', 'not json at all'), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/tasks/task1/local/commit', 'POST', 'not json at all'), {} as Env)).status).toBe(
+      400,
+    )
   })
 
   // The two remote bodies. `'yes'` coerced would turn a fast-forward pull into a rebase, or an
@@ -143,7 +205,9 @@ describe('local-git routes over a real worktree', () => {
 
     // No origin in this fixture, so the pull fails in git rather than in the parser — which is the
     // proof the flag reached the bridge.
-    const pulled = await (await app.fetch(req('/api/tasks/task1/local/pull', 'POST', { rebase: true }), {} as Env)).json() as GitActionResult
+    const pulled = (await (
+      await app.fetch(req('/api/tasks/task1/local/pull', 'POST', { rebase: true }), {} as Env)
+    ).json()) as GitActionResult
     expect(pulled.ok).toBe(false)
     expect(pulled.reason).toBeTruthy()
   })
@@ -152,8 +216,10 @@ describe('local-git routes over a real worktree', () => {
   // is in flight is refused rather than guessed at.
   it('refuses an abort when no Git operation is in progress', async () => {
     const app = authed()
-    expect(await (await app.fetch(req('/api/tasks/task1/local/abort', 'POST'), {} as Env)).json())
-      .toEqual({ ok: false, reason: 'No Git operation is in progress.' })
+    expect(await (await app.fetch(req('/api/tasks/task1/local/abort', 'POST'), {} as Env)).json()).toEqual({
+      ok: false,
+      reason: 'No Git operation is in progress.',
+    })
   })
 
   it('401s without a principal; 503s without a bridge', async () => {
@@ -199,15 +265,38 @@ describe('the hook chains, as the bridge runs them', () => {
 
     t = makeTestDb()
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: work, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-widget',
+      name: 'widget',
+      path: work,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({
-      id: 'task1', title: 'T', origin: 'local', projectId: 'project-widget', branch: 'main',
-      worktreePath: work, pullNumber: null, status: 'active', sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+      id: 'task1',
+      title: 'T',
+      origin: 'local',
+      projectId: 'project-widget',
+      branch: 'main',
+      worktreePath: work,
+      pullNumber: null,
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
     })
   })
   afterEach(() => {
@@ -215,14 +304,17 @@ describe('the hook chains, as the bridge runs them', () => {
     rmSync(work, { recursive: true, force: true })
   })
 
-  const bridge = () => localGitBridge(withAdmission({ tasks: createTaskService(t.db), models: noModels }), () => {}, hooks)
+  const bridge = () =>
+    localGitBridge(withAdmission({ tasks: createTaskService(t.db), models: noModels }), () => {}, hooks)
 
   it('hands a handler the amend flag, and commits the message the chain left', { timeout: 15_000 }, async () => {
     verdict = { ok: true, transform: (message) => `lint: ${message}` }
     writeFileSync(join(work, 'a.txt'), 'two\n', 'utf8')
 
     expect(await bridge().commit('task1', 'plain subject', { all: true })).toEqual({ ok: true })
-    expect(seen).toEqual([{ id: 'before-commit', taskId: 'task1', branch: 'main', message: 'plain subject', amend: false }])
+    expect(seen).toEqual([
+      { id: 'before-commit', taskId: 'task1', branch: 'main', message: 'plain subject', amend: false },
+    ])
     // The transform, not the original: one value for the owner to act on either way.
     expect(git('log', '-1', '--pretty=%s').trim()).toBe('lint: plain subject')
 
@@ -238,12 +330,14 @@ describe('the hook chains, as the bridge runs them', () => {
     verdict = { ok: false, reason: 'subject too long', by: 'commit-lint' }
     writeFileSync(join(work, 'a.txt'), 'two\n', 'utf8')
 
-    expect(await bridge().commit('task1', 'a subject', { all: true }))
-      .toEqual({ ok: false, reason: 'commit-lint: subject too long' })
+    expect(await bridge().commit('task1', 'a subject', { all: true })).toEqual({
+      ok: false,
+      reason: 'commit-lint: subject too long',
+    })
     expect(git('log', '-1', '--pretty=%s').trim()).toBe('first')
   })
 
-  it('answers HEAD\'s message for the field an amend fills, and null where there is no worktree', async () => {
+  it("answers HEAD's message for the field an amend fills, and null where there is no worktree", async () => {
     expect(await bridge().headCommit('task1')).toMatchObject({ message: 'first' })
     expect(await bridge().headCommit('nobody')).toBeNull()
   })
@@ -263,8 +357,10 @@ describe('the hook chains, as the bridge runs them', () => {
 
   it('turns a force-push veto into a reason with the objecting plugin in front of it', async () => {
     verdict = { ok: false, reason: 'main is protected', by: 'branch-guard' }
-    expect(await bridge().push('task1', { force: true }))
-      .toEqual({ ok: false, reason: 'branch-guard: main is protected' })
+    expect(await bridge().push('task1', { force: true })).toEqual({
+      ok: false,
+      reason: 'branch-guard: main is protected',
+    })
     // Vetoed before git ran, so nothing was attempted against a remote that does not exist.
     expect(seen).toEqual([{ id: 'before-push', taskId: 'task1', branch: 'main', force: true }])
   })
@@ -287,11 +383,17 @@ describe('the generated commit message', () => {
     generateText: (request: GenerateTextRequest) => {
       asked = request
       if (fail) return Promise.reject(fail)
-      return Promise.resolve({ text: answer, providerId: 'anthropic', backendId: request.backendId, modelId: 'a-model' })
+      return Promise.resolve({
+        text: answer,
+        providerId: 'anthropic',
+        backendId: request.backendId,
+        modelId: 'a-model',
+      })
     },
-    available: () => Promise.resolve([
-      { id: 'connection:conn-1', kind: 'connection', label: 'Work key', models: [], defaultModelId: '' },
-    ] satisfies ModelBackend[]),
+    available: () =>
+      Promise.resolve([
+        { id: 'connection:conn-1', kind: 'connection', label: 'Work key', models: [], defaultModelId: '' },
+      ] satisfies ModelBackend[]),
   }
 
   // An agent's credential: an internal token bound to one task. It may drive that task's tools and it
@@ -320,15 +422,38 @@ describe('the generated commit message', () => {
     t = makeTestDb()
     setLocalGitBridge(localGitBridge(withAdmission({ tasks: createTaskService(t.db), models })))
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: work, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-widget',
+      name: 'widget',
+      path: work,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'widget',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({
-      id: 'task1', title: 'T', origin: 'local', projectId: 'project-widget', branch: 'james/fix-the-header',
-      worktreePath: work, pullNumber: null, status: 'active', sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+      id: 'task1',
+      title: 'T',
+      origin: 'local',
+      projectId: 'project-widget',
+      branch: 'james/fix-the-header',
+      worktreePath: work,
+      pullNumber: null,
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
     })
   })
   afterEach(() => {
@@ -346,7 +471,11 @@ describe('the generated commit message', () => {
 
     const response = await generate(authed(), { backendId: 'conn-1', modelId: 'a-model' })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ message: 'feat: something\n\nAnd why.', providerId: 'anthropic', modelId: 'a-model' })
+    expect(await response.json()).toEqual({
+      message: 'feat: something\n\nAnd why.',
+      providerId: 'anthropic',
+      modelId: 'a-model',
+    })
     // The prompt is built on the node from the diff the next commit would take, so the branch and the
     // patch are both in it and the client sent neither.
     expect(asked!.input.prompt).toContain('Branch: james/fix-the-header')
@@ -381,7 +510,10 @@ describe('the generated commit message', () => {
   // An automation caller has no editor to put the text in and no business paying for one.
   it('403s an agent credential on both routes', async () => {
     const app = asAgent()
-    expect((await app.fetch(req('/api/tasks/task1/local/commit-message', 'POST', { backendId: 'conn-1' }), {} as Env)).status).toBe(403)
+    expect(
+      (await app.fetch(req('/api/tasks/task1/local/commit-message', 'POST', { backendId: 'conn-1' }), {} as Env))
+        .status,
+    ).toBe(403)
     expect((await app.fetch(req('/api/tasks/task1/local/model-connections'), {} as Env)).status).toBe(403)
   })
 
@@ -432,7 +564,8 @@ describe('the local diff document', () => {
   let t: TestDb
   let work: string
   const git = (...args: string[]) => execFileSync('git', args, { cwd: work })
-  const lines = (count: number, word: string) => Array.from({ length: count }, (_, i) => `${word} ${i}`).join('\n') + '\n'
+  const lines = (count: number, word: string) =>
+    Array.from({ length: count }, (_, i) => `${word} ${i}`).join('\n') + '\n'
 
   beforeEach(async () => {
     _resetLocalDocuments()
@@ -447,15 +580,38 @@ describe('the local diff document', () => {
     t = makeTestDb()
     setLocalGitBridge(localGitBridge(withAdmission({ tasks: createTaskService(t.db), models: noModels })))
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-doc', name: 'doc', path: work, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-doc',
+      name: 'doc',
+      path: work,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({
-      id: 'task1', title: 'T', origin: 'local', projectId: 'project-doc', branch: 'main',
-      worktreePath: work, pullNumber: null, status: 'active', sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+      id: 'task1',
+      title: 'T',
+      origin: 'local',
+      projectId: 'project-doc',
+      branch: 'main',
+      worktreePath: work,
+      pullNumber: null,
+      status: 'active',
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
     })
   })
   afterEach(() => {
@@ -464,15 +620,22 @@ describe('the local diff document', () => {
     rmSync(work, { recursive: true, force: true })
   })
 
-  const post = async <T,>(path: string, body: unknown): Promise<{ status: number; body: T }> => {
+  const post = async <T>(path: string, body: unknown): Promise<{ status: number; body: T }> => {
     const res = await authed().fetch(req(`/api/tasks/task1/local/${path}`, 'POST', body), {} as Env)
     return { status: res.status, body: (await res.json()) as T }
   }
   const documentOf = (scope: 'staged' | 'unstaged', key = 'k1') =>
-    post<LocalDocumentResponse>('document', { scope, files: ['a.txt', 'b.txt', 'c.txt'].map((path) => ({ path, key })) })
+    post<LocalDocumentResponse>('document', {
+      scope,
+      files: ['a.txt', 'b.txt', 'c.txt'].map((path) => ({ path, key })),
+    })
 
   it('answers descriptors for the stack, in order, with untracked files and no-diff files included', async () => {
-    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'ALPHA five\n').replace('alpha 150\n', 'ALPHA 150\n'), 'utf8')
+    writeFileSync(
+      join(work, 'a.txt'),
+      lines(200, 'alpha').replace('alpha 5\n', 'ALPHA five\n').replace('alpha 150\n', 'ALPHA 150\n'),
+      'utf8',
+    )
     writeFileSync(join(work, 'c.txt'), lines(3, 'gamma'), 'utf8')
     const { status, body } = await documentOf('unstaged')
     expect(status).toBe(200)
@@ -484,11 +647,19 @@ describe('the local diff document', () => {
     expect(b).toEqual({ path: 'b.txt', patchKey: null, segments: [] })
     expect(c!.segments[0]).toMatchObject({ rows: 5, lines: [0, 0, 1, 3] })
 
-    const segments = await post<DiffSegmentPayload[]>('document/segments', { scope: 'unstaged', requests: [{ path: 'c.txt', patchKey: c!.patchKey, ordinal: 0 }] })
-    expect(segments.body[0]!.rows.filter((row) => row.kind === 'insert').map((row) => 'raw' in row && row.raw)).toEqual(['gamma 0', 'gamma 1', 'gamma 2'])
+    const segments = await post<DiffSegmentPayload[]>('document/segments', {
+      scope: 'unstaged',
+      requests: [{ path: 'c.txt', patchKey: c!.patchKey, ordinal: 0 }],
+    })
+    expect(segments.body[0]!.rows.filter((row) => row.kind === 'insert').map((row) => 'raw' in row && row.raw)).toEqual(
+      ['gamma 0', 'gamma 1', 'gamma 2'],
+    )
 
     const found = await post<DiffSearchPage>('document/search', {
-      scope: 'unstaged', query: 'alpha', caseSensitive: true, cursor: null,
+      scope: 'unstaged',
+      query: 'alpha',
+      caseSensitive: true,
+      cursor: null,
       files: body.files.flatMap((file) => (file.patchKey ? [{ path: file.path, patchKey: file.patchKey }] : [])),
     })
     expect(found.body.matches.length).toBeGreaterThan(0)
@@ -501,9 +672,15 @@ describe('the local diff document', () => {
     writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'second edit\n'), 'utf8')
     const after = (await documentOf('unstaged', 'k2')).body.files[0]!
     expect(after.patchKey).not.toBe(before.patchKey)
-    const stale = await post('document/segments', { scope: 'unstaged', requests: [{ path: 'a.txt', patchKey: before.patchKey, ordinal: 0 }] })
+    const stale = await post('document/segments', {
+      scope: 'unstaged',
+      requests: [{ path: 'a.txt', patchKey: before.patchKey, ordinal: 0 }],
+    })
     expect(stale.status).toBe(409)
-    const fresh = await post<DiffSegmentPayload[]>('document/segments', { scope: 'unstaged', requests: [{ path: 'a.txt', patchKey: after.patchKey, ordinal: 0 }] })
+    const fresh = await post<DiffSegmentPayload[]>('document/segments', {
+      scope: 'unstaged',
+      requests: [{ path: 'a.txt', patchKey: after.patchKey, ordinal: 0 }],
+    })
     expect(fresh.status).toBe(200)
     // The same status key again reads nothing new and answers the same digest.
     expect((await documentOf('unstaged', 'k2')).body.files[0]!.patchKey).toBe(after.patchKey)
@@ -518,10 +695,21 @@ describe('the local diff document', () => {
     git('config', 'diff.noprefix', 'true')
     writeFileSync(join(work, 'c.md'), 'one edited\n', 'utf8')
     writeFileSync(join(work, 'Plan b', 'c.md'), 'two edited\n', 'utf8')
-    const { body } = await post<LocalDocumentResponse>('document', { scope: 'unstaged', files: ['c.md', 'Plan b/c.md'].map((path) => ({ path, key: 'k1' })) })
-    for (const [file, text] of [[body.files[0]!, 'one edited'], [body.files[1]!, 'two edited']] as const) {
+    const { body } = await post<LocalDocumentResponse>('document', {
+      scope: 'unstaged',
+      files: ['c.md', 'Plan b/c.md'].map((path) => ({ path, key: 'k1' })),
+    })
+    for (const [file, text] of [
+      [body.files[0]!, 'one edited'],
+      [body.files[1]!, 'two edited'],
+    ] as const) {
       expect(file.patchKey).toMatch(/^sha256:/)
-      const rows = (await post<DiffSegmentPayload[]>('document/segments', { scope: 'unstaged', requests: [{ path: file.path, patchKey: file.patchKey, ordinal: 0 }] })).body[0]!.rows
+      const rows = (
+        await post<DiffSegmentPayload[]>('document/segments', {
+          scope: 'unstaged',
+          requests: [{ path: file.path, patchKey: file.patchKey, ordinal: 0 }],
+        })
+      ).body[0]!.rows
       expect(rows.filter((row) => row.kind === 'insert').map((row) => 'raw' in row && row.raw)).toEqual([text])
     }
   })
@@ -529,15 +717,31 @@ describe('the local diff document', () => {
   it('keeps the staged and unstaged stacks apart for a file in both', async () => {
     writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'staged edit\n'), 'utf8')
     git('add', 'a.txt')
-    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'staged edit\n').replace('alpha 9\n', 'unstaged edit\n'), 'utf8')
+    writeFileSync(
+      join(work, 'a.txt'),
+      lines(200, 'alpha').replace('alpha 5\n', 'staged edit\n').replace('alpha 9\n', 'unstaged edit\n'),
+      'utf8',
+    )
     const staged = (await documentOf('staged')).body.files[0]!
     const unstaged = (await documentOf('unstaged')).body.files[0]!
     expect(staged.patchKey).not.toBe(unstaged.patchKey)
     const read = async (scope: 'staged' | 'unstaged', file: typeof staged) =>
-      (await post<DiffSegmentPayload[]>('document/segments', { scope, requests: [{ path: 'a.txt', patchKey: file.patchKey, ordinal: 0 }] })).body[0]!.rows
+      (
+        await post<DiffSegmentPayload[]>('document/segments', {
+          scope,
+          requests: [{ path: 'a.txt', patchKey: file.patchKey, ordinal: 0 }],
+        })
+      ).body[0]!.rows
     expect(JSON.stringify(await read('staged', staged))).not.toContain('unstaged edit')
     expect(JSON.stringify(await read('unstaged', unstaged))).toContain('unstaged edit')
     // A staged digest asked for as unstaged is not that stack's revision.
-    expect((await post('document/segments', { scope: 'unstaged', requests: [{ path: 'a.txt', patchKey: staged.patchKey, ordinal: 0 }] })).status).toBe(409)
+    expect(
+      (
+        await post('document/segments', {
+          scope: 'unstaged',
+          requests: [{ path: 'a.txt', patchKey: staged.patchKey, ordinal: 0 }],
+        })
+      ).status,
+    ).toBe(409)
   })
 })

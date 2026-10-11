@@ -2,7 +2,17 @@ import { dispatchLayout } from '../../../features/tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from '../shell/scopeEviction'
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type {
+  AgentSessionChangedEvent,
+  ConnectionChangedEvent,
+  HeadChangedEvent,
+  ProjectChangedEvent,
+  RunTargetChangedEvent,
+  TaskChangedEvent,
+  WorkspaceChangedEvent,
+  WorkspaceProjectsChangedEvent,
+  WorkspacesModeChangedEvent,
+} from '@acorn/protocol/nodeEvents.ts'
 import { createLogger } from '../../../infra/telemetry/logger'
 
 const log = createLogger('client-event')

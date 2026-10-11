@@ -105,8 +105,14 @@ describe('OutputRing', () => {
 it('keeps exact UTF-8 byte suffixes across physical block cuts, wraps, and oversized callbacks', () => {
   const ring = new OutputRing()
   let reference = Buffer.alloc(0)
-  const chunks = ['a'.repeat(4095), '🌰中é', 'x'.repeat(RING_CAP - 23), 'é'.repeat(RING_CAP), '',
-    ...Array.from({ length: 170 }, (_, i) => `row${i}中\n`.repeat(777))]
+  const chunks = [
+    'a'.repeat(4095),
+    '🌰中é',
+    'x'.repeat(RING_CAP - 23),
+    'é'.repeat(RING_CAP),
+    '',
+    ...Array.from({ length: 170 }, (_, i) => `row${i}中\n`.repeat(777)),
+  ]
   for (const chunk of chunks) {
     const encoded = Buffer.from(chunk)
     reference = Buffer.concat([reference, encoded]).subarray(-RING_CAP)
@@ -125,7 +131,7 @@ it('retains few fixed blocks after tiny callbacks and repeated head overflow', (
   expect(ring.tail()).toBe('ba'.repeat(RING_CAP / 2))
   const blocks = (ring as unknown as { blocks: Buffer[] }).blocks
   expect(blocks.filter(Boolean)).toHaveLength(64)
-  expect(blocks.every(block => block.buffer.byteLength === 4096)).toBe(true)
+  expect(blocks.every((block) => block.buffer.byteLength === 4096)).toBe(true)
 })
 
 describe('resolveBackend', () => {
@@ -146,11 +152,33 @@ describe('parseTmuxSessions', () => {
 describe('tmux arg builders', () => {
   it('build create-or-noop + attach argv', () => {
     expect(tmuxName('abc')).toBe('acorn-abc')
-    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude')).toEqual(['new-session', '-A', '-d', '-s', 'acorn-abc', '-c', '/repo', 'claude'])
-    // env is set explicitly via -e so a pre-existing tmux server can't drop ACORN_* (no-tools bug)
-    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude', { ACORN_TASK_ID: 't1', ACORN_API_TOKEN: 'tok' })).toEqual([
-      'new-session', '-A', '-d', '-e', 'ACORN_TASK_ID=t1', '-e', 'ACORN_API_TOKEN=tok', '-s', 'acorn-abc', '-c', '/repo', 'claude',
+    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude')).toEqual([
+      'new-session',
+      '-A',
+      '-d',
+      '-s',
+      'acorn-abc',
+      '-c',
+      '/repo',
+      'claude',
     ])
+    // env is set explicitly via -e so a pre-existing tmux server can't drop ACORN_* (no-tools bug)
+    expect(tmuxNewSessionArgs('acorn-abc', '/repo', 'claude', { ACORN_TASK_ID: 't1', ACORN_API_TOKEN: 'tok' })).toEqual(
+      [
+        'new-session',
+        '-A',
+        '-d',
+        '-e',
+        'ACORN_TASK_ID=t1',
+        '-e',
+        'ACORN_API_TOKEN=tok',
+        '-s',
+        'acorn-abc',
+        '-c',
+        '/repo',
+        'claude',
+      ],
+    )
     expect(tmuxAttachArgs('acorn-abc')).toEqual(['-u', '-T', 'RGB', 'attach', '-t', 'acorn-abc'])
   })
 })

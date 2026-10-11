@@ -287,7 +287,9 @@ export function createRemoteRoot(emit: (ops: TreeMutation[]) => void): RemoteRoo
 
   return {
     node,
-    dispatch: (handler, payload) => { handlers.get(handler)?.(payload) },
+    dispatch: (handler, payload) => {
+      handlers.get(handler)?.(payload)
+    },
     dispose: () => {
       disposed = true
       pending = []

@@ -68,7 +68,9 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
               no subject is unreachable and a `?? 'Reference'` here would only be able to hide a bug
               — which is precisely what it would have done: the empty title was the visible half of
               the reserved-`ref`-prop defect, and the reason it was found at all. */}
-          <span class="integrations-panel-title" id={titleId}>{props.displayId}</span>
+          <span class="integrations-panel-title" id={titleId}>
+            {props.displayId}
+          </span>
           <Toolbar.Spacer />
           <IconButton icon="x" label="Close" onPress={props.onClose} />
         </header>
@@ -77,7 +79,9 @@ export default function PluginRefPanel(props: PluginRefPanelProps) {
         </Show>
         <Show
           when={props.tree}
-          fallback={<PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />}
+          fallback={
+            <PluginFrame binding={props.binding} hash={props.hash} refId={props.displayId} onClose={props.onClose} />
+          }
         >
           {(contribution) => (
             <RemoteTree

@@ -59,7 +59,11 @@ export default function RunsSettings(props: { nodeId: string | null }) {
       id="runs"
       label="Recent runs"
       help="Workflow runs, agent sessions, and other work this node has started. To stop or change one, open it in its task."
-      actions={<Button size="sm" disabled={runs.isFetching} onPress={() => void runs.refetch()}>Refresh</Button>}
+      actions={
+        <Button size="sm" disabled={runs.isFetching} onPress={() => void runs.refetch()}>
+          Refresh
+        </Button>
+      }
     >
       {/* Which owners could not answer, so a short list reads as short rather than as complete. */}
       <Show when={runs.data?.failed.length}>
@@ -70,9 +74,20 @@ export default function RunsSettings(props: { nodeId: string | null }) {
 
       <Show when={runs.error}>{(error) => <Alert>{String(error())}</Alert>}</Show>
 
-      <Show when={rows().length} fallback={<Show when={runs.isSuccess}><EmptyState align="start" size="sm">Nothing has run on this node.</EmptyState></Show>}>
+      <Show
+        when={rows().length}
+        fallback={
+          <Show when={runs.isSuccess}>
+            <EmptyState align="start" size="sm">
+              Nothing has run on this node.
+            </EmptyState>
+          </Show>
+        }
+      >
         <Show when={spend() > 0}>
-          <Text emphasis="muted">{money(spend())} across these {rows().length} runs.</Text>
+          <Text emphasis="muted">
+            {money(spend())} across these {rows().length} runs.
+          </Text>
         </Show>
         <For each={rows()}>
           {(run) => {
@@ -84,7 +99,10 @@ export default function RunsSettings(props: { nodeId: string | null }) {
                 meta={<Show when={run.costUsd}>{(cost) => <Text emphasis="muted">{money(cost())}</Text>}</Show>}
               >
                 <span class="settings-label">
-                  {run.title} <Badge size="xs" tone="accent">{pluginLabel(run.pluginId)}</Badge>
+                  {run.title}{' '}
+                  <Badge size="xs" tone="accent">
+                    {pluginLabel(run.pluginId)}
+                  </Badge>
                 </span>
                 <Text emphasis="muted" wrap>
                   {run.status} · started {formatRelativeTime(run.startedAt)} · {describeDuration(run, now)}

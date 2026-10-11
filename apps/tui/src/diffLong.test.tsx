@@ -25,7 +25,8 @@ describe('a diff longer than its column', () => {
       // Each row that drew is one line, and the lines read down the screen in the patch's own order.
       // Under the squeeze they arrived as 0, 16, 29, 42: every row lost most of its height and what
       // survived came from whichever row the renderer reached last.
-      const drawn = opened.split('\n')
+      const drawn = opened
+        .split('\n')
         .map((line) => line.match(/somethingRatherLongIndeed(\d+)/)?.[1])
         .filter((found): found is string => found !== undefined)
         .map(Number)

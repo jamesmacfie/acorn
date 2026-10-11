@@ -85,8 +85,16 @@ export type NodeKeyCustody = {
   plainFiles: string[]
 }
 
-export function nodeKeyCustody(dataDir: string, delivery: NodeKeyCustody['delivery'], keyCheck: NodeKeyCheck): { snapshot(): NodeKeyCustody } {
+export function nodeKeyCustody(
+  dataDir: string,
+  delivery: NodeKeyCustody['delivery'],
+  keyCheck: NodeKeyCheck,
+): { snapshot(): NodeKeyCustody } {
   return {
-    snapshot: () => ({ delivery, keyCheck, plainFiles: [KEY_FILE, 'internal-token'].filter((name) => existsSync(join(dataDir, name))) }),
+    snapshot: () => ({
+      delivery,
+      keyCheck,
+      plainFiles: [KEY_FILE, 'internal-token'].filter((name) => existsSync(join(dataDir, name))),
+    }),
   }
 }

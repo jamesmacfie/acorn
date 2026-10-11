@@ -27,7 +27,15 @@ export default function ConfigPluginOffers(props: {
             <SettingRow label={offer.id} description={describePluginSource(offer.source)}>
               <Inline>
                 <Badge>Not installed</Badge>
-                <Button size="sm" variant="ghost" label={`Install ${offer.id}`} disabled={props.busy} onPress={() => props.onInstall(offer.id, offer.source)}>Install</Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  label={`Install ${offer.id}`}
+                  disabled={props.busy}
+                  onPress={() => props.onInstall(offer.id, offer.source)}
+                >
+                  Install
+                </Button>
               </Inline>
             </SettingRow>
           )}

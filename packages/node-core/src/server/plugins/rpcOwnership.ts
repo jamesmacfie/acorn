@@ -18,7 +18,8 @@ export type RpcFunctionLifetime = {
 /** Published visitors finish before their host operation returns. All other callback arguments
  * retain realm ownership, including route registrations, subscriptions, and capabilities. */
 export function pluginRpcFunctionLifetime(path: string, requestRoot?: string): RpcFunctionLifetime {
-  if (requestRoot && path === `${requestRoot}.providers.withConnections`) return { scopedArguments: true, persistentResult: true }
+  if (requestRoot && path === `${requestRoot}.providers.withConnections`)
+    return { scopedArguments: true, persistentResult: true }
   const contextMethod = path.match(/^plugin\.(?:init|ready)\.args\[0\]\.(.+)$/)?.[1]
   if (!contextMethod) return {}
   if (/^(?:providers\.withConnection|core\.secrets\.use(?:Optional)?|telemetry\.measure)$/.test(contextMethod)) {

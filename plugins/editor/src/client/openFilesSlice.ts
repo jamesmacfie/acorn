@@ -1,4 +1,10 @@
-import { parseJson, PersistedSliceKeys, savePref, storageKeyFor, type PersistedStateSlice } from '@acorn/plugin-api/client'
+import {
+  parseJson,
+  PersistedSliceKeys,
+  savePref,
+  storageKeyFor,
+  type PersistedStateSlice,
+} from '@acorn/plugin-api/client'
 import type { QueryClient } from '@tanstack/solid-query'
 import { editorStateByTask, hydrateTaskEditorState, type TaskEditorState } from './editorState'
 
@@ -11,12 +17,18 @@ const parseEditorState = (raw: unknown): TaskEditorState => {
   const source = value as { files?: unknown; active?: unknown }
   const files = (Array.isArray(source.files) ? source.files : [])
     .filter((file): file is { path: string; ephemeral?: unknown } => {
-      return !!file && typeof file === 'object' && typeof (file as { path?: unknown }).path === 'string' && !!(file as { path: string }).path
+      return (
+        !!file &&
+        typeof file === 'object' &&
+        typeof (file as { path?: unknown }).path === 'string' &&
+        !!(file as { path: string }).path
+      )
     })
     .map((file) => ({ path: file.path, ephemeral: file.ephemeral === true, dirty: false }))
-  const active = typeof source.active === 'string' && files.some((file) => file.path === source.active)
-    ? source.active
-    : (files[0]?.path ?? null)
+  const active =
+    typeof source.active === 'string' && files.some((file) => file.path === source.active)
+      ? source.active
+      : (files[0]?.path ?? null)
   return { files, active }
 }
 
@@ -44,7 +56,10 @@ export const editorOpenFilesSlice: PersistedStateSlice<TaskEditorState> = {
 
 /** Finish an in-flight file action for the Node that admitted it, even after its pane was evicted. */
 export async function persistCapturedEditorOpenFiles(
-  queryClient: QueryClient, nodeId: string | null, taskId: string, state: TaskEditorState,
+  queryClient: QueryClient,
+  nodeId: string | null,
+  taskId: string,
+  state: TaskEditorState,
 ): Promise<void> {
   const key = storageKeyFor(editorOpenFilesSlice, taskId, nodeId)
   const value = JSON.stringify(editorOpenFilesSlice.codec.serialize(state))

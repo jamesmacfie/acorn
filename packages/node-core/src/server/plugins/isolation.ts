@@ -148,7 +148,8 @@ export async function isolateNodePlugin(options: {
     if (!isAbsolute(configured)) throw refusal(permission, 'must name an absolute path')
     const path = resolve(configured)
     const real = fileGrantTarget(path)
-    if (isProtected(path) || (real && isProtected(real))) throw refusal(permission, "must stay outside acorn's data root")
+    if (isProtected(path) || (real && isProtected(real)))
+      throw refusal(permission, "must stay outside acorn's data root")
     if (!real) throw refusal(permission, 'must name a single regular file')
     read.add(path)
     read.add(real)
@@ -156,7 +157,8 @@ export async function isolateNodePlugin(options: {
       write.add(path)
       const temporary = `${path}.acorn-tmp`
       const temporaryReal = fileGrantTarget(temporary)
-      if (!temporaryReal || isProtected(temporaryReal)) throw refusal(permission, 'has a protected atomic-write sidecar')
+      if (!temporaryReal || isProtected(temporaryReal))
+        throw refusal(permission, 'has a protected atomic-write sidecar')
       read.add(temporary)
       write.add(temporary)
     }
@@ -171,7 +173,10 @@ export async function isolateNodePlugin(options: {
     ...[...write].map((path) => `--allow-fs-write=${path}`),
     // Node 26 added network permissions. The supported Node 24 line relies on the bootstrap's raw
     // module deny list and hostname-checking fetch wrapper instead.
-    ...((options.permissions.net.length || options.permissions.sockets) && Number(process.versions.node.split('.')[0]) >= 26 ? ['--allow-net'] : []),
+    ...((options.permissions.net.length || options.permissions.sockets) &&
+    Number(process.versions.node.split('.')[0]) >= 26
+      ? ['--allow-net']
+      : []),
     ...(options.permissions.exec ? ['--allow-child-process'] : []),
   ]
   const { port1, port2 } = new MessageChannel()

@@ -58,33 +58,40 @@ const byName = (left: string, right: string): number =>
 
 // Each order is a key and a direction, with creation order breaking ties so two sessions that
 // compare equal never swap places between redraws.
-export const compareSessions = (order: SessionOrder) => (left: AgentSession, right: AgentSession): number => {
-  const created = right.createdAt - left.createdAt || left.id.localeCompare(right.id)
-  if (order === 'status') return Number(isActiveAgent(right)) - Number(isActiveAgent(left)) || created
-  if (order === 'name') return byName(left.title, right.title) || created
-  if (order === 'activity') {
-    const at = (session: AgentSession) => session.lastEventAt ?? session.updatedAt
-    return at(right) - at(left) || created
+export const compareSessions =
+  (order: SessionOrder) =>
+  (left: AgentSession, right: AgentSession): number => {
+    const created = right.createdAt - left.createdAt || left.id.localeCompare(right.id)
+    if (order === 'status') return Number(isActiveAgent(right)) - Number(isActiveAgent(left)) || created
+    if (order === 'name') return byName(left.title, right.title) || created
+    if (order === 'activity') {
+      const at = (session: AgentSession) => session.lastEventAt ?? session.updatedAt
+      return at(right) - at(left) || created
+    }
+    return created
   }
-  return created
-}
 
 const subagentRunning = (subagent: AgentSubagent): boolean =>
   subagent.status === 'pending' || subagent.status === 'running'
 
-export const compareSubagents = (order: SessionOrder) => (left: AgentSubagent, right: AgentSubagent): number => {
-  const started = right.startedAt - left.startedAt || left.id.localeCompare(right.id)
-  if (order === 'status') return Number(subagentRunning(right)) - Number(subagentRunning(left)) || started
-  if (order === 'name') return byName(left.title, right.title) || started
-  if (order === 'activity') return right.updatedAt - left.updatedAt || started
-  return started
-}
+export const compareSubagents =
+  (order: SessionOrder) =>
+  (left: AgentSubagent, right: AgentSubagent): number => {
+    const started = right.startedAt - left.startedAt || left.id.localeCompare(right.id)
+    if (order === 'status') return Number(subagentRunning(right)) - Number(subagentRunning(left)) || started
+    if (order === 'name') return byName(left.title, right.title) || started
+    if (order === 'activity') return right.updatedAt - left.updatedAt || started
+    return started
+  }
 
 const parseTaskOrders = (raw: unknown): TaskOrders => {
   const value = parseJson(raw)
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-    .filter(([group, order]) => GROUPS.has(group) && typeof order === 'string' && ORDERS.has(order))) as TaskOrders
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      ([group, order]) => GROUPS.has(group) && typeof order === 'string' && ORDERS.has(order),
+    ),
+  ) as TaskOrders
 }
 
 export const sessionOrderSlice: PersistedStateSlice<TaskOrders> = {

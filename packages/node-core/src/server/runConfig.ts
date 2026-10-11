@@ -121,7 +121,10 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
     // whole complaint was a declaration that quietly did nothing, and the palette already draws these.
     for (const key of ['setup', 'archive'] as const) {
       if (s[key] !== undefined) {
-        errors.push({ source, message: `[scripts] ${key} is not read. Set the ${key === 'setup' ? 'setup' : 'teardown'} script in the project's settings.` })
+        errors.push({
+          source,
+          message: `[scripts] ${key} is not read. Set the ${key === 'setup' ? 'setup' : 'teardown'} script in the project's settings.`,
+        })
       }
     }
     const run = s.run
@@ -134,24 +137,28 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
   }
   // [database] url_script: the Database pane's connection resolver (docs/database.md § Connection resolution).
   const database = doc.database
-  if (database && typeof database === 'object') layer.dbUrlScript = str((database as Record<string, unknown>).url_script)
+  if (database && typeof database === 'object')
+    layer.dbUrlScript = str((database as Record<string, unknown>).url_script)
   // [preview] mode and value: how the browser-preview pane resolves its URL (docs/panes.md).
   const preview = doc.preview
   if (preview && typeof preview === 'object') {
     const pv = preview as Record<string, unknown>
     const mode = str(pv.mode)
     if (mode) {
-      if (mode !== 'url' && mode !== 'port' && mode !== 'script') errors.push({ source, message: `preview.mode must be 'url' | 'port' | 'script'` })
+      if (mode !== 'url' && mode !== 'port' && mode !== 'script')
+        errors.push({ source, message: `preview.mode must be 'url' | 'port' | 'script'` })
       else layer.previewMode = mode
     }
     const value = str(pv.value)
     if (value) {
-      if (layer.previewMode === 'port' && !/^\d{1,5}$/.test(value)) errors.push({ source, message: `preview.value must be a bare port 1-65535` })
+      if (layer.previewMode === 'port' && !/^\d{1,5}$/.test(value))
+        errors.push({ source, message: `preview.value must be a bare port 1-65535` })
       else layer.previewValue = value
     }
   }
   const copy = doc.copy
-  if (Array.isArray(copy)) layer.copy = copy.filter((c): c is string => typeof c === 'string' && !!c.trim()).map((c) => c.trim())
+  if (Array.isArray(copy))
+    layer.copy = copy.filter((c): c is string => typeof c === 'string' && !!c.trim()).map((c) => c.trim())
   else if (copy !== undefined) errors.push({ source, message: `'copy' must be an array of paths` })
   const layout = doc.layout
   if (layout && typeof layout === 'object') {
@@ -187,7 +194,12 @@ export function projectRunTargets(db: DbConfigFallback): RunTarget[] {
     if (!Array.isArray(arr)) return []
     const out: RunTarget[] = []
     for (const v of arr) {
-      if (v && typeof v === 'object' && str((v as Record<string, unknown>).id) && str((v as Record<string, unknown>).command)) {
+      if (
+        v &&
+        typeof v === 'object' &&
+        str((v as Record<string, unknown>).id) &&
+        str((v as Record<string, unknown>).command)
+      ) {
         const o = v as Record<string, unknown>
         out.push({
           id: (o.id as string).trim(),
@@ -240,10 +252,20 @@ export function readCommittedConfig(repoDir: string): ProjectRepoConfig | null {
 
 // Read + merge the layers. Repo overrides user overrides DB; run targets and layouts merge by id
 // (repo's id wins), scripts/copy are per-field.
-export function loadRepoConfig(repoDir: string | null, userConfigDir: string | null, db: DbConfigFallback, repoText?: string | null): RepoConfig {
+export function loadRepoConfig(
+  repoDir: string | null,
+  userConfigDir: string | null,
+  db: DbConfigFallback,
+  repoText?: string | null,
+): RepoConfig {
   const errors: ConfigError[] = []
   // A supplied snapshot is parsed verbatim; null means the captured snapshot had no config file.
-  const repo = repoText === undefined ? readLayer(repoDir, 'repo', errors) : repoText === null ? null : parseLayer(repoText, 'repo', errors)
+  const repo =
+    repoText === undefined
+      ? readLayer(repoDir, 'repo', errors)
+      : repoText === null
+        ? null
+        : parseLayer(repoText, 'repo', errors)
   const user = readLayer(userConfigDir, 'user', errors)
 
   const run = new Map<string, RunTarget>()
@@ -253,7 +275,8 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
   //   2. projects.run_targets JSON (per-project Settings surface)
   //   3. ~/.acorn/config.toml (personal defaults)
   //   4. ./.acorn/config.toml (committed, always wins)
-  if (db.devScript?.trim()) run.set('dev', { id: 'dev', command: db.devScript.trim(), restart: db.devRestartScript?.trim() || undefined })
+  if (db.devScript?.trim())
+    run.set('dev', { id: 'dev', command: db.devScript.trim(), restart: db.devRestartScript?.trim() || undefined })
   for (const t of projectRunTargets(db)) run.set(t.id, t)
   for (const t of user?.run.values() ?? []) run.set(t.id, t)
   for (const t of repo?.run.values() ?? []) run.set(t.id, t)
@@ -269,7 +292,7 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
     dbUrlScript: repo?.dbUrlScript ?? user?.dbUrlScript ?? (db.dbUrlScript?.trim() || null),
     dbUrlFromRepo: repo?.dbUrlScript != null,
     preview: {
-      mode: repo?.previewMode ?? user?.previewMode ?? (db.previewMode ?? null),
+      mode: repo?.previewMode ?? user?.previewMode ?? db.previewMode ?? null,
       value: repo?.previewValue ?? user?.previewValue ?? (db.previewValue?.trim() || null),
     },
     browserRules: db.browserRules ?? [],

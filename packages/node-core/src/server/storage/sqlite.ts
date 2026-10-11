@@ -35,8 +35,7 @@ import { recordDuration, telemetryEnabled } from '../telemetry/collector'
 //   a path Drizzle rarely takes, since typed selects go through array mode.
 const OPEN_OPTIONS = { enableForeignKeyConstraints: false } as const
 
-const plainRow = (row: unknown): unknown =>
-  row && typeof row === 'object' && !Array.isArray(row) ? { ...row } : row
+const plainRow = (row: unknown): unknown => (row && typeof row === 'object' && !Array.isArray(row) ? { ...row } : row)
 
 export type SqliteRunResult = { changes: number | bigint; lastInsertRowid: number | bigint }
 
@@ -61,7 +60,11 @@ export type SqliteDatabase = {
   prepare(sql: string): SqliteStatement
   exec(sql: string): void
   pragma(statement: string): void
-  function(name: string, options: { deterministic?: boolean }, callback: (...args: SQLOutputValue[]) => SQLInputValue): void
+  function(
+    name: string,
+    options: { deterministic?: boolean },
+    callback: (...args: SQLOutputValue[]) => SQLInputValue,
+  ): void
   transaction<A extends unknown[], R>(fn: (...args: A) => R): SqliteTransaction<A, R>
   backup(destination: string): Promise<void>
   close(): void
@@ -125,11 +128,14 @@ const timeStatement = (stmt: SqliteStatement, sql: string): SqliteStatement => {
   return timedStatement
 }
 
-export function openSqlite(path: string, options: {
-  readonly?: boolean
-  initialize?: (database: DatabaseSync) => void
-  allowBackup?: boolean
-} = {}): SqliteDatabase {
+export function openSqlite(
+  path: string,
+  options: {
+    readonly?: boolean
+    initialize?: (database: DatabaseSync) => void
+    allowBackup?: boolean
+  } = {},
+): SqliteDatabase {
   const db = new DatabaseSync(path, { ...OPEN_OPTIONS, readOnly: options.readonly ?? false })
   try {
     options.initialize?.(db)
@@ -143,7 +149,8 @@ export function openSqlite(path: string, options: {
   // transaction a caller can reach from inside another one.
   let depth = 0
   const transaction = <A extends unknown[], R>(fn: (...args: A) => R): SqliteTransaction<A, R> => {
-    const run = (begin: string) =>
+    const run =
+      (begin: string) =>
       (...args: A): R => {
         const nested = depth > 0
         const name = `acorn_sp_${depth}`
@@ -234,7 +241,12 @@ export function drizzleOverSqlite<TSchema extends Record<string, unknown> = Reco
   // with internal generics it does not export. The shapes are right, the names cannot be spelled
   // from out here.
   const session = new BetterSQLiteSession(client as never, dialect, relational as never, { logger: undefined })
-  const db = new NodeSqliteDatabase('sync', dialect, session as never, relational as never) as unknown as SqliteDrizzle<TSchema>
+  const db = new NodeSqliteDatabase(
+    'sync',
+    dialect,
+    session as never,
+    relational as never,
+  ) as unknown as SqliteDrizzle<TSchema>
   // Drizzle's driver exposes the underlying handle here, and code that reaches for it, such as the
   // test that checks journal mode, expects to find it.
   db.$client = client

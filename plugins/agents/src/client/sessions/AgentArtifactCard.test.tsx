@@ -17,7 +17,7 @@ const saveFile = vi.fn()
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 vi.mock('./managedClient', () => ({ managedAgentApi: { artifactContent, artifactPreview } }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
   saveFile,
 }))
 
@@ -67,11 +67,13 @@ it('fetches an authenticated raster artifact and displays it inline', async () =
 
   const download = host.querySelector<HTMLElement>('[role="button"]')
   download?.click()
-  await vi.waitFor(() => expect(saveFile).toHaveBeenCalledWith({
-    bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
-    mimeType: 'image/png',
-    suggestedName: 'Generated image.png',
-  }))
+  await vi.waitFor(() =>
+    expect(saveFile).toHaveBeenCalledWith({
+      bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
+      mimeType: 'image/png',
+      suggestedName: 'Generated image.png',
+    }),
+  )
 })
 
 it('keeps non-image artifacts on the download-only path', () => {
@@ -91,7 +93,14 @@ it('keeps non-image artifacts on the download-only path', () => {
 })
 
 it('does not automatically fetch an oversized advertised image', () => {
-  const host = draw({ type: 'artifact', artifactId: 'large', kind: 'file', title: 'large.png', mediaType: 'image/png', byteSize: 8 * 1024 * 1024 + 1 })
+  const host = draw({
+    type: 'artifact',
+    artifactId: 'large',
+    kind: 'file',
+    title: 'large.png',
+    mediaType: 'image/png',
+    byteSize: 8 * 1024 * 1024 + 1,
+  })
   expect(host.querySelector('img')).toBeNull()
   expect(artifactPreview).not.toHaveBeenCalled()
   expect(host.textContent).toContain('Download')
@@ -99,26 +108,56 @@ it('does not automatically fetch an oversized advertised image', () => {
 
 describe('the agents:artifact point', () => {
   const seen: TranscriptMediaProps[] = []
-  const point = () => registered.push(extensionPointRegistry.register({
-    id: AGENT_ARTIFACT_POINT, ownerId: 'agents', label: 'Agent artifact', kind: 'remote', mode: 'replace', max: 1,
-  }))
+  const point = () =>
+    registered.push(
+      extensionPointRegistry.register({
+        id: AGENT_ARTIFACT_POINT,
+        ownerId: 'agents',
+        label: 'Agent artifact',
+        kind: 'remote',
+        mode: 'replace',
+        max: 1,
+      }),
+    )
   // A compiled contributor, so the tree host stays out of this. Which render path answers is
   // client-core's to test; the key and the props are this plugin's.
   const contributor = (pluginId: string, matches: string[]) => {
     const registration = extensionRegistry.register({
-      id: `plugin:${pluginId}:artifact`, pluginId, point: AGENT_ARTIFACT_POINT, label: `${pluginId} viewer`, order: 500,
-      carrier: 'component', matches,
-      component: (props: TranscriptMediaProps) => { seen.push(props); return <span>drawn by {pluginId}</span> },
+      id: `plugin:${pluginId}:artifact`,
+      pluginId,
+      point: AGENT_ARTIFACT_POINT,
+      label: `${pluginId} viewer`,
+      order: 500,
+      carrier: 'component',
+      matches,
+      component: (props: TranscriptMediaProps) => {
+        seen.push(props)
+        return <span>drawn by {pluginId}</span>
+      },
     } as ExtensionContribution)
     registered.push(registration)
     return registration
   }
   const log: ArtifactEvent = {
-    type: 'artifact', artifactId: 'log-1', kind: 'command_output', title: 'Command output', mediaType: 'text/plain; charset=utf-8', byteSize: 42,
+    type: 'artifact',
+    artifactId: 'log-1',
+    kind: 'command_output',
+    title: 'Command output',
+    mediaType: 'text/plain; charset=utf-8',
+    byteSize: 42,
   }
-  const image: ArtifactEvent = { type: 'artifact', artifactId: 'image-2', kind: 'file', title: 'chart.png', mediaType: 'image/png', byteSize: 4 }
+  const image: ArtifactEvent = {
+    type: 'artifact',
+    artifactId: 'image-2',
+    kind: 'file',
+    title: 'chart.png',
+    mediaType: 'image/png',
+    byteSize: 4,
+  }
 
-  afterEach(() => { seen.length = 0 })
+  afterEach(() => {
+    seen.length = 0
+  })
 
   it('hands the body to the plugin that matched the bare media type, with the session that owns it', async () => {
     point()
@@ -135,7 +174,13 @@ describe('the agents:artifact point', () => {
     artifactContent.mockResolvedValue({ bytes: Uint8Array.from([1]), type: 'text/plain', filename: 'output.txt' })
     expect(host.textContent).toContain('Command output')
     host.querySelector<HTMLElement>('[role="button"]')?.click()
-    await vi.waitFor(() => expect(saveFile).toHaveBeenCalledWith({ bytes: Uint8Array.from([1]), mimeType: 'text/plain', suggestedName: 'output.txt' }))
+    await vi.waitFor(() =>
+      expect(saveFile).toHaveBeenCalledWith({
+        bytes: Uint8Array.from([1]),
+        mimeType: 'text/plain',
+        suggestedName: 'output.txt',
+      }),
+    )
   })
 
   it('fetches no inline image while a plugin draws the body', () => {
@@ -148,7 +193,11 @@ describe('the agents:artifact point', () => {
   })
 
   it('draws its own body while two plugins tie and nobody has picked', async () => {
-    artifactPreview.mockResolvedValue({ bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]), type: 'image/png', filename: 'chart.png' })
+    artifactPreview.mockResolvedValue({
+      bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
+      type: 'image/png',
+      filename: 'chart.png',
+    })
     point()
     contributor('charts', ['image/png'])
     contributor('pixels', ['image/*'])
@@ -159,7 +208,11 @@ describe('the agents:artifact point', () => {
   })
 
   it('goes back to its own body when the plugin is disabled', async () => {
-    artifactPreview.mockResolvedValue({ bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]), type: 'image/png', filename: 'chart.png' })
+    artifactPreview.mockResolvedValue({
+      bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
+      type: 'image/png',
+      filename: 'chart.png',
+    })
     point()
     const charts = contributor('charts', ['image/png'])
     const host = draw(image)
@@ -175,6 +228,11 @@ describe('the agents:artifact point', () => {
     contributor('hex', ['application/octet-stream'])
     const host = draw({ type: 'artifact', artifactId: 'blob', kind: 'file', title: 'blob' })
     expect(host.textContent).toContain('drawn by hex')
-    expect(seen.at(-1)?.media).toEqual({ kind: 'artifact', id: 'blob', filename: 'blob', mediaType: 'application/octet-stream' })
+    expect(seen.at(-1)?.media).toEqual({
+      kind: 'artifact',
+      id: 'blob',
+      filename: 'blob',
+      mediaType: 'application/octet-stream',
+    })
   })
 })

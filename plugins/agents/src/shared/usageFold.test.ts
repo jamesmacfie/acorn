@@ -75,8 +75,10 @@ describe('folding usage rows to one line a turn', () => {
   })
 
   it('never wipes a reported field with an absent one', () => {
-    expect(mergeAgentUsage({ contextUsed: 5, cost: { amount: 1, currency: 'USD' } }, { contextUsed: 9 }))
-      .toEqual({ contextUsed: 9, cost: { amount: 1, currency: 'USD' } })
+    expect(mergeAgentUsage({ contextUsed: 5, cost: { amount: 1, currency: 'USD' } }, { contextUsed: 9 })).toEqual({
+      contextUsed: 9,
+      cost: { amount: 1, currency: 'USD' },
+    })
   })
 
   it('points at the last usage record, or nowhere', () => {

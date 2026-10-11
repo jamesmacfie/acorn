@@ -1,6 +1,11 @@
 import type {
-  Agent, Client, ContentBlock, CreateElicitationResponse, McpServer,
-  RequestPermissionResponse, SessionConfigOption,
+  Agent,
+  Client,
+  ContentBlock,
+  CreateElicitationResponse,
+  McpServer,
+  RequestPermissionResponse,
+  SessionConfigOption,
 } from '@agentclientprotocol/sdk'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -9,14 +14,28 @@ import { pathToFileURL } from 'node:url'
 import { brokerEnv, AGENT_TOOL_PASSTHROUGH, createLogger } from '@acorn/plugin-api/node'
 import { spawnOwnedProcess } from '../processes/ownedProcess'
 import type { AgentInputPart } from '../../contract/wire.ts'
-import { acpPermissionSubject, type AcpToolCallFacts, normalizeAcpConfig, normalizeAcpElicitation, normalizeAcpPermission, normalizeAcpUpdate, acpElicitationResponse } from './acpNormalizer'
+import {
+  acpPermissionSubject,
+  type AcpToolCallFacts,
+  normalizeAcpConfig,
+  normalizeAcpElicitation,
+  normalizeAcpPermission,
+  normalizeAcpUpdate,
+  acpElicitationResponse,
+} from './acpNormalizer'
 import { providerStderrNotice } from './diagnostics'
 import { measureAgentStartup } from './startupTelemetry'
 import { contextBlock } from './contextBlock'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import type { HarnessLaunchSpec } from './harness'
 import type { AcpLaunch } from './acpDriver'
-import type { AgentDriverEvent, AgentDriverMcpServer, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
+import type {
+  AgentDriverEvent,
+  AgentDriverMcpServer,
+  AgentDriverSession,
+  AgentDriverStartOptions,
+  AgentDriverTurnOptions,
+} from './types'
 
 const log = createLogger('agents:provider', 'agents')
 
@@ -36,7 +55,12 @@ export type PendingRequest = {
 
 // The one way a parked request is answered, whether by the person through the session handle or by a
 // policy veto that may arrive before the handle exists.
-const resolvePending = (pending: Map<string, PendingRequest>, requestId: string, resolution: unknown, label: string): void => {
+const resolvePending = (
+  pending: Map<string, PendingRequest>,
+  requestId: string,
+  resolution: unknown,
+  label: string,
+): void => {
   const request = pending.get(requestId)
   if (!request) throw new Error(`The ${label} request is no longer pending.`)
   pending.delete(requestId)
@@ -48,7 +72,6 @@ const drain = (pending: Map<string, PendingRequest>): void => {
   pending.clear()
 }
 
-
 // An attachment goes inline when the agent said at `initialize` it takes that kind of block, so the agent
 // never has to open the file. A session under the read block can't: the store sits in the data root
 // (docs/managed-agents/read-block.md). Anything else goes as a link to the stored file.
@@ -57,36 +80,51 @@ export async function acpPrompt(
   attachments: AgentDriverTurnOptions['attachments'],
   capabilities: { image?: boolean; embeddedContext?: boolean } = {},
 ): Promise<ContentBlock[]> {
-  return Promise.all(parts.map(async (part): Promise<ContentBlock> => {
-    switch (part.type) {
-      case 'text':
-        return { type: 'text', text: part.text }
-      case 'context':
-        return {
-          type: 'text',
-          text: contextBlock(part),
+  return Promise.all(
+    parts.map(async (part): Promise<ContentBlock> => {
+      switch (part.type) {
+        case 'text':
+          return { type: 'text', text: part.text }
+        case 'context':
+          return {
+            type: 'text',
+            text: contextBlock(part),
+          }
+        case 'file':
+          return {
+            type: 'text',
+            text: `Please use the file @${part.path}${part.lineStart ? `:${part.lineStart}${part.lineEnd ? `-${part.lineEnd}` : ''}` : ''}.`,
+          }
+        case 'attachment':
+        case 'image': {
+          const attachment = attachments[part.attachmentId]
+          if (!attachment) throw new Error(`Attachment is unavailable: ${part.attachmentId}`)
+          const uri = pathToFileURL(attachment.localPath).href
+          if (capabilities.image && attachment.mediaType.startsWith('image/')) {
+            return {
+              type: 'image',
+              data: (await readFile(attachment.localPath)).toString('base64'),
+              mimeType: attachment.mediaType,
+            }
+          }
+          // The store decodes every text attachment to UTF-8 (attachmentStore.ts).
+          if (capabilities.embeddedContext && attachment.mediaType.startsWith('text/')) {
+            return {
+              type: 'resource',
+              resource: { uri, mimeType: attachment.mediaType, text: await readFile(attachment.localPath, 'utf8') },
+            }
+          }
+          return {
+            type: 'resource_link',
+            uri,
+            name: attachment.filename,
+            mimeType: attachment.mediaType,
+            size: attachment.byteSize,
+          }
         }
-      case 'file':
-        return {
-          type: 'text',
-          text: `Please use the file @${part.path}${part.lineStart ? `:${part.lineStart}${part.lineEnd ? `-${part.lineEnd}` : ''}` : ''}.`,
-        }
-      case 'attachment':
-      case 'image': {
-        const attachment = attachments[part.attachmentId]
-        if (!attachment) throw new Error(`Attachment is unavailable: ${part.attachmentId}`)
-        const uri = pathToFileURL(attachment.localPath).href
-        if (capabilities.image && attachment.mediaType.startsWith('image/')) {
-          return { type: 'image', data: (await readFile(attachment.localPath)).toString('base64'), mimeType: attachment.mediaType }
-        }
-        // The store decodes every text attachment to UTF-8 (attachmentStore.ts).
-        if (capabilities.embeddedContext && attachment.mediaType.startsWith('text/')) {
-          return { type: 'resource', resource: { uri, mimeType: attachment.mediaType, text: await readFile(attachment.localPath, 'utf8') } }
-        }
-        return { type: 'resource_link', uri, name: attachment.filename, mimeType: attachment.mediaType, size: attachment.byteSize }
       }
-    }
-  }))
+    }),
+  )
 }
 
 // Parked before the session hears about it, deliberately: announcing runs as far as SQLite and the
@@ -134,14 +172,17 @@ export function clientFor(
     async requestPermission(params) {
       remember(params.toolCall)
       const requestId = randomUUID()
-      const response = new Promise<RequestPermissionResponse>((resolve) => pending.set(requestId, {
-        resolve: (resolution) => {
-          const row = typeof resolution === 'object' && resolution != null ? resolution as Record<string, unknown> : {}
-          const optionId = typeof row.optionId === 'string' ? row.optionId : null
-          resolve(optionId ? { outcome: { outcome: 'selected', optionId } } : { outcome: { outcome: 'cancelled' } })
-        },
-        drain: () => resolve({ outcome: { outcome: 'cancelled' } }),
-      }))
+      const response = new Promise<RequestPermissionResponse>((resolve) =>
+        pending.set(requestId, {
+          resolve: (resolution) => {
+            const row =
+              typeof resolution === 'object' && resolution != null ? (resolution as Record<string, unknown>) : {}
+            const optionId = typeof row.optionId === 'string' ? row.optionId : null
+            resolve(optionId ? { outcome: { outcome: 'selected', optionId } } : { outcome: { outcome: 'cancelled' } })
+          },
+          drain: () => resolve({ outcome: { outcome: 'cancelled' } }),
+        }),
+      )
       await announce(pending, requestId, options, {
         type: 'permission_request',
         request: normalizeAcpPermission(requestId, params),
@@ -161,14 +202,17 @@ export function clientFor(
       const event = normalizeAcpElicitation(randomUUID(), params)
       if (event.type !== 'request' || !event.questions?.length) return { action: 'decline' }
       const requestId = event.requestId
-      const response = new Promise<CreateElicitationResponse>((resolve) => pending.set(requestId, {
-        resolve: (resolution) => resolve(acpElicitationResponse(params, resolution)),
-        // Not `decline`. The turn is over, so the tool call that asked should end with it rather than
-        // run on with an empty answer.
-        drain: () => resolve({ action: 'cancel' }),
-      }))
+      const response = new Promise<CreateElicitationResponse>((resolve) =>
+        pending.set(requestId, {
+          resolve: (resolution) => resolve(acpElicitationResponse(params, resolution)),
+          // Not `decline`. The turn is over, so the tool call that asked should end with it rather than
+          // run on with an empty answer.
+          drain: () => resolve({ action: 'cancel' }),
+        }),
+      )
       await announce(pending, requestId, options, {
-        type: 'input_request', request: event,
+        type: 'input_request',
+        request: event,
         open: () => pending.has(requestId),
         respond: (resolution) => resolvePending(pending, requestId, resolution, label),
       })
@@ -218,7 +262,11 @@ export async function startAcpSession(
   const { id, label, quirks } = spec
   // The SDK loads here, not at the top of the file. Building its generated schemas takes about 30 ms,
   // the node loads this module on every boot, and most launches never start an ACP session.
-  const { ClientSideConnection, ndJsonStream, RequestError } = await measureAgentStartup(options, 'driver.load', () => import('@agentclientprotocol/sdk'))
+  const { ClientSideConnection, ndJsonStream, RequestError } = await measureAgentStartup(
+    options,
+    'driver.load',
+    () => import('@agentclientprotocol/sdk'),
+  )
   await options.onEvent({
     type: 'session_state',
     state: options.session.providerSessionRef ? 'replaying' : 'connecting',
@@ -255,14 +303,16 @@ export async function startAcpSession(
   const stop = (): Promise<void> => {
     stopped = true
     drain(pending)
-    return owner.stop(async () => {
-      if (providerSessionRef && agent?.closeSession) await agent.closeSession({ sessionId: providerSessionRef })
-      child.stdin.end()
-    }).finally(() => {
-      child.stdin.destroy()
-      child.stdout.destroy()
-      child.stderr.destroy()
-    })
+    return owner
+      .stop(async () => {
+        if (providerSessionRef && agent?.closeSession) await agent.closeSession({ sessionId: providerSessionRef })
+        child.stdin.end()
+      })
+      .finally(() => {
+        child.stdin.destroy()
+        child.stdout.destroy()
+        child.stderr.destroy()
+      })
   }
   own(stop)
   const stream = ndJsonStream(
@@ -279,34 +329,40 @@ export async function startAcpSession(
     drain(pending)
     if (stopped || notified) return
     notified = true
-    void stop().then(() => options.onClosed(error)).catch(() => undefined)
+    void stop()
+      .then(() => options.onClosed(error))
+      .catch(() => undefined)
   }
   child.on('error', closed)
-  child.on('exit', (code) => closed(code === 0 ? undefined : new Error(`${label} exited with code ${code ?? 'unknown'}.`)))
+  child.on('exit', (code) =>
+    closed(code === 0 ? undefined : new Error(`${label} exited with code ${code ?? 'unknown'}.`)),
+  )
   void connection.closed.then(() => closed(new Error(`${label} ACP connection closed.`)), closed)
 
-  const initialized = await measureAgentStartup(options, 'provider.initialize', async () => agent.initialize({
-    protocolVersion: 1,
-    clientInfo: { name: 'acorn', version: '1.0.0' },
-    // acorn declines every client capability but one. See docs/managed-agents/harnesses.md § Harnesses for
-    // what each buys and why it is parked.
-    //
-    // Form elicitation is the exception, and declaring it is what lets an agent ask a question at
-    // all: Claude Code's adapter disallows its own AskUserQuestion tool outright when this is
-    // absent, and auto-declines anything an MCP server asks. `{}` is how the protocol spells yes.
-    clientCapabilities: {
-      fs: { readTextFile: false, writeTextFile: false },
-      terminal: false,
-      session: { configOptions: {} },
-      elicitation: { form: {} },
-    },
-  }))
+  const initialized = await measureAgentStartup(options, 'provider.initialize', async () =>
+    agent.initialize({
+      protocolVersion: 1,
+      clientInfo: { name: 'acorn', version: '1.0.0' },
+      // acorn declines every client capability but one. See docs/managed-agents/harnesses.md § Harnesses for
+      // what each buys and why it is parked.
+      //
+      // Form elicitation is the exception, and declaring it is what lets an agent ask a question at
+      // all: Claude Code's adapter disallows its own AskUserQuestion tool outright when this is
+      // absent, and auto-declines anything an MCP server asks. `{}` is how the protocol spells yes.
+      clientCapabilities: {
+        fs: { readTextFile: false, writeTextFile: false },
+        terminal: false,
+        session: { configOptions: {} },
+        elicitation: { form: {} },
+      },
+    }),
+  )
   // Two ways back into a session the agent still holds, and they are different calls. `session/load`
   // replays the history the agent kept; `session/resume` restores the context and sends nothing back.
   // An agent advertises whichever one it implements, Claude Code the first and DeepSeek the second, and
   // acorn reads that off the wire rather than out of a manifest, because the protocol already says it.
-  const supportsResume = initialized.agentCapabilities?.sessionCapabilities?.resume != null
-    && typeof agent.resumeSession === 'function'
+  const supportsResume =
+    initialized.agentCapabilities?.sessionCapabilities?.resume != null && typeof agent.resumeSession === 'function'
   const supportsLoad = initialized.agentCapabilities?.loadSession === true && typeof agent.loadSession === 'function'
 
   let configOptions: readonly SessionConfigOption[] = []
@@ -322,25 +378,43 @@ export async function startAcpSession(
       message: `${label} does not take HTTP MCP servers, so this session runs without ${declared.unsupported.join(', ')}.`,
     })
   }
-  const sessionMeta = spec.acpSessionMeta?.(options.session, { folders: options.skillFolders ?? [], plugins: options.skillPlugins ?? [] }, options.loopHooks, options.attendanceInstructions, options.readBlock)
+  const sessionMeta = spec.acpSessionMeta?.(
+    options.session,
+    { folders: options.skillFolders ?? [], plugins: options.skillPlugins ?? [] },
+    options.loopHooks,
+    options.attendanceInstructions,
+    options.readBlock,
+  )
   // A custom agent's instructions, for a harness with no system prompt acorn can reach. Owed to each
   // provider session this driver creates, and never to one it picks back up, which already has them.
   const customAgent = sessionCustomAgent(options.session.config)
   const standing = options.session.config.standingContext
   const fallbackInstructions = !spec.systemPromptInstructions
     ? [
-        customAgent?.instructions ? contextBlock({ source: 'context.agent.instructions', label: `${customAgent.name} instructions`, content: customAgent.instructions }) : null,
-        typeof standing === 'string' && standing ? contextBlock({ source: 'context.memory', label: 'Memory at session start', content: standing }) : null,
-      ].filter(Boolean).join('\n\n') || null
+        customAgent?.instructions
+          ? contextBlock({
+              source: 'context.agent.instructions',
+              label: `${customAgent.name} instructions`,
+              content: customAgent.instructions,
+            })
+          : null,
+        typeof standing === 'string' && standing
+          ? contextBlock({ source: 'context.memory', label: 'Memory at session start', content: standing })
+          : null,
+      ]
+        .filter(Boolean)
+        .join('\n\n') || null
     : null
   let instructionsOwed = false
   const createSession = async (): Promise<void> => {
-    const created = await measureAgentStartup(options, 'provider.session.create', async () => agent.newSession({
-      cwd: options.cwd,
-      additionalDirectories: [],
-      mcpServers,
-      ...(sessionMeta ? { _meta: sessionMeta } : {}),
-    }))
+    const created = await measureAgentStartup(options, 'provider.session.create', async () =>
+      agent.newSession({
+        cwd: options.cwd,
+        additionalDirectories: [],
+        mcpServers,
+        ...(sessionMeta ? { _meta: sessionMeta } : {}),
+      }),
+    )
     providerSessionRef = created.sessionId
     configOptions = created.configOptions ?? []
     instructionsOwed = fallbackInstructions != null
@@ -389,12 +463,16 @@ export async function startAcpSession(
     await createSession()
   }
   replaying = false
-  await measureAgentStartup(options, 'provider.metadata', async () => options.onEvent({
-    type: 'session_metadata',
-    providerSessionRef: providerSessionRef ?? undefined,
-    configOptions: normalizeAcpConfig(configOptions),
-  }))
-  await measureAgentStartup(options, 'provider.ready', async () => options.onEvent({ type: 'session_state', state: 'ready' }))
+  await measureAgentStartup(options, 'provider.metadata', async () =>
+    options.onEvent({
+      type: 'session_metadata',
+      providerSessionRef: providerSessionRef ?? undefined,
+      configOptions: normalizeAcpConfig(configOptions),
+    }),
+  )
+  await measureAgentStartup(options, 'provider.ready', async () =>
+    options.onEvent({ type: 'session_state', state: 'ready' }),
+  )
 
   let active = false
   let currentConfig = normalizeAcpConfig(configOptions)
@@ -417,7 +495,9 @@ export async function startAcpSession(
         // Swallowed: a failed write must not replace the turn's own outcome on the way out.
         try {
           await options.onEvent({ type: 'request_resolved', requestId, resolution: { cancelled: true } })
-        } catch { /* the turn's own result is the one worth reporting */ }
+        } catch {
+          /* the turn's own result is the one worth reporting */
+        }
       }
     }
   }
@@ -431,7 +511,11 @@ export async function startAcpSession(
     pid: child.pid,
     async sendTurn(turnOptions: AgentDriverTurnOptions) {
       try {
-        const blocks = await acpPrompt(turnOptions.input, turnOptions.attachments, initialized.agentCapabilities?.promptCapabilities)
+        const blocks = await acpPrompt(
+          turnOptions.input,
+          turnOptions.attachments,
+          initialized.agentCapabilities?.promptCapabilities,
+        )
         if (instructionsOwed && fallbackInstructions) {
           blocks.unshift({ type: 'text', text: fallbackInstructions })
           instructionsOwed = false
@@ -442,11 +526,17 @@ export async function startAcpSession(
       } catch (error) {
         // The ACP SDK answers anything an agent throws as `Internal error` and puts the agent's own
         // message in `data.details`. The generic message tells the reader nothing, so the details win.
-        const details = error instanceof RequestError ? (error.data as { details?: unknown } | undefined)?.details : undefined
+        const details =
+          error instanceof RequestError ? (error.data as { details?: unknown } | undefined)?.details : undefined
         await options.onEvent({
           type: 'error',
           code: `${id}_turn_failed`,
-          message: typeof details === 'string' && details ? details : error instanceof Error ? error.message : `${label} turn failed.`,
+          message:
+            typeof details === 'string' && details
+              ? details
+              : error instanceof Error
+                ? error.message
+                : `${label} turn failed.`,
           retryable: false,
         })
         throw error
@@ -458,11 +548,15 @@ export async function startAcpSession(
     // a turn, and one would end whatever the transcript thinks is in flight.
     ...(quirks?.manualCompaction
       ? {
-        compact: async () => {
-          await prompt([{ type: 'text', text: '/compact' }])
-          await options.onEvent({ type: 'diagnostic', level: 'info', message: `${label} compacted the conversation.` })
-        },
-      }
+          compact: async () => {
+            await prompt([{ type: 'text', text: '/compact' }])
+            await options.onEvent({
+              type: 'diagnostic',
+              level: 'info',
+              message: `${label} compacted the conversation.`,
+            })
+          },
+        }
       : {}),
     async cancel() {
       if (!providerSessionRef || !active) return

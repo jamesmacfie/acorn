@@ -6,7 +6,13 @@
 // refusal — 200 rows, 256 KB, reads only — and both steps go through one path so neither can forget.
 import { eq } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
-import type { StepField, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator } from '@acorn/plugin-workflows/contract/extensions.ts'
+import type {
+  StepField,
+  StepHandlerContext,
+  StepHandlerOutcome,
+  StepKindContribution,
+  StepValidator,
+} from '@acorn/plugin-workflows/contract/extensions.ts'
 import { dbSavedQueries } from '../node/schema'
 import { MAX_QUERY_ROWS, readOnlyRefusal, type DatabaseQuery, type DatabaseQueryResult } from '../contract/query'
 import type { DatabaseBridge } from './database'
@@ -29,18 +35,49 @@ type DatabaseStepServices = {
   query: DatabaseQuery
 }
 
-const MAX_ROWS_FIELD: StepField = { id: 'maxRows', label: 'Row cap', type: 'number', min: 1, max: MAX_QUERY_ROWS, hint: `Defaults to ${MAX_QUERY_ROWS}, which is also the ceiling.` }
+const MAX_ROWS_FIELD: StepField = {
+  id: 'maxRows',
+  label: 'Row cap',
+  type: 'number',
+  min: 1,
+  max: MAX_QUERY_ROWS,
+  hint: `Defaults to ${MAX_QUERY_ROWS}, which is also the ceiling.`,
+}
 
 const QUERY_FIELDS: StepField[] = [
-  { id: 'savedQueryId', label: 'Saved query', type: 'select', optionsRoute: '/v1/p/database/projects/{projectId}/saved-queries', hint: 'One of a saved query and inline SQL, not both.' },
-  { id: 'sql', label: 'SQL', type: 'textarea', templates: true, placeholder: 'select count(*) from orders where created_at > now() - interval \'7 days\'' },
+  {
+    id: 'savedQueryId',
+    label: 'Saved query',
+    type: 'select',
+    optionsRoute: '/v1/p/database/projects/{projectId}/saved-queries',
+    hint: 'One of a saved query and inline SQL, not both.',
+  },
+  {
+    id: 'sql',
+    label: 'SQL',
+    type: 'textarea',
+    templates: true,
+    placeholder: "select count(*) from orders where created_at > now() - interval '7 days'",
+  },
   MAX_ROWS_FIELD,
 ]
 
 const GENERATE_FIELDS: StepField[] = [
-  { id: 'prompt', label: 'Ask for', type: 'prompt', required: true, placeholder: 'the ten most recent orders with the customer’s email' },
+  {
+    id: 'prompt',
+    label: 'Ask for',
+    type: 'prompt',
+    required: true,
+    placeholder: 'the ten most recent orders with the customer’s email',
+  },
   // The field ID names the pick in workflow definitions. Its value is a canonical backend ID.
-  { id: 'connectionId', label: 'Generate with', type: 'select', required: true, optionsRoute: '/v1/p/database/tasks/{taskId}/model-connections' },
+  {
+    id: 'connectionId',
+    label: 'Generate with',
+    type: 'select',
+    required: true,
+    optionsRoute: '/v1/p/database/tasks/{taskId}/model-connections',
+  },
   MAX_ROWS_FIELD,
 ]
 
@@ -57,12 +94,15 @@ const validateGenerate: StepValidator = (step, { label }) => {
   const config = (step.with ?? {}) as GenerateConfig
   const errors: string[] = []
   if (typeof config.prompt !== 'string' || !config.prompt.trim()) errors.push(`${label} has nothing to ask for`)
-  if (typeof config.connectionId !== 'string' || !config.connectionId.trim()) errors.push(`${label} names no backend to generate with`)
+  if (typeof config.connectionId !== 'string' || !config.connectionId.trim())
+    errors.push(`${label} names no backend to generate with`)
   return errors
 }
 
 const rowCap = (value: unknown): number =>
-  typeof value === 'number' && Number.isFinite(value) ? Math.max(1, Math.min(Math.floor(value), MAX_QUERY_ROWS)) : MAX_QUERY_ROWS
+  typeof value === 'number' && Number.isFinite(value)
+    ? Math.max(1, Math.min(Math.floor(value), MAX_QUERY_ROWS))
+    : MAX_QUERY_ROWS
 
 /**
  * The `database.query` capability: the bridge's own query with the cap and the read-only refusal
@@ -95,11 +135,23 @@ export function databaseQuery(bridge: DatabaseBridge): DatabaseQuery {
 }
 
 /** The result as a step's output, or a failure when it is too big to put in a prompt. */
-function asOutcome(result: DatabaseQueryResult, extra: Record<string, unknown> = {}): { ok: true; structured: Record<string, unknown> } | { ok: false; error: string } {
-  const structured = { ...extra, columns: result.columns, rows: result.rows, rowCount: result.rowCount, truncated: result.truncated }
+function asOutcome(
+  result: DatabaseQueryResult,
+  extra: Record<string, unknown> = {},
+): { ok: true; structured: Record<string, unknown> } | { ok: false; error: string } {
+  const structured = {
+    ...extra,
+    columns: result.columns,
+    rows: result.rows,
+    rowCount: result.rowCount,
+    truncated: result.truncated,
+  }
   const bytes = Buffer.byteLength(JSON.stringify(structured), 'utf8')
   if (bytes > MAX_QUERY_BYTES) {
-    return { ok: false, error: `The result is ${Math.round(bytes / 1024)} KB, over the ${MAX_QUERY_BYTES / 1024} KB a step may hand on. Ask for fewer columns or a lower row cap.` }
+    return {
+      ok: false,
+      error: `The result is ${Math.round(bytes / 1024)} KB, over the ${MAX_QUERY_BYTES / 1024} KB a step may hand on. Ask for fewer columns or a lower row cap.`,
+    }
   }
   return { ok: true, structured }
 }
@@ -144,7 +196,8 @@ export function generateStep(services: DatabaseStepServices): StepKindContributi
       const userId = services.core.identity.active()
       if (!userId) return { status: 'failed', error: 'This node has no bound owner, so it cannot generate SQL.' }
       const schema = await services.bridge.schema(ctx.run.taskId)
-      if ('error' in schema) return { status: 'failed', error: `The database schema could not be read: ${schema.error}` }
+      if ('error' in schema)
+        return { status: 'failed', error: `The database schema could not be read: ${schema.error}` }
       ctx.emit({ at: Date.now(), event: { type: 'progress', text: 'Writing the SQL' } })
       let sql: string
       try {
@@ -152,25 +205,36 @@ export function generateStep(services: DatabaseStepServices): StepKindContributi
           userId,
           backendId: String(config.connectionId),
           input: {
-            system: buildSystemPrompt(schema.schema, { ...(schema.notes ? { notes: schema.notes } : {}), examples: [] }),
+            system: buildSystemPrompt(schema.schema, {
+              ...(schema.notes ? { notes: schema.notes } : {}),
+              examples: [],
+            }),
             prompt: String(config.prompt),
             maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
           },
         })
         sql = stripSqlFences(generated.text)
       } catch (error) {
-        return { status: 'failed', error: `The model could not write the SQL: ${error instanceof Error ? error.message : 'the provider refused'}` }
+        return {
+          status: 'failed',
+          error: `The model could not write the SQL: ${error instanceof Error ? error.message : 'the provider refused'}`,
+        }
       }
       // A generated write is a failure that carries the SQL, because the interesting question is what
       // the model thought it was asked for.
       const refusal = readOnlyRefusal(sql)
-      if (refusal) return { status: 'failed', error: `The generated SQL is refused: ${refusal}.\n\n${sql}`, structured: { sql } }
+      if (refusal)
+        return { status: 'failed', error: `The generated SQL is refused: ${refusal}.\n\n${sql}`, structured: { sql } }
       return runAndReport(services, ctx, sql, { sql })
     },
   }
 }
 
-async function loadSavedQuery(services: DatabaseStepServices, taskId: string, savedQueryId: string): Promise<string | null> {
+async function loadSavedQuery(
+  services: DatabaseStepServices,
+  taskId: string,
+  savedQueryId: string,
+): Promise<string | null> {
   const task = await services.core.tasks.load(taskId)
   const project = task?.projectId ? await services.core.projects.byId(task.projectId) : null
   if (!project) return null

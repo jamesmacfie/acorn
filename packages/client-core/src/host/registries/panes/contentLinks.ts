@@ -57,16 +57,28 @@ export type ContentLinkContribution = {
 
 export const contentLinkRegistry = new Registry<ContentLinkContribution>('content-link')
 
-const coreTaskContentLink: ContentLinkContribution = { id: 'core.task', providerId: 'core', parse: () => null,
-  target: item => ({ kind: 'core.task', item }),
-  path: target => { const task = typeof target.item === 'string' ? taskById(target.item) : undefined; return task ? pathForTask(task) : null },
-  presentations: ['route'] }
+const coreTaskContentLink: ContentLinkContribution = {
+  id: 'core.task',
+  providerId: 'core',
+  parse: () => null,
+  target: (item) => ({ kind: 'core.task', item }),
+  path: (target) => {
+    const task = typeof target.item === 'string' ? taskById(target.item) : undefined
+    return task ? pathForTask(task) : null
+  },
+  presentations: ['route'],
+}
 
 /** Names are bound to their registering plugin, never to a kind copied from a record. */
-export function resolveNamedContentTarget(kind: string, item: string): { target: InAppTarget; contribution: ContentLinkContribution } | null {
+export function resolveNamedContentTarget(
+  kind: string,
+  item: string,
+): { target: InAppTarget; contribution: ContentLinkContribution } | null {
   if (!item || !/^[a-z0-9-]+\.[a-z0-9-]+$/.test(kind)) return null
-  const contribution = kind === 'core.task' ? coreTaskContentLink
-    : contentLinkRegistry.entries().find(entry => entry.id === kind && kind.startsWith(`${entry.providerId}.`))
+  const contribution =
+    kind === 'core.task'
+      ? coreTaskContentLink
+      : contentLinkRegistry.entries().find((entry) => entry.id === kind && kind.startsWith(`${entry.providerId}.`))
   if (!contribution) return null
   const candidate = contribution.target?.(item) ?? { kind, item }
   if (!candidate || candidate.kind !== kind || candidate.item !== item) return null
@@ -99,7 +111,7 @@ export function parseInAppTarget(href: string): InAppTarget | null {
 /** The in-app route for an external URL, or null when it has none. */
 export function inAppPathFor(href: string): string | null {
   const claim = claimFor(href)
-  return claim ? claim.contribution.path?.(claim.target) ?? null : null
+  return claim ? (claim.contribution.path?.(claim.target) ?? null) : null
 }
 
 // ── Extraction: every plugin's recognised URLs out of a body of text ──────────────────────────────
@@ -348,7 +360,12 @@ const DEFAULT_ORDER = ['pane', 'refPanel', 'route', 'overlay'] as const
 //
 // `path` is passed in rather than resolved here because only `claimFor` knows which contribution made
 // the claim, and a target must never be able to resolve to one provider's item and another's route.
-function openClaim(target: InAppTarget, path: string | null | undefined, presentation: ContentLinkPresentation, contribution?: ContentLinkContribution): ContentLinkOutcome {
+function openClaim(
+  target: InAppTarget,
+  path: string | null | undefined,
+  presentation: ContentLinkPresentation,
+  contribution?: ContentLinkContribution,
+): ContentLinkOutcome {
   const order = presentation.prefer
     ? [presentation.prefer, ...DEFAULT_ORDER.filter((rung) => rung !== presentation.prefer)]
     : DEFAULT_ORDER
@@ -371,24 +388,48 @@ export function openContentTarget(target: InAppTarget, presentation: ContentLink
   return openClaim(target, null, presentation)
 }
 
-export function openNamedContentTarget(kind: string, item: string, presentation: ContentLinkPresentation = {}): ContentLinkOutcome {
+export function openNamedContentTarget(
+  kind: string,
+  item: string,
+  presentation: ContentLinkPresentation = {},
+): ContentLinkOutcome {
   const claim = resolveNamedContentTarget(kind, item)
   if (!claim) return 'external'
   return openClaim(claim.target, claim.contribution.path?.(claim.target), presentation, claim.contribution)
 }
 
 /** Editor metadata for a concrete row. This never opens a destination. */
-export function availableContentPresentations(input: { href?: string; kind?: string; item?: string; taskId?: string }, navigate = true): ('route' | 'refPanel' | 'pane' | 'overlay' | 'external')[] {
-  const claim = input.href ? claimFor(input.href) : input.kind && input.item ? resolveNamedContentTarget(input.kind, input.item) : null
+export function availableContentPresentations(
+  input: { href?: string; kind?: string; item?: string; taskId?: string },
+  navigate = true,
+): ('route' | 'refPanel' | 'pane' | 'overlay' | 'external')[] {
+  const claim = input.href
+    ? claimFor(input.href)
+    : input.kind && input.item
+      ? resolveNamedContentTarget(input.kind, input.item)
+      : null
   const result: ('route' | 'refPanel' | 'pane' | 'overlay' | 'external')[] = []
   if (claim) {
     if (navigate && claim.contribution.path?.(claim.target)) result.push('route')
-    if (typeof claim.target.providerId === 'string' && typeof claim.target.item === 'string' && refPanelFor(claim.target.providerId)) result.push('refPanel')
-    if (input.taskId && typeof claim.target.pane === 'string' && paneContribution(claim.target.pane) && paneAvailable(paneContribution(claim.target.pane)!, taskById(input.taskId))) result.push('pane')
+    if (
+      typeof claim.target.providerId === 'string' &&
+      typeof claim.target.item === 'string' &&
+      refPanelFor(claim.target.providerId)
+    )
+      result.push('refPanel')
+    if (
+      input.taskId &&
+      typeof claim.target.pane === 'string' &&
+      paneContribution(claim.target.pane) &&
+      paneAvailable(paneContribution(claim.target.pane)!, taskById(input.taskId))
+    )
+      result.push('pane')
     if (claim.contribution.overlay && typeof claim.target.providerId === 'string') result.push('overlay')
   }
   if (input.href) result.push('external')
-  return claim?.contribution.presentations ? result.filter(value => claim.contribution.presentations!.includes(value)) : result
+  return claim?.contribution.presentations
+    ? result.filter((value) => claim.contribution.presentations!.includes(value))
+    : result
 }
 
 // ── An external URL that a surface was about to hand to the browser ───────────────────────────────
@@ -404,11 +445,14 @@ export function availableContentPresentations(input: { href?: string; kind?: str
 export function openInAppUrl(href: string, destination: ContentLinkPresentation = {}): boolean {
   const claim = claimFor(href)
   if (!claim) return false
-  return openClaim(claim.target, claim.contribution.path?.(claim.target), destination, claim.contribution) !== 'external'
+  return (
+    openClaim(claim.target, claim.contribution.path?.(claim.target), destination, claim.contribution) !== 'external'
+  )
 }
 
 export function handlePluginContentLinkClick(event: MouseEvent, presentation: ContentLinkPresentation = {}): boolean {
-  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return false
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+    return false
   const anchor = (event.target as HTMLElement | null)?.closest('a') as HTMLAnchorElement | null
   if (!anchor) return false
   // A bare-token anchor `linkifyRefs` minted. It carries no href, so no recogniser can claim it and

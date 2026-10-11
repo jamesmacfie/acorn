@@ -36,7 +36,13 @@ function RenameTab(props: { name: string; onCommit: (name: string) => void }) {
       value={props.name}
       // Bare `autofocus` is unreliable inside a conditional in Solid; the microtask is the house
       // workaround.
-      ref={(el) => { field = el; queueMicrotask(() => { el.focus(); el.select() }) }}
+      ref={(el) => {
+        field = el
+        queueMicrotask(() => {
+          el.focus()
+          el.select()
+        })
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter') props.onCommit(field?.value ?? props.name)
         else if (event.key === 'Escape') props.onCommit(props.name)
@@ -77,12 +83,19 @@ export default function DashboardTabs(props: {
     if (isTypingTarget(event.target)) return
     const count = props.tabs.length
     if (count <= 0) return
-    const at = Math.max(0, props.tabs.findIndex((tab) => tab.id === props.active))
-    const next
-      = event.key === 'Home' ? 0
-        : event.key === 'End' ? count - 1
-          : NEXT_KEYS.has(event.key) ? (at + 1) % count
-            : PREV_KEYS.has(event.key) ? (at - 1 + count) % count
+    const at = Math.max(
+      0,
+      props.tabs.findIndex((tab) => tab.id === props.active),
+    )
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? count - 1
+          : NEXT_KEYS.has(event.key)
+            ? (at + 1) % count
+            : PREV_KEYS.has(event.key)
+              ? (at - 1 + count) % count
               : at
     if (next === at) return
     event.preventDefault()
@@ -123,7 +136,15 @@ export default function DashboardTabs(props: {
   /** The same items on the overflow and on the context menu, one list, so the two cannot drift. */
   const verbs = (tab: DashboardTab, menu: MenuContext) => (
     <>
-      <Menu.Item context={menu} onSelect={() => { props.onSelect(tab.id); setRenaming(tab.id) }}>Rename</Menu.Item>
+      <Menu.Item
+        context={menu}
+        onSelect={() => {
+          props.onSelect(tab.id)
+          setRenaming(tab.id)
+        }}
+      >
+        Rename
+      </Menu.Item>
       <Menu.Separator />
       <Menu.Item
         context={menu}
@@ -154,73 +175,79 @@ export default function DashboardTabs(props: {
     <span class="dash-tabs">
       <span
         class="ui-tab-scroll dash-tabs-strip"
-        ref={(element) => { stripRef = element; trackTabOverflow(element) }}
+        ref={(element) => {
+          stripRef = element
+          trackTabOverflow(element)
+        }}
         role="tablist"
         aria-label="Dashboards"
         onKeyDown={onKeyDown}
       >
-      {/* `Index`, not `For`. `homeTabs` rebuilds its entries on every dashboard write, so a
+        {/* `Index`, not `For`. `homeTabs` rebuilds its entries on every dashboard write, so a
           reference-keyed list would rebuild every row — and the row being rebuilt is the one holding
           the rename input a person is typing into (the recorded For/Index defocus trap). */}
-      <Index each={props.tabs}>
-        {(tab) => (
-          <span class="dash-tab-slot">
-            <Show
-              when={renaming() === tab().id}
-              fallback={(
-                <button
-                  id={homeTabDomId(tab().id)}
-                  type="button"
-                  role="tab"
-                  class="dash-tab"
-                  aria-selected={props.active === tab().id}
-                  aria-controls={HOME_TAB_PANEL_ID}
-                  tabindex={props.active === tab().id ? 0 : -1}
-                  onClick={() => props.onSelect(tab().id)}
-                  onDblClick={() => setRenaming(tab().id)}
-                  onContextMenu={(event) => {
-                    event.preventDefault()
-                    setMenuTab(tab())
-                    setMenuAt({ x: event.clientX, y: event.clientY })
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key !== 'F2' && !(event.key === 'Enter' && props.active === tab().id)) return
-                    event.preventDefault()
-                    setRenaming(tab().id)
-                  }}
-                >
-                  {tab().name}
-                </button>
-              )}
-            >
-              <RenameTab name={tab().name} onCommit={(name) => commitRename(tab(), name)} />
-            </Show>
-            {/* Every tab keeps the chevron's room, so picking one does not shift the strip sideways.
-                Only the active tab draws the button, so the others add no tab stop. */}
-            <Show when={renaming() !== tab().id}>
-              <Show when={props.active === tab().id} fallback={<span class="dash-tab-menu-room" aria-hidden="true" />}>
-                <Menu
-                  ariaLabel={`${tab().name} dashboard actions`}
-                  placement="bottom-start"
-                  trigger={({ open, toggle }) => (
-                    <IconButton
-                      size="xs"
-                      variant="ghost"
-                      icon="chevron-down"
-                      label={`${tab().name} dashboard actions`}
-                      opens="menu"
-                      expanded={open()}
-                      onPress={toggle}
-                    />
-                  )}
-                >
-                  {(menu) => verbs(tab(), menu)}
-                </Menu>
+        <Index each={props.tabs}>
+          {(tab) => (
+            <span class="dash-tab-slot">
+              <Show
+                when={renaming() === tab().id}
+                fallback={
+                  <button
+                    id={homeTabDomId(tab().id)}
+                    type="button"
+                    role="tab"
+                    class="dash-tab"
+                    aria-selected={props.active === tab().id}
+                    aria-controls={HOME_TAB_PANEL_ID}
+                    tabindex={props.active === tab().id ? 0 : -1}
+                    onClick={() => props.onSelect(tab().id)}
+                    onDblClick={() => setRenaming(tab().id)}
+                    onContextMenu={(event) => {
+                      event.preventDefault()
+                      setMenuTab(tab())
+                      setMenuAt({ x: event.clientX, y: event.clientY })
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'F2' && !(event.key === 'Enter' && props.active === tab().id)) return
+                      event.preventDefault()
+                      setRenaming(tab().id)
+                    }}
+                  >
+                    {tab().name}
+                  </button>
+                }
+              >
+                <RenameTab name={tab().name} onCommit={(name) => commitRename(tab(), name)} />
               </Show>
-            </Show>
-          </span>
-        )}
-      </Index>
+              {/* Every tab keeps the chevron's room, so picking one does not shift the strip sideways.
+                Only the active tab draws the button, so the others add no tab stop. */}
+              <Show when={renaming() !== tab().id}>
+                <Show
+                  when={props.active === tab().id}
+                  fallback={<span class="dash-tab-menu-room" aria-hidden="true" />}
+                >
+                  <Menu
+                    ariaLabel={`${tab().name} dashboard actions`}
+                    placement="bottom-start"
+                    trigger={({ open, toggle }) => (
+                      <IconButton
+                        size="xs"
+                        variant="ghost"
+                        icon="chevron-down"
+                        label={`${tab().name} dashboard actions`}
+                        opens="menu"
+                        expanded={open()}
+                        onPress={toggle}
+                      />
+                    )}
+                  >
+                    {(menu) => verbs(tab(), menu)}
+                  </Menu>
+                </Show>
+              </Show>
+            </span>
+          )}
+        </Index>
       </span>
 
       {/* The ghost `+`. Past the cap it stays visible and disabled: a button that vanishes at eight

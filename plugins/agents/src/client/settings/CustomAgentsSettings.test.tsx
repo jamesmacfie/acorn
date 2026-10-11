@@ -8,13 +8,27 @@ import type { CustomAgent } from '../../shared/customAgents'
 
 const saveCustomAgent = vi.fn(async (_client: unknown, _id: string | null, input: unknown) => input)
 const agents: CustomAgent[] = [
-  { id: 'a1', name: 'Bug reviewer', providerId: 'codex', profileId: 'codex', options: { reasoning: 'high' }, source: { kind: 'user' } },
-  { id: 'lint:tidy', name: 'Tidy', providerId: 'codex', profileId: 'codex', options: {}, source: { kind: 'plugin', pluginId: 'lint' } },
+  {
+    id: 'a1',
+    name: 'Bug reviewer',
+    providerId: 'codex',
+    profileId: 'codex',
+    options: { reasoning: 'high' },
+    source: { kind: 'user' },
+  },
+  {
+    id: 'lint:tidy',
+    name: 'Tidy',
+    providerId: 'codex',
+    profileId: 'codex',
+    options: {},
+    source: { kind: 'plugin', pluginId: 'lint' },
+  },
 ]
 
 const confirmAction = vi.fn(async (_question: { title: string }) => false)
 vi.mock('@acorn/plugin-api/ui/host', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@acorn/plugin-api/ui/host')>(),
+  ...(await importOriginal<typeof import('@acorn/plugin-api/ui/host')>()),
   confirmAction: (question: { title: string }) => confirmAction(question),
 }))
 
@@ -32,10 +46,25 @@ vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
     providers: async () => [{ id: 'codex', profileId: 'codex', label: 'Codex', installed: true, diagnostics: [] }],
     sessions: async () => ({
-      sessions: [{
-        providerId: 'codex',
-        config: { configOptions: [{ id: 'reasoning', label: 'Reasoning', category: 'reasoning', currentValue: 'medium', values: [{ value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }] }] },
-      }],
+      sessions: [
+        {
+          providerId: 'codex',
+          config: {
+            configOptions: [
+              {
+                id: 'reasoning',
+                label: 'Reasoning',
+                category: 'reasoning',
+                currentValue: 'medium',
+                values: [
+                  { value: 'medium', label: 'Medium' },
+                  { value: 'high', label: 'High' },
+                ],
+              },
+            ],
+          },
+        },
+      ],
     }),
   },
 }))
@@ -47,7 +76,10 @@ const draw = () => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <CustomAgentsSettings />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 const buttons = (root: ParentNode, label: string) =>
@@ -86,9 +118,16 @@ describe('the custom agents settings page', () => {
     expect(host.textContent).toContain('Reasoning')
     buttons(host, 'Save')[0]!.click()
     await settle()
-    expect(saveCustomAgent).toHaveBeenCalledWith(expect.anything(), null, expect.objectContaining({
-      name: 'Bug reviewer copy', providerId: 'codex', profileId: 'codex', options: { reasoning: 'high' },
-    }))
+    expect(saveCustomAgent).toHaveBeenCalledWith(
+      expect.anything(),
+      null,
+      expect.objectContaining({
+        name: 'Bug reviewer copy',
+        providerId: 'codex',
+        profileId: 'codex',
+        options: { reasoning: 'high' },
+      }),
+    )
   })
 
   it('refuses to save an agent with no name', async () => {

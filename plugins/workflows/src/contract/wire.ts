@@ -2,7 +2,6 @@ import type { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 
-
 // These mirror the persisted rows (plugins/workflows/main/workflowContracts.ts derives its own from
 // drizzle) but are declared structurally so the renderer never imports a node-side module. They live
 // in core/shared because both the workflows and agents features read them.
@@ -23,7 +22,14 @@ export type WorkflowDefSummary = {
   source: 'repo' | 'user' | 'database'
   posture?: 'gated' | 'autonomous'
   inputs?: WorkflowInput[]
-  steps: { id?: string; name: string; kind?: string; after?: string[]; isolation?: 'shared' | 'worktree'; inputs?: 'append' | 'template' | 'none' }[]
+  steps: {
+    id?: string
+    name: string
+    kind?: string
+    after?: string[]
+    isolation?: 'shared' | 'worktree'
+    inputs?: 'append' | 'template' | 'none'
+  }[]
   // The project this definition belongs to: the one whose checkout holds the file, or the one a row
   // is bound to. Null on a row that any project in the workspace may run.
   projectId?: string | null
@@ -85,7 +91,15 @@ export type WorkflowRunRow = {
   id: string
   taskId: string
   name: string
-  status: 'running' | 'gated' | 'cancelling' | 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled'
+  status:
+    | 'running'
+    | 'gated'
+    | 'cancelling'
+    | 'done'
+    | 'completed-with-failures'
+    | 'failed'
+    | 'safety-rail'
+    | 'cancelled'
   posture: string
   error: string | null
   createdAt: number
@@ -105,7 +119,17 @@ export type WorkflowStepRow = {
   mode: string
   profileId: string | null
   model: string | null
-  status: 'pending' | 'running' | 'waiting-gate' | 'waiting-children' | 'done' | 'completed-with-failures' | 'failed' | 'skipped' | 'safety-rail' | 'cancelled'
+  status:
+    | 'pending'
+    | 'running'
+    | 'waiting-gate'
+    | 'waiting-children'
+    | 'done'
+    | 'completed-with-failures'
+    | 'failed'
+    | 'skipped'
+    | 'safety-rail'
+    | 'cancelled'
   resultJson: string | null
   structuredJson: string | null
   sessionId: string | null

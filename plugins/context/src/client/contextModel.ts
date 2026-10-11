@@ -1,5 +1,16 @@
 import { createMemo, createResource, createSignal } from 'solid-js'
-import { agentSessionsFor, bytesOf, openPane, readJson, revealCollectionItem, sendToSession, slotFills, toast, type Task, type SessionSummary } from '@acorn/plugin-api/client'
+import {
+  agentSessionsFor,
+  bytesOf,
+  openPane,
+  readJson,
+  revealCollectionItem,
+  sendToSession,
+  slotFills,
+  toast,
+  type Task,
+  type SessionSummary,
+} from '@acorn/plugin-api/client'
 import { CONTEXT_SECTION_POINT } from './sectionPoint'
 import { taskContextRoute, type ContextItem, type TaskContext } from '@acorn/protocol/api.ts'
 import { recordSync, rememberTarget, syncStatus, targetSessionFor, type SyncStatus } from './syncState'
@@ -67,13 +78,18 @@ export function createContextModel(task: Task) {
   // A section with nothing in it and nobody offering to fill its slot is not worth a fold. `slotFills`
   // rather than a registry read, so the pane never learns whether the contributor is compiled or
   // loaded — which is the whole point of the two render paths meeting at the slot.
-  const visibleSections = createMemo(() => (ctx()?.sections ?? []).filter((section) =>
-    section.items.length > 0 || !!section.absent || slotFills(CONTEXT_SECTION_POINT, section.id)))
+  const visibleSections = createMemo(() =>
+    (ctx()?.sections ?? []).filter(
+      (section) => section.items.length > 0 || !!section.absent || slotFills(CONTEXT_SECTION_POINT, section.id),
+    ),
+  )
 
   const target = createMemo(() => targetSessionFor(task.id))
   const status = createMemo(() => {
     const session = target()
-    return session ? syncStatus(`${session.nodeId}:${session.sourceId}:${session.sessionId}`, assembled()?.sections ?? {}) : null
+    return session
+      ? syncStatus(`${session.nodeId}:${session.sourceId}:${session.sessionId}`, assembled()?.sections ?? {})
+      : null
   })
 
   function followJump(item: ContextItem) {
@@ -89,7 +105,9 @@ export function createContextModel(task: Task) {
       openPane(task.id, item.jump.pane, { kind: 'integration:show-ref', ref: item.jump.ref })
       return
     }
-    const link = task.links.find((candidate) => candidate.providerId === item.jump!.pane && candidate.identifier === item.jump!.itemId)
+    const link = task.links.find(
+      (candidate) => candidate.providerId === item.jump!.pane && candidate.identifier === item.jump!.itemId,
+    )
     if (!link) return
     openPane(task.id, item.jump.pane, {
       kind: 'integration:show-ref',
@@ -109,7 +127,8 @@ export function createContextModel(task: Task) {
     const res = await sendToSession(session, block, 'after-ready')
     if (res.ok) recordSync(`${session.nodeId}:${session.sourceId}:${session.sessionId}`, task.id, sections)
     // Success is transient feedback; a failure needs to stay next to the button that failed.
-    if (res.ok) return toast(res.queued ? 'Queued. It goes to the agent when it is free.' : 'Sent.', { tone: 'success' })
+    if (res.ok)
+      return toast(res.queued ? 'Queued. It goes to the agent when it is free.' : 'Sent.', { tone: 'success' })
     setMsg(res.reason ?? 'Send failed.')
   }
 
@@ -121,17 +140,19 @@ export function createContextModel(task: Task) {
     effective,
     toggleSection: (id: string) => setSectionSelection(task.id, { ...effective(), [id]: !effective()[id] }),
     isOpen: (id: string) => expanded().has(id),
-    toggleOpen: (id: string) => setExpanded((current) => {
-      const next = new Set(current)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    }),
+    toggleOpen: (id: string) =>
+      setExpanded((current) => {
+        const next = new Set(current)
+        next.has(id) ? next.delete(id) : next.add(id)
+        return next
+      }),
     sectionOpen: (id: string) => !shut().has(id),
-    setSectionOpen: (id: string, open: boolean) => setShut((current) => {
-      const next = new Set(current)
-      open ? next.delete(id) : next.add(id)
-      return next
-    }),
+    setSectionOpen: (id: string, open: boolean) =>
+      setShut((current) => {
+        const next = new Set(current)
+        open ? next.delete(id) : next.add(id)
+        return next
+      }),
     // The fold has to be open before there is a row to scroll to, so opening and revealing are two
     // ticks rather than one.
     reveal: (sectionId: string, itemId?: string) => {
@@ -157,7 +178,8 @@ export function createContextModel(task: Task) {
     status,
     sessions: (query: string) =>
       agentSessionsFor(task.id).filter((session) => session.title.toLowerCase().includes(query.toLowerCase())),
-    pickTarget: (session: SessionSummary) => rememberTarget(task.id, `${session.nodeId}:${session.sourceId}:${session.sessionId}`),
+    pickTarget: (session: SessionSummary) =>
+      rememberTarget(task.id, `${session.nodeId}:${session.sourceId}:${session.sessionId}`),
     followJump,
     refreshContext,
     syncContext,

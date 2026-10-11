@@ -91,11 +91,16 @@ export function Button(props: ButtonProps) {
   // The label doubles as the visible text, so a call site that has only words never writes them
   // twice. A remote tree hands every node its children as a list, empty when there are none, and an
   // empty list is truthy, so "has content" means a child that draws something.
-  const hasContent = () => content.toArray().some((child) => child != null && child !== '' && typeof child !== 'boolean')
+  const hasContent = () =>
+    content.toArray().some((child) => child != null && child !== '' && typeof child !== 'boolean')
   const body = () => (
     <>
-      <Show when={props.busy}><Spinner size="sm" /></Show>
-      <Show when={hasContent()} fallback={props.label}>{content()}</Show>
+      <Show when={props.busy}>
+        <Spinner size="sm" />
+      </Show>
+      <Show when={hasContent()} fallback={props.label}>
+        {content()}
+      </Show>
     </>
   )
   return (

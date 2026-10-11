@@ -23,21 +23,32 @@ export function PrFileList(props: {
   const model = () => props.model
   return (
     <>
-      <Show when={incompleteFilesMessage(model().filesCompleteness())}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
+      <Show when={incompleteFilesMessage(model().filesCompleteness())}>
+        {(message) => <Alert tone="warn">{message()}</Alert>}
+      </Show>
       <Show
         when={model().files().length}
-        fallback={<EmptyState align="start" size="sm" busy={model().filesLoading()}>{model().filesLoading() ? 'Loading…' : 'No changed files'}</EmptyState>}
+        fallback={
+          <EmptyState align="start" size="sm" busy={model().filesLoading()}>
+            {model().filesLoading() ? 'Loading…' : 'No changed files'}
+          </EmptyState>
+        }
       >
         <Rows
           virtual={props.virtual}
           id={`gh-files:${model().scope.owner}/${model().scope.repo}#${model().scope.number}`}
           ariaLabel="Changed files"
-          items={model().files().map((file) => ({ key: file.path, label: file.path }))}
+          items={model()
+            .files()
+            .map((file) => ({ key: file.path, label: file.path }))}
           selected={props.current() ?? null}
           onSelect={props.onSelect}
         >
           {(item, itemProps, selected, place) => {
-            const file = () => model().files().find((candidate) => candidate.path === item.key)
+            const file = () =>
+              model()
+                .files()
+                .find((candidate) => candidate.path === item.key)
             const status = () => fileStatusMeta(file()?.status)
             // `muted` is the file-status vocabulary's word for "nothing special"; the badge's is
             // `neutral`.
@@ -62,12 +73,20 @@ export function PrFileList(props: {
                       title="Viewed"
                       checked={!!file()?.viewed}
                       disabled={model().readOnly}
-                      onChange={(checked) => { if (!model().readOnly) model().setViewed(item.key, checked) }}
+                      onChange={(checked) => {
+                        if (!model().readOnly) model().setViewed(item.key, checked)
+                      }}
                     />
-                    <Badge size="xs" tone={tone()}>{status().letter}</Badge>
+                    <Badge size="xs" tone={tone()}>
+                      {status().letter}
+                    </Badge>
                   </>
                 }
-                meta={<Text emphasis="muted">+{file()?.additions ?? 0} −{file()?.deletions ?? 0}</Text>}
+                meta={
+                  <Text emphasis="muted">
+                    +{file()?.additions ?? 0} −{file()?.deletions ?? 0}
+                  </Text>
+                }
               >
                 <Text tone={file()?.viewed ? 'muted' : undefined}>{item.key}</Text>
               </Row>

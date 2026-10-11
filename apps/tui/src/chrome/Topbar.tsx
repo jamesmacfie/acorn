@@ -35,9 +35,8 @@ export function Topbar(props: { model: ShellModel; nodeId: string }) {
     if (!workspace) return 'acorn'
     return words().singular === 'project' ? `Project: ${workspace.name}` : workspace.name
   }
-  const shownTask = () => !topOverlay()
-    ? props.model.tasks().find((task) => task.id === highlightedTaskId()) ?? props.model.task()
-    : null
+  const shownTask = () =>
+    !topOverlay() ? (props.model.tasks().find((task) => task.id === highlightedTaskId()) ?? props.model.task()) : null
   const taskLabel = () => {
     const task = shownTask()
     if (!task) return null
@@ -62,20 +61,20 @@ export function Topbar(props: { model: ShellModel; nodeId: string }) {
         </Show>
         <Line role="muted">{`· ${count()} ${count() === 1 ? 'task' : 'tasks'}`}</Line>
         <box flexGrow={1} />
-        <Show when={props.model.task()?.branch}>
-          {(branch) => <Line role="muted">{branch()}</Line>}
-        </Show>
+        <Show when={props.model.task()?.branch}>{(branch) => <Line role="muted">{branch()}</Line>}</Show>
         {/* What is waiting: the same number the desktop's bell puts on its pill and on the app icon,
             written here through the platform seam's `setBadge` (../kit/notify.ts). Its own glyph,
             where the desktop draws a bell: this is a host-owned attention marker, not a Lucide
             icon. Zero draws nothing, because a count that is always there says nothing
             when it moves. `n` opens what is behind it (./Inbox.tsx). */}
-        <Show when={terminalBadge()}>
-          {(count) => <Line tone="warn">{`◔ ${count()}`}</Line>}
-        </Show>
+        <Show when={terminalBadge()}>{(count) => <Line tone="warn">{`◔ ${count()}`}</Line>}</Show>
         <StatusDot tone={nodeTone(state())} label={state()} />
         <Show when={taskLabel()}>
-          {(label) => <box flexShrink={1} minWidth={0} overflow="hidden"><Line role="strong">{label()}</Line></box>}
+          {(label) => (
+            <box flexShrink={1} minWidth={0} overflow="hidden">
+              <Line role="strong">{label()}</Line>
+            </box>
+          )}
         </Show>
       </box>
     </box>

@@ -23,7 +23,10 @@ const READY_BUDGET_MS = 90_000
 
 type Handshake = { nodeId: string; endpoint: string; fingerprint: string; deviceToken: string }
 
-function startNode(dataDir: string, extra: Record<string, string> = {}): { child: ChildProcess; ready: Promise<Handshake> } {
+function startNode(
+  dataDir: string,
+  extra: Record<string, string> = {},
+): { child: ChildProcess; ready: Promise<Handshake> } {
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/entries/standalone.ts'], {
     cwd: appRoot,
     env: {
@@ -75,7 +78,8 @@ const stop = (child: ChildProcess): Promise<void> =>
     child.kill('SIGTERM')
   })
 
-const identityOf = (dataDir: string) => JSON.parse(readFileSync(join(dataDir, 'node.json'), 'utf8')) as Record<string, unknown>
+const identityOf = (dataDir: string) =>
+  JSON.parse(readFileSync(join(dataDir, 'node.json'), 'utf8')) as Record<string, unknown>
 
 describe('a standalone node enrolling with a control plane', () => {
   let child: ChildProcess | null = null

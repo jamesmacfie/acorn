@@ -40,10 +40,13 @@ export default function CommandPalette() {
     return {
       host: 'desktop',
       nodeId: activeNodeId() ?? null,
-      workspaceId: workspaceForProject(
-        fleetWorkspaces().entries.filter((entry) => entry.nodeId === activeNodeId()).map((entry) => entry.workspace),
-        projectId,
-      )?.id ?? null,
+      workspaceId:
+        workspaceForProject(
+          fleetWorkspaces()
+            .entries.filter((entry) => entry.nodeId === activeNodeId())
+            .map((entry) => entry.workspace),
+          projectId,
+        )?.id ?? null,
       projectId: projectId ?? null,
       taskId: taskId ?? null,
       paneId: null,
@@ -99,8 +102,12 @@ export default function CommandPalette() {
       items={session.rows()}
       ariaLabel="Command palette"
       // A search or an input frame asks for its own thing; the root and a group are still this list.
-      placeholder={session.placeholder()
-        || (session.kind() === 'group' && session.frame()?.title ? `Filter ${session.frame()!.title}…` : 'Search commands and settings…')}
+      placeholder={
+        session.placeholder() ||
+        (session.kind() === 'group' && session.frame()?.title
+          ? `Filter ${session.frame()!.title}…`
+          : 'Search commands and settings…')
+      }
       emptyText="No matches."
       breadcrumb={session.breadcrumb()}
       // Segment i names frame i + 1 (the root has no title). A segment for the frame on screen is text.
@@ -108,7 +115,11 @@ export default function CommandPalette() {
       busy={session.busy()}
       announce={announce()}
       onComposing={session.setComposing}
-      status={<Show when={session.status()}><Alert>{session.status()}</Alert></Show>}
+      status={
+        <Show when={session.status()}>
+          <Alert>{session.status()}</Alert>
+        </Show>
+      }
       onPick={(row) => session.activateRow(row.id)}
       rowClassList={(row) => ({ 'palette-error': row.action.effect === 'none' })}
       row={(row) => (

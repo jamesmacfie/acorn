@@ -70,7 +70,11 @@ export function parseLink(href: string): LinkResult {
   const [, authority, rawPath, rawQuery, rawFragment] = match
   if (!authority || !hostPattern.test(authority)) return refuse(href, 'Missing or invalid Node ID')
   let url: URL
-  try { url = new URL(href) } catch { return refuse(href, 'Malformed link') }
+  try {
+    url = new URL(href)
+  } catch {
+    return refuse(href, 'Malformed link')
+  }
   if (url.protocol !== 'acorn:' || url.host !== authority || url.username || url.password || url.port) {
     return refuse(href, 'Invalid Node address')
   }
@@ -79,8 +83,8 @@ export function parseLink(href: string): LinkResult {
   const [form, id, ...rest] = decoded as string[]
   const params = queryParams(rawQuery)
   if (!params) return refuse(href, 'Invalid query encoding')
-  const only = (...names: string[]) => [...params.keys()].every((key) => names.includes(key))
-    && names.every((key) => (params.get(key)?.length ?? 0) <= 1)
+  const only = (...names: string[]) =>
+    [...params.keys()].every((key) => names.includes(key)) && names.every((key) => (params.get(key)?.length ?? 0) <= 1)
   const value = (key: string): string | undefined => params.get(key)?.[0]
   let place: Place
   if (form === 't' && id && !rest.length && !rawFragment && only('pane', 'item')) {
@@ -112,11 +116,19 @@ export function parseLink(href: string): LinkResult {
 /** Build the stable, copyable navigation forms. Node IDs are written explicitly.
  * See docs/frontend/acorn-links.md § Address forms.
  */
-export function buildLink(nodeId: string, place: Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' }>): string {
+export function buildLink(
+  nodeId: string,
+  place: Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' }>,
+): string {
   if (!hostPattern.test(nodeId)) throw new Error('Invalid Node ID')
-  const values = place.kind === 'task' ? [place.taskId, place.pane, place.item]
-    : place.kind === 'project' ? [place.projectId, ...place.rest]
-      : place.kind === 'settings' ? [place.pageId, place.sectionId] : [place.sourceId]
+  const values =
+    place.kind === 'task'
+      ? [place.taskId, place.pane, place.item]
+      : place.kind === 'project'
+        ? [place.projectId, ...place.rest]
+        : place.kind === 'settings'
+          ? [place.pageId, place.sectionId]
+          : [place.sourceId]
   if (values.some((value) => value !== undefined && segment(encodeURIComponent(value)) !== value)) {
     throw new Error('Invalid address segment')
   }
@@ -125,12 +137,19 @@ export function buildLink(nodeId: string, place: Extract<Place, { kind: 'task' |
     case 'task': {
       if (place.item && !place.pane) throw new Error('A task item needs a pane')
       path = taskPath(place.taskId)
-      if (place.pane) path += `?${new URLSearchParams({ pane: place.pane, ...(place.item ? { item: place.item } : {}) })}`
+      if (place.pane)
+        path += `?${new URLSearchParams({ pane: place.pane, ...(place.item ? { item: place.item } : {}) })}`
       break
     }
-    case 'project': path = `${projectPath(place.projectId)}${place.rest.map((part) => `/${encodeURIComponent(part)}`).join('')}`; break
-    case 'settings': path = `/settings${place.pageId ? `/${encodeURIComponent(place.pageId)}` : ''}${place.sectionId ? `#${encodeURIComponent(place.sectionId)}` : ''}`; break
-    case 'source': path = `/source/${encodeURIComponent(place.sourceId)}`; break
+    case 'project':
+      path = `${projectPath(place.projectId)}${place.rest.map((part) => `/${encodeURIComponent(part)}`).join('')}`
+      break
+    case 'settings':
+      path = `/settings${place.pageId ? `/${encodeURIComponent(place.pageId)}` : ''}${place.sectionId ? `#${encodeURIComponent(place.sectionId)}` : ''}`
+      break
+    case 'source':
+      path = `/source/${encodeURIComponent(place.sourceId)}`
+      break
   }
   const href = `acorn://${nodeId}${path}`
   if (href.length > MAX_LINK_LENGTH) throw new Error(`Acorn link exceeds ${MAX_LINK_LENGTH} characters`)

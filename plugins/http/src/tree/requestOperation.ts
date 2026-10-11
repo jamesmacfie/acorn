@@ -6,6 +6,9 @@ export async function withAbort<T>(signal: AbortSignal, work: () => Promise<T>):
     abort = () => reject(signal.reason)
     signal.addEventListener('abort', abort, { once: true })
   })
-  try { return await Promise.race([work(), canceled]) }
-  finally { signal.removeEventListener('abort', abort) }
+  try {
+    return await Promise.race([work(), canceled])
+  } finally {
+    signal.removeEventListener('abort', abort)
+  }
 }

@@ -54,7 +54,8 @@ function record(name: Milestone, at: number, attrs: TelemetryAttrs = {}): void {
  * timing. WebKit reports it for a hidden window too, which an animation frame callback never sees.
  */
 function observeFirstPaint(): boolean {
-  if (typeof PerformanceObserver === 'undefined' || !PerformanceObserver.supportedEntryTypes?.includes('paint')) return false
+  if (typeof PerformanceObserver === 'undefined' || !PerformanceObserver.supportedEntryTypes?.includes('paint'))
+    return false
   const observer = new PerformanceObserver((list) => {
     const paint = list.getEntriesByName('first-contentful-paint')[0]
     if (!paint) return
@@ -171,7 +172,10 @@ function emitReady(): void {
     // went into restoring or into the features' own content.
     const restored = recorded.get('restored')
     if (name !== 'usable' || !restored) continue
-    for (const [phase, from, to] of [['restore', 0, restored.at], ['content', restored.at, milestone.at]] as const) {
+    for (const [phase, from, to] of [
+      ['restore', 0, restored.at],
+      ['content', restored.at, milestone.at],
+    ] as const) {
       emitSpan('core', {
         traceId: startupTraceId,
         spanId: newSpanId(),

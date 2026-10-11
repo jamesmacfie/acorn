@@ -21,7 +21,11 @@ export async function withArchiving<T>(taskId: string, run: () => Promise<T>): P
 
 // The durable archive mutation has already succeeded when this runs. End the active UI scope first
 // so component cleanup can publish its final session state, then make eviction the last writer.
-export function completeTaskArchive(taskId: string, leaveActiveScope: () => void, archivedTaskIds: readonly string[] = [taskId]): void {
+export function completeTaskArchive(
+  taskId: string,
+  leaveActiveScope: () => void,
+  archivedTaskIds: readonly string[] = [taskId],
+): void {
   try {
     leaveActiveScope()
   } finally {

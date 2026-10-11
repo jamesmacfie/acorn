@@ -16,7 +16,11 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...actual, renameSync: vi.fn(actual.renameSync) }
 })
 
-const NONE: NodePluginPermissions = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
+const NONE: NodePluginPermissions = {
+  api: [],
+  events: [],
+  node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+}
 const HASH_A = 'a'.repeat(64)
 const HASH_B = 'b'.repeat(64)
 
@@ -74,7 +78,9 @@ describe('acknowledging a bundle', () => {
     expect(persisted.decisionFor('sparkline', HASH_A)?.permissions.api).toEqual(['core.tasks:read'])
     expect(persisted.decisionFor('refused', HASH_B)).toEqual(rejected)
     expect(persisted.decisionFor('other', 'c'.repeat(64))).toEqual(last)
-    expect(persisted.listDevGrants()).toEqual([{ pluginId: 'workbench', nodeId: 'node-a', source: { kind: 'node', nodeId: 'node-a' }, grantedAt: 100 }])
+    expect(persisted.listDevGrants()).toEqual([
+      { pluginId: 'workbench', nodeId: 'node-a', source: { kind: 'node', nodeId: 'node-a' }, grantedAt: 100 },
+    ])
 
     vi.mocked(writePrivateAtomic).mockClear()
     trust.recordBatch([ack({ ...first, decidedAt: first.decidedAt + 1 }), last])
@@ -85,7 +91,9 @@ describe('acknowledging a bundle', () => {
   it('leaves remembered and durable decisions intact after a failed batch commit', () => {
     const trust = store()
     trust.record(ack({ decision: 'rejected' }))
-    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => { throw new Error('disk unavailable') })
+    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => {
+      throw new Error('disk unavailable')
+    })
 
     expect(() => trust.recordBatch([ack(), ack({ hash: HASH_B })])).toThrow('disk unavailable')
     expect(trust.decisionFor('sparkline', HASH_A)?.decision).toBe('rejected')
@@ -101,7 +109,9 @@ describe('acknowledging a bundle', () => {
     trust.record(ack({ decision: 'rejected' }))
     const path = join(dir, 'acorn-1-plugin-trust.json')
     const before = readFileSync(path, 'utf8')
-    vi.mocked(renameSync).mockImplementationOnce(() => { throw new Error('replacement unavailable') })
+    vi.mocked(renameSync).mockImplementationOnce(() => {
+      throw new Error('replacement unavailable')
+    })
 
     expect(() => trust.recordBatch([ack(), ack({ hash: HASH_B })])).toThrow('replacement unavailable')
     expect(readFileSync(path, 'utf8')).toBe(before)
@@ -113,7 +123,10 @@ describe('acknowledging a bundle', () => {
   })
 
   it('reads a pre-provenance acknowledgement as node sourced', () => {
-    writeFileSync(join(dir, 'acorn-1-plugin-trust.json'), JSON.stringify({ version: 1, acks: [ack({ source: undefined })], devGrants: [] }))
+    writeFileSync(
+      join(dir, 'acorn-1-plugin-trust.json'),
+      JSON.stringify({ version: 1, acks: [ack({ source: undefined })], devGrants: [] }),
+    )
     expect(store().decisionFor('sparkline', HASH_A)?.source).toEqual({ kind: 'node', nodeId: 'node-a' })
   })
 
@@ -127,28 +140,68 @@ describe('acknowledging a bundle', () => {
   it('limits a device development grant to device provenance', () => {
     const first = store()
     first.grantDev({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, grantedAt: Date.now() })
-    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '2.0.0' })).toBe(false)
-    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, hash: HASH_A, version: '2.0.0' })).toBe(true)
-    expect(first.decisionFor('sparkline', HASH_A)).toMatchObject({ dev: true, partial: true, source: { kind: 'device' } })
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '2.0.0' })).toBe(
+      false,
+    )
+    expect(
+      first.recordDevAccept({
+        pluginId: 'sparkline',
+        nodeId: '',
+        source: { kind: 'device' },
+        hash: HASH_A,
+        version: '2.0.0',
+      }),
+    ).toBe(true)
+    expect(first.decisionFor('sparkline', HASH_A)).toMatchObject({
+      dev: true,
+      partial: true,
+      source: { kind: 'device' },
+    })
   })
 
   it('does not overwrite a later manual decision when a development source is cached again', () => {
     const first = store()
-    first.grantDev({ pluginId: 'sparkline', nodeId: 'node-a', source: { kind: 'node', nodeId: 'node-a' }, grantedAt: Date.now() })
-    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '1.0.0' })).toBe(true)
+    first.grantDev({
+      pluginId: 'sparkline',
+      nodeId: 'node-a',
+      source: { kind: 'node', nodeId: 'node-a' },
+      grantedAt: Date.now(),
+    })
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '1.0.0' })).toBe(
+      true,
+    )
     first.record(ack({ decision: 'rejected', declaration: 'reviewed-declaration' }))
-    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '1.0.0' })).toBe(false)
-    expect(first.decisionFor('sparkline', HASH_A)).toMatchObject({ decision: 'rejected', declaration: 'reviewed-declaration' })
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '1.0.0' })).toBe(
+      false,
+    )
+    expect(first.decisionFor('sparkline', HASH_A)).toMatchObject({
+      decision: 'rejected',
+      declaration: 'reviewed-declaration',
+    })
   })
 
   it('keeps device acknowledgements after uninstall while ending future development trust', () => {
     const first = store()
     first.grantDev({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, grantedAt: Date.now() })
-    first.recordDevAccept({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, hash: HASH_A, version: '1.0.0' })
+    first.recordDevAccept({
+      pluginId: 'sparkline',
+      nodeId: '',
+      source: { kind: 'device' },
+      hash: HASH_A,
+      version: '1.0.0',
+    })
     first.forgetDevGrant('sparkline', { kind: 'device' })
     expect(first.devGrantFor('sparkline', { kind: 'device' })).toBeUndefined()
     expect(first.decisionFor('sparkline', HASH_A)?.decision).toBe('accepted')
-    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, hash: HASH_B, version: '2.0.0' })).toBe(false)
+    expect(
+      first.recordDevAccept({
+        pluginId: 'sparkline',
+        nodeId: '',
+        source: { kind: 'device' },
+        hash: HASH_B,
+        version: '2.0.0',
+      }),
+    ).toBe(false)
   })
 
   it('withdraws only the named exact-hash decision', () => {
@@ -254,7 +307,11 @@ describe('custody', () => {
     const alsoGood = ack({ pluginId: 'board', hash: HASH_B, decision: 'rejected' })
     writeFileSync(
       join(dir, 'acorn-1-plugin-trust.json'),
-      JSON.stringify({ version: 1, acks: [good, { pluginId: 'future', hash: 12, whatever: true }, alsoGood], devGrants: [] }),
+      JSON.stringify({
+        version: 1,
+        acks: [good, { pluginId: 'future', hash: 12, whatever: true }, alsoGood],
+        devGrants: [],
+      }),
     )
     const kept = store().list()
     expect(kept.map((entry) => entry.pluginId).sort()).toEqual(['board', 'sparkline'])

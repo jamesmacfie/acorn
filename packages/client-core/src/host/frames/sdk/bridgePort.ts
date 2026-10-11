@@ -4,7 +4,14 @@ import type {
   PluginBridgeReply,
   PluginFrameContext,
 } from '@acorn/protocol/plugin/bridge.ts'
-import { eventChord, hasCommandModifier, isBrowserEditingChord, isNormalizedChord, isPluginKeyClaim, isTypingTarget } from '@acorn/protocol/keybindings.ts'
+import {
+  eventChord,
+  hasCommandModifier,
+  isBrowserEditingChord,
+  isNormalizedChord,
+  isPluginKeyClaim,
+  isTypingTarget,
+} from '@acorn/protocol/keybindings.ts'
 import { AcornBridgeError, type AcornBridge, type PluginByteResponse } from './bridgeTypes'
 import { createBridgeTelemetry } from './bridgeTelemetry'
 
@@ -34,7 +41,10 @@ export function resetBridgePort(): void {
   detachKeyForwarding = null
 }
 
-export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBridgeMode']; onDispose?(dispose: () => void): void } = {}): Promise<AcornBridge> {
+export function attach(
+  port: MessagePort,
+  options: { mode?: AcornBridge['treeBridgeMode']; onDispose?(dispose: () => void): void } = {},
+): Promise<AcornBridge> {
   return new Promise<AcornBridge>((ready, rejectReady) => {
     const pending = new Map<number, Pending>()
     const listeners = new Map<string, Set<(payload: unknown) => void>>()
@@ -51,7 +61,12 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
     const dispose = () => {
       if (!active) return
       active = false
-      const error = new AcornBridgeError({ code: 'unmounted', message: 'the host unmounted this tree', retryable: false, requestId: '' })
+      const error = new AcornBridgeError({
+        code: 'unmounted',
+        message: 'the host unmounted this tree',
+        retryable: false,
+        requestId: '',
+      })
       for (const waiter of pending.values()) {
         waiter.cleanup?.()
         waiter.reject(error)
@@ -70,8 +85,16 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
     bridgeDisposers.set(port, dispose)
 
     const keyTarget = globalThis as unknown as {
-      addEventListener?: (type: 'keydown', listener: (event: KeyboardEvent) => void, options?: { capture?: boolean }) => void
-      removeEventListener?: (type: 'keydown', listener: (event: KeyboardEvent) => void, options?: { capture?: boolean }) => void
+      addEventListener?: (
+        type: 'keydown',
+        listener: (event: KeyboardEvent) => void,
+        options?: { capture?: boolean },
+      ) => void
+      removeEventListener?: (
+        type: 'keydown',
+        listener: (event: KeyboardEvent) => void,
+        options?: { capture?: boolean },
+      ) => void
     }
     const onKeyDown = (event: KeyboardEvent): void => {
       const chord = eventChord(event)
@@ -142,12 +165,26 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
     }
 
     const request = <T>(message: Record<string, unknown>, signal?: AbortSignal): Promise<T> => {
-      if (!active) return Promise.reject(new AcornBridgeError({ code: 'unmounted', message: 'the host unmounted this tree', retryable: false, requestId: '' }))
+      if (!active)
+        return Promise.reject(
+          new AcornBridgeError({
+            code: 'unmounted',
+            message: 'the host unmounted this tree',
+            retryable: false,
+            requestId: '',
+          }),
+        )
       const id = ++seq
       return new Promise<T>((resolve, reject) => {
         const waiter: Pending = { resolve: resolve as (value: unknown) => void, reject }
         pending.set(id, waiter)
-        try { port.postMessage({ ...message, id }) } catch (error) { pending.delete(id); reject(error); return }
+        try {
+          port.postMessage({ ...message, id })
+        } catch (error) {
+          pending.delete(id)
+          reject(error)
+          return
+        }
         if (!signal) return
         if (signal.aborted) return void abort(id, reject, signal)
         const onAbort = () => abort(id, reject, signal)
@@ -179,8 +216,8 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
       listeners.set(channel, set)
       // Webview state is emitted by the host that owns this surface. It's intrinsic to a webview
       // binding, not a node event the manifest must separately request.
-      const localWebviewEvent = context?.target === 'webview'
-        && (channel === 'webview:navigated' || channel === 'webview:blocked')
+      const localWebviewEvent =
+        context?.target === 'webview' && (channel === 'webview:navigated' || channel === 'webview:blocked')
       if (!localWebviewEvent && !subscribing.has(channel)) {
         subscribing.set(
           channel,
@@ -204,16 +241,24 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
         put: (path, body, options) => call('PUT', path, body, options),
         patch: (path, body, options) => call('PATCH', path, body, options),
         del: (path, options) => call('DELETE', path, undefined, options),
-        getBytes: (path, options) => request<PluginByteResponse>({ kind: 'api.bytes', method: 'GET', path }, options?.signal),
-        postBytes: <T,>(path: string, body: { bytes: Uint8Array; type: string; filename?: string }, options?: { signal?: AbortSignal }) =>
-          request<T>({
-            kind: 'api.bytes',
-            method: 'POST',
-            path,
-            bytes: body.bytes,
-            type: body.type,
-            ...(body.filename === undefined ? {} : { filename: body.filename }),
-          }, options?.signal),
+        getBytes: (path, options) =>
+          request<PluginByteResponse>({ kind: 'api.bytes', method: 'GET', path }, options?.signal),
+        postBytes: <T>(
+          path: string,
+          body: { bytes: Uint8Array; type: string; filename?: string },
+          options?: { signal?: AbortSignal },
+        ) =>
+          request<T>(
+            {
+              kind: 'api.bytes',
+              method: 'POST',
+              path,
+              bytes: body.bytes,
+              type: body.type,
+              ...(body.filename === undefined ? {} : { filename: body.filename }),
+            },
+            options?.signal,
+          ),
       },
       events: {
         on: onEvent,
@@ -223,21 +268,33 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
         set: async (key, value) => void (await request({ kind: 'state.set', key, value })),
       },
       ui: {
-        toast: async (title, detail) => void (await request({ kind: 'ui', op: 'toast', title, ...(detail === undefined ? {} : { detail }) })),
+        toast: async (title, detail) =>
+          void (await request({ kind: 'ui', op: 'toast', title, ...(detail === undefined ? {} : { detail }) })),
         copy: async (text) => void (await request({ kind: 'ui', op: 'copy', text })),
         openPane: async (paneId) => void (await request({ kind: 'ui', op: 'openPane', paneId })),
-        openDestination: async (destinationId, resourceId, subresourceId) => void (await request({
-          kind: 'ui', op: 'openDestination', destinationId, resourceId,
-          ...(subresourceId === undefined ? {} : { subresourceId }),
-        })),
+        openDestination: async (destinationId, resourceId, subresourceId) =>
+          void (await request({
+            kind: 'ui',
+            op: 'openDestination',
+            destinationId,
+            resourceId,
+            ...(subresourceId === undefined ? {} : { subresourceId }),
+          })),
         openTask: async (taskId) => void (await request({ kind: 'ui', op: 'openTask', taskId })),
         openUrl: async (url) => void (await request({ kind: 'ui', op: 'openUrl', url })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),
-        close: async (result) => void (await request({ kind: 'ui', op: 'importer.close', ...(result === undefined ? {} : { result }) })),
+        close: async (result) =>
+          void (await request({ kind: 'ui', op: 'importer.close', ...(result === undefined ? {} : { result }) })),
       },
       document: {
         read: async () => (await request<{ text?: string }>({ kind: 'document', op: 'read' }))?.text ?? '',
-        write: async (text, options) => void (await request({ kind: 'document', op: 'write', text, ...(options ? { expectedText: options.expectedText } : {}) })),
+        write: async (text, options) =>
+          void (await request({
+            kind: 'document',
+            op: 'write',
+            text,
+            ...(options ? { expectedText: options.expectedText } : {}),
+          })),
         flush: async () => void (await request({ kind: 'document', op: 'flush' })),
       },
       webview: {
@@ -281,6 +338,12 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
         return () => void actionListeners.delete(listener)
       },
     }
-    try { options.onDispose?.(dispose); if (active) port.start?.() } catch (error) { rejectReady(error); dispose() }
+    try {
+      options.onDispose?.(dispose)
+      if (active) port.start?.()
+    } catch (error) {
+      rejectReady(error)
+      dispose()
+    }
   })
 }

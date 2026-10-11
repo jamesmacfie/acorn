@@ -26,7 +26,11 @@ export type DeletedTaskPurgeDeps = {
  * and webhooks. A session with a provider process or a turn in flight is left for the daily run.
  * Idempotent, and stops early on the signal. Answers how many rows went.
  */
-export async function purgeDeletedTasks(deps: DeletedTaskPurgeDeps, taskIds: readonly string[], signal?: AbortSignal): Promise<number> {
+export async function purgeDeletedTasks(
+  deps: DeletedTaskPurgeDeps,
+  taskIds: readonly string[],
+  signal?: AbortSignal,
+): Promise<number> {
   const { engine, store } = deps
   let events = 0
   const sessionIds: string[] = []
@@ -50,7 +54,7 @@ export async function purgeDeletedTasks(deps: DeletedTaskPurgeDeps, taskIds: rea
     await new Promise((resolve) => setImmediate(resolve))
   }
   let rows = events + sessionIds.length
-  if (!stopped()) rows += deleteTaskLedgers(deps.db, taskIds, sessionIds) + await deleteTaskAttachments(deps, taskIds)
+  if (!stopped()) rows += deleteTaskLedgers(deps.db, taskIds, sessionIds) + (await deleteTaskAttachments(deps, taskIds))
   // Each deleted event left a tombstone in the search index (./ledgerCompaction.ts).
   if (events && !engine.isStopped) await deps.mergeSearchIndex(deps.db, undefined, signal)
   return rows
@@ -62,18 +66,28 @@ export async function purgeDeletedTasks(deps: DeletedTaskPurgeDeps, taskIds: rea
 function deleteTaskLedgers(db: PluginDatabase, taskIds: readonly string[], sessionIds: readonly string[]): number {
   const ids = [...taskIds]
   return db.transaction((tx) => {
-    const webhooks = tx.select({ id: schema.agentWebhooks.id }).from(schema.agentWebhooks)
+    const webhooks = tx
+      .select({ id: schema.agentWebhooks.id })
+      .from(schema.agentWebhooks)
       .where(inArray(schema.agentWebhooks.taskId, ids))
     return [
-      tx.delete(schema.agentSpawns).where(or(
-        inArray(schema.agentSpawns.rootTaskId, ids),
-        inArray(schema.agentSpawns.ownerTaskId, ids),
-        inArray(schema.agentSpawns.childTaskId, ids),
-      )).run(),
+      tx
+        .delete(schema.agentSpawns)
+        .where(
+          or(
+            inArray(schema.agentSpawns.rootTaskId, ids),
+            inArray(schema.agentSpawns.ownerTaskId, ids),
+            inArray(schema.agentSpawns.childTaskId, ids),
+          ),
+        )
+        .run(),
       tx.delete(schema.agentWebhookDeliveries).where(inArray(schema.agentWebhookDeliveries.webhookId, webhooks)).run(),
       tx.delete(schema.agentWebhooks).where(inArray(schema.agentWebhooks.taskId, ids)).run(),
       sessionIds.length
-        ? tx.delete(schema.agentOperations).where(inArray(schema.agentOperations.resourceId, [...sessionIds])).run()
+        ? tx
+            .delete(schema.agentOperations)
+            .where(inArray(schema.agentOperations.resourceId, [...sessionIds]))
+            .run()
         : { changes: 0 },
     ].reduce((count, result) => count + Number(result.changes), 0)
   })
@@ -86,5 +100,8 @@ async function deleteTaskAttachments(deps: DeletedTaskPurgeDeps, taskIds: readon
   const forTasks = inArray(schema.agentAttachments.taskId, [...taskIds])
   const rows = deps.db.select({ id: schema.agentAttachments.id }).from(schema.agentAttachments).where(forTasks).all()
   await deps.attachments.collectNow(rows.map((row) => row.id))
-  return deps.db.delete(schema.agentAttachments).where(and(forTasks, isNotNull(schema.agentAttachments.deletedAt))).run().changes
+  return deps.db
+    .delete(schema.agentAttachments)
+    .where(and(forTasks, isNotNull(schema.agentAttachments.deletedAt)))
+    .run().changes
 }

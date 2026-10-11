@@ -9,7 +9,12 @@ describe('AI list shortcut', () => {
     const [plan, each] = after.def.steps
     expect(before.def.steps).toEqual([])
     expect(plan?.schema).toMatchObject({ properties: { items: { items: { required: ['id', 'title'] } } } })
-    expect(each).toMatchObject({ kind: 'workflow-map', after: [plan!.id], items: { step: plan!.id, pointer: '/items' }, itemKey: '/id' })
+    expect(each).toMatchObject({
+      kind: 'workflow-map',
+      after: [plan!.id],
+      items: { step: plan!.id, pointer: '/items' },
+      itemKey: '/id',
+    })
     expect(each?.childWorkflow).toBeUndefined()
     expect(after.selection).toEqual({ kind: 'node', name: each!.id })
     expect(plan!.id).not.toBe(each!.id)

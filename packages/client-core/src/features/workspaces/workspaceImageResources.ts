@@ -9,12 +9,16 @@ const images = new Map<string, ImageResource>()
 export function acquireWorkspaceImage(nodeId: string, imageId: string): ImageResource {
   const key = JSON.stringify([nodeId, imageId])
   const existing = images.get(key)
-  if (existing) { existing.references++; return existing }
+  if (existing) {
+    existing.references++
+    return existing
+  }
   const [url, setUrl] = createSignal<string>()
   const abort = new AbortController()
   let disposed = false
   const resource: ImageResource = {
-    references: 1, url,
+    references: 1,
+    url,
     release: () => {
       if (--resource.references > 0) return
       // A query refresh can replace rows in the same turn. Let their replacement acquire the
@@ -31,10 +35,16 @@ export function acquireWorkspaceImage(nodeId: string, imageId: string): ImageRes
   }
   images.set(key, resource)
   void readBytes(workspaceIconImageRoute(imageId), 'Could not load workspace image.', {
-    nodeId, signal: abort.signal, maxResponseBytes: WORKSPACE_IMAGE_BYTES,
-  }).then(({ bytes, type }) => {
-    if (disposed || type.split(';')[0] !== 'image/png') return
-    setUrl(URL.createObjectURL(new Blob([bytes.slice().buffer], { type: 'image/png' })))
-  }).catch(() => { /* An unavailable image resolves to initials. Keep its saved reference. */ })
+    nodeId,
+    signal: abort.signal,
+    maxResponseBytes: WORKSPACE_IMAGE_BYTES,
+  })
+    .then(({ bytes, type }) => {
+      if (disposed || type.split(';')[0] !== 'image/png') return
+      setUrl(URL.createObjectURL(new Blob([bytes.slice().buffer], { type: 'image/png' })))
+    })
+    .catch(() => {
+      /* An unavailable image resolves to initials. Keep its saved reference. */
+    })
   return resource
 }

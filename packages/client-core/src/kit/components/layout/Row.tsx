@@ -20,9 +20,17 @@ const placement = (own: { offset?: number; height?: number }): JSX.CSSProperties
   own.offset === undefined && own.height === undefined
     ? undefined
     : {
-      ...(own.offset === undefined ? {} : { position: 'absolute' as const, top: '0', left: '0', right: '0', transform: `translateY(${own.offset}px)` }),
-      ...(own.height === undefined ? {} : { height: `${own.height}px` }),
-    }
+        ...(own.offset === undefined
+          ? {}
+          : {
+              position: 'absolute' as const,
+              top: '0',
+              left: '0',
+              right: '0',
+              transform: `translateY(${own.offset}px)`,
+            }),
+        ...(own.height === undefined ? {} : { height: `${own.height}px` }),
+      }
 
 /** Did a slot draw anything? A fragment of `Show`s that all fail resolves to an array of nothing, and
  *  an array is truthy, so the row drew an empty slot and its gap pushed the body sideways. */
@@ -45,10 +53,18 @@ function RowParts(props: {
   const trailing = children(() => props.trailing)
   return (
     <>
-      <Show when={drew(leading())}><span class="ui-row-leading">{leading()}</span></Show>
+      <Show when={drew(leading())}>
+        <span class="ui-row-leading">{leading()}</span>
+      </Show>
       <span class="ui-row-body">{props.children}</span>
-      <Show when={drew(meta())}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{meta()}</span></Show>
-      <Show when={drew(trailing())}><span class="ui-row-trailing">{trailing()}</span></Show>
+      <Show when={drew(meta())}>
+        <span class="ui-row-meta" data-fields={props.metaFields || undefined}>
+          {meta()}
+        </span>
+      </Show>
+      <Show when={drew(trailing())}>
+        <span class="ui-row-trailing">{trailing()}</span>
+      </Show>
     </>
   )
 }
@@ -134,15 +150,15 @@ export function Row(props: {
   // passes the slot or leaves it off; there is no second boolean that could disagree with the width
   // the column is actually at.
   const collapsed = () => props.collapsed !== undefined || props.collapsedIcon !== undefined
-  const tipText = () => collapsed() ? (props.title ?? props.label) : props.tip
+  const tipText = () => (collapsed() ? (props.title ?? props.label) : props.tip)
   const body = (
     <Show
       when={collapsed()}
-      fallback={(
+      fallback={
         <RowParts leading={props.leading} meta={props.meta} metaFields={props.metaFields} trailing={props.trailing}>
           {props.children}
         </RowParts>
-      )}
+      }
     >
       <span class="ui-row-collapsed">{props.collapsed ?? <Icon name={props.collapsedIcon!} />}</span>
     </Show>
@@ -161,7 +177,7 @@ export function Row(props: {
         data-depth={props.depth && !collapsed() ? String(props.depth) : undefined}
         data-reveal={props.reveal && !collapsed() ? '' : undefined}
         data-density={props.density ?? 'default'}
-        data-variant={collapsed() ? 'default' : props.variant ?? 'default'}
+        data-variant={collapsed() ? 'default' : (props.variant ?? 'default')}
         data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
         title={props.tip ? undefined : props.title}
         data-tip={tipText()}
@@ -169,9 +185,18 @@ export function Row(props: {
         aria-label={props.label}
         aria-selected={props.item ? !!props.selected : undefined}
         style={placement(props)}
-        onFocus={() => { props.item?.onFocus(); props.onHover?.(true) }}
+        onFocus={() => {
+          props.item?.onFocus()
+          props.onHover?.(true)
+        }}
         onBlur={() => props.onHover?.(false)}
-        onPointerDown={props.onBeforeMenu ? (event) => { if (event.button === 2) props.onBeforeMenu?.() } : undefined}
+        onPointerDown={
+          props.onBeforeMenu
+            ? (event) => {
+                if (event.button === 2) props.onBeforeMenu?.()
+              }
+            : undefined
+        }
         onMouseEnter={() => props.onHover?.(true)}
         onMouseLeave={() => props.onHover?.(false)}
         onClick={(event) => {
@@ -180,16 +205,42 @@ export function Row(props: {
           if (!props.onPress) return
           // Leave the browser its own answers: a new tab, a new window, a download, or a handler
           // that already claimed the event.
-          if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+          if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          )
+            return
           event.preventDefault()
           activate()
         }}
-        onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.(event) } : undefined}
-        onKeyDown={(props.onMenu || props.onRename) ? (event) => {
-          if (event.target !== event.currentTarget) return
-          if (event.key === 'F2' && props.onRename) { event.preventDefault(); props.onRename(); return }
-          if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) { event.preventDefault(); props.onMenu?.() }
-        } : undefined}
+        onContextMenu={
+          props.onMenu
+            ? (event) => {
+                event.preventDefault()
+                props.onMenu?.(event)
+              }
+            : undefined
+        }
+        onKeyDown={
+          props.onMenu || props.onRename
+            ? (event) => {
+                if (event.target !== event.currentTarget) return
+                if (event.key === 'F2' && props.onRename) {
+                  event.preventDefault()
+                  props.onRename()
+                  return
+                }
+                if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+                  event.preventDefault()
+                  props.onMenu?.()
+                }
+              }
+            : undefined
+        }
         onDblClick={(event) => {
           if (!fromNestedControl(event)) props.onDoublePress?.()
         }}
@@ -210,7 +261,7 @@ export function Row(props: {
       data-depth={props.depth && !collapsed() ? String(props.depth) : undefined}
       data-reveal={props.reveal && !collapsed() ? '' : undefined}
       data-density={props.density ?? 'default'}
-      data-variant={collapsed() ? 'default' : props.variant ?? 'default'}
+      data-variant={collapsed() ? 'default' : (props.variant ?? 'default')}
       data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
       title={props.tip ? undefined : props.title}
       data-tip={tipText()}
@@ -220,24 +271,59 @@ export function Row(props: {
       style={placement(props)}
       role={props.item?.role ?? (props.onPress || props.onMenu ? 'button' : undefined)}
       tabindex={props.item ? props.item.tabindex : props.onPress || props.onMenu ? 0 : undefined}
-      onClick={props.onPress ? (event) => { if (!fromNestedControl(event)) activate() } : undefined}
-      onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.(event) } : undefined}
-      onPointerDown={props.onBeforeMenu ? (event) => { if (event.button === 2) props.onBeforeMenu?.() } : undefined}
-      onDblClick={props.onDoublePress ? (event) => { if (!fromNestedControl(event)) props.onDoublePress?.() } : undefined}
-      onKeyDown={(props.onRename || (props.onPress || props.onMenu) && !props.item)
-        ? (event) => {
-          // Only when the row itself has focus; a button nested inside owns its own keys. Inside a
-          // collection this is the `activate` intent instead, so the row does not answer twice.
-          if (event.target !== event.currentTarget) return
-          if (event.key === 'F2' && props.onRename) { event.preventDefault(); props.onRename(); return }
-          if (props.item) return
-          if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) { event.preventDefault(); props.onMenu?.(); return }
-          if (!props.onPress) return
-          if (event.key !== 'Enter' && event.key !== ' ') return
-          event.preventDefault()
-          activate()
-        }
-        : undefined}
+      onClick={
+        props.onPress
+          ? (event) => {
+              if (!fromNestedControl(event)) activate()
+            }
+          : undefined
+      }
+      onContextMenu={
+        props.onMenu
+          ? (event) => {
+              event.preventDefault()
+              props.onMenu?.(event)
+            }
+          : undefined
+      }
+      onPointerDown={
+        props.onBeforeMenu
+          ? (event) => {
+              if (event.button === 2) props.onBeforeMenu?.()
+            }
+          : undefined
+      }
+      onDblClick={
+        props.onDoublePress
+          ? (event) => {
+              if (!fromNestedControl(event)) props.onDoublePress?.()
+            }
+          : undefined
+      }
+      onKeyDown={
+        props.onRename || ((props.onPress || props.onMenu) && !props.item)
+          ? (event) => {
+              // Only when the row itself has focus; a button nested inside owns its own keys. Inside a
+              // collection this is the `activate` intent instead, so the row does not answer twice.
+              if (event.target !== event.currentTarget) return
+              if (event.key === 'F2' && props.onRename) {
+                event.preventDefault()
+                props.onRename()
+                return
+              }
+              if (props.item) return
+              if (event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey)) {
+                event.preventDefault()
+                props.onMenu?.()
+                return
+              }
+              if (!props.onPress) return
+              if (event.key !== 'Enter' && event.key !== ' ') return
+              event.preventDefault()
+              activate()
+            }
+          : undefined
+      }
     >
       {body}
     </div>

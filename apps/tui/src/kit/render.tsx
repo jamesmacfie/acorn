@@ -36,7 +36,10 @@ export type Cells = Frame & {
   /** A single character is itself; a named key is the parser's own spelling for one, which is upper
    *  case — `RETURN`, `ESCAPE`, `PAGEDOWN`. Anything else is typed one letter at a time, silently,
    *  which is a good hour to save the next person (../keyEvent.ts § pressedKey). */
-  press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<Cells>
+  press: (
+    key: string,
+    modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },
+  ) => Promise<Cells>
   /** Send one terminal wheel/trackpad step at a cell. */
   scroll: (x: number, y: number, direction: 'up' | 'down') => Promise<Cells>
   /** A bracketed paste, which a terminal delivers whole. Not a run of key presses: the difference
@@ -90,25 +93,36 @@ const openSurface = (size: { width: number; height: number }): Surface => {
       renderer.frame()
     },
     captureCharFrame: () => `${renderer.screen.lines().join('\n')}\n`,
-    runs: () => renderer.screen.runs().flatMap((line) => line.map((run) => ({
-      text: run.text,
-      fg: rgbOf(run.fg),
-      attributes: run.attrs,
-    }))),
+    runs: () =>
+      renderer.screen.runs().flatMap((line) =>
+        line.map((run) => ({
+          text: run.text,
+          fg: rgbOf(run.fg),
+          attributes: run.attrs,
+        })),
+      ),
     resize: (width, height) => {
       renderer.screen.resize(width, height)
       renderer.frame()
     },
-    pressKey: (key, modifiers) => { renderer.keyInput.emit('keypress', pressedKey(key, modifiers)) },
+    pressKey: (key, modifiers) => {
+      renderer.keyInput.emit('keypress', pressedKey(key, modifiers))
+    },
     // Onto the same queue the keys arrive on, because that is where the dispatcher's paste hand-off
     // listens (../keys/install.ts § pasteInto).
-    pasteText: (text) => { renderer.keyInput.emit('paste', { text }) },
+    pasteText: (text) => {
+      renderer.keyInput.emit('paste', { text })
+    },
     // The two gestures this host has. A wheel hit-tests to the innermost viewport under the cell
     // and moves its offset; a press hit-tests to the deepest node and walks up, pressing the stop
     // it landed on and giving it the keys (../tree/hit.ts, ../keys/regions.ts § Clicks are hit
     // tests).
-    scroll: async (x, y, direction) => { renderer.mouseScroll(x, y, direction) },
-    click: async (x, y) => { renderer.mousePress(x, y) },
+    scroll: async (x, y, direction) => {
+      renderer.mouseScroll(x, y, direction)
+    },
+    click: async (x, y) => {
+      renderer.mousePress(x, y)
+    },
     destroy: () => renderer.destroy(),
   }
 }

@@ -13,7 +13,8 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({ invalidateQueries }),
 }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
-  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal, onScopeEvicted: () => () => {},
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal,
+  onScopeEvicted: () => () => {},
   activeNodeId: nodeId,
   wsOnNodeEvent: () => () => {},
   wsOnReconnect: () => () => {},
@@ -21,23 +22,40 @@ vi.mock('@acorn/plugin-api/client', async (original) => ({
 }))
 vi.mock('./historyClient', () => ({
   historyKey: () => ['git-history'],
-  historyOptions: () => ({ queryFn: ({ signal }: { signal: AbortSignal }) => {
-    pendingSignal = signal
-    if (nextRead) {
-      const read = nextRead
-      nextRead = undefined
-      return read()
-    }
-    return new Promise<HistoryPage>((resolve) => { finishPage = resolve })
-  } }),
+  historyOptions: () => ({
+    queryFn: ({ signal }: { signal: AbortSignal }) => {
+      pendingSignal = signal
+      if (nextRead) {
+        const read = nextRead
+        nextRead = undefined
+        return read()
+      }
+      return new Promise<HistoryPage>((resolve) => {
+        finishPage = resolve
+      })
+    },
+  }),
 }))
 
 const { createHistoryModel } = await import('./historyModel')
 let dispose = () => {}
-afterEach(() => { dispose(); setNodeId('node-a'); pendingSignal = undefined; finishPage = undefined; nextRead = undefined; invalidateQueries.mockClear() })
+afterEach(() => {
+  dispose()
+  setNodeId('node-a')
+  pendingSignal = undefined
+  finishPage = undefined
+  nextRead = undefined
+  invalidateQueries.mockClear()
+})
 
 it('aborts and discards a late continuation when its Node or filter changes', async () => {
-  const model = createRoot((stop) => { dispose = stop; return createHistoryModel(() => 'project', () => null) })
+  const model = createRoot((stop) => {
+    dispose = stop
+    return createHistoryModel(
+      () => 'project',
+      () => null,
+    )
+  })
   const first = model.loadMore()
   expect(pendingSignal?.aborted).toBe(false)
   setNodeId('node-b')
@@ -55,7 +73,13 @@ it('aborts and discards a late continuation when its Node or filter changes', as
 })
 
 it('refresh clears a pending continuation and its error, then permits another load', async () => {
-  const model = createRoot((stop) => { dispose = stop; return createHistoryModel(() => 'project', () => null) })
+  const model = createRoot((stop) => {
+    dispose = stop
+    return createHistoryModel(
+      () => 'project',
+      () => null,
+    )
+  })
   nextRead = () => Promise.reject(new Error('offline'))
   await model.loadMore()
   expect(model.moreError()).toBe('offline')
@@ -80,9 +104,15 @@ it('refresh clears a pending continuation and its error, then permits another lo
 
 it('restores filters and loaded pages after leaving, with separate project and Node views', async () => {
   const [project, setProject] = createSignal('retained-project')
-  const draw = () => createRoot((stop) => { dispose = stop; return createHistoryModel(project, () => null) })
+  const draw = () =>
+    createRoot((stop) => {
+      dispose = stop
+      return createHistoryModel(project, () => null)
+    })
   let model = draw()
-  model.setField('author'); model.setQuery('Ada'); model.setRef('refs/heads/topic')
+  model.setField('author')
+  model.setQuery('Ada')
+  model.setRef('refs/heads/topic')
   nextRead = () => Promise.resolve({ commits: [{ id: 'second-page' }], nextCursor: 'third' } as unknown as HistoryPage)
   await model.loadMore()
   dispose()

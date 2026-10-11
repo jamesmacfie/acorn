@@ -5,7 +5,7 @@ import { parsePluginChannel, pluginChannel, pluginStateKey } from './state'
 // the node that stamps them, the renderer that routes them, and the manifest that declares them.
 
 describe('pluginStateKey', () => {
-  it('prefixes a plugin\'s own key', () => {
+  it("prefixes a plugin's own key", () => {
     expect(pluginStateKey('machine-stats', 'public-ip')).toBe('plugin:machine-stats:public-ip')
   })
 })
@@ -29,7 +29,7 @@ describe('pluginChannel', () => {
     expect(parsePluginChannel('plugin:board:')).toBeNull()
   })
 
-  it('holds both halves to the manifest\'s own alphabet', () => {
+  it("holds both halves to the manifest's own alphabet", () => {
     // A channel name is manifest input on its way to a renderer, so "it parsed" has to mean "it is a
     // name" rather than "it had two colons in it".
     expect(parsePluginChannel('plugin:Board:sample')).toBeNull()

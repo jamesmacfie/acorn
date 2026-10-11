@@ -26,14 +26,18 @@ describe('bounded repository configuration snapshots', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it.each(['config', 'workflow'])('rejects a %s FIFO without waiting for a writer, and refuses other special entries', (kind) => {
-    const fifo = kind === 'config' ? join(repo, '.acorn', 'config.toml') : join(repo, '.acorn', 'workflows', 'test.toml')
-    execFileSync('mkfifo', [fifo])
-    expect(() => readRepoConfigSnapshot(repo, null, limits)).toThrow('regular file')
-    rmSync(fifo)
-    mkdirSync(fifo)
-    expect(() => readRepoConfigSnapshot(repo, null, limits)).toThrow('regular file')
-  })
+  it.each(['config', 'workflow'])(
+    'rejects a %s FIFO without waiting for a writer, and refuses other special entries',
+    (kind) => {
+      const fifo =
+        kind === 'config' ? join(repo, '.acorn', 'config.toml') : join(repo, '.acorn', 'workflows', 'test.toml')
+      execFileSync('mkfifo', [fifo])
+      expect(() => readRepoConfigSnapshot(repo, null, limits)).toThrow('regular file')
+      rmSync(fifo)
+      mkdirSync(fifo)
+      expect(() => readRepoConfigSnapshot(repo, null, limits)).toThrow('regular file')
+    },
+  )
 
   it('preserves internal links and root aliases while refusing external or dangling links', () => {
     writeFileSync(join(repo, 'config-source'), 'safe bytes')
@@ -41,7 +45,9 @@ describe('bounded repository configuration snapshots', () => {
     symlinkSync('../config-source', file)
     const alias = join(dir, 'alias')
     symlinkSync(repo, alias)
-    expect(readRepoConfigSnapshot(alias, null, limits)?.files).toEqual([{ path: '.acorn/config.toml', content: 'safe bytes' }])
+    expect(readRepoConfigSnapshot(alias, null, limits)?.files).toEqual([
+      { path: '.acorn/config.toml', content: 'safe bytes' },
+    ])
     rmSync(file)
     writeFileSync(join(dir, 'outside'), 'outside bytes')
     symlinkSync(join(dir, 'outside'), file)
@@ -62,7 +68,9 @@ describe('bounded repository configuration snapshots', () => {
   it('caps formatted aggregate bytes, project executable settings, and file counts', () => {
     writeFileSync(join(repo, '.acorn', 'config.toml'), '1234')
     expect(() => readRepoConfigSnapshot(repo, null, { ...limits, totalBytes: 8 })).toThrow('total byte limit')
-    expect(() => readRepoConfigSnapshot(repo, { devScript: 'x'.repeat(129) }, limits)).toThrow('Project executable configuration')
+    expect(() => readRepoConfigSnapshot(repo, { devScript: 'x'.repeat(129) }, limits)).toThrow(
+      'Project executable configuration',
+    )
     writeFileSync(join(repo, '.acorn', 'workflows', 'one.toml'), 'one')
     writeFileSync(join(repo, '.acorn', 'workflows', 'two.toml'), 'two')
     expect(() => readRepoConfigSnapshot(repo, null, { ...limits, files: 2 })).toThrow('file limit')

@@ -1,5 +1,17 @@
 import { For, createSignal } from 'solid-js'
-import { Badge, Button, Checkbox, Field, Input, Row, SectionHeader, SegmentedControl, Select, Spinner, Textarea } from '../../kit/components/primitives'
+import {
+  Badge,
+  Button,
+  Checkbox,
+  Field,
+  Input,
+  Row,
+  SectionHeader,
+  SegmentedControl,
+  Select,
+  Spinner,
+  Textarea,
+} from '../../kit/components/primitives'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
@@ -24,26 +36,52 @@ export default function StyleGallery() {
   const [density, setDensity] = createSignal<'compact' | 'comfortable'>('comfortable')
   const [tab, setTab] = createSignal('general')
 
-  const applyStyle = (id: string) => { setStyle(id); document.documentElement.dataset.style = id }
-  const applyTheme = (id: string) => { setTheme(id); document.documentElement.dataset.theme = id }
+  const applyStyle = (id: string) => {
+    setStyle(id)
+    document.documentElement.dataset.style = id
+  }
+  const applyTheme = (id: string) => {
+    setTheme(id)
+    document.documentElement.dataset.theme = id
+  }
 
   return (
     <div class="gallery">
-      <Text emphasis="muted" wrap>Preview only. Nothing here is saved.</Text>
+      <Text emphasis="muted" wrap>
+        Preview only. Nothing here is saved.
+      </Text>
 
       <div class="gallery-pickers">
         <Field label="Style" layout="row">
-          <Select value={style()} options={STYLES().map(([value, label]) => ({ value, label }))} onChange={(value) => applyStyle(value)} />
+          <Select
+            value={style()}
+            options={STYLES().map(([value, label]) => ({ value, label }))}
+            onChange={(value) => applyStyle(value)}
+          />
         </Field>
         <Field label="Theme" layout="row">
-          <Select value={theme()} options={THEMES().map(([value, label]) => ({ value, label }))} onChange={(value) => applyTheme(value)} />
+          <Select
+            value={theme()}
+            options={THEMES().map(([value, label]) => ({ value, label }))}
+            onChange={(value) => applyTheme(value)}
+          />
         </Field>
       </div>
 
       {/* What a settings page is made of, so a pack author sees rows, sections and the save state. */}
-      <SettingsSection id="gallery-settings" label="A settings section" description="A section's one line of description." help="The help text, behind the mark.">
+      <SettingsSection
+        id="gallery-settings"
+        label="A settings section"
+        description="A section's one line of description."
+        help="The help text, behind the mark."
+      >
         <SettingRow label="An inline row" description="Its control sits on the right.">
-          <Select label="An inline row" value={size()} options={['12', '13', '14'].map((value) => ({ value, label: `${value} px` }))} onChange={setSize} />
+          <Select
+            label="An inline row"
+            value={size()}
+            options={['12', '13', '14'].map((value) => ({ value, label: `${value} px` }))}
+            onChange={setSize}
+          />
         </SettingRow>
         <SettingRow label="A switch row" help="A row can carry a help mark too.">
           <Checkbox switch ariaLabel="A switch row" checked={on()} onChange={setOn} />
@@ -52,11 +90,18 @@ export default function StyleGallery() {
           <SegmentedControl
             ariaLabel="A changed row"
             value={density()}
-            options={[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }]}
+            options={[
+              { value: 'compact', label: 'Compact' },
+              { value: 'comfortable', label: 'Comfortable' },
+            ]}
             onChange={setDensity}
           />
         </SettingRow>
-        <SettingRow label="A stacked row" description="Its control takes the full width under the words." layout="stacked">
+        <SettingRow
+          label="A stacked row"
+          description="Its control takes the full width under the words."
+          layout="stacked"
+        >
           <Textarea rows={2} placeholder="A script or a long value" />
         </SettingRow>
       </SettingsSection>
@@ -65,7 +110,10 @@ export default function StyleGallery() {
         ariaLabel="Sample tabs"
         active={tab()}
         onChange={setTab}
-        tabs={[{ id: 'general', label: 'General' }, { id: 'advanced', label: 'Advanced', count: 3 }]}
+        tabs={[
+          { id: 'general', label: 'General' },
+          { id: 'advanced', label: 'Advanced', count: 3 },
+        ]}
       />
 
       <SectionHeader level="sub">Buttons</SectionHeader>
@@ -80,7 +128,13 @@ export default function StyleGallery() {
         </For>
         <Button size="sm">small</Button>
         <Button disabled>disabled</Button>
-        <Button busy={busy()} onPress={() => { setBusy(true); setTimeout(() => setBusy(false), 1500) }}>
+        <Button
+          busy={busy()}
+          onPress={() => {
+            setBusy(true)
+            setTimeout(() => setBusy(false), 1500)
+          }}
+        >
           {busy() ? 'working' : 'click me'}
         </Button>
       </div>
@@ -109,24 +163,41 @@ export default function StyleGallery() {
 
       <SectionHeader level="sub">Rows</SectionHeader>
       <div class="gallery-rows">
-        <Row leading={<span class="glyph">◇</span>} meta="2h">First row</Row>
-        <Row leading={<span class="glyph">◷</span>} meta="4h" selected>Selected row</Row>
-        <Row leading={<span class="glyph">◍</span>} meta="1d" onPress={() => {}}>Clickable row</Row>
-        <Row leading={<span class="glyph">▦</span>} nested density="compact">Nested compact row</Row>
-        <Row leading={<span class="glyph">⎇</span>} density="roomy" trailing={<Badge tone="ok">+12</Badge>}>Roomy row</Row>
+        <Row leading={<span class="glyph">◇</span>} meta="2h">
+          First row
+        </Row>
+        <Row leading={<span class="glyph">◷</span>} meta="4h" selected>
+          Selected row
+        </Row>
+        <Row leading={<span class="glyph">◍</span>} meta="1d" onPress={() => {}}>
+          Clickable row
+        </Row>
+        <Row leading={<span class="glyph">▦</span>} nested density="compact">
+          Nested compact row
+        </Row>
+        <Row leading={<span class="glyph">⎇</span>} density="roomy" trailing={<Badge tone="ok">+12</Badge>}>
+          Roomy row
+        </Row>
       </div>
 
       <SectionHeader level="sub">Section headers</SectionHeader>
-      <SectionHeader count={7} actions={<Button variant="bare">⟳</Button>}>Pane header</SectionHeader>
+      <SectionHeader count={7} actions={<Button variant="bare">⟳</Button>}>
+        Pane header
+      </SectionHeader>
       <SectionHeader level="group">Group heading</SectionHeader>
 
       <SectionHeader level="sub">Code surfaces (monospace in every pack)</SectionHeader>
       <div class="gallery-code">
-        <div class="diff-row diff-add"><span class="diff-marker">+</span><span class="diff-code">const added = true</span></div>
-        <div class="diff-row diff-del"><span class="diff-marker">−</span><span class="diff-code">const removed = false</span></div>
+        <div class="diff-row diff-add">
+          <span class="diff-marker">+</span>
+          <span class="diff-code">const added = true</span>
+        </div>
+        <div class="diff-row diff-del">
+          <span class="diff-marker">−</span>
+          <span class="diff-code">const removed = false</span>
+        </div>
         <pre class="gallery-term">$ acorn --version{'\n'}1.0.0</pre>
       </div>
-
     </div>
   )
 }

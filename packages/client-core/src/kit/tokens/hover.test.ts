@@ -19,7 +19,9 @@ const STYLES = new URL('../../infra/styles', import.meta.url).pathname
 const UI = new URL('../components/', import.meta.url).pathname
 
 const sheets = (dir: string): string[] =>
-  readdirSync(dir).filter((name) => name.endsWith('.css')).map((name) => join(dir, name))
+  readdirSync(dir)
+    .filter((name) => name.endsWith('.css'))
+    .map((name) => join(dir, name))
 
 /** A declaration that brings something back into view. The three ways this codebase does it. */
 const REVEALS = /(^|[;{\s])(opacity\s*:\s*1\b|visibility\s*:\s*visible\b|display\s*:\s*(?!none)[a-z-]+)/

@@ -105,7 +105,7 @@ afterEach(() => {
 })
 
 describe('the PR pane', () => {
-  it('is one region, drawn as the host\'s `single` layout', () => {
+  it("is one region, drawn as the host's `single` layout", () => {
     expect(prPaneContribution.layout).toBe('single')
     expect(Object.keys(prPaneContribution.regions)).toEqual(['body'])
   })
@@ -150,11 +150,7 @@ describe('the PR pane', () => {
 
   it('re-reads this pull when its background mirror refresh lands', () => {
     draw()
-    expect(seams.subscribe).toHaveBeenCalledWith(
-      'github',
-      'plugin:github:pr-synced',
-      expect.any(Function),
-    )
+    expect(seams.subscribe).toHaveBeenCalledWith('github', 'plugin:github:pr-synced', expect.any(Function))
 
     seams.prSynced?.({ repoOwner: 'other', repoName: 'acorn', pullNumber: 7 })
     seams.prSynced?.({ repoOwner: 'runn-fast', repoName: 'acorn', pullNumber: 8 })
@@ -172,7 +168,7 @@ describe('the PR pane', () => {
     expect(seams.offPrSynced).toHaveBeenCalledOnce()
   })
 
-  it('shows the selected pull\'s diff, read-only for a related pull', () => {
+  it("shows the selected pull's diff, read-only for a related pull", () => {
     const node = draw()
     const diff = () => node.querySelector<HTMLElement>('[data-diff]')!
     expect(diff().dataset.diff).toBe('7')

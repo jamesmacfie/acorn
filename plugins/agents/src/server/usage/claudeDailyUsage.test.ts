@@ -2,15 +2,8 @@ import { mkdtemp, mkdir, rm, truncate, utimes, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import {
-  analyzeClaudeDailyUsage,
-  deduplicateClaudeUsage,
-  parseClaudeUsageJsonl,
-} from './claudeDailyUsage'
-import {
-  claudeModelPrice,
-  emptyAgentPricingPreferences,
-} from '../../shared/pricing'
+import { analyzeClaudeDailyUsage, deduplicateClaudeUsage, parseClaudeUsageJsonl } from './claudeDailyUsage'
+import { claudeModelPrice, emptyAgentPricingPreferences } from '../../shared/pricing'
 
 const roots: string[] = []
 const now = new Date(2026, 6, 24, 15, 0, 0).getTime()
@@ -78,14 +71,23 @@ describe('Claude JSONL parsing and pricing', () => {
 
   it('deduplicates streamed usage by message and request with last record winning', () => {
     const records = parseClaudeUsageJsonl(
-      [usageLine(now, { output: 4 }), usageLine(now + 1_000, { output: 9 }), usageLine(now, { messageId: 'msg-2', output: 3 })].join('\n'),
+      [
+        usageLine(now, { output: 4 }),
+        usageLine(now + 1_000, { output: 9 }),
+        usageLine(now, { messageId: 'msg-2', output: 3 }),
+      ].join('\n'),
     )
     expect(deduplicateClaudeUsage(records).map((record) => record.outputTokens)).toEqual([9, 3])
   })
 
   it('matches current official model rates and refuses to price unknown models', () => {
     expect(claudeModelPrice('claude-opus-5')).toMatchObject({ input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 })
-    expect(claudeModelPrice('claude-opus-4-6')).toMatchObject({ input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 })
+    expect(claudeModelPrice('claude-opus-4-6')).toMatchObject({
+      input: 5,
+      output: 25,
+      cacheWrite: 6.25,
+      cacheRead: 0.5,
+    })
     expect(claudeModelPrice('claude-sonnet-5', new Date(2026, 6, 24).getTime())).toMatchObject({ input: 2, output: 10 })
     expect(claudeModelPrice('claude-sonnet-5', new Date(2026, 8, 2).getTime())).toMatchObject({ input: 3, output: 15 })
     expect(claudeModelPrice('future-unknown-model')).toBeNull()
@@ -102,8 +104,22 @@ describe('analyzeClaudeDailyUsage', () => {
       [
         usageLine(yesterday, { messageId: 'yesterday', input: 100 }),
         usageLine(todayStart + 60_000, { messageId: 'one', input: 1_000_000, output: 0, cacheWrite: 0, cacheRead: 0 }),
-        usageLine(todayStart + 11 * 60_000, { messageId: 'two', requestId: 'req-2', input: 0, output: 1_000_000, cacheWrite: 0, cacheRead: 0 }),
-        usageLine(todayStart + 50 * 60_000, { messageId: 'three', requestId: 'req-3', input: 0, output: 0, cacheWrite: 1_000_000, cacheRead: 1_000_000 }),
+        usageLine(todayStart + 11 * 60_000, {
+          messageId: 'two',
+          requestId: 'req-2',
+          input: 0,
+          output: 1_000_000,
+          cacheWrite: 0,
+          cacheRead: 0,
+        }),
+        usageLine(todayStart + 50 * 60_000, {
+          messageId: 'three',
+          requestId: 'req-3',
+          input: 0,
+          output: 0,
+          cacheWrite: 1_000_000,
+          cacheRead: 1_000_000,
+        }),
       ].join('\n'),
     )
 
@@ -160,8 +176,12 @@ describe('analyzeClaudeDailyUsage', () => {
 
   it('includes 200,000 compact accepted records without skipping the file', async () => {
     const { root, project } = await fixtureRoot()
-    const line = JSON.stringify({ type: 'assistant', timestamp: new Date(now).toISOString(),
-      message: { model: 'x', usage: {} } }) + '\n'
+    const line =
+      JSON.stringify({
+        type: 'assistant',
+        timestamp: new Date(now).toISOString(),
+        message: { model: 'x', usage: {} },
+      }) + '\n'
     await writeFile(join(project, 'compact.jsonl'), line.repeat(200_000))
     const report = await analyzeClaudeDailyUsage(root, now)
     expect(report.skippedFileCount).toBe(0)

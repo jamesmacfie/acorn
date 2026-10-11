@@ -15,8 +15,15 @@ describe('chrome action boundary', () => {
     const props: RailProps = {
       sources: [{ id: 'home', label: 'Home', icon: 'house', selected: true, markers: [] }],
       workspaces: [{ id: 'w1', label: 'Work', active: true }],
-      collapsed: false, formFactor: 'desktop', slots: { taskList: slot },
-      selectSource, openWorkspace: vi.fn(), toggleCollapsed: vi.fn(), reorderSources, createTask: vi.fn(), openContextMenu,
+      collapsed: false,
+      formFactor: 'desktop',
+      slots: { taskList: slot },
+      selectSource,
+      openWorkspace: vi.fn(),
+      toggleCollapsed: vi.fn(),
+      reorderSources,
+      createTask: vi.fn(),
+      openContextMenu,
     }
     const remote = railRemote(props)
     expect(() => structuredClone(remote.data)).not.toThrow()
@@ -37,15 +44,26 @@ describe('chrome action boundary', () => {
     const navigate = vi.fn()
     const props: TopbarProps = {
       workspacesMode: 'on',
-      workspace: null, workspaces: [], project: null, projects: [],
+      workspace: null,
+      workspaces: [],
+      project: null,
+      projects: [],
       workspacePickerVisible: false,
-      projectPickerVisible: false, projectPickerDisabled: false,
+      projectPickerVisible: false,
+      projectPickerDisabled: false,
       breadcrumb: [{ label: 'Project', route: '/p/one' }],
       node: { id: 'n1', label: 'Local', state: 'online' },
       nodes: [{ id: 'n1', label: 'Local', state: 'online' }],
-      account: null, canAddProject: false, slots: { right: slot },
-      pickWorkspace: vi.fn(), pickProject: vi.fn(), pickNode, openSettings: vi.fn(),
-      navigate, clearCache: vi.fn(), addProject,
+      account: null,
+      canAddProject: false,
+      slots: { right: slot },
+      pickWorkspace: vi.fn(),
+      pickProject: vi.fn(),
+      pickNode,
+      openSettings: vi.fn(),
+      navigate,
+      clearCache: vi.fn(),
+      addProject,
     }
     const remote = topbarRemote(props)
     expect(remote.data.workspacePickerVisible).toBe(false)

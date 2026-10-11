@@ -1,24 +1,68 @@
 import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  activeNodeId, agentSessionsFor, clientCapability, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
-  openPane, projectsOptions, readGeneratePick, readJson, registerCommands, registerKeybindings, saveGeneratePick,
-  sendReferenceToAgent, sendToSession, taskStatusRevision, type PaneModelContext, type Task,
+  activeNodeId,
+  agentSessionsFor,
+  clientCapability,
+  clientEvents,
+  effectiveModelPick,
+  focusedPane,
+  formatFileReference,
+  isArchiving,
+  prefsOptions,
+  openPane,
+  projectsOptions,
+  readGeneratePick,
+  readJson,
+  registerCommands,
+  registerKeybindings,
+  saveGeneratePick,
+  sendReferenceToAgent,
+  sendToSession,
+  taskStatusRevision,
+  type PaneModelContext,
+  type Task,
 } from '@acorn/plugin-api/client'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
 import { MAX_DOCUMENT_FILES } from '@acorn/diff-document/document'
-import { documentTopology, loadDiffLineContext, type CodeRow, type DiffLineAnchor, type DiffSource } from '@acorn/plugin-api/ui/diff'
+import {
+  documentTopology,
+  loadDiffLineContext,
+  type CodeRow,
+  type DiffLineAnchor,
+  type DiffSource,
+} from '@acorn/plugin-api/ui/diff'
 import { sameInlineLine, type InlineDiffOrigin } from '@acorn/plugin-agents/contract/inlineDiff.ts'
 import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClient.ts'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
-import { emptyLocalStatus, reviewNotesRoute, type GitSecretCheckResult, type LocalDocumentResponse, type LocalScope, type ModelPick, type ReviewNote } from '../../shared/changes/api'
+import {
+  emptyLocalStatus,
+  reviewNotesRoute,
+  type GitSecretCheckResult,
+  type LocalDocumentResponse,
+  type LocalScope,
+  type ModelPick,
+  type ReviewNote,
+} from '../../shared/changes/api'
 import type { SecretFinding } from '@acorn/protocol/secretChecks.ts'
 import { formatReviewPrompt } from '../../shared/changes/reviewPrompt'
 import { localGitApi } from './changesClient'
 import { readChangeView, saveChangeView } from './changesPrefs'
 import {
-  changeKey, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, remoteReason,
-  stackFor, stageableRows, stagedState, documentFile, viewNodes, type ChangeView, type RemoteAction,
+  changeKey,
+  groupChanges,
+  groupSections,
+  isFolderKey,
+  patchKey,
+  pickSelected,
+  remoteReason,
+  stackFor,
+  stageableRows,
+  stagedState,
+  documentFile,
+  viewNodes,
+  type ChangeView,
+  type RemoteAction,
 } from './model'
 import { changesBindings, changesCommands } from './commands'
 import { GIT_PANE } from '../gitPane'
@@ -52,7 +96,8 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const [checkingSecrets, setCheckingSecrets] = createSignal(false)
   async function checkSecrets(operation: 'commit' | 'push') {
     setCheckingSecrets(true)
-    const result = await localGitApi.secretCheck(task.id, operation)
+    const result = await localGitApi
+      .secretCheck(task.id, operation)
       .catch((error: unknown) => ({ error: error instanceof Error ? error.message : 'The check failed.' }))
       .finally(() => setCheckingSecrets(false))
     setSecretCheck(result)
@@ -65,7 +110,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     // Archive keeps the pane mounted so it can report teardown failures. Stop asking for Git state
     // during that interval: the node is removing this worktree, and a status read has no stable tree
     // to describe. Returning to active after a refusal changes this source back and refetches.
-    () => isArchiving(task.id) ? undefined : task.id,
+    () => (isArchiving(task.id) ? undefined : task.id),
     async (id) => {
       const next = await localGitApi.status(id)
       setStatusRevision((revision) => revision + 1)
@@ -82,11 +127,17 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     if (!pane.shown()) owed = true
     else void refetch()
   }
-  createEffect(on(pane.shown, (shown) => {
-    if (!shown || !owed) return
-    owed = false
-    void refetch()
-  }, { defer: true }))
+  createEffect(
+    on(
+      pane.shown,
+      (shown) => {
+        if (!shown || !owed) return
+        owed = false
+        void refetch()
+      },
+      { defer: true },
+    ),
+  )
   // The rail's status poll is the refresh signal. Its summary keeps the same object when the dirty
   // count, branch and HEAD are unchanged, but this list has more information than that summary: one
   // file can replace another, or its line counts can move, without changing any rail marker.
@@ -95,9 +146,11 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // its terminal leaves a clean tree and a branch one commit further ahead. `head:changed` is the
   // node noticing HEAD moved, and it is what makes the ahead count move within a poll rather than
   // waiting for the next edit (docs/diff-rendering/changes-pane.md § The footer and freshness).
-  onCleanup(clientEvents.on('head:changed', (event) => {
-    if (event.taskId === task.id) refresh()
-  }))
+  onCleanup(
+    clientEvents.on('head:changed', (event) => {
+      if (event.taskId === task.id) refresh()
+    }),
+  )
 
   const groups = createMemo(() => groupChanges(status().changes))
   const selected = createMemo(() => pickSelected(groups(), selectedKey()))
@@ -114,10 +167,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // Which folders the reader has closed, this session only. A memo over the groups and the view, so
   // closing one re-flattens the tree without rebuilding it (`visibleNodes` is the cheap half).
   const [closedFolders, setClosedFolders] = createSignal<ReadonlySet<string>>(new Set())
-  const sections = createMemo(() => groupSections(groups(), view()).map((section) => ({
-    ...section,
-    nodes: viewNodes(section.rows, view()),
-  })))
+  const sections = createMemo(() =>
+    groupSections(groups(), view()).map((section) => ({
+      ...section,
+      nodes: viewNodes(section.rows, view()),
+    })),
+  )
 
   // "Add file/line to agent": drops a path[:line] draft into the agent composer.
   async function sendRef(ref: string) {
@@ -138,7 +193,11 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const [sendMsg, setSendMsg] = createSignal('')
 
   const anchorOf = (r: CodeRow): { side: ReviewNote['side']; line: number } | null =>
-    r.newNo != null ? { side: 'additions', line: r.newNo } : r.oldNo != null ? { side: 'deletions', line: r.oldNo } : null
+    r.newNo != null
+      ? { side: 'additions', line: r.newNo }
+      : r.oldNo != null
+        ? { side: 'deletions', line: r.oldNo }
+        : null
 
   const notesForRow = (r: CodeRow): ReviewNote[] => {
     const a = anchorOf(r)
@@ -150,9 +209,19 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const stack = createMemo(() => stackFor(groups(), selected()))
   const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
   const [dependencies] = createResource(
-    () => pane.shown() && project()?.vcs === 'git' && !isArchiving(task.id)
-      && status().changes.some((change) => change.staged === (scope() === 'staged') && /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.pnpmfile\.cjs|npm\.config\.js|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?|requirements\.txt|pyproject\.toml|uv\.lock|Pipfile\.lock)$/.test(change.path))
-      ? { scope: scope(), revision: statusRevision() } : undefined,
+    () =>
+      pane.shown() &&
+      project()?.vcs === 'git' &&
+      !isArchiving(task.id) &&
+      status().changes.some(
+        (change) =>
+          change.staged === (scope() === 'staged') &&
+          /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.pnpmfile\.cjs|npm\.config\.js|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?|requirements\.txt|pyproject\.toml|uv\.lock|Pipfile\.lock)$/.test(
+            change.path,
+          ),
+      )
+        ? { scope: scope(), revision: statusRevision() }
+        : undefined,
     async ({ scope }) => localGitApi.dependencies(task.id, scope),
   )
 
@@ -163,14 +232,27 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // At most the node's document limit. A stack past it, such as an unignored build folder, draws the
   // rest as files with no diff rather than having the whole document refused.
   const documentRequest = createMemo(
-    () => ({ scope: scope(), files: stack().slice(0, MAX_DOCUMENT_FILES).map((change) => ({ path: change.path, key: patchKey(change, statusRevision()) })) }),
+    () => ({
+      scope: scope(),
+      files: stack()
+        .slice(0, MAX_DOCUMENT_FILES)
+        .map((change) => ({ path: change.path, key: patchKey(change, statusRevision()) })),
+    }),
     undefined,
-    { equals: (a, b) => a.scope === b.scope && a.files.length === b.files.length && a.files.every((file, at) => file.path === b.files[at]!.path && file.key === b.files[at]!.key) },
+    {
+      equals: (a, b) =>
+        a.scope === b.scope &&
+        a.files.length === b.files.length &&
+        a.files.every((file, at) => file.path === b.files[at]!.path && file.key === b.files[at]!.key),
+    },
   )
   type HeldDocument = { scope: LocalScope; changes: ReturnType<typeof stack>; answer: LocalDocumentResponse }
   // A read that fails keeps the last document, and the next status change asks again. Letting the
   // resource error would make every read of it throw, in whichever pane region built this model.
-  const [document, { refetch: refetchDocument }] = createResource<HeldDocument | undefined, ReturnType<typeof documentRequest>>(
+  const [document, { refetch: refetchDocument }] = createResource<
+    HeldDocument | undefined,
+    ReturnType<typeof documentRequest>
+  >(
     () => (isArchiving(task.id) ? undefined : documentRequest()),
     async (request, { value }) => {
       try {
@@ -194,24 +276,36 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   createEffect(() => inline()?.prime(task.id))
   createEffect(() => {
     const files = topology()?.files
-    if (files) inline()?.reportPatches(
-      { taskId: task.id, source: 'changes', scope: scope() },
-      Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
-    )
+    if (files)
+      inline()?.reportPatches(
+        { taskId: task.id, source: 'changes', scope: scope() },
+        Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
+      )
   })
   const [openInline, setOpenInline] = createSignal<InlineDiffOrigin | null>(null)
   createEffect(() => {
     const opened = openInline()
-    if (opened && (opened.scope !== scope() || topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey)) setOpenInline(null)
+    if (
+      opened &&
+      (opened.scope !== scope() ||
+        topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey)
+    )
+      setOpenInline(null)
   })
   const inlineOrigin = (row: CodeRow): InlineDiffOrigin | null => {
     const patchKey = topology()?.files.find((file) => file.path === row.path)?.patchKey
     const line = row.kind === 'delete' ? row.oldNo : row.newNo
     if (!patchKey || line == null) return null
     return {
-      kind: 'inline-diff', source: 'changes', taskId: task.id, path: row.path,
-      side: row.kind === 'delete' ? 'old' : 'new', line, patchKey,
-      quote: row.raw.slice(0, 2_000), scope: scope(),
+      kind: 'inline-diff',
+      source: 'changes',
+      taskId: task.id,
+      path: row.path,
+      side: row.kind === 'delete' ? 'old' : 'new',
+      line,
+      patchKey,
+      quote: row.raw.slice(0, 2_000),
+      scope: scope(),
     }
   }
   const inlineAnchors = createMemo<DiffLineAnchor[]>(() => {
@@ -234,9 +328,13 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
 
   // Review notes, known up front by the line they sit under, so the document reserves for them before
   // the segment loads.
-  const noteAnchors = createMemo<DiffLineAnchor[]>(() => (notes() ?? []).map((note) => ({
-    path: note.path, side: note.side === 'deletions' ? 'old' : 'new', line: note.endLine,
-  })))
+  const noteAnchors = createMemo<DiffLineAnchor[]>(() =>
+    (notes() ?? []).map((note) => ({
+      path: note.path,
+      side: note.side === 'deletions' ? 'old' : 'new',
+      line: note.endLine,
+    })),
+  )
 
   // The diff column's whole contract with the shared viewer: the stacked files as a document, its
   // segments and search read on demand, and review notes as the annotation the viewer itself has no
@@ -251,10 +349,13 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     signature: () => stack().map(changeKey).join('\0'),
     // Only after a click. pickSelected falls back to the first row so something renders on open, and
     // treating that as a scroll target would mean the remembered offset never won.
-    selectedPath: () => (selectedKey() ? selected()?.path ?? '' : ''),
-    loadSegments: (requests, signal) => localGitApi.segments(task.id, { scope: documentScope(), requests }, signal).catch(conflicted),
+    selectedPath: () => (selectedKey() ? (selected()?.path ?? '') : ''),
+    loadSegments: (requests, signal) =>
+      localGitApi.segments(task.id, { scope: documentScope(), requests }, signal).catch(conflicted),
     search: (request, signal) => {
-      const files = (topology()?.files ?? []).flatMap((file) => (file.patchKey ? [{ path: file.path, patchKey: file.patchKey }] : []))
+      const files = (topology()?.files ?? []).flatMap((file) =>
+        file.patchKey ? [{ path: file.path, patchKey: file.patchKey }] : [],
+      )
       return localGitApi.search(task.id, { ...request, scope: documentScope(), files }, signal).catch(conflicted)
     },
     // Fills an expanded gap. `sha` is the staging area documentFile put there, which is what says
@@ -268,7 +369,14 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     addComment: async (body, { row }) => {
       const a = anchorOf(row)
       if (!a) return
-      await addReviewNote(task.id, { path: row.path, side: a.side, startLine: a.line, endLine: a.line, snippet: row.raw, body })
+      await addReviewNote(task.id, {
+        path: row.path,
+        side: a.side,
+        startLine: a.line,
+        endLine: a.line,
+        snippet: row.raw,
+        body,
+      })
     },
     invalidate: () => {
       void refetch()
@@ -282,40 +390,63 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
         // The host calls this inside a tracked expression, and the task's sessions move on every
         // update to any of them. Read directly, each one rebuilt the card and blurred its textarea.
         // A memo that settles on the same line keeps the card mounted until the answer changes.
-        const shown = createMemo(() => {
-          const origin = inlineOrigin(row)
-          if (!origin || !inline()?.Card) return null
-          const exists = inline()?.sessionsForTask(task.id).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
-          return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
-        }, null, { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) })
-        return <Show when={shown()} keyed>{(origin) => {
-          const Card = inline()!.Card
-          return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
-        }}</Show>
+        const shown = createMemo(
+          () => {
+            const origin = inlineOrigin(row)
+            if (!origin || !inline()?.Card) return null
+            const exists = inline()
+              ?.sessionsForTask(task.id)
+              .some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+            return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
+          },
+          null,
+          { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) },
+        )
+        return (
+          <Show when={shown()} keyed>
+            {(origin) => {
+              const Card = inline()!.Card
+              return (
+                <Card
+                  origin={origin}
+                  loadContext={() => loadDiffLineContext(source, row)}
+                  onClose={() => setOpenInline(null)}
+                />
+              )
+            }}
+          </Show>
+        )
       },
     },
     // Drawn in the same shape another plugin's marks are, which is what the host puts under a line
     // (plugins/annotations/AnnotationMarks.tsx): a state, the text, and who it belongs to. What a
     // review note has and a mark does not is a verb, because this one is the reader's own. The viewer
     // measures the segment it sits in, so a note added, edited or deleted resizes its row.
-    lineExtra: { anchors: noteAnchors, render: (row) => (
-      <For each={notesForRow(row)}>
-        {(note) => (
-          <Stack gap="none">
-            <Inline gap="inline">
-              <Badge size="xs" tone={note.sentAt ? 'ok' : 'warn'}>{note.sentAt ? 'Sent' : 'Not sent'}</Badge>
-              <Text emphasis="muted" wrap>{note.body}</Text>
-              <IconButton
-                icon="x"
-                tone="danger"
-                label="Delete note"
-                onPress={() => void deleteReviewNote(task.id, note.id).then(() => refetchNotes())}
-              />
-            </Inline>
-          </Stack>
-        )}
-      </For>
-    ) },
+    lineExtra: {
+      anchors: noteAnchors,
+      render: (row) => (
+        <For each={notesForRow(row)}>
+          {(note) => (
+            <Stack gap="none">
+              <Inline gap="inline">
+                <Badge size="xs" tone={note.sentAt ? 'ok' : 'warn'}>
+                  {note.sentAt ? 'Sent' : 'Not sent'}
+                </Badge>
+                <Text emphasis="muted" wrap>
+                  {note.body}
+                </Text>
+                <IconButton
+                  icon="x"
+                  tone="danger"
+                  label="Delete note"
+                  onPress={() => void deleteReviewNote(task.id, note.id).then(() => refetchNotes())}
+                />
+              </Inline>
+            </Stack>
+          )}
+        </For>
+      ),
+    },
     lineAction: {
       title: '⌥-click a line to add it to your message',
       run: (row, event) => {
@@ -360,7 +491,8 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // inside the header region, and reading a resource that is still loading holds that region back.
   // The header does not draw the wand, so it must not wait for the wand's list.
   const modelPick = createMemo(() =>
-    effectiveModelPick(modelBackends.loading ? [] : modelBackends(), readGeneratePick(prefs.data)))
+    effectiveModelPick(modelBackends.loading ? [] : modelBackends(), readGeneratePick(prefs.data)),
+  )
 
   // The commit editor: the message, the three options, and the two verbs (./commitState.ts). Built
   // here so it lives as long as the pane's model rather than as long as the footer, which the host
@@ -372,22 +504,29 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     commit: (message, options) => localGitApi.commit(task.id, message, options),
     commitMessage: (request) => localGitApi.commitMessage(task.id, request),
     onError: setActionError,
-    onCommitted: async () => { await refetch() },
+    onCommitted: async () => {
+      await refetch()
+    },
   })
 
   // The commit pair, the three remote palette rows, and the two chords, all registered for as long
   // as this model lives (./commands.ts). The model outlives every region of the pane and is disposed
   // before the next task's is built, so the registry never sees a duplicate id.
-  const commands = registerCommands(changesCommands({
-    commit: () => void editor.commit(),
-    amend: () => void editor.amendCommit(),
-    remote: (action) => void remote(action),
-    // The model can be held for a task nobody is looking at, so a remote row asks the host which
-    // pane has focus rather than assuming its own does.
-    inPane: () => focusedPane(task.id) === GIT_PANE && project()?.vcs === 'git',
-  }))
+  const commands = registerCommands(
+    changesCommands({
+      commit: () => void editor.commit(),
+      amend: () => void editor.amendCommit(),
+      remote: (action) => void remote(action),
+      // The model can be held for a task nobody is looking at, so a remote row asks the host which
+      // pane has focus rather than assuming its own does.
+      inPane: () => focusedPane(task.id) === GIT_PANE && project()?.vcs === 'git',
+    }),
+  )
   const bindings = registerKeybindings(changesBindings(editor.editorFocused))
-  onCleanup(() => { bindings.dispose(); commands.dispose() })
+  onCleanup(() => {
+    bindings.dispose()
+    commands.dispose()
+  })
 
   // The bar's four verbs, behind one busy flag. One flag rather than four: they all talk to the same
   // remote, none of them is safe to start while another is running, and the bar has one place to
@@ -404,15 +543,19 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     if (action === 'pull-ff') return localGitApi.pull(task.id, { rebase: false })
     if (action === 'rebase') return localGitApi.pull(task.id, { rebase: true })
     if (action === 'push') return localGitApi.push(task.id, {})
-    if (action === 'force') return localGitApi.push(task.id, {
-      force: true, expectedBranch: observed.branch ?? undefined, expectedRemoteId: observed.upstreamId ?? undefined,
-    })
+    if (action === 'force')
+      return localGitApi.push(task.id, {
+        force: true,
+        expectedBranch: observed.branch ?? undefined,
+        expectedRemoteId: observed.upstreamId ?? undefined,
+      })
     return localGitApi.abort(task.id)
   }
   async function remote(action: RemoteAction, observed = forceObservation()): Promise<void> {
     if (remoteBusy()) return
     if (action === 'force' && (observed.nodeId !== activeNodeId() || observed.branch !== status().branch)) {
-      setActionError('Node or branch changed. Reopen Force push.'); return
+      setActionError('Node or branch changed. Reopen Force push.')
+      return
     }
     setRemoteBusy(true)
     setActionError('')
@@ -420,7 +563,10 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     // route itself can fail — a node that went away mid-fetch, a 120-second call the transport gave up
     // on — and the reader would otherwise press a button and watch nothing happen.
     const res = await runRemote(action, observed)
-      .catch((error: unknown) => ({ ok: false, reason: error instanceof Error ? error.message : 'The node did not answer.' }))
+      .catch((error: unknown) => ({
+        ok: false,
+        reason: error instanceof Error ? error.message : 'The node did not answer.',
+      }))
       .finally(() => setRemoteBusy(false))
     setActionError(res.ok ? '' : remoteReason(action, res.reason ?? 'The remote refused.'))
     await refetch()
@@ -433,7 +579,10 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     if (!target) return setSendMsg('No agent is running for this task.')
     const res = await sendToSession(target, formatReviewPrompt(list), 'after-ready')
     if (!res.ok) return setSendMsg(res.reason ?? "Couldn't send the notes.")
-    await markReviewNotesSent(task.id, list.map((n) => n.id))
+    await markReviewNotesSent(
+      task.id,
+      list.map((n) => n.id),
+    )
     await refetchNotes()
     setSendMsg(res.queued ? "Queued. The agent gets them when it's free." : 'Sent.')
   }
@@ -447,7 +596,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     // A finding opens the worktree's copy of its file. For a push check that copy can be newer than
     // the commit that holds the finding, so the line is a best guess there.
     openFinding: (finding: SecretFinding) =>
-      openPane(task.id, 'editor', { kind: 'editor:reveal', path: finding.location, line: finding.line, column: finding.column }, 'add'),
+      openPane(
+        task.id,
+        'editor',
+        { kind: 'editor:reveal', path: finding.location, line: finding.line, column: finding.column },
+        'add',
+      ),
     task,
     project,
     isGit: () => project()?.vcs === 'git',
@@ -522,7 +676,8 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     // Both are destructive and both arm before they run — the row's item through `Menu.Item`'s
     // `confirm`, Discard all through `ConfirmButton` — so the control is the prompt and the model
     // just does the thing. `oldPath` rides along for a rename, which takes both of its names.
-    discard: (path: string, untracked: boolean, oldPath?: string) => gitAction(() => localGitApi.discard(task.id, path, untracked, oldPath)),
+    discard: (path: string, untracked: boolean, oldPath?: string) =>
+      gitAction(() => localGitApi.discard(task.id, path, untracked, oldPath)),
     discardAll: () => gitAction(() => localGitApi.discardAll(task.id)),
     sendRef,
     sendNotes,

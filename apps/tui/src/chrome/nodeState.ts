@@ -45,9 +45,8 @@ export const markNodeRecovered = (nodeId: string): void => {
 
 export { nodeStarting, setNodeStarting }
 
-export const nodeTone = (state: NodeConnectionState): DotTone =>
-  (nodeStarting() ? 'warn' : TONES[state] ?? 'muted')
+export const nodeTone = (state: NodeConnectionState): DotTone => (nodeStarting() ? 'warn' : (TONES[state] ?? 'muted'))
 
 /** What the footer says, or nothing at all while the node is fine. */
 export const nodeSentence = (state: NodeConnectionState): string | undefined =>
-  (nodeStarting() ? 'starting the node…' : SENTENCES[state])
+  nodeStarting() ? 'starting the node…' : SENTENCES[state]

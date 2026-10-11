@@ -45,7 +45,10 @@ const log = createLogger('fleet')
  * is where an id or a filter object sits.
  */
 const keyPrefix = (key: readonly unknown[]): string =>
-  key.slice(0, 2).filter((part) => typeof part === 'string').join('.') || 'unknown'
+  key
+    .slice(0, 2)
+    .filter((part) => typeof part === 'string')
+    .join('.') || 'unknown'
 
 /**
  * Every failed read and every failed write on one node, as a handled error record.
@@ -149,7 +152,12 @@ export async function refreshFleet(): Promise<void> {
   setStatuses(Object.fromEntries(fleet.statuses.map((status) => [status.nodeId, status])))
 }
 
-export type NodeCache = { hydrated(): void; client: QueryClient; persister: QueryCacheLifecycle['persister']; persistence: QueryCacheLifecycle }
+export type NodeCache = {
+  hydrated(): void
+  client: QueryClient
+  persister: QueryCacheLifecycle['persister']
+  persistence: QueryCacheLifecycle
+}
 
 const caches = new Map<string, NodeCache>()
 type Retirement = { pending: Promise<void>; retry?: () => Promise<void> }
@@ -158,11 +166,14 @@ const retirements = new Map<string, Retirement>()
 function retryRetirement(nodeId: string, record: Retirement): void {
   if (record.retry) record.pending = record.retry()
   const pending = record.pending
-  void pending.then(() => {
-    if (record.pending !== pending) return
-    record.retry = undefined
-    if (retirements.get(nodeId) === record) retirements.delete(nodeId)
-  }, () => {})
+  void pending.then(
+    () => {
+      if (record.pending !== pending) return
+      record.retry = undefined
+      if (retirements.get(nodeId) === record) retirements.delete(nodeId)
+    },
+    () => {},
+  )
 }
 
 function trackRetirement(nodeId: string, retry: () => Promise<void>): Retirement {
@@ -213,7 +224,9 @@ export function clientFor(nodeId: string): NodeCache {
   })
   let offTelemetry = () => {}
   const persistence = queryCacheLifecycle({
-    client, storage, key: cacheKeyFor(nodeId),
+    client,
+    storage,
+    key: cacheKeyFor(nodeId),
     beforeAccess: () => predecessor?.pending ?? Promise.resolve(),
     beforeRetire: () => {
       if (predecessor?.retry) retryRetirement(nodeId, predecessor)
@@ -233,7 +246,8 @@ export function clientFor(nodeId: string): NodeCache {
   offTelemetry = cache.client.getQueryCache().subscribe((event) => {
     // Fixed action names only. Query keys can contain task IDs, search text, and file paths.
     if (event.type === 'updated') recordSample('core', 'cache.updates', 1, '1', { action: event.action.type })
-    else if (event.type === 'added' || event.type === 'removed') recordSample('core', 'cache.entries.changed', 1, '1', { action: event.type })
+    else if (event.type === 'added' || event.type === 'removed')
+      recordSample('core', 'cache.entries.changed', 1, '1', { action: event.type })
   })
   caches.set(nodeId, cache)
   return cache
@@ -265,7 +279,10 @@ export function dropNode(nodeId: string): Promise<void> {
   const storage = cacheStorage
   const retiring = cache
     ? trackRetirement(nodeId, () => cache.persistence.retire())
-    : predecessor ?? trackRetirement(nodeId, async () => { await storage.removeItem(cacheKeyFor(nodeId)) })
+    : (predecessor ??
+      trackRetirement(nodeId, async () => {
+        await storage.removeItem(cacheKeyFor(nodeId))
+      }))
   return retiring.pending.catch((error: unknown) => {
     log.warn(`could not delete the persisted cache for ${nodeId}`, error)
   })

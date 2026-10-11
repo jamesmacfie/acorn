@@ -20,7 +20,12 @@ type SerializeAddon = {
 }
 
 const { Terminal } = nodeRequire('@xterm/headless') as {
-  Terminal: new (options: { cols: number; rows: number; scrollback: number; allowProposedApi: boolean }) => HeadlessTerminal
+  Terminal: new (options: {
+    cols: number
+    rows: number
+    scrollback: number
+    allowProposedApi: boolean
+  }) => HeadlessTerminal
 }
 const { SerializeAddon } = nodeRequire('@xterm/addon-serialize') as {
   SerializeAddon: new () => SerializeAddon
@@ -135,7 +140,8 @@ export class TerminalDisplay {
     // Injected so a test can drive the ordering without a real emulator, and called per emulator
     // rather than once per session, since there is now one per watched period rather than one for
     // life.
-    private readonly makeScreen: (cols: number, rows: number) => TerminalScreen = (cols, rows) => new HeadlessTerminalScreen(cols, rows),
+    private readonly makeScreen: (cols: number, rows: number) => TerminalScreen = (cols, rows) =>
+      new HeadlessTerminalScreen(cols, rows),
   ) {}
 
   write(data: string): void {

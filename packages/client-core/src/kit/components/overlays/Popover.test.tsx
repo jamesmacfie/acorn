@@ -26,24 +26,37 @@ const press = (element: Element) => {
 describe('a Select inside a Popover', () => {
   it('picks a row without the popover closing under it', () => {
     const onChange = vi.fn()
-    dispose = render(() => (
-      <Popover trigger={({ toggle }) => <button type="button" onClick={toggle}>open</button>}>
-        <Select
-          title="Model"
-          value="a"
-          options={[{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }]}
-          onChange={onChange}
-        />
-      </Popover>
-    ), host)
+    dispose = render(
+      () => (
+        <Popover
+          trigger={({ toggle }) => (
+            <button type="button" onClick={toggle}>
+              open
+            </button>
+          )}
+        >
+          <Select
+            title="Model"
+            value="a"
+            options={[
+              { value: 'a', label: 'A' },
+              { value: 'b', label: 'B' },
+            ]}
+            onChange={onChange}
+          />
+        </Popover>
+      ),
+      host,
+    )
 
     press(host.querySelector('button')!)
     const surface = document.querySelector('.ui-popover')
     expect(surface).toBeTruthy()
 
     press(surface!.querySelector('button.ui-select')!)
-    const row = [...document.querySelectorAll<HTMLButtonElement>('.ui-select-list .ui-menu-item')]
-      .find((item) => item.dataset.value === 'b')
+    const row = [...document.querySelectorAll<HTMLButtonElement>('.ui-select-list .ui-menu-item')].find(
+      (item) => item.dataset.value === 'b',
+    )
     expect(row).toBeTruthy()
 
     press(row!)
@@ -53,11 +66,20 @@ describe('a Select inside a Popover', () => {
   })
 
   it('still closes on a press that is outside both of them', () => {
-    dispose = render(() => (
-      <Popover trigger={({ toggle }) => <button type="button" onClick={toggle}>open</button>}>
-        <Select title="Model" value="a" options={[{ value: 'a', label: 'A' }]} />
-      </Popover>
-    ), host)
+    dispose = render(
+      () => (
+        <Popover
+          trigger={({ toggle }) => (
+            <button type="button" onClick={toggle}>
+              open
+            </button>
+          )}
+        >
+          <Select title="Model" value="a" options={[{ value: 'a', label: 'A' }]} />
+        </Popover>
+      ),
+      host,
+    )
 
     press(host.querySelector('button')!)
     press(document.querySelector('.ui-popover')!.querySelector('button.ui-select')!)
@@ -67,11 +89,20 @@ describe('a Select inside a Popover', () => {
     expect(document.querySelector('.ui-popover')).toBe(null)
   })
   it('dismisses a nested list with Escape before its parent popover', () => {
-    dispose = render(() => (
-      <Popover trigger={({ toggle }) => <button type="button" onClick={toggle}>open</button>}>
-        <Select title="Model" value="a" options={[{ value: 'a', label: 'A' }]} />
-      </Popover>
-    ), host)
+    dispose = render(
+      () => (
+        <Popover
+          trigger={({ toggle }) => (
+            <button type="button" onClick={toggle}>
+              open
+            </button>
+          )}
+        >
+          <Select title="Model" value="a" options={[{ value: 'a', label: 'A' }]} />
+        </Popover>
+      ),
+      host,
+    )
     press(host.querySelector('button')!)
     press(document.querySelector('.ui-popover')!.querySelector('button.ui-select')!)
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
@@ -80,5 +111,4 @@ describe('a Select inside a Popover', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
     expect(document.querySelector('.ui-popover')).toBe(null)
   })
-
 })

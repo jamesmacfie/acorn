@@ -26,9 +26,13 @@ let plugin: TestPluginDb
 let blobs: Map<string, string>
 let app: Hono<AppEnv>
 const emit = vi.fn()
-const env = () => ({
-  BLOBS: { get: async (k: string) => blobs.get(k) ?? null, put: async (k: string, v: string) => void blobs.set(k, v) },
-}) as unknown as Env
+const env = () =>
+  ({
+    BLOBS: {
+      get: async (k: string) => blobs.get(k) ?? null,
+      put: async (k: string, v: string) => void blobs.set(k, v),
+    },
+  }) as unknown as Env
 
 describe('pulls batch route', () => {
   beforeEach(() => {
@@ -80,23 +84,36 @@ describe('pulls batch route', () => {
 
     const [item] = (await res.json()) as PullBatchItem[]
     expect(quiet).not.toHaveBeenCalled()
-    expect(item!.files?.files.map((f) => f.patch)).toEqual(['@@ -1 +1 @@\n-old 0\n+new 0', '@@ -1 +1 @@\n-old 1\n+new 1'])
+    expect(item!.files?.files.map((f) => f.patch)).toEqual([
+      '@@ -1 +1 @@\n-old 0\n+new 0',
+      '@@ -1 +1 @@\n-old 1\n+new 1',
+    ])
   })
 
   it('omits files for a pull whose files refresh failed, and leaves out files when none were asked for', async () => {
-    vi.stubGlobal('fetch', fakeGithub(makeFakePull({ files: 2 }), {
-      override: (r) => (r.kind === 'files' ? new Response('unavailable', { status: 500 }) : undefined),
-    }).fetch)
-    const [failed] = (await (await app.fetch(jsonRequest({ numbers: [7], files: 'summary' }), env())).json()) as PullBatchItem[]
+    vi.stubGlobal(
+      'fetch',
+      fakeGithub(makeFakePull({ files: 2 }), {
+        override: (r) => (r.kind === 'files' ? new Response('unavailable', { status: 500 }) : undefined),
+      }).fetch,
+    )
+    const [failed] = (await (
+      await app.fetch(jsonRequest({ numbers: [7], files: 'summary' }), env())
+    ).json()) as PullBatchItem[]
     expect(failed!.files).toBeUndefined()
     expect(failed!.detail.pull?.number).toBe(7)
 
-    const [none] = (await (await app.fetch(jsonRequest({ numbers: [7], files: 'none' }), env())).json()) as PullBatchItem[]
+    const [none] = (await (
+      await app.fetch(jsonRequest({ numbers: [7], files: 'none' }), env())
+    ).json()) as PullBatchItem[]
     expect(none!.files).toBeUndefined()
   })
 
   it('fails the batch on an account-level failure', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('limited', { status: 403, headers: { 'x-ratelimit-remaining': '0' } })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('limited', { status: 403, headers: { 'x-ratelimit-remaining': '0' } })),
+    )
     const res = await app.fetch(jsonRequest({ numbers: [7], files: 'summary' }), env())
     expect(res.status).toBe(429)
   })

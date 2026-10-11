@@ -64,15 +64,20 @@ const sourceLabel = (source: PanelProjectionSource, sources: readonly PanelProje
 const provenanceField = (sources: readonly PanelProjectionSource[]): DashboardDisplayField[] =>
   sources.length < 2
     ? []
-    : [{
-      id: PANEL_SOURCE_FIELD_ID,
-      name: 'Source',
-      type: 'enum',
-      values: sources.map((source) => ({ id: panelSourceKey(source), label: sourceLabel(source, sources) })),
-    }]
+    : [
+        {
+          id: PANEL_SOURCE_FIELD_ID,
+          name: 'Source',
+          type: 'enum',
+          values: sources.map((source) => ({ id: panelSourceKey(source), label: sourceLabel(source, sources) })),
+        },
+      ]
 
-const asField = (definition: PanelFieldDef): DashboardDisplayField =>
-  ({ id: definition.id, name: definition.label, type: definition.type })
+const asField = (definition: PanelFieldDef): DashboardDisplayField => ({
+  id: definition.id,
+  name: definition.label,
+  type: definition.type,
+})
 
 /** The panel-local vocabulary for a given mapping: the five roles, then whatever the user invented in
  *  declaration order, then `source` on a panel with more than one. Everything downstream walks this one
@@ -84,8 +89,11 @@ const asField = (definition: PanelFieldDef): DashboardDisplayField =>
 export const panelFieldsFor = (
   mapping: PanelMapping | undefined,
   sources: readonly PanelProjectionSource[] = [],
-): DashboardDisplayField[] =>
-  [...ROLE_FIELDS, ...(mapping?.extraFields ?? []).map(asField), ...provenanceField(sources)]
+): DashboardDisplayField[] => [
+  ...ROLE_FIELDS,
+  ...(mapping?.extraFields ?? []).map(asField),
+  ...provenanceField(sources),
+]
 
 /** An invented field's id is never a role's, so `undefined` here means "this is one of the five". */
 const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): PanelFieldDef | undefined =>
@@ -97,8 +105,11 @@ const extraField = (mapping: PanelMapping | undefined, panelFieldId: string): Pa
  *  source), an invented field, or an explicit role/value mapping. A single-source panel with none
  *  of them takes the untouched pre-mapping path, so its rows and schema pass through verbatim. */
 export const isMapped = (sources: readonly PanelProjectionSource[], mapping: PanelMapping | undefined): boolean =>
-  sources.length > 1 || !!mapping?.columns?.length || !!mapping?.extraFields?.length
-    || !!Object.keys(mapping?.fields ?? {}).length || !!Object.keys(mapping?.bySource ?? {}).length
+  sources.length > 1 ||
+  !!mapping?.columns?.length ||
+  !!mapping?.extraFields?.length ||
+  !!Object.keys(mapping?.fields ?? {}).length ||
+  !!Object.keys(mapping?.bySource ?? {}).length
 
 // ── Field mapping ─────────────────────────────────────────────────────────────────────────────
 
@@ -153,8 +164,7 @@ export const candidateFieldsFor = (
   panelFieldId: string,
   mapping?: PanelMapping | undefined,
 ): DashboardDisplayField[] => {
-  const type = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.type
-    ?? extraField(mapping, panelFieldId)?.type
+  const type = ROLE_FIELDS.find((field) => field.id === panelFieldId)?.type ?? extraField(mapping, panelFieldId)?.type
   return type ? source.schema.fields.filter((field) => field.type === type) : []
 }
 
@@ -212,10 +222,7 @@ export function withMappedValue(
  *  destination and then hide that it guessed.
  *
  *  Values the user already placed are left alone, so this is safe to press at any time. */
-export function suggestValueMapping(
-  sources: readonly PanelSourcePage[],
-  mapping: PanelMapping,
-): PanelMapping {
+export function suggestValueMapping(sources: readonly PanelSourcePage[], mapping: PanelMapping): PanelMapping {
   const columns = mapping.columns ?? []
   if (!columns.length) return mapping
   let next = mapping
@@ -224,8 +231,9 @@ export function suggestValueMapping(
     for (const value of statusValuesOf(source, mapping)) {
       if (mappedColumnId(next, key, value.id)) continue
       const wanted = [value.id, value.label].map((text) => text.toLowerCase())
-      const column = columns.find((candidate) =>
-        wanted.includes(candidate.id.toLowerCase()) || wanted.includes(candidate.label.toLowerCase()))
+      const column = columns.find(
+        (candidate) => wanted.includes(candidate.id.toLowerCase()) || wanted.includes(candidate.label.toLowerCase()),
+      )
       if (column) next = withMappedValue(next, key, value.id, column.id)
     }
   }
@@ -320,32 +328,33 @@ export function unionRows(
       if (stampsSource) values[PANEL_SOURCE_FIELD_ID] = key
       if (columns.length) {
         const raw = values[PANEL_STATUS_FIELD_ID]
-        const column = raw === null || raw === undefined || raw === ''
-          ? undefined
-          : mappedColumnId(mapping, key, String(raw))
+        const column =
+          raw === null || raw === undefined || raw === '' ? undefined : mappedColumnId(mapping, key, String(raw))
         if (!column && hideUnmapped) return []
         values[PANEL_STATUS_FIELD_ID] = column ?? null
       }
-      return [{
-        id: `${key}:${row.id}`,
-        // The row's own id before this qualification, because the qualification is for rendering and the
-        // action isn't: a click hands the id to the plugin's pane as its selection, and a pane told to
-        // select `agents:sessions:<uuid>` finds nothing. `id` stays qualified, because two sources can
-        // collide on `42` and the board dedupes on it.
-        sourceRowId: row.id,
-        ...(row.records ? { records: row.records } : {}),
-        ...(row.recordItems ? { recordItems: row.recordItems } : {}),
-        values,
-        // Carried for the same reason `action` is: they're one thing. The action opens a pane and this
-        // says in which task, so a mapped panel that dropped it would send every click to the "open a
-        // task first" refusal.
-        ...(row.taskId ? { taskId: row.taskId } : {}),
-        ...(row.action ? { action: row.action } : {}),
-        ...(row.actions ? { actions: row.actions } : {}),
-        ...(row.target ? { target: row.target } : {}),
-        pluginId: row.pluginId,
-        sourceId: row.sourceId,
-      }]
+      return [
+        {
+          id: `${key}:${row.id}`,
+          // The row's own id before this qualification, because the qualification is for rendering and the
+          // action isn't: a click hands the id to the plugin's pane as its selection, and a pane told to
+          // select `agents:sessions:<uuid>` finds nothing. `id` stays qualified, because two sources can
+          // collide on `42` and the board dedupes on it.
+          sourceRowId: row.id,
+          ...(row.records ? { records: row.records } : {}),
+          ...(row.recordItems ? { recordItems: row.recordItems } : {}),
+          values,
+          // Carried for the same reason `action` is: they're one thing. The action opens a pane and this
+          // says in which task, so a mapped panel that dropped it would send every click to the "open a
+          // task first" refusal.
+          ...(row.taskId ? { taskId: row.taskId } : {}),
+          ...(row.action ? { action: row.action } : {}),
+          ...(row.actions ? { actions: row.actions } : {}),
+          ...(row.target ? { target: row.target } : {}),
+          pluginId: row.pluginId,
+          sourceId: row.sourceId,
+        },
+      ]
     })
   })
 }

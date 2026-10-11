@@ -9,25 +9,67 @@ import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 
 type Tone = 'ok' | 'warn' | 'danger' | 'muted'
 
-const STEP_GLYPH: Record<string, string> = { pending: 'circle-dashed', running: 'loader-circle', 'waiting-gate': 'hand', done: 'circle-check', 'completed-with-failures': 'circle-alert', failed: 'circle-x', 'safety-rail': 'octagon-alert', skipped: 'circle-dashed', cancelled: 'ban' }
-const STEP_TONE: Record<string, Tone> = { running: 'ok', 'waiting-gate': 'warn', done: 'ok', 'completed-with-failures': 'warn', failed: 'danger', 'safety-rail': 'danger' }
+const STEP_GLYPH: Record<string, string> = {
+  pending: 'circle-dashed',
+  running: 'loader-circle',
+  'waiting-gate': 'hand',
+  done: 'circle-check',
+  'completed-with-failures': 'circle-alert',
+  failed: 'circle-x',
+  'safety-rail': 'octagon-alert',
+  skipped: 'circle-dashed',
+  cancelled: 'ban',
+}
+const STEP_TONE: Record<string, Tone> = {
+  running: 'ok',
+  'waiting-gate': 'warn',
+  done: 'ok',
+  'completed-with-failures': 'warn',
+  failed: 'danger',
+  'safety-rail': 'danger',
+}
 // `waiting` is the merged run list's word for `gated` (@acorn/protocol/runtime/runs.ts), which the rail reads.
-const RUN_GLYPH: Record<string, string> = { running: 'loader-circle', gated: 'hand', waiting: 'hand', cancelling: 'ban', done: 'circle-check', 'completed-with-failures': 'circle-alert', failed: 'circle-x', 'safety-rail': 'octagon-alert', cancelled: 'ban' }
+const RUN_GLYPH: Record<string, string> = {
+  running: 'loader-circle',
+  gated: 'hand',
+  waiting: 'hand',
+  cancelling: 'ban',
+  done: 'circle-check',
+  'completed-with-failures': 'circle-alert',
+  failed: 'circle-x',
+  'safety-rail': 'octagon-alert',
+  cancelled: 'ban',
+}
 // One map for step and run statuses, because where the two vocabularies share a word they mean the same thing.
 const STATUS_LABEL: Record<string, string> = {
-  pending: 'Not started', running: 'Running', 'waiting-gate': 'Needs you', gated: 'Needs you', waiting: 'Needs you',
-  'waiting-children': 'Waiting', cancelling: 'Cancelling', done: 'Done', 'completed-with-failures': 'Finished with failures',
-  failed: 'Failed', skipped: 'Skipped', 'safety-rail': 'Stopped at a limit', cancelled: 'Cancelled',
+  pending: 'Not started',
+  running: 'Running',
+  'waiting-gate': 'Needs you',
+  gated: 'Needs you',
+  waiting: 'Needs you',
+  'waiting-children': 'Waiting',
+  cancelling: 'Cancelling',
+  done: 'Done',
+  'completed-with-failures': 'Finished with failures',
+  failed: 'Failed',
+  skipped: 'Skipped',
+  'safety-rail': 'Stopped at a limit',
+  cancelled: 'Cancelled',
   // A child run's dispatch, before the run itself has a status.
-  reserved: 'Starting', 'task-created': 'Starting', 'run-started': 'Starting', terminal: 'Finished',
+  reserved: 'Starting',
+  'task-created': 'Starting',
+  'run-started': 'Starting',
+  terminal: 'Finished',
 }
 
 export const stepGlyph = (status: string | undefined): string => STEP_GLYPH[status ?? 'pending'] ?? 'circle-dashed'
 export const stepTone = (status: string | undefined): Tone => STEP_TONE[status ?? 'pending'] ?? 'muted'
 export const runGlyph = (status: string): string => RUN_GLYPH[status] ?? 'circle-dashed'
-export const runTone = (status: string): Tone => STEP_TONE[status] ?? (status === 'gated' || status === 'waiting' ? 'warn' : 'muted')
+export const runTone = (status: string): Tone =>
+  STEP_TONE[status] ?? (status === 'gated' || status === 'waiting' ? 'warn' : 'muted')
 /** The word a person reads for a step or run status: "Needs you", not `waiting-gate`. */
-export const statusLabel = (status: string | undefined): string => STATUS_LABEL[status ?? 'pending'] ?? status ?? 'Not started'
+export const statusLabel = (status: string | undefined): string =>
+  STATUS_LABEL[status ?? 'pending'] ?? status ?? 'Not started'
 
 export const kindLabel = (kind: string): string => BUILTIN_STEP_DESCRIPTIONS[kind]?.label ?? kind
 export const kindRunsAgent = (kind: string): boolean => BUILTIN_STEP_DESCRIPTIONS[kind]?.runsAgent ?? false
@@ -58,5 +100,7 @@ export const formatUsage = (usage: WorkflowUsageSummary | null | undefined): str
     formatCost(usage.costUsd),
     `${usage.turns.toLocaleString()} ${usage.turns === 1 ? 'turn' : 'turns'}`,
     `${usage.inputTokens.toLocaleString()} tokens in, ${usage.outputTokens.toLocaleString()} out`,
-  ].filter(Boolean).join(' · ')
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }

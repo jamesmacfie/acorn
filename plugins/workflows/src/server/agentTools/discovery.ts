@@ -24,29 +24,47 @@ export type WorkflowToolDeps = {
   validationCatalog(): WorkflowValidationCatalog
   taskScope(taskId: string): Promise<WorkflowTaskResolutionScope | null>
   /** Whether the owner lets agents start this definition, for workflows_list (./launches.ts). */
-  invocation?(projectId: string, definitionKey: string, digest: string | undefined, sessionId: string | undefined): unknown
+  invocation?(
+    projectId: string,
+    definitionKey: string,
+    digest: string | undefined,
+    sessionId: string | undefined,
+  ): unknown
 }
 
 /** Where a definition opens: the editor's item key in the task's project, which a client turns into
  *  its own URL (client/surfacePath.ts). */
 export type WorkflowDefinitionTarget = { kind: 'workflow-definition'; resourceId: string; projectId: string }
 
-export const definitionKey = (ref: WorkflowDefinitionRef): string => ref.source === 'database'
-  ? `db:${ref.id}`
-  : ref.source === 'user' ? `user:${ref.id}` : `repo:${fileId(ref.path) ?? ref.path}`
+export const definitionKey = (ref: WorkflowDefinitionRef): string =>
+  ref.source === 'database'
+    ? `db:${ref.id}`
+    : ref.source === 'user'
+      ? `user:${ref.id}`
+      : `repo:${fileId(ref.path) ?? ref.path}`
 
-export const definitionTarget = (ref: WorkflowDefinitionRef, scope: { projectId: string }): WorkflowDefinitionTarget =>
-  ({ kind: 'workflow-definition', resourceId: definitionKey(ref), projectId: scope.projectId })
+export const definitionTarget = (
+  ref: WorkflowDefinitionRef,
+  scope: { projectId: string },
+): WorkflowDefinitionTarget => ({
+  kind: 'workflow-definition',
+  resourceId: definitionKey(ref),
+  projectId: scope.projectId,
+})
 
 /** The reference a definition key names. The inverse of definitionKey. */
 export const refForKey = (key: string): WorkflowDefinitionRef | null => {
   const match = /^(db|repo|user):(.+)$/.exec(key)
   if (!match) return null
-  return match[1] === 'db' ? { source: 'database', id: match[2]! }
-    : match[1] === 'repo' ? { source: 'repo', path: `.acorn/workflows/${match[2]}.toml` } : { source: 'user', id: match[2]! }
+  return match[1] === 'db'
+    ? { source: 'database', id: match[2]! }
+    : match[1] === 'repo'
+      ? { source: 'repo', path: `.acorn/workflows/${match[2]}.toml` }
+      : { source: 'user', id: match[2]! }
 }
 
-const fileId = (path: string): string | null => /^\.acorn\/workflows\/([A-Za-z0-9][A-Za-z0-9_-]*)\.toml$/.exec(path)?.[1] ?? null
+const fileId = (path: string): string | null =>
+  /^\.acorn\/workflows\/([A-Za-z0-9][A-Za-z0-9_-]*)\.toml$/.exec(path)?.[1] ?? null
 
 const bytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value) ?? '')
 
@@ -82,10 +100,18 @@ export const sameScope = (row: StoredWorkflowDef, scope: WorkflowResolutionScope
   row.workspaceId === scope.workspaceId && (!row.projectId || row.projectId === scope.projectId)
 
 /** The validation catalog with the child workflow targets this task's checkout can resolve. */
-export async function scopedValidation(deps: WorkflowToolDeps, scope: WorkflowTaskResolutionScope): Promise<WorkflowValidationCatalog> {
+export async function scopedValidation(
+  deps: WorkflowToolDeps,
+  scope: WorkflowTaskResolutionScope,
+): Promise<WorkflowValidationCatalog> {
   const scoped = await scopedWorkflowCatalog({
-    db: deps.db, base: deps.catalog(), workspaceId: scope.workspaceId, projectId: scope.projectId,
-    repoDir: scope.repoDir, userDir: scope.userDir, validation: deps.validationCatalog(),
+    db: deps.db,
+    base: deps.catalog(),
+    workspaceId: scope.workspaceId,
+    projectId: scope.projectId,
+    repoDir: scope.repoDir,
+    userDir: scope.userDir,
+    validation: deps.validationCatalog(),
   })
   return { ...deps.validationCatalog(), workflowTargets: scoped.workflows }
 }
@@ -100,11 +126,19 @@ export type Applicable = {
   loadErrors?: string[]
 }
 
-function fileLayer(scope: WorkflowResolutionScope, source: 'repo' | 'user', validation: WorkflowValidationCatalog): Applicable[] {
+function fileLayer(
+  scope: WorkflowResolutionScope,
+  source: 'repo' | 'user',
+  validation: WorkflowValidationCatalog,
+): Applicable[] {
   // The user layer is read on its own, as resolution does, so a repo file of the same name does not
   // hide it from a reference that names the user layer.
-  const loaded = source === 'repo' ? loadWorkflowFiles(scope.repoDir, scope.userDir, validation) : loadWorkflowFiles(null, scope.userDir, validation)
-  const refOf = (id: string): WorkflowDefinitionRef => source === 'repo' ? { source, path: `.acorn/workflows/${id}.toml` } : { source, id }
+  const loaded =
+    source === 'repo'
+      ? loadWorkflowFiles(scope.repoDir, scope.userDir, validation)
+      : loadWorkflowFiles(null, scope.userDir, validation)
+  const refOf = (id: string): WorkflowDefinitionRef =>
+    source === 'repo' ? { source, path: `.acorn/workflows/${id}.toml` } : { source, id }
   const found = new Map<string, Applicable>()
   for (const workflow of loaded.workflows) {
     if (workflow.source === source) found.set(workflow.id, { ref: refOf(workflow.id), file: workflow })
@@ -132,17 +166,22 @@ async function applicable(deps: WorkflowToolDeps, scope: WorkflowTaskResolutionS
   const validation = deps.validationCatalog()
   const rows = await defsForProject(deps.db, scope.workspaceId, scope.projectId)
   return [
-    ...await Promise.all(rows.map((row) => withPublished(deps.db, row))),
+    ...(await Promise.all(rows.map((row) => withPublished(deps.db, row)))),
     ...fileLayer(scope, 'repo', validation),
     ...fileLayer(scope, 'user', validation),
   ]
 }
 
-export async function resolveRef(deps: WorkflowToolDeps, scope: WorkflowResolutionScope, ref: WorkflowDefinitionRef): Promise<Applicable> {
+export async function resolveRef(
+  deps: WorkflowToolDeps,
+  scope: WorkflowResolutionScope,
+  ref: WorkflowDefinitionRef,
+): Promise<Applicable> {
   if (ref.source === 'database') {
     const row = await getDef(deps.db, ref.id)
     // Another project's or workspace's row answers exactly as a missing one does.
-    if (!row || !sameScope(row, scope)) throw new ToolError('not_found', 'No workflow with that reference is available to this task.')
+    if (!row || !sameScope(row, scope))
+      throw new ToolError('not_found', 'No workflow with that reference is available to this task.')
     return withPublished(deps.db, row)
   }
   const key = definitionKey(ref)
@@ -178,16 +217,29 @@ export function catalogPage(deps: WorkflowToolDeps, cursor: string | undefined) 
 
 // ─── workflows_list ─────────────────────────────────────────────────────────────────────────────
 
-export async function listDefinitions(deps: WorkflowToolDeps, context: { taskId: string; sessionId?: string }, input: { search?: string; cursor?: string }) {
+export async function listDefinitions(
+  deps: WorkflowToolDeps,
+  context: { taskId: string; sessionId?: string },
+  input: { search?: string; cursor?: string },
+) {
   const scope = await requireTaskScope(deps, context.taskId)
   const validation = await scopedValidation(deps, scope)
   const needle = input.search?.trim().toLowerCase()
   const entries = (await applicable(deps, scope))
-    .filter((entry) => !needle || nameOf(entry).toLowerCase().includes(needle) || definitionKey(entry.ref).toLowerCase().includes(needle))
+    .filter(
+      (entry) =>
+        !needle ||
+        nameOf(entry).toLowerCase().includes(needle) ||
+        definitionKey(entry.ref).toLowerCase().includes(needle),
+    )
     .map((entry) => {
       const signature = signatureOf(entry)
       const runnable = executable(entry)
-      const problems = entry.loadErrors ?? (runnable ? validateWorkflow(runnable, validation) : ['Not published. The owner publishes a draft from the workflow editor.'])
+      const problems =
+        entry.loadErrors ??
+        (runnable
+          ? validateWorkflow(runnable, validation)
+          : ['Not published. The owner publishes a draft from the workflow editor.'])
       return {
         ref: entry.ref,
         name: nameOf(entry),
@@ -195,20 +247,42 @@ export async function listDefinitions(deps: WorkflowToolDeps, context: { taskId:
         published: !!runnable,
         ...(entry.row ? { revision: entry.row.revision, publishedRevision: entry.row.publishedRevision ?? null } : {}),
         ...(executableDigest(entry) ? { digest: executableDigest(entry) } : {}),
-        ...(signature ? (({ inputs, outputs }) => ({ inputs, outputs }))(workflowCatalogTarget(entry.ref, signature)) : {}),
-        ...(entry.row?.agentOrigin ? { agentDraft: { yours: entry.row.agentOrigin.sessionId === context.sessionId } } : {}),
-        ...(deps.invocation ? { invocation: deps.invocation(scope.projectId, definitionKey(entry.ref), executableDigest(entry), context.sessionId) } : {}),
+        ...(signature
+          ? (({ inputs, outputs }) => ({ inputs, outputs }))(workflowCatalogTarget(entry.ref, signature))
+          : {}),
+        ...(entry.row?.agentOrigin
+          ? { agentDraft: { yours: entry.row.agentOrigin.sessionId === context.sessionId } }
+          : {}),
+        ...(deps.invocation
+          ? {
+              invocation: deps.invocation(
+                scope.projectId,
+                definitionKey(entry.ref),
+                executableDigest(entry),
+                context.sessionId,
+              ),
+            }
+          : {}),
         ...(problems.length ? { problems: problems.slice(0, 10) } : {}),
         target: definitionTarget(entry.ref, scope),
       }
     })
-  const page = boundedPage(entries, (entry) => `${entry.name.toLowerCase()}\u0000${definitionKey(entry.ref)}`, input.cursor, MAX_LIST_ENTRIES)
+  const page = boundedPage(
+    entries,
+    (entry) => `${entry.name.toLowerCase()}\u0000${definitionKey(entry.ref)}`,
+    input.cursor,
+    MAX_LIST_ENTRIES,
+  )
   return { workflows: page.items, nextCursor: page.nextCursor }
 }
 
 // ─── workflow_get ───────────────────────────────────────────────────────────────────────────────
 
-export async function getDefinition(deps: WorkflowToolDeps, taskId: string, input: { ref: WorkflowDefinitionRef; revision?: number; step?: string }) {
+export async function getDefinition(
+  deps: WorkflowToolDeps,
+  taskId: string,
+  input: { ref: WorkflowDefinitionRef; revision?: number; step?: string },
+) {
   const scope = await requireTaskScope(deps, taskId)
   const entry = await resolveRef(deps, scope, input.ref)
   let shown: { showing: 'draft' | 'published' | 'file'; revision: number | null; def: WorkflowDef }
@@ -221,10 +295,16 @@ export async function getDefinition(deps: WorkflowToolDeps, taskId: string, inpu
   } else if (entry.row) {
     shown = { showing: 'draft', revision: entry.row.revision, def: entry.row.def }
   } else if (entry.file) {
-    if (input.revision !== undefined) throw new ToolError('bad_request', 'A workflow file has no revisions. Omit revision.')
+    if (input.revision !== undefined)
+      throw new ToolError('bad_request', 'A workflow file has no revisions. Omit revision.')
     shown = { showing: 'file', revision: null, def: entry.file }
   } else {
-    return { ref: entry.ref, source: entry.ref.source, problems: entry.loadErrors ?? [], target: definitionTarget(entry.ref, scope) }
+    return {
+      ref: entry.ref,
+      source: entry.ref.source,
+      problems: entry.loadErrors ?? [],
+      target: definitionTarget(entry.ref, scope),
+    }
   }
 
   const view = agentDefinitionView(shown.def)
@@ -238,7 +318,12 @@ export async function getDefinition(deps: WorkflowToolDeps, taskId: string, inpu
     // Always what would run, whichever version is shown: the value workflow_run checks.
     ...(executableDigest(entry) ? { digest: executableDigest(entry) } : {}),
     editable: !!entry.row,
-    ...(entry.row ? { draftRevision: entry.row.revision, published: entry.published ? { revision: entry.published.revision, digest: entry.published.digest } : null } : {}),
+    ...(entry.row
+      ? {
+          draftRevision: entry.row.revision,
+          published: entry.published ? { revision: entry.published.revision, digest: entry.published.digest } : null,
+        }
+      : {}),
     problems,
     withheld: view.withheld,
     target: definitionTarget(entry.ref, scope),
@@ -248,11 +333,15 @@ export async function getDefinition(deps: WorkflowToolDeps, taskId: string, inpu
     if (!step) throw new ToolError('not_found', `No step '${input.step}' in this definition.`)
     return { ...header, step }
   }
-  if (bytes(view.definition) <= MAX_TOOL_RESPONSE_BYTES - bytes(header) - 1024) return { ...header, definition: view.definition }
+  if (bytes(view.definition) <= MAX_TOOL_RESPONSE_BYTES - bytes(header) - 1024)
+    return { ...header, definition: view.definition }
   // Too large for one answer. The outline still names every step, and `step` reads one in full.
   return {
     ...header,
-    definition: { ...view.definition, steps: view.definition.steps.map(({ id, name, kind, after }) => ({ id, name, kind, after })) },
+    definition: {
+      ...view.definition,
+      steps: view.definition.steps.map(({ id, name, kind, after }) => ({ id, name, kind, after })),
+    },
     truncated: 'Step bodies were left out to fit the response. Pass step with a step ID to read one in full.',
   }
 }
@@ -261,18 +350,23 @@ export async function getDefinition(deps: WorkflowToolDeps, taskId: string, inpu
 
 // Structural only, like the device route's body: a name, the format markers, and a list of steps.
 // The validator says everything else, field by field.
-export const candidateDefinitionSchema = z.object({
-  baseline: z.literal(ACORN_BASELINE),
-  formatVersion: z.literal(1),
-  name: z.string().min(1).max(200),
-  steps: z.array(z.object({ name: z.string().min(1) }).passthrough()).max(200),
-}).passthrough()
+export const candidateDefinitionSchema = z
+  .object({
+    baseline: z.literal(ACORN_BASELINE),
+    formatVersion: z.literal(1),
+    name: z.string().min(1).max(200),
+    steps: z.array(z.object({ name: z.string().min(1) }).passthrough()).max(200),
+  })
+  .passthrough()
 
 /** The structural problems of an untrusted candidate, each prefixed with the field it is about. */
 export function structuralProblems(candidate: unknown): string[] {
-  if (bytes(candidate) > MAX_DEFINITION_BYTES) return [`The definition is larger than ${MAX_DEFINITION_BYTES / 1024} KiB.`]
+  if (bytes(candidate) > MAX_DEFINITION_BYTES)
+    return [`The definition is larger than ${MAX_DEFINITION_BYTES / 1024} KiB.`]
   const parsed = candidateDefinitionSchema.safeParse(candidate)
-  return parsed.success ? [] : parsed.error.issues.map((issue) => `${issue.path.join('.') || 'definition'}: ${issue.message}`)
+  return parsed.success
+    ? []
+    : parsed.error.issues.map((issue) => `${issue.path.join('.') || 'definition'}: ${issue.message}`)
 }
 
 export async function validateCandidate(deps: WorkflowToolDeps, taskId: string, candidate: unknown) {

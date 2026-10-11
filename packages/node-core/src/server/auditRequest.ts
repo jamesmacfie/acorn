@@ -13,7 +13,9 @@ import type { AppEnv } from './middleware/auth'
 // answerable from the trail. An internal principal records its scope rather than its task or
 // session: the scope is what decided whether the call was allowed at all, and it is the field an owner
 // reviewing the trail can act on.
-export const auditActor = (c: Context<AppEnv>): { actor: 'device' | 'internal' | 'system'; actorId?: string | null } => {
+export const auditActor = (
+  c: Context<AppEnv>,
+): { actor: 'device' | 'internal' | 'system'; actorId?: string | null } => {
   const principal = c.get('principal')
   if (!principal) return { actor: 'system' }
   return principal.kind === 'device'

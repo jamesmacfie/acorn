@@ -8,9 +8,7 @@ export function spawnProfileId(
   requested: string | undefined,
   custom: CustomAgent | null,
 ): string {
-  return requested ?? custom?.profileId
-    ?? (defaults.mode === 'explicit' ? defaults.profileId : null)
-    ?? parentProfileId
+  return requested ?? custom?.profileId ?? (defaults.mode === 'explicit' ? defaults.profileId : null) ?? parentProfileId
 }
 
 /** Snapshot only model and reasoning. Permission and collaboration modes are separate authority. */
@@ -24,9 +22,13 @@ export function spawnConfigOptions(
   let base: Record<string, string> = {}
   if (defaults.mode === 'explicit') base = defaults.pinned[providerId] ?? {}
   else if (parent?.providerId === providerId && Array.isArray(parent.config.configOptions)) {
-    base = Object.fromEntries((parent.config.configOptions as AgentConfigOption[]).flatMap((option) =>
-      (option.category === 'model' || option.category === 'reasoning') && typeof option.currentValue === 'string'
-        ? [[option.id, option.currentValue]] : []))
+    base = Object.fromEntries(
+      (parent.config.configOptions as AgentConfigOption[]).flatMap((option) =>
+        (option.category === 'model' || option.category === 'reasoning') && typeof option.currentValue === 'string'
+          ? [[option.id, option.currentValue]]
+          : [],
+      ),
+    )
   }
   return { ...base, ...custom?.options, ...requested }
 }

@@ -23,11 +23,12 @@ export function buildIntegrationProviderRoutes(): Hono<AppEnv> {
       guarded.route('/', contribution.router)
     } else {
       const pluginId = integrationProviderRegistry.ownerOf(contribution.providerId) ?? contribution.providerId
-      const serve = (c: Parameters<typeof servePluginFetch>[0]) => servePluginFetch(c, {
-        pluginId,
-        mount: `${PLUGIN_NAMESPACE}${relativeMount}`,
-        fetch: contribution.fetch,
-      })
+      const serve = (c: Parameters<typeof servePluginFetch>[0]) =>
+        servePluginFetch(c, {
+          pluginId,
+          mount: `${PLUGIN_NAMESPACE}${relativeMount}`,
+          fetch: contribution.fetch,
+        })
       guarded.all('/', serve)
       guarded.all('/*', serve)
     }

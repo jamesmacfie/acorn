@@ -48,12 +48,14 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
 const byName = new Map(PACKAGES.map((p) => [p.name, p]))
 const pkgOf = (file: string): Pkg | undefined => PACKAGES.find((p) => file.startsWith(p.dir + '/'))
 
-const packageExports = new Map(PACKAGES.map((pkg) => {
-  const manifest = JSON.parse(readFileSync(join(pkg.dir, 'package.json'), 'utf8')) as {
-    exports?: Record<string, string>
-  }
-  return [pkg.name, manifest.exports ?? {}] as const
-}))
+const packageExports = new Map(
+  PACKAGES.map((pkg) => {
+    const manifest = JSON.parse(readFileSync(join(pkg.dir, 'package.json'), 'utf8')) as {
+      exports?: Record<string, string>
+    }
+    return [pkg.name, manifest.exports ?? {}] as const
+  }),
+)
 
 function exportedFile(pkg: Pkg, subpath: string): string | null {
   const exports = packageExports.get(pkg.name)!
@@ -119,22 +121,34 @@ function resolveSpec(from: string, spec: string): Target {
     const file = exportedFile(pkg, rest.join('/'))
     return { file, external: null, pkg }
   }
-  return { file: null, external: spec.split('/')[0].startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0], pkg: undefined }
+  return {
+    file: null,
+    external: spec.split('/')[0].startsWith('@') ? spec.split('/').slice(0, 2).join('/') : spec.split('/')[0],
+    pkg: undefined,
+  }
 }
 
 type Edge = { fromFile: string; fromPkg: Pkg; spec: string; target: Target; isTest: boolean }
 
 const EDGES: Edge[] = PACKAGES.flatMap((p) =>
-  walk(p.src).concat(walk(join(p.dir, 'test')), walk(join(p.dir, 'scripts'))).flatMap((file) => {
-    const text = readFileSync(file, 'utf8')
-    const out: Edge[] = []
-    let m: RegExpExecArray | null
-    IMPORT_RE.lastIndex = 0
-    while ((m = IMPORT_RE.exec(text))) {
-      out.push({ fromFile: file, fromPkg: p, spec: m[2], target: resolveSpec(file, m[2]), isTest: /\.test\.tsx?$/.test(file) })
-    }
-    return out
-  }),
+  walk(p.src)
+    .concat(walk(join(p.dir, 'test')), walk(join(p.dir, 'scripts')))
+    .flatMap((file) => {
+      const text = readFileSync(file, 'utf8')
+      const out: Edge[] = []
+      let m: RegExpExecArray | null
+      IMPORT_RE.lastIndex = 0
+      while ((m = IMPORT_RE.exec(text))) {
+        out.push({
+          fromFile: file,
+          fromPkg: p,
+          spec: m[2],
+          target: resolveSpec(file, m[2]),
+          isTest: /\.test\.tsx?$/.test(file),
+        })
+      }
+      return out
+    }),
 )
 
 const rel = (f: string) => relative(ROOT, f)
@@ -152,7 +166,8 @@ const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
 
 // Test scaffolding by location, not filename: a `.test.ts` suffix, a package's test/ or e2e/ tree, or
 // its testkit/, whose helpers are test-only but deliberately unsuffixed.
-const isTestCode = (file: string): boolean => /\.test\.tsx?$/.test(file) || /\/(test|e2e|testkit)(\/|\.ts$)/.test(rel(file))
+const isTestCode = (file: string): boolean =>
+  /\.test\.tsx?$/.test(file) || /\/(test|e2e|testkit)(\/|\.ts$)/.test(rel(file))
 
 // Kit purity, shared by the two tiers that have to hold it: a plugin's tree/ and its client/. Both
 // draw only kit nodes, so both are scanned for the same three things — a raw element, a class or an
@@ -177,7 +192,8 @@ function kitPurity(dir: string, { skipTests = false } = {}): { offences: string[
       .replace(/\/\*[\s\S]*?\*\//g, '')
       .replace(/^\s*\/\/.*$/gm, '')
     if (RAW_TAG.test(code)) offences.push(`${rel(file)}: a raw element`)
-    if (/\bclass=|\bclassList=|\bstyle=|innerHTML/.test(code)) offences.push(`${rel(file)}: a class, a style or an innerHTML`)
+    if (/\bclass=|\bclassList=|\bstyle=|innerHTML/.test(code))
+      offences.push(`${rel(file)}: a class, a style or an innerHTML`)
   }
   return { offences, scanned }
 }
@@ -215,7 +231,9 @@ describe('architecture boundaries', () => {
   })
 
   it('every first-party specifier resolves to a real file', () => {
-    const broken = EDGES.filter((e) => e.spec.startsWith('@acorn/') && !e.target.file).map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    const broken = EDGES.filter((e) => e.spec.startsWith('@acorn/') && !e.target.file).map(
+      (e) => `${rel(e.fromFile)}: ${e.spec}`,
+    )
     expect([...new Set(broken)].sort()).toEqual([])
   })
 
@@ -233,7 +251,10 @@ describe('architecture boundaries', () => {
         dependencies?: Record<string, string>
         devDependencies?: Record<string, string>
       }
-      const declared = new Set([...Object.keys(manifest.dependencies ?? {}), ...Object.keys(manifest.devDependencies ?? {})])
+      const declared = new Set([
+        ...Object.keys(manifest.dependencies ?? {}),
+        ...Object.keys(manifest.devDependencies ?? {}),
+      ])
       for (const e of crossPackage.filter((x) => x.fromPkg.name === p.name)) {
         if (!declared.has(e.target.pkg!.name)) undeclared.push(`${p.name} -> ${e.target.pkg!.name}`)
       }
@@ -267,8 +288,12 @@ describe('architecture boundaries', () => {
   it('protocol is a pure sink: zod only, no first-party imports, no node/electron', () => {
     const proto = EDGES.filter((e) => e.fromPkg.name === '@acorn/protocol')
     const allowed = new Set(['zod', 'vitest'])
-    const badExternal = proto.filter((e) => e.target.external && !allowed.has(e.target.external)).map((e) => `${rel(e.fromFile)}: ${e.spec}`)
-    const badFirstParty = proto.filter((e) => e.target.pkg && e.target.pkg.name !== '@acorn/protocol').map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    const badExternal = proto
+      .filter((e) => e.target.external && !allowed.has(e.target.external))
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    const badFirstParty = proto
+      .filter((e) => e.target.pkg && e.target.pkg.name !== '@acorn/protocol')
+      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set([...badExternal, ...badFirstParty])].sort()).toEqual([])
   })
 
@@ -300,12 +325,14 @@ describe('architecture boundaries', () => {
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
       'plugins/editor/src/server/searchProcess.ts', // ripgrep, streamed
     ])
-    const importers = [...new Set(
-      // Build tooling excluded: apps/desktop/scripts/ runs at package time and never ships.
-      EDGES.filter((e) => !isTestCode(e.fromFile) && !/\/scripts\//.test(rel(e.fromFile)))
-        .filter((e) => e.target.external === 'node:child_process' || e.target.external === 'child_process')
-        .map((e) => rel(e.fromFile)),
-    )].sort()
+    const importers = [
+      ...new Set(
+        // Build tooling excluded: apps/desktop/scripts/ runs at package time and never ships.
+        EDGES.filter((e) => !isTestCode(e.fromFile) && !/\/scripts\//.test(rel(e.fromFile)))
+          .filter((e) => e.target.external === 'node:child_process' || e.target.external === 'child_process')
+          .map((e) => rel(e.fromFile)),
+      ),
+    ].sort()
     // Anti-vacuity: the broker itself must always be in the result, or the matcher has stopped matching.
     expect(importers).toContain('packages/node-core/src/server/core/proc.ts')
     expect(importers.filter((f) => !CHILD_PROCESS_OK.has(f))).toEqual([])
@@ -346,12 +373,18 @@ describe('architecture boundaries', () => {
       'apps/tui/src/platform.ts',
     ]
     const SCANNED = ['packages/client-core/src', 'apps/desktop/src/client', 'apps/desktop/src/shell', 'apps/tui/src']
-    const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir)))
-      .filter((file) => !isTestCode(file))
+    const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir))).filter((file) => !isTestCode(file))
     expect(files.length).toBeGreaterThan(300) // anti-vacuity: the walker found the renderer
-    expect(files.filter((file) => callsConsole(readFileSync(file, 'utf8'))).map(rel).sort()).toEqual([...CONSOLE_BASELINE].sort())
+    expect(
+      files
+        .filter((file) => callsConsole(readFileSync(file, 'utf8')))
+        .map(rel)
+        .sort(),
+    ).toEqual([...CONSOLE_BASELINE].sort())
     // And the logger itself must still be the file doing it, or it has been hollowed out.
-    expect(callsConsole(readFileSync(join(ROOT, 'packages/client-core/src/infra/telemetry/logger.ts'), 'utf8'))).toBe(true)
+    expect(callsConsole(readFileSync(join(ROOT, 'packages/client-core/src/infra/telemetry/logger.ts'), 'utf8'))).toBe(
+      true,
+    )
   })
 
   it('the node logs through the logger, not console (shrinking baseline)', () => {
@@ -387,18 +420,24 @@ describe('architecture boundaries', () => {
     // processes, they already depend on node-core, and their lines belong on stderr
     // (docs/shell/node-child.md § What the helper reports).
     const SCANNED = ['packages/node-core/src', 'apps/node/src', 'packages/custody/src', 'apps/desktop/src/helper']
-    const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir)))
-      .filter((file) => !isTestCode(file))
+    const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir))).filter((file) => !isTestCode(file))
     expect(files.length).toBeGreaterThan(150) // anti-vacuity: the walker found the node
-    expect(files.filter((file) => callsConsole(readFileSync(file, 'utf8'))).map(rel).sort()).toEqual([...CONSOLE_BASELINE].sort())
+    expect(
+      files
+        .filter((file) => callsConsole(readFileSync(file, 'utf8')))
+        .map(rel)
+        .sort(),
+    ).toEqual([...CONSOLE_BASELINE].sort())
     // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree.
-    expect(callsConsole("console.warn(`[hooks] ${id} failed:`, error)")).toBe(true)
+    expect(callsConsole('console.warn(`[hooks] ${id} failed:`, error)')).toBe(true)
     expect(callsConsole("if (x) console.log('hi')")).toBe(true)
     expect(callsConsole('console\n  .error(x)')).toBe(true)
-    expect(callsConsole("// a bare `console.error` carries no owner")).toBe(false)
+    expect(callsConsole('// a bare `console.error` carries no owner')).toBe(false)
     expect(callsConsole("log.error('unhandled error')")).toBe(false)
     // And the logger itself must still be the file doing it, or it has been hollowed out.
-    expect(callsConsole(readFileSync(join(ROOT, 'packages/node-core/src/server/telemetry/logger.ts'), 'utf8'))).toBe(true)
+    expect(callsConsole(readFileSync(join(ROOT, 'packages/node-core/src/server/telemetry/logger.ts'), 'utf8'))).toBe(
+      true,
+    )
   })
 
   it('plugins log through their own logger, not console (empty baseline)', () => {
@@ -418,7 +457,12 @@ describe('architecture boundaries', () => {
       .flatMap((entry) => walk(join(ROOT, 'plugins', entry.name, 'src')))
       .filter((file) => !isTestCode(file))
     expect(files.length).toBeGreaterThan(300) // anti-vacuity: the walker found the plugins
-    expect(files.filter((file) => callsConsole(readFileSync(file, 'utf8'))).map(rel).sort()).toEqual([])
+    expect(
+      files
+        .filter((file) => callsConsole(readFileSync(file, 'utf8')))
+        .map(rel)
+        .sort(),
+    ).toEqual([])
     // Anti-vacuity: a field named `console` is not a call, and used to be three lines in browser's
     // driver that the predicate must keep ignoring.
     expect(callsConsole('session.console.push(text)')).toBe(false)
@@ -435,7 +479,13 @@ describe('architecture boundaries', () => {
     // with the JSX preset pointed at the remote adapter, so a shell component pulled onto its graph is
     // compiled into a tree of its own rather than into a document, and the result is neither. This is
     // the one check the client tier does not share: a compiled pane is *supposed* to import the barrel.
-    const TREE_DIRS = ['plugins/http/src/tree', 'plugins/database/src/tree', 'plugins/linear/src/tree', 'plugins/rollbar/src/tree', 'plugins/sentry-telemetry/src/tree']
+    const TREE_DIRS = [
+      'plugins/http/src/tree',
+      'plugins/database/src/tree',
+      'plugins/linear/src/tree',
+      'plugins/rollbar/src/tree',
+      'plugins/sentry-telemetry/src/tree',
+    ]
     const offences: string[] = []
     let scanned = 0
     for (const dir of TREE_DIRS) {
@@ -468,7 +518,8 @@ describe('architecture boundaries', () => {
         if (!/\.tsx?$/.test(file) || isTestCode(file)) continue
         scanned++
         const code = readFileSync(file, 'utf8')
-        if (/import\s*\{[^}]*\bconnect\b[^}]*\}\s*from '@acorn\/plugin-api\/ui\/sdk'/.test(code)) offences.push(rel(file))
+        if (/import\s*\{[^}]*\bconnect\b[^}]*\}\s*from '@acorn\/plugin-api\/ui\/sdk'/.test(code))
+          offences.push(rel(file))
       }
     }
     expect(scanned).toBeGreaterThan(10) // anti-vacuity: the walker found the tree directories
@@ -532,8 +583,9 @@ describe('architecture boundaries', () => {
   })
 
   it('plugin tests reach core through the facade testkits', () => {
-    const deep = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && isTestCode(e.fromFile))
-      .filter((e) => e.spec.startsWith('@acorn/node-core/') || e.spec.startsWith('@acorn/client-core/'))
+    const deep = EDGES.filter((e) => e.fromPkg.kind === 'plugin' && isTestCode(e.fromFile)).filter(
+      (e) => e.spec.startsWith('@acorn/node-core/') || e.spec.startsWith('@acorn/client-core/'),
+    )
     expect(deep.map((e) => `${rel(e.fromFile)}: ${e.spec}`)).toEqual([])
     expect(EDGES.filter((e) => e.spec === '@acorn/plugin-api/testkit').length).toBeGreaterThan(4)
     expect(EDGES.filter((e) => e.spec === '@acorn/plugin-api/testkit/client').length).toBeGreaterThan(2)
@@ -546,7 +598,9 @@ describe('architecture boundaries', () => {
     // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
     // before the window starts and is test scaffolding by purpose (docs/testing/desktop.md § The large-surface
     // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
-    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts')
+    const offenders = EDGES.filter(
+      (e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts',
+    )
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set(offenders)].sort()).toEqual([])
@@ -591,8 +645,10 @@ describe('architecture boundaries', () => {
         // `linear` and `rollbar` each declare `./server/index.ts` on top of the four kinds, because a
         // `vi.mock` has to name the module the code under test imports and both plugins' routes
         // import their own `../index` relatively. Their testkits record it; nothing else may.
-        const extra = subpath === './server/index.ts' && ['@acorn/plugin-linear', '@acorn/plugin-rollbar'].includes(pkg.name)
-        if (!KINDS.test(subpath) && !extra) problems.push(`${pkg.name}: ${subpath} is not an entrypoint, contract/, or testkit`)
+        const extra =
+          subpath === './server/index.ts' && ['@acorn/plugin-linear', '@acorn/plugin-rollbar'].includes(pkg.name)
+        if (!KINDS.test(subpath) && !extra)
+          problems.push(`${pkg.name}: ${subpath} is not an entrypoint, contract/, or testkit`)
         const resolved = target.replace('/*', '')
         if (!existsSync(join(pkg.dir, resolved))) problems.push(`${pkg.name}: ${subpath} -> ${target} does not exist`)
       }
@@ -649,7 +705,11 @@ describe('architecture boundaries', () => {
         if (/\.test\.[cm]?[jt]sx?$/.test(subpath) || /\.test\.[cm]?[jt]sx?$/.test(target)) {
           problems.push(`${name}: ${subpath} exports a test file`)
         }
-        if (!target.startsWith('./src/') || !existsSync(join(pkg.dir, target)) || !statSync(join(pkg.dir, target)).isFile()) {
+        if (
+          !target.startsWith('./src/') ||
+          !existsSync(join(pkg.dir, target)) ||
+          !statSync(join(pkg.dir, target)).isFile()
+        ) {
           problems.push(`${name}: ${subpath} -> ${target} is missing or outside src`)
         }
         if (target.includes('/testkit/') && !subpath.startsWith('./testkit')) {
@@ -667,9 +727,9 @@ describe('architecture boundaries', () => {
     for (const name of ['@acorn/client-core', '@acorn/node-core', '@acorn/custody', '@acorn/dashboards-core']) {
       const pkg = byName.get(name)!
       const targets = new Set(Object.values(packageExports.get(name)!))
-      const privateFile = walk(pkg.src).find((file) => /\.tsx?$/.test(file)
-        && !/\.test\.tsx?$/.test(file)
-        && !targets.has(`./${relative(pkg.dir, file)}`))
+      const privateFile = walk(pkg.src).find(
+        (file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file) && !targets.has(`./${relative(pkg.dir, file)}`),
+      )
       expect(privateFile, `${name} needs a private module to test`).toBeDefined()
       const spec = `${name}/${relative(pkg.src, privateFile!).replace(/\\/g, '/')}`
       const resolver = createRequire(join(pkg.dir, 'package.json'))
@@ -685,7 +745,9 @@ describe('architecture boundaries', () => {
     // Anti-vacuity: the suite's own guard counts packages and edges, not protocol's files, so a walk
     // that returned nothing would satisfy the assertion below.
     expect(files.length).toBeGreaterThan(15)
-    const offenders = files.filter((f) => !isTestCode(f) && readFileSync(f, 'utf8').includes('/v1/p/')).map((f) => relative(proto.src, f))
+    const offenders = files
+      .filter((f) => !isTestCode(f) && readFileSync(f, 'utf8').includes('/v1/p/'))
+      .map((f) => relative(proto.src, f))
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
@@ -700,7 +762,13 @@ describe('architecture boundaries', () => {
         scanned++
         const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
         const visit = (node: ts.Node): void => {
-          if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+          if (
+            ts.isStringLiteral(node) ||
+            ts.isNoSubstitutionTemplateLiteral(node) ||
+            ts.isTemplateHead(node) ||
+            ts.isTemplateMiddle(node) ||
+            ts.isTemplateTail(node)
+          ) {
             if (/\/v1\/p\/[a-z][a-z0-9-]*(?:\/|$)/.test(node.text)) offenders.push(`${rel(file)}: ${node.text}`)
           }
           ts.forEachChild(node, visit)
@@ -736,7 +804,9 @@ describe('architecture boundaries', () => {
     // `preview`. Nothing in `plugins/browser` reads them.
     const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts', 'contextTime.ts']
     // Git is also core's VCS vocabulary. A `git` file name alone cannot imply plugin ownership.
-    const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin' && p.name !== '@acorn/plugin-git').map((p) => p.name.replace('@acorn/plugin-', ''))
+    const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin' && p.name !== '@acorn/plugin-git').map((p) =>
+      p.name.replace('@acorn/plugin-', ''),
+    )
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)
       // Source ownership folders do not change whether a module names a plugin.
@@ -745,7 +815,14 @@ describe('architecture boundaries', () => {
       .filter((f) => !NAME_COLLISIONS.includes(f))
       // Matched on the file name, not the contents: a comment can't create a dependency, and scanning
       // prose for 'context' or 'http' would flag half of core's English.
-      .filter((f) => pluginNames.some((n) => f.toLowerCase().replace(/s?\.ts$/, '').includes(n.replace(/s$/, ''))))
+      .filter((f) =>
+        pluginNames.some((n) =>
+          f
+            .toLowerCase()
+            .replace(/s?\.ts$/, '')
+            .includes(n.replace(/s$/, '')),
+        ),
+      )
     expect([...new Set(named)].sort()).toEqual([...PLUGIN_NAMED_BASELINE].sort())
   })
 
@@ -766,7 +843,10 @@ describe('architecture boundaries', () => {
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/plugin-types/src/contracts/agents.ts', "'context' is a review-input provenance kind"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
-      ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
+      [
+        'packages/client-core/src/features/dataSources/SourceQueryEditor.tsx',
+        'preview is a data-query mode, not the preview plugin',
+      ],
       ['packages/client-core/src/features/dashboards/studio/PanelStudio.tsx', 'preview is a dashboard run mode'],
       ['packages/client-core/src/features/dashboards/studio/stageFormParts.tsx', 'context is a binding address'],
       ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
@@ -774,7 +854,10 @@ describe('architecture boundaries', () => {
       ['packages/dashboards-core/src/outline.ts', 'context is a binding address; database is a Lucide icon name'],
       ['packages/node-core/src/server/dashboards/run.ts', 'context is a binding address and preview is a run mode'],
       ['packages/node-core/src/server/dataSources/coreTasks.ts', 'context is a binding address in a starter plan'],
-      ['packages/node-core/src/server/queries/sourceContext.ts', 'context is a host binding; github names the core-owned project repository facet'],
+      [
+        'packages/node-core/src/server/queries/sourceContext.ts',
+        'context is a host binding; github names the core-owned project repository facet',
+      ],
       ['packages/node-core/src/server/queries/validation.ts', 'context is a binding address'],
       ['packages/protocol/src/dashboards/panels.ts', 'preview is a dashboard run mode'],
       ['packages/protocol/src/data/queries/contextTime.ts', 'context is a binding address'],
@@ -800,7 +883,10 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],
-      ['packages/node-core/src/server/plugins/nodePluginWorker.ts', "'context' the RPC path and 'http' the Node builtin"],
+      [
+        'packages/node-core/src/server/plugins/nodePluginWorker.ts',
+        "'context' the RPC path and 'http' the Node builtin",
+      ],
       ['packages/protocol/src/plugin/nodeBuiltins.ts', "'http' the Node builtin family"],
       ['packages/node-core/src/server/plugins/storagePolicy.ts', "'memory' the SQLite temp_store value"],
       // `database` the layer a workflow definition was found in: a row in acorn's own store rather
@@ -827,7 +913,10 @@ describe('architecture boundaries', () => {
       ['packages/protocol/src/chrome/settingsPages.ts', "'agents' the settings rail group"],
       // Moved from apps/desktop so the terminal lists the same pages. Search words name the services a
       // Services page lists, which is text a person types, not a branch on a plugin.
-      ['packages/client-core/src/features/settings/corePages.ts', "'agents' the settings rail group, and service names as search words"],
+      [
+        'packages/client-core/src/features/settings/corePages.ts',
+        "'agents' the settings rail group, and service names as search words",
+      ],
     ])
 
     // A `//` outside a string starts a comment. Prose is allowed to name a plugin, and most of the
@@ -853,7 +942,11 @@ describe('architecture boundaries', () => {
 
     // Core's `git` literals name the VCS and commands, not the Git plugin. Check explicit package,
     // route, and source ids separately so this collision does not hide a real plugin dependency.
-    const roster = new Set(PACKAGES.filter((p) => p.kind === 'plugin' && p.name !== '@acorn/plugin-git').map((p) => p.name.replace('@acorn/plugin-', '')))
+    const roster = new Set(
+      PACKAGES.filter((p) => p.kind === 'plugin' && p.name !== '@acorn/plugin-git').map((p) =>
+        p.name.replace('@acorn/plugin-', ''),
+      ),
+    )
     const namesGitPlugin = (source: string): boolean =>
       /@acorn\/plugin-git\b|\/v1\/p\/git(?:\/|\b)|\bgit\.worktrees\b/.test(codeOnly(source))
     const namesAPlugin = (source: string): string[] => {
@@ -942,11 +1035,25 @@ describe('architecture boundaries', () => {
     const LAZY_REQUIRE = /\(\s*['"]electron['"]\s*\)/
     const withoutComments = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
     const files = PACKAGES.flatMap((p) => walk(p.src))
-    expect(files.filter((f) => LAZY_REQUIRE.test(withoutComments(readFileSync(f, 'utf8')))).map(rel).sort()).toEqual([])
+    expect(
+      files
+        .filter((f) => LAZY_REQUIRE.test(withoutComments(readFileSync(f, 'utf8'))))
+        .map(rel)
+        .sort(),
+    ).toEqual([])
     // And out of the manifests, so nobody reinstalls it by accident.
-    const manifestOf = (p: Pkg) => JSON.parse(readFileSync(join(p.dir, 'package.json'), 'utf8')) as Record<string, Record<string, string> | undefined>
-    const declares = (p: Pkg, name: string) => ['dependencies', 'devDependencies'].some((field) => manifestOf(p)[field]?.[name])
-    expect(PACKAGES.filter((p) => declares(p, 'electron')).map((p) => p.name).sort()).toEqual([])
+    const manifestOf = (p: Pkg) =>
+      JSON.parse(readFileSync(join(p.dir, 'package.json'), 'utf8')) as Record<
+        string,
+        Record<string, string> | undefined
+      >
+    const declares = (p: Pkg, name: string) =>
+      ['dependencies', 'devDependencies'].some((field) => manifestOf(p)[field]?.[name])
+    expect(
+      PACKAGES.filter((p) => declares(p, 'electron'))
+        .map((p) => p.name)
+        .sort(),
+    ).toEqual([])
 
     // Anti-vacuity: an empty result has to mean "nothing matched", not "nothing was scanned". Each of
     // the three scans is shown finding something it should.
@@ -965,7 +1072,12 @@ describe('architecture boundaries', () => {
     // the package.
     const SHELL = join(ROOT, 'apps', 'desktop', 'src', 'shell') + '/'
     const naming = [...new Set(EDGES.filter((e) => e.target.external === '@tauri-apps/api').map((e) => e.fromFile))]
-    expect(naming.filter((f) => !f.startsWith(SHELL)).map(rel).sort()).toEqual([])
+    expect(
+      naming
+        .filter((f) => !f.startsWith(SHELL))
+        .map(rel)
+        .sort(),
+    ).toEqual([])
     // Anti-vacuity: the bridge must still be the file that carries it.
     expect(naming.map(rel)).toContain('apps/desktop/src/shell/bridge.ts')
   })
@@ -990,8 +1102,8 @@ describe('architecture boundaries', () => {
     expect(files.map(rel).sort()).toEqual(PLATFORM_BASELINE)
     // Anti-vacuity: the predicate must still recognise the forms that used to be in the tree.
     expect(readsHostGlobal('const off = window.acorn?.onClosePane?.(cb)')).toBe(true)
-    expect(readsHostGlobal("window.acorn?.preview?.evict(taskId)")).toBe(true)
-    expect(readsHostGlobal("if (!window.acorn?.terminal) return null")).toBe(true)
+    expect(readsHostGlobal('window.acorn?.preview?.evict(taskId)')).toBe(true)
+    expect(readsHostGlobal('if (!window.acorn?.terminal) return null')).toBe(true)
     expect(readsHostGlobal("window['acorn'].nodeFetch(id, req)")).toBe(true)
     expect(readsHostGlobal('// the `window.acorn` global is declared in the platform seam')).toBe(false)
     expect(readsHostGlobal('const w = window.acornish')).toBe(false)
@@ -1011,12 +1123,13 @@ describe('architecture boundaries', () => {
     // the only file in this package allowed to name `PluginCache` or `PluginTrustStore` (the rule
     // above), so widening this does not widen that.
     const MAY_HOLD_A_TOKEN = /^apps\/tui\/src\/(node\/|platform\.ts$|plugins\/custody\.ts$)/
-    const importers = [...new Set(
-      EDGES
-        .filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))
-        .filter((e) => e.target.pkg?.name === '@acorn/custody')
-        .map((e) => rel(e.fromFile)),
-    )].sort()
+    const importers = [
+      ...new Set(
+        EDGES.filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))
+          .filter((e) => e.target.pkg?.name === '@acorn/custody')
+          .map((e) => rel(e.fromFile)),
+      ),
+    ].sort()
     expect(importers.filter((file) => !MAY_HOLD_A_TOKEN.test(file))).toEqual([])
     // Anti-vacuity: the seam must still be the thing that installs the broker.
     expect(importers).toContain('apps/tui/src/platform.ts')
@@ -1027,8 +1140,7 @@ describe('architecture boundaries', () => {
     // is the rail (docs/tui/focus.md § Focus regions). Everything the shell knows about its own
     // arrangement arrives through `setTopology` and `setPaneCycler`, installed from `chrome/Shell.tsx`.
     // An import the other way is how `moveBack` came to find Browse by spelling its id.
-    const reaching = EDGES
-      .filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))
+    const reaching = EDGES.filter((e) => e.fromPkg.name === '@acorn/tui' && !isTestCode(e.fromFile))
       .filter((e) => /\/src\/keys\//.test(e.fromFile))
       .filter((e) => e.target.pkg?.name === '@acorn/tui')
       .filter((e) => !!e.target.file && /\/src\/(chrome|kit)\//.test(e.target.file))
@@ -1056,9 +1168,16 @@ describe('architecture boundaries', () => {
     // bugs. `@acorn/diff-document` is on the list because `ui/diff` publishes the document types the
     // viewer's port is written in (docs/diff-rendering/document.md § The document).
     const api = PACKAGES.find((p) => p.name === '@acorn/plugin-api')!
-    const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api', '@acorn/diff-document'])
-    const foreign = EDGES.filter((e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name))
-      .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
+    const CORE = new Set([
+      '@acorn/node-core',
+      '@acorn/client-core',
+      '@acorn/protocol',
+      '@acorn/plugin-api',
+      '@acorn/diff-document',
+    ])
+    const foreign = EDGES.filter(
+      (e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name),
+    ).map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     // Re-exports only: no plain imports, and no declarations. `export … from` is the whole file.
     const DECLARES = /^\s*(import\s|export\s+(const|let|var|function|class|default|async)\b)/m
     // Deliberately not isTestCode(), which would also exempt src/testkit.ts: the entrypoint a
@@ -1080,7 +1199,9 @@ describe('architecture boundaries', () => {
     ])
     const componentLeak = entrypoints
       .filter((f) => !componentEntrypoints.has(rel(f)))
-      .flatMap((f) => (readFileSync(f, 'utf8').match(/'@acorn\/[^']+\.tsx'/g) ?? []).map((spec) => `${rel(f)}: ${spec}`))
+      .flatMap((f) =>
+        (readFileSync(f, 'utf8').match(/'@acorn\/[^']+\.tsx'/g) ?? []).map((spec) => `${rel(f)}: ${spec}`),
+      )
     expect(entrypoints.length).toBeGreaterThanOrEqual(4) // anti-vacuity: the walker found the entrypoints
     expect([...new Set([...foreign, ...declaring, ...componentLeak])].sort()).toEqual([])
   })
@@ -1104,15 +1225,16 @@ describe('architecture boundaries', () => {
       return inner.startsWith('kit/') || inner.startsWith('infra/highlight/')
     }
     const uiDir = join(ROOT, 'packages/client-core/src/kit')
-    const kitImportOffenders = (fromFile: string, specs: readonly string[]): string[] => specs.flatMap((spec) => {
-      const target = resolveSpec(fromFile, spec)
-      if (!target.file || target.pkg?.name !== '@acorn/client-core' || UI_MAY_IMPORT(target.file)) return []
-      return [`${rel(fromFile)}: ${spec}`]
-    })
+    const kitImportOffenders = (fromFile: string, specs: readonly string[]): string[] =>
+      specs.flatMap((spec) => {
+        const target = resolveSpec(fromFile, spec)
+        if (!target.file || target.pkg?.name !== '@acorn/client-core' || UI_MAY_IMPORT(target.file)) return []
+        return [`${rel(fromFile)}: ${spec}`]
+      })
     const scanned = walk(uiDir).filter((file) => !isTestCode(file)).length
-    const offenders = EDGES
-      .filter((edge) => edge.fromFile.startsWith(uiDir + '/') && !isTestCode(edge.fromFile))
-      .flatMap((edge) => kitImportOffenders(edge.fromFile, [edge.spec]))
+    const offenders = EDGES.filter(
+      (edge) => edge.fromFile.startsWith(uiDir + '/') && !isTestCode(edge.fromFile),
+    ).flatMap((edge) => kitImportOffenders(edge.fromFile, [edge.spec]))
     // Anti-vacuity: the walker must actually be finding the design system.
     expect(scanned).toBeGreaterThan(15)
     const syntheticFile = join(uiDir, 'components/overlays/tips.tsx')
@@ -1137,13 +1259,25 @@ describe('architecture boundaries', () => {
     // which Vite keeps whatever the rule says.
     const inert = (node: ts.Expression | undefined): boolean => {
       if (!node) return true
-      if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return inert(node.expression)
-      if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isIdentifier(node) || ts.isLiteralExpression(node)) return true
-      if ([ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)) return true
+      if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node))
+        return inert(node.expression)
+      if (
+        ts.isArrowFunction(node) ||
+        ts.isFunctionExpression(node) ||
+        ts.isIdentifier(node) ||
+        ts.isLiteralExpression(node)
+      )
+        return true
+      if ([ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind))
+        return true
       if (ts.isTaggedTemplateExpression(node)) return node.tag.getText() === 'String.raw'
       if (ts.isArrayLiteralExpression(node)) return node.elements.every((e) => inert(e))
       if (ts.isObjectLiteralExpression(node)) {
-        return node.properties.every((p) => ts.isPropertyAssignment(p) ? inert(p.initializer) : ts.isShorthandPropertyAssignment(p) || ts.isMethodDeclaration(p))
+        return node.properties.every((p) =>
+          ts.isPropertyAssignment(p)
+            ? inert(p.initializer)
+            : ts.isShorthandPropertyAssignment(p) || ts.isMethodDeclaration(p),
+        )
       }
       return false
     }
@@ -1152,26 +1286,46 @@ describe('architecture boundaries', () => {
     for (const file of walk(join(ROOT, 'packages/client-core/src/kit/components'))) {
       if (!file.endsWith('.tsx') || isTestCode(file)) continue
       scanned++
-      const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(file, 'utf8'),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      )
       const declared = new Set<string>()
       for (const statement of source.statements) {
         if (ts.isFunctionDeclaration(statement) && statement.name) declared.add(statement.name.text)
-        if (ts.isVariableStatement(statement)) for (const d of statement.declarationList.declarations) if (ts.isIdentifier(d.name)) declared.add(d.name.text)
+        if (ts.isVariableStatement(statement))
+          for (const d of statement.declarationList.declarations) if (ts.isIdentifier(d.name)) declared.add(d.name.text)
       }
       for (const statement of source.statements) {
         if (ts.isImportDeclaration(statement)) {
           const spec = (statement.moduleSpecifier as ts.StringLiteral).text
           if (statement.importClause || spec.endsWith('.css')) continue
-        } else if (ts.isFunctionDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isExportDeclaration(statement)) {
+        } else if (
+          ts.isFunctionDeclaration(statement) ||
+          ts.isInterfaceDeclaration(statement) ||
+          ts.isTypeAliasDeclaration(statement) ||
+          ts.isExportDeclaration(statement)
+        ) {
           continue
         } else if (ts.isExportAssignment(statement) && ts.isIdentifier(statement.expression)) {
           continue
-        } else if (ts.isVariableStatement(statement) && statement.declarationList.declarations.every((d) => inert(d.initializer))) {
+        } else if (
+          ts.isVariableStatement(statement) &&
+          statement.declarationList.declarations.every((d) => inert(d.initializer))
+        ) {
           continue
-        } else if (ts.isExpressionStatement(statement) && ts.isBinaryExpression(statement.expression)
-          && statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken
-          && ts.isPropertyAccessExpression(statement.expression.left) && ts.isIdentifier(statement.expression.left.expression)
-          && declared.has(statement.expression.left.expression.text) && inert(statement.expression.right)) {
+        } else if (
+          ts.isExpressionStatement(statement) &&
+          ts.isBinaryExpression(statement.expression) &&
+          statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          ts.isPropertyAccessExpression(statement.expression.left) &&
+          ts.isIdentifier(statement.expression.left.expression) &&
+          declared.has(statement.expression.left.expression.text) &&
+          inert(statement.expression.right)
+        ) {
           continue
         }
         offenders.push(`${rel(file)}:${source.getLineAndCharacterOfPosition(statement.getStart()).line + 1}`)
@@ -1193,8 +1347,7 @@ describe('architecture boundaries', () => {
     // in it happens to be `.ts`. The same line keybindings.ts's header already draws for a different
     // reason: this folder has to stay importable from a bare-Node test run.
     const dir = /\/packages\/client-core\/src\/host\/registries\/commands\//
-    const reaching = EDGES
-      .filter((e) => dir.test(e.fromFile) && !isTestCode(e.fromFile))
+    const reaching = EDGES.filter((e) => dir.test(e.fromFile) && !isTestCode(e.fromFile))
       .filter((e) => !!e.target.file)
       .filter((e) => e.target.file!.endsWith('.tsx') || /\/client-core\/src\/host\/palette\//.test(e.target.file!))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
@@ -1212,7 +1365,10 @@ describe('architecture boundaries', () => {
   const SESSION = 'packages/client-core/src/host/registries/commands/sessionStore.ts'
   // Each host in two files: the one that builds the session and captures the identity, and the one
   // that draws the rows.
-  const HOST_ADAPTERS = ['packages/client-core/src/host/palette/paletteView.ts', 'apps/tui/src/chrome/paletteSession.ts']
+  const HOST_ADAPTERS = [
+    'packages/client-core/src/host/palette/paletteView.ts',
+    'apps/tui/src/chrome/paletteSession.ts',
+  ]
   const HOST_RENDERERS = ['packages/client-core/src/host/palette/CommandPalette.tsx', 'apps/tui/src/chrome/Palette.tsx']
 
   it('has exactly one palette session, and both hosts render that one', () => {
@@ -1231,9 +1387,13 @@ describe('architecture boundaries', () => {
     // And both hosts reach it. Named rather than derived, because "no host has its own" is only half
     // the property: a host that stopped importing it would pass a count check by drawing nothing.
     for (const host of HOST_ADAPTERS) {
-      const edges = EDGES.filter((e) => rel(e.fromFile) === host && e.target.file
-        && (rel(e.target.file) === SESSION
-          || readFileSync(e.target.file, 'utf8').includes("createCommandSession } from './sessionStore.ts'")))
+      const edges = EDGES.filter(
+        (e) =>
+          rel(e.fromFile) === host &&
+          e.target.file &&
+          (rel(e.target.file) === SESSION ||
+            readFileSync(e.target.file, 'utf8').includes("createCommandSession } from './sessionStore.ts'")),
+      )
       expect(`${host} builds a session: ${edges.length > 0}`).toBe(`${host} builds a session: true`)
     }
   })
@@ -1258,7 +1418,8 @@ describe('architecture boundaries', () => {
       for (const [pattern, why] of FORBIDDEN) if (pattern.test(code)) offences.push(`${host}: ${why}`)
       // A renderer may not even reach the registry. An adapter may: `paletteView.ts` registers the
       // chord that opens the palette, which is a command like any other one.
-      if (HOST_RENDERERS.includes(host) && /\bcommandRegistry\b/.test(code)) offences.push(`${host}: reads the registry itself`)
+      if (HOST_RENDERERS.includes(host) && /\bcommandRegistry\b/.test(code))
+        offences.push(`${host}: reads the registry itself`)
     }
     expect(offences.sort()).toEqual([])
 
@@ -1330,7 +1491,7 @@ describe('architecture boundaries', () => {
     expect([...new Set(cycles)].sort()).toEqual([])
   })
 
-  it('the plugin SDK carries no dependency into a stranger\'s bundle', () => {
+  it("the plugin SDK carries no dependency into a stranger's bundle", () => {
     // A third-party client bundle imports `@acorn/plugin-api/ui/sdk`. Its bundler follows value
     // imports through these framework-free SDK modules and the protocol leaves they use. Keep external
     // runtime dependencies out of that closure.
@@ -1408,7 +1569,8 @@ describe('architecture boundaries', () => {
           leaks.push(`${rel(start.fromFile)}: ${step.path} (${rel(step.file)})`)
           continue
         }
-        for (const next of withinPkg.get(step.file) ?? []) queue.push({ file: next.file, path: `${step.path} -> ${next.spec}` })
+        for (const next of withinPkg.get(step.file) ?? [])
+          queue.push({ file: next.file, path: `${step.path} -> ${next.spec}` })
       }
     }
     expect([...new Set(leaks)].sort()).toEqual([])
@@ -1532,7 +1694,10 @@ describe('architecture boundaries', () => {
         // holds, and idempotency.ts describes `c.req.json()` in prose without calling it.
         const reads = text
           .split('\n')
-          .filter((line) => line.includes('c.req.json()') && !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'))
+          .filter(
+            (line) =>
+              line.includes('c.req.json()') && !line.trimStart().startsWith('//') && !line.trimStart().startsWith('*'),
+          )
         if (!reads.length || text.includes('safeParse')) continue
         if (ALLOWED.has(rel(file))) continue
         offenders.push(`${rel(file)}: ${reads.length} body read(s), no safeParse`)
@@ -1540,7 +1705,9 @@ describe('architecture boundaries', () => {
     }
     expect(offenders.sort()).toEqual([])
     // Anti-vacuity: the tree has mutation routes, and they do read bodies.
-    const readers = PACKAGES.flatMap((pkg) => walk(pkg.src)).filter((file) => readFileSync(file, 'utf8').includes('c.req.json()'))
+    const readers = PACKAGES.flatMap((pkg) => walk(pkg.src)).filter((file) =>
+      readFileSync(file, 'utf8').includes('c.req.json()'),
+    )
     expect(readers.length).toBeGreaterThan(20)
     // And every allowlist entry still names a file that still reads a body, so an exception cannot
     // outlive the code it excuses.
@@ -1582,8 +1749,8 @@ describe('architecture boundaries', () => {
     // that plugin's regions under jsdom (plugins/vitest.shared.ts § hosts), which is the whole point
     // of that tier and never reaches a user.
     const mountsSolid = (source: string): boolean =>
-      /\bimport\s*\{[^}]*\brender\b[^}]*\}\s*from\s*'solid-js\/web'/.test(source)
-      || /\bimport\s*\*\s*as\s+\w+\s*from\s*'solid-js\/web'/.test(source)
+      /\bimport\s*\{[^}]*\brender\b[^}]*\}\s*from\s*'solid-js\/web'/.test(source) ||
+      /\bimport\s*\*\s*as\s+\w+\s*from\s*'solid-js\/web'/.test(source)
     const roots = pluginFiles
       .filter((file) => /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file))
       .filter((file) => mountsSolid(readFileSync(file, 'utf8')))
@@ -1611,12 +1778,14 @@ describe('architecture boundaries', () => {
       scanned++
       for (const entry of readdirSync(pkg.src, { withFileTypes: true })) {
         if (!entry.isDirectory()) problems.push(`${rel(join(pkg.src, entry.name))} is a loose file under src/`)
-        else if (!NAMES.includes(entry.name)) problems.push(`${rel(join(pkg.src, entry.name))} is not one of ${NAMES.join(', ')}`)
+        else if (!NAMES.includes(entry.name))
+          problems.push(`${rel(join(pkg.src, entry.name))} is not one of ${NAMES.join(', ')}`)
       }
       const nodeDir = join(pkg.src, 'node')
       if (!existsSync(nodeDir)) continue
       for (const entry of readdirSync(nodeDir, { withFileTypes: true })) {
-        if (entry.isDirectory() || !NODE_FILES.test(entry.name)) problems.push(`${rel(join(nodeDir, entry.name))} is not index.ts, schema.ts, or a test of one`)
+        if (entry.isDirectory() || !NODE_FILES.test(entry.name))
+          problems.push(`${rel(join(nodeDir, entry.name))} is not index.ts, schema.ts, or a test of one`)
       }
     }
     // Anti-vacuity: a moved plugins/ root would leave nothing to scan and pass on an empty tree.
@@ -1631,7 +1800,12 @@ describe('architecture boundaries', () => {
     const files = PACKAGES.flatMap((pkg) => walk(join(pkg.src, 'contract')))
     // Anti-vacuity: the contract folders exist and hold files, so an empty offender list means something.
     expect(files.length).toBeGreaterThan(15)
-    expect(files.filter((file) => /\.test\.tsx?$/.test(file)).map(rel).sort()).toEqual([])
+    expect(
+      files
+        .filter((file) => /\.test\.tsx?$/.test(file))
+        .map(rel)
+        .sort(),
+    ).toEqual([])
   })
 
   it('no folder is named main, service, or wiring', () => {
@@ -1653,7 +1827,12 @@ describe('architecture boundaries', () => {
     const all = PACKAGES.flatMap((pkg) => dirs(pkg.src))
     // Anti-vacuity: the walker has to be seeing the tree for an empty offender list to mean anything.
     expect(all.length).toBeGreaterThan(200)
-    expect(all.filter((d) => RETIRED.includes(basename(d))).map(rel).sort()).toEqual([])
+    expect(
+      all
+        .filter((d) => RETIRED.includes(basename(d)))
+        .map(rel)
+        .sort(),
+    ).toEqual([])
   })
 
   it('every workspace package declares a one-line description', () => {

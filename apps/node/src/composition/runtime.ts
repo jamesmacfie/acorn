@@ -54,13 +54,14 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   let stopped = false
   let stopInstalledBytes = () => {}
   let stopping: Promise<void> | null = null
-  const stop = (): Promise<void> => (stopping ??= (async () => {
-    stopped = true
-    stateChanged('draining')
-    stopInstalledBytes()
-    await node.stop()
-    stateChanged('stopped')
-  })())
+  const stop = (): Promise<void> =>
+    (stopping ??= (async () => {
+      stopped = true
+      stateChanged('draining')
+      stopInstalledBytes()
+      await node.stop()
+      stateChanged('stopped')
+    })())
 
   // The app's shipped and installed bytes, once, a minute after boot (node-core
   // server/telemetry/installedBytes.ts). Only the desktop app hands over its resource directory, as
@@ -81,7 +82,9 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   }
 
   stateChanged('reconciling')
-  void node.reconciled.then(() => { if (!stopped) stateChanged('ready') })
+  void node.reconciled.then(() => {
+    if (!stopped) stateChanged('ready')
+  })
 
   try {
     return {

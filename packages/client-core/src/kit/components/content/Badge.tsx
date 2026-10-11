@@ -19,21 +19,25 @@ export function Badge(props: {
   const tipId = createUniqueId()
   return (
     <>
-    <span
-      class="ui-badge"
-      data-tone={props.tone ?? 'neutral'}
-      data-shape={props.shape ?? 'tag'}
-      data-size={props.size ?? 'sm'}
-      data-dashed={props.dashed ? '' : undefined}
-      data-tip={props.tip}
-      role={props.tip ? 'note' : undefined}
-      tabindex={props.tip ? 0 : undefined}
-      aria-describedby={props.tip ? tipId : undefined}
-    >
-      {props.children}
-    </span>
-    {/* Beside the badge rather than in it, so its text is still just the word. */}
-    <Show when={props.tip}><span id={tipId} hidden>{props.tip}</span></Show>
+      <span
+        class="ui-badge"
+        data-tone={props.tone ?? 'neutral'}
+        data-shape={props.shape ?? 'tag'}
+        data-size={props.size ?? 'sm'}
+        data-dashed={props.dashed ? '' : undefined}
+        data-tip={props.tip}
+        role={props.tip ? 'note' : undefined}
+        tabindex={props.tip ? 0 : undefined}
+        aria-describedby={props.tip ? tipId : undefined}
+      >
+        {props.children}
+      </span>
+      {/* Beside the badge rather than in it, so its text is still just the word. */}
+      <Show when={props.tip}>
+        <span id={tipId} hidden>
+          {props.tip}
+        </span>
+      </Show>
     </>
   )
 }

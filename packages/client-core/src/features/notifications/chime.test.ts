@@ -16,10 +16,19 @@ function fakeAudio(currentTime = 5): AudioContextLike & { played: Scheduled[] } 
       const note: Scheduled = { frequencyHz: 0, startAt: 0, stopAt: 0 }
       played.push(note)
       return {
-        frequency: { setValueAtTime: (value) => { note.frequencyHz = value }, linearRampToValueAtTime: () => {} },
+        frequency: {
+          setValueAtTime: (value) => {
+            note.frequencyHz = value
+          },
+          linearRampToValueAtTime: () => {},
+        },
         connect: () => {},
-        start: (at) => { note.startAt = at },
-        stop: (at) => { note.stopAt = at },
+        start: (at) => {
+          note.startAt = at
+        },
+        stop: (at) => {
+          note.stopAt = at
+        },
       }
     },
     createGain: () => ({
@@ -47,27 +56,41 @@ describe('the schedules', () => {
 it('plays each note at its own frequency, offset from the context clock', () => {
   const audio = fakeAudio(5)
   playChime('attention', audio)
-  expect(audio.played).toEqual(CHIMES.attention.map((note) => ({
-    frequencyHz: note.frequencyHz,
-    startAt: 5 + note.startMs / 1000,
-    stopAt: 5 + (note.startMs + note.durationMs) / 1000,
-  })))
+  expect(audio.played).toEqual(
+    CHIMES.attention.map((note) => ({
+      frequencyHz: note.frequencyHz,
+      startAt: 5 + note.startMs / 1000,
+      stopAt: 5 + (note.startMs + note.durationMs) / 1000,
+    })),
+  )
 })
 
 // The switch. `sound` on is the default a device with no preference reads, so only "off" needs saying.
 const settings = vi.hoisted(() => ({ sound: true }))
 vi.mock('./settings', async (original) => ({
   ...(await original<object>()),
-  readNotificationSettings: () => ({ sound: settings.sound, system: true, badge: true, events: { blocked: true, finished: true, error: true } }),
+  readNotificationSettings: () => ({
+    sound: settings.sound,
+    system: true,
+    badge: true,
+    events: { blocked: true, finished: true, error: true },
+  }),
 }))
 
 describe('the sink', () => {
   const notice = (kind: string): Notice => ({ id: 'n1', taskId: 't1', kind, title: 'claude', at: 0, read: false })
   // One context for both tests, because the module builds its own once and keeps it.
   const audio = fakeAudio(0)
-  Object.assign(globalThis, { AudioContext: function AudioContext() { return audio } })
+  Object.assign(globalThis, {
+    AudioContext: function AudioContext() {
+      return audio
+    },
+  })
 
-  beforeEach(() => { settings.sound = true; audio.played.length = 0 })
+  beforeEach(() => {
+    settings.sound = true
+    audio.played.length = 0
+  })
 
   it('rings for an agent that needs you and chimes done for one that finished', () => {
     soundSink(notice('agent-needs-input'))

@@ -27,19 +27,31 @@ export type WorkflowAgentServiceDeps = Omit<WorkflowToolDeps, 'invocation'> & {
 }
 
 export function createWorkflowAgentServices(deps: WorkflowAgentServiceDeps) {
-  const base: WorkflowToolDeps = { db: deps.db, catalog: deps.catalog, validationCatalog: deps.validationCatalog, taskScope: deps.taskScope }
+  const base: WorkflowToolDeps = {
+    db: deps.db,
+    catalog: deps.catalog,
+    validationCatalog: deps.validationCatalog,
+    taskScope: deps.taskScope,
+  }
   const policies = new WorkflowInvocationPolicies({ ...base, prepare: deps.prepare, audit: deps.audit })
   const launches = new WorkflowAgentLaunches({ ...deps, ...base, policies })
   const discovery: WorkflowToolDeps = { ...base, invocation: launches.readiness.bind(launches) }
   return {
     catalog: (cursor: string | undefined) => catalogPage(discovery, cursor),
-    list: (context: Parameters<typeof listDefinitions>[1], input: Parameters<typeof listDefinitions>[2]) => listDefinitions(discovery, context, input),
+    list: (context: Parameters<typeof listDefinitions>[1], input: Parameters<typeof listDefinitions>[2]) =>
+      listDefinitions(discovery, context, input),
     get: (taskId: string, input: Parameters<typeof getDefinition>[2]) => getDefinition(discovery, taskId, input),
     validate: (taskId: string, candidate: unknown) => validateCandidate(discovery, taskId, candidate),
     drafts: new WorkflowAgentDrafts({ ...base, writer: deps.writer, caller: deps.caller, audit: deps.audit }),
     policies,
     launches,
-    reads: new WorkflowRunReads({ db: deps.db, launches, caller: deps.caller, childRuns: deps.childRuns, requests: deps.requests }),
+    reads: new WorkflowRunReads({
+      db: deps.db,
+      launches,
+      caller: deps.caller,
+      childRuns: deps.childRuns,
+      requests: deps.requests,
+    }),
   }
 }
 

@@ -32,14 +32,20 @@ export function projectPlaceFromPath(pathname: string): Extract<Place, { kind: '
 }
 
 /** A project subpath can belong to a loaded surface even when its rail source is not project-scoped. */
-export function sourcePlaceFromPath(pathname: string, sourceId: string, projectScoped: boolean):
-  Extract<Place, { kind: 'project' | 'source' }> {
+export function sourcePlaceFromPath(
+  pathname: string,
+  sourceId: string,
+  projectScoped: boolean,
+): Extract<Place, { kind: 'project' | 'source' }> {
   const project = projectPlaceFromPath(pathname)
-  const routeOwned = project?.rest.length ? sourceIdForPath(pathname) === sourceId
-    || projectSurfaceRoutes().some((surface) =>
-      sourceRegistry.get(sourceId)?.projectSurfaceId === surface.id && !!matchRoute(surface.path, pathname)) : false
-  return project && (project.rest.length === 0 ? projectScoped : routeOwned)
-    ? project : { kind: 'source', sourceId }
+  const routeOwned = project?.rest.length
+    ? sourceIdForPath(pathname) === sourceId ||
+      projectSurfaceRoutes().some(
+        (surface) =>
+          sourceRegistry.get(sourceId)?.projectSurfaceId === surface.id && !!matchRoute(surface.path, pathname),
+      )
+    : false
+  return project && (project.rest.length === 0 ? projectScoped : routeOwned) ? project : { kind: 'source', sourceId }
 }
 
 /** Only a successful clipboard write earns the confirmation. */

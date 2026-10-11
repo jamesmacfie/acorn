@@ -3,8 +3,23 @@ import type { RpcFunctionLifetime } from './rpcOwnership'
 export type RpcFunction = (...args: never[]) => unknown
 export type FunctionMode = (path: string, fn: RpcFunction) => 'sync' | 'async'
 export type RpcScope = { id: number; functions: Set<number>; active: number; retired: boolean; sent: boolean }
-export type FunctionEntry = { fn: RpcFunction; path: string; scope?: RpcScope; terminal: boolean; scopedResult: boolean; lifetime: RpcFunctionLifetime; claims: number; published: boolean }
-export type WireFunction = { __acornRpc: 'function'; id: number; sync: boolean; scopeId?: number; terminal?: boolean } & RpcFunctionLifetime
+export type FunctionEntry = {
+  fn: RpcFunction
+  path: string
+  scope?: RpcScope
+  terminal: boolean
+  scopedResult: boolean
+  lifetime: RpcFunctionLifetime
+  claims: number
+  published: boolean
+}
+export type WireFunction = {
+  __acornRpc: 'function'
+  id: number
+  sync: boolean
+  scopeId?: number
+  terminal?: boolean
+} & RpcFunctionLifetime
 
 /** Strong exports keep a live remote proxy callable. Only its explicit owner can retire it. */
 export class RpcReferences {
@@ -33,20 +48,28 @@ export class RpcReferences {
 
   bind(owner: object, fn: RpcFunction): RpcFunction {
     let methods = this.#bindings.get(owner)
-    if (!methods) this.#bindings.set(owner, methods = new WeakMap())
+    if (!methods) this.#bindings.set(owner, (methods = new WeakMap()))
     let bound = methods.get(fn)
-    if (!bound) methods.set(fn, bound = fn.bind(owner))
+    if (!bound) methods.set(fn, (bound = fn.bind(owner)))
     return bound
   }
 
-  export(fn: RpcFunction, path: string, created: Set<number>, scope?: RpcScope, terminal = false, lifetime: RpcFunctionLifetime = {}, scopedResult = false): WireFunction {
+  export(
+    fn: RpcFunction,
+    path: string,
+    created: Set<number>,
+    scope?: RpcScope,
+    terminal = false,
+    lifetime: RpcFunctionLifetime = {},
+    scopedResult = false,
+  ): WireFunction {
     if (this.#closed) throw new Error('Plugin RPC endpoint has closed.')
     if (scope?.retired) throw new Error('Plugin RPC invocation has ended.')
     const sync = this.mode(path, fn) === 'sync'
     if (this.#closed) throw new Error('Plugin RPC endpoint has closed.')
     const key = `${scope?.id ?? 0}:${sync}:${terminal}:${scopedResult}:${lifetime.scopedArguments ?? false}:${lifetime.resultTerminal ?? ''}:${lifetime.persistentResult ?? false}`
     let identities = this.#identities.get(fn)
-    if (!identities) this.#identities.set(fn, identities = new Map())
+    if (!identities) this.#identities.set(fn, (identities = new Map()))
     let id = identities.get(key)
     if (id === undefined || !this.functions.has(id)) {
       id = this.#nextFunctionId++
@@ -54,8 +77,18 @@ export class RpcReferences {
       this.functions.set(id, { fn, path, scope, terminal, scopedResult, lifetime, claims: 0, published: false })
       scope?.functions.add(id)
     }
-    if (!created.has(id)) { created.add(id); this.functions.get(id)!.claims++ }
-    return { __acornRpc: 'function', id, sync, ...(scope ? { scopeId: scope.id } : {}), ...lifetime, ...(terminal ? { terminal: true } : {}) }
+    if (!created.has(id)) {
+      created.add(id)
+      this.functions.get(id)!.claims++
+    }
+    return {
+      __acornRpc: 'function',
+      id,
+      sync,
+      ...(scope ? { scopeId: scope.id } : {}),
+      ...lifetime,
+      ...(terminal ? { terminal: true } : {}),
+    }
   }
 
   enter(entry: FunctionEntry): () => void {
@@ -88,14 +121,20 @@ export class RpcReferences {
   commit(ids: Set<number>): void {
     for (const id of ids) {
       const entry = this.functions.get(id)
-      if (entry) { entry.published = true; entry.claims-- }
+      if (entry) {
+        entry.published = true
+        entry.claims--
+      }
     }
     ids.clear()
   }
 
   close(): void {
     this.#closed = true
-    for (const scope of this.scopes) { scope.retired = true; scope.functions.clear() }
+    for (const scope of this.scopes) {
+      scope.retired = true
+      scope.functions.clear()
+    }
     this.scopes.clear()
     this.functions.clear()
   }

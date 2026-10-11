@@ -67,10 +67,17 @@ export function hasNode(value: unknown): boolean {
 export function Line(props: { role?: TextRole; tone?: Tone; wrap?: boolean; children: JSX.Element }) {
   const run = () => styled(flatten(props.children), props.role, props.tone)
   return (
-    <Show when={hasNode(props.children)} fallback={
-      <text {...run().style} wrapMode={props.wrap ? 'word' : 'none'}>{run().text}</text>
-    }>
-      <box flexDirection="row" gap={0}>{slot(props.children)}</box>
+    <Show
+      when={hasNode(props.children)}
+      fallback={
+        <text {...run().style} wrapMode={props.wrap ? 'word' : 'none'}>
+          {run().text}
+        </text>
+      }
+    >
+      <box flexDirection="row" gap={0}>
+        {slot(props.children)}
+      </box>
     </Show>
   )
 }
@@ -105,7 +112,12 @@ export function Rule(props: { axis?: 'x' | 'y' }) {
   const vertical = () => props.axis === 'y'
   return (
     <Show when={borderCell('divider').glyph}>
-      <box border={vertical() ? ['left'] : ['top']} borderStyle="single" borderColor={slotColor('default')} flexShrink={0} />
+      <box
+        border={vertical() ? ['left'] : ['top']}
+        borderStyle="single"
+        borderColor={slotColor('default')}
+        flexShrink={0}
+      />
     </Show>
   )
 }

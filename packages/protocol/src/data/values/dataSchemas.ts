@@ -1,4 +1,11 @@
-import { DATA_LIMITS, canonicalDataEncoding, parseDataPointer, parseDataValue, type DataPrimitive, type DataValue } from './dataValues'
+import {
+  DATA_LIMITS,
+  canonicalDataEncoding,
+  parseDataPointer,
+  parseDataValue,
+  type DataPrimitive,
+  type DataValue,
+} from './dataValues'
 
 export type DataType = 'string' | 'number' | 'integer' | 'boolean' | 'null' | 'object' | 'array'
 export type DataSchema = {
@@ -18,23 +25,25 @@ export function parseDataSchema(input: unknown): DataSchema {
     if (depth > DATA_LIMITS.depth) throw new Error('Schema nesting exceeds limit')
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected structural schema')
     const keywords = ['type', 'properties', 'required', 'items', 'enum', 'additionalProperties']
-    if (Object.keys(value).some(key => !keywords.includes(key))) {
+    if (Object.keys(value).some((key) => !keywords.includes(key))) {
       throw new Error('Unsupported schema keyword')
     }
     const types = Array.isArray(value.type) ? value.type : [value.type]
     const allowed = ['string', 'number', 'integer', 'boolean', 'null', 'object', 'array']
     if (
-      types.length < 1 || types.length > 2
-      || types.some(type => typeof type !== 'string' || !allowed.includes(type))
-      || new Set(types).size !== types.length
-      || (types.length === 2 && !types.includes('null'))
-    ) throw new Error('Unsupported schema type')
-    const primary = types.find(type => type !== 'null') ?? 'null'
+      types.length < 1 ||
+      types.length > 2 ||
+      types.some((type) => typeof type !== 'string' || !allowed.includes(type)) ||
+      new Set(types).size !== types.length ||
+      (types.length === 2 && !types.includes('null'))
+    )
+      throw new Error('Unsupported schema type')
+    const primary = types.find((type) => type !== 'null') ?? 'null'
     const schema: DataSchema = {
-      type: types.length === 2 ? [primary as Exclude<DataType, 'null'>, 'null'] : primary as DataType,
+      type: types.length === 2 ? [primary as Exclude<DataType, 'null'>, 'null'] : (primary as DataType),
     }
-    const hasObjectKeywords = value.properties !== undefined
-      || value.required !== undefined || value.additionalProperties !== undefined
+    const hasObjectKeywords =
+      value.properties !== undefined || value.required !== undefined || value.additionalProperties !== undefined
     if (primary !== 'object' && hasObjectKeywords) throw new Error('Object keywords require object type')
     if (primary !== 'array' && value.items !== undefined) throw new Error('items requires array type')
     if (primary === 'array') {
@@ -43,19 +52,22 @@ export function parseDataSchema(input: unknown): DataSchema {
     }
     if (primary === 'object') {
       const properties = value.properties ?? {}
-      if (!properties || typeof properties !== 'object' || Array.isArray(properties)) throw new Error('Expected schema properties')
+      if (!properties || typeof properties !== 'object' || Array.isArray(properties))
+        throw new Error('Expected schema properties')
       schema.properties = {}
       for (const [key, property] of Object.entries(properties)) {
-        if (!parseDataPointer(`/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`)) throw new Error('Unsafe schema property')
+        if (!parseDataPointer(`/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`))
+          throw new Error('Unsafe schema property')
         if (++fields > DATA_LIMITS.fields) throw new Error('Too many schema fields')
         schema.properties[key] = visit(property, depth + 1)
       }
       if (value.required !== undefined) {
         if (
-          !Array.isArray(value.required)
-          || value.required.some(key => typeof key !== 'string' || !Object.hasOwn(properties, key))
-          || new Set(value.required).size !== value.required.length
-        ) throw new Error('Invalid required fields')
+          !Array.isArray(value.required) ||
+          value.required.some((key) => typeof key !== 'string' || !Object.hasOwn(properties, key)) ||
+          new Set(value.required).size !== value.required.length
+        )
+          throw new Error('Invalid required fields')
         schema.required = value.required as string[]
       }
       if (value.additionalProperties !== undefined) {
@@ -65,20 +77,27 @@ export function parseDataSchema(input: unknown): DataSchema {
     }
     if (value.enum !== undefined) {
       if (
-        !Array.isArray(value.enum) || !value.enum.length
-        || value.enum.length > DATA_LIMITS.options
-        || value.enum.some(item => item !== null && typeof item === 'object')
-      ) throw new Error('Invalid primitive enum')
+        !Array.isArray(value.enum) ||
+        !value.enum.length ||
+        value.enum.length > DATA_LIMITS.options ||
+        value.enum.some((item) => item !== null && typeof item === 'object')
+      )
+        throw new Error('Invalid primitive enum')
       schema.enum = value.enum as DataPrimitive[]
       for (const item of schema.enum) validateNode(item, { ...schema, enum: undefined }, '')
-      if (new Set(schema.enum.map(canonicalDataEncoding)).size !== schema.enum.length) throw new Error('Duplicate enum values')
+      if (new Set(schema.enum.map(canonicalDataEncoding)).size !== schema.enum.length)
+        throw new Error('Duplicate enum values')
     }
     return schema
   }
   return visit(raw, 0)
 }
 
-export function validateDataValue(value: unknown, schema: DataSchema, maxBytes: number = DATA_LIMITS.recordBytes): DataValue {
+export function validateDataValue(
+  value: unknown,
+  schema: DataSchema,
+  maxBytes: number = DATA_LIMITS.recordBytes,
+): DataValue {
   const parsedSchema = parseDataSchema(schema)
   const parsed = parseDataValue(value, maxBytes)
   validateNode(parsed, parsedSchema, '')
@@ -95,25 +114,31 @@ export class DataValueError extends Error {
   }
 }
 
-const childPointer = (pointer: string, key: string | number): string => `${pointer}/${String(key).replace(/~/g, '~0').replace(/\//g, '~1')}`
+const childPointer = (pointer: string, key: string | number): string =>
+  `${pointer}/${String(key).replace(/~/g, '~0').replace(/\//g, '~1')}`
 
 function validateNode(value: DataValue, schema: DataSchema, pointer: string): void {
   const types = Array.isArray(schema.type) ? schema.type : [schema.type]
   const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
-  const matchesType = types.some(expected => expected === type
-    || (expected === 'integer' && typeof value === 'number' && Number.isInteger(value)))
+  const matchesType = types.some(
+    (expected) => expected === type || (expected === 'integer' && typeof value === 'number' && Number.isInteger(value)),
+  )
   if (!matchesType) throw new DataValueError(`Value does not match ${types.join(' or ')}`, pointer)
-  if (schema.enum && !schema.enum.some(item => item === value)) throw new DataValueError(`${JSON.stringify(value)} isn't a declared choice`, pointer)
+  if (schema.enum && !schema.enum.some((item) => item === value))
+    throw new DataValueError(`${JSON.stringify(value)} isn't a declared choice`, pointer)
   if (value === null) return
   if (Array.isArray(value)) {
     for (const [index, item] of value.entries()) validateNode(item, schema.items!, childPointer(pointer, index))
     return
   }
   if (typeof value !== 'object') return
-  for (const key of schema.required ?? []) if (!Object.hasOwn(value, key)) throw new DataValueError(`Missing required field: ${key}`, childPointer(pointer, key))
+  for (const key of schema.required ?? [])
+    if (!Object.hasOwn(value, key))
+      throw new DataValueError(`Missing required field: ${key}`, childPointer(pointer, key))
   for (const [key, item] of Object.entries(value)) {
     const property = Object.hasOwn(schema.properties ?? {}, key) ? schema.properties![key] : undefined
     if (property) validateNode(item, property, childPointer(pointer, key))
-    else if (schema.additionalProperties === false) throw new DataValueError(`Unexpected field: ${key}`, childPointer(pointer, key))
+    else if (schema.additionalProperties === false)
+      throw new DataValueError(`Unexpected field: ${key}`, childPointer(pointer, key))
   }
 }

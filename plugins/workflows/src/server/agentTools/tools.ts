@@ -10,54 +10,125 @@ import type { WorkflowAgentServices } from './services'
 /** The longest one `workflow_wait` holds a request. */
 export const MAX_WAIT_MS = 30_000
 
-export const workflowRefSchema = z.discriminatedUnion('source', [
-  z.object({ source: z.literal('database'), id: z.string().min(1).max(200) }).strict(),
-  z.object({ source: z.literal('repo'), path: z.string().regex(/^\.acorn\/workflows\/[A-Za-z0-9][A-Za-z0-9_-]*\.toml$/) }).strict(),
-  z.object({ source: z.literal('user'), id: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/).max(200) }).strict(),
-]).describe('A workflow reference exactly as workflows_list returns it.')
+export const workflowRefSchema = z
+  .discriminatedUnion('source', [
+    z.object({ source: z.literal('database'), id: z.string().min(1).max(200) }).strict(),
+    z
+      .object({
+        source: z.literal('repo'),
+        path: z.string().regex(/^\.acorn\/workflows\/[A-Za-z0-9][A-Za-z0-9_-]*\.toml$/),
+      })
+      .strict(),
+    z
+      .object({
+        source: z.literal('user'),
+        id: z
+          .string()
+          .regex(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)
+          .max(200),
+      })
+      .strict(),
+  ])
+  .describe('A workflow reference exactly as workflows_list returns it.')
 
 const cursor = z.string().min(1).max(400).optional().describe('nextCursor from the previous page.')
-const definition = z.record(z.string(), z.unknown())
-  .describe('A whole workflow definition: { formatVersion: 1, baseline, name, steps: [...] }, using step kinds, fields, and profiles from workflow_catalog.')
+const definition = z
+  .record(z.string(), z.unknown())
+  .describe(
+    'A whole workflow definition: { formatVersion: 1, baseline, name, steps: [...] }, using step kinds, fields, and profiles from workflow_catalog.',
+  )
 
 const catalogInput = z.object({ cursor }).strict()
-const listInput = z.object({
-  search: z.string().max(200).optional().describe('Case-insensitive text to find in a name or reference.'),
-  cursor,
-}).strict()
-const getInput = z.object({
-  ref: workflowRefSchema,
-  revision: z.number().int().positive().optional().describe('A published revision to read. Omit to read the current draft or file.'),
-  step: z.string().min(1).max(200).optional().describe('One step ID to read in full, for a definition too large for one answer.'),
-}).strict()
+const listInput = z
+  .object({
+    search: z.string().max(200).optional().describe('Case-insensitive text to find in a name or reference.'),
+    cursor,
+  })
+  .strict()
+const getInput = z
+  .object({
+    ref: workflowRefSchema,
+    revision: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('A published revision to read. Omit to read the current draft or file.'),
+    step: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe('One step ID to read in full, for a definition too large for one answer.'),
+  })
+  .strict()
 const validateInput = z.object({ definition }).strict()
-const draftInput = z.object({
-  definition,
-  draftId: z.string().min(1).max(200).optional().describe('The ID of a draft this session created, to replace it.'),
-  expectedRevision: z.number().int().positive().optional().describe('The draft revision you last read. Required with draftId.'),
-  source: workflowRefSchema.optional().describe('A workflow to propose changes to. The Node saves a separate draft and leaves the source untouched.'),
-}).strict()
+const draftInput = z
+  .object({
+    definition,
+    draftId: z.string().min(1).max(200).optional().describe('The ID of a draft this session created, to replace it.'),
+    expectedRevision: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('The draft revision you last read. Required with draftId.'),
+    source: workflowRefSchema
+      .optional()
+      .describe('A workflow to propose changes to. The Node saves a separate draft and leaves the source untouched.'),
+  })
+  .strict()
 
-const runInput = z.object({
-  ref: workflowRefSchema,
-  digest: z.string().min(1).max(200).describe('The digest workflows_list or workflow_get returned for this workflow.'),
-  inputs: z.record(z.string(), z.unknown()).optional().transform((value) => value === undefined ? undefined : parseDataValue(value) as Record<string, import('@acorn/protocol/dataValues.ts').DataValue>)
-    .describe('Typed values for the inputs the owner lets agents set, by input name.'),
-}).strict()
+const runInput = z
+  .object({
+    ref: workflowRefSchema,
+    digest: z
+      .string()
+      .min(1)
+      .max(200)
+      .describe('The digest workflows_list or workflow_get returned for this workflow.'),
+    inputs: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .transform((value) =>
+        value === undefined
+          ? undefined
+          : (parseDataValue(value) as Record<string, import('@acorn/protocol/dataValues.ts').DataValue>),
+      )
+      .describe('Typed values for the inputs the owner lets agents set, by input name.'),
+  })
+  .strict()
 const runId = z.string().min(1).max(200).describe('The runId workflow_run returned.')
-const readInput = z.object({
-  runId,
-  step: z.string().min(1).max(200).optional().describe('One step, by its stepId or step ID, to read with its output.'),
-  cursor,
-}).strict()
-const waitInput = z.object({
-  runId,
-  after: z.string().min(1).max(64).optional().describe('The observation from your last read or wait. The wait returns when the run moves past it.'),
-  timeoutMs: z.number().int().min(1).max(MAX_WAIT_MS).optional().describe('At most 30000.'),
-}).strict()
+const readInput = z
+  .object({
+    runId,
+    step: z
+      .string()
+      .min(1)
+      .max(200)
+      .optional()
+      .describe('One step, by its stepId or step ID, to read with its output.'),
+    cursor,
+  })
+  .strict()
+const waitInput = z
+  .object({
+    runId,
+    after: z
+      .string()
+      .min(1)
+      .max(64)
+      .optional()
+      .describe('The observation from your last read or wait. The wait returns when the run moves past it.'),
+    timeoutMs: z.number().int().min(1).max(MAX_WAIT_MS).optional().describe('At most 30000.'),
+  })
+  .strict()
 const cancelInput = z.object({ runId }).strict()
 
-export function workflowAgentTools(load: () => Promise<WorkflowAgentServices>, caller: CallerLookup): AgentToolContribution[] {
+export function workflowAgentTools(
+  load: () => Promise<WorkflowAgentServices>,
+  caller: CallerLookup,
+): AgentToolContribution[] {
   // Hidden from a terminal session, which has no managed identity to own a draft or a run.
   const managed = async (context: Parameters<NonNullable<AgentToolContribution['when']>>[0]) =>
     !!(await managedCaller(caller, context).catch(() => null))
@@ -101,7 +172,8 @@ export function workflowAgentTools(load: () => Promise<WorkflowAgentServices>, c
     },
     {
       name: 'workflow_validate',
-      description: 'Check a candidate workflow definition against this Node\'s step kinds and the workflows this task can reference. Saves nothing and runs nothing.',
+      description:
+        "Check a candidate workflow definition against this Node's step kinds and the workflows this task can reference. Saves nothing and runs nothing.",
       input: validateInput,
       scope: 'task',
       risk: 'read',
@@ -140,7 +212,8 @@ export function workflowAgentTools(load: () => Promise<WorkflowAgentServices>, c
         const signed = await managedCaller(caller, context).catch(() => null)
         return !!signed && !signed.workflowOwned && !signed.delegated
       },
-      whenDescription: 'Available to signed managed agent sessions, except sessions a workflow or another agent started.',
+      whenDescription:
+        'Available to signed managed agent sessions, except sessions a workflow or another agent started.',
       handler: async (input, context) => (await load()).launches.launch(runInput.parse(input), context),
     },
     {
@@ -173,7 +246,8 @@ export function workflowAgentTools(load: () => Promise<WorkflowAgentServices>, c
     },
     {
       name: 'workflow_cancel',
-      description: 'Cancel a workflow run this session started, including any child runs. It cannot cancel the workflow you are part of or anyone else\'s run.',
+      description:
+        "Cancel a workflow run this session started, including any child runs. It cannot cancel the workflow you are part of or anyone else's run.",
       input: cancelInput,
       scope: 'task',
       risk: 'execute',

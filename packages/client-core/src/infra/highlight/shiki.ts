@@ -74,12 +74,14 @@ export function highlightToHtml(code: string, lang: string, isLive: () => boolea
     // Grammar admission is shared. A leaving block cannot cancel another block's highlight.
     if (![...live].some((consumer) => consumer())) return ''
     recordSample('core', 'highlight.html.characters', code.length)
-    const html = measure('core', 'highlight.html.render', () => hl.codeToHtml(code, {
-      lang,
-      themes: { l: 'github-light', r: 'github-dark' },
-      defaultColor: false,
-      cssVariablePrefix: '--',
-    }))
+    const html = measure('core', 'highlight.html.render', () =>
+      hl.codeToHtml(code, {
+        lang,
+        themes: { l: 'github-light', r: 'github-dark' },
+        defaultColor: false,
+        cssVariablePrefix: '--',
+      }),
+    )
     if (code.length <= HTML_CACHE_MAX_BYTES) {
       if (htmlCache.size >= HTML_CACHE_ENTRIES) {
         const oldest = htmlCache.keys().next()
@@ -129,24 +131,28 @@ export function tokenizeAnsiLines(hl: HighlighterCore, text: string): AnsiTok[][
   const clean = keepAnsiColour(text)
   const [light, dark] = (['github-light', 'github-dark'] as const).map((name) => {
     const theme = hl.getTheme(name)
-    return tokenizeAnsiWithTheme(theme, clean).map((line) => line.map((t) => ({
-      content: t.content,
-      color: t.color === theme.fg ? '' : t.color ?? '',
-      bg: t.bgColor ?? '',
-      fontStyle: t.fontStyle ?? 0,
-    })))
+    return tokenizeAnsiWithTheme(theme, clean).map((line) =>
+      line.map((t) => ({
+        content: t.content,
+        color: t.color === theme.fg ? '' : (t.color ?? ''),
+        bg: t.bgColor ?? '',
+        fontStyle: t.fontStyle ?? 0,
+      })),
+    )
   })
-  return light.map((line, i) => line.map((t, j) => {
-    const other = dark[i]?.[j]
-    return {
-      content: t.content,
-      light: t.color,
-      dark: other?.color ?? '',
-      lightBg: t.bg,
-      darkBg: other?.bg ?? '',
-      bold: (t.fontStyle & BOLD) !== 0,
-      italic: (t.fontStyle & ITALIC) !== 0,
-      underline: (t.fontStyle & UNDERLINE) !== 0,
-    }
-  }))
+  return light.map((line, i) =>
+    line.map((t, j) => {
+      const other = dark[i]?.[j]
+      return {
+        content: t.content,
+        light: t.color,
+        dark: other?.color ?? '',
+        lightBg: t.bg,
+        darkBg: other?.bg ?? '',
+        bold: (t.fontStyle & BOLD) !== 0,
+        italic: (t.fontStyle & ITALIC) !== 0,
+        underline: (t.fontStyle & UNDERLINE) !== 0,
+      }
+    }),
+  )
 }

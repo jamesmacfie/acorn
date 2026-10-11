@@ -47,7 +47,9 @@ export function commitFiles(changes: readonly LocalChange[], scope: CommitDiffSc
  *  binary, a rename with no content change — sorts last rather than first, because "no numstat" is
  *  not "no bytes". */
 const sizeOf = (file: CommitFile): number =>
-  file.additions == null && file.deletions == null ? Number.MAX_SAFE_INTEGER : (file.additions ?? 0) + (file.deletions ?? 0)
+  file.additions == null && file.deletions == null
+    ? Number.MAX_SAFE_INTEGER
+    : (file.additions ?? 0) + (file.deletions ?? 0)
 
 /** Roughly how many characters a file's patch will take: its lines, plus git's per-file header.
  *
@@ -164,7 +166,10 @@ export function buildCommitPrompt(args: {
     spent += Math.min(patch.length, room)
   }
   if (args.omit.length) {
-    lines.push('', `The last ${args.omit.length} file${args.omit.length === 1 ? '' : 's'} above changed too; their patches did not fit.`)
+    lines.push(
+      '',
+      `The last ${args.omit.length} file${args.omit.length === 1 ? '' : 's'} above changed too; their patches did not fit.`,
+    )
   }
   return lines.join('\n')
 }

@@ -35,9 +35,9 @@ describe('startup restore lifecycle', () => {
       version: 1,
       codec: {
         parse: (raw) => {
-          const value = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw
+          const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
           return value && typeof value === 'object' && typeof (value as { count?: unknown }).count === 'number'
-            ? value as LateState
+            ? (value as LateState)
             : { count: 0 }
         },
         serialize: (value) => value,
@@ -69,12 +69,9 @@ describe('startup restore lifecycle', () => {
 
     setState({ 'task-1': { count: 3 } })
     await vi.advanceTimersByTimeAsync(500)
-    expect(mocks.savePref).toHaveBeenCalledWith(
-      expect.any(QueryClient),
-      storedKey,
-      JSON.stringify({ count: 3 }),
-      { surfaceFailure: true },
-    )
+    expect(mocks.savePref).toHaveBeenCalledWith(expect.any(QueryClient), storedKey, JSON.stringify({ count: 3 }), {
+      surfaceFailure: true,
+    })
     dispose()
   })
 })

@@ -5,11 +5,18 @@ import type { SlotRef, TopbarProps } from '@acorn/protocol/chrome.ts'
 import Topbar from './Topbar'
 import { WithNestedChromeSlots } from '../plugins/NestedChromeSlot'
 
-vi.mock('../../features/fleet/NodeChip', () => ({ default: (props: { nodeId: string }) => <span data-node={props.nodeId} /> }))
+vi.mock('../../features/fleet/NodeChip', () => ({
+  default: (props: { nodeId: string }) => <span data-node={props.nodeId} />,
+}))
 
 let dispose: (() => void) | undefined
 let host: HTMLElement | undefined
-afterEach(() => { dispose?.(); host?.remove(); dispose = undefined; host = undefined })
+afterEach(() => {
+  dispose?.()
+  host?.remove()
+  dispose = undefined
+  host = undefined
+})
 
 describe('core topbar', () => {
   it('draws its shell chrome from the shared contract and places status items', () => {
@@ -20,22 +27,34 @@ describe('core topbar', () => {
       workspacesMode: 'on',
       workspace: { id: 'w1', label: 'Work' },
       workspaces: [{ id: 'w1', label: 'Work', nodeId: 'n1', nodeLabel: 'Local', projectCount: 1 }],
-      project: { id: 'p1', label: 'Project' }, projects: [{ id: 'p1', label: 'Project' }],
-      projectPickerVisible: true, projectPickerDisabled: false,
+      project: { id: 'p1', label: 'Project' },
+      projects: [{ id: 'p1', label: 'Project' }],
+      projectPickerVisible: true,
+      projectPickerDisabled: false,
       breadcrumb: [{ label: 'Project', route: '/p/p1' }, { label: '#4' }],
       node: { id: 'n1', label: 'Local', state: 'online' },
       nodes: [{ id: 'n1', label: 'Local', state: 'online' }],
-      account: null, canAddProject: false, slots: { right },
-      pickWorkspace: vi.fn(), pickProject: vi.fn(), pickNode: vi.fn(), openSettings: vi.fn(),
-      navigate, clearCache: vi.fn(), addProject: vi.fn(),
+      account: null,
+      canAddProject: false,
+      slots: { right },
+      pickWorkspace: vi.fn(),
+      pickProject: vi.fn(),
+      pickNode: vi.fn(),
+      openSettings: vi.fn(),
+      navigate,
+      clearCache: vi.fn(),
+      addProject: vi.fn(),
     }
     host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => (
-      <WithNestedChromeSlots slots={[{ ref: right, render: () => <span data-status>Ready</span> }]}>
-        <Topbar value={{ ...props, workspacePickerVisible: workspacePickerVisible() }} />
-      </WithNestedChromeSlots>
-    ), host!)
+    dispose = render(
+      () => (
+        <WithNestedChromeSlots slots={[{ ref: right, render: () => <span data-status>Ready</span> }]}>
+          <Topbar value={{ ...props, workspacePickerVisible: workspacePickerVisible() }} />
+        </WithNestedChromeSlots>
+      ),
+      host!,
+    )
     expect(host.querySelector('.topbar')).not.toBeNull()
     expect(host.querySelector('[data-node="n1"]')).not.toBeNull()
     expect(host.querySelector('[data-status]')?.textContent).toBe('Ready')
@@ -56,24 +75,52 @@ describe('core topbar', () => {
       workspacesMode: 'on',
       workspace: { id: 'w1', label: 'Work' },
       workspaces: [{ id: 'w1', label: 'Work', nodeId: 'n1', nodeLabel: 'Local', projectCount: 0 }],
-      project: null, projects: [], projectPickerVisible: false, projectPickerDisabled: false,
-      breadcrumb: [], node: null, nodes: [], account: null, canAddProject: true,
+      project: null,
+      projects: [],
+      projectPickerVisible: false,
+      projectPickerDisabled: false,
+      breadcrumb: [],
+      node: null,
+      nodes: [],
+      account: null,
+      canAddProject: true,
       slots: { right: 'minted-right' as SlotRef },
-      pickWorkspace: vi.fn(), pickProject: vi.fn(), pickNode: vi.fn(), openSettings: vi.fn(),
-      navigate: vi.fn(), clearCache: vi.fn(), addProject,
+      pickWorkspace: vi.fn(),
+      pickProject: vi.fn(),
+      pickNode: vi.fn(),
+      openSettings: vi.fn(),
+      navigate: vi.fn(),
+      clearCache: vi.fn(),
+      addProject,
     }
-    const addButton = () => [...document.querySelectorAll<HTMLButtonElement>('.repo-picker-footer button')]
-      .find((button) => button.textContent === 'Add project…')
+    const addButton = () =>
+      [...document.querySelectorAll<HTMLButtonElement>('.repo-picker-footer button')].find(
+        (button) => button.textContent === 'Add project…',
+      )
     host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => <WithNestedChromeSlots slots={[]}><Topbar value={base} /></WithNestedChromeSlots>, host!)
+    dispose = render(
+      () => (
+        <WithNestedChromeSlots slots={[]}>
+          <Topbar value={base} />
+        </WithNestedChromeSlots>
+      ),
+      host!,
+    )
     host.querySelector<HTMLButtonElement>('.repo-picker button')?.click()
     addButton()?.click()
     expect(addProject).toHaveBeenCalledOnce()
     expect(document.querySelector('.repo-picker-popover')).toBeNull()
 
     dispose()
-    dispose = render(() => <WithNestedChromeSlots slots={[]}><Topbar value={{ ...base, canAddProject: false }} /></WithNestedChromeSlots>, host!)
+    dispose = render(
+      () => (
+        <WithNestedChromeSlots slots={[]}>
+          <Topbar value={{ ...base, canAddProject: false }} />
+        </WithNestedChromeSlots>
+      ),
+      host!,
+    )
     host.querySelector<HTMLButtonElement>('.repo-picker button')?.click()
     expect(document.querySelector('.repo-picker-popover')).not.toBeNull()
     expect(addButton()).toBeUndefined()
@@ -81,18 +128,37 @@ describe('core topbar', () => {
 
   it('labels the primary picker as Project and hides the second picker while off', () => {
     const value: TopbarProps = {
-      workspacesMode: 'off', workspace: { id: 'w1', label: 'Repo' },
+      workspacesMode: 'off',
+      workspace: { id: 'w1', label: 'Repo' },
       workspaces: [{ id: 'w1', label: 'Repo', nodeId: 'n1', nodeLabel: 'Local', projectCount: 1 }],
-      project: { id: 'p1', label: 'Repo' }, projects: [{ id: 'p1', label: 'Repo' }],
-      projectPickerVisible: true, projectPickerDisabled: false,
-      breadcrumb: [], node: null, nodes: [], account: null, canAddProject: true,
+      project: { id: 'p1', label: 'Repo' },
+      projects: [{ id: 'p1', label: 'Repo' }],
+      projectPickerVisible: true,
+      projectPickerDisabled: false,
+      breadcrumb: [],
+      node: null,
+      nodes: [],
+      account: null,
+      canAddProject: true,
       slots: { right: 'right' as SlotRef },
-      pickWorkspace: vi.fn(), pickProject: vi.fn(), pickNode: vi.fn(), openSettings: vi.fn(),
-      navigate: vi.fn(), clearCache: vi.fn(), addProject: vi.fn(),
+      pickWorkspace: vi.fn(),
+      pickProject: vi.fn(),
+      pickNode: vi.fn(),
+      openSettings: vi.fn(),
+      navigate: vi.fn(),
+      clearCache: vi.fn(),
+      addProject: vi.fn(),
     }
     host = document.createElement('div')
     document.body.append(host)
-    dispose = render(() => <WithNestedChromeSlots slots={[]}><Topbar value={value} /></WithNestedChromeSlots>, host!)
+    dispose = render(
+      () => (
+        <WithNestedChromeSlots slots={[]}>
+          <Topbar value={value} />
+        </WithNestedChromeSlots>
+      ),
+      host!,
+    )
     expect(host.querySelectorAll('.repo-picker')).toHaveLength(1)
     expect(host.querySelector('[aria-label="Project"]')).not.toBeNull()
     host.querySelector<HTMLButtonElement>('.repo-picker button')!.click()

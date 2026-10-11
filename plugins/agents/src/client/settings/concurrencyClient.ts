@@ -1,8 +1,5 @@
 import { readJson, writeJson } from '@acorn/plugin-api/client'
-import {
-  agentConcurrencyRoute,
-  type AgentConcurrencyLimits,
-} from '../../shared/concurrency'
+import { agentConcurrencyRoute, type AgentConcurrencyLimits } from '../../shared/concurrency'
 
 export const agentConcurrencyQueryKey = ['agents', 'concurrency'] as const
 

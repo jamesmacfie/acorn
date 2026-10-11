@@ -1,8 +1,4 @@
-import type {
-  DashboardDisplayField,
-  DashboardDisplayRow,
-  DashboardDisplaySchema,
-} from './display'
+import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import { cellText, formatCell } from './format'
 import { dayBucket } from './planBuckets'
 import type { PanelShaping, PanelTone, PanelView } from './model'
@@ -95,7 +91,10 @@ const frameWithLeft = (left: number, tickFont = TICK_FONT): ChartFrame => {
  *  squeezed to nothing. */
 const frameFor = (yLabels: readonly string[], tickFont: number): ChartFrame => {
   const widest = Math.max(0, ...yLabels.map((label) => label.length))
-  return frameWithLeft(Math.min(CHART_BOX.width / 3, Math.max(MIN_LEFT, widest * tickFont * GLYPH_RATIO + TICK_GAP * 2)), tickFont)
+  return frameWithLeft(
+    Math.min(CHART_BOX.width / 3, Math.max(MIN_LEFT, widest * tickFont * GLYPH_RATIO + TICK_GAP * 2)),
+    tickFont,
+  )
 }
 
 /** The frame a chart has before any label widens its gutter. Only a placeholder: every plot carries
@@ -318,8 +317,7 @@ function axisNumber(schema: DashboardDisplaySchema, view: PanelView, value: numb
   return field ? cellText(formatCell(field, value)) : String(value)
 }
 
-const dayLabel = (at: number): string =>
-  new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+const dayLabel = (at: number): string => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
 /** The y axis and the frame it implies, in that order: the labels decide how wide the left gutter has
  *  to be, and the gutter decides where everything else is drawn. Both come out of one function so a
@@ -366,10 +364,8 @@ const declaredTone = (field: DashboardDisplayField | undefined, valueId: string)
 
 /** The one place a mark's colour attribute is chosen: the declared tone where there is one, an ordinal
  *  identity slot where there is not, and never both. */
-const toneOrSlot = (
-  tone: PanelTone | undefined,
-  index: number,
-): { tone: PanelTone } | { series: ChartSeriesSlot } => (tone ? { tone } : { series: seriesSlot(index) })
+const toneOrSlot = (tone: PanelTone | undefined, index: number): { tone: PanelTone } | { series: ChartSeriesSlot } =>
+  tone ? { tone } : { series: seriesSlot(index) }
 
 /** The legend for a set of drawn series, or `undefined` for fewer than two.
  *
@@ -415,8 +411,10 @@ function buildBar(
     // Object identity, not a re-bucket: `boardColumns` already decided which rows are in this series,
     // and re-deriving the intersection from the cells would have to restate its three destinations.
     const inGroup = new Set(group.rows)
-    return columns.map((column) =>
-      aggregateRows(series ? column.rows.filter((row) => inGroup.has(row)) : column.rows, schema, view) ?? 0)
+    return columns.map(
+      (column) =>
+        aggregateRows(series ? column.rows.filter((row) => inGroup.has(row)) : column.rows, schema, view) ?? 0,
+    )
   })
   const max = Math.max(0, ...values.flat())
   const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max, tickFont)
@@ -449,7 +447,8 @@ function buildBar(
         w: width,
         h: height,
       }
-    }))
+    }),
+  )
 
   // Every category label, until they would collide; then every nth, evenly. The value stays reachable
   // through the tooltip and, one view flip away, through the table.
@@ -462,11 +461,13 @@ function buildBar(
   })
 
   const legend = series
-    ? legendFor(groups.map((group, index): ChartLegendKey => ({
-      id: group.id,
-      label: group.label,
-      ...toneOrSlot(declaredTone(series, group.id), index),
-    })))
+    ? legendFor(
+        groups.map((group, index): ChartLegendKey => ({
+          id: group.id,
+          label: group.label,
+          ...toneOrSlot(declaredTone(series, group.id), index),
+        })),
+      )
     : undefined
 
   return {
@@ -488,9 +489,10 @@ function buildLine(
   shaping: PanelShaping,
   tickFont: number,
 ): ChartPlot | undefined {
-  const time = fieldById(schema, view.x)?.type === 'datetime'
-    ? fieldById(schema, view.x)!
-    : datetimeFields(schema).find((field) => field.role === 'updated') ?? datetimeFields(schema)[0]
+  const time =
+    fieldById(schema, view.x)?.type === 'datetime'
+      ? fieldById(schema, view.x)!
+      : (datetimeFields(schema).find((field) => field.role === 'updated') ?? datetimeFields(schema)[0])
   if (!time) return undefined
   const split = fieldById(schema, view.series ?? shaping.groupBy)
   const series = split?.type === 'enum' ? split : undefined
@@ -588,17 +590,19 @@ function buildLine(
       label: `${group.label || measureLabel(schema, view)} · ${dayLabel(point.day)} · ${axisNumber(schema, view, point.value)}`,
       filled: point.filled,
     }))
-    return [{
-      id: group.id || 'all',
-      label: group.label,
-      // Unsplit: one line, `--accent`, no identity question to answer. Split: the declared tone where
-      // the enum has one, else an identity slot.
-      ...(series ? toneOrSlot(declaredTone(series, group.id), index) : { tone: 'accent' as PanelTone }),
-      path: placed.length > 1 ? placed.map((point, at) => `${at ? 'L' : 'M'}${point.x} ${point.y}`).join(' ') : '',
-      // The path runs through the filled zeroes; the dots do not. A dot is where the tooltip lives and
-      // a filled day has nothing to say, so marking every empty day would bury the real ones.
-      points: placed.flatMap(({ filled, ...point }) => (filled ? [] : [point])),
-    }]
+    return [
+      {
+        id: group.id || 'all',
+        label: group.label,
+        // Unsplit: one line, `--accent`, no identity question to answer. Split: the declared tone where
+        // the enum has one, else an identity slot.
+        ...(series ? toneOrSlot(declaredTone(series, group.id), index) : { tone: 'accent' as PanelTone }),
+        path: placed.length > 1 ? placed.map((point, at) => `${at ? 'L' : 'M'}${point.x} ${point.y}`).join(' ') : '',
+        // The path runs through the filled zeroes; the dots do not. A dot is where the tooltip lives and
+        // a filled day has nothing to say, so marking every empty day would bury the real ones.
+        points: placed.flatMap(({ filled, ...point }) => (filled ? [] : [point])),
+      },
+    ]
   })
 
   const xTicks = (last === first ? [first] : [first, last]).map((day) => {
@@ -609,12 +613,14 @@ function buildLine(
   })
   // Over the lines that drew, not the groups that exist: a series with no points has no mark for a
   // swatch to stand for, and an empty declared column is a real case (`boardColumns` keeps them).
-  const legend = legendFor(lines.map((line): ChartLegendKey => ({
-    id: line.id,
-    label: line.label,
-    ...(line.tone ? { tone: line.tone } : {}),
-    ...(line.series ? { series: line.series } : {}),
-  })))
+  const legend = legendFor(
+    lines.map((line): ChartLegendKey => ({
+      id: line.id,
+      label: line.label,
+      ...(line.tone ? { tone: line.tone } : {}),
+      ...(line.series ? { series: line.series } : {}),
+    })),
+  )
   return {
     shape: 'line',
     lines,
@@ -638,6 +644,9 @@ export function buildChart(
   /** The tick font in user units, from the measured scale (TICK_FONT). */
   tickFont: number = TICK_FONT,
 ): ChartPlot | undefined {
-  const shape: ChartShape = view.shape === 'line' ? 'line' : view.shape === 'bar' ? 'bar' : (chartShapesFor(schema)[0] ?? 'bar')
-  return shape === 'line' ? buildLine(rows, schema, view, shaping, tickFont) : buildBar(rows, schema, view, shaping, tickFont)
+  const shape: ChartShape =
+    view.shape === 'line' ? 'line' : view.shape === 'bar' ? 'bar' : (chartShapesFor(schema)[0] ?? 'bar')
+  return shape === 'line'
+    ? buildLine(rows, schema, view, shaping, tickFont)
+    : buildBar(rows, schema, view, shaping, tickFont)
 }

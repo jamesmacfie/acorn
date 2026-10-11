@@ -73,8 +73,8 @@ export function managedAgentsBridge(
     },
     providers: (force) => guarded(() => runtime.providers.list(force)),
     footprint: async () => ({
-      ...await runtime.upkeep.processFootprint(),
-      ...await runtime.upkeep.diskFootprint(),
+      ...(await runtime.upkeep.processFootprint()),
+      ...(await runtime.upkeep.diskFootprint()),
     }),
     stopIdleNow: async () => ({ stopped: (await runtime.upkeep.stopIdleSessionsNow()).length }),
     // A session projected to the merged run list's shape (@acorn/protocol/runs.ts). Live sessions
@@ -115,32 +115,35 @@ export function managedAgentsBridge(
     createSession: (input, idempotencyKey) => guarded(() => runtime.acceptSession(input, idempotencyKey)),
     importTranscript: (input) => guarded(() => runtime.importTranscript(input)),
     verifyImportedResume: (sessionId) => guarded(() => runtime.verifyImportedResume(sessionId)),
-    listSessions: (filter) => guarded(async () => {
-      const page = await runtime.store.listSessions(filter)
-      return delegation ? delegation.projectSessionList(page) : page
-    }),
+    listSessions: (filter) =>
+      guarded(async () => {
+        const page = await runtime.store.listSessions(filter)
+        return delegation ? delegation.projectSessionList(page) : page
+      }),
     // Folded here rather than in the store, because this is the one caller whose reader folds anyway.
     // `store.snapshot` still answers workflow execution and the wait route with every row
     // (../../shared/usageFold.ts says why, ../sessions/sessionExecute.ts is the caller that needs them).
     // Usage folds for every reader, since applying a usage row twice changes nothing; tool calls only
     // for one that asks (./managed.ts, `fold=1`). The client read paths already omit `searchText`.
-    snapshot: (sessionId, afterSeq, eventLimit, foldTools) => guarded(async () => {
-      const snapshot = await runtime.store.clientSnapshot(sessionId, afterSeq, eventLimit)
-      const events = foldUsageEvents(snapshot.events)
-      return { ...snapshot, events: foldTools ? foldToolEvents(events) : events }
-    }),
-    referenceContext: (sessionId) => guarded(async () => sessionReferenceContext(await runtime.store.exportSnapshot(sessionId))),
+    snapshot: (sessionId, afterSeq, eventLimit, foldTools) =>
+      guarded(async () => {
+        const snapshot = await runtime.store.clientSnapshot(sessionId, afterSeq, eventLimit)
+        const events = foldUsageEvents(snapshot.events)
+        return { ...snapshot, events: foldTools ? foldToolEvents(events) : events }
+      }),
+    referenceContext: (sessionId) =>
+      guarded(async () => sessionReferenceContext(await runtime.store.exportSnapshot(sessionId))),
     setGoal: (sessionId, objective) => guarded(() => runtime.setGoal(sessionId, objective)),
     resumeGoal: (sessionId) => guarded(() => runtime.resumeGoal(sessionId)),
-    events: (sessionId, afterSeq, limit, foldTools) => guarded(async () => {
-      const page = await runtime.store.clientEventPage(sessionId, afterSeq, limit)
-      const events = foldTools ? foldToolEvents(foldUsageEvents(page.events)) : page.events
-      return { ...page, events }
-    }),
+    events: (sessionId, afterSeq, limit, foldTools) =>
+      guarded(async () => {
+        const page = await runtime.store.clientEventPage(sessionId, afterSeq, limit)
+        const events = foldTools ? foldToolEvents(foldUsageEvents(page.events)) : page.events
+        return { ...page, events }
+      }),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
     implementCodexPlan: (sessionId, itemId) => guarded(() => runtime.implementCodexPlan(sessionId, itemId)),
-    patchQueuedTurn: (sessionId, turnId, patch) =>
-      guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
+    patchQueuedTurn: (sessionId, turnId, patch) => guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
     cancelTurn: (sessionId, turnId) => guarded(() => runtime.cancelTurn(sessionId, turnId)),
     cancelSubagent: (sessionId, subagentId) => guarded(() => runtime.cancelSubagent(sessionId, subagentId)),
     resolveRequest: (sessionId, requestId, resolution, idempotencyKey) =>

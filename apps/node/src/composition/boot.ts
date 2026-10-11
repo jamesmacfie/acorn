@@ -22,7 +22,13 @@ import { createLogger, describeError, installPerfSink } from '@acorn/node-core/s
 import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry'
 import { buildPluginDeps } from './pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from './pluginState'
-import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode, type NodeDrainResources } from './composition'
+import {
+  assembleNodeGraph,
+  drainNode,
+  reconcileBundledPackages,
+  reconcileNode,
+  type NodeDrainResources,
+} from './composition'
 
 // What differs between the two hosts that boot a Node: the desktop helper's supervised Node
 // (./runtime.ts) and the standalone Node (../entries/standalone.ts). Everything else is the same
@@ -133,14 +139,15 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     dataRoot: async () => root.release(),
   }
   let stopping: Promise<void> | null = null
-  const stop = (): Promise<void> => (stopping ??= (async () => {
-    const outcome = await drainNode(drain)
-    if (outcome === 'timeout') stopLog.warn('drain exceeded its deadline; exiting anyway')
-    mark('teardown')
-    // The last chance a sink gets, and where `ACORN_PERF=1` prints its histograms. A node that was
-    // killed rather than drained still has `kill -USR2` (node-core server/telemetry/collector.ts).
-    stopTelemetry()
-  })())
+  const stop = (): Promise<void> =>
+    (stopping ??= (async () => {
+      const outcome = await drainNode(drain)
+      if (outcome === 'timeout') stopLog.warn('drain exceeded its deadline; exiting anyway')
+      mark('teardown')
+      // The last chance a sink gets, and where `ACORN_PERF=1` prints its histograms. A node that was
+      // killed rather than drained still has `kill -USR2` (node-core server/telemetry/collector.ts).
+      stopTelemetry()
+    })())
 
   try {
     // One reporter for both hosts (docs/node-distribution.md § Plugins), before the loader scans the
@@ -168,13 +175,21 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     // The factory mints on demand and `apiUrl` is assigned after binding. The ordering that matters
     // is that these bridges are installed before any request can arrive.
     let apiUrl = ''
-    const credentials = renewingInternalEnv(runtime.INTERNAL_TOKEN, dataDir, () => ({
-      ACORN_API_URL: apiUrl,
-      ACORN_NODE_ID: runtime.NODE_ID,
-      ACORN_DATA_DIR: dataDir,
-      NODE_EXTRA_CA_CERTS: join(dataDir, 'tls', 'cert.pem'),
-    }), runtime.INTERNAL_CREDENTIALS)
-    drain.dataRoot = async () => { credentials.dispose(); root.release() }
+    const credentials = renewingInternalEnv(
+      runtime.INTERNAL_TOKEN,
+      dataDir,
+      () => ({
+        ACORN_API_URL: apiUrl,
+        ACORN_NODE_ID: runtime.NODE_ID,
+        ACORN_DATA_DIR: dataDir,
+        NODE_EXTRA_CA_CERTS: join(dataDir, 'tls', 'cert.pem'),
+      }),
+      runtime.INTERNAL_CREDENTIALS,
+    )
+    drain.dataRoot = async () => {
+      credentials.dispose()
+      root.release()
+    }
     // Whether the session key opens a stored credential. The helper keeps the plain session.key unless
     // it does (docs/security/credentials.md § Node keys). A standalone Node asks the same question of
     // the key it read from a file or its environment.
@@ -213,18 +228,29 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     installPerfSink()
     // Awaited before the listener binds: a plugin's init opens and migrates its own SQLite file, so a
     // request must not be able to arrive first (server/pluginHost/host.ts).
-    const graph = await assembleNodeGraph(dataDir, buildPluginDeps({ capabilities, internalEnv: credentials.internalEnv, reconciled }))
+    const graph = await assembleNodeGraph(
+      dataDir,
+      buildPluginDeps({ capabilities, internalEnv: credentials.internalEnv, reconciled }),
+    )
     // The node's one scheduler (docs/schedules.md § Why the node, and only the node): built and
     // provided before the plugins so a declared schedule has somewhere to land, started after the
     // listener binds because a catch-up run may call this node's own routes.
     const scheduler = createScheduler(db, { env: runtime })
     const providedScheduler = capabilities.provide(SCHEDULER, scheduler)
-    drain.schedules = async () => { providedScheduler.dispose(); await scheduler.stop() }
+    drain.schedules = async () => {
+      providedScheduler.dispose()
+      await scheduler.stop()
+    }
     mark('graph')
-    const plugins = await initPlugins(
-      graph.plugins,
-      { capabilities, core, env: runtime, dataDir, disabled: disabled(), loaded: graph.loaded, mark },
-    )
+    const plugins = await initPlugins(graph.plugins, {
+      capabilities,
+      core,
+      env: runtime,
+      dataDir,
+      disabled: disabled(),
+      loaded: graph.loaded,
+      mark,
+    })
     drain.plugins = () => plugins.dispose()
     if (plugins.skipped.length) bootLog.info(`plugins disabled for this node: ${plugins.skipped.join(', ')}`)
     const pluginStateBridge = await buildPluginStateBridge({
@@ -238,21 +264,29 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
       reloadHost: plugins,
     })
     const providedPluginState = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
-    drain.pluginState = async () => { providedPluginState.dispose(); pluginStateBridge.dispose() }
+    drain.pluginState = async () => {
+      providedPluginState.dispose()
+      pluginStateBridge.dispose()
+    }
 
     // Core's own agent tools and the config-trust bridge. Both are pure functions over the database.
     wireAgentTools({ db, secrets: runtime.SECRETS, env: runtime })
     mark('install')
 
     const listener = await startListener(runtime, root, mark)
-    drain.listener = async () => { core.taskScripts.close(); await closeListener(listener.server) }
+    drain.listener = async () => {
+      core.taskScripts.close()
+      await closeListener(listener.server)
+    }
     apiUrl = listener.endpoint.origin
     mark('listener-up')
     await scheduler.start()
     mark('scheduler')
 
     if (options.mcp && process.env.NODE_ENV !== 'test') {
-      void refreshAcornMcpRegistrations().catch((error) => bootLog.warn(`MCP re-register failed: ${describeError(error).message}`))
+      void refreshAcornMcpRegistrations().catch((error) =>
+        bootLog.warn(`MCP re-register failed: ${describeError(error).message}`),
+      )
     }
     // Re-attach sessions, repair worktree state, and sweep workflow and agent records. The listener is
     // already live because resumed work calls the node's own authenticated routes.

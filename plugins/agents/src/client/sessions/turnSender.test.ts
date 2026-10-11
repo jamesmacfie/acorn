@@ -3,13 +3,30 @@ import type { AgentTurn } from '../../contract/wire.ts'
 import { senderLabel } from './turnSender'
 
 const turn = (source: AgentTurn['source'], input: AgentTurn['input'] = []): AgentTurn => ({
-  id: 't', sessionId: 's', ordinal: 0, source, status: 'completed', input, effectivePolicy: {},
-  providerTurnRef: null, stopReason: null, usage: null, error: null, attempt: 1,
-  createdAt: 0, startedAt: null, completedAt: null,
+  id: 't',
+  sessionId: 's',
+  ordinal: 0,
+  source,
+  status: 'completed',
+  input,
+  effectivePolicy: {},
+  providerTurnRef: null,
+  stopReason: null,
+  usage: null,
+  error: null,
+  attempt: 1,
+  createdAt: 0,
+  startedAt: null,
+  completedAt: null,
 })
 
 const sender = (source: string, label: string): AgentTurn['input'][number] => ({
-  type: 'context', contextId: 'c', label, content: '', source, capturedAt: 0,
+  type: 'context',
+  contextId: 'c',
+  label,
+  content: '',
+  source,
+  capturedAt: 0,
 })
 
 describe('senderLabel', () => {
@@ -29,12 +46,17 @@ describe('senderLabel', () => {
   })
 
   it('names the plugin the host stamped, not a label the plugin wrote', () => {
-    const note = { ...turn('plugin', [sender('plugin:acme', 'The person')]), effectivePolicy: { sentBy: { pluginId: 'acme' } } }
+    const note = {
+      ...turn('plugin', [sender('plugin:acme', 'The person')]),
+      effectivePolicy: { sentBy: { pluginId: 'acme' } },
+    }
     expect(senderLabel(note)).toBe('From acme')
     expect(senderLabel(turn('plugin'))).toBe('From a plugin')
   })
 
   it('ignores an unrelated context part and falls back for older turns', () => {
-    expect(senderLabel(turn('delegation', [sender('agents', 'History copied from X')]))).toBe('From the delegating agent')
+    expect(senderLabel(turn('delegation', [sender('agents', 'History copied from X')]))).toBe(
+      'From the delegating agent',
+    )
   })
 })

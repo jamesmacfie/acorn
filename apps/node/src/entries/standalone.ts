@@ -25,7 +25,8 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 // (../composition/crash.ts).
 const background = process.env.ACORN_CLI_BACKGROUND === '1'
 if (background) {
-  if (!process.env.ACORN_CLI_LOG_PATH || !process.env.ACORN_CLI_SERVICE_ID) throw new Error('Missing background service configuration')
+  if (!process.env.ACORN_CLI_LOG_PATH || !process.env.ACORN_CLI_SERVICE_ID)
+    throw new Error('Missing background service configuration')
   installBackgroundLog(process.env.ACORN_CLI_LOG_PATH)
 }
 installCrashHandlers()
@@ -44,7 +45,9 @@ await confirmAdvertiseHost(root)
 // A standalone Node has no keychain, so its keys are files in the data root or SESSION_ENC_KEY in its
 // environment. Agents it runs share its OS user and can read both (docs/security.md § What task scope
 // does and doesn't protect against).
-log.warn(`this Node keeps its signing and encryption keys in ${root.dir} or its environment, where agents it runs can read them`)
+log.warn(
+  `this Node keeps its signing and encryption keys in ${root.dir} or its environment, where agents it runs can read them`,
+)
 
 const bundledRoot = process.env.ACORN_BUNDLED_PLUGINS_DIR
 const development = process.env.NODE_ENV !== 'production'
@@ -53,7 +56,9 @@ const development = process.env.NODE_ENV !== 'production'
 // is the right answer for a service-managed node. Only a developer needs
 // `ACORN_BUNDLED_PLUGINS_DIR` set.
 if (development && !bundledRoot) {
-  pluginLog.info('ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.')
+  pluginLog.info(
+    'ACORN_BUNDLED_PLUGINS_DIR is unset, so bundled packages are not reconciled. Whatever is in the data root keeps running.',
+  )
 }
 
 // The shared boot (../composition/boot.ts). This host has no start config: no app version, no
@@ -123,25 +128,27 @@ process.once('SIGTERM', (signal) => void shutdown(signal))
 
 const previousToken = background ? readPrivateToken() : process.env.ACORN_DEVICE_TOKEN
 const handshake = JSON.stringify({
-    baseline: ACORN_BASELINE,
-    nodeId: root.nodeId,
-    // The handshake's protocol number (docs/api-reference/transport.md § Versioning): a launcher can refuse a
-    // node it cannot drive without pairing to it first.
-    protocolVersion: NODE_PROTOCOL_VERSION,
-    endpoint: listener.endpoint.origin,
-    fingerprint: listener.fingerprint,
-    certPem: listener.certPem,
-    deviceToken: await resolveDeviceToken(runtime.DEVICES, previousToken || undefined, 'Standalone node launcher'),
-  })
+  baseline: ACORN_BASELINE,
+  nodeId: root.nodeId,
+  // The handshake's protocol number (docs/api-reference/transport.md § Versioning): a launcher can refuse a
+  // node it cannot drive without pairing to it first.
+  protocolVersion: NODE_PROTOCOL_VERSION,
+  endpoint: listener.endpoint.origin,
+  fingerprint: listener.fingerprint,
+  certPem: listener.certPem,
+  deviceToken: await resolveDeviceToken(runtime.DEVICES, previousToken || undefined, 'Standalone node launcher'),
+})
 if (background) {
   writeSync(3, `${handshake}\n`)
   closeSync(3)
-}
-else console.log(handshake)
+} else console.log(handshake)
 
 function readPrivateToken(): string {
-  try { return readFileSync(4, 'utf8').trim() }
-  finally { closeSync(4) }
+  try {
+    return readFileSync(4, 'utf8').trim()
+  } finally {
+    closeSync(4)
+  }
 }
 
 // The first advertised host, or the loopback origin when there is none. One line, beside the banner
@@ -172,7 +179,7 @@ function printPairingBanner(code: string | null): void {
     console.log(`  ${alreadyPaired} device(s) already paired. For another, run:  kill -USR1 ${process.pid}`)
   }
   if (reachable.length === 0) {
-    console.log('  To reach this node from another machine, set advertiseHost in this data root\'s')
+    console.log("  To reach this node from another machine, set advertiseHost in this data root's")
     console.log('  node.json (or ACORN_ADVERTISE_HOST) and restart.')
   }
   console.log('')

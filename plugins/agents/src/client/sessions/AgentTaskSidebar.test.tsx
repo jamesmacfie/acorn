@@ -32,7 +32,8 @@ const session = (id: string, over: Partial<AgentSession> = {}): AgentSession => 
   config: {},
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [], queuedTurns: 0,
+  subagents: [],
+  queuedTurns: 0,
   lastEventSeq: 0,
   lastReadSeq: 0,
   archivedAt: null,
@@ -53,10 +54,7 @@ const nativeSubagent: AgentSubagent = {
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
 
-const mount = (
-  sessions: AgentSession[],
-  delegations: Record<string, AgentSessionDelegation>,
-): void => {
+const mount = (sessions: AgentSession[], delegations: Record<string, AgentSessionDelegation>): void => {
   const model = {
     taskSessions: () => sessions,
     sessionRoster: () => agentSessionRoster(sessions, delegations),
@@ -115,12 +113,15 @@ describe('the delegated session sidebar', () => {
     expect(rowNamed('Parent').dataset.nested).toBeUndefined()
     expect(rowNamed('Nested child').textContent).toContain('waiting')
     // The attention mark is an icon now, so what a reader gets is its name rather than a pill's words.
-    expect(rowNamed('Nested child').querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('Wants permission')
+    expect(rowNamed('Nested child').querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe(
+      'Wants permission',
+    )
     expect(rowNamed('Nested child').textContent).toContain('depth 1 · shared')
     expect(rowNamed('Terminal child').dataset.depth).toBeUndefined()
     expect(rowNamed('Terminal child').dataset.nested).toBeUndefined()
-    expect(rowNamed('Terminal child').textContent)
-      .toContain('Delegated by Claude terminal (claude-code) · depth 1 · shared')
+    expect(rowNamed('Terminal child').textContent).toContain(
+      'Delegated by Claude terminal (claude-code) · depth 1 · shared',
+    )
   })
 
   it('leads a resting session with a queued prompt on its queue, and a busy one on its motion', () => {
@@ -139,27 +140,32 @@ describe('the delegated session sidebar', () => {
   })
 
   it('shows Codex reasoning effort beside its model', () => {
-    mount([session('configured', {
-      title: 'Configured Codex',
-      config: {
-        configOptions: [
-          {
-            id: 'model',
-            label: 'Model',
-            category: 'model',
-            currentValue: 'gpt-5.6-sol',
-            values: [{ value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' }],
+    mount(
+      [
+        session('configured', {
+          title: 'Configured Codex',
+          config: {
+            configOptions: [
+              {
+                id: 'model',
+                label: 'Model',
+                category: 'model',
+                currentValue: 'gpt-5.6-sol',
+                values: [{ value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' }],
+              },
+              {
+                id: 'reasoning',
+                label: 'Effort',
+                category: 'reasoning',
+                currentValue: 'high',
+                values: [{ value: 'high', label: 'High' }],
+              },
+            ],
           },
-          {
-            id: 'reasoning',
-            label: 'Effort',
-            category: 'reasoning',
-            currentValue: 'high',
-            values: [{ value: 'high', label: 'High' }],
-          },
-        ],
-      },
-    })], {})
+        }),
+      ],
+      {},
+    )
 
     expect(rowNamed('Configured Codex').textContent).toContain('codex · GPT-5.6 Sol · High · ready')
   })
@@ -191,10 +197,13 @@ describe('the delegated session sidebar', () => {
   })
 
   it('lists workflow sessions, with their subagents, under Workflow runs and not Managed sessions', () => {
-    mount([
-      session('mine', { title: 'Mine' }),
-      session('run', { kind: 'workflow', title: 'Workflow step', subagents: [nativeSubagent] }),
-    ], {})
+    mount(
+      [
+        session('mine', { title: 'Mine' }),
+        session('run', { kind: 'workflow', title: 'Workflow step', subagents: [nativeSubagent] }),
+      ],
+      {},
+    )
 
     const group = (label: string) => host.querySelector(`[aria-label="${label}"]`)?.textContent ?? ''
     expect(group('Managed sessions')).toContain('Mine')

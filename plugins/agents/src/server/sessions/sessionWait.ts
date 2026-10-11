@@ -53,17 +53,26 @@ export function waitForSessionSnapshot(
           const facts = await deps.store.waitFacts(sessionId, afterSeq, until)
           if (settled || expired) return
           // Retain the setup recheck even when the initial reader yields after its transaction.
-          if (initial) { initial = false; dirty = true }
+          if (initial) {
+            initial = false
+            dirty = true
+          }
           if (dirty) continue
           if (facts.matched) {
             const snapshot = await deps.store.waitSnapshot(sessionId, afterSeq, until)
             if (settled || expired) return
-            if (!dirty && snapshot.wait?.matched) { finish(snapshot); return }
+            if (!dirty && snapshot.wait?.matched) {
+              finish(snapshot)
+              return
+            }
             dirty = true
           }
         } while (dirty && !settled && !expired)
-      } catch (error) { if (!expired) fail(error) }
-      finally { active = false }
+      } catch (error) {
+        if (!expired) fail(error)
+      } finally {
+        active = false
+      }
     }
     const timeout = () => {
       if (settled) return
@@ -73,15 +82,27 @@ export function waitForSessionSnapshot(
       void deps.store.waitSnapshot(sessionId, afterSeq, until).then(finish, fail)
     }
     for (const item of signals) item.addEventListener('abort', abort, { once: true })
-    if (signals.some((item) => item.aborted)) { abort(); return }
+    if (signals.some((item) => item.aborted)) {
+      abort()
+      return
+    }
     // Subscribe before the first read, closing the initial read/listener gap as well.
     off = deps.subscribe((frame) => {
-      const target = frame.channel === 'agent:event' ? frame.event.sessionId
-        : frame.channel === 'agent:session' ? frame.session.id
-        : frame.channel === 'agent:turn' ? frame.turn.sessionId
-        : frame.channel === 'agent:request' ? frame.request.sessionId : frame.sessionId
+      const target =
+        frame.channel === 'agent:event'
+          ? frame.event.sessionId
+          : frame.channel === 'agent:session'
+            ? frame.session.id
+            : frame.channel === 'agent:turn'
+              ? frame.turn.sessionId
+              : frame.channel === 'agent:request'
+                ? frame.request.sessionId
+                : frame.sessionId
       if (target !== sessionId || settled || expired) return
-      if (frame.channel === 'agent:deleted') { fail(new Error(`Managed agent session not found: ${sessionId}`)); return }
+      if (frame.channel === 'agent:deleted') {
+        fail(new Error(`Managed agent session not found: ${sessionId}`))
+        return
+      }
       dirty = true
       void check()
     })

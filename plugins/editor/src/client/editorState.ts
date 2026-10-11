@@ -21,7 +21,9 @@ export function openFileIn(list: OpenFile[], path: string, ephemeral: boolean): 
 }
 
 export function promoteFile(list: OpenFile[], path: string): OpenFile[] {
-  return list.some((f) => f.path === path && f.ephemeral) ? list.map((f) => (f.path === path ? { ...f, ephemeral: false } : f)) : list
+  return list.some((f) => f.path === path && f.ephemeral)
+    ? list.map((f) => (f.path === path ? { ...f, ephemeral: false } : f))
+    : list
 }
 
 export function closeFile(list: OpenFile[], path: string): OpenFile[] {
@@ -49,14 +51,20 @@ const [byTask, setByTask] = createSignal<Record<string, TaskEditorState>>({})
 const tabInstances = new Map<string, Map<string, object>>()
 const instanceMap = (taskId: string) => {
   let instances = tabInstances.get(taskId)
-  if (!instances) { instances = new Map(); tabInstances.set(taskId, instances) }
+  if (!instances) {
+    instances = new Map()
+    tabInstances.set(taskId, instances)
+  }
   return instances
 }
 export const editorTabIdentity = (taskId: string, path: string): object | undefined => {
   if (!openFiles(taskId).some((file) => file.path === path)) return undefined
   const instances = instanceMap(taskId)
   let identity = instances.get(path)
-  if (!identity) { identity = {}; instances.set(path, identity) }
+  if (!identity) {
+    identity = {}
+    instances.set(path, identity)
+  }
   return identity
 }
 
@@ -81,12 +89,14 @@ export const editorReopen = (taskId: string, path: string, index: number): void 
   if (!existed) instanceMap(taskId).set(path, {})
   update(taskId, (state) => {
     const files = [...state.files]
-    if (!files.some((file) => file.path === path)) files.splice(Math.min(index, files.length), 0, { path, ephemeral: false, dirty: false })
+    if (!files.some((file) => file.path === path))
+      files.splice(Math.min(index, files.length), 0, { path, ephemeral: false, dirty: false })
     else return { files: promoteFile(files, path), active: path }
     return { files, active: path }
   })
 }
-export const editorPromote = (taskId: string, path: string): void => update(taskId, (s) => ({ ...s, files: promoteFile(s.files, path) }))
+export const editorPromote = (taskId: string, path: string): void =>
+  update(taskId, (s) => ({ ...s, files: promoteFile(s.files, path) }))
 export const editorClose = (taskId: string, path: string): void => {
   update(taskId, (s) => ({ files: closeFile(s.files, path), active: nextActive(s.files, path, s.active) }))
   instanceMap(taskId).delete(path)
@@ -103,13 +113,21 @@ export const movePathsInEditorState = (state: TaskEditorState, from: string, to:
 export const editorMovePaths = (taskId: string, from: string, to: string): void => {
   update(taskId, (s) => movePathsInEditorState(s, from, to))
   const instances = instanceMap(taskId)
-  for (const [path, identity] of Array.from(instances)) if (pathContains(from, path)) { instances.delete(path); instances.set(movedPath(path, from, to), identity) }
+  for (const [path, identity] of Array.from(instances))
+    if (pathContains(from, path)) {
+      instances.delete(path)
+      instances.set(movedPath(path, from, to), identity)
+    }
 }
 
 export const removePathsInEditorState = (state: TaskEditorState, path: string): TaskEditorState => {
   const removed = state.files.filter((file) => pathContains(path, file.path))
   const files = state.files.filter((file) => !pathContains(path, file.path))
-  return { files, active: state.active && removed.some((file) => file.path === state.active) ? files[0]?.path ?? null : state.active }
+  return {
+    files,
+    active:
+      state.active && removed.some((file) => file.path === state.active) ? (files[0]?.path ?? null) : state.active,
+  }
 }
 export const editorRemovePaths = (taskId: string, path: string): void => {
   update(taskId, (s) => removePathsInEditorState(s, path))
@@ -121,7 +139,8 @@ export const captureTaskEditorState = (taskId: string): TaskEditorState => {
   return { files: state.files.map((file) => ({ ...file })), active: state.active }
 }
 
-export const pathContains = (parent: string, child: string): boolean => !parent || child === parent || child.startsWith(`${parent}/`)
+export const pathContains = (parent: string, child: string): boolean =>
+  !parent || child === parent || child.startsWith(`${parent}/`)
 export const movedPath = (path: string, from: string, to: string): string =>
   pathContains(from, path) ? `${to}${path.slice(from.length)}` : path
 
@@ -144,7 +163,8 @@ export const requestEditorReveal = (taskId: string, path: string, line: number, 
 export function serializeEditorState(): string {
   const out: Record<string, { files: { path: string; ephemeral: boolean }[]; active: string | null }> = {}
   for (const [taskId, s] of Object.entries(byTask())) {
-    if (s.files.length) out[taskId] = { files: s.files.map((f) => ({ path: f.path, ephemeral: f.ephemeral })), active: s.active }
+    if (s.files.length)
+      out[taskId] = { files: s.files.map((f) => ({ path: f.path, ephemeral: f.ephemeral })), active: s.active }
   }
   return JSON.stringify(out)
 }
@@ -152,7 +172,10 @@ export function serializeEditorState(): string {
 export function hydrateEditorState(json: string | undefined): void {
   if (!json) return
   try {
-    const raw = JSON.parse(json) as Record<string, { files?: { path?: unknown; ephemeral?: unknown }[]; active?: unknown }>
+    const raw = JSON.parse(json) as Record<
+      string,
+      { files?: { path?: unknown; ephemeral?: unknown }[]; active?: unknown }
+    >
     if (!raw || typeof raw !== 'object') return
     setByTask((prev) => {
       const next = { ...prev }
@@ -161,7 +184,11 @@ export function hydrateEditorState(json: string | undefined): void {
         const files = (Array.isArray(s.files) ? s.files : [])
           .filter((f): f is { path: string; ephemeral?: unknown } => !!f && typeof f.path === 'string' && !!f.path)
           .map((f) => ({ path: f.path, ephemeral: f.ephemeral === true, dirty: false }))
-        if (files.length) next[taskId] = { files, active: typeof s.active === 'string' && files.some((f) => f.path === s.active) ? s.active : files[0].path }
+        if (files.length)
+          next[taskId] = {
+            files,
+            active: typeof s.active === 'string' && files.some((f) => f.path === s.active) ? s.active : files[0].path,
+          }
       }
       return next
     })

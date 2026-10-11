@@ -26,32 +26,37 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
           id: 'reproduce',
           name: 'reproduce',
           after: [],
-          prompt: 'Reproduce this issue. Answer with the exact command that shows it and what it prints, or say you could not reproduce it and what you tried.\n\nIssue: ${inputs.issue}',
+          prompt:
+            'Reproduce this issue. Answer with the exact command that shows it and what it prints, or say you could not reproduce it and what you tried.\n\nIssue: ${inputs.issue}',
         },
         {
           id: 'read-the-code',
           name: 'read-the-code',
           after: [],
-          prompt: 'Find the code behind this issue without running anything. Answer with the files and functions involved, one line each, and what you think is going wrong.\n\nIssue: ${inputs.issue}',
+          prompt:
+            'Find the code behind this issue without running anything. Answer with the files and functions involved, one line each, and what you think is going wrong.\n\nIssue: ${inputs.issue}',
         },
         {
           id: 'diagnose',
           name: 'diagnose',
           after: ['reproduce', 'read-the-code'],
-          prompt: 'A reproduction attempt and a code reading of the same issue follow. Write the diagnosis: what is broken, why, and the smallest change that would fix it.',
+          prompt:
+            'A reproduction attempt and a code reading of the same issue follow. Write the diagnosis: what is broken, why, and the smallest change that would fix it.',
         },
         {
           id: 'write-the-fix',
           name: 'write-the-fix',
           after: ['diagnose'],
-          prompt: 'Make the change the diagnosis describes and run the tests that cover it. Commit nothing and push nothing.',
+          prompt:
+            'Make the change the diagnosis describes and run the tests that cover it. Commit nothing and push nothing.',
         },
         { id: 'approve', name: 'approve', kind: 'gate-human', after: ['write-the-fix'] },
         {
           id: 'open-a-pull-request',
           name: 'open-a-pull-request',
           after: ['approve'],
-          prompt: 'Commit the change, push the branch, and open a pull request. The title says what changed and the body says why.',
+          prompt:
+            'Commit the change, push the branch, and open a pull request. The title says what changed and the body says why.',
         },
       ],
     },
@@ -62,17 +67,42 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
       baseline: ACORN_BASELINE,
       formatVersion: 1,
       name: 'Plan package updates',
-      steps: [{
-        id: 'plan', name: 'Plan package updates', kind: 'agent',
-        prompt: 'List packages needing an update. Return items with a stable id and title; return an empty array when none need updates.',
-        schema: { type: 'object', required: ['items'], properties: {
-          items: { type: 'array', items: { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } } },
-        } },
-      }, {
-        id: 'update', name: 'Update each package', kind: 'workflow-map', after: ['plan'],
-        items: { step: 'plan', pointer: '/items' }, itemKey: '/id',
-        agent: { prompt: 'Update the package described by the current item, run the relevant checks, and report what changed.', onFailure: 'continue' },
-      }],
+      steps: [
+        {
+          id: 'plan',
+          name: 'Plan package updates',
+          kind: 'agent',
+          prompt:
+            'List packages needing an update. Return items with a stable id and title; return an empty array when none need updates.',
+          schema: {
+            type: 'object',
+            required: ['items'],
+            properties: {
+              items: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['id', 'title'],
+                  properties: { id: { type: 'string' }, title: { type: 'string' } },
+                },
+              },
+            },
+          },
+        },
+        {
+          id: 'update',
+          name: 'Update each package',
+          kind: 'workflow-map',
+          after: ['plan'],
+          items: { step: 'plan', pointer: '/items' },
+          itemKey: '/id',
+          agent: {
+            prompt:
+              'Update the package described by the current item, run the relevant checks, and report what changed.',
+            onFailure: 'continue',
+          },
+        },
+      ],
     },
   },
 ]
@@ -81,4 +111,6 @@ export const SECTION_EXAMPLES = [
   '## 8. Worked examples',
   '',
   ...BUILTIN_EXAMPLES.flatMap(({ def, note }) => [JSON.stringify(def, null, 2), '', note, '']),
-].join('\n').trimEnd()
+]
+  .join('\n')
+  .trimEnd()

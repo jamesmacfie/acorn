@@ -43,9 +43,7 @@ const defaultGateway: AnthropicGatewayFactory = (apiKey) => {
   }
 }
 
-export const createAnthropicProviders = (
-  gateway: AnthropicGatewayFactory = defaultGateway,
-) => {
+export const createAnthropicProviders = (gateway: AnthropicGatewayFactory = defaultGateway) => {
   const connectionProvider = publicConnectionProvider({
     id: 'anthropic',
     label: 'Anthropic',
@@ -56,14 +54,16 @@ export const createAnthropicProviders = (
       connectable: true,
       disconnectable: true,
       maxConnections: 1,
-      fields: [{
-        id: 'apiKey',
-        label: 'API key',
-        type: 'password',
-        placeholder: 'sk-ant-…',
-        hint: 'Claude Console → API keys. acorn stores it encrypted.',
-        required: true,
-      }],
+      fields: [
+        {
+          id: 'apiKey',
+          label: 'API key',
+          type: 'password',
+          placeholder: 'sk-ant-…',
+          hint: 'Claude Console → API keys. acorn stores it encrypted.',
+          required: true,
+        },
+      ],
       async validate(credentials) {
         const secret = credentials.apiKey?.trim()
         if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
@@ -107,16 +107,21 @@ export const createAnthropicProviders = (
     recommendedModelId: ANTHROPIC_RECOMMENDED_MODEL_ID,
     async generateText({ secret, input }) {
       try {
-        const message = await gateway(secret).createMessage({
-          model: input.modelId ?? ANTHROPIC_RECOMMENDED_MODEL_ID,
-          system: input.system,
-          messages: [{ role: 'user', content: input.prompt }],
-          max_tokens: input.maxOutputTokens,
-        }, input.signal)
+        const message = await gateway(secret).createMessage(
+          {
+            model: input.modelId ?? ANTHROPIC_RECOMMENDED_MODEL_ID,
+            system: input.system,
+            messages: [{ role: 'user', content: input.prompt }],
+            max_tokens: input.maxOutputTokens,
+          },
+          input.signal,
+        )
         return {
           text: message.content
-            .filter((block): block is { type: 'text'; text: string } =>
-              block.type === 'text' && typeof block.text === 'string')
+            .filter(
+              (block): block is { type: 'text'; text: string } =>
+                block.type === 'text' && typeof block.text === 'string',
+            )
             .map((block) => block.text)
             .join(''),
           modelId: message.model,
@@ -134,7 +139,5 @@ export const createAnthropicProviders = (
   return { connectionProvider, modelAdapter }
 }
 
-export const {
-  connectionProvider: anthropicConnectionProvider,
-  modelAdapter: anthropicModelProvider,
-} = createAnthropicProviders()
+export const { connectionProvider: anthropicConnectionProvider, modelAdapter: anthropicModelProvider } =
+  createAnthropicProviders()

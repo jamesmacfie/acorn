@@ -2,14 +2,41 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import {
-  activateTaskSignals, CHECK_TONE, checksState, checksSummary, clientEvents, contextMenuItems,
-  formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, railDotProps,
-  registerContextMenuItems, runContextMenuItem, tasksOptions, workspaceForProject,
-  workspacesOptions, type ItemRowTarget,
+  activateTaskSignals,
+  CHECK_TONE,
+  checksState,
+  checksSummary,
+  clientEvents,
+  contextMenuItems,
+  formatRelativeTime,
+  integrationsOptions,
+  pathForTask,
+  projectsOptions,
+  railDotProps,
+  registerContextMenuItems,
+  runContextMenuItem,
+  tasksOptions,
+  workspaceForProject,
+  workspacesOptions,
+  type ItemRowTarget,
 } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, EmptyState, Icon, Inline, Input, Menu, Row, RowActions, Rows, sidebarCollapsed,
-  StatusDot, Tabs, Text, FilterBar, UserAvatar,
+  Alert,
+  Button,
+  EmptyState,
+  Icon,
+  Inline,
+  Input,
+  Menu,
+  Row,
+  RowActions,
+  Rows,
+  sidebarCollapsed,
+  StatusDot,
+  Tabs,
+  Text,
+  FilterBar,
+  UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { debounce } from '@acorn/plugin-api/client'
 import {
@@ -30,7 +57,8 @@ import { readFailure } from './actionErrors'
 // REST list calls a merged PR closed and the closed page carries no merged_at, so a merged PR wears
 // the closed icon here. The detail header, which reads the GraphQL mirror, still says "merged".
 // Open draws no glyph: on the Open tab it said "open" on every row.
-const prState = (pull: Pull): 'draft' | 'open' | 'closed' => (pull.draft ? 'draft' : pull.state === 'open' ? 'open' : 'closed')
+const prState = (pull: Pull): 'draft' | 'open' | 'closed' =>
+  pull.draft ? 'draft' : pull.state === 'open' ? 'open' : 'closed'
 const PR_STATE_MARK = {
   draft: { icon: 'git-pull-request-draft', word: 'Draft' },
   closed: { icon: 'git-pull-request-closed', word: 'Closed' },
@@ -52,7 +80,10 @@ function ChecksDot(props: { checks: readonly { status: string | null }[] }) {
 // "14m ago" says less in less room as "14m". The row's tip carries the age in full.
 const shortAge = (at: number | null) => formatRelativeTime(at).replace(/ ago$/, '')
 
-const LIST_TABS = [{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed' }]
+const LIST_TABS = [
+  { id: 'open', label: 'Open' },
+  { id: 'closed', label: 'Closed' },
+]
 
 // The pull-request list for the routed repository. Access checks live on the server; this only needs
 // route params before it can ask for the repo's pulls.
@@ -84,7 +115,9 @@ export default function PullList() {
   const repoKnown = () => !!owner() && !!repo()
   // Open: the full mirror in one shot. Closed: paginated on demand, so only the active tab fetches.
   const openPulls = createQuery(() => pullsOptions(owner(), repo(), 'open', repoKnown() && tab() === 'open'))
-  const closedPulls = createInfiniteQuery(() => closedPullsInfiniteOptions(owner(), repo(), repoKnown() && tab() === 'closed'))
+  const closedPulls = createInfiniteQuery(() =>
+    closedPullsInfiniteOptions(owner(), repo(), repoKnown() && tab() === 'closed'),
+  )
   const closedRows = createMemo(() => closedPulls.data?.pages?.flatMap((page) => page.pulls) ?? [])
   const list = () => (tab() === 'open' ? (openPulls.data ?? []) : closedRows())
   const ready = () => (tab() === 'open' ? openPulls.data !== undefined : closedPulls.data !== undefined)
@@ -100,19 +133,23 @@ export default function PullList() {
   // for the Linear seeding, so this costs nothing extra.
   const integrations = createQuery(() => integrationsOptions(true))
   const githubConnected = () =>
-    (integrations.data?.integrations ?? []).some((connection) => connection.providerId === 'github' && connection.status === 'connected')
+    (integrations.data?.integrations ?? []).some(
+      (connection) => connection.providerId === 'github' && connection.status === 'connected',
+    )
 
   // Once the repo is known on the repo overview, warm per-pull caches so navigating is instant.
   // Direct pull routes skip first-load warm-up so detail and files own the critical path.
-  createEffect(on(
-    () => (repoKnown() && !params.number ? `${owner()}/${repo()}` : ''),
-    (key) => {
-      if (!key) return
-      const controller = new AbortController()
-      void prefetchOpenPulls(queryClient, owner(), repo(), controller.signal).catch(() => {})
-      onCleanup(() => controller.abort())
-    },
-  ))
+  createEffect(
+    on(
+      () => (repoKnown() && !params.number ? `${owner()}/${repo()}` : ''),
+      (key) => {
+        if (!key) return
+        const controller = new AbortController()
+        void prefetchOpenPulls(queryClient, owner(), repo(), controller.signal).catch(() => {})
+        onCleanup(() => controller.abort())
+      },
+    ),
+  )
 
   // Search: the loaded tab narrows as the reader types (title / author / #number), and once the text
   // settles GitHub is asked for matches past the loaded pages, in this repository and tab. Its hits
@@ -136,7 +173,9 @@ export default function PullList() {
     }
   })
   // Keyed by repository, tab and text, so an answer for another scope is never drawn for this one.
-  const search = createQuery(() => pullSearchOptions(owner(), repo(), tab(), settled(), repoKnown() && !!settled() && settled() === outbound()))
+  const search = createQuery(() =>
+    pullSearchOptions(owner(), repo(), tab(), settled(), repoKnown() && !!settled() && settled() === outbound()),
+  )
   const searchStatus = (): 'idle' | 'local' | 'searching' | 'done' | 'failed' => {
     if (!searchText()) return 'idle'
     if (!outbound()) return 'local'
@@ -157,10 +196,12 @@ export default function PullList() {
     }
     return undefined
   }
-  const items = createMemo(() => shown().map((pull) => ({
-    key: String(pull.number),
-    label: `#${pull.number} ${pull.title}`,
-  })))
+  const items = createMemo(() =>
+    shown().map((pull) => ({
+      key: String(pull.number),
+      label: `#${pull.number} ${pull.title}`,
+    })),
+  )
   const byNumber = createMemo(() => new Map(shown().map((pull) => [String(pull.number), pull])))
   // A pull's own URL, or nothing at all without a project to hang it off. `githubBrowsePath('')` is
   // `/p/`, so the old `?? ''` built `/p//42` — which is not a broken path, it is a *different* one:
@@ -189,8 +230,9 @@ export default function PullList() {
     const projectId = params.projectId
     if (!projectId || !owner() || !repo()) return
     try {
-      const headRef = pull.headRef
-        ?? (await queryClient.fetchQuery(pullDetailOptions(owner(), repo(), String(pull.number), true))).pull?.headRef
+      const headRef =
+        pull.headRef ??
+        (await queryClient.fetchQuery(pullDetailOptions(owner(), repo(), String(pull.number), true))).pull?.headRef
       if (!headRef) throw new Error("This pull request's branch isn't available, so a task can't be created for it.")
       const task = await promotePullToTask(queryClient, {
         projectId,
@@ -235,7 +277,8 @@ export default function PullList() {
     // `openAsTask` exactly as it was — find the PR's task or make one, with its Linear links — and
     // it now sits beside whatever else offers an `item.row` action, "Start workflow…" first among
     // them. Two registrations with opposite checks, so the label says which of the two it will do.
-    const isPull = (target: ItemRowTarget) => target.providerId === 'github' && typeof (target.item as Pull).number === 'number'
+    const isPull = (target: ItemRowTarget) =>
+      target.providerId === 'github' && typeof (target.item as Pull).number === 'number'
     const rows = registerContextMenuItems([
       {
         id: 'github.pull.create-task',
@@ -285,10 +328,20 @@ export default function PullList() {
             is about the list that choice produced, and squeezed into the tab row it had no room and no
             inset of its own. */}
         <FilterBar ariaLabel="Search pull requests">
-          <Input kind="filter" label="Search pull requests" placeholder="Search…" value={filter()} onInput={setFilter} />
+          <Input
+            kind="filter"
+            label="Search pull requests"
+            placeholder="Search…"
+            value={filter()}
+            onInput={setFilter}
+          />
         </FilterBar>
         <Show when={shown().length ? searchNotice() : undefined}>
-          {(notice) => <EmptyState align="start" size="sm" busy={searchStatus() === 'searching'}>{notice()}</EmptyState>}
+          {(notice) => (
+            <EmptyState align="start" size="sm" busy={searchStatus() === 'searching'}>
+              {notice()}
+            </EmptyState>
+          )}
         </Show>
       </Show>
       <Show when={taskError()}>{(text) => <Alert>{text()}</Alert>}</Show>
@@ -298,7 +351,14 @@ export default function PullList() {
           <Show
             when={!githubConnected() && (isError() || repoKnown())}
             fallback={
-              <Show when={isError()} fallback={<EmptyState align="start" size="sm" busy>Loading…</EmptyState>}>
+              <Show
+                when={isError()}
+                fallback={
+                  <EmptyState align="start" size="sm" busy>
+                    Loading…
+                  </EmptyState>
+                }
+              >
                 <EmptyState
                   align="start"
                   size="sm"
@@ -306,9 +366,16 @@ export default function PullList() {
                   action={
                     <Show
                       when={listErrorCode() === 'reauth'}
-                      fallback={<Button size="sm" onPress={() => void retry()}>Try again</Button>}
+                      fallback={
+                        <Button size="sm" onPress={() => void retry()}>
+                          Try again
+                        </Button>
+                      }
                     >
-                      <Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
+                      <Button
+                        size="sm"
+                        onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}
+                      >
                         Reconnect GitHub
                       </Button>
                     </Show>
@@ -338,9 +405,13 @@ export default function PullList() {
           fallback={
             <EmptyState align="start" size="sm">
               {searchStatus() === 'idle'
-                ? tab() === 'open' ? 'No open pull requests.' : 'No closed pull requests.'
-                : searchStatus() === 'searching' ? 'Searching GitHub…'
-                  : searchStatus() === 'failed' ? "No loaded pull requests match, and GitHub couldn't be searched."
+                ? tab() === 'open'
+                  ? 'No open pull requests.'
+                  : 'No closed pull requests.'
+                : searchStatus() === 'searching'
+                  ? 'Searching GitHub…'
+                  : searchStatus() === 'failed'
+                    ? "No loaded pull requests match, and GitHub couldn't be searched."
                     : 'No pull requests match.'}
             </EmptyState>
           }
@@ -393,23 +464,32 @@ export default function PullList() {
                       // Both marks fit the row's existing height, which is not negotiable here: this
                       // list is the app's only virtualized one and its row height is a number read
                       // off the document root, so a taller row would tear the scroll range.
-                      collapsed={collapsed()
-                        ? (
+                      collapsed={
+                        collapsed() ? (
                           <>
                             <Inline gap="inline">
                               <UserAvatar login={pull().author} />
                               <Show when={checks().length}>
-                                <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={checksSummary(checks())} />
+                                <StatusDot
+                                  {...railDotProps(CHECK_TONE[checksState(checks())])}
+                                  label={checksSummary(checks())}
+                                />
                               </Show>
                             </Inline>
                             <Text emphasis="muted">#{item.key}</Text>
                           </>
-                        )
-                        : undefined}
+                        ) : undefined
+                      }
                       leading={
                         <>
                           <ChecksDot checks={checks()} />
-                          <Show when={prState(pull()) !== 'open' ? PR_STATE_MARK[prState(pull()) as 'draft' | 'closed'] : undefined}>
+                          <Show
+                            when={
+                              prState(pull()) !== 'open'
+                                ? PR_STATE_MARK[prState(pull()) as 'draft' | 'closed']
+                                : undefined
+                            }
+                          >
                             {(mark) => <Icon name={mark().icon} title={mark().word} size={14} />}
                           </Show>
                           {/* The author column is gone, so the avatar carries the login on hover. */}
@@ -438,7 +518,9 @@ export default function PullList() {
                       }
                     >
                       {/* The number leads the title and keeps its width; the title gives way. */}
-                      <Text emphasis="mono" tone="muted">#{item.key}</Text>
+                      <Text emphasis="mono" tone="muted">
+                        #{item.key}
+                      </Text>
                       <Text>{pull().title}</Text>
                     </Row>
                   )}

@@ -62,7 +62,8 @@ class ServiceChild {
     const deadline = Date.now() + timeoutMs
     const poll = async (): Promise<void> => {
       while (!this.states.includes(state)) {
-        if (Date.now() > deadline) throw new Error(`timed out waiting for state '${state}'; saw ${this.states.join(' → ')}`)
+        if (Date.now() > deadline)
+          throw new Error(`timed out waiting for state '${state}'; saw ${this.states.join(' → ')}`)
         await new Promise((r) => setTimeout(r, 20))
       }
     }
@@ -96,14 +97,18 @@ function call(
         agent: false,
         headers: {
           ...(init.token ? { authorization: `Bearer ${init.token}` } : {}),
-          ...(payload === undefined ? {} : { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) }),
+          ...(payload === undefined
+            ? {}
+            : { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) }),
           ...(init.idempotencyKey ? { 'idempotency-key': init.idempotencyKey } : {}),
         },
       },
       (res) => {
         const chunks: Buffer[] = []
         res.on('data', (chunk: Buffer) => chunks.push(chunk))
-        res.on('end', () => resolvePromise({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }))
+        res.on('end', () =>
+          resolvePromise({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
+        )
       },
     )
     req.on('error', reject)
@@ -153,7 +158,13 @@ describe('the service as a spawned child process', () => {
   it('refuses missing or different baseline before opening the data root', async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-spawn-incompatible-'))
     child = new ServiceChild({ SESSION_ENC_KEY: '0'.repeat(64), GITHUB_CLIENT_ID: 'test-client', ACORN_PORT: '' })
-    const config = { dataDir, version: 'spawn-test', isPackaged: false, hostRuntimePath: process.execPath, mcpEntry: join(dataDir, 'unused-mcp.js') }
+    const config = {
+      dataDir,
+      version: 'spawn-test',
+      isPackaged: false,
+      hostRuntimePath: process.execPath,
+      mcpEntry: join(dataDir, 'unused-mcp.js'),
+    }
     await expect(child.request('service.start', config)).rejects.toThrow()
     await expect(child.request('service.start', { ...config, baseline: 'other' })).rejects.toThrow()
     expect(readdirSync(dataDir)).toEqual([])
@@ -164,7 +175,14 @@ describe('the service as a spawned child process', () => {
   it('refuses a start message without keys, naming them', async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-spawn-keyless-'))
     child = new ServiceChild({ GITHUB_CLIENT_ID: 'test-client', ACORN_PORT: '' })
-    const config = { baseline: ACORN_BASELINE, dataDir, version: 'spawn-test', isPackaged: false, hostRuntimePath: process.execPath, mcpEntry: join(dataDir, 'unused-mcp.js') }
+    const config = {
+      baseline: ACORN_BASELINE,
+      dataDir,
+      version: 'spawn-test',
+      isPackaged: false,
+      hostRuntimePath: process.execPath,
+      mcpEntry: join(dataDir, 'unused-mcp.js'),
+    }
     await expect(child.request('service.start', config)).rejects.toThrow(/keys/)
     expect(readdirSync(dataDir)).toEqual([])
   })
@@ -208,8 +226,16 @@ describe('the service as a spawned child process', () => {
     // Idempotency-Key through the middleware createApp() mounts. POST /v1/core/pair/start mints a new
     // code on every call, so an identical body back is only explicable as the stored response.
     const key = randomUUID()
-    const opened = await call(started, '/v1/core/pair/start', { method: 'POST', token: started.deviceToken, idempotencyKey: key })
-    const replayed = await call(started, '/v1/core/pair/start', { method: 'POST', token: started.deviceToken, idempotencyKey: key })
+    const opened = await call(started, '/v1/core/pair/start', {
+      method: 'POST',
+      token: started.deviceToken,
+      idempotencyKey: key,
+    })
+    const replayed = await call(started, '/v1/core/pair/start', {
+      method: 'POST',
+      token: started.deviceToken,
+      idempotencyKey: key,
+    })
     expect(opened.status).toBe(200)
     expect(replayed.status).toBe(200)
     expect(replayed.body).toBe(opened.body)
@@ -225,7 +251,10 @@ describe('the service as a spawned child process', () => {
     expect((await call(started, '/v1/core/devices', { token: result.deviceToken })).status).toBe(200)
 
     // And revocation takes it away on the very next request, envelope and all.
-    const revoke = await call(started, `/v1/core/devices/${result.device.id}`, { method: 'DELETE', token: started.deviceToken })
+    const revoke = await call(started, `/v1/core/devices/${result.device.id}`, {
+      method: 'DELETE',
+      token: started.deviceToken,
+    })
     expect(revoke.status).toBe(204)
     const after = await call(started, '/v1/core/devices', { token: result.deviceToken })
     expect(after.status).toBe(401)

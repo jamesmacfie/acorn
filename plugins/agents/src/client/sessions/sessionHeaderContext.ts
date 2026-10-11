@@ -79,19 +79,21 @@ export function sessionHeaderContext(
       const turnUsage = usage.get(turn.id)
       if (!turnUsage) return []
       const model = advertisedModel(turn) ?? currentSessionModel(session)
-      return [{
-        turnId: turn.id,
-        model,
-        usage: turnUsage,
-        price: model
-          ? agentModelPrice(
-              session.providerId,
-              model,
-              turn.completedAt ?? turn.startedAt ?? turn.createdAt,
-              preferences,
-            )
-          : null,
-      }]
+      return [
+        {
+          turnId: turn.id,
+          model,
+          usage: turnUsage,
+          price: model
+            ? agentModelPrice(
+                session.providerId,
+                model,
+                turn.completedAt ?? turn.startedAt ?? turn.createdAt,
+                preferences,
+              )
+            : null,
+        },
+      ]
     }),
   }
 }

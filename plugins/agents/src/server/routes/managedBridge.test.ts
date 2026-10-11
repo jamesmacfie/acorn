@@ -42,13 +42,16 @@ describe('the snapshot a client reads', () => {
   const bridge = () => managedAgentsBridge({ store } as unknown as ManagedAgentRuntime)
 
   it('carries one usage row a turn, and the ledger still holds every one', async () => {
-    const session = await store.createSession({
-      taskId: randomUUID(),
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, PROVIDER)
+    const session = await store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      PROVIDER,
+    )
     const { turn } = await store.enqueueTurn(session.id, {
       source: 'interactive',
       input: [{ type: 'text', text: 'go' }],
@@ -81,13 +84,16 @@ describe('the snapshot a client reads', () => {
   })
 
   it('folds a tool call only for a reader that asks, and pages on from where the fold reached', async () => {
-    const session = await store.createSession({
-      taskId: randomUUID(),
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, PROVIDER)
+    const session = await store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      PROVIDER,
+    )
     const { turn } = await store.enqueueTurn(session.id, {
       source: 'interactive',
       input: [{ type: 'text', text: 'go' }],
@@ -130,13 +136,16 @@ describe('the snapshot a client reads', () => {
   })
 
   it('leaves the search text out of both pages, and keeps it for export', async () => {
-    const session = await store.createSession({
-      taskId: randomUUID(),
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, PROVIDER)
+    const session = await store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      PROVIDER,
+    )
     await store.recordEvent(session.id, null, { type: 'tool', tool: { id: 'cmd', title: 'ls', output: 'README.md' } })
 
     const reads = [
@@ -153,50 +162,79 @@ describe('the snapshot a client reads', () => {
   })
 
   it('projects delegation visibility onto the bounded session list', async () => {
-    const session = await store.createSession({
-      taskId: randomUUID(),
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'delegated',
-      config: {},
-    }, PROVIDER)
+    const session = await store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'delegated',
+        config: {},
+      },
+      PROVIDER,
+    )
     const projectSessionList = async (page: Awaited<ReturnType<AgentStore['listSessions']>>) => ({
       ...page,
-      delegations: [{
-        sessionId: session.id,
-        depth: 1,
-        isolation: 'shared' as const,
-        owner: { kind: 'managed' as const, parentSessionId: 'parent-1' },
-      }],
+      delegations: [
+        {
+          sessionId: session.id,
+          depth: 1,
+          isolation: 'shared' as const,
+          owner: { kind: 'managed' as const, parentSessionId: 'parent-1' },
+        },
+      ],
     })
 
-    const listed = await managedAgentsBridge(
-      { store } as unknown as ManagedAgentRuntime,
-      { projectSessionList },
-    ).listSessions({ taskId: session.taskId })
-    expect(listed.delegations).toEqual([{
-      sessionId: session.id,
-      depth: 1,
-      isolation: 'shared',
-      owner: { kind: 'managed', parentSessionId: 'parent-1' },
-    }])
+    const listed = await managedAgentsBridge({ store } as unknown as ManagedAgentRuntime, {
+      projectSessionList,
+    }).listSessions({ taskId: session.taskId })
+    expect(listed.delegations).toEqual([
+      {
+        sessionId: session.id,
+        depth: 1,
+        isolation: 'shared',
+        owner: { kind: 'managed', parentSessionId: 'parent-1' },
+      },
+    ])
   })
 })
 
 it('answers a session for an unknown provider as a bad request', async () => {
   const runtime = {
-    acceptSession: async () => { throw new Error('Unknown agent provider: nope') },
+    acceptSession: async () => {
+      throw new Error('Unknown agent provider: nope')
+    },
   } as unknown as ManagedAgentRuntime
-  await expect(managedAgentsBridge(runtime).createSession({ providerId: 'nope' } as never)).rejects.toMatchObject({ status: 400, code: 'bad_request' })
+  await expect(managedAgentsBridge(runtime).createSession({ providerId: 'nope' } as never)).rejects.toMatchObject({
+    status: 400,
+    code: 'bad_request',
+  })
 })
 
 it('answers a secret gate refusal as a conflict that keeps its reason', async () => {
   const { SecretPublicationRefused } = await import('../sessions/secretPublication')
-  const report = { detectorVersion: 'acorn-secrets/1', digest: 'd', findings: [{ rule: 'npm-token', confidence: 'high' as const, location: 'markdown export', line: 4, column: 1 }], counts: { high: 1, heuristic: 0 }, truncated: false, unscanned: [], complete: true, limits: [] }
+  const report = {
+    detectorVersion: 'acorn-secrets/1',
+    digest: 'd',
+    findings: [{ rule: 'npm-token', confidence: 'high' as const, location: 'markdown export', line: 4, column: 1 }],
+    counts: { high: 1, heuristic: 0 },
+    truncated: false,
+    unscanned: [],
+    complete: true,
+    limits: [],
+  }
   const runtime = {
-    exportSession: async () => { throw new SecretPublicationRefused({ decisionId: 'a'.repeat(64), operation: 'export', reason: 'findings', report }) },
+    exportSession: async () => {
+      throw new SecretPublicationRefused({
+        decisionId: 'a'.repeat(64),
+        operation: 'export',
+        reason: 'findings',
+        report,
+      })
+    },
   } as unknown as ManagedAgentRuntime
   await expect(managedAgentsBridge(runtime).exportSession('s1', 'markdown', 'original')).rejects.toMatchObject({
-    status: 409, code: 'secret_check_blocked', message: expect.stringContaining('npm-token at markdown export:4'),
+    status: 409,
+    code: 'secret_check_blocked',
+    message: expect.stringContaining('npm-token at markdown export:4'),
   })
 })

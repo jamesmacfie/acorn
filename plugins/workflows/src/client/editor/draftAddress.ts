@@ -9,7 +9,11 @@ export const defRefKey = (ref: DefRef): string => `${ref.source === 'database' ?
 /** Where a definition is kept, as a mark rather than a word. The list draws one per row and the editor
  *  one in its header, so both name the same three icons here. One line, because the icon census reads a
  *  name only off a line that mentions an icon (client-core scripts/icon-census.mjs). */
-export const SOURCE_GLYPH: Record<DefRef['source'], { icon: string; title: string }> = { database: { icon: 'database', title: 'Saved in this workspace' }, repo: { icon: 'git-branch', title: 'Saved in the repository' }, user: { icon: 'user', title: 'Saved on this computer' } }
+export const SOURCE_GLYPH: Record<DefRef['source'], { icon: string; title: string }> = {
+  database: { icon: 'database', title: 'Saved in this workspace' },
+  repo: { icon: 'git-branch', title: 'Saved in the repository' },
+  user: { icon: 'user', title: 'Saved on this computer' },
+}
 
 /** A key arrives either from the address, where it is encoded, or straight from `defRefKey`, where it
  *  is not. A malformed escape is not worth throwing over: the caller reads it as unparseable. */
@@ -47,7 +51,13 @@ export type WorkflowDraftAddress = {
 }
 
 export function workflowDraftAddress(ref: DefRef, projectId: string, signal: AbortSignal): WorkflowDraftAddress {
-  return { key: defRefKey(ref), route: routeId(ref), projectId, source: ref.source,
+  return {
+    key: defRefKey(ref),
+    route: routeId(ref),
+    projectId,
+    source: ref.source,
     entityId: ref.source === 'database' ? ref.id : `${projectId}:${routeId(ref)}`,
-    target: { projectId, source: ref.source as 'repo' | 'user', path: `.acorn/workflows/${ref.id}.toml` }, signal }
+    target: { projectId, source: ref.source as 'repo' | 'user', path: `.acorn/workflows/${ref.id}.toml` },
+    signal,
+  }
 }

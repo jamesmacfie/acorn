@@ -1,7 +1,18 @@
 import { createSignal, For, Show } from 'solid-js'
 import {
-  Alert, Button, Chip, ChipRow, defaultModelIdFor, Field, Modal, ModalActions, ModalBody,
-  ModelBackendPicker, modelProviderFailure, Picker, Textarea,
+  Alert,
+  Button,
+  Chip,
+  ChipRow,
+  defaultModelIdFor,
+  Field,
+  Modal,
+  ModalActions,
+  ModalBody,
+  ModelBackendPicker,
+  modelProviderFailure,
+  Picker,
+  Textarea,
 } from '@acorn/plugin-api/ui/tree'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
@@ -65,7 +76,12 @@ export default function GenerateSqlModal(props: {
       await props.onGenerated(res.sql)
       props.onDismiss()
     } catch (e) {
-      setError(errorMessage(e, props.backends.find((backend) => backend.id === backendId())))
+      setError(
+        errorMessage(
+          e,
+          props.backends.find((backend) => backend.id === backendId()),
+        ),
+      )
     } finally {
       setBusy(false)
     }
@@ -90,11 +106,17 @@ export default function GenerateSqlModal(props: {
         </Field>
         <Show when={props.queries.length}>
           {/* `group`, so the picker's filter box does not take the caption. */}
-          <Field label="Example queries" group help="The model sees these saved queries as examples of how you write SQL.">
+          <Field
+            label="Example queries"
+            group
+            help="The model sees these saved queries as examples of how you write SQL."
+          >
             <ChipRow ariaLabel="Example queries">
               <For each={chosen()}>
                 {(q) => (
-                  <Chip title={q.notes ?? ''} onRemove={() => toggle(q)}>{q.name}</Chip>
+                  <Chip title={q.notes ?? ''} onRemove={() => toggle(q)}>
+                    {q.name}
+                  </Chip>
                 )}
               </For>
               {/* The data form of the picker: a tree cannot hand over a `results(query)` callback. */}
@@ -131,7 +153,9 @@ export default function GenerateSqlModal(props: {
         </Show>
       </ModalBody>
       <ModalActions>
-        <Button variant="ghost" disabled={busy()} onPress={dismiss}>Cancel</Button>
+        <Button variant="ghost" disabled={busy()} onPress={dismiss}>
+          Cancel
+        </Button>
         <Button variant="solid" disabled={busy() || !prompt().trim()} onPress={() => void generate()}>
           {busy() ? 'Generating…' : 'Generate'}
         </Button>

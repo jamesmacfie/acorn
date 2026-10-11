@@ -27,4 +27,10 @@ export const LAYOUTS: Record<PaneLayoutName, Layout> = {
 
 export type { Layout, LayoutProps, Region } from './regions'
 export { layoutState } from './state'
-export { setLayouts, setRegionPlaceholder, suppliedLayout, suppliedRegionPlaceholder, type RegionPlaceholder } from './table'
+export {
+  setLayouts,
+  setRegionPlaceholder,
+  suppliedLayout,
+  suppliedRegionPlaceholder,
+  type RegionPlaceholder,
+} from './table'

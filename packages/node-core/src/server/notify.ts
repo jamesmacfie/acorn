@@ -1,6 +1,17 @@
 // Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
 // hub and do nothing when no socket is connected.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type {
+  AgentSessionChangedEvent,
+  ConnectionChangedEvent,
+  HeadChangedEvent,
+  ProjectChangedEvent,
+  RunTargetChangedEvent,
+  TaskChangedEvent,
+  WorkspaceChangedEvent,
+  WorkspaceProjectsChangedEvent,
+  WorkspacesModeChangedEvent,
+  WorktreeStatusChangedEvent,
+} from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
 import { clearDashboardReadCache } from './dashboards/readCache'
@@ -77,7 +88,12 @@ export function broadcastRepoConfigTrustNotice(taskId: string): void {
 export function broadcastPluginApprovalNotice(taskId: string, action: 'install' | 'update' | 'uninstall'): void {
   wsBroadcast({
     channel: 'workflow:notice',
-    notice: { taskId, kind: 'plugin-request', title: `A plugin ${action} needs your approval`, action: 'review-plugin-request' },
+    notice: {
+      taskId,
+      kind: 'plugin-request',
+      title: `A plugin ${action} needs your approval`,
+      action: 'review-plugin-request',
+    },
   })
   broadcastStatus()
 }

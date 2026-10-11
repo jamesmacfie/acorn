@@ -34,7 +34,9 @@ export function RefPanelHost() {
               // A link inside a panel's own content. `prefer: 'refPanel'` so a ticket linking a
               // sibling ticket swaps this panel rather than pushing a pane behind it, the reader asked
               // to look sideways, twice.
-              onContentClick={(event: MouseEvent) => handlePluginContentLinkClick(event, { taskId: activeTaskId(), prefer: 'refPanel' })}
+              onContentClick={(event: MouseEvent) =>
+                handlePluginContentLinkClick(event, { taskId: activeTaskId(), prefer: 'refPanel' })
+              }
             />
           )}
         </Show>

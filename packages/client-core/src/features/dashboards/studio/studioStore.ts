@@ -27,8 +27,13 @@ export type StudioChangeOptions = {
 }
 
 export const blankPlan = (): PanelPlan => ({
-  version: 2, title: 'New panel', time: { zone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', mode: 'fixed', weekStart: 'monday' },
-  sources: [], columns: [], stages: [], view: { kind: 'list' },
+  version: 2,
+  title: 'New panel',
+  time: { zone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', mode: 'fixed', weekStart: 'monday' },
+  sources: [],
+  columns: [],
+  stages: [],
+  view: { kind: 'list' },
 })
 
 /** An AI proposal under review: the reply, and its candidate rebased onto the plan as it was when the
@@ -63,8 +68,12 @@ export function createStudioStore(input: {
   let edited = false
 
   const recoveryCopy = (content: PanelPlan, current = draft()) => ({
-    nodeId, entityId: current?.id ?? input.recoveryId, baseRevision: current?.draftRevision ?? 0,
-    baseContent: current?.content ?? blankPlan(), content, savedAt: Date.now(),
+    nodeId,
+    entityId: current?.id ?? input.recoveryId,
+    baseRevision: current?.draftRevision ?? 0,
+    baseContent: current?.content ?? blankPlan(),
+    content,
+    savedAt: Date.now(),
   })
   /** A device copy on every change, and a Node save once the plan parses and typing pauses. */
   const persist = (next: PanelPlan): void => {
@@ -106,7 +115,7 @@ export function createStudioStore(input: {
     if (!options.derived) {
       const now = Date.now()
       if (!options.coalesce || now - lastPush > UNDO_COALESCE_MS) {
-        setPast(stack => pushUndo(stack, current))
+        setPast((stack) => pushUndo(stack, current))
         lastPush = now
       }
       setFuture([])
@@ -118,7 +127,7 @@ export function createStudioStore(input: {
   const undo = (): void => {
     const stack = past()
     if (!stack.length || review()) return
-    setFuture(forward => pushUndo(forward, plan()))
+    setFuture((forward) => pushUndo(forward, plan()))
     setPast(stack.slice(0, -1))
     lastPush = Number.NEGATIVE_INFINITY
     show(stack[stack.length - 1]!)
@@ -126,7 +135,7 @@ export function createStudioStore(input: {
   const redo = (): void => {
     const stack = future()
     if (!stack.length || review()) return
-    setPast(back => pushUndo(back, plan()))
+    setPast((back) => pushUndo(back, plan()))
     setFuture(stack.slice(0, -1))
     lastPush = Number.NEGATIVE_INFINITY
     show(stack[stack.length - 1]!)
@@ -152,7 +161,10 @@ export function createStudioStore(input: {
   /** Reviews an AI proposal against the plan as it is now. A proposal that conflicts with an edit made
    *  while it was prepared ends review instead. `undefined` ends review. */
   const reviewProposal = (proposal: StudioReview['proposal'] | undefined): void => {
-    if (!proposal) { setReview(undefined); return }
+    if (!proposal) {
+      setReview(undefined)
+      return
+    }
     const merged = mergeAuthoringCandidate(proposal.base as PanelPlan, proposal.candidate as PanelPlan, plan())
     if (merged.conflicts.length) setProblem('This panel changed while the proposal was prepared.')
     setReview(merged.conflicts.length ? undefined : { proposal, merged: merged.value })
@@ -166,15 +178,28 @@ export function createStudioStore(input: {
   }
 
   return {
-    plan, apply, undo, redo,
+    plan,
+    apply,
+    undo,
+    redo,
     canUndo: () => past().length > 0 && !review(),
     canRedo: () => future().length > 0 && !review(),
-    review, reviewProposal, applyReview,
+    review,
+    reviewProposal,
+    applyReview,
     selected,
     /** Selection moves no data, so it is not an undo step. */
     select: (key: PlanPartKey | undefined) => setSelected(() => key),
-    draft, saveState, problem, setProblem, flush, open, restoreLocal,
+    draft,
+    saveState,
+    problem,
+    setProblem,
+    flush,
+    open,
+    restoreLocal,
     edited: () => edited,
-    dispose: () => { if (saveTimer) clearTimeout(saveTimer) },
+    dispose: () => {
+      if (saveTimer) clearTimeout(saveTimer)
+    },
   }
 }

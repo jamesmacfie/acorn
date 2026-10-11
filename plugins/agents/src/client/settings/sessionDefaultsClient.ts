@@ -1,9 +1,6 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { latestSignal, readJson, writeJson } from '@acorn/plugin-api/client'
-import {
-  agentSessionDefaultsRoute,
-  type AgentSessionDefaults,
-} from '../../shared/sessionDefaults'
+import { agentSessionDefaultsRoute, type AgentSessionDefaults } from '../../shared/sessionDefaults'
 
 export const agentSessionDefaultsQueryKey = ['agents', 'session-defaults'] as const
 

@@ -19,7 +19,9 @@ it('samples only while collecting and releases its timer on disposal', () => {
     enabled = false
     vi.advanceTimersByTime(10_000)
     expect(gauge).not.toHaveBeenCalled()
-  } finally { stop() }
+  } finally {
+    stop()
+  }
   expect(vi.getTimerCount()).toBe(0)
 })
 
@@ -39,7 +41,17 @@ describe('a window the process spent suspended', () => {
       sources: {
         now: () => clock,
         loop: () => ({ ...loop }),
-        delay: { enable: () => true, disable: () => true, reset() { max = 20 }, percentile: () => 20e6, get max() { return max * 1e6 } },
+        delay: {
+          enable: () => true,
+          disable: () => true,
+          reset() {
+            max = 20
+          },
+          percentile: () => 20e6,
+          get max() {
+            return max * 1e6
+          },
+        },
       },
     })
     const window = (w: { gap: number; active: number; max: number }) => {

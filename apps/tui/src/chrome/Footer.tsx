@@ -31,7 +31,9 @@ export function Footer(props: { nodeId: string }) {
 
   const hints = (): string => {
     if (enteredRectangle()) return ENTERED
-    const line = activeHints().map((hint) => `${hint.keys} ${hint.label}`).join(' · ')
+    const line = activeHints()
+      .map((hint) => `${hint.keys} ${hint.label}`)
+      .join(' · ')
     // Cut rather than wrap. A footer that grows to two lines takes a line off the pane, and the
     // hints are already in reading order: what is cut is what mattered least.
     return ellipsise(line, Math.max(0, width() - (sentence()?.length ?? 0) - 2))
@@ -42,7 +44,10 @@ export function Footer(props: { nodeId: string }) {
       flexDirection="row"
       gap={1}
       flexShrink={0}
-      ref={(element: Renderable) => { box = element; setWidth(element.width) }}
+      ref={(element: Renderable) => {
+        box = element
+        setWidth(element.width)
+      }}
       onSizeChange={() => setWidth(box?.width ?? 80)}
     >
       <Line role="muted">{hints()}</Line>

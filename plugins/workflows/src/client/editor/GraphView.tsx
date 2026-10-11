@@ -34,19 +34,21 @@ export default function GraphView(props: {
   const order = createMemo(() => graphOrder(def()))
   const selected = () => (props.draft.selection.kind === 'node' ? props.draft.selection.name : undefined)
 
-  const cards = createMemo<GraphCard[]>(() => order().map((row) => {
-    const kind = def().steps.find((step) => stepIdentity(step) === row.name)?.kind ?? 'agent'
-    const described = describeFor(kind, props.catalog)
-    return {
-      id: row.name,
-      label: def().steps.find(step => stepIdentity(step) === row.name)?.name ?? row.name,
-      detail: unavailableCatalogKind(kind, props.catalog)
-        ? `${stepKindPluginId(kind) ? `Plugin ${stepKindPluginId(kind)}` : kind} unavailable`
-        : described?.label ?? kind,
-      glyph: unavailableCatalogKind(kind, props.catalog) ? 'triangle-alert' : described?.icon,
-      selected: row.name === selected(),
-    }
-  }))
+  const cards = createMemo<GraphCard[]>(() =>
+    order().map((row) => {
+      const kind = def().steps.find((step) => stepIdentity(step) === row.name)?.kind ?? 'agent'
+      const described = describeFor(kind, props.catalog)
+      return {
+        id: row.name,
+        label: def().steps.find((step) => stepIdentity(step) === row.name)?.name ?? row.name,
+        detail: unavailableCatalogKind(kind, props.catalog)
+          ? `${stepKindPluginId(kind) ? `Plugin ${stepKindPluginId(kind)}` : kind} unavailable`
+          : (described?.label ?? kind),
+        glyph: unavailableCatalogKind(kind, props.catalog) ? 'triangle-alert' : described?.icon,
+        selected: row.name === selected(),
+      }
+    }),
+  )
 
   const edges = createMemo(() => order().flatMap((row) => row.parents.map((from) => ({ from, to: row.name }))))
 
@@ -56,22 +58,31 @@ export default function GraphView(props: {
   // A draft with no id yet has nowhere to file a position, so it keeps them in memory for the session
   // and the layout falls back to the ranks. Writing them under an empty key would put every unsaved
   // draft's cards in the same place.
-  const persist = debounce(
-    (layout: WorkflowLayout) => { if (props.defId) writeLayout(props.defId, layout) },
-    LAYOUT_WRITE_DELAY_MS,
-  )
+  const persist = debounce((layout: WorkflowLayout) => {
+    if (props.defId) writeLayout(props.defId, layout)
+  }, LAYOUT_WRITE_DELAY_MS)
   // Flushed rather than dropped: a view swapped away 200 ms after a drag still owes the write.
   onCleanup(() => persist.flush())
 
   // Renaming a node and deleting one both rewrite the stored layout from outside this component
   // (../layoutPrefs.ts), so the held copy is re-read whenever the set of names changes. A memo, not
   // an inline getter: `on()` re-fires on identity and this list is rebuilt on every keystroke.
-  const names = createMemo(() => cards().map((card) => card.id).join('\u0000'))
-  createEffect(on(names, () => {
-    if (!props.defId) return
-    persist.flush()
-    setPositions(readLayout(props.defId))
-  }, { defer: true }))
+  const names = createMemo(() =>
+    cards()
+      .map((card) => card.id)
+      .join('\u0000'),
+  )
+  createEffect(
+    on(
+      names,
+      () => {
+        if (!props.defId) return
+        persist.flush()
+        setPositions(readLayout(props.defId))
+      },
+      { defer: true },
+    ),
+  )
 
   const move = (id: string, at: { x: number; y: number }): void => {
     const next = { ...positions(), [id]: at }
@@ -87,12 +98,14 @@ export default function GraphView(props: {
       edges={edges()}
       positions={positions()}
       onSelect={(name) => props.onSelect({ kind: 'node', name })}
-      {...(props.readOnly ? {} : {
-        onConnect: props.onConnect,
-        onDisconnect: props.onDisconnect,
-        onMove: move,
-        onRemove: props.onRemove,
-      })}
+      {...(props.readOnly
+        ? {}
+        : {
+            onConnect: props.onConnect,
+            onDisconnect: props.onDisconnect,
+            onMove: move,
+            onRemove: props.onRemove,
+          })}
     />
   )
 }

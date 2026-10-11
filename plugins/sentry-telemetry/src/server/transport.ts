@@ -40,7 +40,10 @@ export function parseRateLimits(header: string | null | undefined, now: number):
     const seconds = Number(rawSeconds?.trim())
     if (!Number.isFinite(seconds) || seconds < 0) continue
     const untilMs = now + seconds * 1_000
-    const named = (rawCategories ?? '').split(';').map((entry) => entry.trim().toLowerCase()).filter(Boolean)
+    const named = (rawCategories ?? '')
+      .split(';')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean)
     if (!named.length) {
       limits.push({ categories: 'all', untilMs })
       continue
@@ -92,7 +95,9 @@ export async function postEnvelope(options: {
         'user-agent': options.client,
       },
       body,
-      signal: options.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(10_000)]) : AbortSignal.timeout(10_000),
+      signal: options.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(10_000)])
+        : AbortSignal.timeout(10_000),
     })
   } catch {
     // A closed laptop, a dropped VPN, a DNS answer that has not come back. The caller retries this

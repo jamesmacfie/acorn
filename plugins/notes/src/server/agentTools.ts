@@ -17,7 +17,11 @@ const scopeArg = z.enum(['task', 'workspace', 'global']).optional()
 // A note scope becomes a directory, so the workspace case has to resolve the task's membership
 // first. It throws when the task has no workspace, surfaced as a tool error rather than a 500,
 // because "this task is not in a workspace" is an answer the agent can act on.
-async function noteLocationFor(core: NotesToolCoreServices, taskId: string, scope: NoteScope = 'task'): Promise<NoteLocation> {
+async function noteLocationFor(
+  core: NotesToolCoreServices,
+  taskId: string,
+  scope: NoteScope = 'task',
+): Promise<NoteLocation> {
   if (scope === 'task') return { scope, taskId }
   if (scope === 'global') return { scope }
   try {
@@ -35,7 +39,8 @@ export function notesAgentTools(notes: NotesStoreCapability, core: NotesToolCore
       input: z.object({ scope: scopeArg }),
       scope: 'task',
       risk: 'read',
-      handler: async (a, ctx) => notes.list(await noteLocationFor(core, ctx.taskId, (a as { scope?: NoteScope }).scope)),
+      handler: async (a, ctx) =>
+        notes.list(await noteLocationFor(core, ctx.taskId, (a as { scope?: NoteScope }).scope)),
     },
     {
       name: 'notes_read',

@@ -32,7 +32,16 @@ export type WorkflowChildRunSummary = {
   runId: string
   name: string | null
   dispatchState: 'reserved' | 'task-created' | 'run-started' | 'cancelling' | 'terminal'
-  runStatus: 'running' | 'gated' | 'cancelling' | 'done' | 'completed-with-failures' | 'failed' | 'safety-rail' | 'cancelled' | null
+  runStatus:
+    | 'running'
+    | 'gated'
+    | 'cancelling'
+    | 'done'
+    | 'completed-with-failures'
+    | 'failed'
+    | 'safety-rail'
+    | 'cancelled'
+    | null
   resultSummary: string | null
   error: string | null
   usage: WorkflowUsageSummary | null
@@ -92,10 +101,8 @@ type WorkflowGenerateRequestBase = {
  *  The modes are a discriminated union because an edit without the current definition would quietly
  *  behave like an overwrite. Conversely, an overwrite carries only the name and inputs that the old
  *  generate path has always treated as hints; it does not send the rest of the draft to the model. */
-export type WorkflowGenerateRequest = WorkflowGenerateRequestBase & (
-  | { mode: 'overwrite'; name?: string; inputs?: WorkflowInput[] }
-  | { mode: 'edit'; currentDef: WorkflowDef }
-)
+export type WorkflowGenerateRequest = WorkflowGenerateRequestBase &
+  ({ mode: 'overwrite'; name?: string; inputs?: WorkflowInput[] } | { mode: 'edit'; currentDef: WorkflowDef })
 
 /** Why the definition that came back is not the definition being applied.
  *

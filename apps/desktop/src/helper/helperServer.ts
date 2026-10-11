@@ -19,7 +19,15 @@ import { encodeIdFrame, wsFrameSchema, wsSubscriptionIntentSchema } from '@acorn
 import type { Helper } from '@acorn/custody/runtime'
 import { toNodeRecord } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
-import { MAX_HELPER_REQUEST_BYTES, decodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
+import {
+  MAX_HELPER_REQUEST_BYTES,
+  decodeBytes,
+  type HelperMessage,
+  type HelperMethod,
+  type HelperPush,
+  type HelperRequest,
+  type WireFetchRequest,
+} from '../shell/wire'
 import {
   decisionSchema,
   devGrantSchema,
@@ -93,17 +101,27 @@ const toFetchRequest = (wire: WireFetchRequest): unknown => {
   }
 }
 
-export function startHelperServer(helper: Helper, options: { secret: string; appOrigin: string; maxRequestBytes?: number }): Promise<HelperServer> {
+export function startHelperServer(
+  helper: Helper,
+  options: { secret: string; appOrigin: string; maxRequestBytes?: number },
+): Promise<HelperServer> {
   const { secret, appOrigin } = options
   const sockets = new Set<WebSocket>()
   const connections = new Map<WebSocket, RendererConnection>()
   const watchdogs = new Map<WebSocket, ReturnType<typeof createRendererWatchdog>>()
   const send = (socket: WebSocket, payload: string | Uint8Array): void => {
     if (socket.readyState !== socket.OPEN) return
-    try { socket.send(payload, (error) => { if (error) socket.terminate() }) }
-    catch { socket.terminate() }
+    try {
+      socket.send(payload, (error) => {
+        if (error) socket.terminate()
+      })
+    } catch {
+      socket.terminate()
+    }
   }
-  const watchdogTimer = setInterval(() => { for (const watchdog of watchdogs.values()) watchdog.tick() }, 1000)
+  const watchdogTimer = setInterval(() => {
+    for (const watchdog of watchdogs.values()) watchdog.tick()
+  }, 1000)
   watchdogTimer.unref()
 
   const push = (message: HelperMessage, viewerId?: string): void => {
@@ -111,7 +129,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     for (const [socket, owner] of connections) {
       if (viewerId && owner.viewerId !== viewerId) continue
       if ('push' in message && message.push === 'node-frame' && !owner.interestedIn(message.nodeId)) continue
-      send(socket, payload ??= JSON.stringify(message))
+      send(socket, (payload ??= JSON.stringify(message)))
     }
   }
   const stopConfigWatch = helper.config.watch((state) => push({ push: 'config-changed', state }))
@@ -165,7 +183,14 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       owner.abort(requestId)
     },
     'node-send': (raw, owner) => {
-      const { nodeId, frame, intent, cleanup } = z.strictObject({ nodeId: z.string().min(1), frame: wsFrameSchema, intent: wsSubscriptionIntentSchema.optional(), cleanup: z.boolean().optional() }).parse(raw)
+      const { nodeId, frame, intent, cleanup } = z
+        .strictObject({
+          nodeId: z.string().min(1),
+          frame: wsFrameSchema,
+          intent: wsSubscriptionIntentSchema.optional(),
+          cleanup: z.boolean().optional(),
+        })
+        .parse(raw)
       owner.send(nodeId, frame, { ...(intent ? { intent } : {}), ...(cleanup === undefined ? {} : { cleanup }) })
     },
     // Membership from the fleet store, connection state from the broker: a node whose token could not
@@ -215,10 +240,16 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         path: coreNodeAdoptRoute,
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify({ providerId: request.providerId, providerNodeId: request.providerNodeId })) },
+        body: {
+          kind: 'bytes',
+          bytes: new TextEncoder().encode(
+            JSON.stringify({ providerId: request.providerId, providerNodeId: request.providerNodeId }),
+          ),
+        },
       })
       const text = new TextDecoder().decode(response.body)
-      if (response.status !== 200) throw new Error(`That node could not be adopted (${response.status}). ${text.slice(0, 200)}`)
+      if (response.status !== 200)
+        throw new Error(`That node could not be adopted (${response.status}). ${text.slice(0, 200)}`)
       const adopted = nodeAdoptResultSchema.safeParse(JSON.parse(text) as unknown)
       if (!adopted.success) throw new Error('The node returned an unusable adoption result.')
       const record = adopted.data
@@ -227,7 +258,9 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       // substituted since it was listed, fails here rather than becoming a pinned connection.
       const probe = await probeNode(record.endpoint)
       if (probe.fingerprint !== record.fingerprint) {
-        throw new Error(`${record.endpoint} presented a different identity than ${request.providerId} vouched for. Nothing was paired.`)
+        throw new Error(
+          `${record.endpoint} presented a different identity than ${request.providerId} vouched for. Nothing was paired.`,
+        )
       }
       if (!probe.compatible) throw new Error('That node speaks a different protocol version.')
       const node = helper.fleet.remember(
@@ -238,7 +271,11 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
           fingerprint: probe.fingerprint,
           certPem: probe.certPem,
           local: false,
-          provider: { providerId: request.providerId, providerNodeId: request.providerNodeId, sourceNodeId: request.sourceNodeId },
+          provider: {
+            providerId: request.providerId,
+            providerNodeId: request.providerNodeId,
+            sourceNodeId: request.sourceNodeId,
+          },
         },
         record.deviceToken,
       )
@@ -263,8 +300,17 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         // The last request that will ever authenticate, and it closes our own socket. A failure must
         // not abort the local forget: the usual reason revoke fails is that the node is offline.
         await helper.broker
-          .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v1/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
-          .catch((error: unknown) => log.warn(`could not revoke this device on ${nodeId}: ${describeError(error).message}`, { 'node.id': nodeId }))
+          .fetch(nodeId, {
+            requestId: `forget-${nodeId}`,
+            path: `/v1/core/devices/${node.deviceId}`,
+            method: 'DELETE',
+            headers: {},
+          })
+          .catch((error: unknown) =>
+            log.warn(`could not revoke this device on ${nodeId}: ${describeError(error).message}`, {
+              'node.id': nodeId,
+            }),
+          )
       }
       helper.broker.remove(nodeId)
       for (const owner of connections.values()) owner.forget(nodeId)
@@ -280,7 +326,20 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       // Projected rather than passed through: `nodeIds` and the eviction timestamps are the helper's
       // bookkeeping, and a field added to the cache entry must not reach the renderer by default.
       cached: Object.fromEntries(
-        Object.entries(helper.pluginCache.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes, source: entry.source ?? (entry.nodeIds[0] ? { kind: 'node' as const, nodeId: entry.nodeIds[0] } : undefined), nodeIds: entry.nodeIds, installSource: entry.installSource, sourceLabel: entry.sourceLabel, manifest: entry.manifest }]),
+        Object.entries(helper.pluginCache.list()).map(([hash, entry]) => [
+          hash,
+          {
+            pluginId: entry.pluginId,
+            version: entry.version,
+            bytes: entry.bytes,
+            source:
+              entry.source ?? (entry.nodeIds[0] ? { kind: 'node' as const, nodeId: entry.nodeIds[0] } : undefined),
+            nodeIds: entry.nodeIds,
+            installSource: entry.installSource,
+            sourceLabel: entry.sourceLabel,
+            manifest: entry.manifest,
+          },
+        ]),
       ),
       acks: helper.pluginTrust.list(),
       devGrants: helper.pluginTrust.listDevGrants(),
@@ -294,7 +353,14 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     'plugins-install': async (raw) => {
       const { source, expectedPluginId } = installSchema.parse(raw)
       const result = await helper.pluginCache.putFromSource(source, expectedPluginId)
-      if ('hash' in result) helper.pluginTrust.recordDevAccept({ pluginId: result.pluginId, nodeId: '', source: { kind: 'device' }, hash: result.hash, version: result.version })
+      if ('hash' in result)
+        helper.pluginTrust.recordDevAccept({
+          pluginId: result.pluginId,
+          nodeId: '',
+          source: { kind: 'device' },
+          hash: result.hash,
+          version: result.version,
+        })
       return result
     },
     'plugins-remove': (raw): void => {
@@ -305,7 +371,13 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     'plugins-dev-grant': (raw): void => {
       const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
       if (!grant) return helper.pluginTrust.revokeDev(pluginId, source ?? nodeId)
-      helper.pluginTrust.grantDev({ pluginId, nodeId, source: source ?? { kind: 'node', nodeId }, ...(path ? { path } : {}), grantedAt: Date.now() })
+      helper.pluginTrust.grantDev({
+        pluginId,
+        nodeId,
+        source: source ?? { kind: 'node', nodeId },
+        ...(path ? { path } : {}),
+        grantedAt: Date.now(),
+      })
       if (source?.kind === 'device') {
         for (const [hash, entry] of Object.entries(helper.pluginCache.list())) {
           if (entry.pluginId === pluginId && entry.source?.kind === 'device') {
@@ -316,9 +388,11 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     },
     'plugins-trust-record': (raw): void => {
       const decision = decisionSchema.parse(raw)
-      if (!helper.pluginCache.has(decision.hash)) throw new Error(`No cached bundle for ${decision.pluginId}@${decision.hash.slice(0, 12)}`)
+      if (!helper.pluginCache.has(decision.hash))
+        throw new Error(`No cached bundle for ${decision.pluginId}@${decision.hash.slice(0, 12)}`)
       const disclosure = disclosureSchema.safeParse(raw)
-      if (disclosure.success) return helper.pluginTrust.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
+      if (disclosure.success)
+        return helper.pluginTrust.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
       log.warn(
         `the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record: ${disclosure.error.message}`,
         { 'plugin.id': decision.pluginId },
@@ -326,10 +400,12 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       helper.pluginTrust.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
     },
     'plugins-trust-forget': (raw): void => {
-      const { pluginId, hash } = z.object({
-        pluginId: z.string().min(1),
-        hash: z.string().regex(/^[0-9a-f]{64}$/),
-      }).parse(raw)
+      const { pluginId, hash } = z
+        .object({
+          pluginId: z.string().min(1),
+          hash: z.string().regex(/^[0-9a-f]{64}$/),
+        })
+        .parse(raw)
       helper.pluginTrust.forgetDecision(pluginId, hash)
     },
   }
@@ -344,11 +420,14 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     const handlerFrom = performance.now()
     const reply = (message: object): void => {
       if (owner.closed || socket.readyState !== socket.OPEN) return
-      send(socket, JSON.stringify({
-      id: request.id,
-      ...message,
-      timing: { receivedAt, repliedAt: Date.now(), handlerMs: performance.now() - handlerFrom },
-      }))
+      send(
+        socket,
+        JSON.stringify({
+          id: request.id,
+          ...message,
+          timing: { receivedAt, repliedAt: Date.now(), handlerMs: performance.now() - handlerFrom },
+        }),
+      )
     }
     // `hasOwn`, not `in`: `method` came off the wire, and `in` would happily resolve `toString` off
     // the prototype and call it with whatever params came with it.
@@ -366,17 +445,33 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   }
 
   const http = createServer((_request, response) => response.writeHead(426).end())
-  http.on('close', () => { stopConfigWatch(); clearInterval(watchdogTimer); watchdogs.clear() })
-  http.on('error', () => { stopConfigWatch(); clearInterval(watchdogTimer) })
-  const wss = new WebSocketServer({ noServer: true, maxPayload: Math.min(options.maxRequestBytes ?? MAX_HELPER_REQUEST_BYTES, MAX_HELPER_REQUEST_BYTES) })
+  http.on('close', () => {
+    stopConfigWatch()
+    clearInterval(watchdogTimer)
+    watchdogs.clear()
+  })
+  http.on('error', () => {
+    stopConfigWatch()
+    clearInterval(watchdogTimer)
+  })
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: Math.min(options.maxRequestBytes ?? MAX_HELPER_REQUEST_BYTES, MAX_HELPER_REQUEST_BYTES),
+  })
 
   http.on('upgrade', (request, socket, head) => {
-    const onPeerError = (): void => { socket.destroy() }
+    const onPeerError = (): void => {
+      socket.destroy()
+    }
     socket.on('error', onPeerError)
     try {
       const url = new URL(request.url ?? '/', 'http://127.0.0.1')
       const origin = request.headers.origin
-      if (url.pathname !== HELPER_PATH || !secretMatches(secret, url.searchParams.get('secret')) || (origin && origin !== appOrigin)) {
+      if (
+        url.pathname !== HELPER_PATH ||
+        !secretMatches(secret, url.searchParams.get('secret')) ||
+        (origin && origin !== appOrigin)
+      ) {
         socket.destroy()
         return
       }
@@ -384,7 +479,12 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         sockets.add(ws)
         connections.set(ws, new RendererConnection(helper.broker))
         watchdogs.set(ws, createRendererWatchdog())
-        const cleanup = (): void => { connections.get(ws)?.close(); connections.delete(ws); sockets.delete(ws); watchdogs.delete(ws) }
+        const cleanup = (): void => {
+          connections.get(ws)?.close()
+          connections.delete(ws)
+          sockets.delete(ws)
+          watchdogs.delete(ws)
+        }
         ws.on('close', cleanup)
         ws.on('error', cleanup)
         socket.off('error', onPeerError)
@@ -398,7 +498,9 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
           void serve(ws, parsed).catch(() => ws.terminate())
         })
       })
-    } catch { socket.destroy() }
+    } catch {
+      socket.destroy()
+    }
   })
 
   // Every node remembered from a previous launch, brought up before the listener opens, so the

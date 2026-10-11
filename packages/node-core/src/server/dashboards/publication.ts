@@ -23,7 +23,11 @@ export async function dashboardContentProblems(
   for (const [index, entry] of plan.sources.entries()) {
     try {
       const resolved = await resolveQuery(env, scope, entry.reference, {}, invocation)
-      const description = await invokeDataSource(env, { operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }, invocation)
+      const description = await invokeDataSource(
+        env,
+        { operation: 'describe', source: resolved.query.source, scope: resolved.query.scope },
+        invocation,
+      )
       described.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description })
     } catch (error) {
       problems.push({
@@ -33,7 +37,9 @@ export async function dashboardContentProblems(
     }
   }
   // The rest needs every source's description, so an unreadable query is the only answer for now.
-  return problems.length ? problems : validatePanelPlan(plan, described).filter(problem => problem.severity === 'error')
+  return problems.length
+    ? problems
+    : validatePanelPlan(plan, described).filter((problem) => problem.severity === 'error')
 }
 
 export async function validateDashboardContent(
@@ -61,8 +67,13 @@ export async function publishDashboard(
   await validateDashboardContent(env, scope, draft.content, invocation)
   const published = store.publish(scope, id, expectedRevision)
   const consumer = { pluginId: 'core', kind: 'panel' as const, id, name: published.content.title, href: '/' }
-  const referenced = new Set(published.content.sources.flatMap(entry => entry.reference.kind === 'saved' ? [entry.reference.queryId] : []))
-  const removed = new Set(previous?.content.sources.flatMap(entry => entry.reference.kind === 'saved' ? [entry.reference.queryId] : []) ?? [])
+  const referenced = new Set(
+    published.content.sources.flatMap((entry) => (entry.reference.kind === 'saved' ? [entry.reference.queryId] : [])),
+  )
+  const removed = new Set(
+    previous?.content.sources.flatMap((entry) => (entry.reference.kind === 'saved' ? [entry.reference.queryId] : [])) ??
+      [],
+  )
   for (const queryId of referenced) removed.delete(queryId)
   for (const queryId of removed) queryStore(getDb(env)).setConsumer(scope, queryId, consumer, true)
   for (const queryId of referenced) queryStore(getDb(env)).setConsumer(scope, queryId, consumer)
@@ -74,7 +85,11 @@ export function deleteDashboard(env: Env, scope: DashboardScope, id: string, exp
   const draft = store.get(scope, id)
   const published = draft.publishedRevision ? store.published(scope, id) : undefined
   const consumer = { pluginId: 'core', kind: 'panel' as const, id, name: draft.content.title, href: '/' }
-  for (const queryId of new Set(published?.content.sources.flatMap(entry => entry.reference.kind === 'saved' ? [entry.reference.queryId] : []) ?? [])) {
+  for (const queryId of new Set(
+    published?.content.sources.flatMap((entry) =>
+      entry.reference.kind === 'saved' ? [entry.reference.queryId] : [],
+    ) ?? [],
+  )) {
     queryStore(getDb(env)).setConsumer(scope, queryId, consumer, true)
   }
   store.delete(scope, id, expectedRevision)

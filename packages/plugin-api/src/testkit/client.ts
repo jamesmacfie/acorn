@@ -21,8 +21,14 @@ export type { Project } from '@acorn/client-core/infra/queries.ts'
 // its own plugin's slots and needs somebody on the other side of it (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points). Production code never writes these — the chrome pass does, from a roster row —
 // which is exactly why they belong here rather than on ./client.
-export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
-export type { ExtensionContribution, ExtensionPointContribution } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+export {
+  extensionPointRegistry,
+  extensionRegistry,
+} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+export type {
+  ExtensionContribution,
+  ExtensionPointContribution,
+} from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 // Hover and diagnostics providers by language, for an owner's test that needs one present. The chrome
 // pass fills it from `contributions.documentServices` in production.
 export { documentServiceRegistry } from '@acorn/client-core/host/registries/panes'
@@ -42,7 +48,14 @@ export { createRemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
 export type { RemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'
 
 // Client host state used by plugin tests.
-export { contentLinkRegistry, openInAppUrl, parseInAppTarget, activeRefPanel, closeRefPanel, refPanelRegistry } from '@acorn/client-core/host/registries/panes'
+export {
+  contentLinkRegistry,
+  openInAppUrl,
+  parseInAppTarget,
+  activeRefPanel,
+  closeRefPanel,
+  refPanelRegistry,
+} from '@acorn/client-core/host/registries/panes'
 export { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
 // Pane tests invoke the commands their mounted pane registered through the real host registry.
 export { commandRegistry } from '@acorn/client-core/host/registries/commands'

@@ -11,14 +11,24 @@ it('captures the live focused row rather than the retained roving key', () => {
   document.body.append(host)
   let retain!: (key: string) => void
   const dispose = render(() => {
-    const collection = createCollection({ id: () => 'tree.node.task', role: 'tree', items: () => [
-      { key: 'old', label: 'Old' }, { key: 'live', label: 'Live' },
-    ] })
+    const collection = createCollection({
+      id: () => 'tree.node.task',
+      role: 'tree',
+      items: () => [
+        { key: 'old', label: 'Old' },
+        { key: 'live', label: 'Live' },
+      ],
+    })
     retain = collection.focus
-    return <><div {...collection.containerProps}>
-      <button {...collection.itemProps('old')}>Old</button>
-      <button {...collection.itemProps('live')}>Live</button>
-    </div><input /></>
+    return (
+      <>
+        <div {...collection.containerProps}>
+          <button {...collection.itemProps('old')}>Old</button>
+          <button {...collection.itemProps('live')}>Live</button>
+        </div>
+        <input />
+      </>
+    )
   }, host)
   try {
     host.querySelectorAll('button')[1].focus()
@@ -28,7 +38,10 @@ it('captures the live focused row rather than the retained roving key', () => {
     expect(focusedCollectionTarget()).toBeUndefined()
     host.querySelector('input')!.focus()
     expect(focusedCollectionTarget()).toBeUndefined()
-  } finally { dispose(); host.remove() }
+  } finally {
+    dispose()
+    host.remove()
+  }
 })
 
 it('resolves row ids and tab stops with linear work on mount and refresh', () => {
@@ -36,7 +49,10 @@ it('resolves row ids and tab stops with linear work on mount and refresh', () =>
     try {
       let reads = 0
       const roster = Array.from({ length: 500 }, (_, index) => ({
-        get key() { reads++; return String(index) },
+        get key() {
+          reads++
+          return String(index)
+        },
         label: `Session ${index}`,
       }))
       const [items, setItems] = createSignal(roster)

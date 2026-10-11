@@ -40,7 +40,9 @@ export default function AgentUsageIndicator() {
                 {(entry) => (
                   <Inline>
                     <StatusDot tone={usageTone(entry.health)} size="sm" />
-                    <Text emphasis="muted">{entry.label} {entry.value}</Text>
+                    <Text emphasis="muted">
+                      {entry.label} {entry.value}
+                    </Text>
                   </Inline>
                 )}
               </For>

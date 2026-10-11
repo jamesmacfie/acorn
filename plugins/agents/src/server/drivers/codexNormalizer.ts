@@ -20,10 +20,11 @@ import { diffHunks, hunksText } from './patchText'
 type JsonObject = Record<string, unknown>
 
 export const asObject = (value: unknown): JsonObject | null =>
-  typeof value === 'object' && value != null && !Array.isArray(value) ? value as JsonObject : null
+  typeof value === 'object' && value != null && !Array.isArray(value) ? (value as JsonObject) : null
 
-export const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
-export const numberValue = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null
+export const stringValue = (value: unknown): string | null => (typeof value === 'string' ? value : null)
+export const numberValue = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null
 
 // Codex passes a rejected API request through with the provider's raw JSON body as the message, for
 // example `{"type":"error","error":{"message":"model 'x' is not enabled",...},"status":400}`. The
@@ -38,8 +39,11 @@ const readableErrorMessage = (message: string | null): string | null => {
   }
 }
 
-const decodedBase64 =(value: string): Uint8Array | null => {
-  const encoded = value.trim().replace(/^data:[^;,]+;base64,/i, '').replace(/\s/g, '')
+const decodedBase64 = (value: string): Uint8Array | null => {
+  const encoded = value
+    .trim()
+    .replace(/^data:[^;,]+;base64,/i, '')
+    .replace(/\s/g, '')
   if (!encoded || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return null
   const bytes = Buffer.from(encoded, 'base64')
   if (bytes.toString('base64').replace(/=+$/, '') !== encoded.replace(/=+$/, '')) return null
@@ -54,9 +58,13 @@ const generatedImageFormat = (bytes: Uint8Array): { mediaType: string; extension
   if (startsWith(0xff, 0xd8, 0xff)) return { mediaType: 'image/jpeg', extension: 'jpg' }
   if (startsWith(0x47, 0x49, 0x46, 0x38)) return { mediaType: 'image/gif', extension: 'gif' }
   if (
-    startsWith(0x52, 0x49, 0x46, 0x46)
-    && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
-  ) return { mediaType: 'image/webp', extension: 'webp' }
+    startsWith(0x52, 0x49, 0x46, 0x46) &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  )
+    return { mediaType: 'image/webp', extension: 'webp' }
   return { mediaType: 'application/octet-stream', extension: 'bin' }
 }
 
@@ -77,7 +85,6 @@ export function codexGeneratedArtifact(notification: JsonRpcNotification): Agent
     bytes,
   }
 }
-
 
 // ── Web activity ──────────────────────────────────────────────────────────────────────────────
 // Codex's `webSearch` thread item, read into the provider-neutral shape
@@ -134,30 +141,30 @@ function codexWebResults(value: unknown): AgentWebResult[] | undefined {
     const row = asObject(entry)
     const url = stringValue(row?.url)
     if (!url) return []
-    return [{
-      url,
-      title: stringValue(row?.title) ?? undefined,
-      domain: stringValue(row?.domain) ?? undefined,
-      snippet: stringValue(row?.snippet) ?? undefined,
-    }]
+    return [
+      {
+        url,
+        title: stringValue(row?.title) ?? undefined,
+        domain: stringValue(row?.domain) ?? undefined,
+        snippet: stringValue(row?.snippet) ?? undefined,
+      },
+    ]
   })
 }
 
 function codexWebActivity(item: JsonObject): AgentWebActivity | undefined {
   const action = codexWebAction(item)
   const results = codexWebResults(item.results)
-  return action || results?.length ? { ...(action ? { action } : {}), ...(results?.length ? { results } : {}) } : undefined
+  return action || results?.length
+    ? { ...(action ? { action } : {}), ...(results?.length ? { results } : {}) }
+    : undefined
 }
 
 function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | null {
   const type = stringValue(item.type)
   const id = stringValue(item.id)
   if (!type || !id) return null
-  const status = completed
-    ? stringValue(item.status) === 'failed'
-      ? 'failed'
-      : 'completed'
-    : 'running'
+  const status = completed ? (stringValue(item.status) === 'failed' ? 'failed' : 'completed') : 'running'
   switch (type) {
     case 'commandExecution':
       return {
@@ -166,7 +173,7 @@ function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | nul
         kind: 'execute',
         status,
         input: stringValue(item.command) ?? undefined,
-        output: completed ? stringValue(item.aggregatedOutput) ?? undefined : undefined,
+        output: completed ? (stringValue(item.aggregatedOutput) ?? undefined) : undefined,
       }
     case 'fileChange': {
       const paths = Array.isArray(item.changes)
@@ -235,9 +242,8 @@ function codexFileChanges(changes: unknown, itemId: string | null): AgentNormali
     if (!change || !path) return []
     const diff = stringValue(change.diff) ?? ''
     const kind = stringValue(asObject(change.kind)?.type)
-    const patch = kind === 'add' ? hunksText(diffHunks('', diff))
-      : kind === 'delete' ? hunksText(diffHunks(diff, ''))
-      : diff
+    const patch =
+      kind === 'add' ? hunksText(diffHunks('', diff)) : kind === 'delete' ? hunksText(diffHunks(diff, '')) : diff
     return [{ type: 'file_change' as const, path, patch, ...(itemId ? { changeId: itemId } : {}) }]
   })
 }
@@ -249,11 +255,13 @@ function planEntries(value: unknown): AgentPlanEntry[] {
     const text = stringValue(row?.step)
     const rawStatus = stringValue(row?.status)
     if (!text) return []
-    return [{
-      id: `plan-${index}`,
-      text,
-      status: rawStatus === 'completed' ? 'completed' : rawStatus === 'inProgress' ? 'in_progress' : 'pending',
-    } satisfies AgentPlanEntry]
+    return [
+      {
+        id: `plan-${index}`,
+        text,
+        status: rawStatus === 'completed' ? 'completed' : rawStatus === 'inProgress' ? 'in_progress' : 'pending',
+      } satisfies AgentPlanEntry,
+    ]
   })
 }
 
@@ -265,7 +273,8 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
       const type = stringValue(status?.type)
       if (type === 'idle') return [{ type: 'session_state', state: 'ready' }]
       if (type === 'active') return [{ type: 'session_state', state: 'working' }]
-      if (type === 'systemError') return [{ type: 'session_state', state: 'failed', detail: 'Codex reported a system error.' }]
+      if (type === 'systemError')
+        return [{ type: 'session_state', state: 'failed', detail: 'Codex reported a system error.' }]
       if (type === 'notLoaded') return [{ type: 'session_state', state: 'stopped' }]
       return []
     }
@@ -276,30 +285,36 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
       const status = stringValue(turn?.status)
       if (status === 'failed') {
         const error = asObject(turn?.error)
-        return [{
-          type: 'error',
-          code: stringValue(error?.codexErrorInfo) ?? 'codex_turn_failed',
-          message: readableErrorMessage(stringValue(error?.message)) ?? 'Codex turn failed.',
-          retryable: false,
-        }]
+        return [
+          {
+            type: 'error',
+            code: stringValue(error?.codexErrorInfo) ?? 'codex_turn_failed',
+            message: readableErrorMessage(stringValue(error?.message)) ?? 'Codex turn failed.',
+            retryable: false,
+          },
+        ]
       }
       return [{ type: 'turn_completed', stopReason: status ?? 'completed' }]
     }
     case 'item/agentMessage/delta':
-      return [{
-        type: 'assistant_message',
-        text: stringValue(params.delta) ?? '',
-        messageId: stringValue(params.itemId) ?? undefined,
-        append: true,
-      }]
+      return [
+        {
+          type: 'assistant_message',
+          text: stringValue(params.delta) ?? '',
+          messageId: stringValue(params.itemId) ?? undefined,
+          append: true,
+        },
+      ]
     case 'item/reasoning/summaryTextDelta':
     case 'item/reasoning/textDelta':
-      return [{
-        type: 'reasoning',
-        text: stringValue(params.delta) ?? '',
-        messageId: stringValue(params.itemId) ?? undefined,
-        append: true,
-      }]
+      return [
+        {
+          type: 'reasoning',
+          text: stringValue(params.delta) ?? '',
+          messageId: stringValue(params.itemId) ?? undefined,
+          append: true,
+        },
+      ]
     case 'item/started':
     case 'item/completed': {
       const item = asObject(params.item)
@@ -308,14 +323,13 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
         const itemId = stringValue(item.id)
         const providerTurnId = stringValue(params.turnId)
         const text = stringValue(item.text)
-        return itemId && providerTurnId && text?.trim()
-          ? [{ type: 'plan_proposal', itemId, providerTurnId, text }]
-          : []
+        return itemId && providerTurnId && text?.trim() ? [{ type: 'plan_proposal', itemId, providerTurnId, text }] : []
       }
       const tool = toolFromItem(item, method === 'item/completed')
-      const changes = method === 'item/completed' && item.type === 'fileChange'
-        ? codexFileChanges(item.changes, stringValue(item.id))
-        : []
+      const changes =
+        method === 'item/completed' && item.type === 'fileChange'
+          ? codexFileChanges(item.changes, stringValue(item.id))
+          : []
       return [
         ...(tool ? [{ type: 'tool' as const, tool }] : []),
         // A completed item that names no file still gets a row, so the step is not silently missing.
@@ -325,28 +339,32 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
       ]
     }
     case 'item/commandExecution/outputDelta':
-      return [{
-        type: 'tool',
-        tool: {
-          id: stringValue(params.itemId) ?? 'command',
-          title: 'Command output',
-          kind: 'execute',
-          output: stringValue(params.delta) ?? '',
-          outputAppend: true,
+      return [
+        {
+          type: 'tool',
+          tool: {
+            id: stringValue(params.itemId) ?? 'command',
+            title: 'Command output',
+            kind: 'execute',
+            output: stringValue(params.delta) ?? '',
+            outputAppend: true,
+          },
         },
-      }]
+      ]
     case 'item/fileChange/patchUpdated':
       return codexFileChanges(params.changes, stringValue(params.itemId))
     // The whole turn's diff so far, sent again every time it grows. One id per turn, so the thread
     // keeps only the latest (client/sessions/conversationItems.ts § fileChangeCards).
     case 'turn/diff/updated': {
       const turnId = stringValue(params.turnId)
-      return [{
-        type: 'file_change',
-        patch: stringValue(params.diff) ?? '',
-        summary: 'All changes this turn',
-        ...(turnId ? { changeId: `turn:${turnId}` } : {}),
-      }]
+      return [
+        {
+          type: 'file_change',
+          patch: stringValue(params.diff) ?? '',
+          summary: 'All changes this turn',
+          ...(turnId ? { changeId: `turn:${turnId}` } : {}),
+        },
+      ]
     }
     case 'turn/plan/updated':
       return [{ type: 'plan', entries: planEntries(params.plan) }]
@@ -354,17 +372,19 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
       const usage = asObject(params.tokenUsage)
       const total = asObject(usage?.total)
       const last = asObject(usage?.last)
-      return [{
-        type: 'usage',
-        usage: {
-          inputTokens: numberValue(total?.inputTokens) ?? undefined,
-          outputTokens: numberValue(total?.outputTokens) ?? undefined,
-          cachedInputTokens: numberValue(total?.cachedInputTokens) ?? undefined,
-          cacheWriteInputTokens: numberValue(total?.cacheWriteInputTokens) ?? undefined,
-          contextUsed: numberValue(last?.totalTokens) ?? undefined,
-          contextSize: numberValue(usage?.modelContextWindow) ?? undefined,
+      return [
+        {
+          type: 'usage',
+          usage: {
+            inputTokens: numberValue(total?.inputTokens) ?? undefined,
+            outputTokens: numberValue(total?.outputTokens) ?? undefined,
+            cachedInputTokens: numberValue(total?.cachedInputTokens) ?? undefined,
+            cacheWriteInputTokens: numberValue(total?.cacheWriteInputTokens) ?? undefined,
+            contextUsed: numberValue(last?.totalTokens) ?? undefined,
+            contextSize: numberValue(usage?.modelContextWindow) ?? undefined,
+          },
         },
-      }]
+      ]
     }
     case 'thread/compacted':
       return [{ type: 'diagnostic', level: 'info', message: 'Codex compacted this thread’s context.' }]
@@ -372,19 +392,25 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
     case 'guardianWarning':
     case 'configWarning':
     case 'deprecationNotice':
-      return [{
-        type: 'diagnostic',
-        level: 'warning',
-        message: stringValue(params.message) ?? stringValue(params.summary) ?? 'Codex reported a warning.',
-      }]
+      return [
+        {
+          type: 'diagnostic',
+          level: 'warning',
+          message: stringValue(params.message) ?? stringValue(params.summary) ?? 'Codex reported a warning.',
+        },
+      ]
     case 'error': {
       const error = asObject(params.error)
-      return [{
-        type: 'error',
-        code: stringValue(error?.codexErrorInfo) ?? 'codex_error',
-        message: readableErrorMessage(stringValue(params.message) ?? stringValue(error?.message)) ?? 'Codex reported an error.',
-        retryable: Boolean(params.willRetry),
-      }]
+      return [
+        {
+          type: 'error',
+          code: stringValue(error?.codexErrorInfo) ?? 'codex_error',
+          message:
+            readableErrorMessage(stringValue(params.message) ?? stringValue(error?.message)) ??
+            'Codex reported an error.',
+          retryable: Boolean(params.willRetry),
+        },
+      ]
     }
     default:
       return []
@@ -439,16 +465,20 @@ export function normalizeCodexServerRequest(request: JsonRpcServerRequest): Agen
               ? row.options.flatMap((option, index) => {
                   const item = asObject(option)
                   const label = stringValue(item?.label)
-                  return label ? [{ id: String(index), label, description: stringValue(item?.description) ?? undefined }] : []
+                  return label
+                    ? [{ id: String(index), label, description: stringValue(item?.description) ?? undefined }]
+                    : []
                 })
               : undefined
-            return [{
-              id,
-              header: stringValue(row?.header) ?? undefined,
-              prompt,
-              options,
-              secret: Boolean(row?.isSecret),
-            }]
+            return [
+              {
+                id,
+                header: stringValue(row?.header) ?? undefined,
+                prompt,
+                options,
+                secret: Boolean(row?.isSecret),
+              },
+            ]
           })
         : []
       return { type: 'request', requestId, kind: 'question', title: 'Codex has a question', questions }
@@ -478,7 +508,12 @@ export function codexPermissionSubject(request: JsonRpcServerRequest): AgentPerm
   }
   switch (request.method) {
     case 'item/commandExecution/requestApproval':
-      return { toolCallId, kind: 'command', command: stringValue(request.params.command) ?? '', paths: path(request.params.cwd) }
+      return {
+        toolCallId,
+        kind: 'command',
+        command: stringValue(request.params.command) ?? '',
+        paths: path(request.params.cwd),
+      }
     case 'item/fileChange/requestApproval':
       return { toolCallId, kind: 'edit', command: '', paths: path(request.params.grantRoot) }
     case 'item/permissions/requestApproval':
@@ -497,29 +532,33 @@ export function codexServerRequestResponse(request: JsonRpcServerRequest, resolu
     case 'item/permissions/requestApproval': {
       const optionId = stringValue(row?.optionId)
       return {
-        permissions: optionId === 'accept' || optionId === 'acceptForSession'
-          ? asObject(request.params.permissions) ?? {}
-          : {},
+        permissions:
+          optionId === 'accept' || optionId === 'acceptForSession' ? (asObject(request.params.permissions) ?? {}) : {},
         scope: optionId === 'acceptForSession' ? 'session' : 'turn',
       }
     }
     case 'item/tool/requestUserInput': {
       const rawAnswers = asObject(row?.answers) ?? {}
       return {
-        answers: Object.fromEntries(Object.entries(rawAnswers).map(([id, answer]) => [
-          id,
-          { answers: Array.isArray(answer) ? answer.map(String) : [String(answer ?? '')] },
-        ])),
+        answers: Object.fromEntries(
+          Object.entries(rawAnswers).map(([id, answer]) => [
+            id,
+            { answers: Array.isArray(answer) ? answer.map(String) : [String(answer ?? '')] },
+          ]),
+        ),
       }
     }
     case 'mcpServer/elicitation/request': {
       // Rebuilt from the provider's own request, so the answer names the app and scopes it offered.
       const approval = codexAppApproval(request.params)
       if (approval) return appApprovalResponse(approval, resolution)
-      return formElicitationResponse({
-        message: stringValue(request.params.message) ?? 'Input requested',
-        requestedSchema: request.params.requestedSchema,
-      }, resolution)
+      return formElicitationResponse(
+        {
+          message: stringValue(request.params.message) ?? 'Input requested',
+          requestedSchema: request.params.requestedSchema,
+        },
+        resolution,
+      )
     }
     default:
       return row ?? {}

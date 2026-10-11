@@ -5,7 +5,10 @@ import { refreshFleet, _resetFleet } from './fleet'
 import { previewUrlForClient, remotePreviewBlocked } from './previewUrl'
 
 const node = (nodeId: string, local: boolean): NodeRecord => ({
-  nodeId, label: nodeId, endpoint: `https://127.0.0.1:9${nodeId.length}00`, local,
+  nodeId,
+  label: nodeId,
+  endpoint: `https://127.0.0.1:9${nodeId.length}00`,
+  local,
 })
 
 beforeEach(async () => {
@@ -13,10 +16,14 @@ beforeEach(async () => {
   ;(globalThis as { window?: unknown }).window = {
     acorn: {
       desktop: true,
-      fleetList: () => Promise.resolve({
-        nodes: [node('local', true), node('remote', false)],
-        statuses: [{ nodeId: 'local', state: 'online' as const }, { nodeId: 'remote', state: 'online' as const }],
-      }),
+      fleetList: () =>
+        Promise.resolve({
+          nodes: [node('local', true), node('remote', false)],
+          statuses: [
+            { nodeId: 'local', state: 'online' as const },
+            { nodeId: 'remote', state: 'online' as const },
+          ],
+        }),
       onNodeStatus: () => () => {},
     },
   }

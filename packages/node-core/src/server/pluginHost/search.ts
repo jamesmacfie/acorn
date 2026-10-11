@@ -40,13 +40,18 @@ export type RegisteredSearchProvider = SearchProvider & { pluginId: string }
 // hands back its own undo, and the plugin host runs it on teardown (./host.ts § clearRegistrations).
 const providers = new Map<string, RegisteredSearchProvider>()
 
-const key = (provider: Pick<RegisteredSearchProvider, 'pluginId' | 'id'>): string => `${provider.pluginId}:${provider.id}`
+const key = (provider: Pick<RegisteredSearchProvider, 'pluginId' | 'id'>): string =>
+  `${provider.pluginId}:${provider.id}`
 
 export function registerSearchProvider(provider: RegisteredSearchProvider): Disposable {
   const id = key(provider)
   if (providers.has(id)) throw new Error(`Duplicate search provider '${id}'.`)
   providers.set(id, provider)
-  return { dispose: () => { if (providers.get(id) === provider) providers.delete(id) } }
+  return {
+    dispose: () => {
+      if (providers.get(id) === provider) providers.delete(id)
+    },
+  }
 }
 
 export function clearSearchProviders(pluginId: string): void {
@@ -61,29 +66,42 @@ const text = (value: unknown, max: number): string =>
 // data into a page the caller scoped.
 function sanitizeHits(value: unknown, scope: ReadonlySet<string>, limit: number): SearchHit[] {
   if (!Array.isArray(value)) return []
-  return value.flatMap((raw): SearchHit[] => {
-    if (!raw || typeof raw !== 'object') return []
-    const hit = raw as Record<string, unknown>
-    const title = text(hit.title, TITLE_MAX)
-    const taskId = typeof hit.taskId === 'string' ? hit.taskId : null
-    if (!title || (taskId !== null && !scope.has(taskId))) return []
-    const target = hit.target as Record<string, unknown> | undefined
-    const validTarget = target && typeof target.kind === 'string' && typeof target.resourceId === 'string'
-      ? {
-          kind: target.kind,
-          resourceId: target.resourceId,
-          ...(typeof target.subresourceId === 'string' ? { subresourceId: target.subresourceId } : {}),
-        }
-      : undefined
-    return [{ taskId, title, preview: text(hit.preview, PREVIEW_MAX), ...(validTarget ? { target: validTarget } : {}) }]
-  }).slice(0, limit)
+  return value
+    .flatMap((raw): SearchHit[] => {
+      if (!raw || typeof raw !== 'object') return []
+      const hit = raw as Record<string, unknown>
+      const title = text(hit.title, TITLE_MAX)
+      const taskId = typeof hit.taskId === 'string' ? hit.taskId : null
+      if (!title || (taskId !== null && !scope.has(taskId))) return []
+      const target = hit.target as Record<string, unknown> | undefined
+      const validTarget =
+        target && typeof target.kind === 'string' && typeof target.resourceId === 'string'
+          ? {
+              kind: target.kind,
+              resourceId: target.resourceId,
+              ...(typeof target.subresourceId === 'string' ? { subresourceId: target.subresourceId } : {}),
+            }
+          : undefined
+      return [
+        { taskId, title, preview: text(hit.preview, PREVIEW_MAX), ...(validTarget ? { target: validTarget } : {}) },
+      ]
+    })
+    .slice(0, limit)
 }
 
 // Raced rather than only aborted, for the reason taskChecks.ts gives: a provider that ignores its
 // signal would otherwise hold the whole answer open.
-function runOne(provider: RegisteredSearchProvider, query: SearchQuery, scope: ReadonlySet<string>): Promise<SearchGroup> {
-  const group = (status: SearchGroup['status'], hits: SearchHit[] = []): SearchGroup =>
-    ({ providerId: key(provider), label: provider.label, status, hits })
+function runOne(
+  provider: RegisteredSearchProvider,
+  query: SearchQuery,
+  scope: ReadonlySet<string>,
+): Promise<SearchGroup> {
+  const group = (status: SearchGroup['status'], hits: SearchHit[] = []): SearchGroup => ({
+    providerId: key(provider),
+    label: provider.label,
+    status,
+    hits,
+  })
   return new Promise<SearchGroup>((resolve) => {
     const controller = new AbortController()
     let settled = false

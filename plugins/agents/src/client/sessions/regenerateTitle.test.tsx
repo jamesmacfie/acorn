@@ -34,16 +34,18 @@ const original = {
 const regenerated = { ...original, title: 'Generated title', updatedAt: 2 }
 const snapshot = {
   session: original,
-  turns: [{
-    id: 'turn-1',
-    sessionId: original.id,
-    ordinal: 0,
-    source: 'interactive',
-    status: 'completed',
-    input: [{ type: 'text', text: 'Generate a more useful session title' }],
-    effectivePolicy: {},
-    createdAt: 1,
-  }],
+  turns: [
+    {
+      id: 'turn-1',
+      sessionId: original.id,
+      ordinal: 0,
+      source: 'interactive',
+      status: 'completed',
+      input: [{ type: 'text', text: 'Generate a more useful session title' }],
+      effectivePolicy: {},
+      createdAt: 1,
+    },
+  ],
   events: [],
   requests: [],
 } as unknown as AgentSessionSnapshot
@@ -70,7 +72,9 @@ describe('regenerating a session title', () => {
   it('offers the shared session action and replaces the cached title with the server result', async () => {
     await new Promise<void>((resolve, reject) => {
       createRoot((dispose) => {
-        const model = withQueryClient(() => createAgentPaneModel({ id: original.taskId } as Task, { shown: () => true }))
+        const model = withQueryClient(() =>
+          createAgentPaneModel({ id: original.taskId } as Task, { shown: () => true }),
+        )
         void model.sessionsLoaded
           .then(() => managedAgentStore.loadSnapshot(original.id))
           .then(() => {

@@ -1,6 +1,10 @@
 import { createResource, createSignal, For, Show } from 'solid-js'
 import type { SecretPublicationDecision } from '@acorn/protocol/secretChecks.ts'
-import { allowSecretPublication, nodeSecretPublication, setSecretPublicationBlocking } from '../../infra/node/nodeSecurity'
+import {
+  allowSecretPublication,
+  nodeSecretPublication,
+  setSecretPublicationBlocking,
+} from '../../infra/node/nodeSecurity'
 import { Button, Checkbox } from '../../kit/components/primitives'
 import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
@@ -13,19 +17,26 @@ import { createSettingSave } from './settingSave'
 
 const LABEL = 'Block publication with secret findings'
 const OPERATIONS: Record<SecretPublicationDecision['operation'], string> = {
-  commit: 'Commit', push: 'Push', export: 'Transcript export', send: 'Agent message with attachments',
+  commit: 'Commit',
+  push: 'Push',
+  export: 'Transcript export',
+  send: 'Agent message with attachments',
 }
 
 const describe = (decision: SecretPublicationDecision): string => {
-  const found = decision.reason === 'findings'
-    ? `${decision.highCount} likely secret${decision.highCount === 1 ? '' : 's'} (${decision.rules.join(', ')})`
-    : `${decision.unscannedCount} input${decision.unscannedCount === 1 ? '' : 's'} not checked`
+  const found =
+    decision.reason === 'findings'
+      ? `${decision.highCount} likely secret${decision.highCount === 1 ? '' : 's'} (${decision.rules.join(', ')})`
+      : `${decision.unscannedCount} input${decision.unscannedCount === 1 ? '' : 's'} not checked`
   return `${OPERATIONS[decision.operation]} to ${decision.destination}: ${found}.`
 }
 
 export default function SecretPublicationSection(props: { nodeId: string | null }) {
   const nodeId = () => props.nodeId ?? undefined
-  const [state, { mutate, refetch }] = createResource(() => props.nodeId ?? '', (id) => nodeSecretPublication(id || undefined))
+  const [state, { mutate, refetch }] = createResource(
+    () => props.nodeId ?? '',
+    (id) => nodeSecretPublication(id || undefined),
+  )
   const save = createSettingSave()
   const [allowError, setAllowError] = createSignal('')
 
@@ -58,7 +69,11 @@ export default function SecretPublicationSection(props: { nodeId: string | null 
           checked={state()?.block ?? false}
           // Until the node answers, the switch would show Off as a guess and a click would write it.
           disabled={!state()}
-          onChange={(next) => save.run(async () => { mutate(await setSecretPublicationBlocking(next, nodeId())) })}
+          onChange={(next) =>
+            save.run(async () => {
+              mutate(await setSecretPublicationBlocking(next, nodeId()))
+            })
+          }
         />
       </SettingRow>
       <Show when={state()?.decisions.length}>
@@ -75,7 +90,9 @@ export default function SecretPublicationSection(props: { nodeId: string | null 
               </SettingRow>
             )}
           </For>
-          <Button variant="ghost" onPress={() => void refetch()}>Refresh</Button>
+          <Button variant="ghost" onPress={() => void refetch()}>
+            Refresh
+          </Button>
         </SettingRow>
       </Show>
     </SettingsSection>

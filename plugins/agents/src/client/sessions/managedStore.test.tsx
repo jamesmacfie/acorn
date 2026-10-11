@@ -72,20 +72,21 @@ describe('priming the managed-session roster', () => {
   })
 })
 
-const rosterRow = (id: string, updatedAt: number): AgentSession => ({
-  id,
-  taskId: 't1',
-  title: id,
-  config: {},
-  createdAt: 1,
-  updatedAt,
-  lastEventSeq: 0,
-  lastReadSeq: 0,
-  attention: 'none',
-  controller: 'acorn',
-  runtimeState: 'ready',
-  subagents: [],
-} as unknown as AgentSession)
+const rosterRow = (id: string, updatedAt: number): AgentSession =>
+  ({
+    id,
+    taskId: 't1',
+    title: id,
+    config: {},
+    createdAt: 1,
+    updatedAt,
+    lastEventSeq: 0,
+    lastReadSeq: 0,
+    attention: 'none',
+    controller: 'acorn',
+    runtimeState: 'ready',
+    subagents: [],
+  }) as unknown as AgentSession
 
 describe('a page of sessions', () => {
   it('publishes the whole page once, not once per row', async () => {

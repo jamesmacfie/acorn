@@ -32,7 +32,13 @@ const sameName = (a: string, b: string): boolean => a.toLowerCase() === b.toLowe
 
 /** Does this reference name this task's pull request? The task side is `(github.owner/name,
  *  pullNumber)`, which is how a github-pr task records its PR: on the row, never as a link. */
-export function pullRefMatchesTask(value: string, github: { owner: string; name: string }, pullNumber: number): boolean {
+export function pullRefMatchesTask(
+  value: string,
+  github: { owner: string; name: string },
+  pullNumber: number,
+): boolean {
   const ref = parsePullRef(value)
-  return !!ref && sameName(ref.owner, github.owner) && sameName(ref.repo, github.name) && ref.number === String(pullNumber)
+  return (
+    !!ref && sameName(ref.owner, github.owner) && sameName(ref.repo, github.name) && ref.number === String(pullNumber)
+  )
 }

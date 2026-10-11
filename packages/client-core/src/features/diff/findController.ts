@@ -1,6 +1,11 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js'
 import type { Accessor } from 'solid-js'
-import { segmentContentKey, type DiffSearchMatch, type DiffSearchPage, type DiffSearchRequest } from '@acorn/diff-document/document'
+import {
+  segmentContentKey,
+  type DiffSearchMatch,
+  type DiffSearchPage,
+  type DiffSearchRequest,
+} from '@acorn/diff-document/document'
 import type { FindHighlight } from '../../kit/diff/find'
 
 // In-diff find (Cmd+F). The diff is loaded a segment at a time, so the renderer cannot scan it: the
@@ -57,20 +62,25 @@ export function createDiffFindController(props: {
     }
   }
 
-  createEffect(on(() => [findOpen(), findQuery(), findCase(), props.revision()] as const, ([open, query]) => {
-    stop()
-    setMatchIdx(0)
-    setMatches([])
-    setNextCursor(null)
-    if (!open || !query) return
-    timer = setTimeout(() => {
-      void fetchPage(null).then((page) => {
-        if (!page) return
-        setMatches(page.matches)
-        setNextCursor(page.nextCursor)
-      })
-    }, SEARCH_DEBOUNCE_MS)
-  }))
+  createEffect(
+    on(
+      () => [findOpen(), findQuery(), findCase(), props.revision()] as const,
+      ([open, query]) => {
+        stop()
+        setMatchIdx(0)
+        setMatches([])
+        setNextCursor(null)
+        if (!open || !query) return
+        timer = setTimeout(() => {
+          void fetchPage(null).then((page) => {
+            if (!page) return
+            setMatches(page.matches)
+            setNextCursor(page.nextCursor)
+          })
+        }, SEARCH_DEBOUNCE_MS)
+      },
+    ),
+  )
 
   // Match ranges by file, segment content and row, for the rows that happen to be mounted. The path is
   // part of the key because two files with the same patch share a content key.
@@ -90,7 +100,11 @@ export function createDiffFindController(props: {
     const ranges = rangesByRow().get(rowKey(path, contentKey, row))
     if (!ranges) return undefined
     const current = currentMatch()
-    const isCurrent = current && current.path === path && segmentContentKey(current.patchKey, current.ordinal) === contentKey && current.row === row
+    const isCurrent =
+      current &&
+      current.path === path &&
+      segmentContentKey(current.patchKey, current.ordinal) === contentKey &&
+      current.row === row
     return { ranges, current: isCurrent ? [current.start, current.end] : null }
   }
 

@@ -1,14 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { documentCustody } from '@acorn/plugin-api/ui/editor'
-import { inferIndentation, movePresentation, presentationFor, prunePresentation, saveLabel, setPresentation } from './editorPresentation'
+import {
+  inferIndentation,
+  movePresentation,
+  presentationFor,
+  prunePresentation,
+  saveLabel,
+  setPresentation,
+} from './editorPresentation'
 
 describe('editor presentation', () => {
   beforeEach(() => {
     const values = new Map<string, string>()
     vi.stubGlobal('localStorage', {
       getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => { values.set(key, value) },
-      removeItem: (key: string) => { values.delete(key) },
+      setItem: (key: string, value: string) => {
+        values.set(key, value)
+      },
+      removeItem: (key: string) => {
+        values.delete(key)
+      },
     })
   })
   afterEach(() => vi.unstubAllGlobals())
@@ -29,7 +40,10 @@ describe('editor presentation', () => {
     setPresentation('node', 'task', 'src/file.ts', { wrap: true, indentation: { mode: 'tabs', width: 4 } })
     setPresentation('other', 'task', 'src/file.ts', { wrap: false })
     movePresentation('node', 'task', 'src', 'lib')
-    expect(presentationFor('node', 'task', 'lib/file.ts')).toEqual({ wrap: true, indentation: { mode: 'tabs', width: 4 } })
+    expect(presentationFor('node', 'task', 'lib/file.ts')).toEqual({
+      wrap: true,
+      indentation: { mode: 'tabs', width: 4 },
+    })
     expect(presentationFor('node', 'task', 'src/file.ts')).toEqual({})
     prunePresentation('node', 'task', 'lib')
     expect(presentationFor('node', 'task', 'lib/file.ts')).toEqual({})
@@ -42,13 +56,22 @@ describe('editor presentation', () => {
     custody.editText('first')
     expect(saveLabel(custody, null)).toBe('Unsaved')
     let acknowledge!: (value: { text: string; revision: string }) => void
-    const pending = custody.flush(() => new Promise((resolve) => { acknowledge = resolve }))
+    const pending = custody.flush(
+      () =>
+        new Promise((resolve) => {
+          acknowledge = resolve
+        }),
+    )
     expect(saveLabel(custody, null)).toBe('Saving…')
     custody.editText('later')
     acknowledge({ text: 'first', revision: 'next' })
     await pending
     expect(saveLabel(custody, null)).toBe('Unsaved')
-    await expect(custody.flush(async () => { throw new Error('disk full') })).rejects.toThrow('disk full')
+    await expect(
+      custody.flush(async () => {
+        throw new Error('disk full')
+      }),
+    ).rejects.toThrow('disk full')
     expect(saveLabel(custody, null)).toBe('Save failed')
     expect(saveLabel(custody, 'deleted')).toBe('Deleted on disk')
     expect(saveLabel(custody, 'changed')).toBe('Changed on disk')

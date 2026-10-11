@@ -26,7 +26,14 @@ import type { CompiledNodePluginContext, NodePlugin, PluginStorage } from '../pl
 const PLUGIN = 'acme'
 
 // A loaded plugin declares nothing by default, which is what `permissions: {}` means in a manifest.
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
+const NO_PERMISSIONS: NodePermissions = {
+  core: [],
+  capabilities: [],
+  secrets: false,
+  exec: false,
+  net: [],
+  sockets: false,
+}
 // Never opened by anything in this file: these cases are about registrations, and a real chain would drag
 // a temp data root in for nothing. The reload × migration interaction has its own note in
 // server/plugins/storage.ts, and it is a promise deliberately NOT made.
@@ -40,7 +47,12 @@ const binding = { permissions: NO_PERMISSIONS, storage }
 const shared = makeTestDb()
 const hostOptions = () => ({
   capabilities: new CapabilityRegistry(),
-  core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: shared.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
+  core: createCoreServices({
+    secrets: new SecretService('b'.repeat(64)),
+    db: shared.db,
+    activeIdentity: memoryIdentityStore(),
+    ...testCoreSeams(),
+  }),
   dataDir: '',
   loaded: new Map([[PLUGIN, binding]]),
 })
@@ -48,7 +60,10 @@ const hostOptions = () => ({
 // One loaded plugin that contributes the three things a reload has to move: a route (mounted through the
 // portable carrier), an agent tool (a registry that rejects duplicates, which is what makes the candidate
 // buffer necessary) and a captured context (so the test can prove the old one is revoked).
-const acme = (body: string, extra?: Partial<NodePlugin>): { plugin: NodePlugin; context: () => CompiledNodePluginContext } => {
+const acme = (
+  body: string,
+  extra?: Partial<NodePlugin>,
+): { plugin: NodePlugin; context: () => CompiledNodePluginContext } => {
   let captured: CompiledNodePluginContext | null = null
   return {
     context: () => captured!,
@@ -78,7 +93,10 @@ const request = (path: string) =>
     .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
     .fetch(new Request(`http://acorn.test${path}`), {} as Env)
 
-const toolDescriptions = () => agentToolContributions().filter((tool) => tool.name === `${PLUGIN}_probe`).map((tool) => tool.description)
+const toolDescriptions = () =>
+  agentToolContributions()
+    .filter((tool) => tool.name === `${PLUGIN}_probe`)
+    .map((tool) => tool.description)
 
 afterEach(() => clearRegistrations(PLUGIN))
 
@@ -88,7 +106,12 @@ describe('plugin reload', () => {
     const host = await initPlugins([first.plugin], hostOptions())
 
     const outcome = await host.reload(PLUGIN, {
-      plugin: { name: PLUGIN, init: () => { throw new Error('the new bundle is broken') } },
+      plugin: {
+        name: PLUGIN,
+        init: () => {
+          throw new Error('the new bundle is broken')
+        },
+      },
       binding,
     })
 
@@ -104,7 +127,12 @@ describe('plugin reload', () => {
   it('records the failure on the roster row so the owner can read it', async () => {
     const host = await initPlugins([acme('v1').plugin], hostOptions())
     await host.reload(PLUGIN, {
-      plugin: { name: PLUGIN, init: () => { throw new Error('boom') } },
+      plugin: {
+        name: PLUGIN,
+        init: () => {
+          throw new Error('boom')
+        },
+      },
       binding,
     })
     expect(host.roster.find((entry) => entry.name === PLUGIN)).toMatchObject({
@@ -148,10 +176,15 @@ describe('plugin reload', () => {
   })
 
   it('reaches a prefix that only exists after the reload', async () => {
-    const host = await initPlugins([{
-      name: PLUGIN,
-      init: (ctx) => ctx.routes.fetch(() => new Response('early'), { prefix: '/early' }),
-    }], hostOptions())
+    const host = await initPlugins(
+      [
+        {
+          name: PLUGIN,
+          init: (ctx) => ctx.routes.fetch(() => new Response('early'), { prefix: '/early' }),
+        },
+      ],
+      hostOptions(),
+    )
     // Nothing was mounted at this path when the app was built, so a boot-time mount table could never
     // answer it. The fall-through keeps that the app's own 404 rather than the dispatcher's.
     expect((await request(`/v1/p/${PLUGIN}/late`)).status).toBe(404)
@@ -181,7 +214,10 @@ describe('plugin reload', () => {
     const host = await initPlugins([acme('loaded').plugin], hostOptions())
     const app = new Hono<AppEnv>()
       .use('/v1/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
-      .route(`${PLUGIN_NAMESPACE}/${PLUGIN}`, new Hono<AppEnv>().get('/compiled', (c) => c.text('built-in')))
+      .route(
+        `${PLUGIN_NAMESPACE}/${PLUGIN}`,
+        new Hono<AppEnv>().get('/compiled', (c) => c.text('built-in')),
+      )
       .all(`${PLUGIN_NAMESPACE}/:plugin`, dispatchPluginFetch)
       .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
     const call = (path: string) => app.fetch(new Request(`http://acorn.test${path}`), {} as Env)
@@ -203,7 +239,17 @@ describe('plugin reload', () => {
   })
 
   it('lets a plugin whose init was contained at boot come back without a restart', async () => {
-    const host = await initPlugins([{ name: PLUGIN, init: () => { throw new Error('broken at boot') } }], hostOptions())
+    const host = await initPlugins(
+      [
+        {
+          name: PLUGIN,
+          init: () => {
+            throw new Error('broken at boot')
+          },
+        },
+      ],
+      hostOptions(),
+    )
     expect(host.roster.find((entry) => entry.name === PLUGIN)).toMatchObject({ state: 'failed' })
 
     expect(await host.reload(PLUGIN, { plugin: acme('fixed').plugin, binding })).toEqual({ ok: true })
@@ -258,14 +304,44 @@ describe('a folder plugin through the loader, the host, and the reloader', () =>
     try {
       const source = join(root, 'source')
       mkdirSync(join(source, 'dist'), { recursive: true })
-      writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
-        id: 'folder-fixture', name: 'Folder fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-        contributions: { dataSources: [{ sourceId: 'board', name: 'Board', singular: 'Card', plural: 'Cards', identityScope: 'card', handler: '/v1/p/folder-fixture/board', inputs: { tasks: { source: 'core:tasks', label: 'Tasks' } } }] },
-      }))
-      writeFileSync(join(source, 'dist', 'node.js'), 'export default { name: "folder-fixture", init(ctx) { ctx.routes.fetch(() => new Response("x"), { prefix: "/board" }) } }\n')
+      writeFileSync(
+        join(source, 'acorn-plugin.json'),
+        JSON.stringify({
+          id: 'folder-fixture',
+          name: 'Folder fixture',
+          version: '1.0.0',
+          baseline: 'acorn-1',
+          apiVersion: PLUGIN_API_MAJOR,
+          node: './dist/node.js',
+          contributions: {
+            dataSources: [
+              {
+                sourceId: 'board',
+                name: 'Board',
+                singular: 'Card',
+                plural: 'Cards',
+                identityScope: 'card',
+                handler: '/v1/p/folder-fixture/board',
+                inputs: { tasks: { source: 'core:tasks', label: 'Tasks' } },
+              },
+            ],
+          },
+        }),
+      )
+      writeFileSync(
+        join(source, 'dist', 'node.js'),
+        'export default { name: "folder-fixture", init(ctx) { ctx.routes.fetch(() => new Response("x"), { prefix: "/board" }) } }\n',
+      )
       await installPlugin(root, { path: source })
       const { loaded } = await loadExternalPlugins(root, { builtins: [] })
-      const host = await initPlugins(loaded.map((entry) => entry.plugin), { ...hostOptions(), dataDir: root, loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])) })
+      const host = await initPlugins(
+        loaded.map((entry) => entry.plugin),
+        {
+          ...hostOptions(),
+          dataDir: root,
+          loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+        },
+      )
       const ref = { pluginId: 'folder-fixture', sourceId: 'board' }
       expect(registeredDataSource(ref)).toBeDefined()
       const reloader = createPluginReloader({ dataDir: root, builtins: [], host })
@@ -294,25 +370,67 @@ describe('a folder plugin’s hook handler through the loader and the host', () 
     const { testEnv } = await import('../../testkit/db')
     const root = mkdtempSync(join(tmpdir(), 'acorn-hook-folder-'))
     const point = registerHookPoint({
-      id: 'owner:before-thing', ownerId: 'owner', payload: { command: 'string' }, allows: ['veto'],
-      timeoutMs: 5_000, onTimeout: 'allow', order: 'install', collect: false,
+      id: 'owner:before-thing',
+      ownerId: 'owner',
+      payload: { command: 'string' },
+      allows: ['veto'],
+      timeoutMs: 5_000,
+      onTimeout: 'allow',
+      order: 'install',
+      collect: false,
     })
     try {
       const source = join(root, 'source')
       mkdirSync(join(source, 'dist'), { recursive: true })
-      writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
-        id: 'hook-fixture', name: 'Hook fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-        contributions: { extensions: [{ id: 'rule', point: 'owner:before-thing', label: 'do the thing', route: '/v1/p/hook-fixture/check', mode: 'veto' }] },
-      }))
-      writeFileSync(join(source, 'dist', 'node.js'), 'export default { name: "hook-fixture", init(ctx) { ctx.routes.fetch(async (request) => Response.json({ ok: false, reason: `no ${(await request.json()).command}` })) } }\n')
+      writeFileSync(
+        join(source, 'acorn-plugin.json'),
+        JSON.stringify({
+          id: 'hook-fixture',
+          name: 'Hook fixture',
+          version: '1.0.0',
+          baseline: 'acorn-1',
+          apiVersion: PLUGIN_API_MAJOR,
+          node: './dist/node.js',
+          contributions: {
+            extensions: [
+              {
+                id: 'rule',
+                point: 'owner:before-thing',
+                label: 'do the thing',
+                route: '/v1/p/hook-fixture/check',
+                mode: 'veto',
+              },
+            ],
+          },
+        }),
+      )
+      writeFileSync(
+        join(source, 'dist', 'node.js'),
+        'export default { name: "hook-fixture", init(ctx) { ctx.routes.fetch(async (request) => Response.json({ ok: false, reason: `no ${(await request.json()).command}` })) } }\n',
+      )
       await installPlugin(root, { path: source })
       const { loaded } = await loadExternalPlugins(root, { builtins: [] })
-      const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: shared.db, activeIdentity: memoryIdentityStore('owner'), ...testCoreSeams() })
-      const host = await initPlugins(loaded.map((entry) => entry.plugin), {
-        ...hostOptions(), core, dataDir: root, env: testEnv({ ACTIVE_IDENTITY: memoryIdentityStore('owner') }),
-        loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+      const core = createCoreServices({
+        secrets: new SecretService('b'.repeat(64)),
+        db: shared.db,
+        activeIdentity: memoryIdentityStore('owner'),
+        ...testCoreSeams(),
       })
-      expect(await runHook('owner:before-thing', { command: 'push' })).toMatchObject({ ok: false, by: 'hook-fixture', reason: 'no push' })
+      const host = await initPlugins(
+        loaded.map((entry) => entry.plugin),
+        {
+          ...hostOptions(),
+          core,
+          dataDir: root,
+          env: testEnv({ ACTIVE_IDENTITY: memoryIdentityStore('owner') }),
+          loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+        },
+      )
+      expect(await runHook('owner:before-thing', { command: 'push' })).toMatchObject({
+        ok: false,
+        by: 'hook-fixture',
+        reason: 'no push',
+      })
       await host.dispose()
     } finally {
       point.dispose()
@@ -355,18 +473,36 @@ describe('a folder plugin’s session messenger through the loader and the host'
     const root = mkdtempSync(join(tmpdir(), 'acorn-messenger-folder-'))
     const source = join(root, 'source')
     mkdirSync(join(source, 'dist'), { recursive: true })
-    writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
-      id: 'messenger-fixture', name: 'Messenger fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-      contributions: { extensions: manifestExtensions },
-    }))
+    writeFileSync(
+      join(source, 'acorn-plugin.json'),
+      JSON.stringify({
+        id: 'messenger-fixture',
+        name: 'Messenger fixture',
+        version: '1.0.0',
+        baseline: 'acorn-1',
+        apiVersion: PLUGIN_API_MAJOR,
+        node: './dist/node.js',
+        contributions: { extensions: manifestExtensions },
+      }),
+    )
     writeFileSync(join(source, 'dist', 'node.js'), nodeSource)
     await installPlugin(root, { path: source })
     const { loaded } = await loadExternalPlugins(root, { builtins: [] })
-    const host = await initPlugins(loaded.map((entry) => entry.plugin), {
-      ...hostOptions(), dataDir: root,
-      loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
-    })
-    return { host, cleanup: () => { clearRegistrations('messenger-fixture'); rmSync(root, { recursive: true, force: true }) } }
+    const host = await initPlugins(
+      loaded.map((entry) => entry.plugin),
+      {
+        ...hostOptions(),
+        dataDir: root,
+        loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+      },
+    )
+    return {
+      host,
+      cleanup: () => {
+        clearRegistrations('messenger-fixture')
+        rmSync(root, { recursive: true, force: true })
+      },
+    }
   }
 
   it('calls a sender the host bound, after connect returned, and gets its answer back', async () => {
@@ -397,17 +533,31 @@ describe('a folder plugin’s session messenger through the loader and the host'
   it('gives a loaded reviewer the window and reaches it with the owner’s abort', async () => {
     const { extensionsFor, openExtensionPoint } = await import('../pluginHost/extensionPoints')
     const point = openExtensionPoint('agents', 'agents:turn-follow-up' as never, 'Turn reviewers')
-    const { host, cleanup } = await install([{ id: 'review', point: 'agents:turn-follow-up', label: 'review a turn' }], REVIEWER_FIXTURE)
+    const { host, cleanup } = await install(
+      [{ id: 'review', point: 'agents:turn-follow-up', label: 'review a turn' }],
+      REVIEWER_FIXTURE,
+    )
     try {
       const [entry] = extensionsFor<{ review(window: unknown): Promise<void> }>('agents:turn-follow-up' as never)
       expect(entry).toMatchObject({ pluginId: 'messenger-fixture' })
       const controller = new AbortController()
       const reports: unknown[] = []
       let settled = false
-      const review = entry!.value.review({
-        taskId: 't', sessionId: 's', turnId: 'turn-1', owner: 'workflow', deadline: Date.now() + 30_000, signal: controller.signal,
-        report: (seen: unknown) => { reports.push(seen) },
-      }).then(() => { settled = true })
+      const review = entry!.value
+        .review({
+          taskId: 't',
+          sessionId: 's',
+          turnId: 'turn-1',
+          owner: 'workflow',
+          deadline: Date.now() + 30_000,
+          signal: controller.signal,
+          report: (seen: unknown) => {
+            reports.push(seen)
+          },
+        })
+        .then(() => {
+          settled = true
+        })
       await new Promise((resolve) => setTimeout(resolve, 50))
       expect(settled).toBe(false)
       controller.abort()
@@ -458,20 +608,47 @@ describe('a folder plugin’s granted model call through the loader and the host
       available: async () => [],
       generateText: async (request: GenerateTextRequest) => {
         const signal = request.input.signal
-        if (request.input.prompt === 'wait' && signal) await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }))
+        if (request.input.prompt === 'wait' && signal)
+          await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }))
         seen.push({ backendId: request.backendId, aborted: !!signal?.aborted })
         if (signal?.aborted) throw new ProviderOperationError('provider_unavailable', 502)
-        return { text: 'reviewed', providerId: 'fake', backendId: request.backendId, modelId: 'm', usage: { outputTokens: 7 } }
+        return {
+          text: 'reviewed',
+          providerId: 'fake',
+          backendId: request.backendId,
+          modelId: 'm',
+          usage: { outputTokens: 7 },
+        }
       },
     }
     const options = hostOptions()
-    const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: db.db, activeIdentity: identity, ...testCoreSeams() })
+    const core = createCoreServices({
+      secrets: new SecretService('b'.repeat(64)),
+      db: db.db,
+      activeIdentity: identity,
+      ...testCoreSeams(),
+    })
     core.models = { ...models, forPlugin: (id) => pluginModelService(db.db, models, core.identity, id) }
-    const review = { available: true, input: { userText: [{ text: 'é'.repeat(8_000), provenance: { kind: 'context', source: 'plugin:x', label: 'Issue' }, truncated: true }] } }
+    const review = {
+      available: true,
+      input: {
+        userText: [
+          {
+            text: 'é'.repeat(8_000),
+            provenance: { kind: 'context', source: 'plugin:x', label: 'Issue' },
+            truncated: true,
+          },
+        ],
+      },
+    }
     const provided = options.capabilities.provide(capabilityId('agents.reviewInput.v1'), { read: async () => review })
     // A caller-bound capability: the provider learns who called from the host, never from an argument.
     const changes: string[] = []
-    const control = (caller: string) => ({ setConfig: async (_task: string, _session: string, option: string, value: string) => { changes.push(`${caller} ${option}=${value}`) } })
+    const control = (caller: string) => ({
+      setConfig: async (_task: string, _session: string, option: string, value: string) => {
+        changes.push(`${caller} ${option}=${value}`)
+      },
+    })
     const controlled = options.capabilities.provide(capabilityId('agents.sessionControl'), {
       ...control('unbound'),
       [BIND_CAPABILITY_CALLER]: control,
@@ -479,11 +656,29 @@ describe('a folder plugin’s granted model call through the loader and the host
     try {
       const source = join(root, 'source')
       mkdirSync(join(source, 'dist'), { recursive: true })
-      writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
-        id: 'models-fixture', name: 'Models fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-        permissions: { node: { core: ['models', 'identity'], capabilities: ['agents.reviewInput.v1', 'agents.sessionControl'], secrets: false, exec: false, net: [] } },
-      }))
-      writeFileSync(join(source, 'dist', 'node.js'), `export default { name: "models-fixture", init(ctx) {
+      writeFileSync(
+        join(source, 'acorn-plugin.json'),
+        JSON.stringify({
+          id: 'models-fixture',
+          name: 'Models fixture',
+          version: '1.0.0',
+          baseline: 'acorn-1',
+          apiVersion: PLUGIN_API_MAJOR,
+          node: './dist/node.js',
+          permissions: {
+            node: {
+              core: ['models', 'identity'],
+              capabilities: ['agents.reviewInput.v1', 'agents.sessionControl'],
+              secrets: false,
+              exec: false,
+              net: [],
+            },
+          },
+        }),
+      )
+      writeFileSync(
+        join(source, 'dist', 'node.js'),
+        `export default { name: "models-fixture", init(ctx) {
         ctx.routes.fetch(async (request) => {
           const body = await request.json()
           if (body.review) return Response.json(await ctx.capabilities.get("agents.reviewInput.v1").read({ taskId: "t", sessionId: "s", turnId: "u" }))
@@ -495,21 +690,37 @@ describe('a folder plugin’s granted model call through the loader and the host
             return Response.json({ text: (await ctx.core.models.generateText({ userId: body.userId ?? ctx.core.identity.active(), input })).text })
           } catch (error) { return Response.json({ code: error.code }) }
         })
-      } }\n`)
+      } }\n`,
+      )
       await installPlugin(root, { path: source })
       const { loaded } = await loadExternalPlugins(root, { builtins: [] })
-      const host = await initPlugins(loaded.map((entry) => entry.plugin), {
-        ...options, core, dataDir: root,
-        loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
-      })
-      const call = async (body: Record<string, unknown>) => (await new Hono<AppEnv>()
-        .use('/v1/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
-        .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
-        .fetch(new Request('http://acorn.test/v1/p/models-fixture/call', { method: 'POST', body: JSON.stringify(body) }), {} as Env)).json()
+      const host = await initPlugins(
+        loaded.map((entry) => entry.plugin),
+        {
+          ...options,
+          core,
+          dataDir: root,
+          loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+        },
+      )
+      const call = async (body: Record<string, unknown>) =>
+        (
+          await new Hono<AppEnv>()
+            .use('/v1/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
+            .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
+            .fetch(
+              new Request('http://acorn.test/v1/p/models-fixture/call', { method: 'POST', body: JSON.stringify(body) }),
+              {} as Env,
+            )
+        ).json()
       const today = () => dayUsage(db.db, 'owner-1', 'models-fixture', localDay(Date.now()))
 
       expect(await call({})).toEqual({ code: 'provider_not_configured' })
-      writeModelGrant(db.db, 'owner-1', 'models-fixture', { backendId: 'connection:key', modelId: '', dailyOutputTokens: 1_000 })
+      writeModelGrant(db.db, 'owner-1', 'models-fixture', {
+        backendId: 'connection:key',
+        modelId: '',
+        dailyOutputTokens: 1_000,
+      })
       expect(await call({ userId: 'someone-else' })).toEqual({ code: 'provider_bad_config' })
       expect(seen).toEqual([])
 

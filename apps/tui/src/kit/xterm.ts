@@ -20,22 +20,28 @@
 
 const absent = (what: string): never => {
   throw new Error(
-    `${what} is browser xterm.js, and the terminal client has no canvas to draw it on. `
-    + 'This host runs a shell in the `pty` rectangle over @xterm/headless instead '
-    + '(apps/tui/src/kit/xterm.ts, apps/tui/vite.config.ts).',
+    `${what} is browser xterm.js, and the terminal client has no canvas to draw it on. ` +
+      'This host runs a shell in the `pty` rectangle over @xterm/headless instead ' +
+      '(apps/tui/src/kit/xterm.ts, apps/tui/vite.config.ts).',
   )
 }
 
 export class Terminal {
-  constructor() { absent('Terminal') }
+  constructor() {
+    absent('Terminal')
+  }
 }
 
 export class FitAddon {
-  constructor() { absent('FitAddon') }
+  constructor() {
+    absent('FitAddon')
+  }
 }
 
 export class WebglAddon {
-  constructor() { absent('WebglAddon') }
+  constructor() {
+    absent('WebglAddon')
+  }
 }
 
 /** `@xterm/xterm/css/xterm.css`, imported for its side effects. A stylesheet has nothing to throw

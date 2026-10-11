@@ -92,12 +92,14 @@ export function createCommitState(deps: CommitDeps) {
     if (!message || committing()) return
     if (mode() === 'none' && !amending) return
     setCommitting(true)
-    const res = await deps.commit(message, {
-      all: mode() === 'tracked',
-      amend: amending,
-      signoff: signoff(),
-      noVerify: noVerify(),
-    }).finally(() => setCommitting(false))
+    const res = await deps
+      .commit(message, {
+        all: mode() === 'tracked',
+        amend: amending,
+        signoff: signoff(),
+        noVerify: noVerify(),
+      })
+      .finally(() => setCommitting(false))
     // The draft survives a refusal, which is the point of a veto arriving as a reason rather than as
     // a silent failure: the reader fixes what the handler objected to and presses again.
     if (!res.ok) {

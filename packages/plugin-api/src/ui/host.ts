@@ -55,7 +55,10 @@ export { AnnotationMarks } from '@acorn/client-core/host/annotations'
 // Host-only: reading the selection and drawing the menu are the host's, and the owner only says what
 // the selection is and whether it is still current.
 export { SelectionActions } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
-export type { SelectedContent, SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
+export type {
+  SelectedContent,
+  SelectionActionsProps,
+} from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 // Other plugins' viewers for the closed code fences in Markdown this surface draws
 // (`core:markdown-fence`). Host-only: who draws, the cap and the Source/Preview control are the host's,

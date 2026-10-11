@@ -24,9 +24,7 @@ export type ArchiveOpts = {
 
 // `branchMissing` lets the caller offer a new branch when the archived task's local branch
 // disappeared. A failed restore leaves the task archived.
-export type RestoreResult =
-  | { ok: true }
-  | { ok: false; reason: string; branchMissing?: boolean }
+export type RestoreResult = { ok: true } | { ok: false; reason: string; branchMissing?: boolean }
 
 export type RestoreOpts = {
   newBranch?: boolean

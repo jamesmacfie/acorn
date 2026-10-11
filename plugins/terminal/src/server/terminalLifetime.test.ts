@@ -1,67 +1,213 @@
 import { afterEach, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({
-  ptys: [] as Array<{ data: Set<(s: string) => void>; exits: Set<(e: { exitCode: number }) => void>; kills: number; kill(): void; writes: string[]; throwDispose: boolean }>,
-  immediateExit: null as number | null, spawnThrows: false, systemPrompt: false, spawnArgs: [] as string[][], tmux: false, agent: false, warnThrows: false, aliveTmux: '', failExitRegistration: false, exec: [] as string[][],
+  ptys: [] as Array<{
+    data: Set<(s: string) => void>
+    exits: Set<(e: { exitCode: number }) => void>
+    kills: number
+    kill(): void
+    writes: string[]
+    throwDispose: boolean
+  }>,
+  immediateExit: null as number | null,
+  spawnThrows: false,
+  systemPrompt: false,
+  spawnArgs: [] as string[][],
+  tmux: false,
+  agent: false,
+  warnThrows: false,
+  aliveTmux: '',
+  failExitRegistration: false,
+  exec: [] as string[][],
 }))
-vi.mock('node-pty', () => ({ spawn: (_command: string, args: string[]) => {
-  if (state.spawnThrows) throw Error('spawn unavailable')
-  state.spawnArgs.push(args)
-  const pty = {
-    data: new Set<(s: string) => void>(), exits: new Set<(e: { exitCode: number }) => void>(), kills: 0, writes: [] as string[], throwDispose: false,
-    onData(fn: (s: string) => void) { this.data.add(fn); return { dispose: () => { this.data.delete(fn); if (this.throwDispose) throw Error('disposer failed') } } },
-    onExit(fn: (e: { exitCode: number }) => void) { if (state.failExitRegistration) throw Error('exit registration failed'); this.exits.add(fn); if (state.immediateExit !== null) fn({ exitCode: state.immediateExit }); return { dispose: () => { this.exits.delete(fn) } } },
-    kill() { this.kills++ }, write(s: string) { this.writes.push(s) }, resize() {}, pause() {}, resume() {},
-  }
-  state.ptys.push(pty)
-  return pty
-} }))
-vi.mock('node:child_process', () => ({ execFileSync: (_file: string, args: string[]) => { state.exec.push(args); return args[0] === 'list-sessions' ? state.aliveTmux : '' } }))
+vi.mock('node-pty', () => ({
+  spawn: (_command: string, args: string[]) => {
+    if (state.spawnThrows) throw Error('spawn unavailable')
+    state.spawnArgs.push(args)
+    const pty = {
+      data: new Set<(s: string) => void>(),
+      exits: new Set<(e: { exitCode: number }) => void>(),
+      kills: 0,
+      writes: [] as string[],
+      throwDispose: false,
+      onData(fn: (s: string) => void) {
+        this.data.add(fn)
+        return {
+          dispose: () => {
+            this.data.delete(fn)
+            if (this.throwDispose) throw Error('disposer failed')
+          },
+        }
+      },
+      onExit(fn: (e: { exitCode: number }) => void) {
+        if (state.failExitRegistration) throw Error('exit registration failed')
+        this.exits.add(fn)
+        if (state.immediateExit !== null) fn({ exitCode: state.immediateExit })
+        return {
+          dispose: () => {
+            this.exits.delete(fn)
+          },
+        }
+      },
+      kill() {
+        this.kills++
+      },
+      write(s: string) {
+        this.writes.push(s)
+      },
+      resize() {},
+      pause() {},
+      resume() {},
+    }
+    state.ptys.push(pty)
+    return pty
+  },
+}))
+vi.mock('node:child_process', () => ({
+  execFileSync: (_file: string, args: string[]) => {
+    state.exec.push(args)
+    return args[0] === 'list-sessions' ? state.aliveTmux : ''
+  },
+}))
 vi.mock('@acorn/plugin-api/node', () => ({
-  getProfile: () => ({ id: 'shell', label: 'Shell', kind: state.agent ? 'agent' : 'shell', backendPreference: state.tmux ? 'tmux' : 'node-pty', launchContextArgs: state.systemPrompt ? (context: string | null) => ['--append-system-prompt', context ?? ''] : undefined }),
-  interactiveProfile: () => true, resolveCommand: () => '/bin/sh', tmuxAvailable: () => state.tmux,
-  buildSessionEnv: () => ({}), rendererBaseCheckout: () => undefined,
+  getProfile: () => ({
+    id: 'shell',
+    label: 'Shell',
+    kind: state.agent ? 'agent' : 'shell',
+    backendPreference: state.tmux ? 'tmux' : 'node-pty',
+    launchContextArgs: state.systemPrompt
+      ? (context: string | null) => ['--append-system-prompt', context ?? '']
+      : undefined,
+  }),
+  interactiveProfile: () => true,
+  resolveCommand: () => '/bin/sh',
+  tmuxAvailable: () => state.tmux,
+  buildSessionEnv: () => ({}),
+  rendererBaseCheckout: () => undefined,
   taskContext: () => ({ repo: null, pull: null }),
-  createLogger: () => ({ warn() { if (state.warnThrows) throw Error('logger failed') } }), describeError: (error: Error) => ({ message: error.message }),
-  invalidateWorktreeStatus() {}, TEARDOWN_TIMEOUT_MS: 100,
-  acornMcp: () => null, launcherSpec: () => ({}), serverName: () => 'fixture', resolveMcpEntry: () => 'fixture',
-  childEnv: () => ({}), listProfileDefs: () => [], listProfiles: () => [],
+  createLogger: () => ({
+    warn() {
+      if (state.warnThrows) throw Error('logger failed')
+    },
+  }),
+  describeError: (error: Error) => ({ message: error.message }),
+  invalidateWorktreeStatus() {},
+  TEARDOWN_TIMEOUT_MS: 100,
+  acornMcp: () => null,
+  launcherSpec: () => ({}),
+  serverName: () => 'fixture',
+  resolveMcpEntry: () => 'fixture',
+  childEnv: () => ({}),
+  listProfileDefs: () => [],
+  listProfiles: () => [],
 }))
 import { disposeTerminal, registerTerminalChannel, terminalRunGlue, sendToAgent, reconcileTmux } from './terminal'
 
-const deferred = <T>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(yes => { resolve = yes }); return { promise, resolve } }
-function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Promise<unknown>; project?: () => Promise<unknown>; insert?: () => Promise<void>; remove?: () => Promise<void>; root?: () => Promise<string>; status?: () => void; launchText?: () => Promise<string | null>; launch?: () => Promise<void> } = {}) {
+const deferred = <T>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((yes) => {
+    resolve = yes
+  })
+  return { promise, resolve }
+}
+function fixture(
+  options: {
+    load?: () => Promise<unknown>
+    resolveCwd?: () => Promise<unknown>
+    project?: () => Promise<unknown>
+    insert?: () => Promise<void>
+    remove?: () => Promise<void>
+    root?: () => Promise<string>
+    status?: () => void
+    launchText?: () => Promise<string | null>
+    launch?: () => Promise<void>
+  } = {},
+) {
   const rows = new Map<string, Record<string, unknown>>()
   const mutations: string[] = []
   let rosterEvents = 0
   const db = {
-    select: () => ({ from: () => Object.assign(Promise.resolve([...rows.values()]), { where: () => ({ limit: async () => [...rows.values()] }) }) }),
-    insert: () => ({ values: async (row: Record<string, unknown>) => { await options.insert?.(); rows.set(row.id as string, { ...row }); mutations.push('insert') } }),
-    update: () => ({ set: (value: Record<string, unknown>) => ({ where: async () => { for (const row of rows.values()) Object.assign(row, value); mutations.push('update') } }) }),
-    delete: () => ({ where: async () => { mutations.push('delete'); await options.remove?.(); rows.clear() } }),
+    select: () => ({
+      from: () =>
+        Object.assign(Promise.resolve([...rows.values()]), {
+          where: () => ({ limit: async () => [...rows.values()] }),
+        }),
+    }),
+    insert: () => ({
+      values: async (row: Record<string, unknown>) => {
+        await options.insert?.()
+        rows.set(row.id as string, { ...row })
+        mutations.push('insert')
+      },
+    }),
+    update: () => ({
+      set: (value: Record<string, unknown>) => ({
+        where: async () => {
+          for (const row of rows.values()) Object.assign(row, value)
+          mutations.push('update')
+        },
+      }),
+    }),
+    delete: () => ({
+      where: async () => {
+        mutations.push('delete')
+        await options.remove?.()
+        rows.clear()
+      },
+    }),
   }
   const core = {
     taskScripts: { takeSetup: () => null, report: vi.fn(), forSession: () => null, reconcile: () => {} },
-    tasks: { load: options.load ?? (async () => ({ id: 'task', projectId: options.project ? 'project' : null })), resolveCwd: options.resolveCwd ?? (async () => ({ cwd: '/tmp/fixture', isWorktree: false })), root: options.root ?? (async () => '/tmp/fixture') },
-    projects: { byId: options.project ?? (async () => null), setup: async () => ({ trigger: 'off' }) }, proc: {},
+    tasks: {
+      load: options.load ?? (async () => ({ id: 'task', projectId: options.project ? 'project' : null })),
+      resolveCwd: options.resolveCwd ?? (async () => ({ cwd: '/tmp/fixture', isWorktree: false })),
+      root: options.root ?? (async () => '/tmp/fixture'),
+    },
+    projects: { byId: options.project ?? (async () => null), setup: async () => ({ trigger: 'off' }) },
+    proc: {},
     git: { gitText: vi.fn(async () => 'synthetic diff') },
   }
   const streams = vi.fn()
   const reg = registerTerminalChannel(db as never, core as never, {
-    internalEnv: () => ({}), launchContextText: options.launchText, launchContext: options.launch ?? (async () => {}), completed() {},
-    seedTaskNotes: async () => {}, reconciled: Promise.resolve(), streams, status: () => { rosterEvents++; options.status?.() },
+    internalEnv: () => ({}),
+    launchContextText: options.launchText,
+    launchContext: options.launch ?? (async () => {}),
+    completed() {},
+    seedTaskNotes: async () => {},
+    reconciled: Promise.resolve(),
+    streams,
+    status: () => {
+      rosterEvents++
+      options.status?.()
+    },
   })
   return { ...reg, db, core, rows, mutations, events: () => rosterEvents, streams: streams.mock.calls[0][0] }
 }
-afterEach(() => { disposeTerminal(); vi.useRealTimers(); state.ptys.length = 0; state.spawnArgs.length = 0; state.systemPrompt = false; state.exec.length = 0; state.tmux = false; state.agent = false; state.aliveTmux = ''; state.warnThrows = false; state.failExitRegistration = false; state.immediateExit = null; state.spawnThrows = false })
+afterEach(() => {
+  disposeTerminal()
+  vi.useRealTimers()
+  state.ptys.length = 0
+  state.spawnArgs.length = 0
+  state.systemPrompt = false
+  state.exec.length = 0
+  state.tmux = false
+  state.agent = false
+  state.aliveTmux = ''
+  state.warnThrows = false
+  state.failExitRegistration = false
+  state.immediateExit = null
+  state.spawnThrows = false
+})
 
 it('publishes structure once, retires both reader sinks, and drains callbacks and output timers', async () => {
   vi.useFakeTimers()
   const f = fixture()
   const session = await f.terminal.create({ taskId: 'task' })
   const pty = state.ptys[0]!
-  const first = vi.fn(), second = vi.fn()
-  f.streams.attach(session.id, first); f.streams.attach(session.id, second)
+  const first = vi.fn(),
+    second = vi.fn()
+  f.streams.attach(session.id, first)
+  f.streams.attach(session.id, second)
   for (const data of pty.data) data('queued')
   expect(vi.getTimerCount()).toBe(2)
   pty.throwDispose = true
@@ -81,16 +227,21 @@ it('publishes structure once, retires both reader sinks, and drains callbacks an
 
 it('notifies the changed memory roster even when durable removal fails, and batches task drops', async () => {
   state.tmux = true
-  const f = fixture({ remove: async () => { throw Error('disk unavailable') } })
+  const f = fixture({
+    remove: async () => {
+      throw Error('disk unavailable')
+    },
+  })
   const a = await f.terminal.create({ taskId: 'task' })
   await expect(f.terminal.remove(a.id)).rejects.toThrow('disk unavailable')
   expect(f.events()).toBe(2)
   expect(await f.terminal.list()).toEqual([])
-  await f.terminal.create({ taskId: 'task' }); await f.terminal.create({ taskId: 'task' })
+  await f.terminal.create({ taskId: 'task' })
+  await f.terminal.create({ taskId: 'task' })
   await expect(f.taskSessions.dropTaskSessions('task')).rejects.toThrow('disk unavailable')
   expect(await f.terminal.list()).toEqual([])
   expect(f.events()).toBe(5)
-  expect(f.mutations.filter(x => x === 'delete')).toHaveLength(3)
+  expect(f.mutations.filter((x) => x === 'delete')).toHaveLength(3)
 })
 
 it('ordinary shutdown closes a tmux attachment without destroying its session or durable metadata', async () => {
@@ -98,11 +249,12 @@ it('ordinary shutdown closes a tmux attachment without destroying its session or
   const f = fixture()
   await f.terminal.create({ taskId: 'task' })
   const pty = state.ptys[0]!
-  const staleData = [...pty.data], staleExit = [...pty.exits]
+  const staleData = [...pty.data],
+    staleExit = [...pty.exits]
   disposeTerminal()
   expect(pty.kills).toBe(1)
   expect(pty.data.size + pty.exits.size).toBe(0)
-  expect(state.exec.some(args => args[0] === 'kill-session')).toBe(false)
+  expect(state.exec.some((args) => args[0] === 'kill-session')).toBe(false)
   expect(f.rows.size).toBe(1)
   const next = fixture()
   for (const data of staleData) data('late')
@@ -112,17 +264,27 @@ it('ordinary shutdown closes a tmux attachment without destroying its session or
   expect(f.mutations).toEqual(['insert'])
 })
 
-it.each(['load', 'resolveCwd', 'project'] as const)('rejects a retired create held at %s before process admission', async phase => {
-  const hold = deferred<unknown>()
-  const f = fixture({ [phase]: () => hold.promise })
-  const pending = f.terminal.create({ taskId: 'task' }).catch(error => error.message)
-  for (let i = 0; i < 8; i++) await Promise.resolve()
-  disposeTerminal(); const next = fixture()
-  hold.resolve(phase === 'load' ? { id: 'task', projectId: null } : phase === 'resolveCwd' ? { cwd: '/tmp', isWorktree: false } : null)
-  expect(await pending).toContain('disposed')
-  expect(state.ptys).toHaveLength(0)
-  expect(next.events()).toBe(0)
-})
+it.each(['load', 'resolveCwd', 'project'] as const)(
+  'rejects a retired create held at %s before process admission',
+  async (phase) => {
+    const hold = deferred<unknown>()
+    const f = fixture({ [phase]: () => hold.promise })
+    const pending = f.terminal.create({ taskId: 'task' }).catch((error) => error.message)
+    for (let i = 0; i < 8; i++) await Promise.resolve()
+    disposeTerminal()
+    const next = fixture()
+    hold.resolve(
+      phase === 'load'
+        ? { id: 'task', projectId: null }
+        : phase === 'resolveCwd'
+          ? { cwd: '/tmp', isWorktree: false }
+          : null,
+    )
+    expect(await pending).toContain('disposed')
+    expect(state.ptys).toHaveLength(0)
+    expect(next.events()).toBe(0)
+  },
+)
 
 it('captures the insert database and preserves an early tmux exit across held durable admission', async () => {
   state.tmux = true
@@ -145,10 +307,11 @@ it('retires a tmux attachment admitted before held insert, without wiring into a
   state.tmux = true
   const held = deferred<void>()
   const f = fixture({ insert: () => held.promise })
-  const pending = f.terminal.create({ taskId: 'task' }).catch(error => error.message)
+  const pending = f.terminal.create({ taskId: 'task' }).catch((error) => error.message)
   for (let i = 0; i < 8; i++) await Promise.resolve()
   const pty = state.ptys[0]!
-  disposeTerminal(); const next = fixture()
+  disposeTerminal()
+  const next = fixture()
   held.resolve()
   expect(await pending).toContain('disposed')
   expect(pty.kills).toBe(1)
@@ -158,27 +321,35 @@ it('retires a tmux attachment admitted before held insert, without wiring into a
   expect(f.rows.size).toBe(1)
 })
 
-it.each(['remove', 'dispose', 'deadline'] as const)('settles teardown and clears its deadline on %s without an exit event', async reason => {
-  vi.useFakeTimers()
-  const f = fixture()
-  const pending = f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task')
-  for (let i = 0; i < 12; i++) await Promise.resolve()
-  const rows = await f.terminal.list()
-  expect(rows).toHaveLength(1)
-  if (reason === 'remove') await f.terminal.remove(rows[0]!.id)
-  if (reason === 'dispose') disposeTerminal()
-  if (reason === 'deadline') vi.advanceTimersByTime(100)
-  expect(await pending).toEqual({ exitCode: null, output: '', reason: reason === 'deadline' ? 'timeout' : 'cancelled' })
-  expect(state.ptys[0]!.kills).toBe(1)
-  expect(state.ptys[0]!.exits.size).toBe(0)
-  disposeTerminal()
-  expect(vi.getTimerCount()).toBe(0)
-})
+it.each(['remove', 'dispose', 'deadline'] as const)(
+  'settles teardown and clears its deadline on %s without an exit event',
+  async (reason) => {
+    vi.useFakeTimers()
+    const f = fixture()
+    const pending = f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task')
+    for (let i = 0; i < 12; i++) await Promise.resolve()
+    const rows = await f.terminal.list()
+    expect(rows).toHaveLength(1)
+    if (reason === 'remove') await f.terminal.remove(rows[0]!.id)
+    if (reason === 'dispose') disposeTerminal()
+    if (reason === 'deadline') vi.advanceTimersByTime(100)
+    expect(await pending).toEqual({
+      exitCode: null,
+      output: '',
+      reason: reason === 'deadline' ? 'timeout' : 'cancelled',
+    })
+    expect(state.ptys[0]!.kills).toBe(1)
+    expect(state.ptys[0]!.exits.size).toBe(0)
+    disposeTerminal()
+    expect(vi.getTimerCount()).toBe(0)
+  },
+)
 
 it('rejects stale run glue after the terminal engine is replaced', () => {
   fixture()
   const oldGlue = terminalRunGlue()
-  disposeTerminal(); fixture()
+  disposeTerminal()
+  fixture()
   expect(oldGlue.isRunning('unknown')).toBe(false)
   expect(() => oldGlue.killSession('unknown')).toThrow('disposed')
 })
@@ -186,8 +357,13 @@ it('rejects stale run glue after the terminal engine is replaced', () => {
 it('keeps held admission invisible to both roster readers and stream ownership, and rolls back a failed insert', async () => {
   state.tmux = true
   const held = deferred<void>()
-  const f = fixture({ insert: async () => { await held.promise; throw Error('insert failed') } })
-  const pending = f.terminal.create({ taskId: 'task' }).catch(error => error.message)
+  const f = fixture({
+    insert: async () => {
+      await held.promise
+      throw Error('insert failed')
+    },
+  })
+  const pending = f.terminal.create({ taskId: 'task' }).catch((error) => error.message)
   for (let i = 0; i < 8; i++) await Promise.resolve()
   expect(await f.terminal.list()).toEqual([])
   expect(await f.terminal.list()).toEqual([])
@@ -233,7 +409,7 @@ it('keeps timed-out teardown history honestly exited and restores its output wit
   vi.useRealTimers()
   const sink = vi.fn()
   f.streams.attach(rows[0]!.id, sink)
-  for (let i = 0; i < 20 && sink.mock.calls.length < 2; i++) await new Promise(yes => setTimeout(yes, 5))
+  for (let i = 0; i < 20 && sink.mock.calls.length < 2; i++) await new Promise((yes) => setTimeout(yes, 5))
   expect(sink.mock.calls[0][0]).toMatchObject({ type: 'ready', session: { status: 'exited' }, replayed: true })
   expect(await f.terminal.interrupt(rows[0]!.id)).toBe(false)
 })
@@ -243,15 +419,36 @@ it('preserves fresh tmux work when a rejected metadata operation actually commit
   const f = fixture()
   // A post-commit rejection is deliberately injected at the database seam.
   // The engine must inspect the captured row rather than infer absence from rejection.
-  const db = { insert: () => ({ values: async (row: Record<string, unknown>) => { f.rows.set(row.id as string, row); throw Error('after commit') } }),
-    select: () => ({ from: () => ({ where: () => ({ limit: async () => [...f.rows.values()] }) }) }) }
+  const db = {
+    insert: () => ({
+      values: async (row: Record<string, unknown>) => {
+        f.rows.set(row.id as string, row)
+        throw Error('after commit')
+      },
+    }),
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => [...f.rows.values()] }) }) }),
+  }
   disposeTerminal()
   const core = {
-    taskScripts: { takeSetup: () => null, report: () => {}, forSession: () => null, reconcile: () => {} }, tasks: { load: async () => ({ id: 'task', projectId: null }), resolveCwd: async () => ({ cwd: '/tmp', isWorktree: false }) }, projects: {}, proc: {}, git: {} }
-  const reg = registerTerminalChannel(db as never, core as never, { internalEnv: () => ({}), launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve() })
+    taskScripts: { takeSetup: () => null, report: () => {}, forSession: () => null, reconcile: () => {} },
+    tasks: {
+      load: async () => ({ id: 'task', projectId: null }),
+      resolveCwd: async () => ({ cwd: '/tmp', isWorktree: false }),
+    },
+    projects: {},
+    proc: {},
+    git: {},
+  }
+  const reg = registerTerminalChannel(db as never, core as never, {
+    internalEnv: () => ({}),
+    launchContext: async () => {},
+    completed() {},
+    seedTaskNotes: async () => {},
+    reconciled: Promise.resolve(),
+  })
   await expect(reg.terminal.create({ taskId: 'task' })).rejects.toThrow('after commit')
   expect(f.rows.size).toBe(1)
-  expect(state.exec.some(args => args[0] === 'kill-session')).toBe(false)
+  expect(state.exec.some((args) => args[0] === 'kill-session')).toBe(false)
   expect(state.ptys[0]!.kills).toBe(1)
 })
 
@@ -265,16 +462,18 @@ it('clears the engine-owned delayed submit timer and refuses a stale write after
   disposeTerminal()
   expect(vi.getTimerCount()).toBe(0)
   vi.advanceTimersByTime(200)
-  expect(pty.writes.filter(s => s === '\r')).toHaveLength(0)
+  expect(pty.writes.filter((s) => s === '\r')).toHaveLength(0)
 })
 
 it('does not announce private agent activity or admit sends while a durable insert is held', async () => {
-  vi.useFakeTimers(); state.tmux = true; state.agent = true
+  vi.useFakeTimers()
+  state.tmux = true
+  state.agent = true
   const hold = deferred<void>()
   const f = fixture({ insert: () => hold.promise })
   const pending = f.terminal.create({ taskId: 'task' })
   for (let i = 0; i < 12; i++) await Promise.resolve()
-  const args = state.exec.find(args => args[0] === 'new-session')!
+  const args = state.exec.find((args) => args[0] === 'new-session')!
   const id = args[args.indexOf('-s') + 1]!.slice('acorn-'.length)
   sendToAgent(id, 'private', 'now')
   vi.advanceTimersByTime(12000)
@@ -283,7 +482,8 @@ it('does not announce private agent activity or admit sends while a durable inse
   expect(f.streams.streamTaskId(id)).toBeNull()
   expect(f.terminal.taskIdFor(id)).toBeNull()
   expect(await f.terminal.list()).toEqual([])
-  hold.resolve(); await pending
+  hold.resolve()
+  await pending
   expect(f.events()).toBe(1)
 })
 
@@ -317,14 +517,20 @@ it('retires a failed reconciliation attachment without deleting its preexisting 
   disposeTerminal()
   state.aliveTmux = meta.tmuxSession!
   state.failExitRegistration = true
-  const next = registerTerminalChannel(f.db as never, f.core as never, { internalEnv: () => ({}), launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve() })
+  const next = registerTerminalChannel(f.db as never, f.core as never, {
+    internalEnv: () => ({}),
+    launchContext: async () => {},
+    completed() {},
+    seedTaskNotes: async () => {},
+    reconciled: Promise.resolve(),
+  })
   await reconcileTmux()
   expect(state.ptys).toHaveLength(2)
   expect(state.ptys[1]!.kills).toBe(1)
   expect(state.ptys[1]!.data.size + state.ptys[1]!.exits.size).toBe(0)
   expect(await next.terminal.list()).toEqual([])
   expect(f.rows.size).toBe(1)
-  expect(state.exec.some(args => args[0] === 'kill-session')).toBe(false)
+  expect(state.exec.some((args) => args[0] === 'kill-session')).toBe(false)
 })
 
 it('updates a reattached tmux session for newly started MCP children', async () => {
@@ -335,16 +541,25 @@ it('updates a reattached tmux session for newly started MCP children', async () 
   state.aliveTmux = meta.tmuxSession!
   registerTerminalChannel(f.db as never, f.core as never, {
     internalEnv: () => ({ ACORN_API_TOKEN: 'renewed', ACORN_API_TOKEN_FILE: '/data/session.token' }),
-    launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve(),
+    launchContext: async () => {},
+    completed() {},
+    seedTaskNotes: async () => {},
+    reconciled: Promise.resolve(),
   })
   await reconcileTmux()
   expect(state.exec).toContainEqual(['set-environment', '-t', meta.tmuxSession, 'ACORN_API_TOKEN', 'renewed'])
-  expect(state.exec).toContainEqual(['set-environment', '-t', meta.tmuxSession, 'ACORN_API_TOKEN_FILE', '/data/session.token'])
+  expect(state.exec).toContainEqual([
+    'set-environment',
+    '-t',
+    meta.tmuxSession,
+    'ACORN_API_TOKEN_FILE',
+    '/data/session.token',
+  ])
 })
 
-
 it('waits for standing context before spawn and avoids a duplicate idle-edge push', async () => {
-  state.agent = true; state.systemPrompt = true
+  state.agent = true
+  state.systemPrompt = true
   const context = deferred<string | null>()
   const launch = vi.fn(async () => {})
   const f = fixture({ launchText: () => context.promise, launch })
@@ -365,8 +580,9 @@ it('reports process start and an immediate confirmed exit before teardown spawni
   state.immediateExit = 0
   const f = fixture()
   expect(await f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).toMatchObject({ exitCode: 0 })
-  expect(f.core.taskScripts.report.mock.calls.map(call => call[1])).toEqual([
-    { type: 'started', terminalSessionId: expect.any(String) }, { type: 'exit', exitCode: 0, signal: undefined },
+  expect(f.core.taskScripts.report.mock.calls.map((call) => call[1])).toEqual([
+    { type: 'started', terminalSessionId: expect.any(String) },
+    { type: 'exit', exitCode: 0, signal: undefined },
   ])
 })
 it('reports output and terminal removal through the attempt evidence seam', async () => {
@@ -377,15 +593,24 @@ it('reports output and terminal removal through the attempt evidence seam', asyn
   const [meta] = await f.terminal.list()
   await f.terminal.remove(meta!.id)
   expect(await pending).toMatchObject({ exitCode: null, reason: 'cancelled' })
-  expect(f.core.taskScripts.report.mock.calls.map(call => call[1])).toContainEqual({ type: 'output', data: 'diagnostic' })
-  expect(f.core.taskScripts.report.mock.calls.map(call => call[1])).toContainEqual({ type: 'interrupted', reason: 'terminal_removed' })
+  expect(f.core.taskScripts.report.mock.calls.map((call) => call[1])).toContainEqual({
+    type: 'output',
+    data: 'diagnostic',
+  })
+  expect(f.core.taskScripts.report.mock.calls.map((call) => call[1])).toContainEqual({
+    type: 'interrupted',
+    reason: 'terminal_removed',
+  })
 })
 it('reports a spawn error and timeout distinctly without pretending to observe exit zero', async () => {
   state.spawnThrows = true
   const f = fixture()
-  await expect(f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).rejects.toThrow('spawn unavailable')
+  await expect(f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).rejects.toThrow(
+    'spawn unavailable',
+  )
   expect(f.core.taskScripts.report).toHaveBeenCalledWith(attempt, { type: 'failed', reason: 'spawn_failed' })
-  state.spawnThrows = false; vi.useFakeTimers()
+  state.spawnThrows = false
+  vi.useFakeTimers()
   const pending = f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)
   for (let i = 0; i < 12; i++) await Promise.resolve()
   vi.advanceTimersByTime(100)
@@ -394,7 +619,8 @@ it('reports a spawn error and timeout distinctly without pretending to observe e
 })
 
 it('does not treat a successful tmux attachment exit as confirmed teardown command success', async () => {
-  state.tmux = true; state.immediateExit = 0
+  state.tmux = true
+  state.immediateExit = 0
   const f = fixture()
   expect(await f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).toMatchObject({ exitCode: null })
   expect(f.core.taskScripts.report).toHaveBeenCalledWith(attempt, { type: 'interrupted', reason: 'process_lost' })
@@ -403,23 +629,36 @@ it('does not treat a successful tmux attachment exit as confirmed teardown comma
 it('runs setup by hand as a "Setup" session in the existing worktree', async () => {
   const f = fixture({ resolveCwd: async () => ({ cwd: '/tmp/worktree', isWorktree: true, created: false }) })
   const identity = { attemptId: 'manual', generation: 3 }
-  Object.assign(f.core.taskScripts, { admitManualSetup: vi.fn(() => identity), takeSetup: vi.fn(() => ({ identity, script: 'pnpm install' })) })
+  Object.assign(f.core.taskScripts, {
+    admitManualSetup: vi.fn(() => identity),
+    takeSetup: vi.fn(() => ({ identity, script: 'pnpm install' })),
+  })
   const { sessionId } = await f.terminal.runSetup('task')
-  expect((await f.terminal.list()).find((session) => session.id === sessionId)).toMatchObject({ title: 'Setup', cwd: '/tmp/worktree' })
+  expect((await f.terminal.list()).find((session) => session.id === sessionId)).toMatchObject({
+    title: 'Setup',
+    cwd: '/tmp/worktree',
+  })
   expect(f.core.taskScripts.report).toHaveBeenCalledWith(identity, { type: 'started', terminalSessionId: sessionId })
 })
 
 it('fails a manual setup attempt when the spawn fails, and spawns nothing when core refuses', async () => {
   const f = fixture({ resolveCwd: async () => ({ cwd: '/tmp/worktree', isWorktree: true, created: false }) })
   const identity = { attemptId: 'manual', generation: 3 }
-  Object.assign(f.core.taskScripts, { admitManualSetup: vi.fn(() => identity), takeSetup: vi.fn(() => ({ identity, script: 'pnpm install' })) })
+  Object.assign(f.core.taskScripts, {
+    admitManualSetup: vi.fn(() => identity),
+    takeSetup: vi.fn(() => ({ identity, script: 'pnpm install' })),
+  })
   state.spawnThrows = true
   await expect(f.terminal.runSetup('task')).rejects.toThrow('spawn unavailable')
   expect(f.core.taskScripts.report).toHaveBeenCalledWith(identity, { type: 'failed', reason: 'spawn_failed' })
 
   state.spawnThrows = false
   vi.mocked(f.core.taskScripts.report).mockClear()
-  Object.assign(f.core.taskScripts, { admitManualSetup: vi.fn(() => { throw Object.assign(Error('Setup is already running.'), { code: 'already_running' }) }) })
+  Object.assign(f.core.taskScripts, {
+    admitManualSetup: vi.fn(() => {
+      throw Object.assign(Error('Setup is already running.'), { code: 'already_running' })
+    }),
+  })
   await expect(f.terminal.runSetup('task')).rejects.toThrow('Setup is already running.')
   expect(f.core.taskScripts.report).not.toHaveBeenCalled()
   expect(await f.terminal.list()).toEqual([])

@@ -12,5 +12,9 @@ export type ScheduleRequest = {
 const [scheduleRequest, setScheduleRequest] = createSignal<ScheduleRequest | undefined>()
 
 export { scheduleRequest }
-export const requestWorkflowSchedule = (request: ScheduleRequest): void => { setScheduleRequest(request) }
-export const closeWorkflowSchedule = (): void => { setScheduleRequest(undefined) }
+export const requestWorkflowSchedule = (request: ScheduleRequest): void => {
+  setScheduleRequest(request)
+}
+export const closeWorkflowSchedule = (): void => {
+  setScheduleRequest(undefined)
+}

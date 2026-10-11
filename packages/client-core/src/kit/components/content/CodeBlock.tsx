@@ -22,8 +22,9 @@ export function CodeBlock(props: {
   children: JSX.Element
 }) {
   let codeRef: HTMLElement | undefined
-  const copyText = () => (typeof props.copy === 'string' ? props.copy : codeRef?.textContent ?? '')
-  const ansiText = () => (props.ansi && typeof props.children === 'string' && hasAnsi(props.children) ? props.children : undefined)
+  const copyText = () => (typeof props.copy === 'string' ? props.copy : (codeRef?.textContent ?? ''))
+  const ansiText = () =>
+    props.ansi && typeof props.children === 'string' && hasAnsi(props.children) ? props.children : undefined
   const coloured = useAnsiLines(ansiText)
   return (
     <div class="ui-code-wrap">
@@ -32,12 +33,22 @@ export function CodeBlock(props: {
         data-wrap={props.wrap ? '' : undefined}
         data-size={props.size ?? 'sm'}
         data-max={props.maxHeight ?? 'none'}
-      ><code ref={(el) => { codeRef = el }}>
-        {/* The stripped text until the colours arrive, so a reader never sees the raw codes. */}
-        <Show when={ansiText()} fallback={props.children}>
-          {(text) => <Show when={coloured()} fallback={stripAnsi(text())}>{(lines) => ansiRuns(lines())}</Show>}
-        </Show>
-      </code></pre>
+      >
+        <code
+          ref={(el) => {
+            codeRef = el
+          }}
+        >
+          {/* The stripped text until the colours arrive, so a reader never sees the raw codes. */}
+          <Show when={ansiText()} fallback={props.children}>
+            {(text) => (
+              <Show when={coloured()} fallback={stripAnsi(text())}>
+                {(lines) => ansiRuns(lines())}
+              </Show>
+            )}
+          </Show>
+        </code>
+      </pre>
       <Show when={props.copy}>
         <CopyButtonSlot text={copyText} onCopy={props.onCopy} />
       </Show>
@@ -55,7 +66,9 @@ function useAnsiLines(text: () => string | undefined): () => AnsiTok[][] | undef
     const source = text()
     if (source === undefined) return
     let live = true
-    onCleanup(() => { live = false })
+    onCleanup(() => {
+      live = false
+    })
     void import('../../../infra/highlight/shiki')
       .then(async ({ getHighlighter, tokenizeAnsiLines }) => {
         const lines = tokenizeAnsiLines(await getHighlighter(), source)
@@ -75,8 +88,8 @@ function useAnsiLines(text: () => string | undefined): () => AnsiTok[][] | undef
 const ansiRuns = (lines: AnsiTok[][]): JSX.Element =>
   lines.map((line, index) => [
     index > 0 ? '\n' : '',
-    line.map((run) => (run.light || run.lightBg || run.bold || run.italic || run.underline
-      ? (
+    line.map((run) =>
+      run.light || run.lightBg || run.bold || run.italic || run.underline ? (
         <span
           data-fg={run.light ? '' : undefined}
           data-bg={run.lightBg ? '' : undefined}
@@ -89,9 +102,13 @@ const ansiRuns = (lines: AnsiTok[][]): JSX.Element =>
             'font-style': run.italic ? 'italic' : undefined,
             'text-decoration': run.underline ? 'underline' : undefined,
           }}
-        >{run.content}</span>
-      )
-      : run.content)),
+        >
+          {run.content}
+        </span>
+      ) : (
+        run.content
+      ),
+    ),
   ])
 
 // Inline rather than importing inputs/CopyButton: that component reaches `navigator.clipboard`

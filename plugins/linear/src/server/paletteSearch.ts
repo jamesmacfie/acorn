@@ -37,8 +37,7 @@ export const linearSearchItem = ({ issue, connectionLabel }: LinearSearchRow): C
   return {
     id: linearRailItemId({ connectionId: issue.integrationId, identifier: issue.identifier }),
     title: issue.title.slice(0, TITLE) || issue.identifier,
-    subtitle: [issue.identifier, issue.state?.name, connectionLabel]
-      .filter(Boolean).join(' · ').slice(0, SUBTITLE),
+    subtitle: [issue.identifier, issue.state?.name, connectionLabel].filter(Boolean).join(' · ').slice(0, SUBTITLE),
     ...(priority.level === 'none' ? {} : { badge: priority.label.slice(0, BADGE) }),
     ref: issue.identifier,
   }

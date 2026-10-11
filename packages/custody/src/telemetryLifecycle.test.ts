@@ -4,19 +4,34 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import type { PostedTelemetryBatch } from '@acorn/protocol/telemetry.ts'
-import { emitEvent, flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry, telemetryEnabled } from '@acorn/node-core/server/telemetry'
+import {
+  emitEvent,
+  flushTelemetry,
+  onTelemetryBatch,
+  setTelemetryPref,
+  startTelemetry,
+  telemetryEnabled,
+} from '@acorn/node-core/server/telemetry'
 import type { NodeBroker } from './broker/nodeBroker'
 import { startHelperTelemetry, type HelperTelemetry } from './telemetry'
 
-type HeldRequest = { node: string; request: NodeFetchRequest; batch?: PostedTelemetryBatch; answer(status: number, consent?: string): void }
+type HeldRequest = {
+  node: string
+  request: NodeFetchRequest
+  batch?: PostedTelemetryBatch
+  answer(status: number, consent?: string): void
+}
 let root: string
 let helper: HelperTelemetry
 let requests: HeldRequest[]
 let aborts: string[]
-const settle = async () => { for (let i = 0; i < 20; i++) await Promise.resolve() }
-const posts = () => requests.filter(row => row.batch)
-const reads = () => requests.filter(row => !row.batch)
-const eventNames = (rows = posts()) => rows.flatMap(row => row.batch?.records ?? []).flatMap(record => record.kind === 'event' ? [record.name] : [])
+const settle = async () => {
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+}
+const posts = () => requests.filter((row) => row.batch)
+const reads = () => requests.filter((row) => !row.batch)
+const eventNames = (rows = posts()) =>
+  rows.flatMap((row) => row.batch?.records ?? []).flatMap((record) => (record.kind === 'event' ? [record.name] : []))
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -25,15 +40,37 @@ beforeEach(() => {
   aborts = []
   startTelemetry({ node: 'test', version: '0' })
   const broker = {
-    fetch: (node: string, request: NodeFetchRequest) => new Promise<NodeFetchResponse>(resolve => {
-      requests.push({ node, request,
-        ...(request.method === 'POST' ? { batch: JSON.parse(new TextDecoder().decode((request.body as { kind: 'bytes'; bytes: Uint8Array }).bytes)) as PostedTelemetryBatch } : {}),
-        answer: (status, consent = '1') => resolve({ status, headers: {}, body: new TextEncoder().encode(JSON.stringify({ 'telemetry.enabled': consent })) }),
-      })
-    }),
-    abort: (id: string) => { aborts.push(id) },
+    fetch: (node: string, request: NodeFetchRequest) =>
+      new Promise<NodeFetchResponse>((resolve) => {
+        requests.push({
+          node,
+          request,
+          ...(request.method === 'POST'
+            ? {
+                batch: JSON.parse(
+                  new TextDecoder().decode((request.body as { kind: 'bytes'; bytes: Uint8Array }).bytes),
+                ) as PostedTelemetryBatch,
+              }
+            : {}),
+          answer: (status, consent = '1') =>
+            resolve({
+              status,
+              headers: {},
+              body: new TextEncoder().encode(JSON.stringify({ 'telemetry.enabled': consent })),
+            }),
+        })
+      }),
+    abort: (id: string) => {
+      aborts.push(id)
+    },
   } as unknown as NodeBroker
-  helper = startHelperTelemetry({ broker, userDataDir: root, version: '0', platform: 'darwin', requestFootprint: vi.fn() })
+  helper = startHelperTelemetry({
+    broker,
+    userDataDir: root,
+    version: '0',
+    platform: 'darwin',
+    requestFootprint: vi.fn(),
+  })
 })
 afterEach(async () => {
   helper.dispose()
@@ -106,13 +143,16 @@ describe('helper preference ownership', () => {
     reads()[0].answer(200, '0')
     await settle()
     expect(telemetryEnabled()).toBe(true)
-    expect(posts().every(row => row.node === 'B')).toBe(true)
+    expect(posts().every((row) => row.node === 'B')).toBe(true)
   })
 
   it('does not remove another live collector sink on retirement', async () => {
     await enable()
     const rows: string[] = []
-    const other = onTelemetryBatch(batch => rows.push(...batch.records.flatMap(record => record.kind === 'event' ? [record.name] : [])), 'other')
+    const other = onTelemetryBatch(
+      (batch) => rows.push(...batch.records.flatMap((record) => (record.kind === 'event' ? [record.name] : []))),
+      'other',
+    )
     try {
       helper.dispose()
       setTelemetryPref(true)
@@ -125,7 +165,9 @@ describe('helper preference ownership', () => {
       await vi.advanceTimersByTimeAsync(10_000)
       expect(reads()).toHaveLength(readCount)
       expect(telemetryEnabled()).toBe(true)
-    } finally { other.dispose() }
+    } finally {
+      other.dispose()
+    }
   })
 })
 
@@ -152,7 +194,7 @@ describe('helper post ownership', () => {
     expect(eventNames(posts().slice(before))).not.toContain('prior-consent')
   })
 
-  it.each([202, 500])('settles an admitted post with status %i across shutdown without retrying it', async status => {
+  it.each([202, 500])('settles an admitted post with status %i across shutdown without retrying it', async (status) => {
     await enable()
     emitEvent('core', 'admitted')
     flushTelemetry()
@@ -162,8 +204,8 @@ describe('helper post ownership', () => {
     helper.dispose()
     old.answer(status)
     await settle()
-    expect(eventNames().filter(name => name === 'admitted')).toHaveLength(1)
-    expect(eventNames().filter(name => name === 'final-window')).toHaveLength(1)
+    expect(eventNames().filter((name) => name === 'admitted')).toHaveLength(1)
+    expect(eventNames().filter((name) => name === 'final-window')).toHaveLength(1)
     const final = posts().at(-1)!
     final.answer(500)
     await settle()
@@ -190,7 +232,7 @@ describe('helper post ownership', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 
-  it.each(['B', 'A'])('never sends remaining encoded batches to a replacement adoption of %s', async replacement => {
+  it.each(['B', 'A'])('never sends remaining encoded batches to a replacement adoption of %s', async (replacement) => {
     await enable()
     const attrs = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`label${i}`, 'z'.repeat(500)]))
     for (let i = 0; i < 150; i++) emitEvent('core', `large-${i}`, attrs)
@@ -222,11 +264,18 @@ describe('helper post ownership', () => {
     await vi.advanceTimersByTimeAsync(5_000)
     reads().at(-1)!.answer(200)
     await settle()
-    for (let i = before; i < posts().length; i++) { posts()[i].answer(202); await settle() }
+    for (let i = before; i < posts().length; i++) {
+      posts()[i].answer(202)
+      await settle()
+    }
     const successful = [first, ...posts().slice(before)]
-    const names = eventNames(successful).filter(name => name.startsWith('large-'))
+    const names = eventNames(successful).filter((name) => name.startsWith('large-'))
     expect(names).toHaveLength(150)
     expect(new Set(names).size).toBe(150)
-    expect(posts().slice(before).every(row => row.node === 'A')).toBe(true)
+    expect(
+      posts()
+        .slice(before)
+        .every((row) => row.node === 'A'),
+    ).toBe(true)
   })
 })

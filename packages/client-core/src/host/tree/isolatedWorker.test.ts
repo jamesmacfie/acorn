@@ -23,7 +23,9 @@ describe('isolated tree worker relay', () => {
     sandbox.postMessage({ acornBridge: 1 }, ports)
 
     const ready = (origin: string, nonce: string, source: MessageEventSource | null) =>
-      window.dispatchEvent(new MessageEvent('message', { origin, source, data: { kind: 'acorn:tree-relay-ready', nonce } }))
+      window.dispatchEvent(
+        new MessageEvent('message', { origin, source, data: { kind: 'acorn:tree-relay-ready', nonce } }),
+      )
     ready(`app-plugin://${HASH}`, NONCE, window)
     ready('app://acorn', NONCE, frame.contentWindow)
     ready(`app-plugin://${HASH}`, 'wrong', frame.contentWindow)
@@ -47,11 +49,13 @@ describe('isolated tree worker relay', () => {
     const frame = document.querySelector('iframe')!
     const failed = vi.fn()
     sandbox.onerror = failed
-    window.dispatchEvent(new MessageEvent('message', {
-      origin: `app-plugin://${HASH}`,
-      source: frame.contentWindow,
-      data: { kind: 'acorn:tree-relay-error', nonce: NONCE },
-    }))
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        origin: `app-plugin://${HASH}`,
+        source: frame.contentWindow,
+        data: { kind: 'acorn:tree-relay-error', nonce: NONCE },
+      }),
+    )
     expect(failed).toHaveBeenCalledOnce()
     expect(document.querySelector('iframe')).toBeNull()
   })

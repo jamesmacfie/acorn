@@ -32,25 +32,57 @@ describe('resolveTaskDataUrl: repo-authored url_script trust gate', () => {
   let core: Parameters<typeof resolveTaskDataUrl>[0]
 
   const writeCommittedUrlScript = () =>
-    writeFileSync(join(repo, '.acorn', 'config.toml'), `[database]\nurl_script = "touch ${marker}; echo postgres://from-script/db"\n`)
+    writeFileSync(
+      join(repo, '.acorn', 'config.toml'),
+      `[database]\nurl_script = "touch ${marker}; echo postgres://from-script/db"\n`,
+    )
 
   beforeEach(async () => {
     testDb = makeTestDb()
-    core = { tasks: createTaskService(testDb.db), projects: createProjectService(testDb.db, memoryIdentityStore('owner')), fs: coreFs, proc: coreProc }
+    core = {
+      tasks: createTaskService(testDb.db),
+      projects: createProjectService(testDb.db, memoryIdentityStore('owner')),
+      fs: coreFs,
+      proc: coreProc,
+    }
     dir = mkdtempSync(join(tmpdir(), 'acorn-data-trust-'))
     repo = join(dir, 'repo')
     marker = join(dir, 'EXECUTED')
     mkdirSync(join(repo, '.acorn'), { recursive: true })
     const now = Date.now()
-    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await testDb.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: repo, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-widget',
+      name: 'widget',
+      path: repo,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'widget',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await testDb.db.insert(schema.tasks).values({
-      id: 'task1', title: 'Task', origin: 'local', projectId: 'project-widget', branch: 'main',
-      worktreePath: repo, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+      id: 'task1',
+      title: 'Task',
+      origin: 'local',
+      projectId: 'project-widget',
+      branch: 'main',
+      worktreePath: repo,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt: null,
     })
   })
 

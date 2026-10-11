@@ -63,9 +63,14 @@ export async function dispatchPluginRoute(
   // Built-in plugins contribute Hono routers; loaded plugins contribute fetch handlers. Both are
   // served over HTTP, so the in-process path must resolve both carriers as well.
   const match = pluginRouteContributions()
-    .filter((route) => route.plugin === pluginId && (url.pathname === routeMountPath(route) || url.pathname.startsWith(`${routeMountPath(route)}/`)))
+    .filter(
+      (route) =>
+        route.plugin === pluginId &&
+        (url.pathname === routeMountPath(route) || url.pathname.startsWith(`${routeMountPath(route)}/`)),
+    )
     .sort((a, b) => routeMountPath(b).length - routeMountPath(a).length)[0]
-  if (!match) throw new Error(`no route serves ${url.pathname}; the plugin may be disabled or may not have registered it`)
+  if (!match)
+    throw new Error(`no route serves ${url.pathname}; the plugin may be disabled or may not have registered it`)
 
   const userId = env.ACTIVE_IDENTITY.get()
   if (!userId) throw new Error('this node has no bound identity, so an unattended run has nobody to run as')
@@ -82,7 +87,10 @@ export async function dispatchPluginRoute(
   // The one seam where the host calls a plugin's route with no HTTP request behind it, so the
   // request middleware's span cannot cover it. `path` is the declared route, which is a pattern the
   // manifest wrote down rather than a URL a caller composed (docs/telemetry/runtimes.md § Node seams).
-  const span = startSpan(pluginId, { name: 'plugin.dispatch', attrs: { seam: 'plugin.dispatch', method: init.method, path } })
+  const span = startSpan(pluginId, {
+    name: 'plugin.dispatch',
+    attrs: { seam: 'plugin.dispatch', method: init.method, path },
+  })
   try {
     // Entered for the same reason the request middleware enters it: the handler is about to run
     // arbitrary plugin code, and the git spawns and SQL statements it makes are this plugin's

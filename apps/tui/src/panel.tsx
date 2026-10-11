@@ -66,24 +66,27 @@ export function Panel(props: {
       {...boxBorder('surface', { tone: lit() ? 'accent' : 'neutral' })}
       title={props.title}
       titleAlignment="left"
-      ref={(element: Renderable) => { setBox(element); props.onBox?.(element) }}
+      ref={(element: Renderable) => {
+        setBox(element)
+        props.onBox?.(element)
+      }}
     >
       {/* The contents clip inside the border rather than pushing it out: paint clips a child to its
           parent's content box, which a border is outside of, so this is the frame's own promise and
           not something each caller has to remember (`./paint/paint.ts`). */}
-      {props.scroll
-        ? <ScrollViewport>{props.children}</ScrollViewport>
-        : (
-          // A line between the region's children, which is `row-gap: var(--gap-stack)` on the
-          // desktop's own detail region (client-core/infra/styles/shell.css § .layout-region-detail).
-          // A clipping region stacks a pane's parts straight onto each other, and on the agents pane
-          // that put a transcript, a row of provider pickers, an expand toggle and a message box in
-          // one undivided pile. `rowGap`, not `gap`: Yoga's `gap` sets both axes and there is nothing
-          // here to space sideways.
-          <box flexDirection="column" flexGrow={1} rowGap={spaceLines('stack')} overflow="hidden">
-            {props.children}
-          </box>
-        )}
+      {props.scroll ? (
+        <ScrollViewport>{props.children}</ScrollViewport>
+      ) : (
+        // A line between the region's children, which is `row-gap: var(--gap-stack)` on the
+        // desktop's own detail region (client-core/infra/styles/shell.css § .layout-region-detail).
+        // A clipping region stacks a pane's parts straight onto each other, and on the agents pane
+        // that put a transcript, a row of provider pickers, an expand toggle and a message box in
+        // one undivided pile. `rowGap`, not `gap`: Yoga's `gap` sets both axes and there is nothing
+        // here to space sideways.
+        <box flexDirection="column" flexGrow={1} rowGap={spaceLines('stack')} overflow="hidden">
+          {props.children}
+        </box>
+      )}
     </box>
   )
 }
@@ -108,7 +111,11 @@ export function Panel(props: {
  *  write while the renderer owns the terminal is what garbles it. */
 /** The terminal fallback for a failed pane or region, with a keyboard stop to retry its reads. */
 export function PaneFailure(props: {
-  name: string; error: unknown; nodeId: string; reset: () => void; region?: RegionRef
+  name: string
+  error: unknown
+  nodeId: string
+  reset: () => void
+  region?: RegionRef
 }) {
   const client = useQueryClient()
   const [retrying, setRetrying] = createSignal(false)
@@ -126,24 +133,28 @@ export function PaneFailure(props: {
     <box
       flexDirection="column"
       flexShrink={0}
-      ref={(element: Renderable) => { if (props.region) regionFocus(props.region, 0)(element) }}
+      ref={(element: Renderable) => {
+        if (props.region) regionFocus(props.region, 0)(element)
+      }}
     >
       <Alert tone="warn" title={props.name}>
         {props.error instanceof Error ? props.error.message : String(props.error)}
       </Alert>
-      <Button disabled={retrying()} onPress={() => void retry()}>Retry</Button>
+      <Button disabled={retrying()} onPress={() => void retry()}>
+        Retry
+      </Button>
     </box>
   )
 }
 
-export function PanelBody(props: {
-  name: string; nodeId: string; region?: RegionRef; children: JSX.Element
-}) {
+export function PanelBody(props: { name: string; nodeId: string; region?: RegionRef; children: JSX.Element }) {
   return (
-    <ErrorBoundary fallback={(error: unknown, reset) => {
-      log.error(`the ${props.name} pane threw while rendering`, error, { 'pane.name': props.name })
-      return <PaneFailure name={props.name} nodeId={props.nodeId} region={props.region} error={error} reset={reset} />
-    }}>
+    <ErrorBoundary
+      fallback={(error: unknown, reset) => {
+        log.error(`the ${props.name} pane threw while rendering`, error, { 'pane.name': props.name })
+        return <PaneFailure name={props.name} nodeId={props.nodeId} region={props.region} error={error} reset={reset} />
+      }}
+    >
       <Suspense fallback={<Line role="muted">Loading…</Line>}>{props.children}</Suspense>
     </ErrorBoundary>
   )

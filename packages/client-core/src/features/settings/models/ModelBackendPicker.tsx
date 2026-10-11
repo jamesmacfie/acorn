@@ -24,7 +24,9 @@ export default function ModelBackendPicker(props: {
 }) {
   // A memo, not a plain getter: two places read it, and a getter would re-run the find on every
   // upstream tick.
-  const current = createMemo(() => props.backends.find((backend) => backend.id === props.backendId) ?? props.backends[0])
+  const current = createMemo(
+    () => props.backends.find((backend) => backend.id === props.backendId) ?? props.backends[0],
+  )
   const models = () => current()?.models ?? []
   const modelOptions = () => {
     const backend = current()
@@ -49,13 +51,17 @@ export default function ModelBackendPicker(props: {
             // heard of.
             const next = props.backends.find((backend) => backend.id === value)
             props.onChange({ backendId: value, modelId: defaultModelIdFor(next) })
-          }} options={props.backends.map((backend) => ({ value: backend.id, label: backend.label }))} />
+          }}
+          options={props.backends.map((backend) => ({ value: backend.id, label: backend.label }))}
+        />
       </Show>
       <Show when={modelOptions().length}>
         <Select
           label="Model"
           value={props.modelId}
-          onChange={(value) => props.onChange({ backendId: current()?.id ?? '', modelId: value })} options={modelOptions()} />
+          onChange={(value) => props.onChange({ backendId: current()?.id ?? '', modelId: value })}
+          options={modelOptions()}
+        />
       </Show>
       <Show when={current()?.catalogUnavailable}>
         <Text tone="muted">Couldn't refresh this CLI's models. Your choice is kept.</Text>

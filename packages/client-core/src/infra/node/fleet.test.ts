@@ -7,8 +7,19 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 const idb = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(async () => {}) }))
 vi.mock('idb-keyval', () => idb)
 
-const { _resetFleet, cacheKeyFor, clearNodeCache, clientFor, dropNode, homeNodeId, nodeState, nodes, persistedCacheSize, refreshFleet, setCacheStorage } =
-  await import('./fleet')
+const {
+  _resetFleet,
+  cacheKeyFor,
+  clearNodeCache,
+  clientFor,
+  dropNode,
+  homeNodeId,
+  nodeState,
+  nodes,
+  persistedCacheSize,
+  refreshFleet,
+  setCacheStorage,
+} = await import('./fleet')
 const { QueryObserver } = await import('@tanstack/solid-query')
 const { activeCacheId, activeNodeId, nodeReadiness, selectActiveNode, setActiveNode } = await import('./activeNode')
 const { segmentCacheFor } = await import('../../features/diff/segmentCache')
@@ -21,9 +32,9 @@ const record = (nodeId: string, local = false): NodeRecord => ({
 })
 
 // The preload bridge, as the renderer sees it. Only the members the fleet store touches.
-  // `nodeFetch` is what makes the host's transport exist as far as platform/index.ts is concerned: it
-  // is the "there is a broker" discriminator, so a fake that pushes frames has to answer requests too,
-  // even if this suite never sends one.
+// `nodeFetch` is what makes the host's transport exist as far as platform/index.ts is concerned: it
+// is the "there is a broker" discriminator, so a fake that pushes frames has to answer requests too,
+// even if this suite never sends one.
 function stubBridge(nodes: NodeRecord[], statuses: NodeStatus[] = []): (status: NodeStatus) => void {
   let push: (status: NodeStatus) => void = () => {}
   const acorn = {
@@ -170,7 +181,7 @@ describe('dropNode', () => {
     expect(clientFor('remote').client).not.toBe(client)
   })
 
-  it('clears the node\'s resident diff segments with it, and no other node\'s', () => {
+  it("clears the node's resident diff segments with it, and no other node's", () => {
     const plain = [{ kind: 'hunk' as const, text: '@@ -1 +1 @@' }]
     const gone = segmentCacheFor(clientFor('remote').client)
     const kept = segmentCacheFor(clientFor('other').client)
@@ -186,7 +197,7 @@ describe('dropNode', () => {
 })
 
 describe('clearNodeCache', () => {
-  it('empties a connected node\'s cache and refetches what is on screen, and the node stays', async () => {
+  it("empties a connected node's cache and refetches what is on screen, and the node stays", async () => {
     stubBridge([record('remote')], [{ nodeId: 'remote', state: 'online' }])
     await refreshFleet()
     const cache = clientFor('remote')
@@ -197,7 +208,11 @@ describe('clearNodeCache', () => {
     cache.client.setQueryData(['pulls', 'old'], [{ id: 1 }])
     // This one is on screen: an observer is subscribed to it, as a mounted createQuery is.
     let fetches = 0
-    const onScreen = new QueryObserver(cache.client, { queryKey: ['tasks'], queryFn: async () => ++fetches, staleTime: Infinity })
+    const onScreen = new QueryObserver(cache.client, {
+      queryKey: ['tasks'],
+      queryFn: async () => ++fetches,
+      staleTime: Infinity,
+    })
     const unsubscribe = onScreen.subscribe(() => {})
     await vi.waitFor(() => expect(fetches).toBe(1))
 
@@ -218,17 +233,25 @@ describe('clearNodeCache', () => {
     const key = cacheKeyFor('captured-clear')
     const original = new Map([[key, 'original']])
     const replacement = new Map([[key, 'replacement canary']])
-    const removeReplacement = vi.fn(async (entry: string) => { replacement.delete(entry) })
+    const removeReplacement = vi.fn(async (entry: string) => {
+      replacement.delete(entry)
+    })
     setCacheStorage({
       getItem: async (entry) => original.get(entry),
-      setItem: async (entry, value) => { original.set(entry, value) },
-      removeItem: async (entry) => { original.delete(entry) },
+      setItem: async (entry, value) => {
+        original.set(entry, value)
+      },
+      removeItem: async (entry) => {
+        original.delete(entry)
+      },
     })
     const cache = clientFor('captured-clear')
     cache.client.setQueryData(['inactive'], 'discard')
     setCacheStorage({
       getItem: async (entry) => replacement.get(entry),
-      setItem: async (entry, value) => { replacement.set(entry, value) },
+      setItem: async (entry, value) => {
+        replacement.set(entry, value)
+      },
       removeItem: removeReplacement,
     })
     try {
@@ -243,7 +266,7 @@ describe('clearNodeCache', () => {
     }
   })
 
-  it('reads the saved snapshot\'s size and entry count from the store', async () => {
+  it("reads the saved snapshot's size and entry count from the store", async () => {
     const stored = new Map<string, string>()
     setCacheStorage({
       getItem: async (key) => stored.get(key) ?? null,
@@ -270,21 +293,29 @@ describe('partition persistence custody', () => {
     return {
       records,
       getItem: vi.fn(async (key: string) => records.get(key)),
-      setItem: vi.fn(async (key: string, value: string) => { records.set(key, value) }),
-      removeItem: vi.fn(async (key: string) => { records.delete(key) }),
+      setItem: vi.fn(async (key: string, value: string) => {
+        records.set(key, value)
+      }),
+      removeItem: vi.fn(async (key: string) => {
+        records.delete(key)
+      }),
     }
   }
   const gate = () => {
     let release!: () => void
-    const promise = new Promise<void>((resolve) => { release = resolve })
+    const promise = new Promise<void>((resolve) => {
+      release = resolve
+    })
     return { promise, release }
   }
 
   it('keeps a constructed partition on its adapter and leaves never-selected fleet clients memory-only', async () => {
     const { setCacheStorage } = await import('./fleet')
-    const a = adapter(), b = adapter()
+    const a = adapter(),
+      b = adapter()
     setCacheStorage(a)
-    const selected = clientFor('selected'), memoryOnly = clientFor('fleet-only')
+    const selected = clientFor('selected'),
+      memoryOnly = clientFor('fleet-only')
     setCacheStorage(b)
     const lease = selected.persistence.acquire()
     await lease.restored
@@ -303,19 +334,29 @@ describe('partition persistence custody', () => {
 
   it('orders same-ID replacement restore/write after the retiring owner deletes through its adapter', async () => {
     const { setCacheStorage } = await import('./fleet')
-    const first = adapter(), replacement = adapter(), entered = gate(), writeGate = gate()
+    const first = adapter(),
+      replacement = adapter(),
+      entered = gate(),
+      writeGate = gate()
     const initialWrite = first.setItem.getMockImplementation()!
-    first.setItem.mockImplementation(async (key, value) => { entered.release(); await writeGate.promise; await initialWrite(key, value) })
+    first.setItem.mockImplementation(async (key, value) => {
+      entered.release()
+      await writeGate.promise
+      await initialWrite(key, value)
+    })
     setCacheStorage(first)
     const old = clientFor('same')
-    const lease = old.persistence.acquire(); await lease.restored
+    const lease = old.persistence.acquire()
+    await lease.restored
     old.client.setQueryData(['tasks'], ['old'])
-    const saving = old.persistence.flush(); await entered.promise
+    const saving = old.persistence.flush()
+    await entered.promise
     const dropping = dropNode('same')
     setCacheStorage(replacement)
     const fresh = clientFor('same')
     const mounted = fresh.persistence.acquire()
-    await Promise.resolve(); await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
     expect(replacement.getItem).not.toHaveBeenCalled()
     expect(first.removeItem).not.toHaveBeenCalled()
     writeGate.release()
@@ -323,15 +364,19 @@ describe('partition persistence custody', () => {
     expect(first.records.size).toBe(0)
     fresh.client.setQueryData(['tasks'], ['fresh'])
     await fresh.persistence.flush()
-    expect(JSON.parse(replacement.records.get(cacheKeyFor('same'))!).clientState.queries[0].state.data).toEqual(['fresh'])
+    expect(JSON.parse(replacement.records.get(cacheKeyFor('same'))!).clientState.queries[0].state.data).toEqual([
+      'fresh',
+    ])
     expect(first.removeItem).toHaveBeenCalledTimes(1)
     expect(replacement.removeItem).not.toHaveBeenCalled()
-    lease.release(); mounted.release()
+    lease.release()
+    mounted.release()
   })
 
   it('keeps replacements blocked after failed removal and retries the original adapter through repeated explicit removal', async () => {
     const { setCacheStorage } = await import('./fleet')
-    const first = adapter(), replacement = adapter()
+    const first = adapter(),
+      replacement = adapter()
     first.removeItem.mockRejectedValueOnce(new Error('locked'))
     setCacheStorage(first)
     const old = clientFor('retry')
@@ -357,19 +402,24 @@ describe('partition persistence custody', () => {
 
   it('recovers a mounted blocked replacement and flushes its dirty memory through an explicit retry', async () => {
     const { setCacheStorage, retryCacheRetirement } = await import('./fleet')
-    const first = adapter(), replacement = adapter()
+    const first = adapter(),
+      replacement = adapter()
     first.removeItem.mockRejectedValueOnce(new Error('locked'))
-    setCacheStorage(first); clientFor('mounted-retry')
+    setCacheStorage(first)
+    clientFor('mounted-retry')
     await dropNode('mounted-retry')
     setCacheStorage(replacement)
-    const fresh = clientFor('mounted-retry'), mounted = fresh.persistence.acquire()
+    const fresh = clientFor('mounted-retry'),
+      mounted = fresh.persistence.acquire()
     await expect(mounted.restored).rejects.toThrow('locked')
     fresh.client.setQueryData(['tasks'], ['dirty while blocked'])
     await expect(fresh.persistence.flush()).rejects.toThrow('locked')
     expect(replacement.setItem).not.toHaveBeenCalled()
     await retryCacheRetirement('mounted-retry')
     expect(first.removeItem).toHaveBeenCalledTimes(2)
-    expect(JSON.parse(replacement.records.get(cacheKeyFor('mounted-retry'))!).clientState.queries[0].state.data).toEqual(['dirty while blocked'])
+    expect(
+      JSON.parse(replacement.records.get(cacheKeyFor('mounted-retry'))!).clientState.queries[0].state.data,
+    ).toEqual(['dirty while blocked'])
     fresh.client.setQueryData(['tasks'], ['still mounted'])
     await fresh.persistence.flush()
     expect(replacement.setItem).toHaveBeenCalledTimes(2)
@@ -379,9 +429,11 @@ describe('partition persistence custody', () => {
 
   it('retries a failed removal with no replacement without retargeting to the installed adapter', async () => {
     const { setCacheStorage } = await import('./fleet')
-    const first = adapter(), other = adapter()
+    const first = adapter(),
+      other = adapter()
     first.removeItem.mockRejectedValueOnce(new Error('locked'))
-    setCacheStorage(first); clientFor('removed')
+    setCacheStorage(first)
+    clientFor('removed')
     await dropNode('removed')
     setCacheStorage(other)
     await dropNode('removed')

@@ -26,7 +26,11 @@ export function CodeBlock(props: {
     <box flexDirection="column">
       <Line role="muted">{rule(RULE)}</Line>
       <For each={text().split('\n')}>
-        {(line) => <Line role="mono" wrap={props.wrap}>{line}</Line>}
+        {(line) => (
+          <Line role="mono" wrap={props.wrap}>
+            {line}
+          </Line>
+        )}
       </For>
       <Line role="muted">{rule(RULE)}</Line>
     </box>
@@ -35,7 +39,14 @@ export function CodeBlock(props: {
 
 /** Monospace lines with the find bar as the bottom line. `follow` is what the region's scroll does;
  *  the tail is at the bottom because a column of cells grows downward. */
-export function Log(props: { lines: readonly string[]; follow?: boolean; find?: JSX.Element; ariaLabel: string; scrollOffset?: number; onChange?: (offset: number) => void }) {
+export function Log(props: {
+  lines: readonly string[]
+  follow?: boolean
+  find?: JSX.Element
+  ariaLabel: string
+  scrollOffset?: number
+  onChange?: (offset: number) => void
+}) {
   return (
     <box flexDirection="column" flexGrow={1}>
       {/* A viewport, where this was a yoga clip. A clip owns no offset, so a log longer than its
@@ -69,7 +80,13 @@ export function Lines(props: { lines: MarkdownLine[] }) {
                 the buffer paints several, and the next paragraph overwrites those rows. */}
             <box flexDirection="row" flexShrink={0} width="100%" minWidth={0} paddingLeft={line.indent ?? 0}>
               <text wrapMode="word" flexGrow={1} minWidth={0}>
-                <For each={line.runs}>{(run) => <Run role={run.role} tone={run.tone}>{run.text}</Run>}</For>
+                <For each={line.runs}>
+                  {(run) => (
+                    <Run role={run.role} tone={run.tone}>
+                      {run.text}
+                    </Run>
+                  )}
+                </For>
               </text>
             </box>
           </Show>
@@ -100,7 +117,9 @@ export function Markdown(props: {
     revision++
     const spare = new Map<string, MarkdownBlock[]>()
     for (const block of previous) spare.set(block.key, [...(spare.get(block.key) ?? []), block])
-    previous = renderBlocks(props.text, { images: 'placeholder' }).map((block) => spare.get(block.key)?.shift() ?? block)
+    previous = renderBlocks(props.text, { images: 'placeholder' }).map(
+      (block) => spare.get(block.key)?.shift() ?? block,
+    )
     return previous
   })
   return (
@@ -111,14 +130,16 @@ export function Markdown(props: {
           // them, so every block after the first keeps it.
           const lines = createMemo(() => htmlLines(at() ? `\n${block.html}` : block.html))
           const viewer = block.fence && props.fences ? props.fences({ ...block.fence, revision }) : undefined
-          return viewer
-            ? (
-              <box flexDirection="column" flexShrink={0}>
-                {viewer.view}
-                <Show when={!viewer.preview()}><Lines lines={lines()} /></Show>
-              </box>
-            )
-            : <Lines lines={lines()} />
+          return viewer ? (
+            <box flexDirection="column" flexShrink={0}>
+              {viewer.view}
+              <Show when={!viewer.preview()}>
+                <Lines lines={lines()} />
+              </Show>
+            </box>
+          ) : (
+            <Lines lines={lines()} />
+          )
         }}
       </For>
     </box>

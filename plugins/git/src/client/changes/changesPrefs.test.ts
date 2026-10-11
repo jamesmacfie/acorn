@@ -15,17 +15,24 @@ describe('the view preference', () => {
 
   it('reads back a stored choice and defaults the rest', () => {
     expect(readChangeView(stored({ mode: 'tree' }))).toEqual({ ...DEFAULT_CHANGE_VIEW, mode: 'tree' })
-    expect(readChangeView(stored({ mode: 'tree', sort: 'name', groupBy: 'staged' })))
-      .toEqual({ mode: 'tree', sort: 'name', groupBy: 'staged' })
+    expect(readChangeView(stored({ mode: 'tree', sort: 'name', groupBy: 'staged' }))).toEqual({
+      mode: 'tree',
+      sort: 'name',
+      groupBy: 'staged',
+    })
   })
 
   // Field by field, which is the point of the `catch` per field: a build that renamed one choice, or
   // an older one that never had it, costs the reader that choice and not the other two.
   it('keeps the choices that parse when one of them does not', () => {
-    expect(readChangeView(stored({ mode: 'outline', groupBy: 'staged' })))
-      .toEqual({ ...DEFAULT_CHANGE_VIEW, groupBy: 'staged' })
-    expect(readChangeView(stored({ mode: 'tree', unknownChoice: true })))
-      .toEqual({ ...DEFAULT_CHANGE_VIEW, mode: 'tree' })
+    expect(readChangeView(stored({ mode: 'outline', groupBy: 'staged' }))).toEqual({
+      ...DEFAULT_CHANGE_VIEW,
+      groupBy: 'staged',
+    })
+    expect(readChangeView(stored({ mode: 'tree', unknownChoice: true }))).toEqual({
+      ...DEFAULT_CHANGE_VIEW,
+      mode: 'tree',
+    })
   })
 
   it('persists only an object, and an empty one otherwise', () => {

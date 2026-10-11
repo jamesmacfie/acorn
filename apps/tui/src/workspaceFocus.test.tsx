@@ -4,8 +4,7 @@ import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { renderFixture } from './harness'
 import { focusedRegion } from './keys/regions'
 
-const caretLine = (frame: string): string =>
-  frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
+const caretLine = (frame: string): string => frame.split('\n').find((line) => line.includes('\u203a')) ?? ''
 
 // Its own file because the shell QueryClient intentionally survives a render; changing fixture
 // workspaces inside another shell test would otherwise reuse that file's already-cached roster.

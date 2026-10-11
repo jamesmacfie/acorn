@@ -9,7 +9,10 @@ export function uniqueStepName(def: WorkflowDef, base: string): string {
   const words = def.formatVersion === 1
   const root = words
     ? base.trim() || 'Step'
-    : base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'step'
+    : base
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'step'
   const numbered = (n: number) => (words ? `${root} ${n}` : `${root}-${n}`)
   if (!taken.has(root)) return root
   for (let n = 2; ; n += 1) if (!taken.has(numbered(n))) return numbered(n)

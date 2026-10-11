@@ -6,7 +6,13 @@ import { installPlugin, pluginDir, uninstallPlugin, updatePlugin } from './insta
 import { loadExternalPlugins } from './loader'
 import { PLUGIN_API_MAJOR } from './manifest'
 import { createPluginReloader } from './reload'
-import { approvePluginReview, hasPendingPluginReview, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from './pendingReview'
+import {
+  approvePluginReview,
+  hasPendingPluginReview,
+  pendingPluginReviewIds,
+  pluginReviewFingerprint,
+  readPendingPluginReview,
+} from './pendingReview'
 
 let root = ''
 let source = ''
@@ -15,10 +21,17 @@ const requestId = '00000000-0000-4000-8000-000000000001'
 
 const writePackage = (version: string, node = true) => {
   mkdirSync(join(source, 'dist'), { recursive: true })
-  writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
-    id, name: 'Review fixture', version, baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
-    ...(node ? { node: './dist/node.js' } : { client: './dist/client.js' }),
-  }))
+  writeFileSync(
+    join(source, 'acorn-plugin.json'),
+    JSON.stringify({
+      id,
+      name: 'Review fixture',
+      version,
+      baseline: 'acorn-1',
+      apiVersion: PLUGIN_API_MAJOR,
+      ...(node ? { node: './dist/node.js' } : { client: './dist/client.js' }),
+    }),
+  )
   writeFileSync(join(source, 'dist/node.js'), "throw new Error('REVIEW_FIXTURE_IMPORTED')\n")
   writeFileSync(join(source, 'dist/client.js'), 'export function activate() {}\n')
 }
@@ -48,7 +61,13 @@ describe('agent-requested plugin quarantine', () => {
     expect(boot.loaded).toEqual([])
     expect(boot.failures).toEqual([])
     const reloader = createPluginReloader({
-      dataDir: root, builtins: [], host: { reload: async () => { throw new Error('must not call host') } },
+      dataDir: root,
+      builtins: [],
+      host: {
+        reload: async () => {
+          throw new Error('must not call host')
+        },
+      },
     })
     await expect(reloader.reload(id)).rejects.toThrow(`No plugin '${id}'`)
     expect(() => approvePluginReview(root, id, review.reviewId, review.fingerprint)).not.toThrow()

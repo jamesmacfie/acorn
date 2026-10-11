@@ -21,14 +21,15 @@ export const continuesStream = (
   previous: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,
   next: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,
 ): boolean =>
-  isAppendDelta(previous.event)
-  && isAppendDelta(next.event)
-  && previous.turnId === next.turnId
-  && previous.generation === next.generation
-  && previous.event.type === next.event.type
-  && previous.event.messageId === next.event.messageId
+  isAppendDelta(previous.event) &&
+  isAppendDelta(next.event) &&
+  previous.turnId === next.turnId &&
+  previous.generation === next.generation &&
+  previous.event.type === next.event.type &&
+  previous.event.messageId === next.event.messageId
 
-const sameStream = (left: BufferedDelta, right: PendingAgentEvent): right is BufferedDelta => continuesStream(left, right)
+const sameStream = (left: BufferedDelta, right: PendingAgentEvent): right is BufferedDelta =>
+  continuesStream(left, right)
 
 const takeUtf8Prefix = (text: string, maxBytes: number): [prefix: string, rest: string] => {
   let bytes = 0

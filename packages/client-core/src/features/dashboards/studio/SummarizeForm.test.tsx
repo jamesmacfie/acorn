@@ -5,7 +5,10 @@ import SummarizeForm from './SummarizeForm'
 const count = formPlan({ op: 'summarize', by: [], measures: [{ id: 'count', label: 'Count', kind: 'count' }] })
 
 let form: ReturnType<typeof mountStageForm<'summarize'>> | undefined
-afterEach(() => { form?.dispose(); form = undefined })
+afterEach(() => {
+  form?.dispose()
+  form = undefined
+})
 
 describe('SummarizeForm', () => {
   it('groups by columns, a date by a period', () => {
@@ -49,7 +52,10 @@ describe('SummarizeForm', () => {
     form.choose('Calculate', 'Count matching')
     form.choose('Column', 'State')
     form.choose('Value', 'Open')
-    expect(form.stage().measures[0]).toMatchObject({ kind: 'count-where', where: { left: { address: { pointer: '/state' } }, right: { address: { value: 'open' } } } })
+    expect(form.stage().measures[0]).toMatchObject({
+      kind: 'count-where',
+      where: { left: { address: { pointer: '/state' } }, right: { address: { value: 'open' } } },
+    })
   })
 
   it('makes a new measure id from its label, and splits into columns by a choice', () => {

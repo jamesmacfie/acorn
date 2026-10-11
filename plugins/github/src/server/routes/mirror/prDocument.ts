@@ -1,7 +1,17 @@
 import {
-  DIFF_DOCUMENT_VERSION, documentCache, documentTopology, fileDocument, searchDocument,
-  type DiffDocumentFile, type DiffDocumentTopology, type DiffSearchPage, type DiffSearchRequest, type DiffSegmentDescriptor,
-  type DiffSegmentPayload, type DiffSegmentRequest, type FileDocument,
+  DIFF_DOCUMENT_VERSION,
+  documentCache,
+  documentTopology,
+  fileDocument,
+  searchDocument,
+  type DiffDocumentFile,
+  type DiffDocumentTopology,
+  type DiffSearchPage,
+  type DiffSearchRequest,
+  type DiffSegmentDescriptor,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+  type FileDocument,
 } from '@acorn/diff-document/document'
 import { diffDocumentBlobKey, patchBlobKey } from '@acorn/plugin-api/node'
 import type { PullFile } from '../../../shared/api'
@@ -27,9 +37,14 @@ const READ_CONCURRENCY = 16
 /** Cut a patch and store its descriptors beside its body. Called where the body is written. A patch
  *  already cut is skipped: its key is its digest, and a refresh every 45 seconds would otherwise cut
  *  every file of an unchanged pull request again on the node's own thread. */
-export async function writePatchDocument(blobs: PatchBlobStore, patchKey: string, path: string, patch: string): Promise<void> {
+export async function writePatchDocument(
+  blobs: PatchBlobStore,
+  patchKey: string,
+  path: string,
+  patch: string,
+): Promise<void> {
   const key = diffDocumentBlobKey(DIFF_DOCUMENT_VERSION, patchKey)
-  if (await blobs.get(key) != null) return
+  if ((await blobs.get(key)) != null) return
   const doc = fileDocument(path, patch)
   await blobs.put(key, JSON.stringify(doc.descriptors))
 }
@@ -47,7 +62,11 @@ async function patchDocument(blobs: PatchBlobStore, patchKey: string, path: stri
 
 /** A patch's segment descriptors: from their blob, or cut from the body and stored for next time,
  *  which is how a mirror written before documents existed catches up. Null when the body is missing. */
-async function descriptorsFor(blobs: PatchBlobStore, patchKey: string, path: string): Promise<DiffSegmentDescriptor[] | null> {
+async function descriptorsFor(
+  blobs: PatchBlobStore,
+  patchKey: string,
+  path: string,
+): Promise<DiffSegmentDescriptor[] | null> {
   const key = diffDocumentBlobKey(DIFF_DOCUMENT_VERSION, patchKey)
   const stored = await blobs.get(key)
   if (stored != null) return JSON.parse(stored) as DiffSegmentDescriptor[]
@@ -81,11 +100,16 @@ export async function topologyOf(blobs: PatchBlobStore, files: readonly PullFile
   return missing ? { ok: false, missing } : { ok: true, document: documentTopology(out) }
 }
 
-export type SegmentsResult = { ok: true; segments: DiffSegmentPayload[] } | { ok: false; status: 404 | 400; error: string }
+export type SegmentsResult =
+  | { ok: true; segments: DiffSegmentPayload[] }
+  | { ok: false; status: 404 | 400; error: string }
 
 /** The rows of the segments asked for, in request order. A body that is gone, or an ordinal the
  *  patch does not have, fails the request rather than answering rows from something else. */
-export async function segmentsOf(blobs: PatchBlobStore, requests: readonly DiffSegmentRequest[]): Promise<SegmentsResult> {
+export async function segmentsOf(
+  blobs: PatchBlobStore,
+  requests: readonly DiffSegmentRequest[],
+): Promise<SegmentsResult> {
   const out: DiffSegmentPayload[] = []
   for (const request of requests) {
     const doc = await patchDocument(blobs, request.patchKey, request.path)
@@ -103,5 +127,9 @@ export async function searchPatches(
   files: readonly { path: string; patchKey: string | null }[],
   request: DiffSearchRequest,
 ): Promise<DiffSearchPage | null> {
-  return searchDocument(files, async (file) => (await patchDocument(blobs, file.patchKey, file.path))?.segments ?? [], request)
+  return searchDocument(
+    files,
+    async (file) => (await patchDocument(blobs, file.patchKey, file.path))?.segments ?? [],
+    request,
+  )
 }

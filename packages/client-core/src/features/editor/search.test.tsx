@@ -15,10 +15,14 @@ Range.prototype.getBoundingClientRect ??= () => new DOMRect()
 
 const views: EditorView[] = []
 afterEach(() => {
-  views.splice(0).forEach((view) => { view.dom.parentElement?.remove(); view.destroy() })
+  views.splice(0).forEach((view) => {
+    view.dom.parentElement?.remove()
+    view.destroy()
+  })
 })
 
-const stateFor = (doc: string, extra: Extension[] = []) => EditorState.create({ doc, extensions: [basicSetup, editorSearch(), ...extra] })
+const stateFor = (doc: string, extra: Extension[] = []) =>
+  EditorState.create({ doc, extensions: [basicSetup, editorSearch(), ...extra] })
 
 function mount(doc: string, extra: Extension[] = []) {
   const parent = document.createElement('div')
@@ -32,7 +36,9 @@ const panel = (view: EditorView) => view.dom.querySelector<HTMLElement>('.cm-pan
 const field = (view: EditorView) => panel(view)?.querySelector<HTMLInputElement>('[main-field]') ?? null
 const count = (view: EditorView) => panel(view)?.querySelector('.ui-findbar-count')?.textContent ?? null
 const button = (view: EditorView, label: string) => {
-  const found = [...panel(view)?.querySelectorAll('button') ?? []].find((element) => (element.getAttribute('aria-label') ?? element.textContent) === label)
+  const found = [...(panel(view)?.querySelectorAll('button') ?? [])].find(
+    (element) => (element.getAttribute('aria-label') ?? element.textContent) === label,
+  )
   if (!found) throw new Error(`no ${label} button`)
   return found
 }
@@ -91,7 +97,11 @@ describe('editorSearch', () => {
 
   it('replaces through ordinary transactions that the caller hears and undo reverts', async () => {
     const changes: string[] = []
-    const view = mount('cat cat cat', [EditorView.updateListener.of((update) => { if (update.docChanged) changes.push(update.state.doc.toString()) })])
+    const view = mount('cat cat cat', [
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) changes.push(update.state.doc.toString())
+      }),
+    ])
     await open(view)
     type(field(view)!, 'c(a)t')
     button(view, 'Regular expression').click()
@@ -164,7 +174,9 @@ describe('editorSearch', () => {
     view.dom.parentElement!.addEventListener('keydown', outside)
     await open(view)
     button(view, 'Match case').focus()
-    button(view, 'Match case').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    button(view, 'Match case').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+    )
     expect(searchPanelOpen(view.state)).toBe(false)
     expect(outside).not.toHaveBeenCalled()
     expect(view.hasFocus).toBe(true)

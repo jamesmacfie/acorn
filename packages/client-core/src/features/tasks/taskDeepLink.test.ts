@@ -2,9 +2,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { paneRegistry } from '../../host/registries/panes/panes'
 import { parseTaskDeepLink } from './taskDeepLink'
 
-const pane = (id: string) => paneRegistry.register({
-  id, label: id, glyph: 'x', order: 1, component: () => null,
-})
+const pane = (id: string) =>
+  paneRegistry.register({
+    id,
+    label: id,
+    glyph: 'x',
+    order: 1,
+    component: () => null,
+  })
 
 let registered: { dispose(): void } | undefined
 afterEach(() => {
@@ -33,6 +38,9 @@ describe('parseTaskDeepLink', () => {
 
   it('takes the first value when a param is repeated', () => {
     registered = pane('test.notes')
-    expect(parseTaskDeepLink({ pane: ['test.notes', 'test.other'], item: ['a', 'b'] })).toEqual({ pane: 'test.notes', item: 'a' })
+    expect(parseTaskDeepLink({ pane: ['test.notes', 'test.other'], item: ['a', 'b'] })).toEqual({
+      pane: 'test.notes',
+      item: 'a',
+    })
   })
 })

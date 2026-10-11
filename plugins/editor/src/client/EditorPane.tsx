@@ -1,8 +1,39 @@
 import { createEffect, createMemo, createSignal, lazy, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
-import { activeTaskId, clientEvents, consumePaneIntent, focusedPane, onClosePaneWhen, type PaneIntent, prefsOptions, registerCommands, toast, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, ConfirmButton, copyText, DetailColumn, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import {
+  activeTaskId,
+  clientEvents,
+  consumePaneIntent,
+  focusedPane,
+  onClosePaneWhen,
+  type PaneIntent,
+  prefsOptions,
+  registerCommands,
+  toast,
+  type Task,
+} from '@acorn/plugin-api/client'
+import {
+  Alert,
+  Button,
+  ConfirmButton,
+  copyText,
+  DetailColumn,
+  DocumentTabs,
+  EmptyState,
+  Icon,
+  IconButton,
+  Input,
+  ListDetail,
+  Menu,
+  Only,
+  paneCollapseKey,
+  Rectangle,
+  sidebarCollapse,
+  TabPanel,
+  Tabs,
+  ToggleButton,
+} from '@acorn/plugin-api/ui'
 import { SelectionActions, Slot } from '@acorn/plugin-api/ui/host'
 import { EDITOR_DOCUMENT_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { editorApi } from './editorClient'
@@ -67,7 +98,9 @@ export default function EditorPane(props: { task: Task }) {
           file.path,
           status && `${status.label}${fileStatus.stale() ? ' (Git status may be stale)' : ''}`,
           marks.length > 0 && fileMarkLegend(marks),
-        ].filter(Boolean).join(' — '),
+        ]
+          .filter(Boolean)
+          .join(' — '),
         fileStatus: status,
         marks: tabMarks(marks),
         dirty: file.dirty,
@@ -82,10 +115,13 @@ export default function EditorPane(props: { task: Task }) {
 
   // Cmd/Ctrl+W closes the active file tab when this pane is the focused one. The pane draws no
   // element of its own to test containment against, so it asks the host which pane has focus.
-  onClosePaneWhen(() => focusedPane(taskId) === 'editor', () => {
-    const p = active()
-    if (p) void editor.close(p)
-  })
+  onClosePaneWhen(
+    () => focusedPane(taskId) === 'editor',
+    () => {
+      const p = active()
+      if (p) void editor.close(p)
+    },
+  )
 
   // The tree is one of two things the sidebar shows; revealing into a hidden one is a no-op.
   const revealInTree = (path: string) => {
@@ -112,58 +148,90 @@ export default function EditorPane(props: { task: Task }) {
   onMount(() => {
     // All three need the same thing: this task on screen, the editor focused, a file open, and a
     // checkout mapped.
-    const when = () => canRevealActiveFile({
-      paneTaskId: taskId,
-      activeTaskId: activeTaskId(),
-      focusedPane: focusedPane(taskId),
-      activeFile: active(),
-      treeAvailable: !!editor.root(),
-    })
+    const when = () =>
+      canRevealActiveFile({
+        paneTaskId: taskId,
+        activeTaskId: activeTaskId(),
+        focusedPane: focusedPane(taskId),
+        activeFile: active(),
+        treeAvailable: !!editor.root(),
+      })
     const editorFocused = () => focusedPane(taskId) === 'editor'
-    const commands = registerCommands([{
-      id: 'editor.tree.reveal-active-file',
-      title: 'Reveal active file in editor tree',
-      category: 'navigation',
-      hint: () => active() ?? undefined,
-      palette: true,
-      when,
-      run: revealActiveFile,
-    }, {
-      id: 'editor.copy-relative-path',
-      title: 'Copy relative path of active file',
-      category: 'action',
-      hint: () => active() ?? undefined,
-      palette: true,
-      when,
-      run: () => copyPath(false),
-    }, {
-      id: 'editor.copy-absolute-path',
-      title: 'Copy absolute path of active file',
-      category: 'action',
-      hint: () => active() ?? undefined,
-      palette: true,
-      when,
-      run: () => copyPath(true),
-    }, {
-      id: 'editor.tabs.reopen-closed', title: 'Reopen closed file', category: 'navigation', palette: true,
-      when: () => activeTaskId() === taskId && editorFocused(),
-      run: () => { void editor.reopen() },
-    }, {
-      id: 'editor.navigation.back', title: 'Go back in editor', category: 'navigation', palette: true,
-      when: () => activeTaskId() === taskId && editorFocused(),
-      run: () => { void editor.replay(-1) },
-    }, {
-      id: 'editor.navigation.forward', title: 'Go forward in editor', category: 'navigation', palette: true,
-      when: () => activeTaskId() === taskId && editorFocused(),
-      run: () => { void editor.replay(1) },
-    }, {
-      id: 'editor.toggle-word-wrap', title: 'Toggle word wrap', category: 'action', palette: true,
-      when: () => editorFocused() && !!editor.graphicalView(), run: editor.toggleWrap,
-    }, ...EDITOR_ACTIONS.map((action) => ({
-      id: `editor.edit.${action.id}`, title: action.title, category: 'action' as const, palette: true,
-      when: () => editorFocused() && editor.canRunAction(action.id),
-      run: () => editor.runAction(action.id),
-    }))])
+    const commands = registerCommands([
+      {
+        id: 'editor.tree.reveal-active-file',
+        title: 'Reveal active file in editor tree',
+        category: 'navigation',
+        hint: () => active() ?? undefined,
+        palette: true,
+        when,
+        run: revealActiveFile,
+      },
+      {
+        id: 'editor.copy-relative-path',
+        title: 'Copy relative path of active file',
+        category: 'action',
+        hint: () => active() ?? undefined,
+        palette: true,
+        when,
+        run: () => copyPath(false),
+      },
+      {
+        id: 'editor.copy-absolute-path',
+        title: 'Copy absolute path of active file',
+        category: 'action',
+        hint: () => active() ?? undefined,
+        palette: true,
+        when,
+        run: () => copyPath(true),
+      },
+      {
+        id: 'editor.tabs.reopen-closed',
+        title: 'Reopen closed file',
+        category: 'navigation',
+        palette: true,
+        when: () => activeTaskId() === taskId && editorFocused(),
+        run: () => {
+          void editor.reopen()
+        },
+      },
+      {
+        id: 'editor.navigation.back',
+        title: 'Go back in editor',
+        category: 'navigation',
+        palette: true,
+        when: () => activeTaskId() === taskId && editorFocused(),
+        run: () => {
+          void editor.replay(-1)
+        },
+      },
+      {
+        id: 'editor.navigation.forward',
+        title: 'Go forward in editor',
+        category: 'navigation',
+        palette: true,
+        when: () => activeTaskId() === taskId && editorFocused(),
+        run: () => {
+          void editor.replay(1)
+        },
+      },
+      {
+        id: 'editor.toggle-word-wrap',
+        title: 'Toggle word wrap',
+        category: 'action',
+        palette: true,
+        when: () => editorFocused() && !!editor.graphicalView(),
+        run: editor.toggleWrap,
+      },
+      ...EDITOR_ACTIONS.map((action) => ({
+        id: `editor.edit.${action.id}`,
+        title: action.title,
+        category: 'action' as const,
+        palette: true,
+        when: () => editorFocused() && editor.canRunAction(action.id),
+        run: () => editor.runAction(action.id),
+      })),
+    ])
     onCleanup(() => commands.dispose())
   })
 
@@ -193,57 +261,130 @@ export default function EditorPane(props: { task: Task }) {
     const owner = {}
     onCleanup(() => editor.releaseTabMenu(path, owner))
     if (control) {
-      createEffect(() => { if (control.open()) editor.prepareTabMenu(path, owner) })
+      createEffect(() => {
+        if (control.open()) editor.prepareTabMenu(path, owner)
+      })
     }
     const onTab = (action: (identity: object | undefined) => void) => () => editor.withTabTarget(path, action)
-    const closeSome = (pick: (paths: string[]) => string[]) => onTab(() => { void editor.closeMany(pick(files().map((file) => file.path))) })
-    return <Menu ariaLabel={`Actions for ${path}`} maxVisibleRows={9} open={control?.open} onBeforeOpen={() => editor.prepareTabMenu(path, owner)}
-      onOpenChange={(open) => { control?.onOpenChange(open); if (open) editor.prepareTabMenu(path, owner); else editor.releaseTabMenu(path, owner) }} trigger={({ toggle }) =>
-      <IconButton icon="ellipsis" label={`Actions for ${path}`} onPress={toggle} />}
-    >{(menu) => <>
-      <Show when={files().find((file) => file.path === path)?.ephemeral}>
-        <Menu.Item context={menu} onSelect={onTab(() => editorPromote(taskId, path))}>Keep open</Menu.Item>
-      </Show>
-      <Menu.Item context={menu} onSelect={onTab((identity) => { void editor.close(path, { identity }) })}>Close</Menu.Item>
-      <Menu.Item context={menu} onSelect={closeSome((paths) => paths.filter((other) => other !== path))}>Close others</Menu.Item>
-      <Menu.Item context={menu} onSelect={closeSome((paths) => paths.slice(paths.indexOf(path) + 1))}>Close to the right</Menu.Item>
-      <Menu.Item context={menu} onSelect={closeSome((paths) => paths)}>Close all</Menu.Item>
-      <Menu.Separator />
-      <Menu.Item context={menu} onSelect={onTab(() => copyFilePath(path, false))}>Copy relative path</Menu.Item>
-      <Menu.Item context={menu} onSelect={onTab(() => copyFilePath(path, true))}>Copy absolute path</Menu.Item>
-      <Menu.Item context={menu} onSelect={onTab(() => revealInTree(path))}>Reveal in file tree</Menu.Item>
-      <ContributedMenuRows context={menu} guard={(run) => editor.withTabTarget(path, run)}
-        target={editorMenuTarget('document.tab', { nodeId, taskId, projectId: props.task.projectId, path, directory: false,
-          revision: editor.savedRevision(path) })} />
-    </>}</Menu>
+    const closeSome = (pick: (paths: string[]) => string[]) =>
+      onTab(() => {
+        void editor.closeMany(pick(files().map((file) => file.path)))
+      })
+    return (
+      <Menu
+        ariaLabel={`Actions for ${path}`}
+        maxVisibleRows={9}
+        open={control?.open}
+        onBeforeOpen={() => editor.prepareTabMenu(path, owner)}
+        onOpenChange={(open) => {
+          control?.onOpenChange(open)
+          if (open) editor.prepareTabMenu(path, owner)
+          else editor.releaseTabMenu(path, owner)
+        }}
+        trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${path}`} onPress={toggle} />}
+      >
+        {(menu) => (
+          <>
+            <Show when={files().find((file) => file.path === path)?.ephemeral}>
+              <Menu.Item context={menu} onSelect={onTab(() => editorPromote(taskId, path))}>
+                Keep open
+              </Menu.Item>
+            </Show>
+            <Menu.Item
+              context={menu}
+              onSelect={onTab((identity) => {
+                void editor.close(path, { identity })
+              })}
+            >
+              Close
+            </Menu.Item>
+            <Menu.Item context={menu} onSelect={closeSome((paths) => paths.filter((other) => other !== path))}>
+              Close others
+            </Menu.Item>
+            <Menu.Item context={menu} onSelect={closeSome((paths) => paths.slice(paths.indexOf(path) + 1))}>
+              Close to the right
+            </Menu.Item>
+            <Menu.Item context={menu} onSelect={closeSome((paths) => paths)}>
+              Close all
+            </Menu.Item>
+            <Menu.Separator />
+            <Menu.Item context={menu} onSelect={onTab(() => copyFilePath(path, false))}>
+              Copy relative path
+            </Menu.Item>
+            <Menu.Item context={menu} onSelect={onTab(() => copyFilePath(path, true))}>
+              Copy absolute path
+            </Menu.Item>
+            <Menu.Item context={menu} onSelect={onTab(() => revealInTree(path))}>
+              Reveal in file tree
+            </Menu.Item>
+            <ContributedMenuRows
+              context={menu}
+              guard={(run) => editor.withTabTarget(path, run)}
+              target={editorMenuTarget('document.tab', {
+                nodeId,
+                taskId,
+                projectId: props.task.projectId,
+                path,
+                directory: false,
+                revision: editor.savedRevision(path),
+              })}
+            />
+          </>
+        )}
+      </Menu>
+    )
   }
 
   // The pane's own view of a file, drawn whenever no contributor stands in for it.
   const fileView = () => (
-    <Show when={imagePath()} fallback={
-      <>
-        <SelectionActions select={editor.selectionTarget} isCurrent={editor.selectionIsCurrent}>
-          <Rectangle kind="editor" label="Editor" mount={editor.mountEditor} />
-        </SelectionActions>
-        <Only hosts={['tui']}>
-          <Show when={active()} keyed>
-            {(path) => <FileDiagnostics nodeId={nodeId ?? ''} route={() => editor.servicesFor(path).diagnostics} read={async () => (await api.read(taskId, path)).text} />}
-          </Show>
-        </Only>
-      </>
-    } keyed>
-      {(path) => <>
-        <Only hosts={['dom']}><ImagePreview taskId={taskId} path={path} /></Only>
-        <Only hosts={['tui']}><EmptyState>Image preview is available in the desktop editor: {path}</EmptyState></Only>
-      </>}
+    <Show
+      when={imagePath()}
+      fallback={
+        <>
+          <SelectionActions select={editor.selectionTarget} isCurrent={editor.selectionIsCurrent}>
+            <Rectangle kind="editor" label="Editor" mount={editor.mountEditor} />
+          </SelectionActions>
+          <Only hosts={['tui']}>
+            <Show when={active()} keyed>
+              {(path) => (
+                <FileDiagnostics
+                  nodeId={nodeId ?? ''}
+                  route={() => editor.servicesFor(path).diagnostics}
+                  read={async () => (await api.read(taskId, path)).text}
+                />
+              )}
+            </Show>
+          </Only>
+        </>
+      }
+      keyed
+    >
+      {(path) => (
+        <>
+          <Only hosts={['dom']}>
+            <ImagePreview taskId={taskId} path={path} />
+          </Only>
+          <Only hosts={['tui']}>
+            <EmptyState>Image preview is available in the desktop editor: {path}</EmptyState>
+          </Only>
+        </>
+      )}
     </Show>
   )
 
-  const reloadActive = () => { const path = active(); if (path) void editor.revalidate(path) }
+  const reloadActive = () => {
+    const path = active()
+    if (path) void editor.revalidate(path)
+  }
 
   return (
     <Show when={editor.root() !== undefined} fallback={<EmptyState busy>Loading…</EmptyState>}>
-      <Show when={editor.root()} fallback={<EmptyState title="Can't find this task's files">Open a terminal in this task, then try again.</EmptyState>}>
+      <Show
+        when={editor.root()}
+        fallback={
+          <EmptyState title="Can't find this task's files">Open a terminal in this task, then try again.</EmptyState>
+        }
+      >
         <ListDetail
           listLabel="Editor sidebar"
           collapseKey={sidebarKey}
@@ -252,7 +393,10 @@ export default function EditorPane(props: { task: Task }) {
             <>
               <Tabs
                 level="pane"
-                tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
+                tabs={[
+                  { id: 'files', label: 'Files' },
+                  { id: 'search', label: 'Search' },
+                ]}
                 active={side()}
                 onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
                 idPrefix="editor-side"
@@ -274,7 +418,7 @@ export default function EditorPane(props: { task: Task }) {
                   onVisibleFiles={setTreeFiles}
                   openPath={active()}
                   reveal={treeReveal()}
-                  onRevealed={(done) => setTreeReveal((request) => request === done ? null : request)}
+                  onRevealed={(done) => setTreeReveal((request) => (request === done ? null : request))}
                   onRevealActive={() => {
                     const path = active()
                     if (path) setTreeReveal({ path })
@@ -310,7 +454,9 @@ export default function EditorPane(props: { task: Task }) {
                   tipSub="Uses $EDITOR"
                   pressed={mode() === 'terminal'}
                   onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
-                ><Icon name="square-terminal" /></ToggleButton>
+                >
+                  <Icon name="square-terminal" />
+                </ToggleButton>
                 {/* Outside the slot, so a contributor can never take the way back to the text. */}
                 <Show when={renderedPath() ? occupied() : editor.rendererOffered()}>
                   <ToggleButton
@@ -322,99 +468,175 @@ export default function EditorPane(props: { task: Task }) {
                     tipSub="Drawn by a plugin. Turn off to edit the source."
                     pressed={!!renderedPath()}
                     onPressedChange={(pressed) => editor.showSource(!pressed)}
-                  ><Icon name="eye" /></ToggleButton>
+                  >
+                    <Icon name="eye" />
+                  </ToggleButton>
                 </Show>
                 <Show when={active() && !imagePath() && !editor.documentRendered()}>
-                  <Show when={activeTab()?.dirty} fallback={
-                    <IconButton icon="refresh-cw" label="Reload from disk" onPress={reloadActive} />
-                  }>
-                    <ConfirmButton iconOnly label="Reload from disk" tip="Reload from disk" size="sm" variant="bare" timeoutMs={10_000}
+                  <Show
+                    when={activeTab()?.dirty}
+                    fallback={<IconButton icon="refresh-cw" label="Reload from disk" onPress={reloadActive} />}
+                  >
+                    <ConfirmButton
+                      iconOnly
+                      label="Reload from disk"
+                      tip="Reload from disk"
+                      size="sm"
+                      variant="bare"
+                      timeoutMs={10_000}
                       confirmLabel={`Discard ${editor.armedDecision()?.path ?? active()} and reload?`}
                       onArm={() => editor.armDecision('reload')}
                       onConfirm={() => editor.confirmDecision('reload')}
-                    ><Icon name="refresh-cw" /></ConfirmButton>
+                    >
+                      <Icon name="refresh-cw" />
+                    </ConfirmButton>
                   </Show>
-                  <IconButton icon="send" label="Add to your message to the agent" onPress={editor.sendSelectionToAgent} />
+                  <IconButton
+                    icon="send"
+                    label="Add to your message to the agent"
+                    onPress={editor.sendSelectionToAgent}
+                  />
                 </Show>
               </>
             }
           />
           {/* A failure needs room for a sentence and its resolution actions. */}
-          <Show when={editor.bulkRun()}>{(run) => <Alert variant="banner" tone="warn">Closing files… <Button onPress={() => run().cancel()}>Cancel close</Button></Alert>}</Show>
-          <Show when={editor.saveErr()}><Alert variant="banner" tone="danger">{editor.saveErr()}</Alert></Show>
+          <Show when={editor.bulkRun()}>
+            {(run) => (
+              <Alert variant="banner" tone="warn">
+                Closing files… <Button onPress={() => run().cancel()}>Cancel close</Button>
+              </Alert>
+            )}
+          </Show>
+          <Show when={editor.saveErr()}>
+            <Alert variant="banner" tone="danger">
+              {editor.saveErr()}
+            </Alert>
+          </Show>
           <Show when={editor.servicesOff()}>{(reason) => <Alert tone="muted">{reason()}</Alert>}</Show>
           <Show when={active() && editor.diskState()}>
             <Alert variant="banner" tone="warn">
-              {editor.diskState() === 'deleted' ? 'Deleted on disk' : editor.diskState() === 'read-failed' ? 'Could not read disk' : editor.diskState() === 'recovered' ? 'Recovered draft' : 'Changed on disk'}
+              {editor.diskState() === 'deleted'
+                ? 'Deleted on disk'
+                : editor.diskState() === 'read-failed'
+                  ? 'Could not read disk'
+                  : editor.diskState() === 'recovered'
+                    ? 'Recovered draft'
+                    : 'Changed on disk'}
               <Button onPress={reloadActive}>Reload status</Button>
               <Show when={editor.diskState() !== 'deleted' && editor.diskState() !== 'read-failed'}>
                 <Button onPress={editor.toggleCompare}>Compare</Button>
               </Show>
-              <ConfirmButton timeoutMs={10_000}
+              <ConfirmButton
+                timeoutMs={10_000}
                 confirmLabel={`Discard ${editor.armedDecision()?.path ?? active()} and reload from disk?`}
                 onArm={() => editor.armDecision('reload')}
                 onConfirm={() => editor.confirmDecision('reload')}
-              >Reload from disk</ConfirmButton>
-              <Show when={editor.diskState() === 'changed' || editor.diskState() === 'unknown' || editor.diskState() === 'recovered'}>
-                <ConfirmButton timeoutMs={10_000}
+              >
+                Reload from disk
+              </ConfirmButton>
+              <Show
+                when={
+                  editor.diskState() === 'changed' ||
+                  editor.diskState() === 'unknown' ||
+                  editor.diskState() === 'recovered'
+                }
+              >
+                <ConfirmButton
+                  timeoutMs={10_000}
                   confirmLabel={`Overwrite ${editor.armedDecision()?.path ?? active()} at the shown disk version?`}
                   onArm={() => editor.armDecision('overwrite')}
                   onConfirm={() => editor.confirmDecision('overwrite')}
-                >Overwrite disk…</ConfirmButton>
+                >
+                  Overwrite disk…
+                </ConfirmButton>
               </Show>
               <Show when={editor.diskState() === 'deleted'}>
-                <ConfirmButton timeoutMs={10_000}
+                <ConfirmButton
+                  timeoutMs={10_000}
                   confirmLabel={`Recreate ${editor.armedDecision()?.path ?? active()}?`}
                   onArm={() => editor.armDecision('recreate')}
                   onConfirm={() => editor.confirmDecision('recreate')}
-                >Recreate file…</ConfirmButton>
+                >
+                  Recreate file…
+                </ConfirmButton>
                 <Input label="Save as path" value={editor.saveAsPath()} onInput={editor.setSaveAsPath} />
                 <Button onPress={editor.saveAs}>Save as…</Button>
               </Show>
             </Alert>
           </Show>
-          <Show when={active() && editor.saveErr() && !editor.diskState()}><Button onPress={() => void editor.save(active())}>Retry save</Button></Show>
+          <Show when={active() && editor.saveErr() && !editor.diskState()}>
+            <Button onPress={() => void editor.save(active())}>Retry save</Button>
+          </Show>
           <Show when={editor.compare() ? editor.comparisonDisk() : undefined}>
-            {(snapshot) => <EditorComparison path={active()!} disk={snapshot().text} draft={editor.comparisonDraft()} />}
+            {(snapshot) => (
+              <EditorComparison path={active()!} disk={snapshot().text} draft={editor.comparisonDraft()} />
+            )}
           </Show>
           {/* CodeMirror owns these pixels — its own DOM, its own keyboard, its own scrolling — so the
               pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
               the host (ui/Rectangle.tsx). In terminal mode the same box holds the reader's own editor
               instead, keyed on the path so switching tabs starts a new one. */}
-          <Show when={ptyPath()} fallback={
-            <Show when={renderedPath()} fallback={fileView()}>
-              <Show when={rendered()} fallback={<EmptyState busy>Loading…</EmptyState>}>
-                {/* The pane's own view is beside the slot rather than its default, because a
+          <Show
+            when={ptyPath()}
+            fallback={
+              <Show when={renderedPath()} fallback={fileView()}>
+                <Show when={rendered()} fallback={<EmptyState busy>Loading…</EmptyState>}>
+                  {/* The pane's own view is beside the slot rather than its default, because a
                     contributor's tree needs a scrolling column and CodeMirror needs the whole box.
                     It draws when nobody stands in, which for a matched key means an unsettled tie. */}
-                <Show when={!occupied()}>{fileView()}</Show>
-                <DetailColumn scroll={occupied()}>
-                  <Slot point={EDITOR_DOCUMENT_POINT} key={editor.documentKey()} taskId={taskId} props={() => rendered()} occupied={editor.setOccupied} />
-                </DetailColumn>
+                  <Show when={!occupied()}>{fileView()}</Show>
+                  <DetailColumn scroll={occupied()}>
+                    <Slot
+                      point={EDITOR_DOCUMENT_POINT}
+                      key={editor.documentKey()}
+                      taskId={taskId}
+                      props={() => rendered()}
+                      occupied={editor.setOccupied}
+                    />
+                  </DetailColumn>
+                </Show>
               </Show>
-            </Show>
-          } keyed>
-            {(path) => <EditorTerminal taskId={taskId} path={path} onExit={(code) => editor.onEditorExit(path, code)} />}
+            }
+            keyed
+          >
+            {(path) => (
+              <EditorTerminal taskId={taskId} path={path} onExit={(code) => editor.onEditorExit(path, code)} />
+            )}
           </Show>
-          <Show when={active()} keyed>{(path) => {
-            const current = () => editor.status.isCurrent(path)
-            return <EditorStatus
-              path={path}
-              position={editor.status.position()}
-              selection={editor.status.selectedCharacters()}
-              language={languageName(languageIdForPath(path))}
-              indentation={editor.status.indentation()}
-              save={editor.status.save()}
-              preview={!!imagePath() || editor.documentRendered()}
-              external={!!ptyPath()}
-              wrap={editor.status.wrap()}
-              onToggleWrap={() => { if (current()) editor.toggleWrap() }}
-              onCopy={(absolute) => { if (current()) copyPath(absolute) }}
-              onReveal={() => { if (current()) revealActiveFile() }}
-              onIndentation={(value) => { if (current()) editor.setIndentation(value) }}
-              onRetry={() => { if (current()) void editor.save(path) }}
-            />
-          }}</Show>
+          <Show when={active()} keyed>
+            {(path) => {
+              const current = () => editor.status.isCurrent(path)
+              return (
+                <EditorStatus
+                  path={path}
+                  position={editor.status.position()}
+                  selection={editor.status.selectedCharacters()}
+                  language={languageName(languageIdForPath(path))}
+                  indentation={editor.status.indentation()}
+                  save={editor.status.save()}
+                  preview={!!imagePath() || editor.documentRendered()}
+                  external={!!ptyPath()}
+                  wrap={editor.status.wrap()}
+                  onToggleWrap={() => {
+                    if (current()) editor.toggleWrap()
+                  }}
+                  onCopy={(absolute) => {
+                    if (current()) copyPath(absolute)
+                  }}
+                  onReveal={() => {
+                    if (current()) revealActiveFile()
+                  }}
+                  onIndentation={(value) => {
+                    if (current()) editor.setIndentation(value)
+                  }}
+                  onRetry={() => {
+                    if (current()) void editor.save(path)
+                  }}
+                />
+              )
+            }}
+          </Show>
         </ListDetail>
       </Show>
     </Show>

@@ -17,7 +17,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const without = <T extends object>(record: T, key: string): T =>
   Object.fromEntries(Object.entries(record).filter(([name]) => name !== key)) as T
 
-const add = (notes: WorkflowGenerateNote[], code: WorkflowGenerateNote['code'], message: string, step?: string): void => {
+const add = (
+  notes: WorkflowGenerateNote[],
+  code: WorkflowGenerateNote['code'],
+  message: string,
+  step?: string,
+): void => {
   notes.push({ code, message, ...(step ? { step } : {}) })
 }
 
@@ -36,31 +41,41 @@ const bindingShape = (
     const address = parsed.data.address
     if (address.from === 'input' && !parentInputs.has(address.name)) return 'references an undeclared input'
     if (address.from === 'item' && !allowItem) return 'uses an item outside a map'
-    if (address.from === 'step' && (!names.has(address.stepId) || !precedes(address.stepId, owner) || !structured(address.stepId))) return 'does not name a structured predecessor binding'
+    if (
+      address.from === 'step' &&
+      (!names.has(address.stepId) || !precedes(address.stepId, owner) || !structured(address.stepId))
+    )
+      return 'does not name a structured predecessor binding'
     return undefined
   }
   if (!isRecord(binding) || typeof binding.from !== 'string') return 'is not a binding object'
   if (binding.from === 'literal') {
     return Object.keys(binding).every((key) => key === 'from' || key === 'value') && typeof binding.value === 'string'
-      ? undefined : 'is not a literal string binding'
+      ? undefined
+      : 'is not a literal string binding'
   }
   if (binding.from === 'input') {
-    return Object.keys(binding).every((key) => key === 'from' || key === 'name')
-      && typeof binding.name === 'string' && parentInputs.has(binding.name)
-      ? undefined : 'is not a parent input binding'
+    return Object.keys(binding).every((key) => key === 'from' || key === 'name') &&
+      typeof binding.name === 'string' &&
+      parentInputs.has(binding.name)
+      ? undefined
+      : 'is not a parent input binding'
   }
   if (binding.from === 'item') {
-    return allowItem && Object.keys(binding).every((key) => key === 'from' || key === 'pointer')
-      && parseWorkflowJsonPointer(binding.pointer) !== null
-      ? undefined : 'is not an item binding for this step'
+    return allowItem &&
+      Object.keys(binding).every((key) => key === 'from' || key === 'pointer') &&
+      parseWorkflowJsonPointer(binding.pointer) !== null
+      ? undefined
+      : 'is not an item binding for this step'
   }
   if (binding.from === 'step') {
-    const supported = Object.keys(binding).every((key) => key === 'from' || key === 'step' || key === 'pointer')
-      && typeof binding.step === 'string'
-      && names.has(binding.step)
-      && precedes(binding.step, owner)
-      && structured(binding.step)
-      && parseWorkflowJsonPointer(binding.pointer) !== null
+    const supported =
+      Object.keys(binding).every((key) => key === 'from' || key === 'step' || key === 'pointer') &&
+      typeof binding.step === 'string' &&
+      names.has(binding.step) &&
+      precedes(binding.step, owner) &&
+      structured(binding.step) &&
+      parseWorkflowJsonPointer(binding.pointer) !== null
     return supported ? undefined : 'does not name a structured predecessor binding'
   }
   return `uses the unsupported source '${binding.from}'`
@@ -92,29 +107,48 @@ export function groundWorkflowDispatch(
     const source = def.steps.find((step) => stepIdentity(step) === name)
     if (!source) return false
     if (source.schema && typeof source.schema === 'object' && !Array.isArray(source.schema)) return true
-    return !!declaredOutputSchema(source, catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema)
+    return !!declaredOutputSchema(
+      source,
+      catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema,
+    )
   }
 
   const steps = def.steps.map((step) => {
     if (step.kind !== 'workflow' && step.kind !== 'workflow-map') return step
     let next = step
-    const ref = isRecord(next.childWorkflow) && isRecord(next.childWorkflow.ref)
-      ? next.childWorkflow.ref as WorkflowDefinitionRef
-      : undefined
+    const ref =
+      isRecord(next.childWorkflow) && isRecord(next.childWorkflow.ref)
+        ? (next.childWorkflow.ref as WorkflowDefinitionRef)
+        : undefined
     const target = ref ? targets.find((entry) => sameWorkflowRef(entry.ref, ref)) : undefined
     if (ref && !target) {
-      add(notes, 'unknown-workflow', `Step '${step.name}' named a child workflow that is not available to this project, so the target was dropped.`, step.name)
+      add(
+        notes,
+        'unknown-workflow',
+        `Step '${step.name}' named a child workflow that is not available to this project, so the target was dropped.`,
+        step.name,
+      )
       next = without(next, 'childWorkflow')
     } else if (target && next.childWorkflow) {
       const declared = new Set(target.inputs.map((input) => input.name))
-      const kept = Object.entries(isRecord(next.childWorkflow.inputs) ? next.childWorkflow.inputs : {}).filter(([name, binding]) => {
-        const problem = !declared.has(name)
-          ? `binds the undeclared child input '${name}'`
-          : bindingShape(binding, step.kind === 'workflow-map', parentInputs, names, precedes, structured, stepIdentity(step))
-        if (!problem) return true
-        add(notes, 'unsupported-binding', `Step '${step.name}' ${problem}, so that binding was dropped.`, step.name)
-        return false
-      })
+      const kept = Object.entries(isRecord(next.childWorkflow.inputs) ? next.childWorkflow.inputs : {}).filter(
+        ([name, binding]) => {
+          const problem = !declared.has(name)
+            ? `binds the undeclared child input '${name}'`
+            : bindingShape(
+                binding,
+                step.kind === 'workflow-map',
+                parentInputs,
+                names,
+                precedes,
+                structured,
+                stepIdentity(step),
+              )
+          if (!problem) return true
+          add(notes, 'unsupported-binding', `Step '${step.name}' ${problem}, so that binding was dropped.`, step.name)
+          return false
+        },
+      )
       next = {
         ...next,
         childWorkflow: {
@@ -125,11 +159,19 @@ export function groundWorkflowDispatch(
     }
 
     if (step.kind === 'workflow-map' && next.items) {
-      const valid = typeof next.items.step === 'string' && names.has(next.items.step)
-        && precedes(next.items.step, stepIdentity(step)) && structured(next.items.step)
-        && parseWorkflowJsonPointer(next.items.pointer) !== null
+      const valid =
+        typeof next.items.step === 'string' &&
+        names.has(next.items.step) &&
+        precedes(next.items.step, stepIdentity(step)) &&
+        structured(next.items.step) &&
+        parseWorkflowJsonPointer(next.items.pointer) !== null
       if (!valid) {
-        add(notes, 'unknown-step-reference', `Step '${step.name}' has an invalid map source, so the source was dropped.`, step.name)
+        add(
+          notes,
+          'unknown-step-reference',
+          `Step '${step.name}' has an invalid map source, so the source was dropped.`,
+          step.name,
+        )
         next = without(next, 'items')
       }
     }
@@ -137,10 +179,18 @@ export function groundWorkflowDispatch(
       const kept = Object.entries(next.title.bindings).filter(([name, binding]) => {
         const problem = bindingShape(binding, true, parentInputs, names, precedes, structured, stepIdentity(step))
         if (!problem) return true
-        add(notes, 'unsupported-binding', `Step '${step.name}' title binding '${name}' ${problem}, so that binding was dropped.`, step.name)
+        add(
+          notes,
+          'unsupported-binding',
+          `Step '${step.name}' title binding '${name}' ${problem}, so that binding was dropped.`,
+          step.name,
+        )
         return false
       })
-      next = { ...next, title: { ...next.title, ...(kept.length ? { bindings: Object.fromEntries(kept) } : { bindings: undefined }) } }
+      next = {
+        ...next,
+        title: { ...next.title, ...(kept.length ? { bindings: Object.fromEntries(kept) } : { bindings: undefined }) },
+      }
     }
     return next
   })

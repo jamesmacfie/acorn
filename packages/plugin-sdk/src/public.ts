@@ -185,7 +185,10 @@ export declare function connect(): Promise<AcornBridge>
  * `styles` is your stylesheet as a string, injected rather than linked: a plugin origin serves exactly
  * one file, so a frame with a separate asset is a broken frame.
  */
-export declare function mountFrame(options: { styles: string }, render: (bridge: AcornBridge, root: HTMLElement) => void): void
+export declare function mountFrame(
+  options: { styles: string },
+  render: (bridge: AcornBridge, root: HTMLElement) => void,
+): void
 
 /**
  * Delegated click handler for anchors inside your own rendered content. Returns whether the click was

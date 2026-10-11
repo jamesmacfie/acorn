@@ -32,7 +32,7 @@ export function persistDraft(
   setText: (value: string) => void,
   prefix: string = PREFIX,
 ): void {
-  createEffect(on(key, (k) => setText(k ? readLocal(prefix + k) ?? '' : '')))
+  createEffect(on(key, (k) => setText(k ? (readLocal(prefix + k) ?? '') : '')))
   createEffect(() => {
     const k = key()
     if (k) writeLocal(prefix + k, text())

@@ -8,8 +8,13 @@ export type NotesSelection = { scope: NoteScope; slug: string }
 
 const key = (taskId: string, nodeId: string | null): string => JSON.stringify([nodeId, taskId])
 const selectedByTask = new Map<string, NotesSelection>()
-export const notesSelectionFor = (taskId: string, nodeId: string | null = activeNodeId()): NotesSelection | undefined => selectedByTask.get(key(taskId, nodeId))
-export const rememberNotesSelection = (taskId: string, selection: NotesSelection, nodeId: string | null = activeNodeId()): void => {
+export const notesSelectionFor = (taskId: string, nodeId: string | null = activeNodeId()): NotesSelection | undefined =>
+  selectedByTask.get(key(taskId, nodeId))
+export const rememberNotesSelection = (
+  taskId: string,
+  selection: NotesSelection,
+  nodeId: string | null = activeNodeId(),
+): void => {
   selectedByTask.set(key(taskId, nodeId), selection)
 }
 

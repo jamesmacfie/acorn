@@ -35,10 +35,11 @@ export function createMeasureHistory(
     enabled: !!nodeId && !!panelId() && enabled(),
     // `since` is computed inside the fetch, never in the key: a clock reading in a query key mints a new
     // cache entry on every render and turns a fortnightly read into a poll.
-    queryFn: () => readJson<DashboardHistoryResponse>(
-      `${dashboardHistoryRoute}?panelId=${encodeURIComponent(panelId()!)}&since=${Date.now() - SINCE_MS}`,
-      { nodeId },
-    ),
+    queryFn: () =>
+      readJson<DashboardHistoryResponse>(
+        `${dashboardHistoryRoute}?panelId=${encodeURIComponent(panelId()!)}&since=${Date.now() - SINCE_MS}`,
+        { nodeId },
+      ),
     // The sampler writes hourly, so this is generous rather than lazy. Anything faster is a poll for a
     // number that can't have changed.
     staleTime: 15 * 60_000,

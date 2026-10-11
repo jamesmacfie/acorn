@@ -1,7 +1,11 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InlineSlot } from './InlineSlot'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+} from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 
 // Another plugin's rectangle, drawn as a sibling region of this one's pane (docs/plugins/cooperative-extension-points.md §
@@ -33,42 +37,47 @@ type Roster = { pluginId: string; trusted: boolean; hash: string; target: string
 let roster: Roster[] = []
 
 vi.mock('../plugins/contributions', () => ({
-  eligiblePlugins: () => roster.map((entry) => ({
-    pluginId: entry.pluginId,
-    trusted: entry.trusted,
-    hash: entry.hash,
-    row: {},
-    installed: { contributions: { frames: [{ id: 'preview', target: entry.target }] } },
-  })),
+  eligiblePlugins: () =>
+    roster.map((entry) => ({
+      pluginId: entry.pluginId,
+      trusted: entry.trusted,
+      hash: entry.hash,
+      row: {},
+      installed: { contributions: { frames: [{ id: 'preview', target: entry.target }] } },
+    })),
 }))
 
 const POINT = 'editor:beside'
 const registered: Disposable[] = []
 
 const point = (max = 4) =>
-  registered.push(extensionPointRegistry.register({
-    id: POINT,
-    ownerId: 'editor',
-    label: 'Beside the document',
-    kind: 'rectangle',
-    location: 'pane.inline-beside',
-    surface: 'editor',
-    mode: 'stack',
-    max,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: POINT,
+      ownerId: 'editor',
+      label: 'Beside the document',
+      kind: 'rectangle',
+      location: 'pane.inline-beside',
+      surface: 'editor',
+      mode: 'stack',
+      max,
+    }),
+  )
 
 const contributor = (pluginId: string, matches?: string[]) => {
   roster.push({ pluginId, trusted: true, hash: 'abc', target: 'inline' })
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:beside`,
-    pluginId,
-    point: POINT,
-    label: `${pluginId} preview`,
-    order: 500,
-    carrier: 'frame',
-    frame: 'preview',
-    ...(matches ? { matches } : {}),
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:beside`,
+      pluginId,
+      point: POINT,
+      label: `${pluginId} preview`,
+      order: 500,
+      carrier: 'frame',
+      frame: 'preview',
+      ...(matches ? { matches } : {}),
+    } as ExtensionContribution),
+  )
 }
 
 const draw = (key?: string) => {

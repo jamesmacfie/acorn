@@ -10,7 +10,12 @@ import { createDraftEntry, entryDirty, snapshotDraft, type DraftEntry, type Draf
 import { withAbort } from './requestOperation'
 import { serializeHttpWrite } from './httpWrites'
 
-export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, hasBridge: (bridge: AcornBridge) => boolean, recovery: DraftRecovery) {
+export function buildPanel(
+  subject: PanelSubject,
+  bridge: () => AcornBridge,
+  hasBridge: (bridge: AcornBridge) => boolean,
+  recovery: DraftRecovery,
+) {
   const { projectId, projectName, taskId, initialRequestId } = subject
   const client = createHttpClient(() => bridge().api)
   let disposed = false
@@ -40,19 +45,26 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
       attempted.add(origin)
       const controller = admit(origin)
       try {
-        const rows = await withAbort(controller.signal, () => createHttpClient(origin.api).listRequests(projectId, taskId, controller.signal))
+        const rows = await withAbort(controller.signal, () =>
+          createHttpClient(origin.api).listRequests(projectId, taskId, controller.signal),
+        )
         lastLists.set(taskId ?? '', rows)
         return rows
-      }
-      catch (error) {
+      } catch (error) {
         if (disposed || hasBridge(origin)) {
           if (!disposed) setError(error instanceof Error ? error.message : 'Could not refresh requests')
           return lastLists.get(taskId ?? '') ?? []
         }
         let next: AcornBridge
-        try { next = bridge() } catch { return lastLists.get(taskId ?? '') ?? [] }
+        try {
+          next = bridge()
+        } catch {
+          return lastLists.get(taskId ?? '') ?? []
+        }
         if (attempted.has(next)) return lastLists.get(taskId ?? '') ?? []
-      } finally { operations.delete(controller) }
+      } finally {
+        operations.delete(controller)
+      }
     }
   }
   const blank = () => emptyDraft(taskId ?? null)
@@ -61,7 +73,9 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
   recovery.selected = active.key
   // The selected request. Selecting another aborts the work started for this one.
   let selectionLifetime = new AbortController()
-  const [selection, publishSelection] = createSignal<Selection>(active.id ? { kind: 'saved', id: active.id } : { kind: 'new' })
+  const [selection, publishSelection] = createSignal<Selection>(
+    active.id ? { kind: 'saved', id: active.id } : { kind: 'new' },
+  )
   const [draft, publishDraft] = createSignal<Draft>(snapshotDraft(active.draft))
   const [recoveryVersion, bumpRecovery] = createSignal(0)
   const changed = () => bumpRecovery((value) => value + 1)
@@ -107,10 +121,14 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
     return [...(saved() ?? []), ...(adhoc() ?? [])].find((r) => r.id === sel.id) ?? null
   })
 
-  const dirty = createMemo(() => { recoveryVersion(); return entryDirty(active) })
+  const dirty = createMemo(() => {
+    recoveryVersion()
+    return entryDirty(active)
+  })
   const recoveries = createMemo(() => {
     recoveryVersion()
-    return [...recovery.entries.values()].filter((entry) => entry !== active && entryDirty(entry))
+    return [...recovery.entries.values()]
+      .filter((entry) => entry !== active && entryDirty(entry))
       .map((entry) => ({ key: entry.key, name: entry.draft.name }))
   })
   const patch = (p: Partial<Draft>) => setDraft({ ...draft(), ...p })
@@ -160,7 +178,13 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
     // A duplicate is an independent unsaved request. Dirty prior entries remain recoverable.
     if (!entryDirty(active) && !active.write) recovery.entries.delete(active.key)
     const entry = createDraftEntry(blank())
-    if (from) entry.draft = { ...toDraft(from), name: `${from.name} copy`, taskId: taskId ?? null, folder: taskId ? '' : from.folder }
+    if (from)
+      entry.draft = {
+        ...toDraft(from),
+        name: `${from.name} copy`,
+        taskId: taskId ?? null,
+        folder: taskId ? '' : from.folder,
+      }
     recovery.entries.set(entry.key, entry)
     selectEntry(entry)
   }
@@ -186,7 +210,9 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
 
   async function persist(d: Draft, origin = bridge()) {
     if (!d.name.trim()) return setError('Give the request a name before saving.')
-    const entry = active, selected = selectionLifetime.signal, revision = entry.revision
+    const entry = active,
+      selected = selectionLifetime.signal,
+      revision = entry.revision
     const submitted = snapshotDraft(d)
     const controller = admit(origin)
     const previous = entry.write
@@ -199,10 +225,19 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
         if (previous) await withAbort(controller.signal, () => previous)
         controller.signal.throwIfAborted()
         const api = createHttpClient(origin.api)
-        const identity = JSON.stringify([origin.context.nodeId ?? origin.context.authority, projectId, 'request', entry.id ?? entry.key])
-        const next = await serializeHttpWrite(identity, controller.signal, () => withAbort(controller.signal, () => entry.id
-          ? api.updateRequest(projectId, entry.id, submitted, controller.signal)
-          : api.createRequest(projectId, submitted, controller.signal)))
+        const identity = JSON.stringify([
+          origin.context.nodeId ?? origin.context.authority,
+          projectId,
+          'request',
+          entry.id ?? entry.key,
+        ])
+        const next = await serializeHttpWrite(identity, controller.signal, () =>
+          withAbort(controller.signal, () =>
+            entry.id
+              ? api.updateRequest(projectId, entry.id, submitted, controller.signal)
+              : api.createRequest(projectId, submitted, controller.signal),
+          ),
+        )
         entry.id = next.id
         entry.baseline = toDraft(next)
         entry.failed = false
@@ -220,7 +255,10 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
       } finally {
         operations.delete(controller)
         writes.set(entry, (writes.get(entry) ?? 1) - 1)
-        if (!disposed) { settleSaving(); changed() }
+        if (!disposed) {
+          settleSaving()
+          changed()
+        }
       }
     })()
     entry.write = operation
@@ -232,14 +270,28 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
     const selected = selectionLifetime.signal
     const controller = admit(origin)
     let entry = [...recovery.entries.values()].find((candidate) => candidate.id === row.id)
-    if (!entry) { entry = createDraftEntry(toDraft(row), row.id); recovery.entries.set(entry.key, entry) }
-    const target = entry, revision = target.revision, previous = target.write
+    if (!entry) {
+      entry = createDraftEntry(toDraft(row), row.id)
+      recovery.entries.set(entry.key, entry)
+    }
+    const target = entry,
+      revision = target.revision,
+      previous = target.write
     let operation!: Promise<void>
     operation = (async () => {
       try {
         if (previous) await withAbort(controller.signal, () => previous)
-        const identity = JSON.stringify([origin.context.nodeId ?? origin.context.authority, projectId, 'request', row.id])
-        await serializeHttpWrite(identity, controller.signal, () => withAbort(controller.signal, () => createHttpClient(origin.api).deleteRequest(projectId, row.id, controller.signal)))
+        const identity = JSON.stringify([
+          origin.context.nodeId ?? origin.context.authority,
+          projectId,
+          'request',
+          row.id,
+        ])
+        await serializeHttpWrite(identity, controller.signal, () =>
+          withAbort(controller.signal, () =>
+            createHttpClient(origin.api).deleteRequest(projectId, row.id, controller.signal),
+          ),
+        )
         if (disposed || !hasBridge(origin)) return
         target.id = undefined
         if (target.revision === revision && target.write === operation) {
@@ -256,7 +308,9 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
       } catch (err) {
         if (!disposed && hasBridge(origin) && !selected.aborted)
           setError(err instanceof Error ? err.message : 'Could not delete the request')
-      } finally { operations.delete(controller) }
+      } finally {
+        operations.delete(controller)
+      }
     })()
     target.write = operation
     await operation
@@ -268,20 +322,33 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
     sendingController?.abort()
     const controller = admit(origin)
     sendingController = controller
-    const entry = active, selected = selectionLifetime.signal, revision = entry.revision
+    const entry = active,
+      selected = selectionLifetime.signal,
+      revision = entry.revision
     const submitted = toSendInput(snapshotDraft(draft()), taskId ?? null)
     setSending(true)
     setError(null)
     setResult(null)
-    const publish = () => !disposed && hasBridge(origin) && active === entry && !selected.aborted && entry.revision === revision && sendingController === controller
+    const publish = () =>
+      !disposed &&
+      hasBridge(origin) &&
+      active === entry &&
+      !selected.aborted &&
+      entry.revision === revision &&
+      sendingController === controller
     try {
-      const response = await withAbort(controller.signal, () => createHttpClient(origin.api).sendRequest(projectId, submitted, controller.signal))
+      const response = await withAbort(controller.signal, () =>
+        createHttpClient(origin.api).sendRequest(projectId, submitted, controller.signal),
+      )
       if (publish()) setResult(response)
     } catch (err) {
       if (publish() && !controller.signal.aborted) setError(err instanceof Error ? err.message : 'Request failed')
     } finally {
       operations.delete(controller)
-      if (sendingController === controller) { sendingController = null; setSending(false) }
+      if (sendingController === controller) {
+        sendingController = null
+        setSending(false)
+      }
     }
   }
 
@@ -297,7 +364,14 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
     if (/^\s*curl\s/i.test(value)) {
       const parsed = fromCurl(value)
       if (parsed) {
-        patch({ method: parsed.method, url: parsed.url, headers: parsed.headers, bodyMode: parsed.bodyMode, body: parsed.body, auth: parsed.auth })
+        patch({
+          method: parsed.method,
+          url: parsed.url,
+          headers: parsed.headers,
+          bodyMode: parsed.bodyMode,
+          body: parsed.body,
+          auth: parsed.auth,
+        })
         return true
       }
     }
@@ -310,23 +384,45 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
   const copyAsCurl = (origin = bridge()) => copy(toCurl(draft()), origin)
 
   return {
-    client, refresh,
+    client,
+    refresh,
     requestSelection: (item: string) => setRequested(item),
     retireBridge: (retired: AcornBridge) => {
       for (const [controller, origin] of operations) if (origin === retired) controller.abort()
     },
-    recoveries, recover,
+    recoveries,
+    recover,
     projectId,
     projectName,
     taskId,
-    selection, setSelection,
-    draft, patch, setDraft,
-    result, error, setError,
-    sending, saving,
-    saveOpen, setSaveOpen, openSave, onSaveClick, saveTarget, persist,
-    saved, adhoc, groups, folders,
-    current, dirty,
-    open, startNew, remove, fire,
-    commitUrl, copy, copyAsCurl,
+    selection,
+    setSelection,
+    draft,
+    patch,
+    setDraft,
+    result,
+    error,
+    setError,
+    sending,
+    saving,
+    saveOpen,
+    setSaveOpen,
+    openSave,
+    onSaveClick,
+    saveTarget,
+    persist,
+    saved,
+    adhoc,
+    groups,
+    folders,
+    current,
+    dirty,
+    open,
+    startNew,
+    remove,
+    fire,
+    commitUrl,
+    copy,
+    copyAsCurl,
   }
 }

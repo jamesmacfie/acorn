@@ -16,8 +16,13 @@ import { apiGet, apiSend } from './api'
 
 const TASK_ID = process.env.ACORN_TASK_ID ?? ''
 
-const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }] })
-const NO_TASK = text({ status: 'no-active-task', hint: 'This session was not launched from an acorn task — task-scoped tools need ACORN_TASK_ID.' })
+const text = (value: unknown) => ({
+  content: [{ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
+})
+const NO_TASK = text({
+  status: 'no-active-task',
+  hint: 'This session was not launched from an acorn task — task-scoped tools need ACORN_TASK_ID.',
+})
 
 type ManifestTool = { name: string; description: string; inputSchema: Record<string, unknown> }
 
@@ -57,7 +62,8 @@ export function buildServer(): Server {
       { callId },
     )
     if (!res.ok) return text({ status: res.kind, detail: res.detail })
-    if (isToolImageResult(res.data)) return { content: [{ type: 'image' as const, data: res.data.data, mimeType: res.data.mimeType }] }
+    if (isToolImageResult(res.data))
+      return { content: [{ type: 'image' as const, data: res.data.data, mimeType: res.data.mimeType }] }
     return text(res.data)
   })
 

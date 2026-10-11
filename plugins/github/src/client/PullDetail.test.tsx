@@ -22,8 +22,21 @@ vi.mock('@tanstack/solid-query', () => ({
       if (key[0] === 'projects') return [{ id: 'p1', name: 'acorn', github: { owner: 'runn-fast', name: 'acorn' } }]
       if (key[0] === 'pull') {
         return {
-          pull: { number: Number(key[3]), title: `Pull ${String(key[3])}`, state: 'open', draft: false, body: null, headSha: null },
-          labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [],
+          pull: {
+            number: Number(key[3]),
+            title: `Pull ${String(key[3])}`,
+            state: 'open',
+            draft: false,
+            body: null,
+            headSha: null,
+          },
+          labels: [],
+          reviews: [],
+          requestedReviewers: [],
+          comments: [],
+          commits: [],
+          checks: [],
+          threads: [],
         }
       }
       return undefined
@@ -36,7 +49,7 @@ vi.mock('@tanstack/solid-query', () => ({
 }))
 
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   onPluginFrame: () => () => {},
 }))
 

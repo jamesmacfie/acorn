@@ -26,10 +26,21 @@ const gate: SecretPublicationGate = {
   admit: async (input) => {
     admitted.push(input)
     if ((!input.report.counts.high && input.report.complete) || allowed.has(input.report.digest)) return null
-    return { decisionId: 'd'.repeat(64), operation: input.operation, reason: input.report.counts.high ? 'findings' : 'incomplete', report: input.report }
+    return {
+      decisionId: 'd'.repeat(64),
+      operation: input.operation,
+      reason: input.report.counts.high ? 'findings' : 'incomplete',
+      report: input.report,
+    }
   },
 }
-const bridge = () => localGitBridge({ tasks: { root: async () => dir } as never, models: {} as never, checkoutAdmission: {} as never, secretPublication: gate })
+const bridge = () =>
+  localGitBridge({
+    tasks: { root: async () => dir } as never,
+    models: {} as never,
+    checkoutAdmission: {} as never,
+    secretPublication: gate,
+  })
 const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' }).trim()
 const write = (name: string, text: string) => writeFileSync(join(dir, name), text)
 
@@ -165,7 +176,9 @@ describe('push admission', () => {
     git('add', 'b.ts')
     git('commit', '-q', '-m', 'clean')
     expect(await bridge().push('t')).toEqual({ ok: true })
-    expect(execFileSync('git', ['rev-parse', 'main'], { cwd: origin, encoding: 'utf8' }).trim()).toBe(git('rev-parse', 'HEAD'))
+    expect(execFileSync('git', ['rev-parse', 'main'], { cwd: origin, encoding: 'utf8' }).trim()).toBe(
+      git('rev-parse', 'HEAD'),
+    )
   })
 
   it('reads the annotated tags push.followTags would send', async () => {
@@ -208,8 +221,18 @@ describe('manual check', () => {
 describe('changedBlobs', () => {
   it('keeps added and modified blobs, and drops deletions and submodules', () => {
     const id = (n: number) => String(n).repeat(40)
-    const record = (mode: string, status: string, path: string, n: number) => `:100644 ${mode} ${id(0)} ${id(n)} ${status}\0${path}\0`
-    expect(changedBlobs(record('100644', 'A', 'a', 1) + record('100644', 'M', 'b c', 2) + record('000000', 'D', 'd', 0) + record('160000', 'M', 'sub', 3)))
-      .toEqual([{ id: id(1), path: 'a' }, { id: id(2), path: 'b c' }])
+    const record = (mode: string, status: string, path: string, n: number) =>
+      `:100644 ${mode} ${id(0)} ${id(n)} ${status}\0${path}\0`
+    expect(
+      changedBlobs(
+        record('100644', 'A', 'a', 1) +
+          record('100644', 'M', 'b c', 2) +
+          record('000000', 'D', 'd', 0) +
+          record('160000', 'M', 'sub', 3),
+      ),
+    ).toEqual([
+      { id: id(1), path: 'a' },
+      { id: id(2), path: 'b c' },
+    ])
   })
 })

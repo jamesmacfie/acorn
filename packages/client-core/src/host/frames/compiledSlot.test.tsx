@@ -23,26 +23,30 @@ vi.mock('../tree/RemoteTree', () => ({ RemoteTree: () => <span>worker-tree</span
 const registered: Disposable[] = []
 
 const point = () =>
-  registered.push(extensionPointRegistry.register({
-    id: 'context:section',
-    ownerId: 'context',
-    label: 'Context section',
-    kind: 'remote',
-    mode: 'stack',
-    max: 2,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: 'context:section',
+      ownerId: 'context',
+      label: 'Context section',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
+    }),
+  )
 
 const memory = () =>
-  registered.push(extensionRegistry.register({
-    id: 'memory.section',
-    pluginId: 'memory',
-    point: 'context:section',
-    label: 'Memory proposals',
-    order: 10,
-    carrier: 'component',
-    matches: ['memory'],
-    component: (props: { section: string }) => <span>memory-form:{props.section}</span>,
-  }))
+  registered.push(
+    extensionRegistry.register({
+      id: 'memory.section',
+      pluginId: 'memory',
+      point: 'context:section',
+      label: 'Memory proposals',
+      order: 10,
+      carrier: 'component',
+      matches: ['memory'],
+      component: (props: { section: string }) => <span>memory-form:{props.section}</span>,
+    }),
+  )
 
 const draw = (element: () => import('solid-js').JSX.Element) => {
   const host = document.createElement('div')

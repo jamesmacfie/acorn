@@ -12,7 +12,8 @@ export const isInlineImageType = (mediaType: string | undefined): boolean =>
   INLINE_IMAGE_TYPES.has(mediaType?.split(';', 1)[0]?.trim().toLowerCase() ?? '')
 
 export const dataUrl = async (bytes: Uint8Array, mediaType: string): Promise<string | null> => {
-  if (bytes.byteLength > MAX_INLINE_IMAGE_BYTES || !isInlineImageType(mediaType) || typeof FileReader === 'undefined') return null
+  if (bytes.byteLength > MAX_INLINE_IMAGE_BYTES || !isInlineImageType(mediaType) || typeof FileReader === 'undefined')
+    return null
   return await new Promise((resolve) => {
     const reader = new FileReader()
     reader.onerror = () => resolve(null)

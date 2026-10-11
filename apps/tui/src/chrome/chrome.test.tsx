@@ -14,7 +14,12 @@ import { registerCommands } from '@acorn/client-core/host/registries/commands'
 import { railMarkerRegistry } from '@acorn/client-core/host/registries/rail'
 import { extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { clearAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
-import { CORE_PANE_POINT, CORE_SOURCE_POINT, type PluginAnnotationKey, type PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
+import {
+  CORE_PANE_POINT,
+  CORE_SOURCE_POINT,
+  type PluginAnnotationKey,
+  type PluginAnnotationMark,
+} from '@acorn/protocol/extensionPoints.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { paneRegistry, type PaneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { keyedRows } from '../kit/showing'
@@ -47,31 +52,63 @@ const registerFixtureCommands = () => {
   return registerCommands([
     { id: 'fixture.group', kind: 'group', title: 'Fixture group', category: 'navigation', palette: true, order: 900 },
     {
-      id: 'fixture.stay', parentId: 'fixture.group', title: 'Stay open and say so', category: 'action',
-      palette: true, order: 100, run: () => ({ effect: 'stay', status: 'Still here.' }),
+      id: 'fixture.stay',
+      parentId: 'fixture.group',
+      title: 'Stay open and say so',
+      category: 'action',
+      palette: true,
+      order: 100,
+      run: () => ({ effect: 'stay', status: 'Still here.' }),
     },
     {
-      id: 'fixture.close', parentId: 'fixture.group', title: 'Close the palette', category: 'action',
-      palette: true, order: 200, run: () => {},
+      id: 'fixture.close',
+      parentId: 'fixture.group',
+      title: 'Close the palette',
+      category: 'action',
+      palette: true,
+      order: 200,
+      run: () => {},
     },
     {
-      id: 'fixture.search', parentId: 'fixture.group', kind: 'search', title: 'Search a list',
-      category: 'navigation', palette: true, order: 300, placeholder: 'Type to narrow the colours…',
-      minQueryLength: 0, debounceMs: 0,
-      query: async (text) => ['amber', 'cyan', 'magenta', 'teal']
-        .filter((colour) => colour.includes(text.trim()))
-        .map((colour) => ({ id: colour, title: colour })),
+      id: 'fixture.search',
+      parentId: 'fixture.group',
+      kind: 'search',
+      title: 'Search a list',
+      category: 'navigation',
+      palette: true,
+      order: 300,
+      placeholder: 'Type to narrow the colours…',
+      minQueryLength: 0,
+      debounceMs: 0,
+      query: async (text) =>
+        ['amber', 'cyan', 'magenta', 'teal']
+          .filter((colour) => colour.includes(text.trim()))
+          .map((colour) => ({ id: colour, title: colour })),
       select: (item) => ({ effect: 'stay', status: `You picked ${item.title}.` }),
     },
     {
-      id: 'fixture.input', parentId: 'fixture.group', kind: 'input', title: 'Say something back',
-      category: 'navigation', palette: true, order: 400, placeholder: 'Type a line and press Enter…',
+      id: 'fixture.input',
+      parentId: 'fixture.group',
+      kind: 'input',
+      title: 'Say something back',
+      category: 'navigation',
+      palette: true,
+      order: 400,
+      placeholder: 'Type a line and press Enter…',
       submit: (text) => ({ effect: 'stay', status: `You said ${text}.` }),
     },
     {
-      id: 'fixture.setting', parentId: 'fixture.group', kind: 'setting', title: 'Volume',
-      category: 'navigation', palette: true, order: 500,
-      options: [{ value: 'loud', label: 'Loud' }, { value: 'quiet', label: 'Quiet' }],
+      id: 'fixture.setting',
+      parentId: 'fixture.group',
+      kind: 'setting',
+      title: 'Volume',
+      category: 'navigation',
+      palette: true,
+      order: 500,
+      options: [
+        { value: 'loud', label: 'Loud' },
+        { value: 'quiet', label: 'Quiet' },
+      ],
       read: async () => volume,
       write: async (value) => (volume = value),
     },
@@ -128,14 +165,15 @@ describe('the shell', () => {
     const registration = railMarkerRegistry.register({
       id: 'fixture-many-markers',
       order: 500,
-      markers: (target) => target.kind === 'task'
-        ? Array.from({ length: 5 }, (_, index) => ({
-          id: `marker-${index}`,
-          label: `Marker ${index + 1}`,
-          dotTone: 'warn' as const,
-          placements: ['top-end', 'top-start', 'bottom-end', 'bottom-start'] as const,
-        }))
-        : [],
+      markers: (target) =>
+        target.kind === 'task'
+          ? Array.from({ length: 5 }, (_, index) => ({
+              id: `marker-${index}`,
+              label: `Marker ${index + 1}`,
+              dotTone: 'warn' as const,
+              placements: ['top-end', 'top-start', 'bottom-end', 'bottom-start'] as const,
+            }))
+          : [],
     })
     const screen = await renderFixture({
       width: 80,
@@ -165,17 +203,22 @@ describe('the shell', () => {
       label: 'Late task markers',
       order: 500,
       carrier: 'items',
-      marks: async () => new Promise<PluginAnnotationMark[]>((resolve) => { answer = resolve }),
+      marks: async () =>
+        new Promise<PluginAnnotationMark[]>((resolve) => {
+          answer = resolve
+        }),
     })
     const screen = await renderFixture({ width: 80, height: 24, pane: 'notes' })
     try {
       // Each count includes Git's uncommitted-changes dot, which the fixture task carries.
       expect(await screen.frame()).not.toContain('+7')
-      answer(Array.from({ length: 6 }, (_, index) => ({
-        key: { task: TASK.id },
-        severity: 'warn' as const,
-        text: `Late marker ${index + 1}`,
-      })))
+      answer(
+        Array.from({ length: 6 }, (_, index) => ({
+          key: { task: TASK.id },
+          severity: 'warn' as const,
+          text: `Late marker ${index + 1}`,
+        })),
+      )
       expect(await screen.until('+7')).toContain('+7')
 
       clearAnnotations()
@@ -187,11 +230,12 @@ describe('the shell', () => {
         label: 'Replacement task markers',
         order: 500,
         carrier: 'items',
-        marks: async () => Array.from({ length: 10 }, (_, index) => ({
-          key: { task: TASK.id },
-          severity: 'info' as const,
-          text: `Replacement marker ${index + 1}`,
-        })),
+        marks: async () =>
+          Array.from({ length: 10 }, (_, index) => ({
+            key: { task: TASK.id },
+            severity: 'info' as const,
+            text: `Replacement marker ${index + 1}`,
+          })),
       })
       expect(await screen.until('+11')).toContain('+11')
     } finally {
@@ -202,12 +246,28 @@ describe('the shell', () => {
 
   it('counts a consenting source’s marks in the Menu and lists every label from its menu key', async () => {
     const registrations = [
-      sourceRegistry.register({ id: 'status-fixture', order: 1, glyph: 'rocket', label: 'Deploys', statusAnnotations: true }),
+      sourceRegistry.register({
+        id: 'status-fixture',
+        order: 1,
+        glyph: 'rocket',
+        label: 'Deploys',
+        statusAnnotations: true,
+      }),
       extensionRegistry.register({
-        id: 'fixture:source-status', pluginId: 'fixture', point: CORE_SOURCE_POINT, label: 'Source status', order: 500, carrier: 'items',
-        marks: async (keys: PluginAnnotationKey[]) => keys.flatMap((key) => Array.from({ length: 5 }, (_, index) => ({
-          key, severity: 'warn' as const, text: `Deploy ${index + 1}`,
-        }))),
+        id: 'fixture:source-status',
+        pluginId: 'fixture',
+        point: CORE_SOURCE_POINT,
+        label: 'Source status',
+        order: 500,
+        carrier: 'items',
+        marks: async (keys: PluginAnnotationKey[]) =>
+          keys.flatMap((key) =>
+            Array.from({ length: 5 }, (_, index) => ({
+              key,
+              severity: 'warn' as const,
+              text: `Deploy ${index + 1}`,
+            })),
+          ),
       }),
     ]
     const screen = await renderFixture({ width: 120, height: 40 })
@@ -228,18 +288,32 @@ describe('the shell', () => {
   it('puts pane markers after the label, lists the shown pane’s, and asks only consenting panes', async () => {
     const asked: PluginAnnotationKey[][] = []
     const pane = (id: string, label: string, statusAnnotations?: boolean) =>
-      paneRegistry.register({ id, label, glyph: 'circle', order: 900, component: () => null, ...(statusAnnotations ? { statusAnnotations } : {}) } as PaneContribution)
+      paneRegistry.register({
+        id,
+        label,
+        glyph: 'circle',
+        order: 900,
+        component: () => null,
+        ...(statusAnnotations ? { statusAnnotations } : {}),
+      } as PaneContribution)
     const registrations = [
       pane('status-pane', 'Checks', true),
       pane('quiet-pane', 'Quiet'),
       railMarkerRegistry.register({
-        id: 'fixture-notes-marker', order: 500,
-        markers: (target) => target.kind === 'pane' && target.id === 'notes'
-          ? [{ id: 'saved', label: 'Saved a minute ago', dotTone: 'ok' as const, placements: ['top-end'] as const }]
-          : [],
+        id: 'fixture-notes-marker',
+        order: 500,
+        markers: (target) =>
+          target.kind === 'pane' && target.id === 'notes'
+            ? [{ id: 'saved', label: 'Saved a minute ago', dotTone: 'ok' as const, placements: ['top-end'] as const }]
+            : [],
       }),
       extensionRegistry.register({
-        id: 'fixture:pane-status', pluginId: 'fixture', point: CORE_PANE_POINT, label: 'Pane status', order: 500, carrier: 'items',
+        id: 'fixture:pane-status',
+        pluginId: 'fixture',
+        point: CORE_PANE_POINT,
+        label: 'Pane status',
+        order: 500,
+        carrier: 'items',
         marks: async (keys: PluginAnnotationKey[]) => {
           asked.push(keys)
           return [
@@ -256,7 +330,12 @@ describe('the shell', () => {
       expect(frame).toContain('Saved a minute ago')
       expect(frame).not.toContain('Quiet +')
       // One batch: the shipped Git pane consents too, and the quiet pane is never asked about.
-      expect(asked).toEqual([[{ paneId: 'git', taskId: TASK.id }, { paneId: 'status-pane', taskId: TASK.id }]])
+      expect(asked).toEqual([
+        [
+          { paneId: 'git', taskId: TASK.id },
+          { paneId: 'status-pane', taskId: TASK.id },
+        ],
+      ])
     } finally {
       screen.done()
       for (const registration of registrations) registration.dispose()
@@ -473,7 +552,8 @@ describe('the shell', () => {
 
     // The rows, as drawn: the key column of every line inside the dialog's frame. `Kbd` pads the key
     // to the widest one and the row has a gap of two, so two spaces end the column.
-    const drawn = frame.split('\n')
+    const drawn = frame
+      .split('\n')
       .filter((line) => line.startsWith('│ '))
       .map((line) => line.slice(2).split(/\s{2,}/)[0] ?? '')
 
@@ -563,11 +643,23 @@ describe('the shell', () => {
   // a node it spawned has printed its boot line, so the whole shell has to be drawable from the
   // persisted cache with nothing on the wire.
   it('draws the whole shell from the persisted cache while the node it started is booting', async () => {
-    const cached: Task[] = [{
-      id: 'task-cached', title: 'from-last-time', projectId: 'project-1', branch: 'from-last-time',
-      origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
-      github: null, worktreePath: null, pullNumber: null,
-    }]
+    const cached: Task[] = [
+      {
+        id: 'task-cached',
+        title: 'from-last-time',
+        projectId: 'project-1',
+        branch: 'from-last-time',
+        origin: 'local',
+        icon: null,
+        status: 'active',
+        links: [],
+        parentId: null,
+        sort: 0,
+        github: null,
+        worktreePath: null,
+        pullNumber: null,
+      },
+    ]
     const screen = await renderFixture({
       width: 100,
       height: 28,
@@ -599,18 +691,25 @@ describe('the shell', () => {
 
   it('keeps a 500-child workflow group bounded and leaves manual siblings visible', async () => {
     const task = (id: string, title: string, parentId: string | null, sort: number, origin: string): Task => ({
-      id, title, projectId: 'project-1', branch: id, origin, icon: null, status: 'active', links: [],
-      parentId, sort, github: null, worktreePath: null, pullNumber: null,
+      id,
+      title,
+      projectId: 'project-1',
+      branch: id,
+      origin,
+      icon: null,
+      status: 'active',
+      links: [],
+      parentId,
+      sort,
+      github: null,
+      worktreePath: null,
+      pullNumber: null,
     })
     const cached = [
       task('phase18-root', 'Phase 18 root', null, 0, 'local'),
-      ...Array.from({ length: 500 }, (_, index) => task(
-        `phase18-child-${index}`,
-        `Workflow child ${index + 1}`,
-        'phase18-root',
-        index + 1,
-        'workflows:child',
-      )),
+      ...Array.from({ length: 500 }, (_, index) =>
+        task(`phase18-child-${index}`, `Workflow child ${index + 1}`, 'phase18-root', index + 1, 'workflows:child'),
+      ),
       task('phase18-manual', 'Manual sibling', null, 502, 'local'),
     ]
     const screen = await renderFixture({
@@ -739,7 +838,9 @@ describe('the rail keeps the rows a change did not touch', () => {
       const rows = keyedRows(orderedTasks, (task) => ({
         key: task.id,
         task,
-        get depth() { return depthByTask().get(task.id) ?? 0 },
+        get depth() {
+          return depthByTask().get(task.id) ?? 0
+        },
       }))
 
       const first = rows()

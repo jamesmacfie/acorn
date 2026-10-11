@@ -35,7 +35,9 @@ const { values } = parseArgs({
   allowPositionals: false,
 })
 if (values.help) {
-  process.stdout.write('Usage: acorn [--node <name|id|https://endpoint>] [--task <id>]\n       acorn --link <acorn://node/place>\n')
+  process.stdout.write(
+    'Usage: acorn [--node <name|id|https://endpoint>] [--task <id>]\n       acorn --link <acorn://node/place>\n',
+  )
   process.exit(0)
 }
 if (values.link !== undefined && (values.task !== undefined || values.node !== undefined)) {
@@ -61,7 +63,11 @@ if (values.link !== undefined) {
 // no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
 // soon as the child is spawned, and the shell draws from the persisted cache while it boots
 // (./node/open.ts, docs/tui/process.md § Attach or start).
-const opened = await openNode(link ? (link.nodeId === 'local' ? undefined : link.nodeId) : values.node, undefined, !link).catch((error: unknown) => {
+const opened = await openNode(
+  link ? (link.nodeId === 'local' ? undefined : link.nodeId) : values.node,
+  undefined,
+  !link,
+).catch((error: unknown) => {
   log.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
@@ -131,7 +137,9 @@ bootMark('cache restored')
 // Loaded plugin bundles wait for the worker factory, which loads after the first frame with the rest
 // of the plugin work (`fillIn` below).
 let pluginWorkersInstalled!: () => void
-const pluginsReady = new Promise<void>((resolve) => { pluginWorkersInstalled = resolve })
+const pluginsReady = new Promise<void>((resolve) => {
+  pluginWorkersInstalled = resolve
+})
 const stopClientRuntime = await startClientRuntime({
   runtime: 'tui',
   client: () => client,
@@ -139,7 +147,7 @@ const stopClientRuntime = await startClientRuntime({
     // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.
     // Without a selected theme, retain the terminal's own palette.
     const id = config.themeFollowSystem ? config.themeLight : config.theme
-    setPalette(paletteFor(id ? themeColorTokens(id) ?? {} : {}, reportsTruecolor()))
+    setPalette(paletteFor(id ? (themeColorTokens(id) ?? {}) : {}, reportsTruecolor()))
   },
   pluginsReady,
 })
@@ -253,7 +261,11 @@ async function fillIn(): Promise<void> {
     // sources need the selected Node's loaded contributions too. A stalled roster read must not
     // keep the terminal on its remembered place forever; after the deadline, the resolver gives a
     // specific unavailable-view refusal if the contribution still has not arrived.
-    if ((link.kind === 'task' && !link.pane) || (link.kind === 'settings' && !link.pageId) || (link.kind === 'project' && !link.rest.length)) {
+    if (
+      (link.kind === 'task' && !link.pane) ||
+      (link.kind === 'settings' && !link.pageId) ||
+      (link.kind === 'project' && !link.rest.length)
+    ) {
       setLinkReady(true)
     } else {
       const { preparePluginContributionsForNode } = await import('@acorn/client-core/host/plugins/reload.ts')
@@ -263,7 +275,9 @@ async function fillIn(): Promise<void> {
           if (opened.starting) await opened.starting.catch(() => undefined)
           await preparePluginContributionsForNode(opened.nodeId)
         })().catch((error: unknown) => log.warn('could not load linked node plugin contributions', error)),
-        new Promise<void>((resolve) => { deadline = setTimeout(resolve, 15_000) }),
+        new Promise<void>((resolve) => {
+          deadline = setTimeout(resolve, 15_000)
+        }),
       ])
       if (deadline) clearTimeout(deadline)
       setLinkReady(true)
@@ -281,7 +295,9 @@ async function fillIn(): Promise<void> {
 // emitter, and the same line held fifty times says nothing the first one did not.
 const heldWarnings = new Set<string>()
 process.removeAllListeners('warning')
-process.on('warning', (warning) => { heldWarnings.add(`${warning.name}: ${warning.message}`) })
+process.on('warning', (warning) => {
+  heldWarnings.add(`${warning.name}: ${warning.message}`)
+})
 // Whether this terminal is the one the reader is looking at, which is the gate's `focused()` and
 // therefore the difference between a notice that lands read and one that raises a banner. The
 // renderer asks for DEC 1004 focus reports and turns `ESC [ I` and `ESC [ O` into these two events.
@@ -290,8 +306,12 @@ process.on('warning', (warning) => { heldWarnings.add(`${warning.name}: ${warnin
 // nothing draws from it. It starts true because unknown counts as focused — a terminal that never
 // answers must not be treated as one nobody is watching (client-core § defaultDeliveryContext).
 let terminalFocused = true
-renderer.on('focus', () => { terminalFocused = true })
-renderer.on('blur', () => { terminalFocused = false })
+renderer.on('focus', () => {
+  terminalFocused = true
+})
+renderer.on('blur', () => {
+  terminalFocused = false
+})
 setHostFocused(() => terminalFocused)
 
 const engine = installKeymap(renderer)
@@ -328,7 +348,15 @@ async function quit(code = 0): Promise<never> {
 // point of the Rectangle contract.
 engine.registerLayer({
   priority: COMMAND,
-  bindings: [{ key: 'ctrl+c', cmd: () => { void quit(); return true } }],
+  bindings: [
+    {
+      key: 'ctrl+c',
+      cmd: () => {
+        void quit()
+        return true
+      },
+    },
+  ],
 })
 // A supervisor's SIGTERM drains the child this process started, which is the whole reason it waits.
 process.once('SIGTERM', () => void quit())
@@ -339,15 +367,17 @@ process.once('SIGTERM', () => void quit())
 // (./chrome/nodeState.ts).
 if (opened.starting) {
   setNodeStarting(true)
-  void opened.starting.then(async () => {
-    await selectActiveNode()
-    await refreshNodeQueries(client)
-    setNodeStarting(false)
-  }).catch((error: unknown) => {
-    setNodeStarting(false)
-    log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
-    void quit(1)
-  })
+  void opened.starting
+    .then(async () => {
+      await selectActiveNode()
+      await refreshNodeQueries(client)
+      setNodeStarting(false)
+    })
+    .catch((error: unknown) => {
+      setNodeStarting(false)
+      log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
+      void quit(1)
+    })
 }
 
 // The tree mounts on the screen's root node rather than on the surface around it

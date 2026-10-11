@@ -7,22 +7,52 @@ import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../data
 import { PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
 import {
-  chromeAction, contextFreeAction, contextMenuDescriptor, emptyStateDescriptor, panelRegion,
-  selectedRowAction, slotDescriptor, sourceDescriptor,
+  chromeAction,
+  contextFreeAction,
+  contextMenuDescriptor,
+  emptyStateDescriptor,
+  panelRegion,
+  selectedRowAction,
+  slotDescriptor,
+  sourceDescriptor,
 } from './manifest/chromeDescriptors.ts'
 import {
-  actionCommandDescriptor, commandCategory, commandDescriptor, groupCommandDescriptor,
-  inputCommandDescriptor, keybindingDescriptor, searchCommandDescriptor, settingCommandDescriptor,
+  actionCommandDescriptor,
+  commandCategory,
+  commandDescriptor,
+  groupCommandDescriptor,
+  inputCommandDescriptor,
+  keybindingDescriptor,
+  searchCommandDescriptor,
+  settingCommandDescriptor,
 } from './manifest/commandDescriptors.ts'
 import {
-  agentContextDescriptor, attentionDescriptor, clientRouteDescriptor, contentLinkDescriptor,
-  nodeStatDescriptor, refResolverDescriptor, styleDescriptor, themeDescriptor,
+  agentContextDescriptor,
+  attentionDescriptor,
+  clientRouteDescriptor,
+  contentLinkDescriptor,
+  nodeStatDescriptor,
+  refResolverDescriptor,
+  styleDescriptor,
+  themeDescriptor,
 } from './manifest/displayDescriptors.ts'
 import { extensionDescriptor, extensionPointDescriptor } from './manifest/extensionDescriptors.ts'
 import { brandMark, entry, ID_RE, nodePermissions } from './manifest/manifestFields.ts'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
-import { auditActionDescriptor, harnessDescriptor, scheduleDescriptor, skillDescriptor, taskCheckDescriptor } from './manifest/runtimeDescriptors.ts'
-import { documentCompletions, documentRegion, documentServiceDescriptor, frameSurface, navigationDestination } from './manifest/surfaces.ts'
+import {
+  auditActionDescriptor,
+  harnessDescriptor,
+  scheduleDescriptor,
+  skillDescriptor,
+  taskCheckDescriptor,
+} from './manifest/runtimeDescriptors.ts'
+import {
+  documentCompletions,
+  documentRegion,
+  documentServiceDescriptor,
+  frameSurface,
+  navigationDestination,
+} from './manifest/surfaces.ts'
 
 // A saved start for a managed session: a harness, the provider options it starts on, text for its
 // system prompt, and a ceiling on acorn's own tools (docs/managed-agents/custom-agents.md § Custom agents). Data
@@ -30,7 +60,11 @@ import { documentCompletions, documentRegion, documentServiceDescriptor, frameSu
 // cannot bring a tool server: a server is a program to run, which is what `agentTools` is for.
 const customAgentDescriptor = z.object({
   // Namespaced by the host into `<pluginId>:<id>` and copied onto every session started from it.
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9-]*$/),
   name: z.string().min(1).max(100),
   glyph: z.string().min(1).max(64).optional(),
   description: z.string().min(1).max(500).optional(),
@@ -39,7 +73,8 @@ const customAgentDescriptor = z.object({
   harness: z.string().min(1).max(130),
   // Provider option id to value, the same table a session default is. A value the harness does not
   // advertise is dropped when the session starts, with a line in the transcript.
-  options: z.record(z.string().min(1).max(200), z.string().max(500))
+  options: z
+    .record(z.string().min(1).max(200), z.string().max(500))
     .refine((value) => Object.keys(value).length <= 20, 'at most 20 options')
     .default({}),
   // Shown in full in the trust prompt, and a changed text asks again.
@@ -112,7 +147,16 @@ const contributions = contributionsShape.prefault({})
 // scope is one this acorn can't grant, which the bridge denies rather than the manifest rejecting.
 const manifestPermissions = z.object({
   api: z.array(z.string().min(1).max(64)).max(64).default([]),
-  events: z.array(z.string().min(1).max(64).regex(/^[a-z][a-z0-9:._-]*$/i)).max(64).default([]),
+  events: z
+    .array(
+      z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[a-z][a-z0-9:._-]*$/i),
+    )
+    .max(64)
+    .default([]),
   node: nodePermissions.prefault({}),
 })
 
@@ -140,7 +184,15 @@ const manifestShape = z.object({
   icon: brandMark.optional(),
   // The plural feeder, for a package that hosts several brands. Keys become the suffix in
   // `brand:<pluginId>/<key>`; the host stamps the prefix, so the key namespace is private to the plugin.
-  icons: z.record(z.string().min(1).max(32).regex(/^[a-z0-9][a-z0-9-]*$/), brandMark)
+  icons: z
+    .record(
+      z
+        .string()
+        .min(1)
+        .max(32)
+        .regex(/^[a-z0-9][a-z0-9-]*$/),
+      brandMark,
+    )
     .refine((marks) => Object.keys(marks).length <= 16, 'too many icons')
     .optional(),
   version: z.string().min(1).max(64),
@@ -148,7 +200,11 @@ const manifestShape = z.object({
   emits: z.array(pluginEmitSchema).max(32).default([]),
   // A range over plugin API majors, not a single number: '3', '2 || 3', '2-4'. Held to the shape
   // here so a typo fails the manifest with a reason instead of loading nowhere (./apiVersion.ts).
-  apiVersion: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),
+  apiVersion: z
+    .string()
+    .min(1)
+    .max(16)
+    .regex(PLUGIN_API_RANGE_RE, 'apiVersion must be a major or a range of majors, such as "3" or "2 || 3"'),
   // What this package needs from the rest of the node before it can work.
   //
   // Without it a plugin that consumes another plugin's capability has no way to say so, and the failure
@@ -159,12 +215,24 @@ const manifestShape = z.object({
   // `version` is a range over the required plugin's major, the same grammar and the same matcher as
   // `apiVersion` above. A plugin's version is its own, so majors are all a dependant can reason about
   // without the two packages sharing a release process.
-  requires: z.object({
-    plugins: z.array(z.object({
-      id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
-      version: z.string().min(1).max(16).regex(PLUGIN_API_RANGE_RE, 'version must be a major or a range of majors, such as "3" or "2 || 3"').optional(),
-    })).max(16).default([]),
-  }).prefault({}),
+  requires: z
+    .object({
+      plugins: z
+        .array(
+          z.object({
+            id: z.string().regex(ID_RE, `plugin id must match ${ID_RE.source}`),
+            version: z
+              .string()
+              .min(1)
+              .max(16)
+              .regex(PLUGIN_API_RANGE_RE, 'version must be a major or a range of majors, such as "3" or "2 || 3"')
+              .optional(),
+          }),
+        )
+        .max(16)
+        .default([]),
+    })
+    .prefault({}),
   node: entry.optional(),
   client: entry.optional(),
   // Loaded-plugin storage is host-opened and host-migrated. The same confinement rule as the code
@@ -255,14 +323,19 @@ export type PluginDocumentRegion = Omit<z.infer<typeof documentRegion>, 'languag
   completions?: PluginDocumentCompletions
 }
 /** A file-language provider as a roster row carries it. `languageId` is re-checked on arrival. */
-export type PluginDocumentService = Omit<z.infer<typeof documentServiceDescriptor>, 'languageId'> & { languageId: string }
+export type PluginDocumentService = Omit<z.infer<typeof documentServiceDescriptor>, 'languageId'> & {
+  languageId: string
+}
 /** What one region holds. The two object kinds carry a `kind` tag so the union stays discriminated;
  *  `'frame'` is a bare string because it has nothing to say beyond its own name. */
 export type PluginPaneRegion =
   | 'frame'
   | { kind: 'remote'; entry: string }
   | ({ kind: 'document' } & PluginDocumentRegion)
-export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'destinations' | 'layout' | 'regions' | 'coreSlot' | 'category' | 'settingsScope'> & {
+export type PluginFrameSurface = Omit<
+  z.infer<typeof frameSurface>,
+  'scope' | 'claimsKeys' | 'destinations' | 'layout' | 'regions' | 'coreSlot' | 'category' | 'settingsScope'
+> & {
   scope?: 'task' | 'project'
   // Wider than the parse: a newer node can know a group or scope this build does not, and the client
   // places the page by its own lists (client-core/host/frames/register.ts).
@@ -333,25 +406,37 @@ export type PluginContextMenuDescriptor = Omit<z.infer<typeof contextMenuDescrip
 // `kind` and `location` are wider than the parse, for the reason the context-menu descriptor gives
 // above: the client re-checks both against its own copy of the vocabulary before registering anything,
 // and a newer node's kind must not be coerced into one this shell has a host for.
-export type PluginExtensionPointDescriptor =
-  & Omit<z.infer<typeof extensionPointDescriptor>, 'kind' | 'location' | 'panels' | 'key' | 'mode' | 'allows' | 'order' | 'max' | 'timeoutMs' | 'onTimeout' | 'collect' | 'mounts'>
-  & {
-    kind: string
-    // `region` is wider for the reason `kind` is: the client re-checks it before mounting anything.
-    mounts?: { surface: string; region: string }[]
-    location?: string
-    panels?: PluginPanelRegion
-    key?: Record<string, string>
-    mode?: string
-    allows?: string[]
-    order?: string
-    // Optional for the reason the projection's header gives: these gained defaults when the kinds
-    // landed, and an older node's roster row carries none of them.
-    max?: number
-    timeoutMs?: number
-    onTimeout?: 'allow' | 'deny'
-    collect?: boolean
-  }
+export type PluginExtensionPointDescriptor = Omit<
+  z.infer<typeof extensionPointDescriptor>,
+  | 'kind'
+  | 'location'
+  | 'panels'
+  | 'key'
+  | 'mode'
+  | 'allows'
+  | 'order'
+  | 'max'
+  | 'timeoutMs'
+  | 'onTimeout'
+  | 'collect'
+  | 'mounts'
+> & {
+  kind: string
+  // `region` is wider for the reason `kind` is: the client re-checks it before mounting anything.
+  mounts?: { surface: string; region: string }[]
+  location?: string
+  panels?: PluginPanelRegion
+  key?: Record<string, string>
+  mode?: string
+  allows?: string[]
+  order?: string
+  // Optional for the reason the projection's header gives: these gained defaults when the kinds
+  // landed, and an older node's roster row carries none of them.
+  max?: number
+  timeoutMs?: number
+  onTimeout?: 'allow' | 'deny'
+  collect?: boolean
+}
 // `mode` is wider than the parse, for the same reason the point's is; `priority` is optional, for the
 // reason the defaulted fields above are.
 export type PluginExtensionDescriptor = Omit<z.infer<typeof extensionDescriptor>, 'mode' | 'priority'> & {

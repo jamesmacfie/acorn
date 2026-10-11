@@ -14,10 +14,13 @@ function canonical(value: unknown, depth: number): string {
   if (Array.isArray(value)) return `[${value.map((entry) => canonical(entry, depth + 1)).join(',')}]`
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>
-    return `{${Object.keys(record).sort().map((key) => {
-      if (record[key] === undefined) throw new Error('The MCP catalogue contains an undefined field.')
-      return `${JSON.stringify(key)}:${canonical(record[key], depth + 1)}`
-    }).join(',')}}`
+    return `{${Object.keys(record)
+      .sort()
+      .map((key) => {
+        if (record[key] === undefined) throw new Error('The MCP catalogue contains an undefined field.')
+        return `${JSON.stringify(key)}:${canonical(record[key], depth + 1)}`
+      })
+      .join(',')}}`
   }
   throw new Error('The MCP catalogue contains an unsupported value.')
 }
@@ -32,9 +35,11 @@ export function mcpCatalogue(tools: unknown[]): McpCatalogue {
   if (tools.length > MAX_TOOLS) throw new Error('The MCP server offers too many tools.')
   const names = new Set<string>()
   for (const tool of tools) {
-    if (!tool || typeof tool !== 'object' || Array.isArray(tool)) throw new Error('The MCP server returned an invalid tool.')
+    if (!tool || typeof tool !== 'object' || Array.isArray(tool))
+      throw new Error('The MCP server returned an invalid tool.')
     const name = (tool as Record<string, unknown>).name
-    if (typeof name !== 'string' || !name || names.has(name)) throw new Error('The MCP server returned a missing or duplicate tool name.')
+    if (typeof name !== 'string' || !name || names.has(name))
+      throw new Error('The MCP server returned a missing or duplicate tool name.')
     names.add(name)
   }
   const bytes = canonical(tools, 0)

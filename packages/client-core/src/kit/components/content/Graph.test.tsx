@@ -11,7 +11,12 @@ import { GRAPH_CARD_H, GRAPH_CARD_W, layoutGraph } from '../../lib/layout/graphL
 
 const diamond = {
   ids: ['a', 'b', 'c', 'd'],
-  edges: [{ from: 'a', to: 'b' }, { from: 'a', to: 'c' }, { from: 'b', to: 'd' }, { from: 'c', to: 'd' }],
+  edges: [
+    { from: 'a', to: 'b' },
+    { from: 'a', to: 'c' },
+    { from: 'b', to: 'd' },
+    { from: 'c', to: 'd' },
+  ],
 }
 
 describe('the layout is deterministic from the edges', () => {
@@ -42,7 +47,13 @@ describe('the layout is deterministic from the edges', () => {
   })
 
   it('does not hang on a cycle', () => {
-    const laid = layoutGraph(['a', 'b'], [{ from: 'a', to: 'b' }, { from: 'b', to: 'a' }])
+    const laid = layoutGraph(
+      ['a', 'b'],
+      [
+        { from: 'a', to: 'b' },
+        { from: 'b', to: 'a' },
+      ],
+    )
     expect(laid.cards).toHaveLength(2)
   })
 
@@ -52,8 +63,7 @@ describe('the layout is deterministic from the edges', () => {
     const positions = { a: { x: 0, y: 0 }, b: { x: 0, y: 152 }, c: { x: 0, y: 304 } }
     const laid = layoutGraph(['a', 'b', 'c'], [{ from: 'a', to: 'c' }], positions)
     const control = laid.edges[0].control
-    const covered = control.y > 152 && control.y < 152 + GRAPH_CARD_H
-      && control.x > 0 && control.x < GRAPH_CARD_W
+    const covered = control.y > 152 && control.y < 152 + GRAPH_CARD_H && control.x > 0 && control.x < GRAPH_CARD_W
     expect(covered).toBe(false)
   })
 })
@@ -100,9 +110,7 @@ describe('the graph a reader touches', () => {
   })
 
   it('marks the selected card and nothing else', () => {
-    mount(() => (
-      <Graph id="g" ariaLabel="Steps" nodes={[nodes[0], { ...nodes[1], selected: true }]} edges={[]} />
-    ))
+    mount(() => <Graph id="g" ariaLabel="Steps" nodes={[nodes[0], { ...nodes[1], selected: true }]} edges={[]} />)
     expect(cards().map((card) => card.hasAttribute('data-selected'))).toEqual([false, true])
   })
 
@@ -146,6 +154,8 @@ describe('the graph a reader touches', () => {
     const sneaky = { class: 'mine', style: 'color: red' } as unknown as Record<string, never>
     mount(() => <Graph id="g" ariaLabel="Steps" nodes={nodes} edges={[]} {...sneaky} />)
     expect(host.querySelector('.mine')).toBe(null)
-    expect([...host.querySelectorAll('*')].every((element) => !element.getAttribute('style')?.includes('red'))).toBe(true)
+    expect([...host.querySelectorAll('*')].every((element) => !element.getAttribute('style')?.includes('red'))).toBe(
+      true,
+    )
   })
 })

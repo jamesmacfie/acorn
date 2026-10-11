@@ -29,16 +29,12 @@ export default function ExtendedPane(props: ExtendedPaneProps) {
             between. Neither can reach into the other. */}
         <div class="extended-pane-frame">
           {props.children}
-          <Show when={props.inlineBesidePointId}>
-            {(pointId) => <InlineSlot point={pointId()} {...scope()} />}
-          </Show>
+          <Show when={props.inlineBesidePointId}>{(pointId) => <InlineSlot point={pointId()} {...scope()} />}</Show>
         </div>
         <Show when={props.detail?.footerPointId}>
           {(pointId) => <DetailRegion point={pointId()} region="footer" subject={props.detail!.subject} />}
         </Show>
-        <Show when={props.inlineBelowPointId}>
-          {(pointId) => <InlineSlot point={pointId()} {...scope()} />}
-        </Show>
+        <Show when={props.inlineBelowPointId}>{(pointId) => <InlineSlot point={pointId()} {...scope()} />}</Show>
         <Show when={props.footerPointId}>{(pointId) => <ExtensionPointHost pointId={pointId()} />}</Show>
       </div>
       {/* Scoped by the point, not by the task: definitions are per-user-per-node and surface-free, so the
@@ -48,8 +44,11 @@ export default function ExtendedPane(props: ExtendedPaneProps) {
       <Show when={props.aside}>
         {(aside) => (
           <aside class="extended-pane-aside">
-            <PanelGrid scope={regionScope(aside().pointId)} region={aside().region}
-              returnLabel={(props.taskId && taskById(props.taskId)?.title) || 'Task'} />
+            <PanelGrid
+              scope={regionScope(aside().pointId)}
+              region={aside().region}
+              returnLabel={(props.taskId && taskById(props.taskId)?.title) || 'Task'}
+            />
           </aside>
         )}
       </Show>

@@ -21,8 +21,10 @@ export function assertBoundedJson(label: string, value: unknown, maxBytes: numbe
 
 export async function validateAgentInputFiles(cwd: string, input: AgentInputPart[]): Promise<void> {
   assertBoundedJson('Agent turn input', input, MAX_AGENT_INPUT_BYTES)
-  const contextBytes = input.reduce((total, part) =>
-    part.type === 'context' ? total + Buffer.byteLength(part.content, 'utf8') : total, 0)
+  const contextBytes = input.reduce(
+    (total, part) => (part.type === 'context' ? total + Buffer.byteLength(part.content, 'utf8') : total),
+    0,
+  )
   if (contextBytes > MAX_AGENT_CONTEXT_BYTES) {
     throw new Error('Acorn context snapshots are limited to 512 KiB per turn.')
   }
@@ -34,9 +36,11 @@ export async function validateAgentInputFiles(cwd: string, input: AgentInputPart
     if (part.type !== 'file') continue
     const confined = await confineExistingFile(cwd, part.path)
     if (!confined.ok) {
-      if (confined.reason === 'absolute') throw new Error(`File mentions must be relative to the task worktree: ${part.path}`)
+      if (confined.reason === 'absolute')
+        throw new Error(`File mentions must be relative to the task worktree: ${part.path}`)
       if (confined.reason === 'escapes') throw new Error(`File mention escapes the task worktree: ${part.path}`)
-      if (confined.reason === 'missing') throw new Error(`Mentioned file does not exist in the task worktree: ${part.path}`)
+      if (confined.reason === 'missing')
+        throw new Error(`Mentioned file does not exist in the task worktree: ${part.path}`)
       throw new Error(`Mentioned path is not a file: ${part.path}`)
     }
     if (part.lineStart && part.lineEnd && part.lineEnd < part.lineStart) {

@@ -1,7 +1,11 @@
 import { z } from 'zod'
 import {
-  commandSettingOptionSchema, MAX_COMMAND_SEARCH_MIN_QUERY, MAX_COMMAND_SEARCH_DEBOUNCE_MS,
-  MAX_COMMAND_SETTING_OPTIONS, MIN_COMMAND_SEARCH_DEBOUNCE_MS, MIN_COMMAND_SETTING_OPTIONS,
+  commandSettingOptionSchema,
+  MAX_COMMAND_SEARCH_MIN_QUERY,
+  MAX_COMMAND_SEARCH_DEBOUNCE_MS,
+  MAX_COMMAND_SETTING_OPTIONS,
+  MIN_COMMAND_SEARCH_DEBOUNCE_MS,
+  MIN_COMMAND_SETTING_OPTIONS,
 } from '../../chrome/commands.ts'
 import { isNormalizedChord, isPluginShortcutChord } from '../../chrome/keybindings.ts'
 import { contextFreeAction, selectedRowAction } from './chromeDescriptors.ts'
@@ -123,13 +127,17 @@ export const commandDescriptor = z.discriminatedUnion('kind', [
 
 export const keybindingDescriptor = z.object({
   command: z.string().min(1).max(64),
-  defaultChord: z.string().min(1).max(64).superRefine((value, ctx) => {
-    if (!isNormalizedChord(value)) {
-      ctx.addIssue({ code: 'custom', message: 'shortcut must use canonical meta+ctrl+alt+shift+key order' })
-    } else if (!isPluginShortcutChord(value)) {
-      ctx.addIssue({ code: 'custom', message: 'plugin shortcuts require meta, ctrl, or alt' })
-    }
-  }),
+  defaultChord: z
+    .string()
+    .min(1)
+    .max(64)
+    .superRefine((value, ctx) => {
+      if (!isNormalizedChord(value)) {
+        ctx.addIssue({ code: 'custom', message: 'shortcut must use canonical meta+ctrl+alt+shift+key order' })
+      } else if (!isPluginShortcutChord(value)) {
+        ctx.addIssue({ code: 'custom', message: 'plugin shortcuts require meta, ctrl, or alt' })
+      }
+    }),
   when: z.enum(['global', 'task', 'surface']),
   surface: z.string().min(1).max(64).optional(),
 })

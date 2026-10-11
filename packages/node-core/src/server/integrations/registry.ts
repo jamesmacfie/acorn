@@ -18,10 +18,14 @@ class IntegrationProviderRegistry {
   register(provider: IntegrationProviderContribution, owner?: string): Disposable {
     if (this.#providers.has(provider.id)) throw new Error(`Duplicate integration provider '${provider.id}'.`)
     if ((provider.capabilities.comments === 'write') !== !!provider.comment) {
-      throw new Error(`Provider '${provider.id}' must declare both \`capabilities.comments: 'write'\` and \`comment\`, or neither.`)
+      throw new Error(
+        `Provider '${provider.id}' must declare both \`capabilities.comments: 'write'\` and \`comment\`, or neither.`,
+      )
     }
     if (provider.image && !provider.detail) {
-      throw new Error(`Provider '${provider.id}' declares \`image\` without \`detail\`, which core reads to check the URL.`)
+      throw new Error(
+        `Provider '${provider.id}' declares \`image\` without \`detail\`, which core reads to check the URL.`,
+      )
     }
     if (provider.capabilities.contextFormat && (!provider.codec || !provider.taskContext)) {
       throw new Error(`Provider '${provider.id}' declares context formatting without a codec and formatter.`)
@@ -31,13 +35,20 @@ class IntegrationProviderRegistry {
     }
     const resourceIds = new Set<string>()
     for (const resource of provider.resources) {
-      if (resourceIds.has(resource.id)) throw new Error(`Provider '${provider.id}' declares duplicate resource '${resource.id}'.`)
+      if (resourceIds.has(resource.id))
+        throw new Error(`Provider '${provider.id}' declares duplicate resource '${resource.id}'.`)
       resourceIds.add(resource.id)
-      if (resource.ttlMs <= 0 || typeof resource.key !== 'function' || typeof resource.read !== 'function' || typeof resource.refresh !== 'function') {
+      if (
+        resource.ttlMs <= 0 ||
+        typeof resource.key !== 'function' ||
+        typeof resource.read !== 'function' ||
+        typeof resource.refresh !== 'function'
+      ) {
         throw new Error(`Provider '${provider.id}' resource '${resource.id}' is not executable.`)
       }
     }
-    if (provider.codec && !provider.conformance) throw new Error(`Provider '${provider.id}' has a codec without conformance fixtures.`)
+    if (provider.codec && !provider.conformance)
+      throw new Error(`Provider '${provider.id}' has a codec without conformance fixtures.`)
     this.#providers.set(provider.id, provider)
     if (owner) this.#owners.set(provider.id, owner)
     return {
@@ -93,7 +104,9 @@ class IntegrationProviderRegistry {
     this.validateContribution(route.providerId, 'Provider route')
     // Keyed by (providerId, prefix): the prefix is namespace-relative now, so two providers may both
     // contribute the empty prefix. Only the same provider doing it twice is a collision.
-    if (this.#routes.some((candidate) => candidate.providerId === route.providerId && candidate.prefix === route.prefix)) {
+    if (
+      this.#routes.some((candidate) => candidate.providerId === route.providerId && candidate.prefix === route.prefix)
+    ) {
       throw new Error(`Duplicate provider route prefix '${route.prefix}' for provider '${route.providerId}'.`)
     }
     this.#routes.push(route)
@@ -110,7 +123,8 @@ class IntegrationProviderRegistry {
   }
 
   validateContribution(providerId: string, kind: string): void {
-    if (!this.#providers.has(providerId)) throw new Error(`${kind} names unregistered integration provider '${providerId}'.`)
+    if (!this.#providers.has(providerId))
+      throw new Error(`${kind} names unregistered integration provider '${providerId}'.`)
   }
 }
 

@@ -7,16 +7,19 @@ const ref: ExternalRef = { providerId: 'rollbar', connectionId: 'conn-1', displa
 
 // See docs/integrations/rollbar.md § Rollbar: why the project source is declared rather than omitted.
 describe('rollbar project source', () => {
-  const connection = (config: string) => ({ id: 'conn-1', label: 'Rollbar · acme', config } as StoredConnection)
+  const connection = (config: string) => ({ id: 'conn-1', label: 'Rollbar · acme', config }) as StoredConnection
 
   it('offers the one project the connection is scoped to', async () => {
-    await expect(rollbarProvider.projects!.list({ connection: connection('{"projectId":"9001"}'), secret: 'unused' }))
-      .resolves.toEqual([{ id: '9001', label: 'Rollbar · acme' }])
+    await expect(
+      rollbarProvider.projects!.list({ connection: connection('{"projectId":"9001"}'), secret: 'unused' }),
+    ).resolves.toEqual([{ id: '9001', label: 'Rollbar · acme' }])
   })
 
   it('offers nothing rather than an invented id when the row carries no project', async () => {
     for (const config of ['{}', 'not json', '{"projectId":42}']) {
-      await expect(rollbarProvider.projects!.list({ connection: connection(config), secret: 'unused' })).resolves.toEqual([])
+      await expect(
+        rollbarProvider.projects!.list({ connection: connection(config), secret: 'unused' }),
+      ).resolves.toEqual([])
     }
   })
 
@@ -29,40 +32,72 @@ describe('rollbar provider cache contract', () => {
   it('rejects malformed cache values and preserves detail on summary refresh', () => {
     expect(rollbarProvider.codec!.parse({ nope: true }, ref)).toEqual({ ok: false, error: 'invalid_rollbar_cache' })
     const detail = { resolvedInVersion: 'abc', assignedTo: 'james' }
-    const summary = { integrationId: 'conn-1', integrationLabel: 'Rollbar · acme', identifier: '142', itemId: '999', url: 'https://rollbar.com/item/999/', title: 'TypeError', level: 'error', environment: 'prod', status: 'active', totalOccurrences: 4, firstOccurrenceAt: 1, lastOccurrenceAt: 3 }
+    const summary = {
+      integrationId: 'conn-1',
+      integrationLabel: 'Rollbar · acme',
+      identifier: '142',
+      itemId: '999',
+      url: 'https://rollbar.com/item/999/',
+      title: 'TypeError',
+      level: 'error',
+      environment: 'prod',
+      status: 'active',
+      totalOccurrences: 4,
+      firstOccurrenceAt: 1,
+      lastOccurrenceAt: 3,
+    }
     const merged = rollbarProvider.codec!.mergeSummary(
       { ref, summary, detail, detailFetchedAt: 10, listFetchedAt: 20, schemaVersion: 4 },
       ref,
       { ...summary, title: 'Updated' },
       30,
     )
-    expect(merged).toMatchObject({ summary: { title: 'Updated' }, detail, detailFetchedAt: 10, listFetchedAt: 30, schemaVersion: 4 })
+    expect(merged).toMatchObject({
+      summary: { title: 'Updated' },
+      detail,
+      detailFetchedAt: 10,
+      listFetchedAt: 30,
+      schemaVersion: 4,
+    })
   })
 })
 
 // Three resource calls, and the two occurrence ones stay soft: an item whose occurrences cannot be
 // listed is still worth handing an agent (docs/agent-tools/tracker-tools.md § issue_detail).
 describe('rollbar item detail', () => {
-  const metadata = { identifier: '142', itemId: '999', title: 'TypeError', level: 'error', environment: 'prod', status: 'active' }
+  const metadata = {
+    identifier: '142',
+    itemId: '999',
+    title: 'TypeError',
+    level: 'error',
+    environment: 'prod',
+    status: 'active',
+  }
 
-  const context = (answers: Record<string, unknown>) => ({
-    resource: async (resourceId: string) =>
-      resourceId in answers ? { ok: true, value: answers[resourceId] } : { ok: false, failure: { error: 'provider_resource_not_found', status: 404 } },
-  }) as never
+  const context = (answers: Record<string, unknown>) =>
+    ({
+      resource: async (resourceId: string) =>
+        resourceId in answers
+          ? { ok: true, value: answers[resourceId] }
+          : { ok: false, failure: { error: 'provider_resource_not_found', status: 404 } },
+    }) as never
 
   it('composes the item with its newest occurrence', async () => {
-    const detail = await rollbarProvider.detail!(context({
-      'rollbar.items': metadata,
-      'rollbar.item-occurrences': { occurrences: [{ id: 'occ-1' }, { id: 'occ-2' }] },
-      'rollbar.occurrence': { id: 'occ-1', framesText: 'at boom()' },
-    }), '142') as { identifier: string; latestOccurrence: { id: string } | null }
+    const detail = (await rollbarProvider.detail!(
+      context({
+        'rollbar.items': metadata,
+        'rollbar.item-occurrences': { occurrences: [{ id: 'occ-1' }, { id: 'occ-2' }] },
+        'rollbar.occurrence': { id: 'occ-1', framesText: 'at boom()' },
+      }),
+      '142',
+    )) as { identifier: string; latestOccurrence: { id: string } | null }
 
     expect(detail.identifier).toBe('142')
     expect(detail.latestOccurrence?.id).toBe('occ-1')
   })
 
   it('still answers when the occurrence list is unavailable', async () => {
-    const detail = await rollbarProvider.detail!(context({ 'rollbar.items': metadata }), '142') as {
+    const detail = (await rollbarProvider.detail!(context({ 'rollbar.items': metadata }), '142')) as {
       identifier: string
       latestOccurrence: unknown
     }

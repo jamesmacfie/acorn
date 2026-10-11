@@ -73,7 +73,11 @@ export const nodeProviderRoutes = new Hono<AppEnv>()
         failures.push({ providerId: provider.qualifiedId, reason: reasonOf(error) })
       }
     }
-    return c.json({ providers: registered.map(nodeProviderDescriptor), nodes, failures } satisfies NodeProvidersResponse)
+    return c.json({
+      providers: registered.map(nodeProviderDescriptor),
+      nodes,
+      failures,
+    } satisfies NodeProvidersResponse)
   })
   // The credential half of adoption, answered to the desktop host and nobody else in practice: the
   // renderer names a provider and a node, and the reply goes to whoever is holding the device-token
@@ -83,7 +87,8 @@ export const nodeProviderRoutes = new Hono<AppEnv>()
     const body = nodeAdoptBodySchema.safeParse(await c.req.json().catch(() => null))
     if (!body.success) return respondError(c, 400, 'bad_request', ['Name a providerId and a providerNodeId.'])
     const provider = nodeProvider(body.data.providerId)
-    if (!provider) return respondError(c, 404, 'not_found', [`No node provider '${body.data.providerId}' on this node.`])
+    if (!provider)
+      return respondError(c, 404, 'not_found', [`No node provider '${body.data.providerId}' on this node.`])
     let listed: ProvidedNodeRecord[]
     try {
       listed = await withTimeout(LIST_TIMEOUT_MS, (signal) => provider.list(signal))
@@ -93,12 +98,15 @@ export const nodeProviderRoutes = new Hono<AppEnv>()
     // Re-listed rather than taken from the request: the caller names a node, and the provider is what
     // says where it is and how to authenticate to it. A caller cannot smuggle in an endpoint.
     const record = listed.find((candidate) => candidate.providerNodeId === body.data.providerNodeId)
-    if (!record) return respondError(c, 404, 'not_found', [`${provider.label} does not list '${body.data.providerNodeId}'.`])
+    if (!record)
+      return respondError(c, 404, 'not_found', [`${provider.label} does not list '${body.data.providerNodeId}'.`])
     if (!record.nodeId || !record.endpoint || !record.fingerprint) {
       return respondError(c, 409, 'conflict', [`${record.label} is ${record.state} and has nothing to connect to yet.`])
     }
     if (!record.enrollment?.deviceToken) {
-      return respondError(c, 409, 'conflict', [`${provider.label} holds no credential for ${record.label}, so it cannot be adopted.`])
+      return respondError(c, 409, 'conflict', [
+        `${provider.label} holds no credential for ${record.label}, so it cannot be adopted.`,
+      ])
     }
     return c.json({
       nodeId: record.nodeId,
@@ -112,7 +120,8 @@ export const nodeProviderRoutes = new Hono<AppEnv>()
     const body = nodeCreateRequestSchema.safeParse(await c.req.json().catch(() => null))
     if (!body.success) return respondError(c, 400, 'bad_request', ['Name a providerId and a label.'])
     const provider = nodeProvider(body.data.providerId)
-    if (!provider?.create) return respondError(c, 404, 'not_found', [`No node provider '${body.data.providerId}' that can create nodes.`])
+    if (!provider?.create)
+      return respondError(c, 404, 'not_found', [`No node provider '${body.data.providerId}' that can create nodes.`])
     const create = provider.create.bind(provider)
     try {
       const record = await withTimeout(MUTATE_TIMEOUT_MS, (signal) =>
@@ -133,7 +142,8 @@ export const nodeProviderRoutes = new Hono<AppEnv>()
     if (!body.success) return respondError(c, 400, 'bad_request', ['Name a providerId and a providerNodeId.'])
     const provider = nodeProvider(body.data.providerId)
     const run = provider?.[verb]?.bind(provider)
-    if (!run) return respondError(c, 404, 'not_found', [`No node provider '${body.data.providerId}' that can ${verb} nodes.`])
+    if (!run)
+      return respondError(c, 404, 'not_found', [`No node provider '${body.data.providerId}' that can ${verb} nodes.`])
     try {
       await withTimeout(MUTATE_TIMEOUT_MS, (signal) => run(body.data.providerNodeId, signal))
       return c.body(null, 204)

@@ -5,7 +5,12 @@ import { logStorageFootprint } from '@acorn/node-core/server/storage'
 import type { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
 import type { LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
-import { loadedPluginBinding, loadExternalPlugins, type InstalledPlugin, type PluginLoadFailure } from '@acorn/node-core/server/plugins'
+import {
+  loadedPluginBinding,
+  loadExternalPlugins,
+  type InstalledPlugin,
+  type PluginLoadFailure,
+} from '@acorn/node-core/server/plugins'
 import { adoptRenamedPluginDb, reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
 import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/server/plugins'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
@@ -46,9 +51,12 @@ export type NodeComposition = {
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
   // The changes plugin became part of git on 2026-10-11. Its review notes move with it, before any
   // plugin opens a database.
-  if (dataDir && adoptRenamedPluginDb(dataDir, 'changes', 'git')) pluginLog.info('moved the changes plugin database to git')
+  if (dataDir && adoptRenamedPluginDb(dataDir, 'changes', 'git'))
+    pluginLog.info('moved the changes plugin database to git')
   const builtins = nodePlugins(dataDir, deps)
-  const { loaded, installed, failures } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
+  const { loaded, installed, failures } = await loadExternalPlugins(dataDir, {
+    builtins: builtins.map((plugin) => plugin.name),
+  })
   // A loaded plugin may replace a built-in of the same id, which is how the loader gets dogfooded
   // (scripts/build-plugin.mjs). Only one of them lands in the graph: the ids are route namespaces and
   // database filenames, and initPlugins rejects a duplicate name outright.
@@ -85,12 +93,16 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
     const bundled = reconcileBundledPlugins(dataDir, bundledRoot)
     preserved.push(...bundled.preserved)
     if (bundled.installed.length || bundled.updated.length) {
-      pluginLog.info(`bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
+      pluginLog.info(
+        `bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`,
+      )
     }
     // Tombstoned outside the package directory so a later app update cannot restore it
     // (docs/plugins/loaded-plugins.md § Loaded plugins).
     if (bundled.removed.length) {
-      pluginLog.info(`bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`)
+      pluginLog.info(
+        `bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`,
+      )
     }
     for (const failure of bundled.failures) {
       pluginLog.error(`bundled ${failure.id} was not reconciled: ${failure.reason}`)
@@ -106,7 +118,9 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
   if (development) {
     // Development only (docs/plugins/loaded-plugins.md § Loaded plugins): for a user this row is correct and
     // permanent, an owner install must never be replaced by a bundled copy.
-    pluginLog.info(`an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`)
+    pluginLog.info(
+      `an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`,
+    )
   }
 }
 

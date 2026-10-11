@@ -6,8 +6,7 @@ import type { LinearProjectIssue } from './api'
 // across connections (docs/integrations/linear.md § Linear).
 export type LinearRailTarget = { connectionId: string; identifier: string }
 
-export const linearRailItemId = (target: LinearRailTarget): string =>
-  railItemId(target.connectionId, target.identifier)
+export const linearRailItemId = (target: LinearRailTarget): string => railItemId(target.connectionId, target.identifier)
 
 export function parseLinearRailItemId(value: string): LinearRailTarget | null {
   const parts = parseRailItemId(value)

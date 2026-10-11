@@ -44,9 +44,10 @@ export function createRouterNavigation(options: {
     tasks: everyTask,
     // The project's name, never its id. A task from another node's project is not in this node's
     // list, and it gets no subtitle rather than a UUID.
-    taskSubtitle: (task) => task.github
-      ? `${task.github.owner}/${task.github.name}`
-      : projects.data?.find((project) => project.id === task.projectId)?.name,
+    taskSubtitle: (task) =>
+      task.github
+        ? `${task.github.owner}/${task.github.name}`
+        : projects.data?.find((project) => project.id === task.projectId)?.name,
     workspaces: () => options.fleetWorkspaces().entries,
     projects: () => (projects.data ?? []).filter((project) => !project.hidden),
     openTask: (row) => {

@@ -25,7 +25,9 @@ export function createProjectOrder(options: {
     const saving = pending()
     if (!saving || saving.workspaceId !== group.workspaceId) return group.projects
     const byId = new Map(group.projects.map((project) => [project.id, project]))
-    return saving.ids.flatMap((id) => byId.get(id) ?? []).concat(group.projects.filter((project) => !saving.ids.includes(project.id)))
+    return saving.ids
+      .flatMap((id) => byId.get(id) ?? [])
+      .concat(group.projects.filter((project) => !saving.ids.includes(project.id)))
   }
 
   async function move(id: string, targetId: string, position: DropTarget['position']) {
@@ -51,8 +53,9 @@ export function createProjectOrder(options: {
       // Index preserves controls across refetches, but a reorder changes which project a slot owns.
       // Follow the moved project so another keyboard move still acts on the same project.
       queueMicrotask(() => {
-        const handle = [...options.table()?.querySelectorAll<HTMLElement>('.ws-project-reorder') ?? []]
-          .find((element) => element.dataset.projectId === id)
+        const handle = [...(options.table()?.querySelectorAll<HTMLElement>('.ws-project-reorder') ?? [])].find(
+          (element) => element.dataset.projectId === id,
+        )
         handle?.querySelector<HTMLButtonElement>('button')?.focus()
       })
     }
@@ -96,14 +99,22 @@ export function createProjectOrder(options: {
       setDragId(gesture.id)
       const selection = document.body.style.userSelect
       document.body.style.userSelect = 'none'
-      restoreSelection = () => { document.body.style.userSelect = selection }
+      restoreSelection = () => {
+        document.body.style.userSelect = selection
+      }
     }
     event.preventDefault()
     const row = document.elementFromPoint(event.clientX, event.clientY)?.closest('tr')
     const handle = row?.querySelector<HTMLElement>('.ws-project-reorder')
     const targetId = handle?.dataset.projectId
     const target = targetId ? groupFor(targetId) : undefined
-    if (!row || !options.table()?.contains(row) || !targetId || targetId === gesture.id || target?.workspaceId !== gesture.workspaceId) {
+    if (
+      !row ||
+      !options.table()?.contains(row) ||
+      !targetId ||
+      targetId === gesture.id ||
+      target?.workspaceId !== gesture.workspaceId
+    ) {
       setDropTarget(undefined)
       return
     }

@@ -16,7 +16,17 @@ export type { PluginsBridge } from './state.ts'
 export type { SearchProvider, SearchQuery } from './search.ts'
 export type { TaskConcern } from './taskChecks.ts'
 export type {
-  CompiledPluginBroadcast, NodePlugin, NodePluginContext, PluginBroadcast,
-  PluginFetchHandler, PluginHookHandler, PluginHookPoint, PluginHookRegistry,
-  PluginProviderResourceRequest, PluginRequestContext, DataSourceInputHandle, DataSourceInputQuery, DataSourceInputOptionsRequest,
+  CompiledPluginBroadcast,
+  NodePlugin,
+  NodePluginContext,
+  PluginBroadcast,
+  PluginFetchHandler,
+  PluginHookHandler,
+  PluginHookPoint,
+  PluginHookRegistry,
+  PluginProviderResourceRequest,
+  PluginRequestContext,
+  DataSourceInputHandle,
+  DataSourceInputQuery,
+  DataSourceInputOptionsRequest,
 } from './types.ts'

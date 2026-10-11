@@ -15,11 +15,19 @@ import {
 import type { WorkflowValidationCatalog } from '../validation/definition'
 
 const base: WorkflowCatalog = {
-  kinds: [{
-    id: 'agent',
-    pluginId: null,
-    describe: { label: 'Ask an agent', description: 'Ask an agent.', icon: 'bot', fields: [], output: { description: 'Answer.' } },
-  }],
+  kinds: [
+    {
+      id: 'agent',
+      pluginId: null,
+      describe: {
+        label: 'Ask an agent',
+        description: 'Ask an agent.',
+        icon: 'bot',
+        fields: [],
+        output: { description: 'Answer.' },
+      },
+    },
+  ],
   policies: [],
   profiles: [{ id: 'claude-code', label: 'Claude Code', managed: true, structured: true }],
 }
@@ -28,7 +36,8 @@ const validation: WorkflowValidationCatalog = {
   stepKinds: new Set(['agent']),
   policies: new Set(),
   profiles: new Set(['claude-code']),
-  structuredProfiles: new Set(['claude-code']), managedProfiles: new Set(['claude-code']),
+  structuredProfiles: new Set(['claude-code']),
+  managedProfiles: new Set(['claude-code']),
 }
 
 describe('the project-scoped workflow catalog', () => {
@@ -59,27 +68,44 @@ describe('the project-scoped workflow catalog', () => {
         baseline: 'acorn-1' as const,
         formatVersion: 1 as const,
         name: 'Review one ticket',
-        inputs: [{ name: 'ticket', schema: { type: 'string' }, description: 'Ticket number', required: true, default: 'SECRET-42' }],
-        outputs: [{
-          name: 'summary',
-          schema: { type: 'object', properties: { summary: { type: 'string' } } },
-          binding: { address: { from: 'step', stepId: 'answer', pointer: '' } },
-        }],
-        steps: [{
-          id: 'answer',
-          name: 'answer',
-          prompt: 'Review it.',
-          schema: {
-            type: 'object',
-            properties: { summary: { type: 'string', examples: ['SECRET-SUMMARY'] } },
+        inputs: [
+          {
+            name: 'ticket',
+            schema: { type: 'string' },
+            description: 'Ticket number',
+            required: true,
+            default: 'SECRET-42',
           },
-        }],
+        ],
+        outputs: [
+          {
+            name: 'summary',
+            schema: { type: 'object', properties: { summary: { type: 'string' } } },
+            binding: { address: { from: 'step', stepId: 'answer', pointer: '' } },
+          },
+        ],
+        steps: [
+          {
+            id: 'answer',
+            name: 'answer',
+            prompt: 'Review it.',
+            schema: {
+              type: 'object',
+              properties: { summary: { type: 'string', examples: ['SECRET-SUMMARY'] } },
+            },
+          },
+        ],
       },
     })
     await createDef(store.db, {
       workspaceId: 'workspace-1',
       projectId: 'project-2',
-      def: { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Other project', steps: [{ id: 'work', name: 'work', prompt: 'Work.' }] },
+      def: {
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
+        name: 'Other project',
+        steps: [{ id: 'work', name: 'work', prompt: 'Work.' }],
+      },
     })
     await createDef(store.db, {
       workspaceId: 'workspace-1',
@@ -91,17 +117,26 @@ describe('the project-scoped workflow catalog', () => {
       projectId: 'project-1',
       def: {
         baseline: 'acorn-1' as const,
-        formatVersion: 1 as const, name: 'Parent workflow',
-        steps: [{
-          id: 'child',
-          name: 'child',
-          kind: 'workflow',
-          childWorkflow: { ref: { source: 'database', id: row.id } },
-        }],
+        formatVersion: 1 as const,
+        name: 'Parent workflow',
+        steps: [
+          {
+            id: 'child',
+            name: 'child',
+            kind: 'workflow',
+            childWorkflow: { ref: { source: 'database', id: row.id } },
+          },
+        ],
       },
     })
-    writeFileSync(join(repoDir, '.acorn', 'workflows', 'repo-review.toml'), 'format_version = 1\nbaseline = "acorn-1"\nname = "Repo review"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
-    writeFileSync(join(userDir, '.acorn', 'workflows', 'personal.toml'), 'format_version = 1\nbaseline = "acorn-1"\nname = "Personal"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n')
+    writeFileSync(
+      join(repoDir, '.acorn', 'workflows', 'repo-review.toml'),
+      'format_version = 1\nbaseline = "acorn-1"\nname = "Repo review"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n',
+    )
+    writeFileSync(
+      join(userDir, '.acorn', 'workflows', 'personal.toml'),
+      'format_version = 1\nbaseline = "acorn-1"\nname = "Personal"\n[[steps]]\nid = "work"\nname = "work"\nprompt = "Review."\n',
+    )
 
     const catalog = await scopedWorkflowCatalog({
       db: store.db,
@@ -113,13 +148,28 @@ describe('the project-scoped workflow catalog', () => {
       validation,
     })
 
-    expect(catalog.workflows?.map((target) => target.name)).toEqual(['Invalid draft', 'Personal', 'Repo review', 'Review one ticket'])
-    expect(catalog.workflows).toContainEqual(expect.objectContaining({
-      ref: { source: 'database', id: row.id },
-      published: true,
-      inputs: [{ name: 'ticket', schema: { type: 'string' }, description: 'Ticket number', required: true, hasDefault: true }],
-      outputs: [{ name: 'summary', schema: { type: 'object', properties: { summary: { type: 'string' } } } }],
-    }))
+    expect(catalog.workflows?.map((target) => target.name)).toEqual([
+      'Invalid draft',
+      'Personal',
+      'Repo review',
+      'Review one ticket',
+    ])
+    expect(catalog.workflows).toContainEqual(
+      expect.objectContaining({
+        ref: { source: 'database', id: row.id },
+        published: true,
+        inputs: [
+          {
+            name: 'ticket',
+            schema: { type: 'string' },
+            description: 'Ticket number',
+            required: true,
+            hasDefault: true,
+          },
+        ],
+        outputs: [{ name: 'summary', schema: { type: 'object', properties: { summary: { type: 'string' } } } }],
+      }),
+    )
     expect(catalog.workflows).toContainEqual(expect.objectContaining({ name: 'Invalid draft', published: true }))
     expect(JSON.stringify(catalog)).not.toContain('SECRET-42')
     expect(JSON.stringify(catalog)).not.toContain('Review it.')
@@ -133,7 +183,9 @@ describe('the project-scoped workflow catalog', () => {
     }))
     const catalog = generationWorkflowCatalog({ ...base, workflows }, 'row-3')
     expect(catalog.workflows).toHaveLength(GENERATE_MAX_WORKFLOW_TARGETS)
-    expect(catalog.workflows?.some((target) => target.ref.source === 'database' && target.ref.id === 'row-3')).toBe(false)
+    expect(catalog.workflows?.some((target) => target.ref.source === 'database' && target.ref.id === 'row-3')).toBe(
+      false,
+    )
     expect(JSON.stringify(catalog.workflows).length).toBeLessThanOrEqual(GENERATE_MAX_WORKFLOW_CATALOG_JSON_CHARS)
   })
 
@@ -160,14 +212,18 @@ describe('the project-scoped workflow catalog', () => {
       validation,
     })
 
-    expect(catalog.workflows).toContainEqual(expect.objectContaining({
-      ref: { source: 'database', id: draft.id },
-      name: 'New record reviewer',
-      published: false,
-      inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
-    }))
-    expect(generationWorkflowCatalog(catalog).workflows).not.toContainEqual(expect.objectContaining({
-      ref: { source: 'database', id: draft.id },
-    }))
+    expect(catalog.workflows).toContainEqual(
+      expect.objectContaining({
+        ref: { source: 'database', id: draft.id },
+        name: 'New record reviewer',
+        published: false,
+        inputs: [{ name: 'record', schema: { type: 'object' }, required: true }],
+      }),
+    )
+    expect(generationWorkflowCatalog(catalog).workflows).not.toContainEqual(
+      expect.objectContaining({
+        ref: { source: 'database', id: draft.id },
+      }),
+    )
   })
 })

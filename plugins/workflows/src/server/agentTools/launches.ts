@@ -12,14 +12,24 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { AgentSettledTurn, AgentToolCaller } from '@acorn/plugin-agents/contract/toolCaller.ts'
 import type { AgentTurnsCapability } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import { workflowAgentLaunches, workflowRuns } from '../../node/schema'
-import type { ResolvedWorkflowGraph, ToolCeiling, WorkflowBudget, WorkflowDefinitionRef } from '../../shared/workflowContracts'
+import type {
+  ResolvedWorkflowGraph,
+  ToolCeiling,
+  WorkflowBudget,
+  WorkflowDefinitionRef,
+} from '../../shared/workflowContracts'
 import type { WorkflowInvocationLimits } from '../../shared/workflowInvocation'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
 import { intersectToolCeilings } from '../steps/tools'
 import { WorkflowValidationError } from '../validation/definition'
 import { requireManagedCaller, type CallerLookup } from './caller'
 import { definitionKey, requireTaskScope, type WorkflowToolDeps } from './discovery'
-import { definitionIdForKey, executableGraphDigest, type PrepareInvocation, type WorkflowInvocationPolicies } from './invocation'
+import {
+  definitionIdForKey,
+  executableGraphDigest,
+  type PrepareInvocation,
+  type WorkflowInvocationPolicies,
+} from './invocation'
 
 type LaunchRow = typeof workflowAgentLaunches.$inferSelect
 export type LaunchState = 'awaiting-caller' | 'started' | 'failed' | 'cancelled'
@@ -28,14 +38,23 @@ export const ACTIVE_RUN_STATUSES = ['running', 'gated', 'cancelling'] as const
 const BUSY_TURN = new Set(['queued', 'dispatching', 'active'])
 
 export type WorkflowRunTarget = { kind: 'workflow-run'; resourceId: string; taskId: string }
-export const runTarget = (runId: string, taskId: string): WorkflowRunTarget => ({ kind: 'workflow-run', resourceId: runId, taskId })
+export const runTarget = (runId: string, taskId: string): WorkflowRunTarget => ({
+  kind: 'workflow-run',
+  resourceId: runId,
+  taskId,
+})
 
 export type WorkflowLaunchDeps = WorkflowToolDeps & {
   policies: WorkflowInvocationPolicies
   prepare: PrepareInvocation
   startLaunch(request: {
-    taskId: string; graph: ResolvedWorkflowGraph; intendedRunId: string; callerKey: string
-    payloadFingerprint: string; effectiveBudget: WorkflowBudget; effectiveTools: ToolCeiling
+    taskId: string
+    graph: ResolvedWorkflowGraph
+    intendedRunId: string
+    callerKey: string
+    payloadFingerprint: string
+    effectiveBudget: WorkflowBudget
+    effectiveTools: ToolCeiling
   }): Promise<string>
   cancelRun(runId: string): Promise<void>
   caller: CallerLookup
@@ -77,22 +96,35 @@ export class WorkflowAgentLaunches {
   }
 
   bySession(taskId: string, sessionId: string): LaunchRow[] {
-    return this.deps.db.select().from(workflowAgentLaunches)
-      .where(and(eq(workflowAgentLaunches.taskId, taskId), eq(workflowAgentLaunches.sessionId, sessionId))).all()
+    return this.deps.db
+      .select()
+      .from(workflowAgentLaunches)
+      .where(and(eq(workflowAgentLaunches.taskId, taskId), eq(workflowAgentLaunches.sessionId, sessionId)))
+      .all()
   }
 
   /** Starts this session has spent against a policy. A failed dispatch never started, so it is free;
    *  a completed or cancelled run stays spent. */
   spent(sessionId: string, policyId: string): number {
-    return this.deps.db.select({ id: workflowAgentLaunches.id }).from(workflowAgentLaunches)
-      .where(and(eq(workflowAgentLaunches.sessionId, sessionId), eq(workflowAgentLaunches.policyId, policyId), ne(workflowAgentLaunches.state, 'failed'))).all().length
+    return this.deps.db
+      .select({ id: workflowAgentLaunches.id })
+      .from(workflowAgentLaunches)
+      .where(
+        and(
+          eq(workflowAgentLaunches.sessionId, sessionId),
+          eq(workflowAgentLaunches.policyId, policyId),
+          ne(workflowAgentLaunches.state, 'failed'),
+        ),
+      )
+      .all().length
   }
 
   /** For workflows_list: whether this session could start the definition, as far as can be told
    *  without resolving its graph. A changed dependency still surfaces at workflow_run. */
   readiness(projectId: string, definitionKey: string, digest: string | undefined, sessionId: string | undefined) {
     const policy = this.deps.policies.find(projectId, definitionKey)
-    if (!policy || policy.state !== 'active') return { allowed: false, reason: 'The owner has not allowed agents to start it.' }
+    if (!policy || policy.state !== 'active')
+      return { allowed: false, reason: 'The owner has not allowed agents to start it.' }
     if (digest !== policy.definitionDigest) return { allowed: false, reason: 'It changed since the owner approved it.' }
     return {
       allowed: true,
@@ -107,10 +139,15 @@ export class WorkflowAgentLaunches {
     const caller = await requireManagedCaller(this.deps.caller, context)
     // Nested execution goes through declared child workflow steps, which keep their ancestor's
     // accounting. A step's own session never starts a fresh root.
-    if (caller.workflowOwned) throw new ToolError('not_found', 'A workflow step cannot start a workflow. Use a child workflow step instead.')
+    if (caller.workflowOwned)
+      throw new ToolError('not_found', 'A workflow step cannot start a workflow. Use a child workflow step instead.')
     // The allowance is per session, so a spawned child would bring fresh starts with it. Only a
     // session the person talks to starts workflows.
-    if (caller.delegated) throw new ToolError('not_found', 'An agent another agent started cannot start a workflow. Ask the agent that started you.')
+    if (caller.delegated)
+      throw new ToolError(
+        'not_found',
+        'An agent another agent started cannot start a workflow. Ask the agent that started you.',
+      )
     if (!context.callId) throw new ToolError('bad_request', 'workflow_run needs a stable tool call ID.')
     const key = `${context.taskId}:${caller.sessionId}:workflow_run:${context.callId}`
     const running = this.inFlight.get(key)
@@ -125,7 +162,11 @@ export class WorkflowAgentLaunches {
     const prior = this.admitting.get(taskId) ?? Promise.resolve()
     const next = prior.catch(() => undefined).then(work)
     this.admitting.set(taskId, next)
-    try { return await next } finally { if (this.admitting.get(taskId) === next) this.admitting.delete(taskId) }
+    try {
+      return await next
+    } finally {
+      if (this.admitting.get(taskId) === next) this.admitting.delete(taskId)
+    }
   }
 
   private async admit(key: string, input: WorkflowRunInput, caller: AgentToolCaller, context: ToolContext) {
@@ -134,7 +175,8 @@ export class WorkflowAgentLaunches {
     const existing = db.select().from(workflowAgentLaunches).where(eq(workflowAgentLaunches.key, key)).get()
     // A replay answers with the admitted snapshot, even if the definition changed since.
     if (existing) {
-      if (existing.payloadFingerprint !== fingerprint) throw new ToolError('conflict', 'This tool call ID was already used to start a workflow with different inputs.')
+      if (existing.payloadFingerprint !== fingerprint)
+        throw new ToolError('conflict', 'This tool call ID was already used to start a workflow with different inputs.')
       return this.answer(existing)
     }
 
@@ -142,38 +184,74 @@ export class WorkflowAgentLaunches {
     const target = definitionKey(input.ref)
     const policy = this.deps.policies.find(scope.projectId, target)
     if (!policy || policy.state !== 'active') {
-      throw new ToolError('needs-trust', 'The owner has not allowed agents to start this workflow in this project. Ask them to open it in the workflow editor and choose Allow agent invocation.')
+      throw new ToolError(
+        'needs-trust',
+        'The owner has not allowed agents to start this workflow in this project. Ask them to open it in the workflow editor and choose Allow agent invocation.',
+      )
     }
     const read = await this.deps.policies.definitionDigest(scope, target).catch(() => null)
-    if (read !== input.digest) throw new ToolError('conflict', 'The workflow changed since you read it. Read it again with workflows_list, then start it with the new digest.')
+    if (read !== input.digest)
+      throw new ToolError(
+        'conflict',
+        'The workflow changed since you read it. Read it again with workflows_list, then start it with the new digest.',
+      )
     // The graph digest below leaves the root's input values out, because a caller supplies some of
     // them. The definition digest covers the root's defaults, so a changed default needs approval too.
     if (read !== policy.definitionDigest) {
-      throw new ToolError('needs-trust', 'The workflow changed since the owner approved it. Ask the owner to review agent invocation again.')
+      throw new ToolError(
+        'needs-trust',
+        'The workflow changed since the owner approved it. Ask the owner to review agent invocation again.',
+      )
     }
     const refused = Object.keys(input.inputs ?? {}).filter((name) => !policy.callerInputs.includes(name))
     if (refused.length) {
-      throw new ToolError('bad_request', `The owner has not let agents set ${refused.map((name) => `'${name}'`).join(', ')}. `
-        + (policy.callerInputs.length ? `You may set: ${policy.callerInputs.join(', ')}.` : 'This workflow takes no inputs from agents.'))
+      throw new ToolError(
+        'bad_request',
+        `The owner has not let agents set ${refused.map((name) => `'${name}'`).join(', ')}. ` +
+          (policy.callerInputs.length
+            ? `You may set: ${policy.callerInputs.join(', ')}.`
+            : 'This workflow takes no inputs from agents.'),
+      )
     }
     const used = this.spent(caller.sessionId, policy.id)
     if (used >= policy.startsPerSession) {
-      throw new ToolError('conflict', `This session has used all ${policy.startsPerSession} starts the owner allowed for this workflow.`)
+      throw new ToolError(
+        'conflict',
+        `This session has used all ${policy.startsPerSession} starts the owner allowed for this workflow.`,
+      )
     }
     const busy = await this.activeInCheckout(context.taskId)
-    if (busy) throw new ToolError('conflict', `Workflow run ${busy} is already active in this checkout. Wait for it to finish; the person can open it in the run pane.`)
+    if (busy)
+      throw new ToolError(
+        'conflict',
+        `Workflow run ${busy} is already active in this checkout. Wait for it to finish; the person can open it in the run pane.`,
+      )
 
     let graph: ResolvedWorkflowGraph
     try {
-      graph = (await this.deps.prepare({ taskId: context.taskId }, definitionIdForKey(target), { ...input.inputs, ...policy.fixedInputs }, 'start')).graph
+      graph = (
+        await this.deps.prepare(
+          { taskId: context.taskId },
+          definitionIdForKey(target),
+          { ...input.inputs, ...policy.fixedInputs },
+          'start',
+        )
+      ).graph
     } catch (error) {
-      if (isRepoConfigTrustError(error)) throw new ToolError('needs-trust', "This workflow's repository files changed and need the owner's trust review before it can run.")
+      if (isRepoConfigTrustError(error))
+        throw new ToolError(
+          'needs-trust',
+          "This workflow's repository files changed and need the owner's trust review before it can run.",
+        )
       if (error instanceof WorkflowValidationError) throw new ToolError('bad_request', error.message)
       throw new ToolError('failed', error instanceof Error ? error.message : 'The workflow could not be prepared.')
     }
     const graphDigest = executableGraphDigest(graph)
     if (graphDigest !== policy.graphDigest) {
-      throw new ToolError('needs-trust', 'The workflow or one of its dependencies changed since the owner approved it. Ask the owner to review agent invocation again.')
+      throw new ToolError(
+        'needs-trust',
+        'The workflow or one of its dependencies changed since the owner approved it. Ask the owner to review agent invocation again.',
+      )
     }
 
     const at = Date.now()
@@ -212,17 +290,28 @@ export class WorkflowAgentLaunches {
 
   /** What `workflow_run` returns, for a new launch and a replay alike. */
   answer(row: LaunchRow) {
-    const run = this.deps.db.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, row.id)).get()
+    const run = this.deps.db
+      .select({ status: workflowRuns.status })
+      .from(workflowRuns)
+      .where(eq(workflowRuns.id, row.id))
+      .get()
     const policy = this.deps.policies.byId(row.policyId)
     const effective = JSON.parse(row.effectiveJson) as { budget: WorkflowBudget; tools: ToolCeiling }
     return {
       runId: row.id,
       status: run?.status ?? (row.state === 'failed' ? 'not-started' : row.state),
-      ...(row.state === 'awaiting-caller' ? { next: 'The run starts after this turn ends. End your turn now; the person can watch it in the run pane.' } : {}),
+      ...(row.state === 'awaiting-caller'
+        ? { next: 'The run starts after this turn ends. End your turn now; the person can watch it in the run pane.' }
+        : {}),
       ...(row.error ? { error: row.error } : {}),
       effective,
       allowance: { used: this.spent(row.sessionId, row.policyId), limit: policy?.startsPerSession ?? null },
-      receipt: { launchId: row.id, definition: row.definitionKey, graphDigest: row.graphDigest, admittedAt: row.createdAt },
+      receipt: {
+        launchId: row.id,
+        definition: row.definitionKey,
+        graphDigest: row.graphDigest,
+        admittedAt: row.createdAt,
+      },
       target: runTarget(row.id, row.taskId),
     }
   }
@@ -231,13 +320,22 @@ export class WorkflowAgentLaunches {
   private async activeInCheckout(taskId: string, except?: string): Promise<string | null> {
     const db = this.deps.db
     const candidates = [
-      ...db.select({ id: workflowRuns.id, taskId: workflowRuns.taskId }).from(workflowRuns).where(inArray(workflowRuns.status, [...ACTIVE_RUN_STATUSES])).all(),
-      ...db.select({ id: workflowAgentLaunches.id, taskId: workflowAgentLaunches.taskId }).from(workflowAgentLaunches).where(eq(workflowAgentLaunches.state, 'awaiting-caller')).all(),
+      ...db
+        .select({ id: workflowRuns.id, taskId: workflowRuns.taskId })
+        .from(workflowRuns)
+        .where(inArray(workflowRuns.status, [...ACTIVE_RUN_STATUSES]))
+        .all(),
+      ...db
+        .select({ id: workflowAgentLaunches.id, taskId: workflowAgentLaunches.taskId })
+        .from(workflowAgentLaunches)
+        .where(eq(workflowAgentLaunches.state, 'awaiting-caller'))
+        .all(),
     ].filter((candidate) => candidate.id !== except)
     if (!candidates.length) return null
     const path = await this.deps.checkoutPath(taskId)
     for (const candidate of candidates) {
-      if (candidate.taskId === taskId || (path && await this.deps.checkoutPath(candidate.taskId) === path)) return candidate.id
+      if (candidate.taskId === taskId || (path && (await this.deps.checkoutPath(candidate.taskId)) === path))
+        return candidate.id
     }
     return null
   }
@@ -249,25 +347,35 @@ export class WorkflowAgentLaunches {
     const prior = this.settling.get(id) ?? Promise.resolve()
     const next = prior.catch(() => undefined).then(() => this.settleOnce(id))
     this.settling.set(id, next)
-    void next.finally(() => { if (this.settling.get(id) === next) this.settling.delete(id) }).catch(() => undefined)
+    void next
+      .finally(() => {
+        if (this.settling.get(id) === next) this.settling.delete(id)
+      })
+      .catch(() => undefined)
     return next
   }
 
   private setState(id: string, state: LaunchState, error: string | null = null): void {
-    this.deps.db.update(workflowAgentLaunches).set({ state, error, updatedAt: Date.now() }).where(eq(workflowAgentLaunches.id, id)).run()
+    this.deps.db
+      .update(workflowAgentLaunches)
+      .set({ state, error, updatedAt: Date.now() })
+      .where(eq(workflowAgentLaunches.id, id))
+      .run()
   }
 
   private async settleOnce(id: string): Promise<void> {
     const launch = this.get(id)
     if (!launch || launch.state !== 'awaiting-caller') return
     // A restart between creating the run and recording it.
-    if (this.deps.db.select({ id: workflowRuns.id }).from(workflowRuns).where(eq(workflowRuns.id, id)).get()) return this.setState(id, 'started')
+    if (this.deps.db.select({ id: workflowRuns.id }).from(workflowRuns).where(eq(workflowRuns.id, id)).get())
+      return this.setState(id, 'started')
     const turns = this.deps.turns()
     // Without the Agents plugin nobody can say the caller settled, so the launch keeps waiting.
     if (!turns) return
     const own = await turns.list({ taskId: launch.taskId, sessionId: launch.sessionId })
     const launching = launch.callerTurnId ? own.find((turn) => turn.turnId === launch.callerTurnId) : undefined
-    if (launching?.status === 'cancelled') return this.setState(id, 'cancelled', 'Stopped with the turn that started it.')
+    if (launching?.status === 'cancelled')
+      return this.setState(id, 'cancelled', 'Stopped with the turn that started it.')
     // The caller is working, either still in the launching turn or in a newer one. The next settled
     // turn tries again, so a caller that never settles never starts the work.
     if (own.some((turn) => BUSY_TURN.has(turn.status))) return
@@ -298,7 +406,9 @@ export class WorkflowAgentLaunches {
     } catch (error) {
       const message = isRepoConfigTrustError(error)
         ? "The workflow's repository files need the owner's trust review."
-        : error instanceof Error ? error.message : 'The workflow could not start.'
+        : error instanceof Error
+          ? error.message
+          : 'The workflow could not start.'
       this.setState(launch.id, 'failed', message)
       this.deps.warn(`agent-launched workflow ${launch.id} did not start: ${message}`)
     }
@@ -320,15 +430,26 @@ export class WorkflowAgentLaunches {
 
   /** After a restart, every launch still waiting is checked once; events cover the rest. */
   async reconcile(): Promise<void> {
-    const waiting = this.deps.db.select({ id: workflowAgentLaunches.id }).from(workflowAgentLaunches)
-      .where(eq(workflowAgentLaunches.state, 'awaiting-caller')).all()
+    const waiting = this.deps.db
+      .select({ id: workflowAgentLaunches.id })
+      .from(workflowAgentLaunches)
+      .where(eq(workflowAgentLaunches.state, 'awaiting-caller'))
+      .all()
     for (const { id } of waiting) {
-      await this.settle(id).catch((error) => this.deps.warn(`agent launch ${id} could not be checked: ${error instanceof Error ? error.message : String(error)}`))
+      await this.settle(id).catch((error) =>
+        this.deps.warn(
+          `agent launch ${id} could not be checked: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+      )
     }
   }
 
   private async cancelIfActive(runId: string): Promise<void> {
-    const run = this.deps.db.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, runId)).get()
+    const run = this.deps.db
+      .select({ status: workflowRuns.status })
+      .from(workflowRuns)
+      .where(eq(workflowRuns.id, runId))
+      .get()
     if (run && (ACTIVE_RUN_STATUSES as readonly string[]).includes(run.status)) await this.deps.cancelRun(runId)
   }
 
@@ -341,10 +462,22 @@ export class WorkflowAgentLaunches {
     if (!launch || launch.sessionId !== caller.sessionId || launch.taskId !== context.taskId) {
       throw new ToolError('not_found', 'No run this session started has that ID.')
     }
-    if (launch.state === 'awaiting-caller') this.setState(launch.id, 'cancelled', 'Cancelled by the agent that started it.')
+    if (launch.state === 'awaiting-caller')
+      this.setState(launch.id, 'cancelled', 'Cancelled by the agent that started it.')
     else if (launch.state === 'started') await this.cancelIfActive(launch.id)
-    this.deps.audit('agent-run-cancelled', { subject: launch.id, details: { taskId: launch.taskId, sessionId: launch.sessionId } })
-    const run = this.deps.db.select({ status: workflowRuns.status }).from(workflowRuns).where(eq(workflowRuns.id, launch.id)).get()
-    return { runId: launch.id, status: run?.status ?? this.get(launch.id)!.state, target: runTarget(launch.id, launch.taskId) }
+    this.deps.audit('agent-run-cancelled', {
+      subject: launch.id,
+      details: { taskId: launch.taskId, sessionId: launch.sessionId },
+    })
+    const run = this.deps.db
+      .select({ status: workflowRuns.status })
+      .from(workflowRuns)
+      .where(eq(workflowRuns.id, launch.id))
+      .get()
+    return {
+      runId: launch.id,
+      status: run?.status ?? this.get(launch.id)!.state,
+      target: runTarget(launch.id, launch.taskId),
+    }
   }
 }

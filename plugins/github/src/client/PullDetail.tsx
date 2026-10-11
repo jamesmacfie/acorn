@@ -44,7 +44,8 @@ export default function PullDetail() {
   // Keyed, because `DiffForPull` reads its route once and `Sections` renders the diff once. Without a
   // new mount per pull, picking #44 after #42 left #42's diff on screen.
   const diffRoute = createMemo<PullRoute | null>(
-    () => (ready() ? { owner: owner(), repo: repo(), number: number(), key: routeKey(owner(), repo(), number()) } : null),
+    () =>
+      ready() ? { owner: owner(), repo: repo(), number: number(), key: routeKey(owner(), repo(), number()) } : null,
     null,
     { equals: (a, b) => a?.key === b?.key },
   )
@@ -76,8 +77,18 @@ export default function PullDetail() {
 
   return (
     <Show when={number()} fallback={<EmptyState title="Choose a pull request" />}>
-      <Show when={ready() || !projects.data} fallback={<EmptyState title={`Couldn't find pull request #${number()}`} />}>
-        <Show when={model()} fallback={<EmptyState align="start" size="sm" busy>Loading…</EmptyState>}>
+      <Show
+        when={ready() || !projects.data}
+        fallback={<EmptyState title={`Couldn't find pull request #${number()}`} />}
+      >
+        <Show
+          when={model()}
+          fallback={
+            <EmptyState align="start" size="sm" busy>
+              Loading…
+            </EmptyState>
+          }
+        >
           {(loaded) => (
             <Show
               when={loaded().pull()}
@@ -105,10 +116,18 @@ export default function PullDetail() {
                   id: 'diff',
                   label: 'Diff',
                   actions: () => (
-                    <IconButton icon="refresh-cw" tip="Refresh pull request" label="Refresh pull request" busy={refreshing()} onPress={() => void refresh()} />
+                    <IconButton
+                      icon="refresh-cw"
+                      tip="Refresh pull request"
+                      label="Refresh pull request"
+                      busy={refreshing()}
+                      onPress={() => void refresh()}
+                    />
                   ),
                   render: () => (
-                    <Show when={diffRoute()} keyed>{(route) => <DiffForPull route={route} router />}</Show>
+                    <Show when={diffRoute()} keyed>
+                      {(route) => <DiffForPull route={route} router />}
+                    </Show>
                   ),
                 }}
               />

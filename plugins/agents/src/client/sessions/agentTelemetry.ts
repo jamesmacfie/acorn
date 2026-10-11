@@ -21,8 +21,13 @@ export function startAgentView(name: string) {
     ready: () => {
       if (done || scheduled) return
       scheduled = true
-      if (typeof requestAnimationFrame !== 'function') { finish('ready'); return }
-      frame = requestAnimationFrame(() => { frame = requestAnimationFrame(() => finish('ready')) })
+      if (typeof requestAnimationFrame !== 'function') {
+        finish('ready')
+        return
+      }
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => finish('ready'))
+      })
     },
     fail: () => finish('error'),
     dispose: () => finish('cancelled'),

@@ -53,7 +53,12 @@ const detailAttrs = (detail: unknown): TelemetryAttrs => {
  * the line answer "whose is this" without anyone reading the call site.
  */
 export function createLogger(tag: string, owner = 'core'): Logger {
-  const write = (level: 'debug' | 'info' | 'warn' | 'error', message: string, detail?: unknown, attrs?: TelemetryAttrs): void => {
+  const write = (
+    level: 'debug' | 'info' | 'warn' | 'error',
+    message: string,
+    detail?: unknown,
+    attrs?: TelemetryAttrs,
+  ): void => {
     const line = `[${tag}] ${message}`
     // The console's own two channels, so a devtools filter on warnings and errors keeps working.
     // `debug` and `info` share `log`, which is where every renderer line went before. The detail is

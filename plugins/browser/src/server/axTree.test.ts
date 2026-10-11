@@ -6,11 +6,31 @@ import { buildAxTree, isAllowedBrowserUrl, isBenignNavError, renderAxTree, resol
 const FIXTURE: CdpAxNode[] = [
   { nodeId: '1', role: { value: 'RootWebArea' }, name: { value: 'Login' }, childIds: ['2'], backendDOMNodeId: 1 },
   { nodeId: '2', parentId: '1', role: { value: 'generic' }, childIds: ['3', '6'], backendDOMNodeId: 2 },
-  { nodeId: '3', parentId: '2', role: { value: 'form' }, name: { value: 'login form' }, childIds: ['4', '5'], backendDOMNodeId: 3 },
-  { nodeId: '4', parentId: '3', role: { value: 'textbox' }, name: { value: 'Email' }, value: { value: '' }, backendDOMNodeId: 4 },
+  {
+    nodeId: '3',
+    parentId: '2',
+    role: { value: 'form' },
+    name: { value: 'login form' },
+    childIds: ['4', '5'],
+    backendDOMNodeId: 3,
+  },
+  {
+    nodeId: '4',
+    parentId: '3',
+    role: { value: 'textbox' },
+    name: { value: 'Email' },
+    value: { value: '' },
+    backendDOMNodeId: 4,
+  },
   { nodeId: '5', parentId: '3', role: { value: 'button' }, name: { value: 'Sign in' }, backendDOMNodeId: 5 },
   { nodeId: '6', parentId: '2', role: { value: 'generic' }, ignored: true, childIds: ['7'], backendDOMNodeId: 6 },
-  { nodeId: '7', parentId: '6', role: { value: 'StaticText' }, name: { value: 'Forgot password?' }, backendDOMNodeId: 7 },
+  {
+    nodeId: '7',
+    parentId: '6',
+    role: { value: 'StaticText' },
+    name: { value: 'Forgot password?' },
+    backendDOMNodeId: 7,
+  },
 ]
 
 describe('buildAxTree (docs/panes.md — CDP AX payload → refs)', () => {

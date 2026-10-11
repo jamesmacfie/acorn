@@ -42,7 +42,11 @@ describe('the kit support matrix', () => {
   })
 
   it('names a node in every row', () => {
-    expect(Object.keys(NODE_SUPPORT).filter((name) => !barrel.includes(name)).sort()).toEqual([])
+    expect(
+      Object.keys(NODE_SUPPORT)
+        .filter((name) => !barrel.includes(name))
+        .sort(),
+    ).toEqual([])
   })
 
   it('answers for the terminal in every row', () => {

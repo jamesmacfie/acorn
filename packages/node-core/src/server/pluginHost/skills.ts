@@ -50,7 +50,9 @@ export function registerSkill(pluginId: string, skill: PackageSkill): Disposable
 }
 
 export const catalogueSkills = (pluginId?: string): CatalogueSkill[] =>
-  [...catalogue.values()].filter((skill) => !pluginId || skill.pluginId === pluginId).sort((a, b) => a.name.localeCompare(b.name))
+  [...catalogue.values()]
+    .filter((skill) => !pluginId || skill.pluginId === pluginId)
+    .sort((a, b) => a.name.localeCompare(b.name))
 
 /** The roster's account of a running plugin's skills (../pluginHost/state.ts). Undefined when it has none. */
 export function pluginSkills(pluginId: string, state: SkillState): PluginSkills | undefined {
@@ -92,7 +94,8 @@ export async function deliverableSkills(dataDir: string): Promise<DeliverableSki
   const state = skillStateStore(dataDir).get()
   const ready: DeliverableSkill[] = []
   for (const skill of catalogueSkills()) {
-    if (await skillStatus(state, skill) === 'ready') ready.push({ name: skill.name, description: skill.description, dir: skill.dir, file: skill.file })
+    if ((await skillStatus(state, skill)) === 'ready')
+      ready.push({ name: skill.name, description: skill.description, dir: skill.dir, file: skill.file })
   }
   return ready
 }

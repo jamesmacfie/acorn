@@ -119,7 +119,8 @@ describe('docs cite paths that exist', () => {
           if (!fragment || !destination.endsWith('.md')) continue
           fragmentsChecked += 1
           const anchor = decodeFragment(fragment)
-          if (!anchors(destination).has(anchor)) brokenFragments.push(`${rel(file)}:${index + 1}: ${target}#${fragment}`)
+          if (!anchors(destination).has(anchor))
+            brokenFragments.push(`${rel(file)}:${index + 1}: ${target}#${fragment}`)
         }
       }
     }

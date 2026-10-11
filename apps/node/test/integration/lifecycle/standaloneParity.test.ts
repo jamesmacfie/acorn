@@ -58,12 +58,41 @@ describe.each(Object.entries(hosts))('a %s Node booted through bootNode', (_host
       const db = first.runtime.DB
       const now = Date.now()
       db.insert(schema.workspaces).values({ id: 'w', name: 'Fixture', createdAt: now, updatedAt: now }).run()
-      db.insert(schema.projects).values({ id: 'p', name: 'Fixture', workspaceId: 'w', setupScript: 'pnpm install', createdAt: now, updatedAt: now }).run()
-      db.insert(schema.tasks).values({ id: 'task', title: 'Fixture', projectId: 'p', origin: 'local', status: 'active',
-        branch: 'fixture', worktreePath: dataDir, createdAt: now, updatedAt: now }).run()
+      db.insert(schema.projects)
+        .values({
+          id: 'p',
+          name: 'Fixture',
+          workspaceId: 'w',
+          setupScript: 'pnpm install',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
+      db.insert(schema.tasks)
+        .values({
+          id: 'task',
+          title: 'Fixture',
+          projectId: 'p',
+          origin: 'local',
+          status: 'active',
+          branch: 'fixture',
+          worktreePath: dataDir,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
       // A failed first run, so setup may be started again by hand.
-      db.insert(schema.taskScriptAttempts).values({ attemptId: 'failed', taskId: 'task', phase: 'setup', generation: 1,
-        state: 'failed', reason: 'nonzero_exit', requestedAt: now }).run()
+      db.insert(schema.taskScriptAttempts)
+        .values({
+          attemptId: 'failed',
+          taskId: 'task',
+          phase: 'setup',
+          generation: 1,
+          state: 'failed',
+          reason: 'nonzero_exit',
+          requestedAt: now,
+        })
+        .run()
       const pending = await first.core.taskScripts.admitManualSetup('task')
       expect(pending).toMatchObject({ state: 'starting' })
       attemptId = pending.attemptId
@@ -74,7 +103,10 @@ describe.each(Object.entries(hosts))('a %s Node booted through bootNode', (_host
     const second = await bootNode({ ...options, root: openDataRoot(dataDir) })
     try {
       await second.reconciled
-      const attempt = second.runtime.DB.select().from(schema.taskScriptAttempts).where(eq(schema.taskScriptAttempts.attemptId, attemptId!)).get()
+      const attempt = second.runtime.DB.select()
+        .from(schema.taskScriptAttempts)
+        .where(eq(schema.taskScriptAttempts.attemptId, attemptId!))
+        .get()
       expect(attempt).toMatchObject({ state: 'interrupted', reason: 'shutdown' })
     } finally {
       await second.stop()
@@ -104,9 +136,17 @@ describe('plugin-state parity', () => {
     const resources = mkdtempSync(join(tmpdir(), 'acorn-parity-resources-'))
     try {
       mkdirSync(join(resources, 'rollbar', 'dist'), { recursive: true })
-      writeFileSync(join(resources, 'rollbar/acorn-plugin.json'), JSON.stringify({
-        id: 'rollbar', name: 'Rollbar', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-      }))
+      writeFileSync(
+        join(resources, 'rollbar/acorn-plugin.json'),
+        JSON.stringify({
+          id: 'rollbar',
+          name: 'Rollbar',
+          version: '1.0.0',
+          baseline: 'acorn-1',
+          apiVersion: PLUGIN_API_MAJOR,
+          node: './dist/node.js',
+        }),
+      )
       writeFileSync(join(resources, 'rollbar/dist/node.js'), 'export default {}\n')
 
       reconcileBundledPackages({ dataDir: dataRoot, bundledRoot: undefined, development: true })
@@ -146,9 +186,12 @@ describe('plugin-state parity', () => {
 })
 
 describe('what the shared composition populates', () => {
-  it('registers the three built-in agent profiles beside core\'s shell', () => {
+  it("registers the three built-in agent profiles beside core's shell", () => {
     registerBuiltInProfiles()
-    const ids = agentProfileRegistry.list().map((profile) => profile.id).sort()
+    const ids = agentProfileRegistry
+      .list()
+      .map((profile) => profile.id)
+      .sort()
     expect(ids).toEqual(expect.arrayContaining(['claude-code', 'codex', 'aider', 'shell']))
   })
 

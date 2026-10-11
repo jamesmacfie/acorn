@@ -36,7 +36,11 @@ describe('idempotency store', () => {
   it('round-trips a stored response', async () => {
     const hash = requestHash('POST', '/v1/core/tasks', '{}')
     await store.save(DEVICE, 'key-1', hash, 201, '{"id":"t1"}')
-    expect(await store.lookup(DEVICE, 'key-1')).toEqual({ requestHash: hash, responseStatus: 201, responseBody: '{"id":"t1"}' })
+    expect(await store.lookup(DEVICE, 'key-1')).toEqual({
+      requestHash: hash,
+      responseStatus: 201,
+      responseBody: '{"id":"t1"}',
+    })
   })
 
   it('misses on an unknown key and scopes by device', async () => {

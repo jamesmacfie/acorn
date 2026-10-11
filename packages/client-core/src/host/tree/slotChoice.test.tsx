@@ -3,7 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { Slot } from './Slot'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+} from '../registries/extensionPoints/extensionPoints'
 import { prefsKey } from '../../infra/queries'
 import type { Disposable } from '../../kit/lib/state/registry'
 
@@ -43,20 +47,34 @@ const contributor = (pluginId: string) => {
 }
 
 it('creates the preferences query only once a tie needs the pick', async () => {
-  registered.push(extensionPointRegistry.register({
-    id: 'agents:tool-card', ownerId: 'agents', label: 'Tool card', kind: 'remote', mode: 'replace', max: 1,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: 'agents:tool-card',
+      ownerId: 'agents',
+      label: 'Tool card',
+      kind: 'remote',
+      mode: 'replace',
+      max: 1,
+    }),
+  )
   localStorage.setItem(picks, JSON.stringify({ 'agents:tool-card': 'thumbs' }))
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } })
   client.setQueryData(prefsKey, {})
   const observers = () => client.getQueryCache().find({ queryKey: prefsKey })!.observers.length
   const host = document.createElement('div')
-  const dispose = render(() => (
-    <QueryClientProvider client={client}>
-      <Slot point="agents:tool-card" key="bash">card</Slot>
-      <Slot point="agents:tool-card" key="read">card</Slot>
-    </QueryClientProvider>
-  ), host)
+  const dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Slot point="agents:tool-card" key="bash">
+          card
+        </Slot>
+        <Slot point="agents:tool-card" key="read">
+          card
+        </Slot>
+      </QueryClientProvider>
+    ),
+    host,
+  )
   try {
     await settle()
     expect(host.textContent).toBe('cardcard')

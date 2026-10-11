@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { eventScope, parseCliTimestamp, parseInspectOutput, parseJsonLines, parseLabelString, parsePortString, parsePsOutput, parseStatsLine } from './parse'
+import {
+  eventScope,
+  parseCliTimestamp,
+  parseInspectOutput,
+  parseJsonLines,
+  parseLabelString,
+  parsePortString,
+  parsePsOutput,
+  parseStatsLine,
+} from './parse'
 
 // Fixtures captured from a live daemon (docker 29.x, compose 5.x labels).
 const PS_LINE = JSON.stringify({
@@ -63,19 +72,42 @@ describe('parsePsOutput', () => {
 
 describe('parseInspectOutput', () => {
   it('maps the inspect array shape, normalizing go zero-times and the /name prefix', () => {
-    const detail = parseInspectOutput(JSON.stringify([{
-      Id: 'a52e9c718b8801c9b1065ad29a88728a4b3e197f8f7e5561fe482ca79ad892df',
-      Name: '/runn-postgres-1',
-      Created: '2026-07-23T22:10:09.777918174Z',
-      Path: 'docker-entrypoint.sh',
-      Args: ['postgres'],
-      Image: 'sha256:abc',
-      RestartCount: 2,
-      State: { Status: 'running', ExitCode: 0, StartedAt: '2026-07-23T22:10:09.777918174Z', FinishedAt: '0001-01-01T00:00:00Z', Health: { Status: 'healthy' } },
-      Config: { Image: 'pgvector/pgvector:0.8.0-pg15', Env: ['POSTGRES_USER=postgres'], Labels: { 'com.docker.compose.project': 'runn', 'com.docker.compose.project.working_dir': '/w/t' } },
-      Mounts: [{ Type: 'volume', Source: 'pgdata', Destination: '/var/lib/postgresql/data', RW: true }],
-      NetworkSettings: { Networks: { runn_default: {} }, Ports: { '5432/tcp': [{ HostIp: '127.0.0.1', HostPort: '5535' }, { HostIp: '::', HostPort: '5535' }], '9000/tcp': null } },
-    }]))
+    const detail = parseInspectOutput(
+      JSON.stringify([
+        {
+          Id: 'a52e9c718b8801c9b1065ad29a88728a4b3e197f8f7e5561fe482ca79ad892df',
+          Name: '/runn-postgres-1',
+          Created: '2026-07-23T22:10:09.777918174Z',
+          Path: 'docker-entrypoint.sh',
+          Args: ['postgres'],
+          Image: 'sha256:abc',
+          RestartCount: 2,
+          State: {
+            Status: 'running',
+            ExitCode: 0,
+            StartedAt: '2026-07-23T22:10:09.777918174Z',
+            FinishedAt: '0001-01-01T00:00:00Z',
+            Health: { Status: 'healthy' },
+          },
+          Config: {
+            Image: 'pgvector/pgvector:0.8.0-pg15',
+            Env: ['POSTGRES_USER=postgres'],
+            Labels: { 'com.docker.compose.project': 'runn', 'com.docker.compose.project.working_dir': '/w/t' },
+          },
+          Mounts: [{ Type: 'volume', Source: 'pgdata', Destination: '/var/lib/postgresql/data', RW: true }],
+          NetworkSettings: {
+            Networks: { runn_default: {} },
+            Ports: {
+              '5432/tcp': [
+                { HostIp: '127.0.0.1', HostPort: '5535' },
+                { HostIp: '::', HostPort: '5535' },
+              ],
+              '9000/tcp': null,
+            },
+          },
+        },
+      ]),
+    )
     expect(detail).not.toBeNull()
     expect(detail!.id).toBe('a52e9c718b88')
     expect(detail!.name).toBe('runn-postgres-1')
@@ -95,8 +127,23 @@ describe('parseInspectOutput', () => {
 
 describe('parseStatsLine', () => {
   it('parses a stats tick, stripping percent signs', () => {
-    const line = JSON.stringify({ BlockIO: '0B / 0B', CPUPerc: '0.50%', ID: 'abc', MemPerc: '0.31%', MemUsage: '24.5MiB / 7.751GiB', NetIO: '1.2kB / 800B', PIDs: '9' })
-    expect(parseStatsLine(line)).toEqual({ cpuPercent: 0.5, memPercent: 0.31, memUsage: '24.5MiB / 7.751GiB', netIO: '1.2kB / 800B', blockIO: '0B / 0B', pids: 9 })
+    const line = JSON.stringify({
+      BlockIO: '0B / 0B',
+      CPUPerc: '0.50%',
+      ID: 'abc',
+      MemPerc: '0.31%',
+      MemUsage: '24.5MiB / 7.751GiB',
+      NetIO: '1.2kB / 800B',
+      PIDs: '9',
+    })
+    expect(parseStatsLine(line)).toEqual({
+      cpuPercent: 0.5,
+      memPercent: 0.31,
+      memUsage: '24.5MiB / 7.751GiB',
+      netIO: '1.2kB / 800B',
+      blockIO: '0B / 0B',
+      pids: 9,
+    })
     expect(parseStatsLine('not json')).toBeNull()
     expect(parseStatsLine('{}')).toBeNull()
   })

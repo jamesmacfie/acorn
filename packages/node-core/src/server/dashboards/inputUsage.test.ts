@@ -6,23 +6,40 @@ import { dashboardStore } from './store'
 import { pluginInputUsage } from './inputUsage'
 
 const cleanups: (() => void)[] = []
-afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup() })
+afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup()
+})
 const scope = { workspaceId: 'workspace' }
-const panel = (title: string, source: { pluginId: string; sourceId: string }, inputs: DataSourceScope['inputs']): DashboardPanelContent => ({
+const panel = (
+  title: string,
+  source: { pluginId: string; sourceId: string },
+  inputs: DataSourceScope['inputs'],
+): DashboardPanelContent => ({
   title,
-  queries: [{
-    id: 'rows', label: 'Rows', reference: { kind: 'inline', bindings: {}, content: {
-      name: 'Rows', parameters: { type: 'object', properties: {}, additionalProperties: false },
-      query: { source, scope: { ...scope, parameters: {}, ...(inputs ? { inputs } : {}) }, sort: [] }, sourceParameters: {},
-    } },
-  }],
+  queries: [
+    {
+      id: 'rows',
+      label: 'Rows',
+      reference: {
+        kind: 'inline',
+        bindings: {},
+        content: {
+          name: 'Rows',
+          parameters: { type: 'object', properties: {}, additionalProperties: false },
+          query: { source, scope: { ...scope, parameters: {}, ...(inputs ? { inputs } : {}) }, sort: [] },
+          sourceParameters: {},
+        },
+      },
+    },
+  ],
   mapping: { columns: [], fields: {}, values: {}, unmapped: 'catch-all' },
   display: { view: { kind: 'list' }, fields: [] },
 })
 
 describe('pluginInputUsage', () => {
   it('counts published panels per input with the accounts they bind, and skips unpublished drafts', () => {
-    const test = makeTestDb(); cleanups.push(test.cleanup)
+    const test = makeTestDb()
+    cleanups.push(test.cleanup)
     const store = dashboardStore(test.db)
     const board = { pluginId: 'readiness', sourceId: 'board' }
     const publish = (content: DashboardPanelContent) => {

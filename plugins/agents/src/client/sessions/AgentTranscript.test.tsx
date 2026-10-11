@@ -24,7 +24,11 @@ vi.mock('./AgentEventCard', () => ({
   default: (props: { item: { key: string; turnId: string | null }; turn?: AgentTurn }) => {
     drawn.push({ turnId: props.item.turnId, turn: props.turn })
     createRenderEffect(() => woken.push(props.item.key))
-    return <div data-item={props.item.key} tabindex={-1}>{props.item.key}</div>
+    return (
+      <div data-item={props.item.key} tabindex={-1}>
+        {props.item.key}
+      </div>
+    )
   },
 }))
 
@@ -78,15 +82,14 @@ const draw = (snapshot: AgentSessionSnapshot) => {
   ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => (
-    <AgentTranscript
-      taskId="t1"
-      snapshot={snapshot}
-      onExitSubagent={() => {}}
-      onRequestResolved={() => {}}
-    />
-  ), host)
-  hosts.push(() => { dispose(); host.remove() })
+  const dispose = render(
+    () => <AgentTranscript taskId="t1" snapshot={snapshot} onExitSubagent={() => {}} onRequestResolved={() => {}} />,
+    host,
+  )
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 
@@ -97,8 +100,14 @@ describe('a transcript row finding its turn', () => {
       session: { id: 's1', title: 'A session', config: {} },
       turns: [],
       events: [
-        { ...record(1, 'a', { type: 'tool', tool: { id: 'bash', title: 'Run command', status: 'running' } }), createdAt: firstAt },
-        { ...record(2, 'a', { type: 'tool', tool: { id: 'bash', title: '', status: 'completed' } }), createdAt: firstAt + 5000 },
+        {
+          ...record(1, 'a', { type: 'tool', tool: { id: 'bash', title: 'Run command', status: 'running' } }),
+          createdAt: firstAt,
+        },
+        {
+          ...record(2, 'a', { type: 'tool', tool: { id: 'bash', title: '', status: 'completed' } }),
+          createdAt: firstAt + 5000,
+        },
       ],
       requests: [],
     } as unknown as AgentSessionSnapshot
@@ -147,8 +156,7 @@ describe('a transcript row finding its turn', () => {
 // instead of transferring to whatever the array position now holds
 // (docs/ui-design/kit-internals.md § Behavior a pane keeps redoing becomes a node's prop).
 describe('a surviving transcript row keeping its identity', () => {
-  const item = (host: HTMLElement, key: string) =>
-    host.querySelector<HTMLElement>(`[data-item="${key}"]`)
+  const item = (host: HTMLElement, key: string) => host.querySelector<HTMLElement>(`[data-item="${key}"]`)
 
   it('keeps focus on a row when an earlier row is filtered out', () => {
     ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
@@ -166,16 +174,22 @@ describe('a surviving transcript row keeping its identity', () => {
 
     const host = document.createElement('div')
     document.body.append(host)
-    const dispose = render(() => (
-      <AgentTranscript
-        taskId="t1"
-        snapshot={snapshot}
-        chatsOnly={chatsOnly()}
-        onExitSubagent={() => {}}
-        onRequestResolved={() => {}}
-      />
-    ), host)
-    hosts.push(() => { dispose(); host.remove() })
+    const dispose = render(
+      () => (
+        <AgentTranscript
+          taskId="t1"
+          snapshot={snapshot}
+          chatsOnly={chatsOnly()}
+          onExitSubagent={() => {}}
+          onRequestResolved={() => {}}
+        />
+      ),
+      host,
+    )
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
 
     // The reader is on the last message, third in the list.
     const before = item(host, 'e3')!
@@ -196,23 +210,35 @@ describe('a streamed event reaching the transcript', () => {
   it('wakes only the card whose item it changed', () => {
     ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
     const events = [message(1, 'a'), message(2, 'a'), message(3, 'a')]
-    const snapshotOf = (list: AgentEventRecord[]) => ({
-      session: { id: 's1', title: 'A session', config: {} },
-      turns: [turn('a', 0)],
-      events: list,
-      requests: [],
-    }) as unknown as AgentSessionSnapshot
+    const snapshotOf = (list: AgentEventRecord[]) =>
+      ({
+        session: { id: 's1', title: 'A session', config: {} },
+        turns: [turn('a', 0)],
+        events: list,
+        requests: [],
+      }) as unknown as AgentSessionSnapshot
     const [snapshot, setSnapshot] = createSignal(snapshotOf(events))
     const host = document.createElement('div')
     document.body.append(host)
-    const dispose = render(() => (
-      <AgentTranscript taskId="t1" snapshot={snapshot()} onExitSubagent={() => {}} onRequestResolved={() => {}} />
-    ), host)
-    hosts.push(() => { dispose(); host.remove() })
+    const dispose = render(
+      () => (
+        <AgentTranscript taskId="t1" snapshot={snapshot()} onExitSubagent={() => {}} onRequestResolved={() => {}} />
+      ),
+      host,
+    )
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
     woken.length = 0
 
     // More text for the last message, the way a harness streams it.
-    setSnapshot(snapshotOf([...events, record(4, 'a', { type: 'assistant_message', text: ' more', messageId: 'm3', append: true })]))
+    setSnapshot(
+      snapshotOf([
+        ...events,
+        record(4, 'a', { type: 'assistant_message', text: ' more', messageId: 'm3', append: true }),
+      ]),
+    )
     expect(woken).toEqual(['e3'])
   })
 })
@@ -222,31 +248,41 @@ describe('a streamed event reaching the transcript', () => {
 // for on top of it.
 describe('a long transcript', () => {
   const PAGE = 200
-  const snapshotOf = (id: string, count: number, extra: AgentEventRecord[] = []) => ({
-    session: { id, title: 'A session', config: {} },
-    turns: [turn('a', 0)],
-    events: [...Array.from({ length: count }, (_, index) => message(index + 1, 'a')), ...extra],
-    requests: [],
-  }) as unknown as AgentSessionSnapshot
+  const snapshotOf = (id: string, count: number, extra: AgentEventRecord[] = []) =>
+    ({
+      session: { id, title: 'A session', config: {} },
+      turns: [turn('a', 0)],
+      events: [...Array.from({ length: count }, (_, index) => message(index + 1, 'a')), ...extra],
+      requests: [],
+    }) as unknown as AgentSessionSnapshot
   const rows = (host: HTMLElement) => [...host.querySelectorAll<HTMLElement>('.ui-timeline-turn')]
   const earlier = (host: HTMLElement) =>
     [...host.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show earlier'))
 
-  const mount = (snapshot: () => AgentSessionSnapshot, extra: { focusRequestId?: () => string | undefined; onControls?: (api: TimelineControls) => void } = {}) => {
+  const mount = (
+    snapshot: () => AgentSessionSnapshot,
+    extra: { focusRequestId?: () => string | undefined; onControls?: (api: TimelineControls) => void } = {},
+  ) => {
     ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
     const host = document.createElement('div')
     document.body.append(host)
-    const dispose = render(() => (
-      <AgentTranscript
-        taskId="t1"
-        snapshot={snapshot()}
-        focusRequestId={extra.focusRequestId?.()}
-        onControls={extra.onControls}
-        onExitSubagent={() => {}}
-        onRequestResolved={() => {}}
-      />
-    ), host)
-    hosts.push(() => { dispose(); host.remove() })
+    const dispose = render(
+      () => (
+        <AgentTranscript
+          taskId="t1"
+          snapshot={snapshot()}
+          focusRequestId={extra.focusRequestId?.()}
+          onControls={extra.onControls}
+          onExitSubagent={() => {}}
+          onRequestResolved={() => {}}
+        />
+      ),
+      host,
+    )
+    hosts.push(() => {
+      dispose()
+      host.remove()
+    })
     return host
   }
 
@@ -270,7 +306,12 @@ describe('a long transcript', () => {
   })
 
   it('draws a request a notice named, even when it is older than the window', () => {
-    const question = record(0, 'a', { type: 'request', requestId: 'q1', kind: 'question', title: 'Which one?' } as AgentNormalizedEvent)
+    const question = record(0, 'a', {
+      type: 'request',
+      requestId: 'q1',
+      kind: 'question',
+      title: 'Which one?',
+    } as AgentNormalizedEvent)
     const events = [question, ...snapshotOf('s1', 1000).events]
     const [focus, setFocus] = createSignal<string>()
     const host = mount(() => ({ ...snapshotOf('s1', 0), events }) as AgentSessionSnapshot, { focusRequestId: focus })
@@ -281,7 +322,11 @@ describe('a long transcript', () => {
 
   it('draws every card when the reader goes to the top, which is the oldest turn', () => {
     let api: TimelineControls | undefined
-    const host = mount(() => snapshotOf('s1', 1000), { onControls: (next) => { api = next } })
+    const host = mount(() => snapshotOf('s1', 1000), {
+      onControls: (next) => {
+        api = next
+      },
+    })
     api!.toTop()
     expect(rows(host)).toHaveLength(1000)
     expect(earlier(host)).toBeUndefined()
@@ -300,7 +345,12 @@ describe('a long transcript', () => {
     document.getSelection()!.addRange(range)
     const selected = document.getSelection()!.toString()
 
-    setSnapshot(snapshotOf('s1', 0, [...events, record(301, 'a', { type: 'assistant_message', text: ' more', messageId: 'm300', append: true })]))
+    setSnapshot(
+      snapshotOf('s1', 0, [
+        ...events,
+        record(301, 'a', { type: 'assistant_message', text: ' more', messageId: 'm300', append: true }),
+      ]),
+    )
     expect(first.isConnected && second.isConnected).toBe(true)
     expect(document.getSelection()!.toString()).toBe(selected)
     document.getSelection()!.removeAllRanges()

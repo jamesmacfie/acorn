@@ -4,12 +4,24 @@
 import type { HeadlessResult } from '@acorn/plugin-api/node'
 import type { AgentExecuteGoalStatus, AgentExecuteGoalSummary } from '../../contract/sessionExecute'
 import type { AgentEventRecord, AgentGoalVerdict } from '../../contract/wire.ts'
-import { goalProgress, judgeGoal, MAX_GOAL_CONTINUATIONS, MAX_GOAL_NO_PROGRESS, type GoalJudgePorts } from './sessionGoal'
+import {
+  goalProgress,
+  judgeGoal,
+  MAX_GOAL_CONTINUATIONS,
+  MAX_GOAL_NO_PROGRESS,
+  type GoalJudgePorts,
+} from './sessionGoal'
 import type { AgentStore } from './store'
 
 const EVALUATE = 'workflow.goal.evaluate'
 const SUMMARY = 'workflow.goal'
-const TERMINAL: ReadonlySet<AgentExecuteGoalStatus> = new Set(['satisfied', 'blocked', 'exhausted', 'unavailable', 'stopped'])
+const TERMINAL: ReadonlySet<AgentExecuteGoalStatus> = new Set([
+  'satisfied',
+  'blocked',
+  'exhausted',
+  'unavailable',
+  'stopped',
+])
 
 type JudgeUsage = { inputTokens?: number; outputTokens?: number }
 
@@ -43,7 +55,9 @@ export class StepGoal {
   ) {}
 
   /** Goal continuations and result repairs together, which share one limit. */
-  get automatic(): number { return this.#continuations + this.#repairs }
+  get automatic(): number {
+    return this.#continuations + this.#repairs
+  }
 
   summary(): AgentExecuteGoalSummary {
     return {
@@ -73,14 +87,27 @@ export class StepGoal {
 
   /** The verdict already saved for this exact turn set, so a repeated pass doesn't ask again. */
   async saved(turnIds: readonly string[]): Promise<AgentGoalVerdict | null> {
-    const saved = await this.ports.store.operationResult<{ objective: string; verdict: AgentGoalVerdict }>(this.#key(turnIds), EVALUATE)
+    const saved = await this.ports.store.operationResult<{ objective: string; verdict: AgentGoalVerdict }>(
+      this.#key(turnIds),
+      EVALUATE,
+    )
     return saved?.objective === this.objective ? saved.verdict : null
   }
 
   /** Asks the judge. Throws when the check can't run or answers out of shape. */
-  async judge(events: readonly AgentEventRecord[], turnId: string, signal: AbortSignal | undefined, timeoutMs: number): Promise<AgentGoalVerdict> {
+  async judge(
+    events: readonly AgentEventRecord[],
+    turnId: string,
+    signal: AbortSignal | undefined,
+    timeoutMs: number,
+  ): Promise<AgentGoalVerdict> {
     const { verdict, usage } = await judgeGoal(this.ports.judge, {
-      profileId: this.profileId, objective: this.objective, events, turnId, signal, timeoutMs,
+      profileId: this.profileId,
+      objective: this.objective,
+      events,
+      turnId,
+      signal,
+      timeoutMs,
     })
     if (usage) this.judgeUsage.push(usage)
     return verdict
@@ -88,7 +115,12 @@ export class StepGoal {
 
   /** Saves a verdict against the turns it read and the last event it saw. */
   async save(turnIds: readonly string[], seq: number, verdict: AgentGoalVerdict): Promise<void> {
-    await this.ports.store.saveOperation(this.#key(turnIds), EVALUATE, { objective: this.objective, turnIds, seq, verdict }, this.sessionId)
+    await this.ports.store.saveOperation(
+      this.#key(turnIds),
+      EVALUATE,
+      { objective: this.objective, turnIds, seq, verdict },
+      this.sessionId,
+    )
   }
 
   /**
@@ -108,11 +140,12 @@ export class StepGoal {
     }
     const continued = this.#automaticTurns.some((turn) => turn.turnId === lastTurn.id && turn.reason === 'goal')
     if (continued) this.#noProgress = goalProgress(lastTurn.events) ? 0 : this.#noProgress + 1
-    const limit = this.automatic >= MAX_GOAL_CONTINUATIONS
-      ? `${MAX_GOAL_CONTINUATIONS} automatic continuations`
-      : this.#noProgress >= MAX_GOAL_NO_PROGRESS
-        ? `${MAX_GOAL_NO_PROGRESS} continuations in a row with no tool call or file change`
-        : null
+    const limit =
+      this.automatic >= MAX_GOAL_CONTINUATIONS
+        ? `${MAX_GOAL_CONTINUATIONS} automatic continuations`
+        : this.#noProgress >= MAX_GOAL_NO_PROGRESS
+          ? `${MAX_GOAL_NO_PROGRESS} continuations in a row with no tool call or file change`
+          : null
     if (limit) {
       const reason = `Goal limit reached after ${limit}. Last check: ${verdict.reason}`
       this.set('exhausted', reason)
@@ -124,7 +157,11 @@ export class StepGoal {
   /** The attempt's final state, saved once. A step that ended on its own reason records that reason. */
   async finish(result: HeadlessResult): Promise<AgentExecuteGoalSummary> {
     if (!TERMINAL.has(this.#status) || (this.#status === 'satisfied' && result.status !== 'ok')) {
-      this.set('stopped', result.stderrTail || (result.status === 'cancelled' ? 'The step was cancelled.' : `The step ended: ${result.status}.`))
+      this.set(
+        'stopped',
+        result.stderrTail ||
+          (result.status === 'cancelled' ? 'The step was cancelled.' : `The step ended: ${result.status}.`),
+      )
     }
     const summary = this.summary()
     await this.ports.store.saveOperation(`workflow-goal:${this.originTurnId}`, SUMMARY, summary, this.sessionId)

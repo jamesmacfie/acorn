@@ -15,16 +15,22 @@ import type { EditorCoreServices } from './editor'
 let root = ''
 const core = {
   tasks: { root: async () => root },
-  fs: { resolveInRoot: (dir: string, relPath: string) => {
-    const abs = resolve(dir, relPath)
-    return abs.startsWith(`${dir}/`) ? abs : null
-  } },
+  fs: {
+    resolveInRoot: (dir: string, relPath: string) => {
+      const abs = resolve(dir, relPath)
+      return abs.startsWith(`${dir}/`) ? abs : null
+    },
+  },
 } as unknown as EditorCoreServices
 
 // The channel handler, as the host would hand it one connection's frames.
 const open = () => {
   let handler: Parameters<CompiledPluginBroadcast['channel']>[1] | undefined
-  const events = { channel: (_prefix: string, h: typeof handler) => { handler = h } } as unknown as CompiledPluginBroadcast
+  const events = {
+    channel: (_prefix: string, h: typeof handler) => {
+      handler = h
+    },
+  } as unknown as CompiledPluginBroadcast
   registerEditorWsChannel(events, core)
   const frames: WsFrame[] = []
   const conn = {}
@@ -33,11 +39,15 @@ const open = () => {
     conn,
     handler: handler!,
     send: (frame: WsFrame) => handler!.onFrame(frame, (out) => void frames.push(out), conn),
-    exit: () => vi.waitFor(() => {
-      const frame = frames.find((f) => f.channel === 'editor:pty:exit')
-      if (!frame) throw new Error('no exit yet')
-      return frame
-    }, { timeout: 15_000 }),
+    exit: () =>
+      vi.waitFor(
+        () => {
+          const frame = frames.find((f) => f.channel === 'editor:pty:exit')
+          if (!frame) throw new Error('no exit yet')
+          return frame
+        },
+        { timeout: 15_000 },
+      ),
   }
 }
 
@@ -54,7 +64,7 @@ afterEach(() => {
   process.env = { ...env }
 })
 
-describe('the editor pane\'s $EDITOR handoff', () => {
+describe("the editor pane's $EDITOR handoff", () => {
   it('runs $EDITOR on the file and reports the exit, so the pane can re-read it', async () => {
     const editor = join(root, 'fake-editor.sh')
     await writeFile(editor, '#!/bin/sh\nprintf "// edited in \\$EDITOR\\n" >> "$1"\n', { mode: 0o755 })

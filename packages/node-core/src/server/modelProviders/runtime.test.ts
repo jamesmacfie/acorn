@@ -64,9 +64,7 @@ describe('generateTextForConnection', () => {
     scheduler: new ProviderRequestScheduler(),
   })
 
-  const insertConnection = async (
-    overrides: Partial<typeof schema.integrations.$inferInsert> = {},
-  ) => {
+  const insertConnection = async (overrides: Partial<typeof schema.integrations.$inferInsert> = {}) => {
     await testDb.db.insert(schema.integrations).values({
       id: 'connection-1',
       userId: 'alice',
@@ -144,10 +142,10 @@ describe('generateTextForConnection', () => {
   it('does not reveal whether another user owns a connection', async () => {
     await insertConnection()
 
-    await expect(generateTextForConnection(
-      { ...args(), userId: 'bob' },
-      dependencies(),
-    )).rejects.toMatchObject({ code: 'provider_not_connected', status: 404 })
+    await expect(generateTextForConnection({ ...args(), userId: 'bob' }, dependencies())).rejects.toMatchObject({
+      code: 'provider_not_connected',
+      status: 404,
+    })
   })
 
   it.each([
@@ -194,10 +192,9 @@ describe('generateTextForConnection', () => {
     await expect(generateTextForConnection(args(), dependencies())).rejects.toMatchObject({
       code: 'provider_unavailable',
     })
-    await expect(generateTextForConnection(
-      { ...args(), input: { ...input, maxOutputTokens: 128_001 } },
-      dependencies(),
-    )).rejects.toMatchObject({ code: 'provider_bad_config' })
+    await expect(
+      generateTextForConnection({ ...args(), input: { ...input, maxOutputTokens: 128_001 } }, dependencies()),
+    ).rejects.toMatchObject({ code: 'provider_bad_config' })
   })
 
   it('propagates cancellation and prevents a queued provider call from starting', async () => {
@@ -243,10 +240,9 @@ describe('generateTextForConnection', () => {
       })
     })
 
-    await expect(generateTextForConnection(
-      { ...args(), timeoutMs: 5 },
-      dependencies(),
-    )).rejects.toMatchObject({ code: 'provider_unavailable' })
+    await expect(generateTextForConnection({ ...args(), timeoutMs: 5 }, dependencies())).rejects.toMatchObject({
+      code: 'provider_unavailable',
+    })
     expect(observedSignal?.aborted).toBe(true)
   })
 })

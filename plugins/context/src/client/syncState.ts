@@ -56,5 +56,9 @@ export function evictSyncState(taskId: string): void {
 // it are one edit apart (registries/scopeEviction.ts).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictSyncState(e.taskId)
-  if (e.scope === 'node-switched') { targetByTask.clear(); lastSync.clear(); bump(tick() + 1) }
+  if (e.scope === 'node-switched') {
+    targetByTask.clear()
+    lastSync.clear()
+    bump(tick() + 1)
+  }
 })

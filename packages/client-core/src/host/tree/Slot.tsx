@@ -94,7 +94,10 @@ export type SlotProps = {
 }
 
 export function Slot(props: SlotProps) {
-  const choice = createSlotChoice(() => props.point, () => props.key)
+  const choice = createSlotChoice(
+    () => props.point,
+    () => props.key,
+  )
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
@@ -198,7 +201,12 @@ function CompiledWithHost(props: {
   onCleanup(() => unwatch())
   const host = compiledOwnerHost({ declared: props.declared, actions: props.actions, byPerson: gestures.recent })
   return (
-    <span style={{ display: 'contents' }} ref={(element) => { unwatch = gestures.watch(element) }}>
+    <span
+      style={{ display: 'contents' }}
+      ref={(element) => {
+        unwatch = gestures.watch(element)
+      }}
+    >
       <Dynamic component={props.component} {...props.props()} host={host} />
     </span>
   )

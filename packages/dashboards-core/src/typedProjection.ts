@@ -18,13 +18,15 @@ export type DashboardQueryProjection = {
   result: DataSourceResult
 }
 
-const primitiveType = (schema: DataSchema): string => Array.isArray(schema.type)
-  ? schema.type.find(type => type !== 'null') ?? 'null'
-  : schema.type
+const primitiveType = (schema: DataSchema): string =>
+  Array.isArray(schema.type) ? (schema.type.find((type) => type !== 'null') ?? 'null') : schema.type
 
 function schemaAtPointer(schema: DataSchema, pointer: string): DataSchema | undefined {
   if (!pointer) return schema
-  const parts = pointer.slice(1).split('/').map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'))
+  const parts = pointer
+    .slice(1)
+    .split('/')
+    .map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
   let current = schema
   for (const part of parts) {
     if (primitiveType(current) !== 'object') return undefined
@@ -41,9 +43,12 @@ function displayType(field: DataField, schema: DataSchema): DashboardDisplayFiel
   if (kind) return kind
   switch (primitiveType(schema)) {
     case 'number':
-    case 'integer': return 'number'
-    case 'boolean': return 'boolean'
-    default: return 'text'
+    case 'integer':
+      return 'number'
+    case 'boolean':
+      return 'boolean'
+    default:
+      return 'text'
   }
 }
 
@@ -52,19 +57,22 @@ export function dashboardFields(description: DataSourceDescription): DashboardDi
     const schema = schemaAtPointer(description.schema, field.pointer)
     if (!schema) return []
     const type = displayType(field, schema)
-    const values = type === 'enum' && field.choices?.kind === 'static'
-      ? field.choices.values.map(value => ({ ...value }))
-      : undefined
-    return [{
-      id: field.pointer,
-      name: field.label,
-      type,
-      ...(field.display?.role ? { role: field.display.role } : {}),
-      ...(field.display?.unit && type === 'number' ? { unit: field.display.unit } : {}),
-      ...(field.display?.precision ? { precision: field.display.precision } : {}),
-      ...(field.display?.list ? { list: true } : {}),
-      ...(values?.length ? { values } : {}),
-    }]
+    const values =
+      type === 'enum' && field.choices?.kind === 'static'
+        ? field.choices.values.map((value) => ({ ...value }))
+        : undefined
+    return [
+      {
+        id: field.pointer,
+        name: field.label,
+        type,
+        ...(field.display?.role ? { role: field.display.role } : {}),
+        ...(field.display?.unit && type === 'number' ? { unit: field.display.unit } : {}),
+        ...(field.display?.precision ? { precision: field.display.precision } : {}),
+        ...(field.display?.list ? { list: true } : {}),
+        ...(values?.length ? { values } : {}),
+      },
+    ]
   })
 }
 
@@ -88,14 +96,22 @@ function panelSource(preview: DashboardQueryProjection): PanelProjectionSource {
 
 function sourceRows(preview: DashboardQueryProjection): DashboardDisplayRow[] {
   const fields = dashboardFields(preview.description)
-  return preview.result.records.map(record => ({
+  return preview.result.records.map((record) => ({
     id: record.ref.recordId,
-    values: Object.fromEntries(fields.map(field => [field.id, cell(readDataPointer(record.data, field.id))])),
+    values: Object.fromEntries(fields.map((field) => [field.id, cell(readDataPointer(record.data, field.id))])),
     pluginId: record.ref.pluginId,
     sourceId: `${record.ref.sourceId}@${preview.instanceId}`,
     sourceRowId: record.ref.recordId,
     records: [record.ref],
-    recordItems: [{ ref: record.ref, ...(record.taskId ? { taskId: record.taskId } : {}), ...(record.action ? { action: record.action } : {}), ...(record.actions ? { actions: record.actions } : {}), ...(record.target ? { target: record.target } : {}) }],
+    recordItems: [
+      {
+        ref: record.ref,
+        ...(record.taskId ? { taskId: record.taskId } : {}),
+        ...(record.action ? { action: record.action } : {}),
+        ...(record.actions ? { actions: record.actions } : {}),
+        ...(record.target ? { target: record.target } : {}),
+      },
+    ],
     ...(record.taskId ? { taskId: record.taskId } : {}),
     ...(record.action ? { action: record.action } : {}),
     ...(record.actions ? { actions: record.actions } : {}),
@@ -103,18 +119,24 @@ function sourceRows(preview: DashboardQueryProjection): DashboardDisplayRow[] {
   }))
 }
 
-function panelMapping(mapping: DashboardMapping, previews: readonly DashboardQueryProjection[]): PanelMapping | undefined {
+function panelMapping(
+  mapping: DashboardMapping,
+  previews: readonly DashboardQueryProjection[],
+): PanelMapping | undefined {
   const fields: NonNullable<PanelMapping['fields']> = {}
   const bySource: NonNullable<PanelMapping['bySource']> = {}
   for (const preview of previews) {
     const key = dashboardQuerySourceKey(preview.query, preview.instanceId)
     if (mapping.fields[preview.instanceId]) fields[key] = { ...mapping.fields[preview.instanceId] }
     const values = mapping.values[preview.instanceId]
-    if (values) bySource[key] = Object.fromEntries(Object.entries(values).map(([columnId, ids]) => [columnId, { values: [...ids] }]))
+    if (values)
+      bySource[key] = Object.fromEntries(
+        Object.entries(values).map(([columnId, ids]) => [columnId, { values: [...ids] }]),
+      )
   }
   if (!mapping.columns.length && !Object.keys(fields).length && !Object.keys(bySource).length) return undefined
   return {
-    columns: mapping.columns.map(column => ({ ...column })),
+    columns: mapping.columns.map((column) => ({ ...column })),
     ...(Object.keys(fields).length ? { fields } : {}),
     ...(Object.keys(bySource).length ? { bySource } : {}),
     ...(mapping.unmapped === 'hidden' ? { unmapped: 'hidden' } : {}),

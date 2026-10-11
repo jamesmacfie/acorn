@@ -81,7 +81,10 @@ export function parseNote(text: string, slug: string): { meta: NoteMeta; body: s
 export class NotesStore {
   // Optional so a second, silent handle over the same directory is one constructor call: task seeding
   // uses that to write N notes and announce once (node/index.ts).
-  constructor(private root: string, private emit?: (frame: { channel: string } & Record<string, unknown>) => void) {}
+  constructor(
+    private root: string,
+    private emit?: (frame: { channel: string } & Record<string, unknown>) => void,
+  ) {}
 
   /** `plugin:notes:notes-changed`, the location and nothing else: a consumer re-lists. */
   changed(location: NoteLocation): void {
@@ -89,7 +92,8 @@ export class NotesStore {
   }
 
   private dirFor(location: NoteLocation): string {
-    const key = location.scope === 'global' ? 'global' : location.scope === 'workspace' ? location.workspaceId : location.taskId
+    const key =
+      location.scope === 'global' ? 'global' : location.scope === 'workspace' ? location.workspaceId : location.taskId
     if (!isValidDirKey(key)) throw new Error('Invalid note location id.')
     const dir = location.scope === 'task' ? join(this.root, 'task', key) : join(this.root, key)
     mkdirSync(dir, { recursive: true })
@@ -125,7 +129,15 @@ export class NotesStore {
         const file = join(dir, name)
         const [text, st] = await Promise.all([readFile(file, 'utf8'), stat(file)])
         const { meta } = parseNote(text, slug)
-        out.push({ slug, title: meta.title, author: meta.author, kind: meta.kind, included: meta.included, originTaskId: meta.originTaskId, updatedAt: st.mtimeMs })
+        out.push({
+          slug,
+          title: meta.title,
+          author: meta.author,
+          kind: meta.kind,
+          included: meta.included,
+          originTaskId: meta.originTaskId,
+          updatedAt: st.mtimeMs,
+        })
       } catch {
         // unreadable note → skipped, never breaks the list
       }
@@ -139,7 +151,18 @@ export class NotesStore {
     return { slug, body, ...meta }
   }
 
-  async create(location: NoteLocation, title: string, opts?: { author?: NoteAuthor; kind?: NoteKind; originSessionId?: string; originTaskId?: string; included?: boolean; body?: string }): Promise<{ slug: string }> {
+  async create(
+    location: NoteLocation,
+    title: string,
+    opts?: {
+      author?: NoteAuthor
+      kind?: NoteKind
+      originSessionId?: string
+      originTaskId?: string
+      included?: boolean
+      body?: string
+    },
+  ): Promise<{ slug: string }> {
     const base = slugifyTitle(title)
     const existing = new Set((await this.list(location)).map((n) => n.slug))
     let slug = base
@@ -196,7 +219,12 @@ export class NotesStore {
   }
 
   // Append (agents logging findings). Missing note → created with the writer's identity.
-  async append(location: NoteLocation, slug: string, text: string, opts?: { author?: NoteAuthor; originSessionId?: string; originTaskId?: string }): Promise<void> {
+  async append(
+    location: NoteLocation,
+    slug: string,
+    text: string,
+    opts?: { author?: NoteAuthor; originSessionId?: string; originTaskId?: string },
+  ): Promise<void> {
     const file = this.fileFor(location, slug)
     const existing = await readFile(file, 'utf8').catch(() => null)
     if (existing == null) {
@@ -217,7 +245,8 @@ export class NotesStore {
     if (opts?.author) {
       parsed.meta.author = opts.author
       parsed.meta.originSessionId = opts.originSessionId ?? null
-      parsed.meta.originTaskId = opts.originTaskId ?? (location.scope === 'task' ? location.taskId : parsed.meta.originTaskId)
+      parsed.meta.originTaskId =
+        opts.originTaskId ?? (location.scope === 'task' ? location.taskId : parsed.meta.originTaskId)
     }
     const sep = parsed.body.endsWith('\n') || !parsed.body ? '' : '\n'
     const body = `${parsed.body}${sep}${text.endsWith('\n') ? text : `${text}\n`}`

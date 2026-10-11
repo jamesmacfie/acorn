@@ -25,8 +25,10 @@ export const canStopAgent = (session: AgentSession): boolean =>
   ['working', 'waiting', 'cancelling', 'reconnecting'].includes(session.runtimeState)
 
 export const canStopSubagent = (session: AgentSession, subagent: AgentSubagent | undefined): boolean =>
-  session.driverKind === 'codex-app-server' && session.controller === 'acorn' && !session.archivedAt
-  && subagent?.status === 'running'
+  session.driverKind === 'codex-app-server' &&
+  session.controller === 'acorn' &&
+  !session.archivedAt &&
+  subagent?.status === 'running'
 
 // "Needs you": anything but a settled or merely-unread attention state. Same reasoning, since Agent
 // Center's filter, its header count and the attention inbox all have to agree.

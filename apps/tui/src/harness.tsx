@@ -92,7 +92,10 @@ export type Caret = { region: RegionRef | null; text: string }
 export type Screen = {
   frame: () => Promise<string>
   until: (text: string, seconds?: number) => Promise<string>
-  press: (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }) => Promise<void>
+  press: (
+    key: string,
+    modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },
+  ) => Promise<void>
   spans: () => Promise<Span[][]>
   caret: () => Promise<Caret>
   walk: (steps: number, each?: (caret: Caret) => unknown) => Promise<void>
@@ -161,14 +164,17 @@ function openSurface(size: { width: number; height: number }): Surface {
     // A trailing newline: 24 rows and an empty twenty-fifth after the split, which is the shape every
     // test that splits a frame on newlines is written against.
     captureCharFrame: () => `${renderer.screen.lines().join('\n')}\n`,
-    captureSpans: () => renderer.screen.runs().map((line) => line.map((run) => ({
-      text: run.text,
-      // As the `{ r, g, b }` triple in nought to one, so a comparison is about which slot a role
-      // chose rather than about two spellings of one grey (./colourCompat.ts § rgbOf).
-      fg: rgbOf(run.fg),
-      attributes: run.attrs,
-      width: run.width,
-    }))),
+    captureSpans: () =>
+      renderer.screen.runs().map((line) =>
+        line.map((run) => ({
+          text: run.text,
+          // As the `{ r, g, b }` triple in nought to one, so a comparison is about which slot a role
+          // chose rather than about two spellings of one grey (./colourCompat.ts § rgbOf).
+          fg: rgbOf(run.fg),
+          attributes: run.attrs,
+          width: run.width,
+        })),
+      ),
     resize: (width, height) => {
       renderer.screen.resize(width, height)
       renderer.frame()
@@ -176,7 +182,9 @@ function openSurface(size: { width: number; height: number }): Surface {
     // Straight onto the key stream. The parser is not wired to the dispatcher until phase 3, and it
     // is not what a test wants either: a harness that constructs the event has no bytes to get wrong
     // (./renderer.ts § The key stream is a queue).
-    pressKey: (key, modifiers) => { renderer.keyInput.emit('keypress', pressedKey(key, modifiers)) },
+    pressKey: (key, modifiers) => {
+      renderer.keyInput.emit('keypress', pressedKey(key, modifiers))
+    },
     destroy: () => renderer.destroy(),
   }
 }
@@ -191,26 +199,28 @@ function openSurface(size: { width: number; height: number }): Surface {
 // (./tree/renderer.ts § render).
 let previous: (() => void) | null = null
 
-export async function renderFixture(size: {
-  width?: number
-  height?: number
-  supervised?: boolean
-  /** Draw as if this run had spawned the node and its handshake had not landed yet: the footer says
-   *  so and the broker has reported nothing (../chrome/nodeState.ts). */
-  starting?: boolean
-  pane?: string
-  /** Seed the node's query cache before the shell mounts, which is what a warm start reads. Handed
-   *  the same per-node client the shell renders under, so a query seeded here with a fresh timestamp
-   *  is inside `clientFor`'s 30-second staleTime and no fetch is made for it at all. */
-  cache?: (client: QueryClient) => void
-  /** Bundles this device has never decided about, seeded into the distribution queue so the shell
-   *  raises its trust overlay. Seeded here rather than by the caller because the reset below would
-   *  clear anything seeded before the call (client-core/host/plugins/distribution.ts). */
-  trust?: readonly PluginTrustRequest[]
-  link?: import('@acorn/client-core/host/registries/commands/addresses').Address
-  linkReady?: import('solid-js').Accessor<boolean>
-  register?: () => () => void
-} = {}): Promise<Screen> {
+export async function renderFixture(
+  size: {
+    width?: number
+    height?: number
+    supervised?: boolean
+    /** Draw as if this run had spawned the node and its handshake had not landed yet: the footer says
+     *  so and the broker has reported nothing (../chrome/nodeState.ts). */
+    starting?: boolean
+    pane?: string
+    /** Seed the node's query cache before the shell mounts, which is what a warm start reads. Handed
+     *  the same per-node client the shell renders under, so a query seeded here with a fresh timestamp
+     *  is inside `clientFor`'s 30-second staleTime and no fetch is made for it at all. */
+    cache?: (client: QueryClient) => void
+    /** Bundles this device has never decided about, seeded into the distribution queue so the shell
+     *  raises its trust overlay. Seeded here rather than by the caller because the reset below would
+     *  clear anything seeded before the call (client-core/host/plugins/distribution.ts). */
+    trust?: readonly PluginTrustRequest[]
+    link?: import('@acorn/client-core/host/registries/commands/addresses').Address
+    linkReady?: import('solid-js').Accessor<boolean>
+    register?: () => () => void
+  } = {},
+): Promise<Screen> {
   const { render } = await import('./tree/renderer')
   const { installKeymap } = await import('./keys/install')
   const { _resetCollections } = await import('./keys/collection')
@@ -225,7 +235,8 @@ export async function renderFixture(size: {
   const { _resetRouter } = await import('./kit/router')
   const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
   const { setActiveTaskId, setSelectedSource } = await import('@acorn/client-core/features/tasks/tasks.ts')
-  const { _resetPluginDistribution, _seedPendingTrust } = await import('@acorn/client-core/host/plugins/distribution.ts')
+  const { _resetPluginDistribution, _seedPendingTrust } =
+    await import('@acorn/client-core/host/plugins/distribution.ts')
   const { setNodeStarting } = await import('./chrome/nodeState')
   // The collection store, the region list, the per-pane layout state, the path and which browse
   // source is showing are all module state, so two renders in one process would share a caret, a
@@ -279,8 +290,7 @@ export async function renderFixture(size: {
     const pane = paneContribution(size.pane)
     type Lazy = { preload?: () => Promise<unknown> }
     const regions = Object.values((pane as { regions?: Record<string, unknown> } | undefined)?.regions ?? {})
-    await Promise.all([pane?.component as Lazy | undefined, ...regions as Lazy[]]
-      .map((entry) => entry?.preload?.()))
+    await Promise.all([pane?.component as Lazy | undefined, ...(regions as Lazy[])].map((entry) => entry?.preload?.()))
   }
   const { App } = await import('./App')
   // The roster, which production loads after its first frame (./roster.ts). A suite awaits it
@@ -322,8 +332,21 @@ export async function renderFixture(size: {
   // The tree mounts on the screen's root node rather than on the surface around it
   // (./tree/renderer.ts § render).
   const target = (renderer as unknown as { root: unknown }).root
-  const mounted = await render(() => <App client={client} nodeId="node-1" supervised={size.supervised ?? false}
-    link={size.link} linkReady={size.linkReady ?? (() => true)} onQuit={() => { quits += 1 }} />, target as never)
+  const mounted = await render(
+    () => (
+      <App
+        client={client}
+        nodeId="node-1"
+        supervised={size.supervised ?? false}
+        link={size.link}
+        linkReady={size.linkReady ?? (() => true)}
+        onQuit={() => {
+          quits += 1
+        }}
+      />
+    ),
+    target as never,
+  )
   const tearDown = (): void => {
     ;(mounted as unknown as () => void)()
     disposeRegistrations?.()
@@ -364,7 +387,10 @@ export async function renderFixture(size: {
 
   // Dispatch is synchronous, but a key may start a query whose fixture timer and subsequent Solid
   // render are asynchronous. Wait for that work and the painter rather than sleeping after every key.
-  const press = async (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }): Promise<void> => {
+  const press = async (
+    key: string,
+    modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean },
+  ): Promise<void> => {
     surface.pressKey(key, modifiers)
     const deadline = Date.now() + 3000
     for (let turn = 0; turn < 20; turn += 1) {
@@ -372,9 +398,20 @@ export async function renderFixture(size: {
       if (transport.pending() > 0) {
         const controller = new AbortController()
         const remaining = deadline - Date.now()
-        if (remaining <= 0) throw new Error(`TUI fixture did not finish after key ${key} (pending: ${transport.pending()})`)
-        const timer = setTimeout(() => controller.abort(new Error(`TUI fixture did not finish after key ${key} (pending: ${transport.pending()})`)), remaining)
-        try { await transport.idle(controller.signal) } finally { clearTimeout(timer) }
+        if (remaining <= 0)
+          throw new Error(`TUI fixture did not finish after key ${key} (pending: ${transport.pending()})`)
+        const timer = setTimeout(
+          () =>
+            controller.abort(
+              new Error(`TUI fixture did not finish after key ${key} (pending: ${transport.pending()})`),
+            ),
+          remaining,
+        )
+        try {
+          await transport.idle(controller.signal)
+        } finally {
+          clearTimeout(timer)
+        }
       }
       await new Promise((done) => setImmediate(done))
       if (transport.pending() === 0 && !frameRequested()) {
@@ -383,7 +420,9 @@ export async function renderFixture(size: {
       }
       if (Date.now() >= deadline) break
     }
-    throw new Error(`TUI did not settle after key ${key} (fixture requests: ${transport.pending()}, frame requested: ${frameRequested()})`)
+    throw new Error(
+      `TUI did not settle after key ${key} (fixture requests: ${transport.pending()}, frame requested: ${frameRequested()})`,
+    )
   }
 
   /**
@@ -439,7 +478,10 @@ export async function renderFixture(size: {
       previous = node
       const done = repeats >= 2
       await press(done ? 'TAB' : 'ARROW_DOWN')
-      if (done) { repeats = 0; previous = null }
+      if (done) {
+        repeats = 0
+        previous = null
+      }
     }
   }
 

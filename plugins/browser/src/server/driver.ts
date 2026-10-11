@@ -36,7 +36,14 @@ export type Capture = { id: string; mime: string; bytes: Buffer; taskId: string 
 /// this file never learns what a database is. See docs/agent-tools/browser-and-scripts.md § Browser tools.
 export type CaptureStore = { put(capture: Omit<Capture, 'id'>): Promise<{ id: string }> }
 
-type Session = { context: BrowserContext; page: Page; cdp: CDPSession; console: BrowserDiagnostics; snapshot: AxSnapshot | null; closing: boolean }
+type Session = {
+  context: BrowserContext
+  page: Page
+  cdp: CDPSession
+  console: BrowserDiagnostics
+  snapshot: AxSnapshot | null
+  closing: boolean
+}
 type Allocation = { cancelled: boolean; promise: Promise<Session> }
 
 export class BrowserPool {
@@ -115,7 +122,10 @@ export class BrowserPool {
   // settled. Independent operations on live task pages still run concurrently.
   #queue<T>(action: () => Promise<T>): Promise<T> {
     const work = this.#allocationQueue.then(action)
-    this.#allocationQueue = work.then(() => {}, () => {})
+    this.#allocationQueue = work.then(
+      () => {},
+      () => {},
+    )
     return work
   }
 
@@ -150,7 +160,8 @@ export class BrowserPool {
       check()
       const cdp = await context.newCDPSession(page)
       check()
-      if (this.#browser !== browser || !browser.isConnected()) throw new Error('Browser disconnected during session creation.')
+      if (this.#browser !== browser || !browser.isConnected())
+        throw new Error('Browser disconnected during session creation.')
       const session: Session = { context, page, cdp, console: new BrowserDiagnostics(), snapshot: null, closing: false }
       page.on('console', (message) => session.console.append(message.type(), message.text()))
       page.on('pageerror', (error) => session.console.append('error', error.message))
@@ -193,7 +204,9 @@ export class BrowserPool {
     return this.#attempt(taskId, async (session) => {
       const backendNodeId = resolveRef(session.snapshot, ref)
       await session.cdp.send('DOM.getDocument')
-      const { model } = (await session.cdp.send('DOM.getBoxModel', { backendNodeId })) as { model: { content: number[] } }
+      const { model } = (await session.cdp.send('DOM.getBoxModel', { backendNodeId })) as {
+        model: { content: number[] }
+      }
       // content is [x1,y1, x2,y2, x3,y3, x4,y4]; the centre is the midpoint of the diagonal.
       const [x1, y1, , , x3, y3] = model.content
       await session.page.mouse.click((x1 + x3) / 2, (y1 + y3) / 2)
@@ -206,10 +219,13 @@ export class BrowserPool {
       await session.cdp.send('DOM.getDocument')
       // Clear through the resolved node, not a selector, so the page cannot substitute a different
       // element between the snapshot and the write. Focus and type so frameworks see real input events.
-      const { object } = (await session.cdp.send('DOM.resolveNode', { backendNodeId })) as { object: { objectId: string } }
+      const { object } = (await session.cdp.send('DOM.resolveNode', { backendNodeId })) as {
+        object: { objectId: string }
+      }
       await session.cdp.send('Runtime.callFunctionOn', {
         objectId: object.objectId,
-        functionDeclaration: 'function () { if ("value" in this) { this.value = ""; this.dispatchEvent(new Event("input", { bubbles: true })) } }',
+        functionDeclaration:
+          'function () { if ("value" in this) { this.value = ""; this.dispatchEvent(new Event("input", { bubbles: true })) } }',
       })
       await session.cdp.send('DOM.focus', { backendNodeId })
       await session.page.keyboard.insertText(text)
@@ -243,9 +259,10 @@ export class BrowserPool {
     const session = this.#sessions.get(taskId)
     if (session) session.closing = true
     // Capture identity before queuing: a later request for the same task owns its own lifetime.
-    if (session) await this.#queue(async () => {
-      if (this.#sessions.get(taskId) === session) await this.#closeSession(taskId)
-    })
+    if (session)
+      await this.#queue(async () => {
+        if (this.#sessions.get(taskId) === session) await this.#closeSession(taskId)
+      })
     await allocation?.promise.catch(() => {})
   }
 

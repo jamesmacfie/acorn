@@ -41,7 +41,19 @@ export { openTarget } from '@acorn/client-core/features/notifications'
 export type { PaneIntent } from '@acorn/client-core/host/registries/commands'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
-export { registerWsBinaryHandler, wsConnect, wsOnNotice, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend, wsSendToNode } from '@acorn/client-core/infra/node/wsClient.ts'
+export {
+  registerWsBinaryHandler,
+  wsConnect,
+  wsOnNotice,
+  wsOnNodeEvent,
+  wsOnPluginsChanged,
+  wsOnReconnect,
+  wsOnStatus,
+  wsOnWorkflowStepChanged,
+  wsOnWorkflowStepEvent,
+  wsSend,
+  wsSendToNode,
+} from '@acorn/client-core/infra/node/wsClient.ts'
 export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node'
 // A compiled plugin hearing the same `plugin:<id>:<verb>` broadcasts its loaded frames can declare.
@@ -53,7 +65,12 @@ export { pluginLabel } from '@acorn/client-core/host/plugins'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
-export type { PaneContribution, PaneLayoutContribution, PaneModelContext, PaneRegistration } from '@acorn/client-core/host/registries/panes/panes.ts'
+export type {
+  PaneContribution,
+  PaneLayoutContribution,
+  PaneModelContext,
+  PaneRegistration,
+} from '@acorn/client-core/host/registries/panes/panes.ts'
 // The host's per-(pane, task) reactive root. A pane that declares `model` on a layout contribution
 // gets this for free; a pane drawing itself with one `component` reaches for it directly, which is
 // what the editor does to keep its per-file document pool across its own mounts
@@ -66,19 +83,45 @@ export type { SourceContribution, SourceRouteContribution } from '@acorn/client-
 // row menu, so github's pull-request list and core's rail list offer the same things. No component
 // crosses — the `<For>` over these rows is eight lines with each host's own `Menu.Item`.
 export {
-  contextMenuItems, contextMenuRegistry, documentSelection, fileMenuTarget, registerContextMenuItems, runContextMenuItem,
+  contextMenuItems,
+  contextMenuRegistry,
+  documentSelection,
+  fileMenuTarget,
+  registerContextMenuItems,
+  runContextMenuItem,
   selectionTooLarge,
 } from '@acorn/client-core/host/registries/panes'
 // Hover and diagnostics providers for a language on a Node, and the checks every owner applies to
 // what they answer (docs/editor/document-surface.md § Language smarts).
 export {
-  LANGUAGE_REQUEST_TOO_LARGE, languageRequestTooLarge, positionAt, requestDiagnostics, requestHover, resolveDocumentServices,
+  LANGUAGE_REQUEST_TOO_LARGE,
+  languageRequestTooLarge,
+  positionAt,
+  requestDiagnostics,
+  requestHover,
+  resolveDocumentServices,
 } from '@acorn/client-core/host/registries/panes'
-export type { CheckedDiagnostic, CheckedHover, DocumentServiceRoute, DocumentServiceRoutes } from '@acorn/client-core/host/registries/panes'
 export type {
-  ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, ItemRowTarget, TaskRowTarget,
-  RailSourceTarget, RailPaneTarget, FileMenuTarget, FileRowTarget, DocumentTabTarget, AgentMessageTarget, AgentTurnTarget,
-  ContentSelectionTarget, SelectionRange,
+  CheckedDiagnostic,
+  CheckedHover,
+  DocumentServiceRoute,
+  DocumentServiceRoutes,
+} from '@acorn/client-core/host/registries/panes'
+export type {
+  ContextMenuContribution,
+  ContextMenuLocation,
+  ContextMenuTarget,
+  ItemRowTarget,
+  TaskRowTarget,
+  RailSourceTarget,
+  RailPaneTarget,
+  FileMenuTarget,
+  FileRowTarget,
+  DocumentTabTarget,
+  AgentMessageTarget,
+  AgentTurnTarget,
+  ContentSelectionTarget,
+  SelectionRange,
 } from '@acorn/client-core/host/registries/panes'
 // Brand-mark registration. See docs/ui-design/icons.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.
@@ -89,7 +132,11 @@ export { brandMarkRegistry, brandStyle } from '@acorn/client-core/kit/tokens'
 export { projectPath } from '@acorn/client-core/host/registries/commands'
 // One slot registry, two component shapes: the slot id picks which (docs/frontend/registries.md § Registries and
 // plugins). `UiSlotContribution` is the union both arms satisfy.
-export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
+export type {
+  ShellSlotContribution,
+  TaskSlotContribution,
+  UiSlotContribution,
+} from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 // Rail status markers (docs/plugins/menus-and-markers.md § Rail markers). A plugin publishes marker data next to the
 // state that owns it and the host draws the pixels: it picks the corner, the colour, the spin, and
 // the tooltip legend. The registry itself stays off this surface; register through
@@ -187,7 +234,13 @@ export { createTask } from '@acorn/client-core/features/tasks'
 export { requestTaskLaunch } from '@acorn/client-core/features/tabs/taskLaunch.ts'
 export { openActionPicker } from '@acorn/client-core/host/registries/commands'
 export { isArchiving } from '@acorn/client-core/features/tasks'
-export { agentSessionsFor, focusSession, refreshSessionSources, sendToSession, sessionSummaries } from '@acorn/client-core/features/tasks'
+export {
+  agentSessionsFor,
+  focusSession,
+  refreshSessionSources,
+  sendToSession,
+  sessionSummaries,
+} from '@acorn/client-core/features/tasks'
 export type { SessionSummary, SessionSubmit } from '@acorn/client-core/features/tasks'
 export { runApi } from '@acorn/client-core/features/tasks'
 export { cachedTaskScripts } from '@acorn/client-core/features/tasks'
@@ -213,7 +266,11 @@ export { previewUrlForClient, remotePreviewBlocked } from '@acorn/client-core/in
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────
 export { contextSnapshot } from '@acorn/client-core/features/agent'
-export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHandler } from '@acorn/client-core/features/agent'
+export {
+  formatFileReference,
+  sendReferenceToAgent,
+  setManagedAgentReferenceHandler,
+} from '@acorn/client-core/features/agent'
 
 // ── The platform seam ─────────────────────────────────────────────────────────────────────────
 // What the host provides, as opposed to what the node provides. A plugin gets the groups it has a
@@ -243,7 +300,10 @@ export { saveJsonPref, savePref } from '@acorn/client-core/features/settings/sav
 // a plugin's Generate dialog reads the pick, resolves it against the backends it was given, and writes
 // the reader's next choice back for every other dialog to open on.
 export {
-  effectiveModelPick, modelPickLabel, readGeneratePick, saveGeneratePick,
+  effectiveModelPick,
+  modelPickLabel,
+  readGeneratePick,
+  saveGeneratePick,
 } from '@acorn/client-core/features/settings'
 export type { ModelPick } from '@acorn/client-core/features/settings'
 export { openRepoConfigTrust } from '@acorn/client-core/features/settings'
@@ -251,7 +311,12 @@ export { openRepoConfigTrust } from '@acorn/client-core/features/settings'
 // Saved signal and the error for a switch or select, a text field that keeps what was typed when its
 // write fails, the question a Save-and-Cancel form asks before settings drops its changes, and the
 // header's name and back link for one item a list page has open.
-export { createSettingSave, createTextSetting, useSettingsDetail, useUnsavedChanges } from '@acorn/client-core/features/settings'
+export {
+  createSettingSave,
+  createTextSetting,
+  useSettingsDetail,
+  useUnsavedChanges,
+} from '@acorn/client-core/features/settings'
 export type { SettingSave, TextSetting } from '@acorn/client-core/features/settings'
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
@@ -262,11 +327,21 @@ export { createDeviceFlow } from '@acorn/client-core/features/integrations'
 export { createCredentialForm } from '@acorn/client-core/features/integrations'
 export type { CredentialFormController } from '@acorn/client-core/features/integrations'
 export { renderMarkdown } from '@acorn/client-core/kit/lib'
-export type { BindingCandidate, BindingCompatibility, BindingOrigin } from '@acorn/client-core/features/dataSources/fieldPickerModel.ts'
+export type {
+  BindingCandidate,
+  BindingCompatibility,
+  BindingOrigin,
+} from '@acorn/client-core/features/dataSources/fieldPickerModel.ts'
 export { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 // The attention model: an adapter turns a session row into a state, and the gate decides whether
 // that state changing is news (docs/notifications.md).
-export { defaultDeliveryContext, forgetAttentionSource, observeAttention, replaceAttentionSource, pushManagedAgentNotice } from '@acorn/client-core/features/notifications/deliver.ts'
+export {
+  defaultDeliveryContext,
+  forgetAttentionSource,
+  observeAttention,
+  replaceAttentionSource,
+  pushManagedAgentNotice,
+} from '@acorn/client-core/features/notifications/deliver.ts'
 export { markAttentionSeen, markTargetsRead } from '@acorn/client-core/features/notifications'
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.
@@ -283,7 +358,17 @@ export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-co
 export { rowHeight, termFontSize } from '@acorn/client-core/kit/lib'
 // `railDotProps` is here beside CHECK_TONE because that is what it is for: the rail's dot
 // vocabulary is not the kit's, and this is the one translation between them.
-export { CHECK_TONE, checkStatusTone, checkStatusWord, checksState, checksSummary, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/kit/lib'
+export {
+  CHECK_TONE,
+  checkStatusTone,
+  checkStatusWord,
+  checksState,
+  checksSummary,
+  FAILED_STATUSES,
+  fileStatusMeta,
+  railDotProps,
+  summarizeFileStats,
+} from '@acorn/client-core/kit/lib'
 
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
 // The client half of what `ctx.telemetry` and `ctx.log` are on the node, and the id is an argument
@@ -327,14 +412,68 @@ export { slotFills } from '@acorn/client-core/host/tree/arbitration.ts'
 // ./ui carries Solid components: one of those makes the whole entrypoint unloadable there
 // (docs/plugin-authoring/testing.md § Testing). Nothing in the module below imports anything.
 export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib'
-export { DATA_VERSION, DATA_LIMITS, MISSING, parseDataValue, parseVersionedDataValue, parseDataPointer, readDataPointer, canonicalDataEncoding, canonicalDataProjection } from '@acorn/protocol/dataValues.ts'
+export {
+  DATA_VERSION,
+  DATA_LIMITS,
+  MISSING,
+  parseDataValue,
+  parseVersionedDataValue,
+  parseDataPointer,
+  readDataPointer,
+  canonicalDataEncoding,
+  canonicalDataProjection,
+} from '@acorn/protocol/dataValues.ts'
 export type { DataValue, DataPrimitive, DataRead, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
 export { parseDataSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 export type { DataSchema, DataType } from '@acorn/protocol/dataSchemas.ts'
-export { DATA_OPERATORS, dataPointerSchema, dataBindingSchema, dataFieldSchema, dataFieldsSchema, parseDataPredicate, compareDataValues } from '@acorn/protocol/dataBindings.ts'
-export type { DataBinding, DataBindingAddress, DataField, DataOperator, DataPredicate } from '@acorn/protocol/dataBindings.ts'
-export type { DataSourceRef, DataSourceDescriptor, DataSourceRegistration, DataSourceDiscovery, DataSourceScope, DataSourceDescription, DataSourceQuery, DataSourceRequest, DataRecordRef, DataRecord, DataSourcePage, DataSourceResult, DataSourceOptions, DataSourceDetails, DataSourceResponse, DataSourceDiscoveryRequest, DataSourceDiscoveryPage } from '@acorn/protocol/dataSources.ts'
-export type { QueryScope, QueryContent, QueryReference, QueryConsumer, QueryRevision, QueryDraft, QueryBindingContext, QueryBindings, ResolvedQuery, QueryRecovery, QuerySaveState } from '@acorn/protocol/dataQueries.ts'
+export {
+  DATA_OPERATORS,
+  dataPointerSchema,
+  dataBindingSchema,
+  dataFieldSchema,
+  dataFieldsSchema,
+  parseDataPredicate,
+  compareDataValues,
+} from '@acorn/protocol/dataBindings.ts'
+export type {
+  DataBinding,
+  DataBindingAddress,
+  DataField,
+  DataOperator,
+  DataPredicate,
+} from '@acorn/protocol/dataBindings.ts'
+export type {
+  DataSourceRef,
+  DataSourceDescriptor,
+  DataSourceRegistration,
+  DataSourceDiscovery,
+  DataSourceScope,
+  DataSourceDescription,
+  DataSourceQuery,
+  DataSourceRequest,
+  DataRecordRef,
+  DataRecord,
+  DataSourcePage,
+  DataSourceResult,
+  DataSourceOptions,
+  DataSourceDetails,
+  DataSourceResponse,
+  DataSourceDiscoveryRequest,
+  DataSourceDiscoveryPage,
+} from '@acorn/protocol/dataSources.ts'
+export type {
+  QueryScope,
+  QueryContent,
+  QueryReference,
+  QueryConsumer,
+  QueryRevision,
+  QueryDraft,
+  QueryBindingContext,
+  QueryBindings,
+  ResolvedQuery,
+  QueryRecovery,
+  QuerySaveState,
+} from '@acorn/protocol/dataQueries.ts'
 export { queryContentSchema, queryReferenceSchema, queryScopeSchema } from '@acorn/protocol/dataQueries.ts'
 export { resolveDataBinding, resolveQueryParameters, resolveQueryContent } from '@acorn/protocol/dataQueryResolution.ts'
 export type { PaneSwitcherData, PaneSwitcherPane, PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'

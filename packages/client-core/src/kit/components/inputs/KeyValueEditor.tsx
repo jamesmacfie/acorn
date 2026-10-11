@@ -53,7 +53,9 @@ export function KeyValueEditor(props: {
       style={extraCols() ? { '--kv-extra-cols': String(extraCols()) } : undefined}
     >
       <div class="ui-kvgrid-head" role="row">
-        <Show when={withEnable()}><span /></Show>
+        <Show when={withEnable()}>
+          <span />
+        </Show>
         <span>{props.keyPlaceholder ?? 'Name'}</span>
         <span>{props.valuePlaceholder ?? 'Value'}</span>
         <Index each={props.columns ?? []}>{(column) => <span>{column().header}</span>}</Index>
@@ -94,9 +96,7 @@ export function KeyValueEditor(props: {
                 />
               </Show>
             </div>
-            <Show when={props.rowHint?.(row())}>
-              {(hint) => <p class="ui-kvgrid-hint">{hint()}</p>}
-            </Show>
+            <Show when={props.rowHint?.(row())}>{(hint) => <p class="ui-kvgrid-hint">{hint()}</p>}</Show>
           </>
         )}
       </Index>

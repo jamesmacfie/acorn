@@ -28,7 +28,11 @@ export function recipeToLayout(recipe: RecipeSpec): TaskLayout | null {
   return { panes }
 }
 
-export async function invokeLayoutRecipe(taskId: string, recipe: RecipeSpec, svc: RecipeServices): Promise<{ ok: boolean; reason?: string }> {
+export async function invokeLayoutRecipe(
+  taskId: string,
+  recipe: RecipeSpec,
+  svc: RecipeServices,
+): Promise<{ ok: boolean; reason?: string }> {
   const layout = recipeToLayout(recipe)
   if (!layout) return { ok: false, reason: `layout.${recipe.id} has no valid panes` }
   svc.setLayout(taskId, layout)

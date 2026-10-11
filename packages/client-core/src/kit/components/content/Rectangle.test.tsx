@@ -15,11 +15,14 @@ let dispose: (() => void) | undefined
 const draw = () => {
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => (
-    <Rectangle kind="pty" label="Terminal">
-      <textarea />
-    </Rectangle>
-  ), host)
+  dispose = render(
+    () => (
+      <Rectangle kind="pty" label="Terminal">
+        <textarea />
+      </Rectangle>
+    ),
+    host,
+  )
   return {
     box: host.querySelector<HTMLElement>('.ui-rect')!,
     inner: host.querySelector<HTMLTextAreaElement>('textarea')!,

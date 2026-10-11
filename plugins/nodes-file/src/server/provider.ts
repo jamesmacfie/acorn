@@ -24,7 +24,10 @@ const fileNodeSchema = z.object({
   nodeId: z.string().min(1).optional(),
   label: z.string().min(1),
   endpoint: z.string().url().optional(),
-  fingerprint: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+  fingerprint: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
   state: providedNodeStateSchema.default('ready'),
   // The node's own device token, as a control plane would have learned it at enrollment. Only the
   // adopt route ever sees it: the list route projects it out, and the projection is a field list
@@ -55,7 +58,8 @@ const read = (path: string): FileNode[] => {
     return []
   }
   const parsed = fileSchema.safeParse(JSON.parse(raw) as unknown)
-  if (!parsed.success) throw new Error(`${path} is not a usable node list: ${parsed.error.issues[0]?.message ?? 'invalid'}`)
+  if (!parsed.success)
+    throw new Error(`${path} is not a usable node list: ${parsed.error.issues[0]?.message ?? 'invalid'}`)
   return parsed.data.nodes
 }
 
@@ -92,7 +96,10 @@ export const nodesFileProvider = (path: string): NodeProviderContribution => ({
     return toRecord(node)
   },
   destroy: async (providerNodeId: string) => {
-    write(path, read(path).filter((node) => node.providerNodeId !== providerNodeId))
+    write(
+      path,
+      read(path).filter((node) => node.providerNodeId !== providerNodeId),
+    )
   },
   start: async (providerNodeId: string) => setState(path, providerNodeId, 'ready'),
   stop: async (providerNodeId: string) => setState(path, providerNodeId, 'stopped'),
@@ -103,5 +110,8 @@ function setState(path: string, providerNodeId: string, state: FileNode['state']
   if (!nodes.some((node) => node.providerNodeId === providerNodeId)) {
     throw new Error(`${path} lists no node '${providerNodeId}'.`)
   }
-  write(path, nodes.map((node) => (node.providerNodeId === providerNodeId ? { ...node, state } : node)))
+  write(
+    path,
+    nodes.map((node) => (node.providerNodeId === providerNodeId ? { ...node, state } : node)),
+  )
 }

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageQuota, AgentUsageSnapshot } from '../../shared/usage'
 import { usageHealth } from '../../shared/usage'
-import { formatEstimateUsd, formatReset, formatTokens, planName, providerMetaLine, providerUsageRows, quotaPace, usageSummaryEntries } from './usageModel'
+import {
+  formatEstimateUsd,
+  formatReset,
+  formatTokens,
+  planName,
+  providerMetaLine,
+  providerUsageRows,
+  quotaPace,
+  usageSummaryEntries,
+} from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
   provider: id,
@@ -144,8 +153,14 @@ describe('agent usage detail formatting', () => {
 
   describe('the pace mark under a quota bar', () => {
     const quota = (over: Partial<AgentUsageQuota>): AgentUsageQuota => ({
-      id: 'session', label: 'Session', percentRemaining: 50, resetsAt: null, resetText: null,
-      windowSeconds: 5 * 60 * 60, health: 'healthy', ...over,
+      id: 'session',
+      label: 'Session',
+      percentRemaining: 50,
+      resetsAt: null,
+      resetText: null,
+      windowSeconds: 5 * 60 * 60,
+      health: 'healthy',
+      ...over,
     })
     const now = 1_700_000_000_000
     const hour = 3_600_000
@@ -198,9 +213,11 @@ describe('agent usage detail formatting', () => {
         },
       },
     }
-    expect(providerUsageRows(claude)).toEqual(expect.arrayContaining([
-      { label: 'Estimated today', value: 'No price for this model' },
-      { label: 'Unpriced models', value: 'claude-new-model' },
-    ]))
+    expect(providerUsageRows(claude)).toEqual(
+      expect.arrayContaining([
+        { label: 'Estimated today', value: 'No price for this model' },
+        { label: 'Unpriced models', value: 'claude-new-model' },
+      ]),
+    )
   })
 })

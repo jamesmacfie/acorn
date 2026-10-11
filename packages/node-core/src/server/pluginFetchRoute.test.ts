@@ -65,17 +65,26 @@ describe('a fetch-shaped plugin route', () => {
 
   it('forwards pre-aborted and live request signals through the mount adapter', async () => {
     let started!: () => void
-    const running = new Promise<void>((resolve) => { started = resolve })
-    registerRoute({ plugin: 'ntfy', prefix: '', fetch: async (request) => {
-      if (request.signal.aborted) return Response.json({ reason: request.signal.reason })
-      started()
-      await new Promise<void>((resolve) => request.signal.addEventListener('abort', () => resolve(), { once: true }))
-      return Response.json({ reason: request.signal.reason })
-    } })
-    const pre = new AbortController(); pre.abort('before')
+    const running = new Promise<void>((resolve) => {
+      started = resolve
+    })
+    registerRoute({
+      plugin: 'ntfy',
+      prefix: '',
+      fetch: async (request) => {
+        if (request.signal.aborted) return Response.json({ reason: request.signal.reason })
+        started()
+        await new Promise<void>((resolve) => request.signal.addEventListener('abort', () => resolve(), { once: true }))
+        return Response.json({ reason: request.signal.reason })
+      },
+    })
+    const pre = new AbortController()
+    pre.abort('before')
     expect(await (await call('/v1/p/ntfy', { signal: pre.signal })).json()).toEqual({ reason: 'before' })
-    const live = new AbortController(), result = call('/v1/p/ntfy', { signal: live.signal })
-    await running; live.abort('during')
+    const live = new AbortController(),
+      result = call('/v1/p/ntfy', { signal: live.signal })
+    await running
+    live.abort('during')
     expect(await (await result).json()).toEqual({ reason: 'during' })
   })
 

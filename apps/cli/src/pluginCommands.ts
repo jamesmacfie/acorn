@@ -9,18 +9,30 @@ import type { CliNode } from './node'
 const apiVersion = 'acorn.cli/v1'
 
 async function active(node: CliNode, id: string) {
-  const state = await node.get('/v1/core/plugins') as NodePluginState
-  if (!Array.isArray(state?.plugins)) throw new CliError('invalid_response', 'The Node returned an invalid plugin roster.', 1)
+  const state = (await node.get('/v1/core/plugins')) as NodePluginState
+  if (!Array.isArray(state?.plugins))
+    throw new CliError('invalid_response', 'The Node returned an invalid plugin roster.', 1)
   const row = state.plugins.find((entry) => entry.name === id)
-  if (!row?.running || row.disabled || row.active?.activation !== 'node') throw new CliError('not_found', `Plugin ${id} is not active on Node ${node.nodeId}.`, 4)
+  if (!row?.running || row.disabled || row.active?.activation !== 'node')
+    throw new CliError('not_found', `Plugin ${id} is not active on Node ${node.nodeId}.`, 4)
   return row
 }
 
 const resource = (nodeId: string, pluginId: string, descriptor: PluginCliCommandDescriptor) => ({
-  apiVersion, kind: 'PluginCommand', nodeId, id: `${pluginId}:${descriptor.name}`, pluginId, name: descriptor.name,
-  title: descriptor.title, summary: descriptor.summary, effects: descriptor.effects ?? null,
-  risk: descriptor.risk, scope: descriptor.scope, capability: descriptor.capability,
-  inputSchema: descriptor.inputSchema, outputSchema: descriptor.outputSchema,
+  apiVersion,
+  kind: 'PluginCommand',
+  nodeId,
+  id: `${pluginId}:${descriptor.name}`,
+  pluginId,
+  name: descriptor.name,
+  title: descriptor.title,
+  summary: descriptor.summary,
+  effects: descriptor.effects ?? null,
+  risk: descriptor.risk,
+  scope: descriptor.scope,
+  capability: descriptor.capability,
+  inputSchema: descriptor.inputSchema,
+  outputSchema: descriptor.outputSchema,
 })
 
 export async function pluginCommandHelp(node: CliNode, args: ParsedArgs): Promise<string> {
@@ -42,12 +54,32 @@ export async function runPluginCommand(node: CliNode, args: ParsedArgs): Promise
   if (!file) throw new CliError('usage', '--input-file is required.', 2)
   const input = await readJsonFile(file, PLUGIN_CLI_INPUT_MAX_BYTES)
   const errors = validatePluginCliValue(descriptor.inputSchema, input)
-  if (errors.length) throw new CliError('invalid_input', errors.map((issue) => `${issue.path}: ${issue.message}`).join('; '), 2)
-  if ((input as { nodeId?: unknown }).nodeId !== node.nodeId) throw new CliError('invalid_input', `$.nodeId must be ${node.nodeId}.`, 2)
-  const result = await node.mutate('POST', `/v1/core/plugins/${encodeURIComponent(id!)}/cli/${encodeURIComponent(command!)}`, { input },
-    requestKey(args.options['request-id'])) as { result?: unknown }
-  if (!result || !('result' in result)) throw new CliError('invalid_response', 'The Node returned no command result.', 1)
+  if (errors.length)
+    throw new CliError('invalid_input', errors.map((issue) => `${issue.path}: ${issue.message}`).join('; '), 2)
+  if ((input as { nodeId?: unknown }).nodeId !== node.nodeId)
+    throw new CliError('invalid_input', `$.nodeId must be ${node.nodeId}.`, 2)
+  const result = (await node.mutate(
+    'POST',
+    `/v1/core/plugins/${encodeURIComponent(id!)}/cli/${encodeURIComponent(command!)}`,
+    { input },
+    requestKey(args.options['request-id']),
+  )) as { result?: unknown }
+  if (!result || !('result' in result))
+    throw new CliError('invalid_response', 'The Node returned no command result.', 1)
   const outputErrors = validatePluginCliValue(descriptor.outputSchema, result.result)
-  if (outputErrors.length) throw new CliError('invalid_response', `Plugin output failed its schema: ${outputErrors.map((issue) => `${issue.path}: ${issue.message}`).join('; ')}`, 1)
-  return { apiVersion, kind: 'PluginCommandResult', nodeId: node.nodeId, id: `${id}:${command}`, pluginId: id, command, result: result.result }
+  if (outputErrors.length)
+    throw new CliError(
+      'invalid_response',
+      `Plugin output failed its schema: ${outputErrors.map((issue) => `${issue.path}: ${issue.message}`).join('; ')}`,
+      1,
+    )
+  return {
+    apiVersion,
+    kind: 'PluginCommandResult',
+    nodeId: node.nodeId,
+    id: `${id}:${command}`,
+    pluginId: id,
+    command,
+    result: result.result,
+  }
 }

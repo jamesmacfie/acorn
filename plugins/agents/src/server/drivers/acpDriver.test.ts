@@ -29,7 +29,8 @@ const sessionWithRef = (providerSessionRef: string): AgentSession => ({
   config: {},
   parentSessionId: null,
   parentTurnId: null,
-  subagents: [], queuedTurns: 0,
+  subagents: [],
+  queuedTurns: 0,
   lastEventSeq: 0,
   lastReadSeq: 0,
   archivedAt: null,
@@ -102,26 +103,29 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     const session = sessionWithRef('d2c6edee-10be-460b-a636-083f68dcde6f')
     const startup = sessionStartupTelemetry(ctx.telemetry, session, false, new AbortController().signal)!
     const events: AgentNormalizedEvent[] = []
-    const handle = await startup.provider((measureStartup) => new AcpDriver({
-      id: 'stub',
-      profileId: 'stub',
-      label: 'Stub',
-      spawn: {
-        entry: () => fileURLToPath(new URL('./__fixtures__/forgetfulAcpAgent.mjs', import.meta.url)),
-      },
-      quirks: { sessionPersistence: true },
-    }).start({
-      session,
-      measureStartup,
-      cwd: process.cwd(),
-      env: {},
-      mcpServers: [],
-      noProviderExecutionHistory: false,
-      onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
-      },
-      onClosed: () => {},
-    }))
+    const handle = await startup.provider((measureStartup) =>
+      new AcpDriver({
+        id: 'stub',
+        profileId: 'stub',
+        label: 'Stub',
+        spawn: {
+          entry: () => fileURLToPath(new URL('./__fixtures__/forgetfulAcpAgent.mjs', import.meta.url)),
+        },
+        quirks: { sessionPersistence: true },
+      }).start({
+        session,
+        measureStartup,
+        cwd: process.cwd(),
+        env: {},
+        mcpServers: [],
+        noProviderExecutionHistory: false,
+        onEvent: (event) => {
+          if (event.type !== 'generated_artifact')
+            events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
+        },
+        onClosed: () => {},
+      }),
+    )
     startup.end('ok')
 
     try {
@@ -137,7 +141,15 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       expect(phases.find((record) => record.attrs.phase === 'provider.session.load')).toMatchObject({ status: 'error' })
       expect(phases.find((record) => record.attrs.phase === 'provider.session.create')).toMatchObject({ status: 'ok' })
       const provider = ctx.recorded.find((record) => record.kind === 'span' && record.name === 'agent.session')!
-      expect(phases.every((record) => record.kind === 'span' && provider.kind === 'span' && record.traceId === provider.traceId && record.parentSpanId === provider.spanId)).toBe(true)
+      expect(
+        phases.every(
+          (record) =>
+            record.kind === 'span' &&
+            provider.kind === 'span' &&
+            record.traceId === provider.traceId &&
+            record.parentSpanId === provider.spanId,
+        ),
+      ).toBe(true)
     } finally {
       await handle.stop()
       ctx.cleanup()
@@ -165,7 +177,8 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
+        if (event.type !== 'generated_artifact')
+          events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
     })
@@ -185,35 +198,41 @@ describe('the generic ACP driver describes a harness before it starts one', () =
   it.each([
     { history: true, warnings: 1 },
     { history: false, warnings: 0 },
-  ])('starts a fresh provider session when a resuming agent refuses the stored one (turns ran: $history)', async ({ history, warnings }) => {
-    const events: AgentNormalizedEvent[] = []
-    const handle = await new AcpDriver({
-      id: 'stub',
-      profileId: 'stub',
-      label: 'Stub',
-      spawn: {
-        entry: () => fileURLToPath(new URL('./__fixtures__/resumableAcpAgent.mjs', import.meta.url)),
-      },
-    }).start({
-      session: sessionWithRef('unresumable-session-id'),
-      cwd: process.cwd(),
-      env: {},
-      mcpServers: [],
-      noProviderExecutionHistory: !history,
-      onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
-      },
-      onClosed: () => {},
-    })
+  ])(
+    'starts a fresh provider session when a resuming agent refuses the stored one (turns ran: $history)',
+    async ({ history, warnings }) => {
+      const events: AgentNormalizedEvent[] = []
+      const handle = await new AcpDriver({
+        id: 'stub',
+        profileId: 'stub',
+        label: 'Stub',
+        spawn: {
+          entry: () => fileURLToPath(new URL('./__fixtures__/resumableAcpAgent.mjs', import.meta.url)),
+        },
+      }).start({
+        session: sessionWithRef('unresumable-session-id'),
+        cwd: process.cwd(),
+        env: {},
+        mcpServers: [],
+        noProviderExecutionHistory: !history,
+        onEvent: (event) => {
+          if (event.type !== 'generated_artifact')
+            events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
+        },
+        onClosed: () => {},
+      })
 
-    try {
-      // Resume answers invalid params rather than resource-not-found, and it is the same dead reference.
-      expect(handle.providerSessionRef).toBe('fresh-session-id')
-      expect(events.filter((event) => event.type === 'diagnostic' && event.level === 'warning')).toHaveLength(warnings)
-    } finally {
-      await handle.stop()
-    }
-  })
+      try {
+        // Resume answers invalid params rather than resource-not-found, and it is the same dead reference.
+        expect(handle.providerSessionRef).toBe('fresh-session-id')
+        expect(events.filter((event) => event.type === 'diagnostic' && event.level === 'warning')).toHaveLength(
+          warnings,
+        )
+      } finally {
+        await handle.stop()
+      }
+    },
+  )
 
   // A contributed harness has no system prompt acorn can reach, so a custom agent's instructions go in
   // front of the first prompt of each provider session the driver creates, and nowhere else.
@@ -233,7 +252,8 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         mcpServers: [],
         noProviderExecutionHistory: false,
         onEvent: (event) => {
-          if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
+          if (event.type !== 'generated_artifact')
+            events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
         },
         onClosed: () => {},
       })
@@ -244,11 +264,14 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       } finally {
         await handle.stop()
       }
-      return events.flatMap((event) => event.type === 'assistant_message' ? [event.text] : [])
+      return events.flatMap((event) => (event.type === 'assistant_message' ? [event.text] : []))
     }
 
     it('sends them once, ahead of the first prompt of a new session', async () => {
-      const said = await echoes({ ...sessionWithRef(''), providerSessionRef: null, config: { customAgent, standingContext: 'Stored memory.' } }, 2)
+      const said = await echoes(
+        { ...sessionWithRef(''), providerSessionRef: null, config: { customAgent, standingContext: 'Stored memory.' } },
+        2,
+      )
       expect(said).toEqual([
         'echo:<acorn-context source="context.agent.instructions" label="Bug reviewer instructions">\nReview for correctness only.\n</acorn-context>\n\n<acorn-context source="context.memory" label="Memory at session start">\nStored memory.\n</acorn-context>',
         'echo:go 1',
@@ -256,7 +279,10 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     })
 
     it('does not send them again to a session it picks back up', async () => {
-      const said = await echoes({ ...sessionWithRef('kept-session'), config: { customAgent, standingContext: 'Stored memory.' } }, 1)
+      const said = await echoes(
+        { ...sessionWithRef('kept-session'), config: { customAgent, standingContext: 'Stored memory.' } },
+        1,
+      )
       expect(said).toEqual(['echo:go 0'])
     })
   })
@@ -277,13 +303,18 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
+        if (event.type !== 'generated_artifact')
+          events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
     })
     try {
-      await expect(handle.sendTurn({ turn: {} as never, input: [{ type: 'text', text: 'go' }], attachments: {} })).rejects.toThrow('Internal error')
-      expect(events).toContainEqual(expect.objectContaining({ type: 'error', code: 'stub_turn_failed', message: 'No model selected.' }))
+      await expect(
+        handle.sendTurn({ turn: {} as never, input: [{ type: 'text', text: 'go' }], attachments: {} }),
+      ).rejects.toThrow('Internal error')
+      expect(events).toContainEqual(
+        expect.objectContaining({ type: 'error', code: 'stub_turn_failed', message: 'No model selected.' }),
+      )
     } finally {
       await handle.stop()
     }
@@ -292,30 +323,50 @@ describe('the generic ACP driver describes a harness before it starts one', () =
   // ACP spells an environment as an ordered list of pairs, so a server naming the same variable twice
   // is a protocol error the agent reports rather than a silent last-wins.
   it('hands acorn\u2019s own tool server to the agent as ordered environment pairs', () => {
-    expect(acpMcpServers([{
-      transport: 'stdio',
-      name: 'acorn-dev',
-      command: '/opt/acorn/node',
-      args: ['/opt/acorn/mcp.js'],
-      env: { ACORN_MCP_NAME: 'acorn-dev', ACORN_API_TOKEN: 'signed' },
-    }]).servers).toEqual([{
-      name: 'acorn-dev',
-      command: '/opt/acorn/node',
-      args: ['/opt/acorn/mcp.js'],
-      env: [
-        { name: 'ACORN_MCP_NAME', value: 'acorn-dev' },
-        { name: 'ACORN_API_TOKEN', value: 'signed' },
-      ],
-    }])
+    expect(
+      acpMcpServers([
+        {
+          transport: 'stdio',
+          name: 'acorn-dev',
+          command: '/opt/acorn/node',
+          args: ['/opt/acorn/mcp.js'],
+          env: { ACORN_MCP_NAME: 'acorn-dev', ACORN_API_TOKEN: 'signed' },
+        },
+      ]).servers,
+    ).toEqual([
+      {
+        name: 'acorn-dev',
+        command: '/opt/acorn/node',
+        args: ['/opt/acorn/mcp.js'],
+        env: [
+          { name: 'ACORN_MCP_NAME', value: 'acorn-dev' },
+          { name: 'ACORN_API_TOKEN', value: 'signed' },
+        ],
+      },
+    ])
     expect(acpMcpServers([])).toEqual({ servers: [], unsupported: [] })
   })
 
   // A user's HTTP server reaches only an agent that said at initialize it takes one. The rest are named,
   // so the session can say which servers it is running without.
   it('declares an HTTP server only to an agent that takes HTTP', () => {
-    const http = [{ transport: 'http' as const, name: 'docs', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer t' } }]
+    const http = [
+      {
+        transport: 'http' as const,
+        name: 'docs',
+        url: 'https://docs.example/mcp',
+        headers: { Authorization: 'Bearer t' },
+      },
+    ]
     expect(acpMcpServers(http, { http: true })).toEqual({
-      servers: [{ type: 'http', name: 'docs', url: 'https://docs.example/mcp', headers: [{ name: 'Authorization', value: 'Bearer t' }] }],
+      servers: [
+        {
+          type: 'http',
+          name: 'docs',
+          url: 'https://docs.example/mcp',
+          headers: [{ name: 'Authorization', value: 'Bearer t' }],
+        },
+      ],
       unsupported: [],
     })
     expect(acpMcpServers(http, {})).toEqual({ servers: [], unsupported: ['docs'] })
@@ -348,7 +399,11 @@ describe('the generic ACP driver parks a question until somebody answers it', ()
   const parked = () => {
     const events: AgentDriverEvent[] = []
     const pending = new Map<string, PendingRequest>()
-    const options = { onEvent: async (event: AgentDriverEvent) => { events.push(event) } }
+    const options = {
+      onEvent: async (event: AgentDriverEvent) => {
+        events.push(event)
+      },
+    }
     return { events, pending, client: clientFor(options as AgentDriverStartOptions, 'Stub', pending, () => false) }
   }
 
@@ -358,7 +413,10 @@ describe('the generic ACP driver parks a question until somebody answers it', ()
     const [requestId] = [...pending.keys()]
     pending.get(requestId)!.resolve({ answers: { pick: 'second' } })
     expect(await response).toEqual({ action: 'accept', content: { pick: 'second' } })
-    expect(events[0]).toMatchObject({ type: 'input_request', request: { type: 'request', kind: 'question', requestId, title: 'Which one?' } })
+    expect(events[0]).toMatchObject({
+      type: 'input_request',
+      request: { type: 'request', kind: 'question', requestId, title: 'Which one?' },
+    })
   })
 
   it('cancels a question the turn left behind rather than answering it empty', async () => {
@@ -383,9 +441,16 @@ describe('the generic ACP driver parks a question until somebody answers it', ()
   // DeepSeek's shape: the request names only the call, and the command arrived on the call's update.
   it('reads a permission subject from the tool call the agent announced before asking', async () => {
     const { events, pending, client } = parked()
-    await client.sessionUpdate({ sessionId: 'acp-session', update: {
-      sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'bash', kind: 'other', rawInput: { command: 'ls -la' },
-    } })
+    await client.sessionUpdate({
+      sessionId: 'acp-session',
+      update: {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'call_1',
+        title: 'bash',
+        kind: 'other',
+        rawInput: { command: 'ls -la' },
+      },
+    })
     const response = client.requestPermission({
       sessionId: 'acp-session',
       toolCall: { toolCallId: 'call_1' },
@@ -423,7 +488,10 @@ describe('a question the agent stopped waiting for is released with the turn', (
       env: {},
       mcpServers: [],
       noProviderExecutionHistory: false,
-      onEvent: (event) => { if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event) },
+      onEvent: (event) => {
+        if (event.type !== 'generated_artifact')
+          events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
+      },
       onClosed: () => {},
     })
 
@@ -463,12 +531,25 @@ describe('the generic ACP driver sends attachments inline when the agent takes t
   it('inlines images and text, and links what it has no inline block for', async () => {
     expect(await acpPrompt(input, attachments, { image: true, embeddedContext: true })).toEqual([
       { type: 'image', data: 'iVBORw==', mimeType: 'image/png' },
-      { type: 'resource', resource: { uri: pathToFileURL(attachments.txt.localPath).href, mimeType: 'text/plain', text: 'hello' } },
-      { type: 'resource_link', uri: pathToFileURL(attachments.pdf.localPath).href, name: 'spec.pdf', mimeType: 'application/pdf', size: 8 },
+      {
+        type: 'resource',
+        resource: { uri: pathToFileURL(attachments.txt.localPath).href, mimeType: 'text/plain', text: 'hello' },
+      },
+      {
+        type: 'resource_link',
+        uri: pathToFileURL(attachments.pdf.localPath).href,
+        name: 'spec.pdf',
+        mimeType: 'application/pdf',
+        size: 8,
+      },
     ])
   })
 
   it('links every attachment for an agent that declared neither', async () => {
-    expect((await acpPrompt(input, attachments)).map((block) => block.type)).toEqual(['resource_link', 'resource_link', 'resource_link'])
+    expect((await acpPrompt(input, attachments)).map((block) => block.type)).toEqual([
+      'resource_link',
+      'resource_link',
+      'resource_link',
+    ])
   })
 })

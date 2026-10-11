@@ -13,19 +13,44 @@ let db: TestDb
 let scripts: TaskScriptService
 beforeEach(() => {
   db = makeTestDb()
-  db.db.insert(schema.tasks).values({ id: 'task', title: 'Fixture', projectId: 'p', origin: 'local', status: 'active', createdAt: 1, updatedAt: 1 }).run()
+  db.db
+    .insert(schema.tasks)
+    .values({
+      id: 'task',
+      title: 'Fixture',
+      projectId: 'p',
+      origin: 'local',
+      status: 'active',
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run()
   scripts = new TaskScriptService(db.db)
 })
-afterEach(() => { scripts.close(); db.cleanup() })
-const admit = (phase: 'setup' | 'teardown' = 'setup') => { const row = scripts.admit('task', phase); return { attemptId: row.attemptId!, generation: row.generation } }
+afterEach(() => {
+  scripts.close()
+  db.cleanup()
+})
+const admit = (phase: 'setup' | 'teardown' = 'setup') => {
+  const row = scripts.admit('task', phase)
+  return { attemptId: row.attemptId!, generation: row.generation }
+}
 
 describe('durable task script contract', () => {
   it('does not invent an execution or start work on reads', async () => {
     expect(scripts.status('task').setup).toMatchObject({ state: 'not_started', attemptId: null, requestedAt: null })
     expect(await scripts.wait('task', { phase: 'setup' })).toMatchObject({ matched: false, reason: 'not_started' })
     expect(scripts.logs('task', { phase: 'setup' })).toMatchObject({ available: false, output: '' })
-    db.db.update(schema.tasks).set({ scriptHistoryKnown: false, worktreePath: '/legacy' }).where(eq(schema.tasks.id, 'task')).run()
-    expect(scripts.status('task').setup).toMatchObject({ state: 'unknown', reason: 'legacy_history', requestedAt: null })
+    db.db
+      .update(schema.tasks)
+      .set({ scriptHistoryKnown: false, worktreePath: '/legacy' })
+      .where(eq(schema.tasks.id, 'task'))
+      .run()
+    expect(scripts.status('task').setup).toMatchObject({
+      state: 'unknown',
+      reason: 'legacy_history',
+      requestedAt: null,
+    })
     expect(await scripts.wait('task', { phase: 'setup' })).toMatchObject({ matched: false, reason: 'unknown' })
     expect(scripts.status('task').attempts).toEqual([])
   })
@@ -43,7 +68,7 @@ describe('durable task script contract', () => {
     expect(reopened.logs('task', { phase: 'setup' })).toMatchObject({ output: 'installed ✓\n', available: true })
     expect(scripts.store.listeners.size).toBe(0)
   })
-  it.each(['spawn_failed', 'timeout'] as const)('records %s without a fabricated exit code', reason => {
+  it.each(['spawn_failed', 'timeout'] as const)('records %s without a fabricated exit code', (reason) => {
     const id = admit()
     scripts.report(id, { type: 'failed', reason })
     expect(scripts.status('task').setup).toMatchObject({ state: 'failed', reason, exitCode: null })
@@ -57,7 +82,10 @@ describe('durable task script contract', () => {
     expect(scripts.status('task').setup.state).toBe('interrupted')
     for (const reason of ['user_skipped', 'disabled', 'not_configured', 'not_applicable'] as const) {
       scripts.admit('task', 'setup', reason)
-      expect(await scripts.wait('task', { phase: 'setup' })).toMatchObject({ matched: true, snapshot: { state: 'skipped', reason, startedAt: null, exitCode: null } })
+      expect(await scripts.wait('task', { phase: 'setup' })).toMatchObject({
+        matched: true,
+        snapshot: { state: 'skipped', reason, startedAt: null, exitCode: null },
+      })
     }
   })
   it('binds waits to a generation and fences late exits from prior attempts', async () => {
@@ -68,13 +96,20 @@ describe('durable task script contract', () => {
     const current = admit()
     scripts.report(old, { type: 'exit', exitCode: 0 })
     expect(scripts.status('task').setup).toMatchObject({ attemptId: current.attemptId, state: 'starting' })
-    expect(scripts.logs('task', { phase: 'setup', attemptId: old.attemptId }).snapshot).toMatchObject({ state: 'interrupted', reason: 'generation_changed' })
+    expect(scripts.logs('task', { phase: 'setup', attemptId: old.attemptId }).snapshot).toMatchObject({
+      state: 'interrupted',
+      reason: 'generation_changed',
+    })
     expect(scripts.status('task').attempts).toHaveLength(2)
   })
   it('timeout and cancellation release wait resources and keep the process running', async () => {
     const id = admit()
     scripts.report(id, { type: 'started', terminalSessionId: 'session' })
-    expect(await scripts.wait('task', { phase: 'setup', timeoutMs: 0 })).toMatchObject({ matched: false, reason: 'timeout', snapshot: { state: 'running' } })
+    expect(await scripts.wait('task', { phase: 'setup', timeoutMs: 0 })).toMatchObject({
+      matched: false,
+      reason: 'timeout',
+      snapshot: { state: 'running' },
+    })
     const abort = new AbortController()
     const wait = scripts.wait('task', { phase: 'setup' }, abort.signal)
     abort.abort()
@@ -109,30 +144,70 @@ describe('durable task script contract', () => {
 
 describe('setup by hand', () => {
   beforeEach(() => {
-    db.db.insert(schema.projects).values({ id: 'p', name: 'Project', workspaceId: 'w', vcs: 'git', setupScript: 'pnpm install', createdAt: 1, updatedAt: 1 }).run()
-    db.db.update(schema.tasks).set({ branch: 'feature', worktreePath: '/worktrees/feature', skipSetup: true }).where(eq(schema.tasks.id, 'task')).run()
+    db.db
+      .insert(schema.projects)
+      .values({
+        id: 'p',
+        name: 'Project',
+        workspaceId: 'w',
+        vcs: 'git',
+        setupScript: 'pnpm install',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run()
+    db.db
+      .update(schema.tasks)
+      .set({ branch: 'feature', worktreePath: '/worktrees/feature', skipSetup: true })
+      .where(eq(schema.tasks.id, 'task'))
+      .run()
   })
-  const setupState = { user_skipped: () => scripts.admit('task', 'setup', 'user_skipped'), disabled: () => scripts.admit('task', 'setup', 'disabled'),
+  const setupState = {
+    user_skipped: () => scripts.admit('task', 'setup', 'user_skipped'),
+    disabled: () => scripts.admit('task', 'setup', 'disabled'),
     not_configured: () => scripts.admit('task', 'setup', 'not_configured'),
-    failed: () => scripts.report(admit(), { type: 'exit', exitCode: 1 }), interrupted: () => scripts.report(admit(), { type: 'interrupted', reason: 'restart' }) }
+    failed: () => scripts.report(admit(), { type: 'exit', exitCode: 1 }),
+    interrupted: () => scripts.report(admit(), { type: 'interrupted', reason: 'restart' }),
+  }
 
-  it.each(Object.keys(setupState) as (keyof typeof setupState)[])('admits a run after %s, in the same generation', (state) => {
-    setupState[state]()
-    const generation = scripts.status('task').generation
-    expect(scripts.status('task').setupRunnable).toBe(true)
-    expect(scripts.admitManualSetup('task')).toMatchObject({ state: 'starting', generation })
-    expect(scripts.takeSetup('task')?.script).toBe('pnpm install')
-    expect(scripts.store.task('task')).toMatchObject({ scriptGeneration: generation, skipSetup: true })
-  })
+  it.each(Object.keys(setupState) as (keyof typeof setupState)[])(
+    'admits a run after %s, in the same generation',
+    (state) => {
+      setupState[state]()
+      const generation = scripts.status('task').generation
+      expect(scripts.status('task').setupRunnable).toBe(true)
+      expect(scripts.admitManualSetup('task')).toMatchObject({ state: 'starting', generation })
+      expect(scripts.takeSetup('task')?.script).toBe('pnpm install')
+      expect(scripts.store.task('task')).toMatchObject({ scriptGeneration: generation, skipSetup: true })
+    },
+  )
 
   it.each([
     ['a task with no worktree of its own', () => scripts.admit('task', 'setup', 'not_applicable'), 'not_needed'],
     ['setup not started yet', () => {}, 'not_needed'],
     ['setup that succeeded', () => scripts.report(admit(), { type: 'exit', exitCode: 0 }), 'not_needed'],
     ['setup that is starting', () => admit(), 'already_running'],
-    ['setup that is running', () => scripts.report(admit(), { type: 'started', terminalSessionId: 's' }), 'already_running'],
-    ['an empty setup script', () => { db.db.update(schema.projects).set({ setupScript: '  ' }).run(); scripts.admit('task', 'setup', 'user_skipped') }, 'not_configured'],
-    ['a task without a worktree', () => { db.db.update(schema.tasks).set({ worktreePath: null }).run(); scripts.admit('task', 'setup', 'user_skipped') }, 'no_worktree'],
+    [
+      'setup that is running',
+      () => scripts.report(admit(), { type: 'started', terminalSessionId: 's' }),
+      'already_running',
+    ],
+    [
+      'an empty setup script',
+      () => {
+        db.db.update(schema.projects).set({ setupScript: '  ' }).run()
+        scripts.admit('task', 'setup', 'user_skipped')
+      },
+      'not_configured',
+    ],
+    [
+      'a task without a worktree',
+      () => {
+        db.db.update(schema.tasks).set({ worktreePath: null }).run()
+        scripts.admit('task', 'setup', 'user_skipped')
+      },
+      'no_worktree',
+    ],
   ] as const)('refuses %s', (_, arrange, code) => {
     arrange()
     expect(scripts.status('task').setupRunnable).toBe(false)
@@ -144,7 +219,9 @@ describe('setup by hand', () => {
     beginTaskArchive('task')
     try {
       expect(() => scripts.admitManualSetup('task')).toThrow('This task is being archived.')
-    } finally { finishTaskArchive('task') }
+    } finally {
+      finishTaskArchive('task')
+    }
   })
 
   it('lets only one of two back-to-back requests through', () => {
@@ -169,19 +246,38 @@ it('keeps completed diagnostics across an actual SQLite close and Node service r
   const path = join(dir, 'core.sqlite')
   let connection = openDb(path)
   try {
-    connection.insert(schema.tasks).values({ id: 'durable', title: 'Fixture', projectId: 'p', origin: 'local', status: 'active', createdAt: 1, updatedAt: 1 }).run()
+    connection
+      .insert(schema.tasks)
+      .values({
+        id: 'durable',
+        title: 'Fixture',
+        projectId: 'p',
+        origin: 'local',
+        status: 'active',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run()
     const first = new TaskScriptService(connection)
     const row = first.admit('durable', 'setup')
     const identity = { attemptId: row.attemptId!, generation: row.generation }
     first.report(identity, { type: 'started', terminalSessionId: 'gone' })
     first.report(identity, { type: 'output', data: 'installed\n' })
     first.report(identity, { type: 'exit', exitCode: 0 })
-    first.close(); connection.close()
+    first.close()
+    connection.close()
     connection = openDb(path)
     const second = new TaskScriptService(connection)
     second.reconcile([])
-    expect(second.status('durable').setup).toMatchObject({ attemptId: identity.attemptId, state: 'succeeded', exitCode: 0 })
+    expect(second.status('durable').setup).toMatchObject({
+      attemptId: identity.attemptId,
+      state: 'succeeded',
+      exitCode: 0,
+    })
     expect(second.logs('durable', { phase: 'setup' })).toMatchObject({ available: true, output: 'installed\n' })
     second.close()
-  } finally { connection.close(); rmSync(dir, { recursive: true, force: true }) }
+  } finally {
+    connection.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

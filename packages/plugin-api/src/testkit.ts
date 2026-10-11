@@ -36,11 +36,21 @@ export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 // a bad declaration fails in `pnpm test` rather than at the next boot. It takes the package root and
 // finds the file itself, so the filename constant and the result type stay its business.
 export { validatePluginConfig } from '@acorn/node-core/testkit'
-export { testAgentToolDescriptor, testContextSectionDescriptor, testCliCommandDescriptor } from '@acorn/node-core/testkit'
+export {
+  testAgentToolDescriptor,
+  testContextSectionDescriptor,
+  testCliCommandDescriptor,
+} from '@acorn/node-core/testkit'
 
 // The skill catalogue as the host fills it from a loaded package, and the owner's answers about it
 // (docs/managed-agents/skills.md § Skills), so the agents plugin can test a start against real skills.
-export { catalogueSkills, readPackageSkill, registerSkill, skillDeliveries, skillStateStore } from '@acorn/node-core/testkit'
+export {
+  catalogueSkills,
+  readPackageSkill,
+  registerSkill,
+  skillDeliveries,
+  skillStateStore,
+} from '@acorn/node-core/testkit'
 
 // Host services used to exercise plugin routes without constructing a full Node.
 export { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
@@ -52,9 +62,20 @@ export { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 export { testCoreSeams } from '@acorn/node-core/testkit'
 export type { CoreServices, GenerateTextRequest, ModelService, ProjectRef } from '@acorn/node-core/server/core/index.ts'
 export { SecretService } from '@acorn/node-core/server/core/secrets.ts'
-export { isContainedPath, isValidRepoIdent, resolveInRoot, confineExistingFile } from '@acorn/node-core/server/core/fs.ts'
+export {
+  isContainedPath,
+  isValidRepoIdent,
+  resolveInRoot,
+  confineExistingFile,
+} from '@acorn/node-core/server/core/fs.ts'
 export type { ConfineFailure, ConfineResult } from '@acorn/node-core/server/core/fs.ts'
-export { ProviderOperationError, connectionProviderRegistry, connectProvider, rotateConnection, testConnection } from '@acorn/node-core/server/integrations'
+export {
+  ProviderOperationError,
+  connectionProviderRegistry,
+  connectProvider,
+  rotateConnection,
+  testConnection,
+} from '@acorn/node-core/server/integrations'
 export { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 export { onServerError } from '@acorn/node-core/server/respond.ts'
 export { harness, setRunBridge } from '@acorn/node-core/server/routes'

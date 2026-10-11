@@ -17,22 +17,22 @@ const wire = vi.hoisted(() => ({
       { name: 'Default', mode: 'default', model: null, reasoning_effort: null },
     ],
   } as unknown,
-  onNotification: undefined as undefined | ((notification: {
-    method: string
-    params: Record<string, unknown>
-  }) => void),
-  onRequest: undefined as undefined | ((request: {
-    id: string | number
-    method: string
-    params: Record<string, unknown>
-  }) => void),
+  onNotification: undefined as
+    | undefined
+    | ((notification: { method: string; params: Record<string, unknown> }) => void),
+  onRequest: undefined as
+    | undefined
+    | ((request: { id: string | number; method: string; params: Record<string, unknown> }) => void),
 }))
 
 vi.mock('../usage/processRunner', () => ({
   resolveUsageCommand: () => '/tmp/codex-test',
   usageProcessEnv: () => ({}),
 }))
-vi.mock('./authProbe', () => ({ probeCodexAuthentication: async () => true, probeExecutableVersion: async () => 'codex-cli test' }))
+vi.mock('./authProbe', () => ({
+  probeCodexAuthentication: async () => true,
+  probeExecutableVersion: async () => 'codex-cli test',
+}))
 vi.mock('./jsonRpcProcess', () => ({
   JsonRpcProcess: class {
     closed = false
@@ -58,16 +58,15 @@ vi.mock('./jsonRpcProcess', () => ({
       if (method === 'model/list') {
         await wire.modelsWait
         return {
-          data: [{
-            id: 'gpt-codex',
-            displayName: 'Codex',
-            isDefault: true,
-            defaultReasoningEffort: 'high',
-            supportedReasoningEfforts: [
-              { reasoningEffort: 'medium' },
-              { reasoningEffort: 'high' },
-            ],
-          }],
+          data: [
+            {
+              id: 'gpt-codex',
+              displayName: 'Codex',
+              isDefault: true,
+              defaultReasoningEffort: 'high',
+              supportedReasoningEfforts: [{ reasoningEffort: 'medium' }, { reasoningEffort: 'high' }],
+            },
+          ],
         }
       }
       if (method === 'permissionProfile/list' || method === 'skills/list') return { data: [] }
@@ -107,15 +106,22 @@ const session = (mode: string | null = null, resumed = false): AgentSession => (
   statusAuthority: 'protocol',
   title: 'Codex',
   model: null,
-  config: mode ? {
-    configOptions: [{
-      id: 'mode',
-      label: 'Mode',
-      category: 'mode',
-      currentValue: mode,
-      values: [{ value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }],
-    }],
-  } : {},
+  config: mode
+    ? {
+        configOptions: [
+          {
+            id: 'mode',
+            label: 'Mode',
+            category: 'mode',
+            currentValue: mode,
+            values: [
+              { value: 'default', label: 'Default' },
+              { value: 'plan', label: 'Plan' },
+            ],
+          },
+        ],
+      }
+    : {},
   parentSessionId: null,
   parentTurnId: null,
   subagents: [],
@@ -169,7 +175,8 @@ async function start(
     attendanceInstructions,
     onEvent: (event) => {
       driverEvents.push(event)
-      if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
+      if (event.type !== 'generated_artifact')
+        events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
     },
     onClosed: () => {},
   })
@@ -177,7 +184,7 @@ async function start(
 }
 
 const requestIds = (events: AgentNormalizedEvent[]): string[] =>
-  events.flatMap((event) => event.type === 'request' ? [event.requestId] : [])
+  events.flatMap((event) => (event.type === 'request' ? [event.requestId] : []))
 
 describe('Codex collaboration modes', () => {
   beforeEach(() => {
@@ -204,19 +211,31 @@ describe('Codex collaboration modes', () => {
       { method: 'turn/interrupt', params: { threadId: 'child-1', turnId: 'child-turn-1' } },
     ])
     expect(handle.ready).toBe(true)
-    wire.onNotification!({ method: 'turn/completed', params: { threadId: 'child-1', turn: { id: 'child-turn-1', status: 'interrupted' } } })
-    expect(events.filter((event) => event.type === 'subagent').at(-1)).toMatchObject({ subagent: { id: 'child-1', status: 'idle' } })
+    wire.onNotification!({
+      method: 'turn/completed',
+      params: { threadId: 'child-1', turn: { id: 'child-turn-1', status: 'interrupted' } },
+    })
+    expect(events.filter((event) => event.type === 'subagent').at(-1)).toMatchObject({
+      subagent: { id: 'child-1', status: 'idle' },
+    })
   })
 
   it('reads a resumed child turn and leaves the parent turn available to cancel', async () => {
     const { handle } = await start(null, true)
     await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
-    wire.threadReadResponse = { thread: { turns: [
-      { id: 'old-turn', status: 'completed' }, { id: 'resumed-child-turn', status: 'inProgress' },
-    ] } }
+    wire.threadReadResponse = {
+      thread: {
+        turns: [
+          { id: 'old-turn', status: 'completed' },
+          { id: 'resumed-child-turn', status: 'inProgress' },
+        ],
+      },
+    }
     await handle.cancelSubagent!('child-1')
     await handle.cancel()
-    expect(wire.requests.filter((request) => request.method === 'turn/interrupt').map((request) => request.params)).toEqual([
+    expect(
+      wire.requests.filter((request) => request.method === 'turn/interrupt').map((request) => request.params),
+    ).toEqual([
       { threadId: 'child-1', turnId: 'resumed-child-turn' },
       { threadId: 'thread-1', turnId: 'turn-provider-1' },
     ])
@@ -236,15 +255,36 @@ describe('Codex collaboration modes', () => {
     const { handle, driverEvents } = await start()
     const first = { ...turn('default'), id: 'managed-first' }
     await handle.sendTurn({ turn: first, input: first.input, attachments: {} })
-    wire.onNotification?.({ method: 'item/started', params: { threadId: 'thread-1', turnId: 'turn-provider-1',
-      item: { id: 'cmd', type: 'commandExecution', command: 'sleep 30' } } })
-    wire.onNotification?.({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-provider-1', status: 'completed' } } })
-    wire.onNotification?.({ method: 'thread/status/changed', params: { threadId: 'thread-1', status: { type: 'idle' } } })
+    wire.onNotification?.({
+      method: 'item/started',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-provider-1',
+        item: { id: 'cmd', type: 'commandExecution', command: 'sleep 30' },
+      },
+    })
+    wire.onNotification?.({
+      method: 'turn/completed',
+      params: { threadId: 'thread-1', turn: { id: 'turn-provider-1', status: 'completed' } },
+    })
+    wire.onNotification?.({
+      method: 'thread/status/changed',
+      params: { threadId: 'thread-1', status: { type: 'idle' } },
+    })
     const second = { ...turn('default'), id: 'managed-second' }
     await handle.sendTurn({ turn: second, input: second.input, attachments: {} })
-    wire.onNotification?.({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-provider-1',
-      item: { id: 'cmd', type: 'commandExecution', status: 'completed', aggregatedOutput: 'done' } } })
-    wire.onNotification?.({ method: 'item/commandExecution/outputDelta', params: { threadId: 'thread-1', turnId: 'turn-provider-1', itemId: 'cmd', delta: 'late' } })
+    wire.onNotification?.({
+      method: 'item/completed',
+      params: {
+        threadId: 'thread-1',
+        turnId: 'turn-provider-1',
+        item: { id: 'cmd', type: 'commandExecution', status: 'completed', aggregatedOutput: 'done' },
+      },
+    })
+    wire.onNotification?.({
+      method: 'item/commandExecution/outputDelta',
+      params: { threadId: 'thread-1', turnId: 'turn-provider-1', itemId: 'cmd', delta: 'late' },
+    })
     const commands = driverEvents.filter((event) => event.type === 'tool')
     expect(commands).toMatchObject([
       { acornTurnId: 'managed-first', tool: { status: 'running' } },
@@ -257,21 +297,25 @@ describe('Codex collaboration modes', () => {
 
   it('supplies host attendance in the developer channel on creation and resume', async () => {
     for (const resumed of [false, true]) {
-      const { handle } = await start(null, resumed, {}, [], undefined, undefined, 'Nobody is waiting to answer.');
-      expect(wire.requests.find((request) => request.method === (resumed ? 'thread/resume' : 'thread/start'))?.params)
-        .toMatchObject({ developerInstructions: 'Nobody is waiting to answer.' });
-      await handle.stop();
+      const { handle } = await start(null, resumed, {}, [], undefined, undefined, 'Nobody is waiting to answer.')
+      expect(
+        wire.requests.find((request) => request.method === (resumed ? 'thread/resume' : 'thread/start'))?.params,
+      ).toMatchObject({ developerInstructions: 'Nobody is waiting to answer.' })
+      await handle.stop()
     }
-  });
+  })
 
   it('separates a slow metadata request from initialization and records an optional failure', async () => {
     const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     const startup = sessionStartupTelemetry(ctx.telemetry, session(), false, new AbortController().signal)!
     let release!: () => void
-    wire.modelsWait = new Promise<void>((resolve) => { release = resolve })
+    wire.modelsWait = new Promise<void>((resolve) => {
+      release = resolve
+    })
     wire.modeResponse = new Error('private provider payload')
     const pending = startup.provider((measure) => start(null, false, {}, [], measure))
-    const phases = () => ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')
+    const phases = () =>
+      ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')
     try {
       await vi.waitFor(() => expect(phases().some((record) => record.attrs.phase === 'provider.modes')).toBe(true))
       expect(phases().some((record) => record.attrs.phase === 'provider.initialize')).toBe(true)
@@ -281,8 +325,19 @@ describe('Codex collaboration modes', () => {
       startup.end('ok')
       expect(handle.ready).toBe(true)
       const provider = ctx.recorded.find((record) => record.kind === 'span' && record.name === 'agent.session')!
-      expect(phases().every((record) => record.kind === 'span' && provider.kind === 'span' && record.traceId === provider.traceId && record.parentSpanId === provider.spanId)).toBe(true)
-      expect(phases().find((record) => record.attrs.phase === 'provider.modes')).toMatchObject({ status: 'error', attrs: { outcome: 'error' } })
+      expect(
+        phases().every(
+          (record) =>
+            record.kind === 'span' &&
+            provider.kind === 'span' &&
+            record.traceId === provider.traceId &&
+            record.parentSpanId === provider.spanId,
+        ),
+      ).toBe(true)
+      expect(phases().find((record) => record.attrs.phase === 'provider.modes')).toMatchObject({
+        status: 'error',
+        attrs: { outcome: 'error' },
+      })
       expect(phases().find((record) => record.attrs.phase === 'provider.models')).toMatchObject({ status: 'ok' })
       expect(JSON.stringify(ctx.recorded)).not.toContain('private provider payload')
       await handle.stop()
@@ -297,57 +352,79 @@ describe('Codex collaboration modes', () => {
   it('sends identical custom instructions and standing memory on thread start and resume', async () => {
     const customAgent = { id: 'a1', name: 'Bug reviewer', instructions: 'Review for correctness only.' }
     await (await start(null, false, { customAgent, standingContext: 'Stored memory.' })).handle.stop()
-    expect(wire.requests.find((request) => request.method === 'thread/start')?.params)
-      .toMatchObject({ developerInstructions: 'Review for correctness only.\n\nStored memory.' })
+    expect(wire.requests.find((request) => request.method === 'thread/start')?.params).toMatchObject({
+      developerInstructions: 'Review for correctness only.\n\nStored memory.',
+    })
     await (await start(null, true, { customAgent, standingContext: 'Stored memory.' })).handle.stop()
-    expect(wire.requests.find((request) => request.method === 'thread/resume')?.params)
-      .toMatchObject({ developerInstructions: 'Review for correctness only.\n\nStored memory.' })
+    expect(wire.requests.find((request) => request.method === 'thread/resume')?.params).toMatchObject({
+      developerInstructions: 'Review for correctness only.\n\nStored memory.',
+    })
     wire.requests.length = 0
     await (await start()).handle.stop()
-    expect(wire.requests.find((request) => request.method === 'thread/start')?.params).not.toHaveProperty('developerInstructions')
+    expect(wire.requests.find((request) => request.method === 'thread/start')?.params).not.toHaveProperty(
+      'developerInstructions',
+    )
   })
 
   // Per process, beside the person's own skills, and before the thread, so its first turn lists them.
   // See docs/managed-agents/native-skills.md § Native skills.
-  it.each([false, true])('adds acorn skill roots before the thread with resumed=%s, and only when there are skills', async (resumed) => {
-    await (await start(null, resumed, {}, [], undefined, ['/data/agent-skills/s1/1/acme'])).handle.stop()
-    const methods = wire.requests.map((request) => request.method)
-    expect(wire.requests.find((request) => request.method === 'skills/extraRoots/set')?.params).toEqual({ extraRoots: ['/data/agent-skills/s1/1/acme/skills'] })
-    expect(methods.indexOf('skills/extraRoots/set')).toBeLessThan(methods.indexOf(resumed ? 'thread/resume' : 'thread/start'))
-    wire.requests.length = 0
-    await (await start(null, resumed)).handle.stop()
-    expect(wire.requests.map((request) => request.method)).not.toContain('skills/extraRoots/set')
-  })
+  it.each([false, true])(
+    'adds acorn skill roots before the thread with resumed=%s, and only when there are skills',
+    async (resumed) => {
+      await (await start(null, resumed, {}, [], undefined, ['/data/agent-skills/s1/1/acme'])).handle.stop()
+      const methods = wire.requests.map((request) => request.method)
+      expect(wire.requests.find((request) => request.method === 'skills/extraRoots/set')?.params).toEqual({
+        extraRoots: ['/data/agent-skills/s1/1/acme/skills'],
+      })
+      expect(methods.indexOf('skills/extraRoots/set')).toBeLessThan(
+        methods.indexOf(resumed ? 'thread/resume' : 'thread/start'),
+      )
+      wire.requests.length = 0
+      await (await start(null, resumed)).handle.stop()
+      expect(wire.requests.map((request) => request.method)).not.toContain('skills/extraRoots/set')
+    },
+  )
 
   it.each([false, true])('passes explicit MCP credentials for a custom agent with resumed=%s', async (resumed) => {
-    const { handle } = await start(null, resumed, {
-      customAgent: { id: 'a1', name: 'Phase delegator', instructions: 'Use Acorn delegation tools.' },
-    }, [{
-      transport: 'stdio',
-      name: 'acorn-dev',
-      command: '/opt/acorn/node',
-      args: ['/opt/acorn/mcp.js'],
-      env: { ACORN_API_TOKEN: 'signed', ACORN_TASK_ID: 'task-1', ACORN_SESSION_ID: 'session-1' },
-    }])
-    await handle.stop()
-
-    expect(wire.requests.find((request) => request.method === (resumed ? 'thread/resume' : 'thread/start'))?.params)
-      .toMatchObject({
-        developerInstructions: 'Use Acorn delegation tools.',
-        config: { mcp_servers: { 'acorn-dev': {
+    const { handle } = await start(
+      null,
+      resumed,
+      {
+        customAgent: { id: 'a1', name: 'Phase delegator', instructions: 'Use Acorn delegation tools.' },
+      },
+      [
+        {
+          transport: 'stdio',
+          name: 'acorn-dev',
           command: '/opt/acorn/node',
           args: ['/opt/acorn/mcp.js'],
           env: { ACORN_API_TOKEN: 'signed', ACORN_TASK_ID: 'task-1', ACORN_SESSION_ID: 'session-1' },
-        } } },
-      })
+        },
+      ],
+    )
+    await handle.stop()
+
+    expect(
+      wire.requests.find((request) => request.method === (resumed ? 'thread/resume' : 'thread/start'))?.params,
+    ).toMatchObject({
+      developerInstructions: 'Use Acorn delegation tools.',
+      config: {
+        mcp_servers: {
+          'acorn-dev': {
+            command: '/opt/acorn/node',
+            args: ['/opt/acorn/mcp.js'],
+            env: { ACORN_API_TOKEN: 'signed', ACORN_TASK_ID: 'task-1', ACORN_SESSION_ID: 'session-1' },
+          },
+        },
+      },
+    })
   })
 
   it('advertises the modes provider capability', async () => {
     const { CodexAgentDriver } = await import('./codexDriver')
-    expect((await new CodexAgentDriver().probe()).capabilities).toEqual(expect.arrayContaining([
-      'modes',
-      'generated_artifacts',
-    ]))
+    expect((await new CodexAgentDriver().probe()).capabilities).toEqual(
+      expect.arrayContaining(['modes', 'generated_artifacts']),
+    )
   })
 
   it('emits image generation output through the generated-artifact seam', async () => {
@@ -366,24 +443,29 @@ describe('Codex collaboration modes', () => {
     })
     await Promise.resolve()
 
-    expect(driverEvents).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        type: 'generated_artifact',
-        kind: 'file',
-        title: 'Generated image.png',
-        mediaType: 'image/png',
-      }),
-    ]))
+    expect(driverEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'generated_artifact',
+          kind: 'file',
+          title: 'Generated image.png',
+          mediaType: 'image/png',
+        }),
+      ]),
+    )
   })
 
   it('advertises modes and sends each selected preset with complete settings', async () => {
     const { events, handle } = await start()
     const metadata = events.find((event) => event.type === 'session_metadata')
-    expect(metadata?.type === 'session_metadata'
-      ? metadata.configOptions?.find((option) => option.id === 'mode')
-      : null).toMatchObject({
+    expect(
+      metadata?.type === 'session_metadata' ? metadata.configOptions?.find((option) => option.id === 'mode') : null,
+    ).toMatchObject({
       currentValue: 'default',
-      values: [{ value: 'default', label: 'Default' }, { value: 'plan', label: 'Plan' }],
+      values: [
+        { value: 'default', label: 'Default' },
+        { value: 'plan', label: 'Plan' },
+      ],
     })
 
     await handle.sendTurn({ turn: turn('plan'), input: turn('plan').input, attachments: {} })
@@ -411,18 +493,20 @@ describe('Codex collaboration modes', () => {
     wire.modeResponse = new Error('Method not found')
     const { events } = await start()
     const metadata = events.find((event) => event.type === 'session_metadata')
-    expect(metadata?.type === 'session_metadata'
-      ? metadata.configOptions?.some((option) => option.id === 'mode')
-      : true).toBe(false)
+    expect(
+      metadata?.type === 'session_metadata' ? metadata.configOptions?.some((option) => option.id === 'mode') : true,
+    ).toBe(false)
     expect(events).toContainEqual({ type: 'session_state', state: 'ready' })
   })
 
   it('preserves a stored Plan selection when resuming', async () => {
     const { events } = await start('plan', true)
     const metadata = events.find((event) => event.type === 'session_metadata')
-    expect(metadata?.type === 'session_metadata'
-      ? metadata.configOptions?.find((option) => option.id === 'mode')?.currentValue
-      : null).toBe('plan')
+    expect(
+      metadata?.type === 'session_metadata'
+        ? metadata.configOptions?.find((option) => option.id === 'mode')?.currentValue
+        : null,
+    ).toBe('plan')
   })
 
   it('synchronizes effective settings reported by Codex', async () => {
@@ -444,13 +528,17 @@ describe('Codex collaboration modes', () => {
     await Promise.resolve()
 
     const metadata = events.findLast((event) => event.type === 'session_metadata')
-    expect(metadata?.type === 'session_metadata'
-      ? metadata.configOptions?.map((option) => [option.id, option.currentValue])
-      : []).toEqual(expect.arrayContaining([
-      ['mode', 'plan'],
-      ['model', 'gpt-codex'],
-      ['reasoning', 'medium'],
-    ]))
+    expect(
+      metadata?.type === 'session_metadata'
+        ? metadata.configOptions?.map((option) => [option.id, option.currentValue])
+        : [],
+    ).toEqual(
+      expect.arrayContaining([
+        ['mode', 'plan'],
+        ['model', 'gpt-codex'],
+        ['reasoning', 'medium'],
+      ]),
+    )
     expect(events).toContainEqual({ type: 'diagnostic', level: 'info', message: 'Mode changed to Plan' })
   })
 
@@ -464,10 +552,12 @@ describe('Codex collaboration modes', () => {
       },
     })
     await handle.resolveRequest(requestIds(events)[0]!, { answers: { scope: 'All files' } })
-    expect(wire.responses).toEqual([{
-      id: 42,
-      result: { answers: { scope: { answers: ['All files'] } } },
-    }])
+    expect(wire.responses).toEqual([
+      {
+        id: 42,
+        result: { answers: { scope: { answers: ['All files'] } } },
+      },
+    ])
   })
 
   // Captured 2026-10-06: Codex sends the failure as an `error` notification, then again on
@@ -481,7 +571,10 @@ describe('Codex collaboration modes', () => {
     const fail = async () => {
       const error = { message: body, codexErrorInfo: 'other' }
       wire.onNotification?.({ method: 'error', params: { error, willRetry: false } })
-      wire.onNotification?.({ method: 'turn/completed', params: { turn: { id: 'turn-provider-1', status: 'failed', error } } })
+      wire.onNotification?.({
+        method: 'turn/completed',
+        params: { turn: { id: 'turn-provider-1', status: 'failed', error } },
+      })
       await Promise.resolve()
     }
     const { events, handle } = await start()
@@ -489,12 +582,14 @@ describe('Codex collaboration modes', () => {
 
     await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
     await fail()
-    expect(errors()).toEqual([{
-      type: 'error',
-      code: 'other',
-      message: "model 'gpt-6.1-sol' is not enabled in rustponsesapi",
-      retryable: false,
-    }])
+    expect(errors()).toEqual([
+      {
+        type: 'error',
+        code: 'other',
+        message: "model 'gpt-6.1-sol' is not enabled in rustponsesapi",
+        retryable: false,
+      },
+    ])
 
     wire.onNotification?.({ method: 'thread/status/changed', params: { status: { type: 'idle' } } })
     await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
@@ -505,11 +600,12 @@ describe('Codex collaboration modes', () => {
   // Each app-server process numbers its requests from 0, so a resumed session asks a second
   // request 0. Reusing that number would attach the new question to the one already answered.
   it('gives a request Codex numbered again after a restart its own id', async () => {
-    const ask = () => wire.onRequest?.({
-      id: 0,
-      method: 'item/tool/requestUserInput',
-      params: { questions: [{ id: 'scope', header: 'Scope', question: 'Which scope?', options: null }] },
-    })
+    const ask = () =>
+      wire.onRequest?.({
+        id: 0,
+        method: 'item/tool/requestUserInput',
+        params: { questions: [{ id: 'scope', header: 'Scope', question: 'Which scope?', options: null }] },
+      })
     const first = await start('plan')
     ask()
     const second = await start('plan', true)

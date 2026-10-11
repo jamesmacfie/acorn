@@ -56,20 +56,25 @@ describe('a dispatched plugin route', () => {
       db.close()
     }
     flushTelemetry()
-    const histogram = seen.find((record): record is TelemetryMetric => record.kind === 'metric' && record.name === 'sql.select')!
+    const histogram = seen.find(
+      (record): record is TelemetryMetric => record.kind === 'metric' && record.name === 'sql.select',
+    )!
     expect(histogram.attrs.owner).toBe('rollbar')
   })
 
   it('puts the dispatch span and what the handler raised in one trace', async () => {
     await dispatch(() => undefined)
     flushTelemetry()
-    const span = seen.find((record): record is TelemetrySpan => record.kind === 'span' && record.name === 'plugin.dispatch')!
+    const span = seen.find(
+      (record): record is TelemetrySpan => record.kind === 'span' && record.name === 'plugin.dispatch',
+    )!
     expect(span.attrs).toMatchObject({ owner: 'rollbar', method: 'GET', path: '/v1/p/rollbar/refresh', status: 200 })
   })
 
   it('refuses a path outside the plugin namespace before it dispatches anything', async () => {
     registerRoute({ plugin: 'rollbar', prefix: '', fetch: async () => Response.json({}) })
-    await expect(dispatchPluginRoute(ENV, 'rollbar', '/v1/core/tasks', { method: 'GET' }, AbortSignal.timeout(5_000)))
-      .rejects.toThrow('route must be inside /v1/p/rollbar/')
+    await expect(
+      dispatchPluginRoute(ENV, 'rollbar', '/v1/core/tasks', { method: 'GET' }, AbortSignal.timeout(5_000)),
+    ).rejects.toThrow('route must be inside /v1/p/rollbar/')
   })
 })

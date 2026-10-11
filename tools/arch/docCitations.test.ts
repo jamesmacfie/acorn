@@ -63,7 +63,10 @@ describe('source comments cite docs that exist', () => {
           text += ` ${next.replace(COMMENT, '')}`
         }
         text = text.replace(/\s+/g, ' ')
-        const heading = text.split(/[),;]|\.(?:\s|$)|\*\//)[0].trim().slice(0, 60)
+        const heading = text
+          .split(/[),;]|\.(?:\s|$)|\*\//)[0]
+          .trim()
+          .slice(0, 60)
         sections.add(`${path} § ${heading}`)
         if (!anchorCache.has(path)) anchorCache.set(path, anchors(join(ROOT, path)))
         const target = slug(text)

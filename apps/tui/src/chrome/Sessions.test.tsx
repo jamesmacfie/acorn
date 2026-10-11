@@ -5,9 +5,14 @@ import { renderCells } from '../kit/render'
 import { focusedRenderable } from '../keys/regions'
 import { Button } from '../kit/asking/buttons'
 import {
-  extensionPointRegistry, extensionRegistry, type ExtensionContribution,
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
-import { TERMINAL_TOOLBAR_ACTIONS_POINT, type TerminalToolbarProps } from '@acorn/plugin-terminal/contract/toolbarActions.ts'
+import {
+  TERMINAL_TOOLBAR_ACTIONS_POINT,
+  type TerminalToolbarProps,
+} from '@acorn/plugin-terminal/contract/toolbarActions.ts'
 
 const mock = vi.hoisted(() => {
   const write = vi.fn()
@@ -18,10 +23,18 @@ const mock = vi.hoisted(() => {
   const resume = vi.fn(async () => {})
   const interrupt = vi.fn(async () => true)
   const state: { status: 'running' | 'exited'; agentSessionId?: string } = { status: 'running' }
-  const rows: { current: null | Array<{
-    id: string; taskId: string; title: string; kind: 'shell'; profileId: string
-    backend: 'node-pty'; createdAt: number; status: 'running'
-  }> } = { current: null }
+  const rows: {
+    current: null | Array<{
+      id: string
+      taskId: string
+      title: string
+      kind: 'shell'
+      profileId: string
+      backend: 'node-pty'
+      createdAt: number
+      status: 'running'
+    }>
+  } = { current: null }
   return { write, resize, attach, detach, setOpen, resume, interrupt, state, rows }
 })
 
@@ -33,22 +46,53 @@ vi.mock('@acorn/plugin-terminal/contract/hostClient.ts', () => ({
   refreshSessions: vi.fn(async () => {}),
   rememberActiveTerminal: vi.fn(),
   sessionNode: () => 'node-1',
-  sessions: () => mock.rows.current ?? [{
-    id: 'terminal-1', taskId: TASK.id, title: 'Shell for task', kind: 'shell', profileId: 'shell',
-    backend: 'node-pty', createdAt: 1, ...mock.state,
-  }],
+  sessions: () =>
+    mock.rows.current ?? [
+      {
+        id: 'terminal-1',
+        taskId: TASK.id,
+        title: 'Shell for task',
+        kind: 'shell',
+        profileId: 'shell',
+        backend: 'node-pty',
+        createdAt: 1,
+        ...mock.state,
+      },
+    ],
   terminalApi: () => ({
     profiles: async () => [{ id: 'shell', label: 'Shell', kind: 'shell', available: true }],
-    attach: mock.attach, write: mock.write, resize: mock.resize,
-    create: vi.fn(), interrupt: mock.interrupt, kill: vi.fn(),
+    attach: mock.attach,
+    write: mock.write,
+    resize: mock.resize,
+    create: vi.fn(),
+    interrupt: mock.interrupt,
+    kill: vi.fn(),
   }),
 }))
 
 describe('native terminal sessions', () => {
   it('reattaches the PTY when the selected session changes', async () => {
     mock.rows.current = [
-      { id: 'terminal-1', taskId: TASK.id, title: 'First shell', kind: 'shell', profileId: 'shell', backend: 'node-pty', createdAt: 1, status: 'running' },
-      { id: 'terminal-2', taskId: TASK.id, title: 'Second shell', kind: 'shell', profileId: 'shell', backend: 'node-pty', createdAt: 2, status: 'running' },
+      {
+        id: 'terminal-1',
+        taskId: TASK.id,
+        title: 'First shell',
+        kind: 'shell',
+        profileId: 'shell',
+        backend: 'node-pty',
+        createdAt: 1,
+        status: 'running',
+      },
+      {
+        id: 'terminal-2',
+        taskId: TASK.id,
+        title: 'Second shell',
+        kind: 'shell',
+        profileId: 'shell',
+        backend: 'node-pty',
+        createdAt: 2,
+        status: 'running',
+      },
     ]
     mock.attach.mockClear()
     mock.detach.mockClear()
@@ -148,15 +192,34 @@ describe('native terminal sessions', () => {
     const answers: unknown[] = []
     const registrations = [
       extensionPointRegistry.register({
-        id: TERMINAL_TOOLBAR_ACTIONS_POINT, ownerId: 'terminal', label: 'Terminal toolbar', kind: 'remote', mode: 'stack', max: 4,
+        id: TERMINAL_TOOLBAR_ACTIONS_POINT,
+        ownerId: 'terminal',
+        label: 'Terminal toolbar',
+        kind: 'remote',
+        mode: 'stack',
+        max: 4,
         actions: ['interrupt'],
       }),
       extensionRegistry.register({
-        id: 'plugin:stopper:interrupt', pluginId: 'stopper', point: TERMINAL_TOOLBAR_ACTIONS_POINT, label: 'Stopper', order: 500,
+        id: 'plugin:stopper:interrupt',
+        pluginId: 'stopper',
+        point: TERMINAL_TOOLBAR_ACTIONS_POINT,
+        label: 'Stopper',
+        order: 500,
         carrier: 'component',
         component: (props: Props) => {
           drawn = props
-          return <Button onPress={() => { void props.host.invoke('interrupt', { expectedSessionId: props.session?.id }).then((answer) => answers.push(answer)) }}>Stop it</Button>
+          return (
+            <Button
+              onPress={() => {
+                void props.host
+                  .invoke('interrupt', { expectedSessionId: props.session?.id })
+                  .then((answer) => answers.push(answer))
+              }}
+            >
+              Stop it
+            </Button>
+          )
         },
       } as ExtensionContribution),
     ]
@@ -164,10 +227,16 @@ describe('native terminal sessions', () => {
     const screen = await renderCells(() => <Sessions task={TASK} onClose={() => {}} />, { width: 80, height: 24 })
     try {
       expect(screen.text).toContain('[Stop it]')
-      expect(drawn).toMatchObject({ taskId: TASK.id, session: { id: 'terminal-1', title: 'Shell for task', running: true } })
+      expect(drawn).toMatchObject({
+        taskId: TASK.id,
+        session: { id: 'terminal-1', title: 'Shell for task', running: true },
+      })
 
       // A tree asking on its own, with nobody pressing anything, is refused.
-      await expect(drawn!.host.invoke('interrupt', { expectedSessionId: 'terminal-1' })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+      await expect(drawn!.host.invoke('interrupt', { expectedSessionId: 'terminal-1' })).resolves.toEqual({
+        ok: false,
+        reason: 'needs_person',
+      })
       expect(mock.interrupt).not.toHaveBeenCalled()
 
       const lines = screen.text.split('\n')

@@ -16,8 +16,12 @@ import type { ModelPick } from '../../shared/changes/api'
 // The model is a stand-in, for the reason the other two pane tests give: `createChangesModel` fetches
 // over HTTP and subscribes to the task poll, and neither is what a button is about.
 
-const backend = (id: string, label: string, models: string[], kind: ModelBackend['kind'] = 'connection'): ModelBackend =>
-  ({ id, kind, label, models: models.map((m) => ({ id: m, label: m })), defaultModelId: '' })
+const backend = (
+  id: string,
+  label: string,
+  models: string[],
+  kind: ModelBackend['kind'] = 'connection',
+): ModelBackend => ({ id, kind, label, models: models.map((m) => ({ id: m, label: m })), defaultModelId: '' })
 
 const generate = vi.fn()
 const setModelPick = vi.fn()

@@ -30,9 +30,17 @@ function prune(now: number): void {
 }
 
 const decisionId = (operation: SecretPublicationOperation, destination: string, report: SecretCheckReport): string =>
-  createHash('sha256').update(JSON.stringify([operation, destination, report.digest, report.detectorVersion])).digest('hex')
+  createHash('sha256')
+    .update(JSON.stringify([operation, destination, report.digest, report.detectorVersion]))
+    .digest('hex')
 
-function audit(db: AppDatabase, actor: AuditActor, decision: SecretPublicationDecision, action: 'secrets.publication.blocked' | 'secrets.publication.allowed', detail: string): void {
+function audit(
+  db: AppDatabase,
+  actor: AuditActor,
+  decision: SecretPublicationDecision,
+  action: 'secrets.publication.blocked' | 'secrets.publication.allowed',
+  detail: string,
+): void {
   recordAudit(db, {
     ...actor,
     action,
@@ -53,10 +61,18 @@ export type SecretPublicationGate = {
   enabled(): Promise<boolean>
   /** Null to proceed. A refusal when blocking is on and the report has a high-confidence finding or
    *  is incomplete, unless the owner allowed this exact operation; that allowance is spent here. */
-  admit(input: { operation: SecretPublicationOperation; destination: string; report: SecretCheckReport }): Promise<SecretPublicationRefusal | null>
+  admit(input: {
+    operation: SecretPublicationOperation
+    destination: string
+    report: SecretCheckReport
+  }): Promise<SecretPublicationRefusal | null>
 }
 
-export function createSecretPublicationGate(deps: { db: AppDatabase; prefs: PrefService; identity: IdentityService }): SecretPublicationGate {
+export function createSecretPublicationGate(deps: {
+  db: AppDatabase
+  prefs: PrefService
+  identity: IdentityService
+}): SecretPublicationGate {
   const enabled = async () => {
     const userId = deps.identity.active()
     return !!userId && (await deps.prefs.read(userId, SECRET_PUBLICATION_PREF_KEY)) === 'true'
@@ -116,18 +132,29 @@ export function allowSecretPublication(db: AppDatabase, actor: AuditActor, id: s
   return true
 }
 
-const VERBS: Record<SecretPublicationOperation, string> = { commit: 'commit', push: 'push', export: 'export', send: 'message' }
+const VERBS: Record<SecretPublicationOperation, string> = {
+  commit: 'commit',
+  push: 'push',
+  export: 'export',
+  send: 'message',
+}
 
 /** One readable refusal: rule ids and positions, never content. `remedy` names the safer path the
  *  caller offers, such as a redacted export. */
-export function describeSecretRefusal(refusal: SecretPublicationRefusal, remedy = 'Remove the secret and try again'): string {
+export function describeSecretRefusal(
+  refusal: SecretPublicationRefusal,
+  remedy = 'Remove the secret and try again',
+): string {
   const { report } = refusal
   const verb = VERBS[refusal.operation]
-  const shown = report.findings.filter((finding) => finding.confidence === 'high').slice(0, 3)
+  const shown = report.findings
+    .filter((finding) => finding.confidence === 'high')
+    .slice(0, 3)
     .map((finding) => `${finding.rule} at ${finding.location}:${finding.line}`)
-  const what = refusal.reason === 'findings'
-    ? `${report.counts.high} likely secret${report.counts.high === 1 ? '' : 's'} (${shown.join(', ')}${report.counts.high > shown.length ? ', …' : ''})`
-    : `an incomplete check (${report.unscanned[0] ? `${report.unscanned[0].location}: ${report.unscanned[0].reason}` : 'not every input was read'})`
+  const what =
+    refusal.reason === 'findings'
+      ? `${report.counts.high} likely secret${report.counts.high === 1 ? '' : 's'} (${shown.join(', ')}${report.counts.high > shown.length ? ', …' : ''})`
+      : `an incomplete check (${report.unscanned[0] ? `${report.unscanned[0].location}: ${report.unscanned[0].reason}` : 'not every input was read'})`
   return `The secret check blocked this ${verb}: ${what}. ${remedy}, or allow this exact ${verb} once in Settings > Security and backup.`
 }
 

@@ -74,31 +74,59 @@ export function SettingRow(props: SettingRowProps) {
         <span class="ui-setting-title">
           <Show
             when={props.help}
-            fallback={<label class="ui-setting-label" id={labelId} for={slot.target()}>{props.label}</label>}
+            fallback={
+              <label class="ui-setting-label" id={labelId} for={slot.target()}>
+                {props.label}
+              </label>
+            }
           >
             {(help) => (
               <span class="ui-titled">
-                <label class="ui-setting-label" id={labelId} for={slot.target()}>{props.label}</label>
+                <label class="ui-setting-label" id={labelId} for={slot.target()}>
+                  {props.label}
+                </label>
                 <HelpMark text={help()} titleId={labelId} />
               </span>
             )}
           </Show>
-          <Show when={props.onReset}><span class="ui-setting-changed" data-tip="Changed from the default">•</span></Show>
-          <Show when={props.scope === 'device'}><span class="ui-setting-scope" id={scopeId}><Badge size="xs">This device</Badge></span></Show>
-          <span class="ui-setting-status" aria-live="polite">{showSaved() ? 'Saved' : ''}</span>
+          <Show when={props.onReset}>
+            <span class="ui-setting-changed" data-tip="Changed from the default">
+              •
+            </span>
+          </Show>
+          <Show when={props.scope === 'device'}>
+            <span class="ui-setting-scope" id={scopeId}>
+              <Badge size="xs">This device</Badge>
+            </span>
+          </Show>
+          <span class="ui-setting-status" aria-live="polite">
+            {showSaved() ? 'Saved' : ''}
+          </span>
           <Show when={props.onReset && !props.from && !showSaved()}>
-            <Button variant="ghost" size="xs" onPress={() => props.onReset?.()}>Reset</Button>
+            <Button variant="ghost" size="xs" onPress={() => props.onReset?.()}>
+              Reset
+            </Button>
           </Show>
         </span>
-        <Show when={props.description}><span class="ui-setting-description" id={descriptionId}>{props.description}</span></Show>
-        <Show when={props.from}><span class="ui-setting-from">From {props.from}</span></Show>
+        <Show when={props.description}>
+          <span class="ui-setting-description" id={descriptionId}>
+            {props.description}
+          </span>
+        </Show>
+        <Show when={props.from}>
+          <span class="ui-setting-from">From {props.from}</span>
+        </Show>
       </div>
       <div class="ui-setting-control">
         <fieldset class="ui-setting-fieldset" disabled={!!props.from}>
           <FieldProvider value={slot.claim}>{props.children}</FieldProvider>
         </fieldset>
       </div>
-      <Show when={props.error}><span class="ui-setting-error" role="alert">{props.error}</span></Show>
+      <Show when={props.error}>
+        <span class="ui-setting-error" role="alert">
+          {props.error}
+        </span>
+      </Show>
     </div>
   )
 }

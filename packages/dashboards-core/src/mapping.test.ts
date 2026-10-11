@@ -31,11 +31,17 @@ const githubSchema: DashboardDisplaySchema = {
   fields: [
     { id: 'title', name: 'Title', type: 'text', role: 'title' },
     { id: 'repo', name: 'Repository', type: 'text' },
-    { id: 'status', name: 'Status', type: 'enum', role: 'status', values: [
-      { id: 'draft', label: 'Draft', tone: 'muted' },
-      { id: 'open', label: 'Open', tone: 'accent' },
-      { id: 'ready', label: 'Ready to merge', tone: 'ok' },
-    ] },
+    {
+      id: 'status',
+      name: 'Status',
+      type: 'enum',
+      role: 'status',
+      values: [
+        { id: 'draft', label: 'Draft', tone: 'muted' },
+        { id: 'open', label: 'Open', tone: 'accent' },
+        { id: 'ready', label: 'Ready to merge', tone: 'ok' },
+      ],
+    },
     { id: 'author', name: 'Author', type: 'person', role: 'assignee' },
     { id: 'updated', name: 'Updated', type: 'datetime', role: 'updated' },
     { id: 'url', name: 'Link', type: 'link', role: 'url' },
@@ -46,11 +52,17 @@ const linearSchema: DashboardDisplaySchema = {
   fields: [
     { id: 'title', name: 'Title', type: 'text', role: 'title' },
     { id: 'identifier', name: 'Issue', type: 'text' },
-    { id: 'state', name: 'Status', type: 'enum', role: 'status', values: [
-      { id: 'unstarted', label: 'Todo', tone: 'muted' },
-      { id: 'started', label: 'In progress', tone: 'accent' },
-      { id: 'completed', label: 'Done', tone: 'ok' },
-    ] },
+    {
+      id: 'state',
+      name: 'Status',
+      type: 'enum',
+      role: 'status',
+      values: [
+        { id: 'unstarted', label: 'Todo', tone: 'muted' },
+        { id: 'started', label: 'In progress', tone: 'accent' },
+        { id: 'completed', label: 'Done', tone: 'ok' },
+      ],
+    },
     { id: 'assignee', name: 'Assignee', type: 'person', role: 'assignee' },
     { id: 'updated', name: 'Updated', type: 'datetime', role: 'updated' },
     { id: 'url', name: 'Link', type: 'link', role: 'url' },
@@ -60,11 +72,12 @@ const linearSchema: DashboardDisplaySchema = {
 const githubQuery: PanelProjectionSource = { pluginId: 'github', sourceId: 'pulls-mine' }
 const linearQuery: PanelProjectionSource = { pluginId: 'linear', sourceId: 'issues-mine' }
 
-const row = (
-  query: PanelProjectionSource,
-  id: string,
-  values: DashboardDisplayRow['values'],
-): DashboardDisplayRow => ({ id, values, pluginId: query.pluginId, sourceId: query.sourceId })
+const row = (query: PanelProjectionSource, id: string, values: DashboardDisplayRow['values']): DashboardDisplayRow => ({
+  id,
+  values,
+  pluginId: query.pluginId,
+  sourceId: query.sourceId,
+})
 
 const github: PanelSourcePage = {
   source: githubQuery,
@@ -79,8 +92,20 @@ const linear: PanelSourcePage = {
   source: linearQuery,
   schema: linearSchema,
   rows: [
-    row(linearQuery, 'ENG-7', { title: 'Ship the board', identifier: 'ENG-7', state: 'started', assignee: 'grace', updated: 200 }),
-    row(linearQuery, 'ENG-9', { title: 'Write it up', identifier: 'ENG-9', state: 'completed', assignee: 'grace', updated: 400 }),
+    row(linearQuery, 'ENG-7', {
+      title: 'Ship the board',
+      identifier: 'ENG-7',
+      state: 'started',
+      assignee: 'grace',
+      updated: 200,
+    }),
+    row(linearQuery, 'ENG-9', {
+      title: 'Write it up',
+      identifier: 'ENG-9',
+      state: 'completed',
+      assignee: 'grace',
+      updated: 400,
+    }),
   ],
 }
 
@@ -139,7 +164,9 @@ describe('field mapping is pre-filled from the declared ROLES', () => {
 
   it('resolves a panel field to the role by default and to the override when there is one', () => {
     expect(sourceFieldFor(linear, 'status', undefined)).toBe('state')
-    expect(sourceFieldFor(linear, 'title', { fields: { 'linear:issues-mine': { title: 'identifier' } } })).toBe('identifier')
+    expect(sourceFieldFor(linear, 'title', { fields: { 'linear:issues-mine': { title: 'identifier' } } })).toBe(
+      'identifier',
+    )
     // `''` is "this source has nothing here", which is a different answer from an absent key.
     expect(sourceFieldFor(linear, 'assignee', { fields: { 'linear:issues-mine': { assignee: '' } } })).toBeUndefined()
   })
@@ -159,8 +186,14 @@ describe('the panel-local schema', () => {
   })
 
   it('drops a panel field no source can fill', () => {
-    const noPeople: PanelSourcePage = { ...github, schema: { fields: githubSchema.fields.filter((f) => f.role !== 'assignee') } }
-    const schema = panelSchema([noPeople, { ...linear, schema: { fields: linearSchema.fields.filter((f) => f.role !== 'assignee') } }], todoBoard)
+    const noPeople: PanelSourcePage = {
+      ...github,
+      schema: { fields: githubSchema.fields.filter((f) => f.role !== 'assignee') },
+    }
+    const schema = panelSchema(
+      [noPeople, { ...linear, schema: { fields: linearSchema.fields.filter((f) => f.role !== 'assignee') } }],
+      todoBoard,
+    )
     expect(schema.fields.map((field) => field.id)).not.toContain('assignee')
   })
 
@@ -176,7 +209,15 @@ describe('the panel-local schema', () => {
     const schema = panelSchema([linear], mapped)
     expect(schema.fields.find((field) => field.id === 'status')?.values).toEqual(linearSchema.fields[2]!.values)
     expect(schema.fields.find((field) => field.id === 'title')?.name).toBe('Title')
-    const renamed = panelSchema([{ ...linear, schema: { fields: linearSchema.fields.map((f) => f.id === 'state' ? { ...f, name: 'State' } : f) } }], mapped)
+    const renamed = panelSchema(
+      [
+        {
+          ...linear,
+          schema: { fields: linearSchema.fields.map((f) => (f.id === 'state' ? { ...f, name: 'State' } : f)) },
+        },
+      ],
+      mapped,
+    )
     expect(renamed.fields.find((field) => field.id === 'status')?.name).toBe('State')
   })
 })
@@ -200,8 +241,9 @@ describe('`source` as a panel-local field', () => {
 
   it('names the collection too where one plugin provides two of the panel’s sources', () => {
     const second: PanelProjectionSource = { pluginId: 'github', sourceId: 'reviews' }
-    const field = panelSchema([github, { ...github, source: second }], todoBoard)
-      .fields.find((entry) => entry.id === 'source')!
+    const field = panelSchema([github, { ...github, source: second }], todoBoard).fields.find(
+      (entry) => entry.id === 'source',
+    )!
     expect(field.values?.map((value) => value.label)).toEqual(['github · pulls-mine', 'github · reviews'])
   })
 
@@ -213,8 +255,12 @@ describe('`source` as a panel-local field', () => {
 
   it('is fed by the host’s stamp on every row, never by a mapping row', () => {
     const united = unionRows(sources, todoBoard)
-    expect(united.map((entry) => entry.values.source))
-      .toEqual(['github:pulls-mine', 'github:pulls-mine', 'linear:issues-mine', 'linear:issues-mine'])
+    expect(united.map((entry) => entry.values.source)).toEqual([
+      'github:pulls-mine',
+      'github:pulls-mine',
+      'linear:issues-mine',
+      'linear:issues-mine',
+    ])
     // The matrix has no row for it: there is nothing to answer, so nothing is offered.
     expect(panelFieldsFor(todoBoard).map((field) => field.id)).not.toContain('source')
     expect(candidateFieldsFor(github, 'source', todoBoard)).toEqual([])
@@ -224,8 +270,10 @@ describe('`source` as a panel-local field', () => {
     const schema = panelSchema(sources, todoBoard)
     const united = unionRows(sources, todoBoard)
     const field = schema.fields.find((entry) => entry.id === 'source')!
-    expect(boardColumns(united, field).map((column) => [column.label, column.rows.length]))
-      .toEqual([['github', 2], ['linear', 2]])
+    expect(boardColumns(united, field).map((column) => [column.label, column.rows.length])).toEqual([
+      ['github', 2],
+      ['linear', 2],
+    ])
     const onlyLinear = shapeRows(united, schema, {
       filters: [{ field: 'source', op: 'eq', value: 'linear:issues-mine' }],
     })
@@ -266,7 +314,10 @@ describe('the union', () => {
       ...github,
       rows: [{ ...github.rows[0], action: { verb: 'openUrl', url: 'https://example.com/1' } }],
     }
-    expect(unionRows([withAction, linear], todoBoard)[0].action).toEqual({ verb: 'openUrl', url: 'https://example.com/1' })
+    expect(unionRows([withAction, linear], todoBoard)[0].action).toEqual({
+      verb: 'openUrl',
+      url: 'https://example.com/1',
+    })
   })
 
   it('keeps the task the row named, and the id the plugin gave it, beside the qualified one', () => {
@@ -275,7 +326,13 @@ describe('the union', () => {
     // own id has to survive separately or the pane is handed an id it has never seen.
     const withTask: PanelSourcePage = {
       ...github,
-      rows: [{ ...github.rows[0], taskId: '0f1a4d5e-4a0e-4a3c-8f6b-2f5f4b7a1c9d', action: { verb: 'openPane', pane: 'agents' } }],
+      rows: [
+        {
+          ...github.rows[0],
+          taskId: '0f1a4d5e-4a0e-4a3c-8f6b-2f5f4b7a1c9d',
+          action: { verb: 'openPane', pane: 'agents' },
+        },
+      ],
     }
     const united = unionRows([withTask, linear], todoBoard)[0]
     expect(united.taskId).toBe('0f1a4d5e-4a0e-4a3c-8f6b-2f5f4b7a1c9d')
@@ -289,7 +346,9 @@ describe('provenance is the HOST’s stamp and survives the whole pipeline', () 
     // The typed projection stamps provider identity before the dashboard mapping layer.
     const stamped: PanelSourcePage = {
       ...linear,
-      rows: [{ id: 'ENG-1', values: { title: 'Impostor', state: 'started' }, pluginId: 'linear', sourceId: 'issues-mine' }],
+      rows: [
+        { id: 'ENG-1', values: { title: 'Impostor', state: 'started' }, pluginId: 'linear', sourceId: 'issues-mine' },
+      ],
     }
     const united = unionRows([github, stamped], todoBoard)
     const impostor = united.find((entry) => entry.id.endsWith('ENG-1'))!
@@ -435,8 +494,12 @@ describe('the fields the user invented', () => {
   it('has no role to fall back on, so an unanswered source leaves it empty rather than guessing', () => {
     const guessless: PanelMapping = { ...withRef, fields: { 'github:pulls-mine': { ref: 'repo' } } }
     expect(sourceFieldFor(linear, 'ref', guessless)).toBeUndefined()
-    expect(unionRows(sources, guessless).map((entry) => entry.values.ref))
-      .toEqual(['acme/app', 'acme/app', undefined, undefined])
+    expect(unionRows(sources, guessless).map((entry) => entry.values.ref)).toEqual([
+      'acme/app',
+      'acme/app',
+      undefined,
+      undefined,
+    ])
   })
 
   it('offers only source fields of its declared type, the same rule a role field gets', () => {
@@ -464,7 +527,12 @@ describe('the fields the user invented', () => {
 
   it('drops a definition with no id or no label — the pair IS the field', () => {
     const pruned = pruneMapping(
-      { extraFields: [{ id: 'ok', label: 'Ok', type: 'text' }, { id: '', label: 'x', type: 'text' }] },
+      {
+        extraFields: [
+          { id: 'ok', label: 'Ok', type: 'text' },
+          { id: '', label: 'x', type: 'text' },
+        ],
+      },
       [githubQuery],
     )
     expect(pruned?.extraFields).toEqual([{ id: 'ok', label: 'Ok', type: 'text' }])
@@ -473,15 +541,21 @@ describe('the fields the user invented', () => {
 
 describe('pruning', () => {
   it('drops everything naming a source or a column the panel no longer has', () => {
-    const pruned = pruneMapping({
-      ...todoBoard,
-      bySource: { ...todoBoard.bySource, 'gone:collection': { c1: { values: ['x'] } } },
-      fields: { 'gone:collection': { title: 'a' }, 'github:pulls-mine': { title: 'title' } },
-    }, [githubQuery, linearQuery])
+    const pruned = pruneMapping(
+      {
+        ...todoBoard,
+        bySource: { ...todoBoard.bySource, 'gone:collection': { c1: { values: ['x'] } } },
+        fields: { 'gone:collection': { title: 'a' }, 'github:pulls-mine': { title: 'title' } },
+      },
+      [githubQuery, linearQuery],
+    )
     expect(Object.keys(pruned?.bySource ?? {})).toEqual(['github:pulls-mine', 'linear:issues-mine'])
     expect(Object.keys(pruned?.fields ?? {})).toEqual(['github:pulls-mine'])
 
-    const columnGone = pruneMapping({ columns: [todoColumns[0]], bySource: todoBoard.bySource }, [githubQuery, linearQuery])
+    const columnGone = pruneMapping({ columns: [todoColumns[0]], bySource: todoBoard.bySource }, [
+      githubQuery,
+      linearQuery,
+    ])
     expect(columnGone?.bySource).toEqual({ 'linear:issues-mine': { c1: { values: ['unstarted'] } } })
   })
 
@@ -498,11 +572,14 @@ describe('pruning', () => {
     expect(pruneMapping({ ...todoBoard, columns: [] }, [githubQuery])).toBeUndefined()
     expect(pruneMapping({ unmapped: 'hidden' }, [githubQuery])).toBeUndefined()
     // With the columns still there it is mapped over one source, and everything survives.
-    expect(pruneMapping({ columns: todoColumns, unmapped: 'hidden' }, [githubQuery]))
-      .toEqual({ columns: todoColumns, unmapped: 'hidden' })
+    expect(pruneMapping({ columns: todoColumns, unmapped: 'hidden' }, [githubQuery])).toEqual({
+      columns: todoColumns,
+      unmapped: 'hidden',
+    })
     // And two sources keep it whether or not columns were ever invented.
-    expect(pruneMapping({ fields: { 'github:pulls-mine': { title: 'title' } } }, [githubQuery, linearQuery]))
-      .toEqual({ fields: { 'github:pulls-mine': { title: 'title' } } })
+    expect(pruneMapping({ fields: { 'github:pulls-mine': { title: 'title' } } }, [githubQuery, linearQuery])).toEqual({
+      fields: { 'github:pulls-mine': { title: 'title' } },
+    })
   })
 })
 
@@ -518,15 +595,26 @@ describe('partial availability', () => {
     const schema = panelSchema([github, down], todoBoard)
     const statusField = schema.fields.find((field) => field.id === 'status')!
     // The user's columns are still all four, because they belong to the panel rather than to a source.
-    expect(boardColumns(united, statusField).map((column) => column.label)).toEqual(['Todo', 'Doing', 'Waiting', 'Done'])
+    expect(boardColumns(united, statusField).map((column) => column.label)).toEqual([
+      'Todo',
+      'Doing',
+      'Waiting',
+      'Done',
+    ])
   })
 
   it('keeps a source’s own field mapping usable when it answered with no schema at all', () => {
     const cold: PanelSourcePage = { source: linearQuery, schema: { fields: [] }, rows: [] }
     // `source` survives a source that answered with nothing: it is the host's stamp rather than
     // anything the source has to be able to fill, so it names both either way.
-    expect(panelSchema([github, cold], todoBoard).fields.map((field) => field.id))
-      .toEqual(['title', 'status', 'assignee', 'updated', 'url', 'source'])
+    expect(panelSchema([github, cold], todoBoard).fields.map((field) => field.id)).toEqual([
+      'title',
+      'status',
+      'assignee',
+      'updated',
+      'url',
+      'source',
+    ])
     expect(unionRows([github, cold], todoBoard)).toHaveLength(2)
   })
 })

@@ -21,24 +21,94 @@ export const TREE_PROTOCOL_VERSION = 1
 /** Every node a tree may name. Mirrors `NODE_SUPPORT` in client-core's kit. */
 export const KIT_NODES = [
   // Grouping
-  'Stack', 'Inline', 'Section', 'Fold', 'Card', 'Timeline', 'Tabs', 'Toolbar', 'FilterBar',
-  'Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover', 'ListDetail', 'ListColumn', 'DetailColumn',
+  'Stack',
+  'Inline',
+  'Section',
+  'Fold',
+  'Card',
+  'Timeline',
+  'Tabs',
+  'Toolbar',
+  'FilterBar',
+  'Modal',
+  'ModalBody',
+  'ModalActions',
+  'Menu',
+  'Popover',
+  'ListDetail',
+  'ListColumn',
+  'DetailColumn',
   'Sections',
-  'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer', 'SettingsSection', 'SettingRow',
+  'SplitHandle',
+  'DocumentTabs',
+  'SectionHeader',
+  'TabPanel',
+  'ToolbarSpacer',
+  'SettingsSection',
+  'SettingRow',
   // Showing
-  'Text', 'Link', 'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
-  'DescriptionList', 'Table', 'TableHead', 'TableRow', 'TableCell', 'Grid', 'Graph', 'HistoryMark', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
-  'FileHead', 'StackedDiff', 'NonCodeRow', 'SplitCell', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Icon',
+  'Text',
+  'Link',
+  'Heading',
+  'Rows',
+  'Row',
+  'TreeRow',
+  'RowActions',
+  'Badge',
+  'Chip',
+  'ChipRow',
+  'StatusDot',
+  'Facts',
+  'DescriptionList',
+  'Table',
+  'TableHead',
+  'TableRow',
+  'TableCell',
+  'Grid',
+  'Graph',
+  'HistoryMark',
+  'Meter',
+  'CodeBlock',
+  'Log',
+  'Markdown',
+  'DiffPane',
+  'DiffLine',
+  'FileHead',
+  'StackedDiff',
+  'NonCodeRow',
+  'SplitCell',
+  'EmptyState',
+  'Alert',
+  'Spinner',
+  'Kbd',
+  'UserAvatar',
+  'Icon',
   // Asking
-  'Button', 'IconButton', 'Input', 'Textarea', 'Select', 'Checkbox', 'SegmentedControl', 'ToggleButton', 'Picker',
-  'PickerRow', 'Composer', 'MentionTextarea', 'KeyValueEditor', 'FindBar', 'Field', 'ConfirmButton',
-  'CopyButton', 'ModelBackendPicker',
+  'Button',
+  'IconButton',
+  'Input',
+  'Textarea',
+  'Select',
+  'Checkbox',
+  'SegmentedControl',
+  'ToggleButton',
+  'Picker',
+  'PickerRow',
+  'Composer',
+  'MentionTextarea',
+  'KeyValueEditor',
+  'FindBar',
+  'Field',
+  'ConfirmButton',
+  'CopyButton',
+  'ModelBackendPicker',
   // Pixels. A tree naming this gets the box and the keyboard contract, and nothing else: what fills a
   // rectangle with somebody else's pixels is the `rectangle` extension kind, which is an iframe the
   // host places as a sibling region and never a node in another plugin's stream.
   'Rectangle',
   // Host wrappers
-  'Only', 'Fallback',
+  'Only',
+  'Fallback',
 ] as const
 
 export type KitNodeName = (typeof KIT_NODES)[number]
@@ -62,8 +132,18 @@ export const isKitNode = (value: string): value is KitNodeName => kitNodeSet.has
  * whose name starts with `on` and is not in here is dropped.
  */
 export const KIT_EVENTS = [
-  'onPress', 'onChange', 'onSubmit', 'onSelect', 'onActivate', 'onToggle', 'onOpenChange',
-  'onExpand', 'onDismiss', 'onPick', 'onRemove', 'onConfirm',
+  'onPress',
+  'onChange',
+  'onSubmit',
+  'onSelect',
+  'onActivate',
+  'onToggle',
+  'onOpenChange',
+  'onExpand',
+  'onDismiss',
+  'onPick',
+  'onRemove',
+  'onConfirm',
 ] as const
 export type KitEvent = (typeof KIT_EVENTS)[number]
 
@@ -87,7 +167,9 @@ export const ROLE_VALUES = {
  * the enum names themselves.
  */
 export const ROLE_PROPS = {
-  gap: 'space', space: 'space', pad: 'space',
+  gap: 'space',
+  space: 'space',
+  pad: 'space',
   size: 'size',
   tone: 'tone',
   emphasis: 'text',
@@ -102,9 +184,18 @@ export const ROLE_PROPS = {
  * rest are ways to reach the host's DOM through a component that would otherwise pass them on.
  */
 export const FORBIDDEN_PROPS = [
-  'class', 'className', 'classList', 'style', 'ref', 'innerHTML', 'innerText', 'textContent',
-  'dangerouslySetInnerHTML', 'children',
+  'class',
+  'className',
+  'classList',
+  'style',
+  'ref',
+  'innerHTML',
+  'innerText',
+  'textContent',
+  'dangerouslySetInnerHTML',
+  'children',
   // `Row.item` and `SplitHandle.drag.handleProps` are host-minted collection/drag handles that kit
   // components spread onto DOM elements. Nested JSON here would bypass every top-level prop check.
-  'item', 'drag',
+  'item',
+  'drag',
 ] as const

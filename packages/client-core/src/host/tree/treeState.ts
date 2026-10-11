@@ -60,7 +60,11 @@ export function createTreeScheduler(
 
 const defaultScheduler: TreeScheduler =
   typeof requestAnimationFrame === 'function'
-    ? createTreeScheduler(requestAnimationFrame, cancelAnimationFrame, () => typeof document !== 'undefined' && document.hidden)
+    ? createTreeScheduler(
+        requestAnimationFrame,
+        cancelAnimationFrame,
+        () => typeof document !== 'undefined' && document.hidden,
+      )
     : { schedule: (run) => setTimeout(run, 0) as unknown as number, cancel: (handle) => clearTimeout(handle) }
 
 export type TreeStateInput = {
@@ -131,7 +135,9 @@ export function createTreeState(input: TreeStateInput) {
         case 'insert': {
           if (op.parent !== null && !projected.has(op.parent)) return `insert under an unknown node ${op.parent}`
           const base = depthIn(op.parent)
-          const stack: { node: typeof op.node; parent: string | null; depth: number }[] = [{ node: op.node, parent: op.parent, depth: base + 1 }]
+          const stack: { node: typeof op.node; parent: string | null; depth: number }[] = [
+            { node: op.node, parent: op.parent, depth: base + 1 },
+          ]
           while (stack.length) {
             const { node, parent, depth } = stack.pop()!
             if (depth > TREE_LIMITS.depth) return `tree deeper than ${TREE_LIMITS.depth}`
@@ -215,7 +221,7 @@ export function createTreeState(input: TreeStateInput) {
     const lists = new Map<string | null, string[]>()
     const childrenOf = (id: string | null): string[] => {
       let list = lists.get(id)
-      if (!list) lists.set(id, (list = [...(id === null ? roots() : nodes[id]?.children ?? [])]))
+      if (!list) lists.set(id, (list = [...(id === null ? roots() : (nodes[id]?.children ?? []))]))
       return list
     }
     const detach = (id: string): void => {
@@ -232,7 +238,11 @@ export function createTreeState(input: TreeStateInput) {
         for (const child of lists.get(at) ?? nodes[at]?.children ?? []) pending.push(child)
         lists.delete(at)
         parents.delete(at)
-        setNodes(produce((table) => { delete table[at] }))
+        setNodes(
+          produce((table) => {
+            delete table[at]
+          }),
+        )
       }
     }
     batch(() => {
@@ -259,7 +269,8 @@ export function createTreeState(input: TreeStateInput) {
             const { props: safe, dropped } = sanitizeProps(nodes[op.id]!.type, op.props)
             if (dropped.length) refuse(`${nodes[op.id]!.type} dropped props: ${dropped.join(', ')}`)
             // A null means "the sandbox unset this", which is `undefined` to a Solid component.
-            for (const [name, value] of Object.entries(safe)) setNodes(op.id, 'props', name, value === null ? undefined : value)
+            for (const [name, value] of Object.entries(safe))
+              setNodes(op.id, 'props', name, value === null ? undefined : value)
             break
           }
           case 'move': {
@@ -330,7 +341,9 @@ export function createTreeState(input: TreeStateInput) {
     if (handle) return
     handle = scheduler.schedule(flush)
   })
-  const detachFailed = input.transport.onFailed((message) => { if (!stopped) setFailed(message) })
+  const detachFailed = input.transport.onFailed((message) => {
+    if (!stopped) setFailed(message)
+  })
 
   return {
     nodes,
@@ -344,7 +357,8 @@ export function createTreeState(input: TreeStateInput) {
     resolveProps(stored: StoredNode | undefined): Record<string, unknown> {
       const out: Record<string, unknown> = {}
       for (const [name, value] of Object.entries(stored?.props ?? {})) {
-        if (isHandlerRef(value)) out[name] = (payload: unknown) => input.transport.send(value.$handler, name as KitEvent, payload)
+        if (isHandlerRef(value))
+          out[name] = (payload: unknown) => input.transport.send(value.$handler, name as KitEvent, payload)
         else out[name] = value
       }
       return out

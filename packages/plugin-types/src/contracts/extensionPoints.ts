@@ -27,4 +27,3 @@ export type PluginExtensionPointRegistry = {
   /** In declared order, ties broken by id. Resolve at call time, never at init. */
   handlers<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
-

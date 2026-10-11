@@ -20,11 +20,18 @@ export function Confirmation(props: { request: ConfirmRequest }) {
       <ModalBody>
         <box flexDirection="column">
           <Line wrap>{props.request.goes}</Line>
-          <Show when={props.request.stays}><Line role="muted" wrap>{props.request.stays!}</Line></Show>
+          <Show when={props.request.stays}>
+            <Line role="muted" wrap>
+              {props.request.stays!}
+            </Line>
+          </Show>
           <Rows
             id={id}
             ariaLabel={props.request.title}
-            items={[{ key: 'cancel', label: 'Cancel' }, { key: 'confirm', label: props.request.actionLabel }]}
+            items={[
+              { key: 'cancel', label: 'Cancel' },
+              { key: 'confirm', label: props.request.actionLabel },
+            ]}
             onActivate={(key) => answer(key === 'confirm')}
           >
             {(row, item) => <Row item={item}>{row.label}</Row>}

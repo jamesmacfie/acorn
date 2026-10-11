@@ -37,17 +37,22 @@ export type HandoffMcp = { args: string[]; env: Record<string, string> }
 export function claudeHandoffMcp(servers: readonly AgentDriverMcpServer[]): HandoffMcp {
   if (!servers.length) return { args: [], env: {} }
   const env: Record<string, string> = {}
-  const named = (values: Record<string, string>) => Object.fromEntries(Object.entries(values).map(([key, value]) => {
-    const variable = `ACORN_MCP_VALUE_${Object.keys(env).length + 1}`
-    env[variable] = value
-    return [key, `\${${variable}}`]
-  }))
-  const mcpServers = Object.fromEntries(servers.map((server) => [
-    server.name,
-    server.transport === 'stdio'
-      ? { command: server.command, args: server.args, env: named(server.env) }
-      : { type: 'http', url: server.url, headers: named(server.headers) },
-  ]))
+  const named = (values: Record<string, string>) =>
+    Object.fromEntries(
+      Object.entries(values).map(([key, value]) => {
+        const variable = `ACORN_MCP_VALUE_${Object.keys(env).length + 1}`
+        env[variable] = value
+        return [key, `\${${variable}}`]
+      }),
+    )
+  const mcpServers = Object.fromEntries(
+    servers.map((server) => [
+      server.name,
+      server.transport === 'stdio'
+        ? { command: server.command, args: server.args, env: named(server.env) }
+        : { type: 'http', url: server.url, headers: named(server.headers) },
+    ]),
+  )
   return { args: ['--mcp-config', JSON.stringify({ mcpServers })], env }
 }
 
@@ -64,7 +69,8 @@ export function codexHandoffMcp(servers: readonly AgentDriverMcpServer[], secret
   // A JSON string literal is also a valid TOML basic string, which is what makes this safe to build.
   const toml = (value: string) => JSON.stringify(value)
   const list = (values: readonly string[]) => `[${values.map(toml).join(',')}]`
-  const table = (entries: ReadonlyArray<[string, string]>) => `{${entries.map(([key, value]) => `${toml(key)}=${toml(value)}`).join(',')}}`
+  const table = (entries: ReadonlyArray<[string, string]>) =>
+    `{${entries.map(([key, value]) => `${toml(key)}=${toml(value)}`).join(',')}}`
   const args = servers.flatMap((server) => {
     if (server.transport === 'http') {
       const headers = Object.entries(server.headers).map(([header, value]): [string, string] => {
@@ -83,13 +89,18 @@ export function codexHandoffMcp(servers: readonly AgentDriverMcpServer[], secret
       }
       const owner = claimedBy.get(name)
       if (owner !== undefined && env[name] !== value) {
-        throw new Error(`Codex cannot give ${owner} and ${server.name} different values for ${name} in a terminal. Switch one of them off for this session first.`)
+        throw new Error(
+          `Codex cannot give ${owner} and ${server.name} different values for ${name} in a terminal. Switch one of them off for this session first.`,
+        )
       }
       claimedBy.set(name, server.name)
       env[name] = value
       forwarded.push(name)
     }
-    return ['-c', `mcp_servers.${server.name}={command=${toml(server.command)},args=${list(server.args)},env=${table(inline)},env_vars=${list(forwarded)}}`]
+    return [
+      '-c',
+      `mcp_servers.${server.name}={command=${toml(server.command)},args=${list(server.args)},env=${table(inline)},env_vars=${list(forwarded)}}`,
+    ]
   })
   return { args, env }
 }

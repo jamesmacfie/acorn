@@ -1,5 +1,15 @@
 import { createMemo } from 'solid-js'
-import { prefsKey, prefsRoute, projectsKey, projectsRoute, workspacesKey, workspacesRoute, type Project, type ProjectsResponse, type Workspace } from '@acorn/protocol/api.ts'
+import {
+  prefsKey,
+  prefsRoute,
+  projectsKey,
+  projectsRoute,
+  workspacesKey,
+  workspacesRoute,
+  type Project,
+  type ProjectsResponse,
+  type Workspace,
+} from '@acorn/protocol/api.ts'
 import { WORKSPACES_PREF_KEY, workspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { readJson } from '../../infra/node/apiClient'
@@ -24,8 +34,13 @@ export type FleetWorkspaceList = {
 }
 
 /** Hide dead picker rows; off mode also excludes projects hidden on that specific Node. */
-export function pickerWorkspaces(workspaces: readonly Workspace[], projects: readonly Project[], preference: string | undefined): Workspace[] {
-  if (workspacesMode(preference, projects.length) === 'on') return workspaces.filter((workspace) => workspace.projects.length > 0)
+export function pickerWorkspaces(
+  workspaces: readonly Workspace[],
+  projects: readonly Project[],
+  preference: string | undefined,
+): Workspace[] {
+  if (workspacesMode(preference, projects.length) === 'on')
+    return workspaces.filter((workspace) => workspace.projects.length > 0)
   const visible = new Set(projects.filter((project) => !project.hidden).map((project) => project.id))
   return workspaces.flatMap((workspace) => {
     const members = workspace.projects.filter((project) => visible.has(project.id))
@@ -65,8 +80,11 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
         const allProjects = projectRows.get(row.nodeId)
         const nodePrefs = preferences.get(row.nodeId)
         if (!allProjects || !nodePrefs) return []
-        return pickerWorkspaces(row.data, allProjects, nodePrefs[WORKSPACES_PREF_KEY])
-          .map((workspace) => ({ workspace, nodeId: row.nodeId, node: row.node }))
+        return pickerWorkspaces(row.data, allProjects, nodePrefs[WORKSPACES_PREF_KEY]).map((workspace) => ({
+          workspace,
+          nodeId: row.nodeId,
+          node: row.node,
+        }))
       }),
       unavailable: [...unavailable.values()],
       grouped: nodes().length > 1,
@@ -80,7 +98,10 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
 // active workspace from that repo against the active node's query cache, so navigating first
 // would resolve the path against the wrong node, which either finds nothing or, worse, finds a
 // different repo that happens to share the owner/name.
-export function selectFleetWorkspace(entry: Pick<FleetWorkspace, 'workspace' | 'nodeId'>, navigate: (path: string) => void): void {
+export function selectFleetWorkspace(
+  entry: Pick<FleetWorkspace, 'workspace' | 'nodeId'>,
+  navigate: (path: string) => void,
+): void {
   const first = entry.workspace.projects[0]
   if (!first) return // an empty workspace has nowhere to go, same as the single-node picker
   if (entry.nodeId !== activeNodeId()) setActiveNode(entry.nodeId)

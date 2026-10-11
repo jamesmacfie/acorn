@@ -64,10 +64,21 @@ describe('integration provider conformance', () => {
           if (!cached.ok) return
           expect(provider.codec!.parse({ obsolete: true }, provider.conformance!.ref).ok).toBe(false)
 
-          const detailed = provider.conformance!.detail === undefined
-            ? cached.value
-            : provider.codec!.withDetail(provider.conformance!.ref, provider.conformance!.summary, provider.conformance!.detail, 10)
-          const refreshed = provider.codec!.mergeSummary(detailed, provider.conformance!.ref, provider.conformance!.summary, 20)
+          const detailed =
+            provider.conformance!.detail === undefined
+              ? cached.value
+              : provider.codec!.withDetail(
+                  provider.conformance!.ref,
+                  provider.conformance!.summary,
+                  provider.conformance!.detail,
+                  10,
+                )
+          const refreshed = provider.codec!.mergeSummary(
+            detailed,
+            provider.conformance!.ref,
+            provider.conformance!.summary,
+            20,
+          )
           expect(refreshed.detail).toEqual(detailed.detail)
           expect(refreshed.listFetchedAt).toBe(20)
         })

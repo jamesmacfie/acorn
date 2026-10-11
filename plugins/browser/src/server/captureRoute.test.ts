@@ -10,12 +10,24 @@ let handler: PluginFetchHandler
 let id: string
 beforeEach(async () => {
   ctx = makeTestNodeContext({ plugin: { name: 'browser' } })
-  vi.spyOn(ctx.routes, 'fetch').mockImplementation((fetch) => { handler = fetch })
+  vi.spyOn(ctx.routes, 'fetch').mockImplementation((fetch) => {
+    handler = fetch
+  })
   plugin = browserPlugin()
   await plugin.init(ctx)
-  id = (await captureStore(ctx.storage.open()).put({ taskId: 'own-task', mime: 'image/png', bytes: Buffer.from('synthetic-pixels') })).id
+  id = (
+    await captureStore(ctx.storage.open()).put({
+      taskId: 'own-task',
+      mime: 'image/png',
+      bytes: Buffer.from('synthetic-pixels'),
+    })
+  ).id
 })
-afterEach(async () => { await plugin.dispose?.(); ctx.cleanup(); vi.restoreAllMocks() })
+afterEach(async () => {
+  await plugin.dispose?.()
+  ctx.cleanup()
+  vi.restoreAllMocks()
+})
 
 async function read(principal: Principal, captureId = id) {
   const context = await makeTestRequestContext({ plugin: 'browser', principal, env: ctx.env })

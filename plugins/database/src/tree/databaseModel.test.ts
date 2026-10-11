@@ -13,7 +13,9 @@ describe('database client model helpers', () => {
   })
 
   it('labels a query with its first notes line when available', () => {
-    expect(savedQueryLabel({ ...queries[0], notes: 'paid orders\nused by finance' })).toBe('Recent orders — paid orders')
+    expect(savedQueryLabel({ ...queries[0], notes: 'paid orders\nused by finance' })).toBe(
+      'Recent orders — paid orders',
+    )
     expect(savedQueryLabel(queries[1])).toBe('Users')
   })
 })

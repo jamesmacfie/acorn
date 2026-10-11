@@ -91,16 +91,40 @@ describe('the providers answer', () => {
     const descriptors = await warm()
     const olderOptions = [{ id: 'model', label: 'Model', category: 'model' as const, currentValue: 'old', values: [] }]
     const latestOptions = [
-      { id: 'model', label: 'Model', category: 'model' as const, currentValue: 'new', values: [{ value: 'new', label: 'New' }] },
-      { id: 'reasoning', label: 'Effort', category: 'reasoning' as const, currentValue: 'high', values: [{ value: 'high', label: 'High' }] },
+      {
+        id: 'model',
+        label: 'Model',
+        category: 'model' as const,
+        currentValue: 'new',
+        values: [{ value: 'new', label: 'New' }],
+      },
+      {
+        id: 'reasoning',
+        label: 'Effort',
+        category: 'reasoning' as const,
+        currentValue: 'high',
+        values: [{ value: 'high', label: 'High' }],
+      },
     ]
-    const makeSession = (configOptions: typeof latestOptions) => runtime.store.createSession({
-      taskId: 'task-options', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { configOptions },
-    }, descriptors[0]!)
+    const makeSession = (configOptions: typeof latestOptions) =>
+      runtime.store.createSession(
+        {
+          taskId: 'task-options',
+          providerId: 'fake',
+          profileId: 'fake',
+          kind: 'interactive',
+          config: { configOptions },
+        },
+        descriptors[0]!,
+      )
     const older = await makeSession(olderOptions)
     const latest = await makeSession(latestOptions)
     const connecting = await makeSession([])
-    vi.spyOn(runtime.store, 'listSessions').mockResolvedValue({ sessions: [connecting, latest, older], delegations: [], nextCursor: null })
+    vi.spyOn(runtime.store, 'listSessions').mockResolvedValue({
+      sessions: [connecting, latest, older],
+      delegations: [],
+      nextCursor: null,
+    })
 
     expect((await runtime.providers.list())[0]?.configOptions).toEqual(latestOptions)
     expect(driver.pending).toHaveLength(0)
@@ -124,7 +148,10 @@ describe('the providers answer', () => {
     await warm()
     driver.installed = false
     let settled = false
-    const forced = runtime.providers.list(true).then((answer) => { settled = true; return answer })
+    const forced = runtime.providers.list(true).then((answer) => {
+      settled = true
+      return answer
+    })
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     expect(settled).toBe(false)
     driver.answer()
@@ -166,7 +193,8 @@ describe('the providers answer', () => {
     vi.setSystemTime(timestamp)
     const fresh = runtime.providers.list(true)
     await vi.waitFor(() => expect(driver.pending).toHaveLength(2))
-    const first = driver.pending.shift()!, second = driver.pending.shift()!
+    const first = driver.pending.shift()!,
+      second = driver.pending.shift()!
     second(undefined as never)
     const descriptors = await fresh
     first(undefined as never)
@@ -186,8 +214,11 @@ describe('the providers answer', () => {
 
   it('returns provider diagnostics after a rejected probe and permits a forced retry', async () => {
     vi.spyOn(driver, 'probe').mockRejectedValueOnce(new Error('Synthetic probe failure'))
-    expect((await runtime.providers.list())[0]).toMatchObject({ installed: false, authenticated: null,
-      diagnostics: ['Synthetic probe failure'] })
+    expect((await runtime.providers.list())[0]).toMatchObject({
+      installed: false,
+      authenticated: null,
+      diagnostics: ['Synthetic probe failure'],
+    })
     const retry = runtime.providers.list(true)
     await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
     driver.answer()

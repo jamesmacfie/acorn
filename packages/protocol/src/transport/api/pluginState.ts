@@ -114,11 +114,13 @@ export type PluginSkillStatus = 'ready' | 'disabled' | 'unapproved' | 'changed'
 /** What `GET /v1/core/plugins/:id/skills` returns: each skill, its status, and the last start of each
  * harness that received it since the Node started. */
 export type PluginSkillState = {
-  skills: Array<PluginSkillLine & {
-    status: PluginSkillStatus
-    /** `native` when the harness loaded the skill with its own skill support, not from acorn's index. */
-    deliveries: Array<{ harness: string; at: number; outcome: 'delivered' | 'omitted'; native?: true }>
-  }>
+  skills: Array<
+    PluginSkillLine & {
+      status: PluginSkillStatus
+      /** `native` when the harness loaded the skill with its own skill support, not from acorn's index. */
+      deliveries: Array<{ harness: string; at: number; outcome: 'delivered' | 'omitted'; native?: true }>
+    }
+  >
 }
 
 export type PluginInputGrant = {
@@ -220,7 +222,12 @@ export type PluginInstallSource =
 // Always restart-required: a plugin's routes, tables and jobs are wired at init, so nothing an install
 // route does makes the plugin live in the running process.
 export type PluginInstallResult = { id: string; version: string; state: 'installed-restart-required' }
-export type PluginUpdateResult = { id: string; fromVersion: string; toVersion: string; state: 'installed-restart-required' }
+export type PluginUpdateResult = {
+  id: string
+  fromVersion: string
+  toVersion: string
+  state: 'installed-restart-required'
+}
 export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
 
 // The one exception, and only for a plugin the node loaded from disk: a reload swaps its node half in
@@ -248,7 +255,8 @@ export const corePluginModelGrantRoute = (id: string) => `/v1/core/plugins/${enc
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
 // an install route the agent can reach (client-core/host/frames/scopes.ts).
-export const corePluginRequestRoute = (requestId: string) => `/v1/core/plugins/requests/${encodeURIComponent(requestId)}`
+export const corePluginRequestRoute = (requestId: string) =>
+  `/v1/core/plugins/requests/${encodeURIComponent(requestId)}`
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
 // task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).
 export const corePluginBundleRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/client.js`

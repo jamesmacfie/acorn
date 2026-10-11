@@ -19,16 +19,33 @@ export const taskContext = new Hono<AppEnv>()
   .get('/:id/repo-info', async (c) => {
     ownerId(c)
     const db = getDb(c.env)
-    const [t] = await db.select().from(schema.tasks).where(eq(schema.tasks.id, c.req.param('id')))
+    const [t] = await db
+      .select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, c.req.param('id')))
     if (!t) return respondError(c, 404, 'not_found')
     const project = await projectForTask(db, t)
     const defaultBranch = project?.defaultBranch ?? null
-    return c.json({ owner: project?.githubOwner ?? null, name: project?.githubName ?? null, projectId: project?.id ?? t.projectId, projectName: project?.name ?? null, defaultBranch, branch: t.branch, worktreePath: t.worktreePath })
+    return c.json({
+      owner: project?.githubOwner ?? null,
+      name: project?.githubName ?? null,
+      projectId: project?.id ?? t.projectId,
+      projectName: project?.name ?? null,
+      defaultBranch,
+      branch: t.branch,
+      worktreePath: t.worktreePath,
+    })
   })
   .get('/:id/context', async (c) => {
-    const ctx = await assembleContext(getDb(c.env), ownerId(c), c.req.param('id'), parseInclude(c.req.query('include')), {
-      workflowRunId: c.req.query('workflowRunId'),
-    })
+    const ctx = await assembleContext(
+      getDb(c.env),
+      ownerId(c),
+      c.req.param('id'),
+      parseInclude(c.req.query('include')),
+      {
+        workflowRunId: c.req.query('workflowRunId'),
+      },
+    )
     if (!ctx) return respondError(c, 404, 'not_found')
     return c.json(ctx)
   })

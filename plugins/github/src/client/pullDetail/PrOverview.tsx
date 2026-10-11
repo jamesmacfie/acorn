@@ -1,10 +1,30 @@
 import { createMemo, For, Show } from 'solid-js'
 import {
-  CHECK_TONE, checksState, checksSummary, clientEvents, formatRelativeTime, railDotProps, splitRefTokens,
+  CHECK_TONE,
+  checksState,
+  checksSummary,
+  clientEvents,
+  formatRelativeTime,
+  railDotProps,
+  splitRefTokens,
 } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, Chip, ConfirmButton, Facts, Heading, Inline, Link, Row, Rows, Select, Stack,
-  StatusDot, Text, UserAvatar,
+  Alert,
+  Badge,
+  Button,
+  Chip,
+  ConfirmButton,
+  Facts,
+  Heading,
+  Inline,
+  Link,
+  Row,
+  Rows,
+  Select,
+  Stack,
+  StatusDot,
+  Text,
+  UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { SUMMARY_BADGES_POINT } from '../extensionPoints'
@@ -25,9 +45,7 @@ function RefText(props: { text: string; prefixes: ReadonlyMap<string, string>; o
   const parts = createMemo(() => splitRefTokens(props.text, props.prefixes))
   return (
     <For each={parts()}>
-      {(part) => part.ref
-        ? <Link onPress={() => props.onOpen(part.ref!.item)}>{part.text}</Link>
-        : <>{part.text}</>}
+      {(part) => (part.ref ? <Link onPress={() => props.onOpen(part.ref!.item)}>{part.text}</Link> : <>{part.text}</>)}
     </For>
   )
 }
@@ -68,7 +86,10 @@ export function PrOverview(props: {
     if (decision.state === 'none') return <Text emphasis="muted">No reviews</Text>
     const changes = decision.state === 'changes-requested'
     return (
-      <Badge tone={changes ? 'danger' : 'ok'} tip={`${changes ? 'Changes requested by' : 'Approved by'} ${decision.reviewers.join(', ')}`}>
+      <Badge
+        tone={changes ? 'danger' : 'ok'}
+        tip={`${changes ? 'Changes requested by' : 'Approved by'} ${decision.reviewers.join(', ')}`}
+      >
         {changes ? 'Changes requested' : 'Approved'}
       </Badge>
     )
@@ -89,15 +110,21 @@ export function PrOverview(props: {
     const age = formatRelativeTime(pull?.updatedAt ?? null)
     return [
       { label: 'State', value: <Badge tone={stateTone()}>{STATE_WORD[state()]}</Badge> },
-      ...(pull?.author ? [{ label: 'Author', value: <Chip leading={<UserAvatar login={pull.author} />}>{pull.author}</Chip> }] : []),
+      ...(pull?.author
+        ? [{ label: 'Author', value: <Chip leading={<UserAvatar login={pull.author} />}>{pull.author}</Chip> }]
+        : []),
       {
         label: 'Branch',
         wide: true,
         value: (
           <Inline>
-            <Chip reveal title={pull?.headRef ?? 'head'}>{pull?.headRef ?? 'head'}</Chip>
+            <Chip reveal title={pull?.headRef ?? 'head'}>
+              {pull?.headRef ?? 'head'}
+            </Chip>
             <Text emphasis="muted">→</Text>
-            <Chip reveal title={pull?.baseRef ?? 'base'}>{pull?.baseRef ?? 'base'}</Chip>
+            <Chip reveal title={pull?.baseRef ?? 'base'}>
+              {pull?.baseRef ?? 'base'}
+            </Chip>
           </Inline>
         ),
       },
@@ -120,16 +147,22 @@ export function PrOverview(props: {
         <Facts items={facts()} />
         {/* Room for other plugins beside github's own facts: a deploy, a stack, a release train.
             `stack`, so github's own overview stays and a contributor is added to it. */}
-        <Slot point={SUMMARY_BADGES_POINT} taskId={model().scope.taskId} props={() => ({
-          owner: model().scope.owner,
-          repo: model().scope.repo,
-          number: model().scope.number,
-        })} />
+        <Slot
+          point={SUMMARY_BADGES_POINT}
+          taskId={model().scope.taskId}
+          props={() => ({
+            owner: model().scope.owner,
+            repo: model().scope.repo,
+            number: model().scope.number,
+          })}
+        />
       </Stack>
 
       {/* A related pull is only looked at. Without this the merge box and pickers simply vanished. */}
       <Show when={model().readOnly}>
-        <Text emphasis="muted" wrap>Related pull request. Open it from its own task or the pull request list to act on it.</Text>
+        <Text emphasis="muted" wrap>
+          Related pull request. Open it from its own task or the pull request list to act on it.
+        </Text>
       </Show>
 
       {/* Two rows, left-aligned so they do not wrap in the navigator: the one primary for this state,
@@ -142,31 +175,51 @@ export function PrOverview(props: {
                 variant="solid"
                 disabled={model().draft.isPending}
                 onPress={() => model().run(model().draft.mutateAsync(false))}
-              >Ready for review</Button>
+              >
+                Ready for review
+              </Button>
             </Show>
             <Show when={!model().pull()?.draft && model().pull()?.autoMergeEnabled}>
               <Button
                 disabled={model().autoMergeDisable.isPending}
                 onPress={() => model().run(model().autoMergeDisable.mutateAsync())}
-              >Turn off auto-merge</Button>
+              >
+                Turn off auto-merge
+              </Button>
               <Text emphasis="muted">Merges on its own when checks pass.</Text>
             </Show>
             {/* A blocked pull keeps the verb it had. "Merge when ready" would turn on auto-merge,
                 which fails on a repository that does not allow it, and choosing its primary is a
                 product call nobody has made. */}
-            <Show when={!model().pull()?.draft && !model().pull()?.autoMergeEnabled && model().pull()?.mergeStateStatus === 'BLOCKED'}>
+            <Show
+              when={
+                !model().pull()?.draft &&
+                !model().pull()?.autoMergeEnabled &&
+                model().pull()?.mergeStateStatus === 'BLOCKED'
+              }
+            >
               <Button
                 disabled={model().autoMergeEnable.isPending}
                 onPress={() => model().run(model().autoMergeEnable.mutateAsync())}
-              >Enable auto-merge ({MERGE_METHOD_WORD[model().mergeMethod()] ?? model().mergeMethod()})</Button>
+              >
+                Enable auto-merge ({MERGE_METHOD_WORD[model().mergeMethod()] ?? model().mergeMethod()})
+              </Button>
             </Show>
-            <Show when={!model().pull()?.draft && !model().pull()?.autoMergeEnabled && model().pull()?.mergeStateStatus !== 'BLOCKED'}>
+            <Show
+              when={
+                !model().pull()?.draft &&
+                !model().pull()?.autoMergeEnabled &&
+                model().pull()?.mergeStateStatus !== 'BLOCKED'
+              }
+            >
               <Button
                 variant="solid"
                 disabled={model().merge.isPending || model().conflicting()}
                 tip={model().conflicting() ? 'Resolve merge conflicts before merging' : undefined}
                 onPress={() => model().run(model().merge.mutateAsync())}
-              >Merge</Button>
+              >
+                Merge
+              </Button>
             </Show>
             <Show when={!model().pull()?.draft && !model().pull()?.autoMergeEnabled}>
               <Select
@@ -185,7 +238,9 @@ export function PrOverview(props: {
                 size="sm"
                 disabled={model().draft.isPending}
                 onPress={() => model().run(model().draft.mutateAsync(true))}
-              >Convert to draft</Button>
+              >
+                Convert to draft
+              </Button>
             </Show>
             {/* Reopen exists, so closing is reversible: arm-to-confirm rather than a dialog. */}
             <ConfirmButton
@@ -194,22 +249,34 @@ export function PrOverview(props: {
               confirmLabel="Close pull request?"
               disabled={model().close.isPending}
               onConfirm={() => model().run(model().close.mutateAsync())}
-            >Close</ConfirmButton>
+            >
+              Close
+            </ConfirmButton>
           </Inline>
         </Stack>
       </Show>
       <Show when={!model().readOnly && state() === 'closed'}>
         <Inline gap="row">
-          <Button disabled={model().reopen.isPending} onPress={() => model().run(model().reopen.mutateAsync())}>Reopen</Button>
+          <Button disabled={model().reopen.isPending} onPress={() => model().run(model().reopen.mutateAsync())}>
+            Reopen
+          </Button>
         </Inline>
       </Show>
       <Show when={model().actionError()}>
         {(text) => (
           <Alert
             {...(model().actionNeedsReconnect()
-              ? { actions: <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Reconnect GitHub</Button> }
+              ? {
+                  actions: (
+                    <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
+                      Reconnect GitHub
+                    </Button>
+                  ),
+                }
               : {})}
-          >{text()}</Alert>
+          >
+            {text()}
+          </Alert>
         )}
       </Show>
 
@@ -217,21 +284,38 @@ export function PrOverview(props: {
         <Alert tone="warn" title="This branch has conflicts">
           <Show
             when={model().conflicts()?.available}
-            fallback={model().conflictsLoading()
-              ? 'Checking for conflicting files…'
-              : 'Map this repository to a local checkout to list the conflicting files.'}
+            fallback={
+              model().conflictsLoading()
+                ? 'Checking for conflicting files…'
+                : 'Map this repository to a local checkout to list the conflicting files.'
+            }
           >
-            <Rows id={`gh-conflicts:${model().scope.number}`} ariaLabel="Conflicting files" items={model().conflicts()!.files.map((path) => ({ key: path, label: path }))}>
+            <Rows
+              id={`gh-conflicts:${model().scope.number}`}
+              ariaLabel="Conflicting files"
+              items={model()
+                .conflicts()!
+                .files.map((path) => ({ key: path, label: path }))}
+            >
               {(item, itemProps) => (
-                <Row item={itemProps} density="compact" onPress={() => props.onOpenFile(item.key)} label={item.key}
-                  leading={<Badge size="xs" tone="warn">!</Badge>}
-                >{item.key}</Row>
+                <Row
+                  item={itemProps}
+                  density="compact"
+                  onPress={() => props.onOpenFile(item.key)}
+                  label={item.key}
+                  leading={
+                    <Badge size="xs" tone="warn">
+                      !
+                    </Badge>
+                  }
+                >
+                  {item.key}
+                </Row>
               )}
             </Rows>
           </Show>
         </Alert>
       </Show>
-
     </Stack>
   )
 }

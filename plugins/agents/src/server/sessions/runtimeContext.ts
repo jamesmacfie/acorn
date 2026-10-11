@@ -4,14 +4,19 @@ import type { AgentStore } from './store'
 import { renderSessionConversation } from './sessionReference'
 
 export const agentTurnInputText = (turn: AgentTurn): string =>
-  turn.input.flatMap((part) => {
-    if (part.type === 'text') return [part.text]
-    if (part.type === 'file') return [`@${part.path}`]
-    if (part.type === 'context') return [`[Context: ${part.label}]`]
-    return [`[Attachment: ${part.attachmentId}]`]
-  }).join('\n\n')
+  turn.input
+    .flatMap((part) => {
+      if (part.type === 'text') return [part.text]
+      if (part.type === 'file') return [`@${part.path}`]
+      if (part.type === 'context') return [`[Context: ${part.label}]`]
+      return [`[Attachment: ${part.attachmentId}]`]
+    })
+    .join('\n\n')
 
-export async function buildForkContext(store: AgentStore, source: AgentSession): Promise<Extract<AgentTurn['input'][number], { type: 'context' }>> {
+export async function buildForkContext(
+  store: AgentStore,
+  source: AgentSession,
+): Promise<Extract<AgentTurn['input'][number], { type: 'context' }>> {
   const snapshot = await store.exportSnapshot(source.id)
   const { text } = renderSessionConversation(snapshot)
   const snapshotContent = [

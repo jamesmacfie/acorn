@@ -1,10 +1,21 @@
 import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  activeNodeId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type PaneModelContext, type Task,
+  activeNodeId,
+  defaultDeliveryContext,
+  markAttentionSeen,
+  saveFile,
+  setTerminalOpen,
+  type PaneModelContext,
+  type Task,
 } from '@acorn/plugin-api/client'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
-import type { AgentAttachment, AgentProviderDescriptor, AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
+import type {
+  AgentAttachment,
+  AgentProviderDescriptor,
+  AgentSession,
+  AgentSessionSnapshot,
+} from '../../contract/wire.ts'
 import { AUTOMATIC_TASK_CONTEXT_SOURCE } from '../composer/automaticTaskContext'
 import { composerDraftState } from '../composer/composerState'
 import { managedDraft } from './managedDrafts'
@@ -55,8 +66,13 @@ export function sessionIsBlank(
   snapshot: Pick<AgentSessionSnapshot, 'turns'> | undefined,
   draft: { text: string; attachments: AgentAttachment[]; contexts: AgentContextSnapshot[] },
 ): boolean {
-  return !!snapshot && !snapshot.turns.length && !draft.text.trim() && !draft.attachments.length
-    && draft.contexts.every((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)
+  return (
+    !!snapshot &&
+    !snapshot.turns.length &&
+    !draft.text.trim() &&
+    !draft.attachments.length &&
+    draft.contexts.every((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)
+  )
 }
 
 export type AgentPaneModel = ReturnType<typeof createAgentPaneModel>
@@ -80,12 +96,15 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     providersQuery.isPending ? undefined : providersQuery.data
   const providersLoading = () => providersQuery.isPending
   const choices = createMemo(() =>
-    newSessionChoices(providers() ?? [], customAgents.isPending ? [] : customAgents.data ?? []))
+    newSessionChoices(providers() ?? [], customAgents.isPending ? [] : (customAgents.data ?? [])),
+  )
 
   const taskSessions = createMemo(() =>
-    managedAgentStore.sessionsForTask(task.id)
+    managedAgentStore
+      .sessionsForTask(task.id)
       .filter((session) => !session.archivedAt)
-      .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id)))
+      .sort((left, right) => right.createdAt - left.createdAt || left.id.localeCompare(right.id)),
+  )
   const sessionRoster = createMemo(() => agentSessionRoster(taskSessions(), managedAgentStore.delegations()))
   // With nothing chosen yet, the session that changed last. That is the order the node lists a task's
   // sessions in, and so the one the load below selects. The newest-created one opened first and then
@@ -93,9 +112,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const selected = createMemo(() => {
     const id = selectedManagedSession(task.id)
     const sessions = taskSessions()
-    return sessions.find((session) => session.id === id)
-      ?? sessions.reduce<AgentSession | undefined>((last, session) =>
-        !last || session.updatedAt > last.updatedAt ? session : last, undefined)
+    return (
+      sessions.find((session) => session.id === id) ??
+      sessions.reduce<AgentSession | undefined>(
+        (last, session) => (!last || session.updatedAt > last.updatedAt ? session : last),
+        undefined,
+      )
+    )
   })
   const selectedSessionId = createMemo(() => selected()?.id)
   const selectedDelegation = createMemo(() => {
@@ -111,8 +134,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     const session = selected()
     return session ? managedAgentStore.snapshots()[session.id] : undefined
   })
-  const provider = createMemo(() =>
-    providers()?.find((candidate) => candidate.id === selected()?.providerId))
+  const provider = createMemo(() => providers()?.find((candidate) => candidate.id === selected()?.providerId))
 
   const releaseSocket = managedAgentStore.activate()
   onCleanup(releaseSocket)
@@ -167,7 +189,8 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     if (seq <= session.lastReadSeq) return
     if (readTimer) clearTimeout(readTimer)
     readTimer = setTimeout(() => {
-      void managedAgentApi.patch(session.id, { lastReadSeq: seq })
+      void managedAgentApi
+        .patch(session.id, { lastReadSeq: seq })
         .then(managedAgentStore.upsertSession)
         .catch(() => undefined)
     }, 350)
@@ -240,7 +263,9 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     if (kind === 'archive') {
       const shared = composerDraftState(session.id)
       const blank = sessionIsBlank(managedAgentStore.snapshots()[session.id], {
-        text: managedDraft(session.id), attachments: shared.attachments(), contexts: shared.contexts(),
+        text: managedDraft(session.id),
+        attachments: shared.attachments(),
+        contexts: shared.contexts(),
       })
       if (blank) return void archive(session)
     }
@@ -284,12 +309,19 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   async function retryLastTurn() {
     const session = selected()
     const value = snapshot()
-    const turn = [...(value?.turns ?? [])].reverse()
+    const turn = [...(value?.turns ?? [])]
+      .reverse()
       .find((candidate) => candidate.status === 'failed' || candidate.status === 'interrupted')
     if (!session || !turn) return
     // A retry is fresh host admission. Do not send saved attendance or internal operation origins.
-    const { attendance: _attendance, initialAttendance: _bootstrap, posture: _posture,
-      followUpOf: _followUp, continuationOf: _continuation, ...policy } = turn.effectivePolicy
+    const {
+      attendance: _attendance,
+      initialAttendance: _bootstrap,
+      posture: _posture,
+      followUpOf: _followUp,
+      continuationOf: _continuation,
+      ...policy
+    } = turn.effectivePolicy
     await action(async () => {
       await managedAgentApi.enqueue(session.id, {
         input: turn.input,
@@ -331,49 +363,58 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const sessionActions = createMemo<SessionAction[]>(() => {
     const session = selected()
     if (!session) return []
-    const hasTextPrompt = snapshot()?.turns[0]?.input.some((part) => part.type === 'text' && !!part.text.trim()) ?? false
+    const hasTextPrompt =
+      snapshot()?.turns[0]?.input.some((part) => part.type === 'text' && !!part.text.trim()) ?? false
     return [
       { id: 'fork', label: 'Fork session', icon: 'git-fork', run: () => void fork() },
       ...(snapshot()?.turns.some((turn) => turn.status === 'failed' || turn.status === 'interrupted')
-        ? [{
-            id: 'retry',
-            label: 'Retry last turn with partial history',
-            icon: 'rotate-ccw',
-            run: () => void retryLastTurn(),
-          }]
+        ? [
+            {
+              id: 'retry',
+              label: 'Retry last turn with partial history',
+              icon: 'rotate-ccw',
+              run: () => void retryLastTurn(),
+            },
+          ]
         : []),
       ...(capability(provider(), 'compact')
-        ? [{
-            id: 'compact',
-            label: 'Compact context',
-            icon: 'shrink',
-            run: () => void action(() => managedAgentApi.compact(session.id)),
-          }]
+        ? [
+            {
+              id: 'compact',
+              label: 'Compact context',
+              icon: 'shrink',
+              run: () => void action(() => managedAgentApi.compact(session.id)),
+            },
+          ]
         : []),
       ...(session.controller === 'acorn'
-        ? [{
-            id: 'terminal',
-            label: 'Continue in terminal',
-            icon: 'square-terminal',
-            description: session.providerSessionRef
-              ? undefined
-              : 'The provider has not supplied a resumable session reference.',
-            disabled: !capability(provider(), 'resume') || !session.providerSessionRef,
-            run: () => void handoff(),
-          }]
+        ? [
+            {
+              id: 'terminal',
+              label: 'Continue in terminal',
+              icon: 'square-terminal',
+              description: session.providerSessionRef
+                ? undefined
+                : 'The provider has not supplied a resumable session reference.',
+              disabled: !capability(provider(), 'resume') || !session.providerSessionRef,
+              run: () => void handoff(),
+            },
+          ]
         : []),
       ...(session.controller === 'terminal'
         ? [{ id: 'managed', label: 'Return to managed mode', icon: 'bot', run: () => void resumeManaged() }]
         : []),
       ...(session.controller === 'external' && session.kind === 'imported'
-        ? [{
-            id: 'verify',
-            label: 'Reconnect session',
-            description: 'Check that the provider still has this session, then continue it in acorn.',
-            icon: 'refresh-cw',
-            disabled: typeof session.config.importedProviderSessionRef !== 'string',
-            run: () => void verifyImportedResume(),
-          }]
+        ? [
+            {
+              id: 'verify',
+              label: 'Reconnect session',
+              description: 'Check that the provider still has this session, then continue it in acorn.',
+              icon: 'refresh-cw',
+              disabled: typeof session.config.importedProviderSessionRef !== 'string',
+              run: () => void verifyImportedResume(),
+            },
+          ]
         : []),
       {
         id: 'regenerate-title',
@@ -385,16 +426,34 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       },
       { id: 'rename', label: 'Rename session', icon: 'pencil', run: () => sessionAction(session, 'rename') },
       {
-        id: 'summarize', label: 'Summarize run…', icon: 'sparkles',
+        id: 'summarize',
+        label: 'Summarize run…',
+        icon: 'sparkles',
         disabled: snapshot()?.turns.length === 0,
         description: snapshot()?.turns.length === 0 ? 'Send a message before summarizing the run.' : undefined,
         run: () => setDialog({ kind: 'summary', session }),
       },
       { id: 'export-markdown', label: 'Export Markdown', icon: 'download', run: () => void exportHistory('markdown') },
       { id: 'export-json', label: 'Export lossless JSON', icon: 'download', run: () => void exportHistory('json') },
-      { id: 'export-redacted-markdown', label: 'Export Markdown without secrets', icon: 'download', run: () => void exportHistory('markdown', 'redacted') },
-      { id: 'export-redacted-json', label: 'Export JSON without secrets', icon: 'download', run: () => void exportHistory('json', 'redacted') },
-      { id: 'archive', label: 'Archive session…', icon: 'archive', tone: 'danger', run: () => sessionAction(session, 'archive') },
+      {
+        id: 'export-redacted-markdown',
+        label: 'Export Markdown without secrets',
+        icon: 'download',
+        run: () => void exportHistory('markdown', 'redacted'),
+      },
+      {
+        id: 'export-redacted-json',
+        label: 'Export JSON without secrets',
+        icon: 'download',
+        run: () => void exportHistory('json', 'redacted'),
+      },
+      {
+        id: 'archive',
+        label: 'Archive session…',
+        icon: 'archive',
+        tone: 'danger',
+        run: () => sessionAction(session, 'archive'),
+      },
     ]
   })
 
@@ -408,8 +467,10 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     /** New's rows: every harness, then every custom agent (./newSessionChoices.ts). */
     choices,
     /** Probe the harnesses again, for the Refresh button in the New menu. */
-    refreshProviders: () => refreshAgentProviders(queryClient)
-      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to check the agent providers.')),
+    refreshProviders: () =>
+      refreshAgentProviders(queryClient).catch((caught) =>
+        setError(caught instanceof Error ? caught.message : 'Unable to check the agent providers.'),
+      ),
     taskSessions,
     sessionRoster,
     selected,

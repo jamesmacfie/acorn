@@ -15,13 +15,16 @@ describe('testing an MCP server from Settings', () => {
     dir = await mkdtemp(join(tmpdir(), 'acorn-mcp-probe-'))
     server = join(dir, 'server.mjs')
     const resolve = (path: string) => pathToFileURL(createRequire(import.meta.url).resolve(path)).href
-    await writeFile(server, [
-      `import { McpServer } from '${resolve('@modelcontextprotocol/sdk/server/mcp.js')}'`,
-      `import { StdioServerTransport } from '${resolve('@modelcontextprotocol/sdk/server/stdio.js')}'`,
-      `const s = new McpServer({ name: 'probe', version: '1.0.0' })`,
-      `s.registerTool('who_' + (process.env.PROBE_NAME ?? 'nobody'), { description: 'Says who.' }, async () => ({ content: [] }))`,
-      `await s.connect(new StdioServerTransport())`,
-    ].join('\n'))
+    await writeFile(
+      server,
+      [
+        `import { McpServer } from '${resolve('@modelcontextprotocol/sdk/server/mcp.js')}'`,
+        `import { StdioServerTransport } from '${resolve('@modelcontextprotocol/sdk/server/stdio.js')}'`,
+        `const s = new McpServer({ name: 'probe', version: '1.0.0' })`,
+        `s.registerTool('who_' + (process.env.PROBE_NAME ?? 'nobody'), { description: 'Says who.' }, async () => ({ content: [] }))`,
+        `await s.connect(new StdioServerTransport())`,
+      ].join('\n'),
+    )
   })
   afterAll(() => rm(dir, { recursive: true, force: true }))
 
@@ -38,7 +41,11 @@ describe('testing an MCP server from Settings', () => {
       { transport: 'stdio', name: 'probe', command: process.execPath, args: [server], env: { PROBE_NAME: 'acorn' } },
       [],
     )
-    expect(catalogue.tools[0]).toMatchObject({ name: 'who_acorn', description: 'Says who.', inputSchema: { type: 'object' } })
+    expect(catalogue.tools[0]).toMatchObject({
+      name: 'who_acorn',
+      description: 'Says who.',
+      inputSchema: { type: 'object' },
+    })
     expect(catalogue.digest).toMatch(/^[a-f0-9]{64}$/)
   })
 

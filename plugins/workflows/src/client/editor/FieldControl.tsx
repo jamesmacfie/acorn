@@ -39,9 +39,7 @@ export function fieldOptionsRoute(
 ): string | undefined {
   const namespace = pluginId ? `/v1/p/${pluginId}/` : '/v1/p/workflows/'
   if (!route.startsWith(namespace)) return undefined
-  const filled = route
-    .replace('{projectId}', context.projectId ?? '')
-    .replace('{taskId}', context.taskId ?? '')
+  const filled = route.replace('{projectId}', context.projectId ?? '').replace('{taskId}', context.taskId ?? '')
   return /\{|\/\//.test(filled) || filled.endsWith('/') ? undefined : filled
 }
 
@@ -54,16 +52,21 @@ function RouteSelect(props: {
   onChange: (value: string) => void
 }) {
   const workflowApi = createWorkflowApi(useQueryClient())
-  const route = () => fieldOptionsRoute(props.field.optionsRoute ?? '', props.pluginId, {
-    projectId: props.projectId,
-    taskId: activeTaskId() ?? undefined,
-  })
+  const route = () =>
+    fieldOptionsRoute(props.field.optionsRoute ?? '', props.pluginId, {
+      projectId: props.projectId,
+      taskId: activeTaskId() ?? undefined,
+    })
   const [options] = createResource(route, async (path) =>
-    workflowApi.fieldOptions(path).then((answer) => answer.options).catch(() => []))
+    workflowApi
+      .fieldOptions(path)
+      .then((answer) => answer.options)
+      .catch(() => []),
+  )
   return (
     <Show
       when={route()}
-      fallback={(
+      fallback={
         <Input
           value={props.value}
           disabled={props.disabled}
@@ -71,7 +74,7 @@ function RouteSelect(props: {
           placeholder="Open a task to list these"
           onInput={props.onChange}
         />
-      )}
+      }
     >
       <Select
         label={props.field.label}
@@ -79,7 +82,11 @@ function RouteSelect(props: {
         value={props.value}
         options={[
           { value: '', label: options.loading ? 'Loading…' : 'Not set' },
-          ...(options() ?? []).map((option) => ({ value: option.value, label: option.label, title: option.description })),
+          ...(options() ?? []).map((option) => ({
+            value: option.value,
+            label: option.label,
+            title: option.description,
+          })),
         ]}
         onChange={props.onChange}
       />
@@ -100,7 +107,8 @@ export default function FieldControl(props: {
   onChange: (value: unknown) => void
 }) {
   const text = () => (props.value == null ? '' : String(props.value))
-  const hint = () => (props.field.required ? [props.field.hint, 'Required.'].filter(Boolean).join(' ') : props.field.hint)
+  const hint = () =>
+    props.field.required ? [props.field.hint, 'Required.'].filter(Boolean).join(' ') : props.field.hint
   const required = useRequiredError(() => !!props.field.required && !text().trim())
   const missing = () => !!required.error()
   const change = (value: unknown): void => {
@@ -113,7 +121,7 @@ export default function FieldControl(props: {
   return (
     <Show
       when={props.field.type !== 'boolean'}
-      fallback={(
+      fallback={
         <Field hint={hint()} group>
           <Checkbox
             checked={props.value === true}
@@ -122,101 +130,101 @@ export default function FieldControl(props: {
             onChange={(checked) => props.onChange(checked)}
           />
         </Field>
-      )}
+      }
     >
-    <Field label={props.field.label} hint={hint()} error={required.error()} group>
-      <Show when={props.field.type === 'number'}>
-        <Input
-          type="number"
-          width="narrow"
-          label={props.field.label}
-          disabled={props.disabled}
-          invalid={missing()}
-          min={props.field.min}
-          max={props.field.max}
-          value={text()}
-          placeholder={props.field.placeholder}
-          onBlur={required.touch}
-          onInput={(value) => change(value === '' ? undefined : Number(value))}
-        />
-      </Show>
-      <Show when={props.field.type === 'text'}>
-        <Input
-          label={props.field.label}
-          disabled={props.disabled}
-          invalid={missing()}
-          value={text()}
-          assist={false}
-          placeholder={props.field.placeholder}
-          onBlur={required.touch}
-          onInput={change}
-        />
-      </Show>
-      <Show when={props.field.type === 'textarea'}>
-        <Textarea
-          rows={4}
-          mono
-          label={props.field.label}
-          disabled={props.disabled}
-          invalid={missing()}
-          value={text()}
-          assist={false}
-          placeholder={props.field.placeholder}
-          onBlur={required.touch}
-          onInput={change}
-        />
-      </Show>
-      {/* A select the editor can fill draws a list. One whose route this host cannot reach, or whose
-          choices nothing knows, falls back to typing the value: a definition written by hand can name
-          something this node has never heard of, and the editor must not lose it. */}
-      <Show when={props.field.type === 'select'}>
-        <Show
-          when={props.field.optionsRoute || (props.options ?? props.field.options ?? []).length}
-          fallback={(
-            <Input
-              label={props.field.label}
-              disabled={props.disabled}
-              invalid={missing()}
-              value={text()}
-              assist={false}
-              placeholder={props.field.placeholder}
-              onBlur={required.touch}
-              onInput={change}
-            />
-          )}
-        >
-        <Show
-          when={!props.field.optionsRoute || props.options}
-          fallback={(
-            <RouteSelect
-              field={props.field}
-              pluginId={props.pluginId}
-              projectId={props.projectId}
-              value={text()}
-              disabled={props.disabled}
-              onChange={change}
-            />
-          )}
-        >
-          <Select
+      <Field label={props.field.label} hint={hint()} error={required.error()} group>
+        <Show when={props.field.type === 'number'}>
+          <Input
+            type="number"
+            width="narrow"
+            label={props.field.label}
+            disabled={props.disabled}
+            invalid={missing()}
+            min={props.field.min}
+            max={props.field.max}
+            value={text()}
+            placeholder={props.field.placeholder}
+            onBlur={required.touch}
+            onInput={(value) => change(value === '' ? undefined : Number(value))}
+          />
+        </Show>
+        <Show when={props.field.type === 'text'}>
+          <Input
             label={props.field.label}
             disabled={props.disabled}
             invalid={missing()}
             value={text()}
-            options={[
-              { value: '', label: 'Not set' },
-              ...(props.options ?? props.field.options ?? []).map((option) => ({
-                value: option.value,
-                label: option.label,
-                title: option.description,
-              })),
-            ]}
-            onChange={change}
+            assist={false}
+            placeholder={props.field.placeholder}
+            onBlur={required.touch}
+            onInput={change}
           />
         </Show>
+        <Show when={props.field.type === 'textarea'}>
+          <Textarea
+            rows={4}
+            mono
+            label={props.field.label}
+            disabled={props.disabled}
+            invalid={missing()}
+            value={text()}
+            assist={false}
+            placeholder={props.field.placeholder}
+            onBlur={required.touch}
+            onInput={change}
+          />
         </Show>
-      </Show>
-    </Field>
+        {/* A select the editor can fill draws a list. One whose route this host cannot reach, or whose
+          choices nothing knows, falls back to typing the value: a definition written by hand can name
+          something this node has never heard of, and the editor must not lose it. */}
+        <Show when={props.field.type === 'select'}>
+          <Show
+            when={props.field.optionsRoute || (props.options ?? props.field.options ?? []).length}
+            fallback={
+              <Input
+                label={props.field.label}
+                disabled={props.disabled}
+                invalid={missing()}
+                value={text()}
+                assist={false}
+                placeholder={props.field.placeholder}
+                onBlur={required.touch}
+                onInput={change}
+              />
+            }
+          >
+            <Show
+              when={!props.field.optionsRoute || props.options}
+              fallback={
+                <RouteSelect
+                  field={props.field}
+                  pluginId={props.pluginId}
+                  projectId={props.projectId}
+                  value={text()}
+                  disabled={props.disabled}
+                  onChange={change}
+                />
+              }
+            >
+              <Select
+                label={props.field.label}
+                disabled={props.disabled}
+                invalid={missing()}
+                value={text()}
+                options={[
+                  { value: '', label: 'Not set' },
+                  ...(props.options ?? props.field.options ?? []).map((option) => ({
+                    value: option.value,
+                    label: option.label,
+                    title: option.description,
+                  })),
+                ]}
+                onChange={change}
+              />
+            </Show>
+          </Show>
+        </Show>
+      </Field>
     </Show>
   )
 }

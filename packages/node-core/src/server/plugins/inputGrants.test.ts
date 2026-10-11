@@ -6,15 +6,25 @@ import { declaredInputs, grantCoversInput, inputGrantsStore, sameInputs, type In
 
 const grant: InputGrant = {
   pluginId: 'release-readiness',
-  sources: { readiness: { issues: { source: 'linear:issues', optional: false }, pulls: { source: 'github:pull-requests', optional: true } } },
-  grantedAt: 1, grantedBy: 'owner',
+  sources: {
+    readiness: {
+      issues: { source: 'linear:issues', optional: false },
+      pulls: { source: 'github:pull-requests', optional: true },
+    },
+  },
+  grantedAt: 1,
+  grantedBy: 'owner',
 }
 
 describe('inputGrantsStore', () => {
   let dir: string
   const file = () => join(dir, 'input-grants.json')
-  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'acorn-input-grants-')) })
-  afterEach(() => { rmSync(dir, { recursive: true, force: true }) })
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'acorn-input-grants-'))
+  })
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true })
+  })
 
   it('round-trips a grant across processes, privately', () => {
     expect(inputGrantsStore(dir).get(grant.pluginId)).toBeUndefined()
@@ -52,15 +62,37 @@ describe('grantCoversInput', () => {
 })
 
 describe('declaredInputs and sameInputs', () => {
-  const registration = { name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/r/board' }
+  const registration = {
+    name: 'Release readiness',
+    singular: 'Issue',
+    plural: 'Issues',
+    identityScope: 'issue',
+    handler: '/v1/p/r/board',
+  }
   it('keys a manifest the way a grant does, and compares lists in any order', () => {
     const declared = declaredInputs([
-      { ...registration, sourceId: 'readiness', inputs: { pulls: { source: 'github:pull-requests', label: 'Pulls', optional: true }, issues: { source: 'linear:issues', label: 'Issues' } } },
+      {
+        ...registration,
+        sourceId: 'readiness',
+        inputs: {
+          pulls: { source: 'github:pull-requests', label: 'Pulls', optional: true },
+          issues: { source: 'linear:issues', label: 'Issues' },
+        },
+      },
       { ...registration, sourceId: 'plain' },
     ])
-    expect(declared).toEqual({ readiness: { pulls: { source: 'github:pull-requests', optional: true }, issues: { source: 'linear:issues', optional: false } } })
+    expect(declared).toEqual({
+      readiness: {
+        pulls: { source: 'github:pull-requests', optional: true },
+        issues: { source: 'linear:issues', optional: false },
+      },
+    })
     expect(sameInputs(declared, grant.sources)).toBe(true)
     expect(sameInputs(declared, { readiness: { issues: grant.sources.readiness!.issues! } })).toBe(false)
-    expect(sameInputs(declared, { readiness: { ...grant.sources.readiness, pulls: { source: 'github:pull-requests', optional: false } } })).toBe(false)
+    expect(
+      sameInputs(declared, {
+        readiness: { ...grant.sources.readiness, pulls: { source: 'github:pull-requests', optional: false } },
+      }),
+    ).toBe(false)
   })
 })

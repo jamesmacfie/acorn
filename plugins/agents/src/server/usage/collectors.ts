@@ -25,7 +25,8 @@ export class AgentUsageCollectorRegistry {
   readonly #entries = new Map<string, AgentUsageCollectorEntry>()
 
   register(entry: AgentUsageCollectorEntry): () => void {
-    if (this.#entries.has(entry.provider)) throw new Error(`Agent usage collector already registered: ${entry.provider}`)
+    if (this.#entries.has(entry.provider))
+      throw new Error(`Agent usage collector already registered: ${entry.provider}`)
     this.#entries.set(entry.provider, entry)
     return () => {
       if (this.#entries.get(entry.provider) === entry) this.#entries.delete(entry.provider)

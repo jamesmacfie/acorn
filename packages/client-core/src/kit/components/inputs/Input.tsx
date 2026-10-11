@@ -51,40 +51,49 @@ export function Input(props: InputProps) {
   const field = claimField(own.id)
   let input: HTMLInputElement | undefined
   const autofocus = createMemo(() => own.autofocus)
-  createEffect(on(autofocus, (active) => {
-    // Focusing a retained panel's field must not move its enclosing reading viewport.
-    if (active) input?.focus({ preventScroll: true })
-  }))
+  createEffect(
+    on(autofocus, (active) => {
+      // Focusing a retained panel's field must not move its enclosing reading viewport.
+      if (active) input?.focus({ preventScroll: true })
+    }),
+  )
   return (
     <>
-    <input
-      {...controlAttrs(own, 'ui-input', field)}
-      {...assistAttrs(own)}
-      ref={(element) => { input = element; if (typeof rest.ref === 'function') rest.ref(element) }}
-      name={own.name}
-      required={own.required}
-      list={props.suggestions ? listId : undefined}
-      type={props.type ?? 'text'}
-      value={props.value ?? ''}
-      placeholder={props.placeholder}
-      readOnly={props.readOnly}
-      maxLength={props.maxLength}
-      min={props.min}
-      max={props.max}
-      step={props.step}
-      onInput={(event) => rest.onInput?.(event.currentTarget.value)}
-      onChange={(event) => rest.onChange?.(event.currentTarget.value)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' && rest.onSubmit) rest.onSubmit(event.currentTarget.value)
-        rest.onKeyDown?.(event)
-      }}
-      onPaste={(event) => rest.onPaste?.(event)}
-      onFocus={() => rest.onFocus?.()}
-      onBlur={() => rest.onBlur?.()}
-    />
-    <Show when={props.suggestions}>
-      {(values) => <datalist id={listId}><For each={values()}>{(value) => <option value={value} />}</For></datalist>}
-    </Show>
+      <input
+        {...controlAttrs(own, 'ui-input', field)}
+        {...assistAttrs(own)}
+        ref={(element) => {
+          input = element
+          if (typeof rest.ref === 'function') rest.ref(element)
+        }}
+        name={own.name}
+        required={own.required}
+        list={props.suggestions ? listId : undefined}
+        type={props.type ?? 'text'}
+        value={props.value ?? ''}
+        placeholder={props.placeholder}
+        readOnly={props.readOnly}
+        maxLength={props.maxLength}
+        min={props.min}
+        max={props.max}
+        step={props.step}
+        onInput={(event) => rest.onInput?.(event.currentTarget.value)}
+        onChange={(event) => rest.onChange?.(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && rest.onSubmit) rest.onSubmit(event.currentTarget.value)
+          rest.onKeyDown?.(event)
+        }}
+        onPaste={(event) => rest.onPaste?.(event)}
+        onFocus={() => rest.onFocus?.()}
+        onBlur={() => rest.onBlur?.()}
+      />
+      <Show when={props.suggestions}>
+        {(values) => (
+          <datalist id={listId}>
+            <For each={values()}>{(value) => <option value={value} />}</For>
+          </datalist>
+        )}
+      </Show>
     </>
   )
 }

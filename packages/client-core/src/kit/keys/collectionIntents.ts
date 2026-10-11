@@ -25,7 +25,16 @@ export const PAGE = 10
 
 /** The intents a collection answers. Anything else it returns false for and lets bubble. */
 export const COLLECTION_INTENTS: readonly Intent[] = [
-  'next', 'prev', 'first', 'last', 'pageNext', 'pagePrev', 'expand', 'collapse', 'activate', 'menu',
+  'next',
+  'prev',
+  'first',
+  'last',
+  'pageNext',
+  'pagePrev',
+  'expand',
+  'collapse',
+  'activate',
+  'menu',
 ]
 
 export type CollectionIntentOptions = {
@@ -72,7 +81,7 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
   const enabled = () => options.items().filter((item) => !item.disabled)
 
   const selected = (): string | null =>
-    options.selected ? options.selected() ?? null : collectionState(options.id()).selected
+    options.selected ? (options.selected() ?? null) : collectionState(options.id()).selected
 
   // The stored place, then whatever is picked, then the top. Falling back to the selection is what
   // makes the first arrow press mean "the next one" rather than "the second one", which is what a
@@ -82,7 +91,7 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
     const stored = collectionState(options.id()).active
     if (has(stored)) return stored
     const picked = selected()
-    return has(picked) ? picked : list[0]?.key ?? null
+    return has(picked) ? picked : (list[0]?.key ?? null)
   }
 
   const active = () => activeIn(enabled())
@@ -106,7 +115,7 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
     const current = activeIn(list)
     const at = list.findIndex((item) => item.key === current)
     // Wraps, because a list you cannot fall off the end of is a list you never have to look at.
-    return goTo(list[(((at < 0 ? 0 : at) + delta) + list.length) % list.length].key)
+    return goTo(list[((at < 0 ? 0 : at) + delta + list.length) % list.length].key)
   }
 
   /** A page key: as far as `PAGE` allows without leaving the list, and `false` once it is there.
@@ -133,12 +142,18 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
 
   const handle = (intent: Intent): boolean => {
     switch (intent) {
-      case 'next': return move(1)
-      case 'prev': return move(-1)
-      case 'first': return move(0, 'first')
-      case 'last': return move(0, 'last')
-      case 'pageNext': return page(PAGE)
-      case 'pagePrev': return page(-PAGE)
+      case 'next':
+        return move(1)
+      case 'prev':
+        return move(-1)
+      case 'first':
+        return move(0, 'first')
+      case 'last':
+        return move(0, 'last')
+      case 'pageNext':
+        return page(PAGE)
+      case 'pagePrev':
+        return page(-PAGE)
       // `?? true` and not a bare `return true`: a handler that says nothing is a handler that has not
       // been asked this question yet, and every DOM tree in the app is one of those. A handler that
       // says `false` gets its key back, which is how Right on a leaf reaches the tier that crosses a
@@ -169,7 +184,8 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
         options.onMenu(current)
         return true
       }
-      default: return false
+      default:
+        return false
     }
   }
 

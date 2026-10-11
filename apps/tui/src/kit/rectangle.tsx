@@ -105,9 +105,11 @@ const SCROLLBACK = 1000
 let loaded: typeof HeadlessTerminal | undefined
 
 const emulatorClass = (): typeof HeadlessTerminal => {
-  loaded ??= (createRequire(import.meta.url)('@xterm/headless') as {
-    Terminal: typeof HeadlessTerminal
-  }).Terminal
+  loaded ??= (
+    createRequire(import.meta.url)('@xterm/headless') as {
+      Terminal: typeof HeadlessTerminal
+    }
+  ).Terminal
   return loaded
 }
 
@@ -286,25 +288,39 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     // its, `Ctrl+C` included, and no app layer may fire. An intercept rather than a layer, because a
     // layer answers the keys it can name and a rectangle answers all of them
     // (docs/tui/traps.md § The Rectangle contract, ../keys/tiers.ts).
-    onCleanup(engine.intercept('key', (ctx) => {
-      const key = ctx.event
-      if (!entered()) {
-        // One stop from outside: the box holds the focus, not what is in it. Enter goes in, and a
-        // second Escape just after leaving goes back in and sends the Escape through, which is how a
-        // reader reaches vim's normal mode from in here.
-        if (!focusWithin(box)) return
-        if (key.name === 'return') { enter(); ctx.consume(); return }
-        if (key.name === 'escape' && Date.now() - leftAt < ESCAPE_PAIR_MS) {
-          enter()
+    onCleanup(
+      engine.intercept(
+        'key',
+        (ctx) => {
+          const key = ctx.event
+          if (!entered()) {
+            // One stop from outside: the box holds the focus, not what is in it. Enter goes in, and a
+            // second Escape just after leaving goes back in and sends the Escape through, which is how a
+            // reader reaches vim's normal mode from in here.
+            if (!focusWithin(box)) return
+            if (key.name === 'return') {
+              enter()
+              ctx.consume()
+              return
+            }
+            if (key.name === 'escape' && Date.now() - leftAt < ESCAPE_PAIR_MS) {
+              enter()
+              send(key)
+              ctx.consume()
+            }
+            return
+          }
+          if (key.name === 'escape') {
+            leave()
+            ctx.consume()
+            return
+          }
           send(key)
           ctx.consume()
-        }
-        return
-      }
-      if (key.name === 'escape') { leave(); ctx.consume(); return }
-      send(key)
-      ctx.consume()
-    }, { priority: RECTANGLE }))
+        },
+        { priority: RECTANGLE },
+      ),
+    )
   }
 
   /** A paste while the rectangle is entered belongs to the program inside it, bracketed where that
@@ -358,7 +374,9 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
 export function EditorRectangle(props: { label: string; children?: JSX.Element }) {
   return (
     <box flexDirection="column" flexGrow={1} {...boxBorder('surface')} title={props.label}>
-      <Show when={props.children} fallback={<Line role="muted">the file opens here</Line>}>{props.children}</Show>
+      <Show when={props.children} fallback={<Line role="muted">the file opens here</Line>}>
+        {props.children}
+      </Show>
     </box>
   )
 }

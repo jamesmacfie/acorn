@@ -102,11 +102,7 @@ export type PreviewBrowserRule = z.infer<typeof previewBrowserRuleSchema>
 
 // The peer is symmetric, but every method here is one the shell calls on the service. Nothing on the
 // node side calls back the other way (docs/shell/node-child.md § Service protocol).
-export const serviceRpcMethods = [
-  'service.start',
-  'service.stop',
-  'service.preview-rules',
-] as const
+export const serviceRpcMethods = ['service.start', 'service.stop', 'service.preview-rules'] as const
 export const serviceRpcMethodSchema = z.enum(serviceRpcMethods)
 export type ServiceRpcMethod = z.infer<typeof serviceRpcMethodSchema>
 
@@ -134,11 +130,7 @@ const rpcEventSchema = z.strictObject({
   payload: z.unknown(),
 })
 
-export const serviceMessageSchema = z.discriminatedUnion('kind', [
-  rpcRequestSchema,
-  rpcResponseSchema,
-  rpcEventSchema,
-])
+export const serviceMessageSchema = z.discriminatedUnion('kind', [rpcRequestSchema, rpcResponseSchema, rpcEventSchema])
 export type ServiceMessage = z.infer<typeof serviceMessageSchema>
 
 export type ServiceMessageTransport = {
@@ -234,7 +226,13 @@ export class ServiceRpcPeer {
       clearTimeout(pending.timer)
       this.pending.delete(message.id)
       if (message.ok) pending.resolve(message.result)
-      else pending.reject(new ServiceRpcError(message.error?.code ?? 'service_failed', message.error?.message ?? 'Service request failed'))
+      else
+        pending.reject(
+          new ServiceRpcError(
+            message.error?.code ?? 'service_failed',
+            message.error?.message ?? 'Service request failed',
+          ),
+        )
       return
     }
     if (message.kind === 'event') {
@@ -255,17 +253,25 @@ export class ServiceRpcPeer {
     void Promise.resolve()
       .then(() => handler(message.payload))
       .then(
-        (result) => this.transport.send({ protocol: SERVICE_PROTOCOL_VERSION, kind: 'response', id: message.id, ok: true, result }),
-        (error: unknown) => this.transport.send({
-          protocol: SERVICE_PROTOCOL_VERSION,
-          kind: 'response',
-          id: message.id,
-          ok: false,
-          error: {
-            code: error instanceof ServiceRpcError ? error.code : 'service_failed',
-            message: error instanceof Error ? error.message : 'Service request failed',
-          },
-        }),
+        (result) =>
+          this.transport.send({
+            protocol: SERVICE_PROTOCOL_VERSION,
+            kind: 'response',
+            id: message.id,
+            ok: true,
+            result,
+          }),
+        (error: unknown) =>
+          this.transport.send({
+            protocol: SERVICE_PROTOCOL_VERSION,
+            kind: 'response',
+            id: message.id,
+            ok: false,
+            error: {
+              code: error instanceof ServiceRpcError ? error.code : 'service_failed',
+              message: error instanceof Error ? error.message : 'Service request failed',
+            },
+          }),
       )
   }
 }

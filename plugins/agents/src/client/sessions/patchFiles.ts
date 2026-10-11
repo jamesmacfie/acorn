@@ -6,13 +6,16 @@
 // still sees that it changed.
 export function patchFiles(path: string | undefined, patch: string): { path: string; patch: string }[] {
   if (!/^diff --git /m.test(patch)) return [{ path: path ?? '', patch }]
-  return patch.split(/^diff --git /m).slice(1).map((part) => {
-    // `a/<old> b/<new>`: the new side names the file as it now stands.
-    const header = part.split('\n', 1)[0]
-    const hunks = part.search(/^@@ /m)
-    return {
-      path: header.match(/ b\/(.+)$/)?.[1] ?? header,
-      patch: hunks === -1 ? '' : part.slice(hunks).trimEnd(),
-    }
-  })
+  return patch
+    .split(/^diff --git /m)
+    .slice(1)
+    .map((part) => {
+      // `a/<old> b/<new>`: the new side names the file as it now stands.
+      const header = part.split('\n', 1)[0]
+      const hunks = part.search(/^@@ /m)
+      return {
+        path: header.match(/ b\/(.+)$/)?.[1] ?? header,
+        patch: hunks === -1 ? '' : part.slice(hunks).trimEnd(),
+      }
+    })
 }

@@ -9,11 +9,21 @@ import { startRenderTransition } from '../../infra/telemetry/emitter'
 import type { WorkspaceView } from '../workspaces/workspaceViewTransition'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 
-export type TaskLaunchRequest = { nodeId: string | null; projectId: string; title: string; baseCommit?: string; worktreePath?: string }
+export type TaskLaunchRequest = {
+  nodeId: string | null
+  projectId: string
+  title: string
+  baseCommit?: string
+  worktreePath?: string
+}
 const [taskLaunch, setTaskLaunch] = createSignal<TaskLaunchRequest | null>(null)
 export const taskLaunchRequest = taskLaunch
-export const requestTaskLaunch = (draft: TaskLaunchRequest): void => { setTaskLaunch(draft) }
-export const closeTaskLaunch = (): void => { setTaskLaunch(null) }
+export const requestTaskLaunch = (draft: TaskLaunchRequest): void => {
+  setTaskLaunch(draft)
+}
+export const closeTaskLaunch = (): void => {
+  setTaskLaunch(null)
+}
 
 export type { PaneId, TaskLayout } from './taskLayout'
 export type { WorkspaceView } from '../workspaces/workspaceViewTransition'
@@ -30,7 +40,7 @@ const UNSET_SOURCE = Symbol('unset-source')
 const [selectedSourceState, setSelectedSourceState] = createSignal<string | null | typeof UNSET_SOURCE>(UNSET_SOURCE)
 export const selectedSource = (): string | null => {
   const selected = selectedSourceState()
-  return selected === UNSET_SOURCE ? defaultSourceId() ?? null : selected
+  return selected === UNSET_SOURCE ? (defaultSourceId() ?? null) : selected
 }
 export function setSelectedSource(source: string | null): void {
   // The source's own plugin owns the span, so "which rail source is slow to draw" is one query
@@ -132,7 +142,8 @@ export function setRecipeBrowserUrl(taskId: string, url: string): void {
 // The terminal drawer is per-task (session state, like activeTaskId): each task remembers whether
 // its drawer is open, so switching tasks swaps it and a Source browse (no task) shows no terminal.
 const [terminalOpenTasks, setTerminalOpenTasks] = createSignal<Set<string>>(new Set())
-export const isTerminalOpen = (taskId: string | null | undefined): boolean => !!taskId && terminalOpenTasks().has(taskId)
+export const isTerminalOpen = (taskId: string | null | undefined): boolean =>
+  !!taskId && terminalOpenTasks().has(taskId)
 export function setTerminalOpen(taskId: string, open: boolean): void {
   setTerminalOpenTasks((prev) => {
     if (open === prev.has(taskId)) return prev
@@ -161,7 +172,8 @@ export function setTerminalMax(taskId: string, max: boolean): void {
 // Core-owned focused pane and session-only maximize state. Pane content never mutates these
 // directly: the host's paneFocus directive marks focus on pointer/focusin, and commands read it.
 const [focusedPanes, setFocusedPanes] = createSignal<Record<string, PaneId | undefined>>({})
-export const focusedPane = (taskId: string | null | undefined): PaneId | undefined => (taskId ? focusedPanes()[taskId] : undefined)
+export const focusedPane = (taskId: string | null | undefined): PaneId | undefined =>
+  taskId ? focusedPanes()[taskId] : undefined
 export function setFocusedPane(taskId: string, pane: PaneId): void {
   setFocusedPanes((current) => (current[taskId] === pane ? current : { ...current, [taskId]: pane }))
 }
@@ -175,7 +187,8 @@ function clearFocusedPane(taskId: string, pane?: PaneId): void {
 }
 
 const [maximizedPanes, setMaximizedPanes] = createSignal<Record<string, PaneId | undefined>>({})
-export const maximizedPane = (taskId: string | null | undefined): PaneId | undefined => (taskId ? maximizedPanes()[taskId] : undefined)
+export const maximizedPane = (taskId: string | null | undefined): PaneId | undefined =>
+  taskId ? maximizedPanes()[taskId] : undefined
 export function setMaximizedPane(taskId: string, pane: PaneId | null): void {
   setMaximizedPanes((current) => {
     if ((current[taskId] ?? null) === pane) return current

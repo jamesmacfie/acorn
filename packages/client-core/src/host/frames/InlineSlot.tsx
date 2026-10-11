@@ -28,7 +28,10 @@ export function InlineSlot(props: {
   taskId?: string
   projectId?: string | null
 }) {
-  const choice = createSlotChoice(() => props.point, () => props.key)
+  const choice = createSlotChoice(
+    () => props.point,
+    () => props.key,
+  )
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
@@ -78,9 +81,7 @@ export function InlineSlot(props: {
       {/* A count and no names, exactly as the remote slot's disclosure does it: the owner set the
           ceiling because it is the owner's screen, and listing who was left out would be inviting a
           person to fix somebody else's arithmetic. */}
-      <Show when={overflow()}>
-        {(count) => <span class="muted">{count()} more from other plugins</span>}
-      </Show>
+      <Show when={overflow()}>{(count) => <span class="muted">{count()} more from other plugins</span>}</Show>
     </Show>
   )
 }

@@ -19,25 +19,65 @@ export default function RowControls(props: {
   onBoardMove?: (row: DashboardDisplayRow, choiceId: string) => void
 }) {
   const task: ButtonPlan = { kind: 'createTask', label: 'Start task' }
-  return <span class="dash-row-controls" data-dash-panel={props.panelId ?? ''} data-dash-row={props.row.id}>
-    <For each={props.buttons ?? []}>{button => <IconButton size="xs" variant="ghost"
-      icon={button.icon ?? (button.kind === 'createTask' ? 'plus' : button.kind === 'open' ? 'external-link' : 'mouse-pointer-click')}
-      label={button.label} onPress={() => props.onButton?.(props.row, button)} />}</For>
-    <RowActions ariaLabel={`Actions for ${props.row.id}`}>
-      {menu => <>
-        <Show when={(props.row.recordItems?.length ?? 0) > 1}><For each={props.row.recordItems}>{item => <Menu.Item context={menu} onSelect={() => props.onOpenRecord?.(props.row, item)}>Open {item.ref.pluginId} {item.ref.recordId}</Menu.Item>}</For></Show>
-        <For each={props.buttons ?? []}>{button => <Menu.Item context={menu} onSelect={() => props.onButton?.(props.row, button)}>{button.label}</Menu.Item>}</For>
-        <For each={props.boardChoices ?? []}>{choice => <Menu.Item context={menu} onSelect={() => props.onBoardMove?.(props.row, choice.id)}>
-          {props.boardMoveReason?.(props.row, choice.id) ? `Move to ${choice.label}: ${props.boardMoveReason(props.row, choice.id)}` : `Move to ${choice.label}`}
-        </Menu.Item>}</For>
-        <Show when={!(props.buttons ?? []).some(button => button.kind === 'createTask')}><Menu.Item context={menu} onSelect={() => props.onButton?.(props.row, task)}>Start task</Menu.Item></Show>
-      </>}
-    </RowActions>
-  </span>
+  return (
+    <span class="dash-row-controls" data-dash-panel={props.panelId ?? ''} data-dash-row={props.row.id}>
+      <For each={props.buttons ?? []}>
+        {(button) => (
+          <IconButton
+            size="xs"
+            variant="ghost"
+            icon={
+              button.icon ??
+              (button.kind === 'createTask' ? 'plus' : button.kind === 'open' ? 'external-link' : 'mouse-pointer-click')
+            }
+            label={button.label}
+            onPress={() => props.onButton?.(props.row, button)}
+          />
+        )}
+      </For>
+      <RowActions ariaLabel={`Actions for ${props.row.id}`}>
+        {(menu) => (
+          <>
+            <Show when={(props.row.recordItems?.length ?? 0) > 1}>
+              <For each={props.row.recordItems}>
+                {(item) => (
+                  <Menu.Item context={menu} onSelect={() => props.onOpenRecord?.(props.row, item)}>
+                    Open {item.ref.pluginId} {item.ref.recordId}
+                  </Menu.Item>
+                )}
+              </For>
+            </Show>
+            <For each={props.buttons ?? []}>
+              {(button) => (
+                <Menu.Item context={menu} onSelect={() => props.onButton?.(props.row, button)}>
+                  {button.label}
+                </Menu.Item>
+              )}
+            </For>
+            <For each={props.boardChoices ?? []}>
+              {(choice) => (
+                <Menu.Item context={menu} onSelect={() => props.onBoardMove?.(props.row, choice.id)}>
+                  {props.boardMoveReason?.(props.row, choice.id)
+                    ? `Move to ${choice.label}: ${props.boardMoveReason(props.row, choice.id)}`
+                    : `Move to ${choice.label}`}
+                </Menu.Item>
+              )}
+            </For>
+            <Show when={!(props.buttons ?? []).some((button) => button.kind === 'createTask')}>
+              <Menu.Item context={menu} onSelect={() => props.onButton?.(props.row, task)}>
+                Start task
+              </Menu.Item>
+            </Show>
+          </>
+        )}
+      </RowActions>
+    </span>
+  )
 }
 
 export function openRowMenu(panelId: string | undefined, rowId: string): void {
-  const controls = [...document.querySelectorAll<HTMLElement>('[data-dash-row]')]
-    .find(element => element.dataset.dashPanel === (panelId ?? '') && element.dataset.dashRow === rowId)
+  const controls = [...document.querySelectorAll<HTMLElement>('[data-dash-row]')].find(
+    (element) => element.dataset.dashPanel === (panelId ?? '') && element.dataset.dashRow === rowId,
+  )
   controls?.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')?.click()
 }

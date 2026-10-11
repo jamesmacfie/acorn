@@ -5,7 +5,20 @@ import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, openPane, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
-  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, StackedDiff, Text,
+  Alert,
+  Button,
+  Card,
+  CodeBlock,
+  Fold,
+  Heading,
+  Icon,
+  IconButton,
+  Inline,
+  Menu,
+  Row,
+  Stack,
+  StackedDiff,
+  Text,
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
@@ -14,7 +27,12 @@ import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
 import { messageAttachments, shownMessageText } from './messageText'
 import {
-  ContributedTranscriptRows, MessageSelectionActions, messageMenuTarget, transcriptMenuRows, turnMenuTarget, TurnActionsMenu,
+  ContributedTranscriptRows,
+  MessageSelectionActions,
+  messageMenuTarget,
+  transcriptMenuRows,
+  turnMenuTarget,
+  TurnActionsMenu,
   type TranscriptScope,
 } from './transcriptMenus'
 import type { AgentMessageTarget } from '@acorn/plugin-api/client'
@@ -41,11 +59,12 @@ const contextLine = (context: { used: number; size?: number }): string =>
     ? `${context.used.toLocaleString()} tokens`
     : `${context.used.toLocaleString()} / ${context.size.toLocaleString()} context`
 
-const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> = {
-  pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
-  in_progress: { icon: 'circle-dot', tone: 'accent', label: 'In progress' },
-  completed: { icon: 'circle-check', tone: 'ok', label: 'Completed' },
-}
+const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> =
+  {
+    pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
+    in_progress: { icon: 'circle-dot', tone: 'accent', label: 'In progress' },
+    completed: { icon: 'circle-check', tone: 'ok', label: 'Completed' },
+  }
 
 // The reader's way out of the transcript. Three formats because the answer lands in three kinds of
 // place: prose in a chat or a ticket, markdown in a doc, and the raw event when somebody is debugging
@@ -61,24 +80,27 @@ function CopyOutputMenu(props: {
   target?: () => AgentMessageTarget | undefined
 }) {
   const copy = (text: string) => void navigator.clipboard.writeText(text)
-  const label = () => transcriptMenuRows(props.target?.()).length ? `Copy this ${props.noun} or act on it` : `Copy this ${props.noun}`
+  const label = () =>
+    transcriptMenuRows(props.target?.()).length ? `Copy this ${props.noun} or act on it` : `Copy this ${props.noun}`
   return (
-    <Menu ariaLabel={label()} placement="bottom-end"
+    <Menu
+      ariaLabel={label()}
+      placement="bottom-end"
       trigger={({ toggle, open }) => (
-        <IconButton
-          icon="ellipsis"
-          label={label()}
-          opens="menu"
-          expanded={open()}
-          onPress={toggle}
-        />
+        <IconButton icon="ellipsis" label={label()} opens="menu" expanded={open()} onPress={toggle} />
       )}
     >
       {(menu) => (
         <>
-          <Menu.Item context={menu} onSelect={() => copy(asPlainText(props.text()))}>Copy as text</Menu.Item>
-          <Menu.Item context={menu} onSelect={() => copy(props.text())}>Copy as Markdown</Menu.Item>
-          <Menu.Item context={menu} onSelect={() => copy(JSON.stringify(props.event(), null, 2))}>Copy as JSON</Menu.Item>
+          <Menu.Item context={menu} onSelect={() => copy(asPlainText(props.text()))}>
+            Copy as text
+          </Menu.Item>
+          <Menu.Item context={menu} onSelect={() => copy(props.text())}>
+            Copy as Markdown
+          </Menu.Item>
+          <Menu.Item context={menu} onSelect={() => copy(JSON.stringify(props.event(), null, 2))}>
+            Copy as JSON
+          </Menu.Item>
           <ContributedTranscriptRows context={menu} target={() => props.target?.()} separated />
         </>
       )}
@@ -107,7 +129,9 @@ function AssistantMessageCard(props: {
         <Inline spread>
           <Inline>
             <Text emphasis="eyebrow">{props.label}</Text>
-            <Text emphasis="eyebrow" tip={time().full} tipAt={props.createdAt}>{time().short}</Text>
+            <Text emphasis="eyebrow" tip={time().full} tipAt={props.createdAt}>
+              {time().short}
+            </Text>
           </Inline>
           <CopyOutputMenu text={() => props.text} event={props.event} noun="response" target={props.target} />
         </Inline>
@@ -141,8 +165,14 @@ export default function AgentEventCard(props: {
   const scope = (): TranscriptScope | undefined =>
     props.menuScope && { ...props.menuScope, taskId: props.taskId, sessionId: props.sessionId }
   // Built only for a message card and a turn's closing line; every other card answers undefined.
-  const messageTarget = createMemo(() => { const bound = scope(); return bound && messageMenuTarget(bound, props.item, props.turn) })
-  const turnTarget = createMemo(() => { const bound = scope(); return bound && turnMenuTarget(bound, props.item, props.turn) })
+  const messageTarget = createMemo(() => {
+    const bound = scope()
+    return bound && messageMenuTarget(bound, props.item, props.turn)
+  })
+  const turnTarget = createMemo(() => {
+    const bound = scope()
+    return bound && turnMenuTarget(bound, props.item, props.turn)
+  })
   // The Git pane's Changes tab. Literal ids, because git depends on this plugin and not the reverse.
   const openChanges = () => openPane(props.taskId, 'git', { kind: 'plugin:select', item: 'changes' })
   const [implementing, setImplementing] = createSignal(false)
@@ -183,28 +213,49 @@ export default function AgentEventCard(props: {
                 <Inline spread>
                   <Inline>
                     <Text emphasis="eyebrow">
-                      {message().subagentId ? 'Subagent' : props.turn?.source === 'goal' ? 'Goal' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
+                      {message().subagentId
+                        ? 'Subagent'
+                        : props.turn?.source === 'goal'
+                          ? 'Goal'
+                          : message().automatic
+                            ? 'Acorn'
+                            : senderLabel(props.turn)}
                     </Text>
-                    <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
+                    <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>
+                      {time().short}
+                    </Text>
                   </Inline>
                   {/* The reader's own message has no menu of its own. It gets the Copy menu only when
                       another plugin offers a row on it, so with none the card is as it always was. */}
                   <Show when={transcriptMenuRows(messageTarget()).length}>
-                    <CopyOutputMenu text={() => shownMessageText(message(), props.turn)} event={message} noun="message" target={messageTarget} />
+                    <CopyOutputMenu
+                      text={() => shownMessageText(message(), props.turn)}
+                      event={message}
+                      noun="message"
+                      target={messageTarget}
+                    />
                   </Show>
                 </Inline>
                 <MessageSelectionActions target={messageTarget} text={() => shownMessageText(message(), props.turn)}>
-                  <AgentMarkdown
-                    text={shownMessageText(message(), props.turn)}
-                    taskId={props.taskId}
-                  />
+                  <AgentMarkdown text={shownMessageText(message(), props.turn)} taskId={props.taskId} />
                 </MessageSelectionActions>
-                <Show when={props.turn?.source === 'delegation_report' ? props.turn.effectivePolicy.checkResults as CheckResults | undefined : undefined}>
+                <Show
+                  when={
+                    props.turn?.source === 'delegation_report'
+                      ? (props.turn.effectivePolicy.checkResults as CheckResults | undefined)
+                      : undefined
+                  }
+                >
                   {(results) => (
                     <Stack gap="row">
                       <Text emphasis="strong">Host checks · {new Date(results().checkedAt).toLocaleString()}</Text>
                       <For each={results().verdicts}>
-                        {(verdict) => <Text>{verdict.status}: {verdict.check.kind}{'path' in verdict.check ? ` · ${verdict.check.path}` : ''} · {verdict.reason}</Text>}
+                        {(verdict) => (
+                          <Text>
+                            {verdict.status}: {verdict.check.kind}
+                            {'path' in verdict.check ? ` · ${verdict.check.path}` : ''} · {verdict.reason}
+                          </Text>
+                        )}
                       </For>
                     </Stack>
                   )}
@@ -224,7 +275,13 @@ export default function AgentEventCard(props: {
                     </Index>
                   </Inline>
                 </Show>
-                <Show when={!message().subagentId && !message().automatic && props.turn?.input.some((part) => part.type === 'context')}>
+                <Show
+                  when={
+                    !message().subagentId &&
+                    !message().automatic &&
+                    props.turn?.input.some((part) => part.type === 'context')
+                  }
+                >
                   <Fold label="Context manifest" level="sub">
                     <Stack gap="row">
                       <For each={props.turn?.input.filter((part) => part.type === 'context') ?? []}>
@@ -232,9 +289,11 @@ export default function AgentEventCard(props: {
                           <Row
                             variant="stacked"
                             density="compact"
-                            onPress={context.deepLink
-                              ? () => dispatchLayout(props.taskId, { type: 'show', pane: context.deepLink!.pane })
-                              : undefined}
+                            onPress={
+                              context.deepLink
+                                ? () => dispatchLayout(props.taskId, { type: 'show', pane: context.deepLink!.pane })
+                                : undefined
+                            }
                             meta={<Text emphasis="muted">~{(context.estimatedTokens ?? 0).toLocaleString()} tok</Text>}
                           >
                             <Text emphasis="strong">{context.label}</Text>
@@ -245,7 +304,9 @@ export default function AgentEventCard(props: {
                         )}
                       </For>
                       <Show when={Object.keys(props.turn?.effectivePolicy ?? {}).length}>
-                        <CodeBlock size="xs" wrap>{JSON.stringify(props.turn?.effectivePolicy, null, 2)}</CodeBlock>
+                        <CodeBlock size="xs" wrap>
+                          {JSON.stringify(props.turn?.effectivePolicy, null, 2)}
+                        </CodeBlock>
                       </Show>
                     </Stack>
                   </Fold>
@@ -283,7 +344,14 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'tool'}>
         {(_shown) => {
           const tool = () => (event() as Extract<ReturnType<typeof event>, { type: 'tool' }>).tool
-          return <AgentToolCallCard tool={tool()} fileChanges={props.item.fileChanges} taskId={props.taskId} createdAt={props.item.createdAt} />
+          return (
+            <AgentToolCallCard
+              tool={tool()}
+              fileChanges={props.item.fileChanges}
+              taskId={props.taskId}
+              createdAt={props.item.createdAt}
+            />
+          )
         }}
       </Show>
       <Show when={event().type === 'subagent'}>
@@ -296,7 +364,8 @@ export default function AgentEventCard(props: {
           // A reactive `open` would instead slam the card shut the moment the subagent finished, which
           // is exactly when somebody is most likely to be reading it.
           const [open, setOpen] = createSignal(
-            subagent().status === undefined || subagent().status === 'running' || subagent().status === 'pending')
+            subagent().status === undefined || subagent().status === 'running' || subagent().status === 'pending',
+          )
           return (
             <Fold
               label={subagent().title ?? 'Subagent'}
@@ -313,11 +382,7 @@ export default function AgentEventCard(props: {
               // Straight to the dedicated view, for a run too long to read in a box. Fold isolates a
               // click on its actions from the toggle underneath.
               actions={
-                <Button
-                  variant="bare"
-                  size="sm"
-                  onPress={() => selectManagedSubagent(props.sessionId, subagent().id)}
-                >
+                <Button variant="bare" size="sm" onPress={() => selectManagedSubagent(props.sessionId, subagent().id)}>
                   Open
                 </Button>
               }
@@ -371,12 +436,19 @@ export default function AgentEventCard(props: {
           // resolved permission does.
           return (
             <Stack gap="row">
-              <AssistantMessageCard label="Agent" text={proposal().text} event={proposal}
-                createdAt={props.item.createdAt} taskId={props.taskId} />
+              <AssistantMessageCard
+                label="Agent"
+                text={proposal().text}
+                event={proposal}
+                createdAt={props.item.createdAt}
+                taskId={props.taskId}
+              />
               <Show when={props.planHandoffState === 'actionable'}>
                 <Card stripe="warn" pad="sm">
                   <Stack gap="row">
-                    <Heading level={3} eyebrow="plan">Ready to code?</Heading>
+                    <Heading level={3} eyebrow="plan">
+                      Ready to code?
+                    </Heading>
                     <Inline wrap>
                       <Button disabled={implementing()} onPress={() => void implementPlan(proposal().itemId)}>
                         {implementing() ? 'Starting implementation…' : 'Implement plan'}
@@ -397,27 +469,38 @@ export default function AgentEventCard(props: {
           // different in the worktree now, so it stays one press away inside the fold. A change with
           // nothing to show, such as one stored before patches were kept, is still just the link.
           return (
-            <Show when={change().patch || change().patchArtifactId} fallback={
-              <Row
-                leading={<Icon name="file-diff" />}
-                meta={<Text emphasis="muted">{change().summary ?? 'Open in Changes'} →</Text>}
-                onPress={openChanges}
+            <Show
+              when={change().patch || change().patchArtifactId}
+              fallback={
+                <Row
+                  leading={<Icon name="file-diff" />}
+                  meta={<Text emphasis="muted">{change().summary ?? 'Open in Changes'} →</Text>}
+                  onPress={openChanges}
+                >
+                  Changed {change().path ?? 'files'}
+                </Row>
+              }
+            >
+              <Fold
+                label={change().path ? `Changed ${change().path}` : (change().summary ?? 'Changed files')}
+                level="sub"
               >
-                Changed {change().path ?? 'files'}
-              </Row>
-            }>
-              <Fold label={change().path ? `Changed ${change().path}` : change().summary ?? 'Changed files'} level="sub">
                 <Stack gap="row">
                   {/* Fold draws its body on first open, so no rows are built for a closed one. */}
-                  <Show when={change().patch} fallback={
-                    <Text emphasis="muted">This diff is too large to show here.</Text>
-                  }>
+                  <Show
+                    when={change().patch}
+                    fallback={<Text emphasis="muted">This diff is too large to show here.</Text>}
+                  >
                     <Index each={patchFiles(change().path, change().patch ?? '')}>
-                      {(file) => <StackedDiff path={file().path} patch={file().patch} lineNumbers={!change().snippet} />}
+                      {(file) => (
+                        <StackedDiff path={file().path} patch={file().patch} lineNumbers={!change().snippet} />
+                      )}
                     </Index>
                   </Show>
                   <Inline>
-                    <Button variant="bare" size="sm" onPress={openChanges}>Open in Changes</Button>
+                    <Button variant="bare" size="sm" onPress={openChanges}>
+                      Open in Changes
+                    </Button>
                   </Inline>
                 </Stack>
               </Fold>
@@ -464,77 +547,92 @@ export default function AgentEventCard(props: {
             return waiting ? request : undefined
           }
           return (
-            <Show when={!open()} fallback={
-              <Show when={open()}>
-                {(request) => (
-                  <AgentRequestCard
-                    request={request()}
-                    taskId={props.taskId}
-                    focused={props.focusRequest}
-                    onResolved={props.onRequestResolved}
-                  />
-                )}
-              </Show>
-            }>
-            <Card pad="sm">
-              <Stack gap="row">
-                <Heading level={3} eyebrow={asked().kind}>{asked().title}</Heading>
-                {/* Which app the answer was about, by the identifier it is keyed on, and for a saved
+            <Show
+              when={!open()}
+              fallback={
+                <Show when={open()}>
+                  {(request) => (
+                    <AgentRequestCard
+                      request={request()}
+                      taskId={props.taskId}
+                      focused={props.focusRequest}
+                      onResolved={props.onRequestResolved}
+                    />
+                  )}
+                </Show>
+              }
+            >
+              <Card pad="sm">
+                <Stack gap="row">
+                  <Heading level={3} eyebrow={asked().kind}>
+                    {asked().title}
+                  </Heading>
+                  {/* Which app the answer was about, by the identifier it is keyed on, and for a saved
                     grant who holds it. An older row has no approval and reads as it always did. */}
-                <Show when={appApprovalOf(asked().approval)}>
-                  {(approval) => (
-                    <Stack gap="row">
-                      <Text emphasis="muted" wrap>{`App: ${approvalTarget(approval())}`}</Text>
-                      <Show when={approvalSentNote(approval(), sentOptionId(props.request))}>
-                        {(note) => <Text emphasis="muted" wrap>{note()}</Text>}
+                  <Show when={appApprovalOf(asked().approval)}>
+                    {(approval) => (
+                      <Stack gap="row">
+                        <Text emphasis="muted" wrap>{`App: ${approvalTarget(approval())}`}</Text>
+                        <Show when={approvalSentNote(approval(), sentOptionId(props.request))}>
+                          {(note) => (
+                            <Text emphasis="muted" wrap>
+                              {note()}
+                            </Text>
+                          )}
+                        </Show>
+                      </Stack>
+                    )}
+                  </Show>
+                  {/* Refused by a policy plugin before anyone saw it. The host stamped who, and capped why. */}
+                  <Show when={asked().blocked}>
+                    {(blocked) => (
+                      // One sentence rather than a title, because the terminal's alert sets a title beside
+                      // its text and a long plugin id would squeeze both.
+                      <Alert tone="warn">
+                        {blocked().reason
+                          ? `Blocked by ${blocked().by}: ${blocked().reason}`
+                          : `Blocked by ${blocked().by}.`}
+                      </Alert>
+                    )}
+                  </Show>
+                  <Show
+                    when={!asked().blocked && askedQuestions(asked(), props.request).length}
+                    fallback={
+                      <Show when={!asked().blocked}>
+                        <Text emphasis="muted">No answer</Text>
                       </Show>
-                    </Stack>
-                  )}
-                </Show>
-                {/* Refused by a policy plugin before anyone saw it. The host stamped who, and capped why. */}
-                <Show when={asked().blocked}>
-                  {(blocked) => (
-                    // One sentence rather than a title, because the terminal's alert sets a title beside
-                    // its text and a long plugin id would squeeze both.
-                    <Alert tone="warn">
-                      {blocked().reason ? `Blocked by ${blocked().by}: ${blocked().reason}` : `Blocked by ${blocked().by}.`}
-                    </Alert>
-                  )}
-                </Show>
-                <Show when={!asked().blocked && askedQuestions(asked(), props.request).length} fallback={
-                  <Show when={!asked().blocked}><Text emphasis="muted">No answer</Text></Show>
-                }>
-                <For each={askedQuestions(asked(), props.request)}>
-                  {(entry) => (
-                    <Stack gap="row">
-                      <Show when={entry.prompt !== asked().title}>
-                        <Text emphasis="muted" wrap>{entry.prompt}</Text>
-                      </Show>
-                      <Show
-                        when={entry.chosen.length}
-                        fallback={<Text emphasis="muted">No answer</Text>}
-                      >
-                        <Text wrap>{entry.chosen.join(', ')}</Text>
-                      </Show>
-                      <Show when={entry.alternatives.length}>
-                        <Fold label="Options not chosen" level="sub">
-                          <Stack gap="row">
-                            <For each={entry.alternatives}>
-                              {(option) => (
-                                <Text emphasis="muted" wrap>
-                                  {option.description ? `${option.label} · ${option.description}` : option.label}
-                                </Text>
-                              )}
-                            </For>
-                          </Stack>
-                        </Fold>
-                      </Show>
-                    </Stack>
-                  )}
-                </For>
-                </Show>
-              </Stack>
-            </Card>
+                    }
+                  >
+                    <For each={askedQuestions(asked(), props.request)}>
+                      {(entry) => (
+                        <Stack gap="row">
+                          <Show when={entry.prompt !== asked().title}>
+                            <Text emphasis="muted" wrap>
+                              {entry.prompt}
+                            </Text>
+                          </Show>
+                          <Show when={entry.chosen.length} fallback={<Text emphasis="muted">No answer</Text>}>
+                            <Text wrap>{entry.chosen.join(', ')}</Text>
+                          </Show>
+                          <Show when={entry.alternatives.length}>
+                            <Fold label="Options not chosen" level="sub">
+                              <Stack gap="row">
+                                <For each={entry.alternatives}>
+                                  {(option) => (
+                                    <Text emphasis="muted" wrap>
+                                      {option.description ? `${option.label} · ${option.description}` : option.label}
+                                    </Text>
+                                  )}
+                                </For>
+                              </Stack>
+                            </Fold>
+                          </Show>
+                        </Stack>
+                      )}
+                    </For>
+                  </Show>
+                </Stack>
+              </Card>
             </Show>
           )
         }}
@@ -556,8 +654,12 @@ export default function AgentEventCard(props: {
             that carries it is a separate event and often arrives after this one
             (./conversationItems.ts § stampTurnContext). A declined turn also says so in words, because
             a safety refusal otherwise looks like a turn that finished with a short answer. */}
-        <Show when={(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason === 'refusal'}>
-          <Alert tone="warn">The model declined this request. Rephrase it, or switch to another model and send it again.</Alert>
+        <Show
+          when={(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason === 'refusal'}
+        >
+          <Alert tone="warn">
+            The model declined this request. Rephrase it, or switch to another model and send it again.
+          </Alert>
         </Show>
         <Inline spread>
           <Text emphasis="muted">
@@ -567,9 +669,7 @@ export default function AgentEventCard(props: {
               : ''}
           </Text>
           <Inline>
-            <Show when={props.item.context}>
-              {(context) => <Text emphasis="muted">{contextLine(context())}</Text>}
-            </Show>
+            <Show when={props.item.context}>{(context) => <Text emphasis="muted">{contextLine(context())}</Text>}</Show>
             <TurnActionsMenu target={turnTarget} />
           </Inline>
         </Inline>

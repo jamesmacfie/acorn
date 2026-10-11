@@ -30,9 +30,12 @@ describe('DurableAgentEventBuffer', () => {
     vi.useFakeTimers()
     try {
       const committed: PendingAgentEvent[] = []
-      const buffer = new DurableAgentEventBuffer(async (entry) => {
-        committed.push(structuredClone(entry))
-      }, { maxBytes: 4, flushMs: 10 })
+      const buffer = new DurableAgentEventBuffer(
+        async (entry) => {
+          committed.push(structuredClone(entry))
+        },
+        { maxBytes: 4, flushMs: 10 },
+      )
       await buffer.accept({
         sessionId: 's',
         turnId: 't',
@@ -53,9 +56,12 @@ describe('DurableAgentEventBuffer', () => {
 
   it('splits a single oversized unicode delta without losing text or exceeding the durable limit', async () => {
     const committed: PendingAgentEvent[] = []
-    const buffer = new DurableAgentEventBuffer(async (entry) => {
-      committed.push(structuredClone(entry))
-    }, { maxBytes: 8 })
+    const buffer = new DurableAgentEventBuffer(
+      async (entry) => {
+        committed.push(structuredClone(entry))
+      },
+      { maxBytes: 8 },
+    )
     const text = 'one🙂two🙂three'
     await buffer.accept({
       sessionId: 's',
@@ -63,8 +69,7 @@ describe('DurableAgentEventBuffer', () => {
       event: { type: 'assistant_message', text, append: true },
     })
     await buffer.flushAll()
-    const chunks = committed.flatMap((entry) =>
-      entry.event.type === 'assistant_message' ? [entry.event.text] : [])
+    const chunks = committed.flatMap((entry) => (entry.event.type === 'assistant_message' ? [entry.event.text] : []))
     expect(chunks.join('')).toBe(text)
     expect(chunks.every((chunk) => Buffer.byteLength(chunk, 'utf8') <= 8)).toBe(true)
   })

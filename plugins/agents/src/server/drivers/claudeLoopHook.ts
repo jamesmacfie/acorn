@@ -28,7 +28,8 @@ export function claudeToolSubject(input: unknown): ClaudeToolSubject | null {
   const row = input as Record<string, unknown>
   const toolName = text(row.tool_name)
   if (!toolName) return null
-  const tool = typeof row.tool_input === 'object' && row.tool_input != null ? row.tool_input as Record<string, unknown> : {}
+  const tool =
+    typeof row.tool_input === 'object' && row.tool_input != null ? (row.tool_input as Record<string, unknown>) : {}
   const command = text(tool.command)
   const paths = [tool.file_path, tool.notebook_path, tool.path].map(text).filter(Boolean)
   return {
@@ -43,10 +44,19 @@ export function claudeToolSubject(input: unknown): ClaudeToolSubject | null {
 
 /** The output for one answer. `''` is no decision, which Claude reads as "carry on with your own
  *  checks". There is no allow here, and nothing can build one. */
-export function claudeHookOutput(event: AgentLoopHookEvent, answer: { deny: string } | { note: string } | null): string {
+export function claudeHookOutput(
+  event: AgentLoopHookEvent,
+  answer: { deny: string } | { note: string } | null,
+): string {
   if (!answer) return ''
   if (event === 'PreToolUse' && 'deny' in answer) {
-    return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: answer.deny } })
+    return JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: answer.deny,
+      },
+    })
   }
   if (event === 'PostToolUse' && 'note' in answer && answer.note) {
     return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: answer.note } })

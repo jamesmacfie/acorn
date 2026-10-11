@@ -18,14 +18,18 @@ export default function DeviceConfigSettings() {
     >
       <Show
         when={configPath()}
-        fallback={<EmptyState align="start" size="sm" busy={configPath.loading}>{configPath.loading ? undefined : 'This app keeps no config file on this device.'}</EmptyState>}
+        fallback={
+          <EmptyState align="start" size="sm" busy={configPath.loading}>
+            {configPath.loading ? undefined : 'This app keeps no config file on this device.'}
+          </EmptyState>
+        }
       >
         {(path) => (
           // One row: the path is what the row describes, and opening it is the one thing to do.
           <SettingRow label="File" description={path()}>
-            <Show when={desktopExtras()}>{(desktop) =>
-              <Button onPress={() => void desktop().openConfigFile()}>Open file</Button>
-            }</Show>
+            <Show when={desktopExtras()}>
+              {(desktop) => <Button onPress={() => void desktop().openConfigFile()}>Open file</Button>}
+            </Show>
           </SettingRow>
         )}
       </Show>

@@ -1,7 +1,15 @@
 // Pure parsers: docker CLI `--format '{{json .}}'` output → shared wire models. Kept free of
 // child-process concerns so they unit-test against captured fixtures (parse.test.ts).
 import type { DockerStatsSample } from '../shared/wsFrames'
-import type { DockerContainerDetail, DockerContainerSummary, DockerImage, DockerNetwork, DockerPort, DockerScope, DockerVolume } from '../shared/model'
+import type {
+  DockerContainerDetail,
+  DockerContainerSummary,
+  DockerImage,
+  DockerNetwork,
+  DockerPort,
+  DockerScope,
+  DockerVolume,
+} from '../shared/model'
 
 // Every list command emits one JSON object per line. Malformed lines are skipped, not fatal: a
 // torn read mid-stream must never take the whole list down.
@@ -80,19 +88,21 @@ export function parsePsOutput(text: string): DockerContainerSummary[] {
   return parseJsonLines<PsLine>(text).flatMap((line) => {
     if (!line.ID || !line.Names) return []
     const labels = parseLabelString(line.Labels ?? '')
-    return [{
-      id: line.ID,
-      name: line.Names,
-      image: line.Image ?? '',
-      state: line.State ?? 'unknown',
-      status: line.Status ?? '',
-      createdAt: line.CreatedAt ? parseCliTimestamp(line.CreatedAt) : null,
-      ports: parsePortString(line.Ports ?? ''),
-      composeProject: labels['com.docker.compose.project'] ?? null,
-      composeService: labels['com.docker.compose.service'] ?? null,
-      composeWorkingDir: labels['com.docker.compose.project.working_dir'] ?? null,
-      labels,
-    }]
+    return [
+      {
+        id: line.ID,
+        name: line.Names,
+        image: line.Image ?? '',
+        state: line.State ?? 'unknown',
+        status: line.Status ?? '',
+        createdAt: line.CreatedAt ? parseCliTimestamp(line.CreatedAt) : null,
+        ports: parsePortString(line.Ports ?? ''),
+        composeProject: labels['com.docker.compose.project'] ?? null,
+        composeService: labels['com.docker.compose.service'] ?? null,
+        composeWorkingDir: labels['com.docker.compose.project.working_dir'] ?? null,
+        labels,
+      },
+    ]
   })
 }
 
@@ -114,7 +124,10 @@ type InspectEntry = {
   }
   Config?: { Image?: string; Env?: string[]; Labels?: Record<string, string> }
   Mounts?: { Type?: string; Source?: string; Destination?: string; RW?: boolean }[]
-  NetworkSettings?: { Networks?: Record<string, unknown>; Ports?: Record<string, { HostIp?: string; HostPort?: string }[] | null> }
+  NetworkSettings?: {
+    Networks?: Record<string, unknown>
+    Ports?: Record<string, { HostIp?: string; HostPort?: string }[] | null>
+  }
 }
 
 const GO_ZERO_TIME = '0001-01-01T00:00:00Z'
@@ -164,26 +177,40 @@ export function parseInspectOutput(text: string): DockerContainerDetail | null {
     restartCount: e.RestartCount ?? 0,
     health: e.State?.Health?.Status ?? null,
     env: e.Config?.Env ?? [],
-    mounts: (e.Mounts ?? []).map((m) => ({ type: m.Type ?? '', source: m.Source ?? '', destination: m.Destination ?? '', rw: m.RW ?? true })),
+    mounts: (e.Mounts ?? []).map((m) => ({
+      type: m.Type ?? '',
+      source: m.Source ?? '',
+      destination: m.Destination ?? '',
+      rw: m.RW ?? true,
+    })),
     networks: Object.keys(e.NetworkSettings?.Networks ?? {}),
     imageId: e.Image ?? '',
   }
 }
 
-type ImageLine = { ID?: string; Repository?: string; Tag?: string; Size?: string; CreatedAt?: string; Containers?: string }
+type ImageLine = {
+  ID?: string
+  Repository?: string
+  Tag?: string
+  Size?: string
+  CreatedAt?: string
+  Containers?: string
+}
 
 export function parseImagesOutput(text: string): DockerImage[] {
   return parseJsonLines<ImageLine>(text).flatMap((line) => {
     if (!line.ID) return []
     const containers = Number(line.Containers ?? '')
-    return [{
-      id: line.ID,
-      repository: line.Repository ?? '<none>',
-      tag: line.Tag ?? '<none>',
-      size: line.Size ?? '',
-      createdAt: line.CreatedAt ? parseCliTimestamp(line.CreatedAt) : null,
-      containers: Number.isNaN(containers) ? null : containers,
-    }]
+    return [
+      {
+        id: line.ID,
+        repository: line.Repository ?? '<none>',
+        tag: line.Tag ?? '<none>',
+        size: line.Size ?? '',
+        createdAt: line.CreatedAt ? parseCliTimestamp(line.CreatedAt) : null,
+        containers: Number.isNaN(containers) ? null : containers,
+      },
+    ]
   })
 }
 
@@ -193,13 +220,15 @@ export function parseVolumesOutput(text: string): DockerVolume[] {
   return parseJsonLines<VolumeLine>(text).flatMap((line) => {
     if (!line.Name) return []
     const labels = parseLabelString(line.Labels ?? '')
-    return [{
-      name: line.Name,
-      driver: line.Driver ?? '',
-      mountpoint: line.Mountpoint ?? '',
-      composeProject: labels['com.docker.compose.project'] ?? null,
-      anonymous: 'com.docker.volume.anonymous' in labels,
-    }]
+    return [
+      {
+        name: line.Name,
+        driver: line.Driver ?? '',
+        mountpoint: line.Mountpoint ?? '',
+        composeProject: labels['com.docker.compose.project'] ?? null,
+        anonymous: 'com.docker.volume.anonymous' in labels,
+      },
+    ]
   })
 }
 
@@ -208,18 +237,27 @@ type NetworkLine = { ID?: string; Name?: string; Driver?: string; Scope?: string
 export function parseNetworksOutput(text: string): DockerNetwork[] {
   return parseJsonLines<NetworkLine>(text).flatMap((line) => {
     if (!line.ID || !line.Name) return []
-    return [{
-      id: line.ID,
-      name: line.Name,
-      driver: line.Driver ?? '',
-      scope: line.Scope ?? '',
-      internal: line.Internal === 'true',
-    }]
+    return [
+      {
+        id: line.ID,
+        name: line.Name,
+        driver: line.Driver ?? '',
+        scope: line.Scope ?? '',
+        internal: line.Internal === 'true',
+      },
+    ]
   })
 }
 
 // One `docker stats --format '{{json .}}'` tick → a sample. Percentages arrive as "0.50%".
-type StatsLine = { CPUPerc?: string; MemPerc?: string; MemUsage?: string; NetIO?: string; BlockIO?: string; PIDs?: string }
+type StatsLine = {
+  CPUPerc?: string
+  MemPerc?: string
+  MemUsage?: string
+  NetIO?: string
+  BlockIO?: string
+  PIDs?: string
+}
 
 const percent = (v: string | undefined): number => {
   const n = Number((v ?? '').replace('%', ''))
@@ -248,7 +286,12 @@ export function parseStatsLine(line: string): DockerStatsSample | null {
 // probes' exec plumbing, top/attach) are ignored so a busy stack doesn't thrash the cache.
 type EventLine = { Type?: string; Action?: string }
 
-const EVENT_SCOPES: Record<string, DockerScope> = { container: 'containers', image: 'images', volume: 'volumes', network: 'networks' }
+const EVENT_SCOPES: Record<string, DockerScope> = {
+  container: 'containers',
+  image: 'images',
+  volume: 'volumes',
+  network: 'networks',
+}
 const IGNORED_ACTION_RE = /^(exec_|top|attach|detach|resize|archive-path|extract-to-dir)/
 
 export function eventScope(line: unknown): DockerScope | null {

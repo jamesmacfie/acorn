@@ -14,14 +14,30 @@ export type NoteScope = 'global' | 'workspace' | 'task'
 
 // The words Notes and Context both show for a note's scope and author, here so the two panes say the
 // same thing. Your own notes carry no author word.
-export const NOTE_SCOPE_LABEL: Record<NoteScope, string> = { task: 'Task', workspace: 'Workspace', global: 'Everywhere' }
-export const NOTE_AUTHOR_LABEL: Record<NoteAuthor, string> = { user: '', agent: 'By agent', workflow: 'From a workflow' }
+export const NOTE_SCOPE_LABEL: Record<NoteScope, string> = {
+  task: 'Task',
+  workspace: 'Workspace',
+  global: 'Everywhere',
+}
+export const NOTE_AUTHOR_LABEL: Record<NoteAuthor, string> = {
+  user: '',
+  agent: 'By agent',
+  workflow: 'From a workflow',
+}
 export type NoteLocation =
   | { scope: 'global' }
   | { scope: 'workspace'; workspaceId: string }
   | { scope: 'task'; taskId: string }
 
-export type NoteSummary = { slug: string; title: string; author: NoteAuthor; kind: NoteKind; included: boolean; originTaskId: string | null; updatedAt: number }
+export type NoteSummary = {
+  slug: string
+  title: string
+  author: NoteAuthor
+  kind: NoteKind
+  included: boolean
+  originTaskId: string | null
+  updatedAt: number
+}
 
 export type Note = {
   slug: string

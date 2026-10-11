@@ -1,8 +1,21 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { activeNodeId, elementRectKey, latestSignal, observeNativePage, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  elementRectKey,
+  latestSignal,
+  observeNativePage,
+  previewViews,
+  toast,
+  visibleElementRect,
+} from '@acorn/plugin-api/client'
 import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
-import { PREVIEW_TOOLBAR_ACTIONS_POINT, type PreviewReloadPayload, type PreviewToolbarProps, type PreviewToolbarResult } from '../contract/toolbarActions'
+import {
+  PREVIEW_TOOLBAR_ACTIONS_POINT,
+  type PreviewReloadPayload,
+  type PreviewToolbarProps,
+  type PreviewToolbarResult,
+} from '../contract/toolbarActions'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -46,13 +59,15 @@ export default function PreviewPane(props: {
     preview.setBounds(props.taskId, r)
   }
 
-
   onMount(() => {
     if (!preview) return
     const stopPage = observeNativePage(host, (rect, covered) => {
       setSuppressed(covered)
       const next = elementRectKey(rect)
-      if (next !== placed) { placed = next; preview.setBounds(props.taskId, rect) }
+      if (next !== placed) {
+        placed = next
+        preview.setBounds(props.taskId, rect)
+      }
     })
     const offEvent = preview.onEvent((s) => {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
@@ -117,13 +132,16 @@ export default function PreviewPane(props: {
     if (!preview || !request || suppressed() || attempted === request) return
     attempted = request
     const { taskId, url, signal } = request
-    void preview.ensure(taskId, url).then((accepted) => {
-      if (signal.aborted) return
-      setFailed(!accepted)
-      setReady(accepted)
-    }).catch(() => {
-      if (!signal.aborted) setFailed(true)
-    })
+    void preview
+      .ensure(taskId, url)
+      .then((accepted) => {
+        if (signal.aborted) return
+        setFailed(!accepted)
+        setReady(accepted)
+      })
+      .catch(() => {
+        if (!signal.aborted) setFailed(true)
+      })
   })
 
   const go = () => {
@@ -134,14 +152,17 @@ export default function PreviewPane(props: {
   // Another plugin's Reload (docs/plugins/toolbar-actions.md). It asks for the page it drew beside, by
   // address, and Preview checks that page is still the one on screen, in the task and on the Node the
   // contributor was mounted for. Then it presses Preview's own reload, so a contributor can't navigate.
-  const reloadFor = (taskId: string, nodeId: string | null) => (payload: unknown, invocation: { byPerson: boolean }): PreviewToolbarResult => {
-    if (!invocation.byPerson) return { ok: false, reason: 'needs_person' }
-    if (!preview || props.remoteBlocked || !ready()) return { ok: false, reason: 'unsupported' }
-    const expected = (payload as Partial<PreviewReloadPayload> | null)?.expectedUrl
-    if (taskId !== props.taskId || nodeId !== activeNodeId() || !pageUrl() || expected !== pageUrl()) return { ok: false, reason: 'changed' }
-    preview.command(taskId, 'reload')
-    return { ok: true }
-  }
+  const reloadFor =
+    (taskId: string, nodeId: string | null) =>
+    (payload: unknown, invocation: { byPerson: boolean }): PreviewToolbarResult => {
+      if (!invocation.byPerson) return { ok: false, reason: 'needs_person' }
+      if (!preview || props.remoteBlocked || !ready()) return { ok: false, reason: 'unsupported' }
+      const expected = (payload as Partial<PreviewReloadPayload> | null)?.expectedUrl
+      if (taskId !== props.taskId || nodeId !== activeNodeId() || !pageUrl() || expected !== pageUrl())
+        return { ok: false, reason: 'changed' }
+      preview.command(taskId, 'reload')
+      return { ok: true }
+    }
 
   const copyAddr = () => {
     void navigator.clipboard.writeText(addr())
@@ -154,45 +175,73 @@ export default function PreviewPane(props: {
           without the seam never offers it (./PreviewTaskPane.tsx). */}
       <Show when={props.remoteBlocked}>
         <EmptyState title="Preview works on this computer only">
-          A page from another computer could reach your local network, so acorn doesn't load it here.
-          Open acorn on that computer to preview it.
+          A page from another computer could reach your local network, so acorn doesn't load it here. Open acorn on that
+          computer to preview it.
         </EmptyState>
       </Show>
       <Show when={!props.remoteBlocked && (failed() || props.resolutionFailed)}>
         <EmptyState title="Could not open the preview">
           Check the preview URL and available browser capacity, then retry.
-          <Button onPress={() => props.resolutionFailed ? props.retryResolution?.() : setRetry((value) => value + 1)}>Retry preview</Button>
+          <Button onPress={() => (props.resolutionFailed ? props.retryResolution?.() : setRetry((value) => value + 1))}>
+            Retry preview
+          </Button>
         </EmptyState>
       </Show>
-      <Show when={!props.remoteBlocked && props.resolving && !props.url}><Spinner label="Resolving preview URL" /></Show>
-      <Show when={!props.remoteBlocked && !failed() && !props.resolutionFailed && props.url} fallback={props.remoteBlocked || props.resolving || failed() || props.resolutionFailed ? null :
-        <EmptyState title="No preview address">
-          Start the app from the pane switcher's run button, or set an address in the project's Preview
-          settings.
-        </EmptyState>
-      }>
+      <Show when={!props.remoteBlocked && props.resolving && !props.url}>
+        <Spinner label="Resolving preview URL" />
+      </Show>
+      <Show
+        when={!props.remoteBlocked && !failed() && !props.resolutionFailed && props.url}
+        fallback={
+          props.remoteBlocked || props.resolving || failed() || props.resolutionFailed ? null : (
+            <EmptyState title="No preview address">
+              Start the app from the pane switcher's run button, or set an address in the project's Preview settings.
+            </EmptyState>
+          )
+        }
+      >
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
             the address box is an `Input`, so it takes the reader's style pack like every other box
             in the app instead of the three rules this plugin used to ship for it. */}
         <Toolbar ariaLabel="Preview">
-          <IconButton icon="chevron-left" label="Back" disabled={!canBack()} onPress={() => preview?.command(props.taskId, 'back')} />
-          <IconButton icon="chevron-right" label="Forward" disabled={!canFwd()} onPress={() => preview?.command(props.taskId, 'forward')} />
+          <IconButton
+            icon="chevron-left"
+            label="Back"
+            disabled={!canBack()}
+            onPress={() => preview?.command(props.taskId, 'back')}
+          />
+          <IconButton
+            icon="chevron-right"
+            label="Forward"
+            disabled={!canFwd()}
+            onPress={() => preview?.command(props.taskId, 'forward')}
+          />
           <IconButton
             icon={loading() ? 'x' : 'rotate-cw'}
             label={loading() ? 'Stop loading the page' : 'Reload the page'}
             onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}
           />
-          <IconButton icon="house" label="Go to the app's start page" onPress={() => props.url && preview?.load(props.taskId, props.url)} />
+          <IconButton
+            icon="house"
+            label="Go to the app's start page"
+            onPress={() => props.url && preview?.load(props.taskId, props.url)}
+          />
           <Input
             size="sm"
             label="Preview address"
             assist={false}
             value={addr()}
             onInput={(value) => setAddr(value)}
-            onKeyDown={(event) => { if (event.key === 'Enter') go() }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') go()
+            }}
           />
           <IconButton icon="copy" label="Copy page address" disabled={!addr()} onPress={copyAddr} />
-          <IconButton icon="code-xml" label="Show developer tools" onPress={() => preview?.command(props.taskId, 'devtools')} />
+          <IconButton
+            icon="code-xml"
+            label="Show developer tools"
+            onPress={() => preview?.command(props.taskId, 'devtools')}
+          />
           {/* Other plugins' controls, after Preview's own and before the spinner, so the spinner
               coming and going doesn't move them. Keyed on the task, so a task switch remounts them
               and a contributor's action can't land on the next task's page. */}
@@ -218,12 +267,21 @@ export default function PreviewPane(props: {
               )
             }}
           </Show>
-          <Show when={loading()}><Spinner label="Loading page" /></Show>
+          <Show when={loading()}>
+            <Spinner label="Loading page" />
+          </Show>
         </Toolbar>
       </Show>
       {/* A WebContentsView is somebody else's pixels, so it is a rectangle: the kit owns the box and
           the way in and out of it with the keyboard, and the shell positions the view over `mount`. */}
-      <Rectangle kind="webview" label="Preview" hidden={props.remoteBlocked || !props.url || failed() || props.resolutionFailed} mount={(element) => { host = element }} />
+      <Rectangle
+        kind="webview"
+        label="Preview"
+        hidden={props.remoteBlocked || !props.url || failed() || props.resolutionFailed}
+        mount={(element) => {
+          host = element
+        }}
+      />
     </>
   )
 }

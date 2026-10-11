@@ -39,9 +39,7 @@ export const atLive = (geometry: ScrollGeometry): boolean =>
 /** Two places that would put the reader in the same spot. The pixel tolerance is what stops a
  *  correction that lands half a device pixel out from reporting a move nobody made. */
 export const samePlace = (a: ReadingPlace, b: ReadingPlace): boolean =>
-  a.at === 'live'
-    ? b.at === 'live'
-    : b.at === 'turn' && a.key === b.key && Math.abs(a.offset - b.offset) < 1
+  a.at === 'live' ? b.at === 'live' : b.at === 'turn' && a.key === b.key && Math.abs(a.offset - b.offset) < 1
 
 /**
  * The place a scroll event leaves the reader in.

@@ -52,15 +52,18 @@ export function mintInternalToken(key: string, claims: InternalClaims): string {
   // Short keys keep the token out of the way in `env` output: s=scope, t=taskId, n=sessioN,
   // c=effective tool Ceiling, i=credential Id, e=expiry in milliseconds since the epoch. A service
   // token never leaves the process, so only a task token needs an id to revoke.
-  const credentialId = claims.scope === 'task' ? claims.credentialId ?? randomBytes(16).toString('base64url') : undefined
-  const payload = b64(JSON.stringify({
-    s: claims.scope,
-    ...(claims.taskId ? { t: claims.taskId } : {}),
-    ...(claims.sessionId ? { n: claims.sessionId } : {}),
-    ...(claims.toolCeiling ? { c: normalizeToolCeiling(claims.toolCeiling) } : {}),
-    ...(credentialId ? { i: credentialId } : {}),
-    e: Date.now() + INTERNAL_TOKEN_LIFETIME_MS,
-  }))
+  const credentialId =
+    claims.scope === 'task' ? (claims.credentialId ?? randomBytes(16).toString('base64url')) : undefined
+  const payload = b64(
+    JSON.stringify({
+      s: claims.scope,
+      ...(claims.taskId ? { t: claims.taskId } : {}),
+      ...(claims.sessionId ? { n: claims.sessionId } : {}),
+      ...(claims.toolCeiling ? { c: normalizeToolCeiling(claims.toolCeiling) } : {}),
+      ...(credentialId ? { i: credentialId } : {}),
+      e: Date.now() + INTERNAL_TOKEN_LIFETIME_MS,
+    }),
+  )
   return `${PREFIX}${payload}${SEPARATOR}${sign(key, payload)}`
 }
 
@@ -79,7 +82,9 @@ function signedClaims(key: string, token: string): (InternalClaims & { expiresAt
   const b = Buffer.from(expected)
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null
   try {
-    const decoded = internalClaimsPayloadSchema.safeParse(JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')))
+    const decoded = internalClaimsPayloadSchema.safeParse(
+      JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')),
+    )
     if (!decoded.success || (decoded.data.s === 'task' && !decoded.data.t)) return null
     return {
       scope: decoded.data.s,
@@ -106,7 +111,11 @@ export function verifyInternalToken(key: string, token: string): InternalClaims 
 // What HTTP and the WebSocket hub accept: a valid signature, and for a task token an id that is still
 // active. A token minted before ids existed has none, so it fails here, and the Node's renewal gives its
 // file a new token with an id at the next start.
-export function authenticateInternalToken(key: string, active: Pick<ActiveCredentials, 'isActive'>, token: string): InternalClaims | null {
+export function authenticateInternalToken(
+  key: string,
+  active: Pick<ActiveCredentials, 'isActive'>,
+  token: string,
+): InternalClaims | null {
   const claims = verifyInternalToken(key, token)
   return claims && (claims.scope === 'service' || active.isActive(claims.credentialId)) ? claims : null
 }

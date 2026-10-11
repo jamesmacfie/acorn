@@ -15,21 +15,43 @@ import { ManagedAgentEngine, type AgentRuntimeOptions } from './runtimeEngine'
  *  (docs/plugin-authoring/testing.md § In tests). A span appears once it has ended, and the attributes it
  *  ended with are merged into the ones it opened with. */
 const spanNamed = (ctx: TestNodeContext, name: string): Extract<TelemetryRecord, { kind: 'span' }> | undefined =>
-  ctx.recorded.find((record): record is Extract<TelemetryRecord, { kind: 'span' }> => record.kind === 'span' && record.name === name)
+  ctx.recorded.find(
+    (record): record is Extract<TelemetryRecord, { kind: 'span' }> => record.kind === 'span' && record.name === name,
+  )
 
 async function seedTask(ctx: TestNodeContext): Promise<string> {
   const at = Date.now()
   const taskId = randomUUID()
   const workspaceId = randomUUID()
-  await ctx.db.insert(schema.workspaces).values({ id: workspaceId, name: 'Test workspace', createdAt: at, updatedAt: at })
+  await ctx.db
+    .insert(schema.workspaces)
+    .values({ id: workspaceId, name: 'Test workspace', createdAt: at, updatedAt: at })
   await ctx.db.insert(schema.projects).values({
-    id: 'project-telemetry', name: 'telemetry', path: ctx.dataDir, workspaceId, sort: 0, hidden: false,
-    vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acorn', githubName: 'telemetry',
-    githubRepoId: null, createdAt: at, updatedAt: at,
+    id: 'project-telemetry',
+    name: 'telemetry',
+    path: ctx.dataDir,
+    workspaceId,
+    sort: 0,
+    hidden: false,
+    vcs: 'git',
+    defaultBranch: 'main',
+    remoteUrl: null,
+    githubOwner: 'acorn',
+    githubName: 'telemetry',
+    githubRepoId: null,
+    createdAt: at,
+    updatedAt: at,
   })
   await ctx.db.insert(schema.tasks).values({
-    id: taskId, title: 'Telemetry test', origin: 'local', projectId: 'project-telemetry', branch: 'test',
-    worktreePath: ctx.dataDir, status: 'active', createdAt: at, updatedAt: at,
+    id: taskId,
+    title: 'Telemetry test',
+    origin: 'local',
+    projectId: 'project-telemetry',
+    branch: 'test',
+    worktreePath: ctx.dataDir,
+    status: 'active',
+    createdAt: at,
+    updatedAt: at,
   })
   return taskId
 }
@@ -40,7 +62,11 @@ describe('what a session reports', () => {
   // Built by build() and handed to the runtime, so a test can start a provider directly.
   let engine: ManagedAgentEngine
 
-  const build = (registry: AgentDriverRegistry, telemetry?: PluginTelemetry, footprintSampleMs?: number): ManagedAgentRuntime => {
+  const build = (
+    registry: AgentDriverRegistry,
+    telemetry?: PluginTelemetry,
+    footprintSampleMs?: number,
+  ): ManagedAgentRuntime => {
     const options: AgentRuntimeOptions = {
       db: ctx.storage.open(),
       dataDir: ctx.dataDir,
@@ -72,7 +98,13 @@ describe('what a session reports', () => {
     registry.registerNative('fake', () => new FakeAgentDriver())
     runtime = build(registry, ctx.telemetry)
 
-    const session = await runtime.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+    const session = await runtime.createSession({
+      taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
     await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Go.' }],
       source: 'interactive',
@@ -84,18 +116,39 @@ describe('what a session reports', () => {
     // The session span covers spawning the provider, not the session's whole life: a session
     // outlives the process, and a span nobody can close is not a measurement.
     const start = spanNamed(ctx, 'agent.session')!
-    expect(start.attrs).toMatchObject({ seam: 'agent.session', 'session.id': session.id, provider: 'fake', reconnect: false, owner: 'agents' })
+    expect(start.attrs).toMatchObject({
+      seam: 'agent.session',
+      'session.id': session.id,
+      provider: 'fake',
+      reconnect: false,
+      owner: 'agents',
+    })
     expect(start.status).toBe('ok')
     const total = spanNamed(ctx, 'agent.session.start')!
     expect(start.traceId).toBe(total.traceId)
     expect(start.parentSpanId).toBe(total.spanId)
     expect(total.attrs).toMatchObject({ 'task.id': taskId, outcome: 'ready' })
     const preparation = ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')
-    expect(preparation.map((record) => record.attrs.phase)).toEqual(['task.root', 'workspace.read', 'history.read', 'mcp.prepare'])
-    expect(preparation.every((record) => record.kind === 'span' && record.traceId === total.traceId && record.parentSpanId === total.spanId)).toBe(true)
+    expect(preparation.map((record) => record.attrs.phase)).toEqual([
+      'task.root',
+      'workspace.read',
+      'history.read',
+      'mcp.prepare',
+    ])
+    expect(
+      preparation.every(
+        (record) => record.kind === 'span' && record.traceId === total.traceId && record.parentSpanId === total.spanId,
+      ),
+    ).toBe(true)
 
     const turn = spanNamed(ctx, 'agent.turn')!
-    expect(turn.attrs).toMatchObject({ seam: 'agent.turn', 'session.id': session.id, provider: 'fake', source: 'interactive', outcome: 'completed' })
+    expect(turn.attrs).toMatchObject({
+      seam: 'agent.turn',
+      'session.id': session.id,
+      provider: 'fake',
+      source: 'interactive',
+      outcome: 'completed',
+    })
     expect(turn.status).toBe('ok')
   })
 
@@ -112,7 +165,13 @@ describe('what a session reports', () => {
     }))
     runtime = build(registry, ctx.telemetry)
 
-    const accepted = await runtime.acceptSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+    const accepted = await runtime.acceptSession({
+      taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
     await runtime.wait(accepted.id, 0, 'stopped', 2_000)
     expect(spanNamed(ctx, 'agent.session')?.status).toBe('error')
     expect(spanNamed(ctx, 'agent.session.start')?.attrs.outcome).toBe('error')
@@ -124,7 +183,10 @@ describe('what a session reports', () => {
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => new FakeAgentDriver())
     runtime = build(registry, ctx.telemetry)
-    const accepted = await runtime.store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
+    const accepted = await runtime.store.createSession(
+      { taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} },
+      await new FakeAgentDriver().probe(),
+    )
     await expect(engine.ensureSession(accepted)).rejects.toThrow('private checkout path and credential')
     const phase = spanNamed(ctx, 'agent.session.phase')!
     expect(phase).toMatchObject({ status: 'error', attrs: { phase: 'task.root', outcome: 'error' } })
@@ -138,20 +200,32 @@ describe('what a session reports', () => {
   it('closes a cancelled preparation once even if its dependency finishes after shutdown', async () => {
     const taskId = await seedTask(ctx)
     let release!: (cwd: string) => void
-    const root = vi.spyOn(ctx.core.tasks, 'requireRoot').mockReturnValue(new Promise<string>((resolve) => { release = resolve }))
+    const root = vi.spyOn(ctx.core.tasks, 'requireRoot').mockReturnValue(
+      new Promise<string>((resolve) => {
+        release = resolve
+      }),
+    )
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => new FakeAgentDriver())
     runtime = build(registry, ctx.telemetry)
-    const session = await runtime.store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
+    const session = await runtime.store.createSession(
+      { taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} },
+      await new FakeAgentDriver().probe(),
+    )
     const starting = engine.ensureSession(session).catch((error: unknown) => error)
     await vi.waitFor(() => expect(root).toHaveBeenCalledOnce())
     await runtime.stop()
     expect(await starting).toBeInstanceOf(Error)
-    expect(spanNamed(ctx, 'agent.session.phase')).toMatchObject({ status: 'error', attrs: { phase: 'task.root', outcome: 'cancelled' } })
+    expect(spanNamed(ctx, 'agent.session.phase')).toMatchObject({
+      status: 'error',
+      attrs: { phase: 'task.root', outcome: 'cancelled' },
+    })
     expect(spanNamed(ctx, 'agent.session.start')?.attrs.outcome).toBe('cancelled')
     release(ctx.dataDir)
     await new Promise<void>((resolve) => setImmediate(resolve))
-    expect(ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')).toHaveLength(1)
+    expect(
+      ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase'),
+    ).toHaveLength(1)
   })
 
   it('runs with no telemetry, because a test builds an engine with no host around it', async () => {
@@ -159,7 +233,13 @@ describe('what a session reports', () => {
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => new FakeAgentDriver())
     runtime = build(registry)
-    const session = await runtime.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+    const session = await runtime.createSession({
+      taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
     await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Go.' }],
       source: 'interactive',
@@ -170,18 +250,24 @@ describe('what a session reports', () => {
   })
 
   describe('provider processes, counted on a timer', () => {
-    const gauges = () => ctx.recorded.flatMap((record) =>
-      record.kind === 'metric' && record.name.startsWith('agent.processes.') ? [[record.name, record.value, record.attrs.owner]] : [])
+    const gauges = () =>
+      ctx.recorded.flatMap((record) =>
+        record.kind === 'metric' && record.name.startsWith('agent.processes.')
+          ? [[record.name, record.value, record.attrs.owner]]
+          : [],
+      )
 
     it('reports live, idle and summed memory as gauges this plugin owns', async () => {
       runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
       vi.spyOn(runtime.upkeep, 'processFootprint').mockResolvedValue({ live: 2, idle: 1, memoryBytes: 331 })
       // The timer keeps running while this waits, so only the first sample is compared.
-      await vi.waitFor(() => expect(gauges().slice(0, 3)).toEqual([
-        ['agent.processes.live', 2, 'agents'],
-        ['agent.processes.idle', 1, 'agents'],
-        ['agent.processes.memory', 331, 'agents'],
-      ]))
+      await vi.waitFor(() =>
+        expect(gauges().slice(0, 3)).toEqual([
+          ['agent.processes.live', 2, 'agents'],
+          ['agent.processes.idle', 1, 'agents'],
+          ['agent.processes.memory', 331, 'agents'],
+        ]),
+      )
     })
 
     it('leaves memory out when the process table could not be read', async () => {

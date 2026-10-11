@@ -16,10 +16,16 @@ import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { toKeymapKey } from '@acorn/client-core/kit/keys'
 import {
-  commandAvailable, commandRegistry, commandTitle, executeCommand,
+  commandAvailable,
+  commandRegistry,
+  commandTitle,
+  executeCommand,
 } from '@acorn/client-core/host/registries/commands'
 import {
-  keybindingRegistry, resolveKeybindings, type KeybindingPrefs, type ResolvedKeybinding,
+  keybindingRegistry,
+  resolveKeybindings,
+  type KeybindingPrefs,
+  type ResolvedKeybinding,
 } from '@acorn/client-core/host/registries/commands'
 import type { TuiKeymap } from './install'
 import { focusedRenderable, isField, scopeDepth } from './regions'
@@ -91,7 +97,8 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
     const depth = scopeDepth()
     const node = focusedRenderable()
     const typing = !!node && isField(node)
-    const commands = commandRegistry.entries()
+    const commands = commandRegistry
+      .entries()
       // `enabled` was this field's home and it was a matcher. A command the host cannot run is a
       // command the palette must not offer and the footer must not name, and dropping it from the
       // layer says that without one.
@@ -100,7 +107,11 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
         name: command.id,
         desc: commandTitle(command),
         group: command.category,
-        run: () => { void executeCommand(command.id).catch((error: unknown) => log.error(`${command.id} failed`, error, { 'command.id': command.id })) },
+        run: () => {
+          void executeCommand(command.id).catch((error: unknown) =>
+            log.error(`${command.id} failed`, error, { 'command.id': command.id }),
+          )
+        },
       }))
     const runnable = new Set(commands.map((command) => command.name))
     const bindings = resolveKeybindings(keybindingRegistry.entries(), scope.prefs())

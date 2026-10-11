@@ -29,10 +29,13 @@ export function sidebarCollapse(key: string): [Accessor<boolean>, (collapsed: bo
   const found = columns.get(key)
   if (found) return found
   const [collapsed, set] = createSignal(readCollapsed(key))
-  const entry: [Accessor<boolean>, (collapsed: boolean) => void] = [collapsed, (next) => {
-    set(next)
-    writeLocal(storageKey(key), next ? '1' : '')
-  }]
+  const entry: [Accessor<boolean>, (collapsed: boolean) => void] = [
+    collapsed,
+    (next) => {
+      set(next)
+      writeLocal(storageKey(key), next ? '1' : '')
+    },
+  ]
   columns.set(key, entry)
   return entry
 }

@@ -32,8 +32,15 @@ const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value)
 
 const parseGrant = (value: unknown): InputGrant | undefined => {
-  if (!record(value) || typeof value.pluginId !== 'string' || !value.pluginId || !record(value.sources)
-    || typeof value.grantedAt !== 'number' || typeof value.grantedBy !== 'string') return undefined
+  if (
+    !record(value) ||
+    typeof value.pluginId !== 'string' ||
+    !value.pluginId ||
+    !record(value.sources) ||
+    typeof value.grantedAt !== 'number' ||
+    typeof value.grantedBy !== 'string'
+  )
+    return undefined
   const sources: InputGrant['sources'] = {}
   for (const [sourceId, inputs] of Object.entries(value.sources)) {
     if (!record(inputs)) return undefined
@@ -43,7 +50,13 @@ const parseGrant = (value: unknown): InputGrant | undefined => {
       sources[sourceId][name] = { source: input.source, optional: input.optional }
     }
   }
-  return { pluginId: value.pluginId, sources, grantedAt: value.grantedAt, grantedBy: value.grantedBy, ...(value.development === true ? { development: true as const } : {}) }
+  return {
+    pluginId: value.pluginId,
+    sources,
+    grantedAt: value.grantedAt,
+    grantedBy: value.grantedBy,
+    ...(value.development === true ? { development: true as const } : {}),
+  }
 }
 
 // Anything unparseable reads as "no grants", as disabled.ts does. Here that fails closed as well as
@@ -74,7 +87,10 @@ export function inputGrantsStore(dataDir: string): InputGrantsStore {
   }
   const write = (next: Map<string, InputGrant>) => {
     mkdirSync(dataDir, { recursive: true, mode: 0o700 })
-    writePrivateAtomic(file, `${JSON.stringify([...next.values()].sort((a, b) => a.pluginId.localeCompare(b.pluginId)))}\n`)
+    writePrivateAtomic(
+      file,
+      `${JSON.stringify([...next.values()].sort((a, b) => a.pluginId.localeCompare(b.pluginId)))}\n`,
+    )
     current = next
   }
   return {
@@ -88,7 +104,12 @@ export function inputGrantsStore(dataDir: string): InputGrantsStore {
 }
 
 /** True when the grant approved this input with the same source and the same optional flag. */
-export function grantCoversInput(grant: InputGrant | undefined, sourceId: string, name: string, input: { source: string; optional?: boolean }): boolean {
+export function grantCoversInput(
+  grant: InputGrant | undefined,
+  sourceId: string,
+  name: string,
+  input: { source: string; optional?: boolean },
+): boolean {
   const granted = grant?.sources[sourceId]?.[name]
   return !!granted && granted.source === input.source && granted.optional === !!input.optional
 }
@@ -98,17 +119,25 @@ export function declaredInputs(dataSources: readonly DataSourceRegistration[] | 
   const sources: InputGrant['sources'] = {}
   for (const source of dataSources ?? []) {
     if (!source.inputs || !Object.keys(source.inputs).length) continue
-    sources[source.sourceId] = Object.fromEntries(Object.entries(source.inputs)
-      .map(([name, input]) => [name, { source: input.source, optional: !!input.optional }]))
+    sources[source.sourceId] = Object.fromEntries(
+      Object.entries(source.inputs).map(([name, input]) => [
+        name,
+        { source: input.source, optional: !!input.optional },
+      ]),
+    )
   }
   return sources
 }
 
 /** True when two input lists name the same inputs with the same sources and optional flags, in any order. */
 export function sameInputs(left: InputGrant['sources'], right: InputGrant['sources']): boolean {
-  const flat = (sources: InputGrant['sources']) => Object.entries(sources)
-    .flatMap(([sourceId, inputs]) => Object.entries(inputs).map(([name, input]) => JSON.stringify([sourceId, name, input.source, input.optional])))
-    .sort().join('\n')
+  const flat = (sources: InputGrant['sources']) =>
+    Object.entries(sources)
+      .flatMap(([sourceId, inputs]) =>
+        Object.entries(inputs).map(([name, input]) => JSON.stringify([sourceId, name, input.source, input.optional])),
+      )
+      .sort()
+      .join('\n')
   return flat(left) === flat(right)
 }
 
@@ -122,10 +151,16 @@ export function pluginInputs(
   grant: InputGrant | undefined,
   describe: (source: string) => { plural?: string; provider?: string },
 ): PluginInputs | undefined {
-  const inputs = (dataSources ?? []).flatMap((source) => Object.entries(source.inputs ?? {}).map(([name, input]) => ({
-    sourceId: source.sourceId, name, source: input.source, optional: !!input.optional, label: input.label,
-    ...describe(input.source),
-    approved: grantCoversInput(grant, source.sourceId, name, input),
-  })))
+  const inputs = (dataSources ?? []).flatMap((source) =>
+    Object.entries(source.inputs ?? {}).map(([name, input]) => ({
+      sourceId: source.sourceId,
+      name,
+      source: input.source,
+      optional: !!input.optional,
+      label: input.label,
+      ...describe(input.source),
+      approved: grantCoversInput(grant, source.sourceId, name, input),
+    })),
+  )
   return inputs.length ? { granted: !!grant, inputs } : undefined
 }

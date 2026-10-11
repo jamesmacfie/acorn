@@ -2,21 +2,35 @@ import { createEffect, createRoot } from 'solid-js'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { setActiveNode } from '@acorn/plugin-api/client'
 const transport = vi.hoisted(() => ({ listeners: new Map<string, (event: any) => void>(), detached: 0 }))
-vi.mock('./wsChannel', () => ({ wsDockerAttach: (_kind: string, id: string, callback: (event: any) => void) => {
-  transport.listeners.set(id, callback)
-  return () => { transport.listeners.delete(id); transport.detached++ }
-} }))
+vi.mock('./wsChannel', () => ({
+  wsDockerAttach: (_kind: string, id: string, callback: (event: any) => void) => {
+    transport.listeners.set(id, callback)
+    return () => {
+      transport.listeners.delete(id)
+      transport.detached++
+    }
+  },
+}))
 import { dockerLogBuffer } from './dockerLogStore'
 import { retireDockerClient } from './dockerScope'
-beforeEach(() => { vi.useFakeTimers(); setActiveNode('a'); transport.detached = 0 })
-afterEach(() => { retireDockerClient(); setActiveNode(null); vi.useRealTimers() })
+beforeEach(() => {
+  vi.useFakeTimers()
+  setActiveNode('a')
+  transport.detached = 0
+})
+afterEach(() => {
+  retireDockerClient()
+  setActiveNode(null)
+  vi.useRealTimers()
+})
 const emit = (id: string, data: string) => transport.listeners.get(id)!({ kind: 'log', data })
 
 it('retains the exact UTF-16 tail, clear, huge chunks, and split surrogates', () => {
   const buffer = dockerLogBuffer('c')
   let expected = ''
   for (const data of ['x'.repeat(600000), '\ud83d', '\ude00', 'tail', 'y'.repeat(524287)]) {
-    emit('c', data); expected = (expected + data).slice(-524288)
+    emit('c', data)
+    expected = (expected + data).slice(-524288)
     expect(buffer.text()).toBe(expected)
   }
   buffer.clear()
@@ -26,9 +40,18 @@ it('retains the exact UTF-16 tail, clear, huge chunks, and split surrogates', ()
 })
 
 it('shares two views, publishes at a bounded cadence, and keeps hidden continuity', async () => {
-  const first = dockerLogBuffer('c'), second = dockerLogBuffer('c')
-  let reads = 0, latest = '', stop!: () => void
-  createRoot(dispose => { stop = dispose; createEffect(() => { latest = first.text(); reads++ }) })
+  const first = dockerLogBuffer('c'),
+    second = dockerLogBuffer('c')
+  let reads = 0,
+    latest = '',
+    stop!: () => void
+  createRoot((dispose) => {
+    stop = dispose
+    createEffect(() => {
+      latest = first.text()
+      reads++
+    })
+  })
   for (let i = 0; i < 100; i++) emit('c', 'x')
   expect(second.text()).toBe('x'.repeat(100))
   expect(reads).toBe(1)

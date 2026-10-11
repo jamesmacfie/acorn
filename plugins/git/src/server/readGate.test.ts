@@ -5,11 +5,12 @@ it('caps concurrent reads and releases a queued read after an abort', async () =
   const limited = readGate()
   const started: number[] = []
   const finish: Array<() => void> = []
-  const read = (id: number, signal = new AbortController().signal) => limited(signal, async () => {
-    started.push(id)
-    await new Promise<void>((resolve) => finish.push(resolve))
-    return id
-  })
+  const read = (id: number, signal = new AbortController().signal) =>
+    limited(signal, async () => {
+      started.push(id)
+      await new Promise<void>((resolve) => finish.push(resolve))
+      return id
+    })
   const first = read(1)
   const second = read(2)
   const controller = new AbortController()

@@ -53,7 +53,11 @@ describe('enrollNode', () => {
     expect(outcome).toEqual({ kind: 'skipped', reason: 'unconfigured' })
     // Byte-for-byte: the file the data root wrote at open, untouched. This is the promise every
     // existing install depends on.
-    expect(JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))).toEqual({ baseline: 'acorn-1', nodeId: root!.nodeId, createdAt: expect.any(Number) })
+    expect(JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))).toEqual({
+      baseline: 'acorn-1',
+      nodeId: root!.nodeId,
+      createdAt: expect.any(Number),
+    })
     expect(await deviceService(core.db).list()).toEqual([])
   })
 
@@ -109,7 +113,9 @@ describe('enrollNode', () => {
   })
 
   it('records a visible failure rather than hanging when the control plane is not there', async () => {
-    const outcome = await enrollNode(deps({ ACORN_ENROLLMENT_TOKEN: 'token-1', ACORN_CONTROL_PLANE_URL: 'http://127.0.0.1:1' }))
+    const outcome = await enrollNode(
+      deps({ ACORN_ENROLLMENT_TOKEN: 'token-1', ACORN_CONTROL_PLANE_URL: 'http://127.0.0.1:1' }),
+    )
     expect(outcome.kind).toBe('failed')
     expect(readNodeAttachment(dir).attachment).toBeUndefined()
     expect(readNodeAttachment(dir).enrollmentError?.reason).toContain('could not enroll')
@@ -136,10 +142,14 @@ describe('enrollNode', () => {
     expect(checkControlPlaneUrl('https://control.example')).toMatchObject({ url: expect.any(URL) })
     expect(checkControlPlaneUrl('http://127.0.0.1:9000')).toMatchObject({ url: expect.any(URL) })
     expect(checkControlPlaneUrl('http://control.example')).toMatchObject({ reason: expect.stringContaining('https') })
-    expect(checkControlPlaneUrl('ftp://control.example')).toMatchObject({ reason: expect.stringContaining('http or https') })
+    expect(checkControlPlaneUrl('ftp://control.example')).toMatchObject({
+      reason: expect.stringContaining('http or https'),
+    })
     expect(checkControlPlaneUrl('not a url')).toMatchObject({ reason: expect.stringContaining('not a URL') })
 
-    const outcome = await enrollNode(deps({ ACORN_ENROLLMENT_TOKEN: 'token-1', ACORN_CONTROL_PLANE_URL: 'http://control.example' }))
+    const outcome = await enrollNode(
+      deps({ ACORN_ENROLLMENT_TOKEN: 'token-1', ACORN_CONTROL_PLANE_URL: 'http://control.example' }),
+    )
     expect(outcome).toMatchObject({ kind: 'failed' })
     // Refused before a device row exists, so a bad URL cannot cost the node a credential.
     expect(await deviceService(core.db).list()).toEqual([])
@@ -151,7 +161,13 @@ describe('enrollNode', () => {
     const response = await fetch(`${stub.url}/enroll`, {
       method: 'POST',
       headers: { authorization: 'Bearer token-1', 'content-type': 'application/json' },
-      body: JSON.stringify({ protocolVersion: 1, nodeId: 'not-a-uuid', endpoint: 'https://x', fingerprint: 'short', deviceToken: '' }),
+      body: JSON.stringify({
+        protocolVersion: 1,
+        nodeId: 'not-a-uuid',
+        endpoint: 'https://x',
+        fingerprint: 'short',
+        deviceToken: '',
+      }),
     })
     expect(response.status).toBe(400)
     expect(stub.inventory()).toEqual([])

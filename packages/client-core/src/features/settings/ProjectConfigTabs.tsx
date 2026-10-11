@@ -2,7 +2,14 @@ import { createQuery } from '@tanstack/solid-query'
 import { createResource, createSignal, Index, Match, Show, Switch } from 'solid-js'
 import { taskBridge } from '../tasks/taskBridge'
 import { modelBackendsOptions } from '../../infra/queries'
-import type { BrowserRule, DbSchemaMode, PreviewMode, ProjectConfigPatch, ProjectConfigResponse, SetupTrigger } from '@acorn/protocol/api.ts'
+import type {
+  BrowserRule,
+  DbSchemaMode,
+  PreviewMode,
+  ProjectConfigPatch,
+  ProjectConfigResponse,
+  SetupTrigger,
+} from '@acorn/protocol/api.ts'
 import { Button, Checkbox, Input, Select, Textarea } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Text } from '../../kit/components/content/Text'
@@ -97,8 +104,14 @@ export function SetupTab(props: { store: ProjectConfigStore }) {
           <Select
             label="When to run it"
             value={trigger()}
-            onChange={(value) => void triggerSave.run(() => props.store.save({ setupScriptTrigger: value as SetupTrigger }))}
-            options={[{ value: 'terminal', label: 'When the terminal first opens' }, { value: 'created', label: 'When the task is created' }, { value: 'off', label: 'Never' }]}
+            onChange={(value) =>
+              void triggerSave.run(() => props.store.save({ setupScriptTrigger: value as SetupTrigger }))
+            }
+            options={[
+              { value: 'terminal', label: 'When the terminal first opens' },
+              { value: 'created', label: 'When the task is created' },
+              { value: 'off', label: 'Never' },
+            ]}
           />
         </SettingRow>
         <ConfigText
@@ -130,12 +143,16 @@ export function SetupTab(props: { store: ProjectConfigStore }) {
           lines={2}
           placeholder="touch tmp/restart.txt"
           value={config(props.store)?.devRestartScript ?? ''}
-          repoValue={repoDev() ? repoDev()?.restart ?? 'Not set. Restart stops and starts it.' : undefined}
+          repoValue={repoDev() ? (repoDev()?.restart ?? 'Not set. Restart stops and starts it.') : undefined}
           save={(value) => props.store.save({ devRestartScript: value })}
         />
       </SettingsSection>
 
-      <SettingsSection id="run-targets" label="Run targets" help="Each run target is a button on the task that runs its command in the task's worktree.">
+      <SettingsSection
+        id="run-targets"
+        label="Run targets"
+        help="Each run target is a button on the task that runs its command in the task's worktree."
+      >
         <RunTargetsTable
           stored={config(props.store)?.runTargets ?? null}
           repoTargets={repo(props.store)?.runTargets ?? []}
@@ -158,7 +175,12 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
     const mode = modeLabels[repoMode() ?? previewMode()]
     return repoValue() ? `${mode}: ${repoValue()}` : mode
   }
-  const modeLabels: Record<PreviewMode | '', string> = { '': 'Dev-server port (default)', url: 'A fixed URL', port: 'localhost with a port', script: 'A script that prints the URL' }
+  const modeLabels: Record<PreviewMode | '', string> = {
+    '': 'Dev-server port (default)',
+    url: 'A fixed URL',
+    port: 'localhost with a port',
+    script: 'A script that prints the URL',
+  }
   const previewValue = (label: string) => ({
     value: config(props.store)?.previewValue ?? '',
     repoValue: repo(props.store)?.previewValue,
@@ -179,7 +201,9 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
           <Select
             label="Browser preview URL"
             value={previewMode()}
-            onChange={(value) => void previewModeSave.run(() => props.store.save({ previewMode: value as PreviewMode | '' }))}
+            onChange={(value) =>
+              void previewModeSave.run(() => props.store.save({ previewMode: value as PreviewMode | '' }))
+            }
             options={(['', 'url', 'port', 'script'] as const).map((value) => ({ value, label: modeLabels[value] }))}
           />
         </SettingRow>
@@ -187,7 +211,12 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
             anything typed for the other one. The modes share the stored value. */}
         <Switch>
           <Match when={previewMode() === 'script'}>
-            <ConfigText {...previewValue('Preview script')} description="Runs in the task's worktree. acorn opens what it prints." lines={2} placeholder="./scripts/preview-url.sh" />
+            <ConfigText
+              {...previewValue('Preview script')}
+              description="Runs in the task's worktree. acorn opens what it prints."
+              lines={2}
+              placeholder="./scripts/preview-url.sh"
+            />
           </Match>
           <Match when={previewMode() === 'url'}>
             <ConfigText {...previewValue('Preview URL')} placeholder="https://example.test" />
@@ -204,7 +233,10 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
         description="Fills in a field when a preview page loads, such as a dev login. Values are saved as plain text, so use dev passwords only."
         help="The pattern matches part of the URL. * matches anything, and $ at the end matches the end, so */$ matches only the home page."
       >
-        <BrowserRulesEditor rules={config(props.store)?.browserRules ?? []} onSave={(rules) => props.store.save({ browserRules: rules })} />
+        <BrowserRulesEditor
+          rules={config(props.store)?.browserRules ?? []}
+          onSave={(rules) => props.store.save({ browserRules: rules })}
+        />
       </SettingsSection>
     </>
   )
@@ -246,8 +278,14 @@ export function DatabaseTab(props: { store: ProjectConfigStore }) {
             <Select
               label="Schema source"
               value={dbSchemaMode()}
-              onChange={(value) => void schemaModeSave.run(() => props.store.save({ dbSchemaMode: value as DbSchemaMode | '' }))}
-              options={[{ value: '', label: 'Read the live database (default)' }, { value: 'script', label: 'A script that prints it' }, { value: 'file', label: 'A file in the worktree' }]}
+              onChange={(value) =>
+                void schemaModeSave.run(() => props.store.save({ dbSchemaMode: value as DbSchemaMode | '' }))
+              }
+              options={[
+                { value: '', label: 'Read the live database (default)' },
+                { value: 'script', label: 'A script that prints it' },
+                { value: 'file', label: 'A file in the worktree' },
+              ]}
             />
           </SettingRow>
           {/* A field per mode, for the same reason as the preview URL. */}
@@ -277,7 +315,9 @@ export function DatabaseTab(props: { store: ProjectConfigStore }) {
             description="Anything the schema doesn't say, such as what a status column's numbers mean."
             help="acorn sends these notes with the schema each time it writes a query."
             lines={4}
-            placeholder={'orders.meta jsonb: { coupon: string, source: "web" | "app" }\norders.status: 0 pending, 1 paid, 2 refunded'}
+            placeholder={
+              'orders.meta jsonb: { coupon: string, source: "web" | "app" }\norders.status: 0 pending, 1 paid, 2 refunded'
+            }
             value={config(props.store)?.dbSchemaNotes ?? ''}
             save={(value) => props.store.save({ dbSchemaNotes: value })}
           />
@@ -289,7 +329,11 @@ export function DatabaseTab(props: { store: ProjectConfigStore }) {
 
 /** What the repo sets, drawn above the machine's own value in a row the repo overrides. */
 function RepoValue(props: { value: string }) {
-  return <Text emphasis="mono" wrap>{props.value}</Text>
+  return (
+    <Text emphasis="mono" wrap>
+      {props.value}
+    </Text>
+  )
 }
 
 // One text setting on a project: a single-line field, or a script box in the code font when it has
@@ -362,12 +406,22 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
   const [rules, setRules] = createSignal<BrowserRule[]>(props.rules)
   const saving = createSettingSave()
 
-  const save = () => void saving.run(() => props.onSave(rules().filter((r) => r.urlPattern.trim() && r.action.selector.trim())))
+  const save = () =>
+    void saving.run(() => props.onSave(rules().filter((r) => r.urlPattern.trim() && r.action.selector.trim())))
 
   const update = (id: string, patch: (r: BrowserRule) => BrowserRule) =>
     setRules((list) => list.map((r) => (r.id === id ? patch(r) : r)))
   const add = () =>
-    setRules((list) => [...list, { id: crypto.randomUUID(), enabled: true, urlPattern: '', trigger: 'load', action: { type: 'fill', selector: '', value: '' } }])
+    setRules((list) => [
+      ...list,
+      {
+        id: crypto.randomUUID(),
+        enabled: true,
+        urlPattern: '',
+        trigger: 'load',
+        action: { type: 'fill', selector: '', value: '' },
+      },
+    ])
   const remove = (id: string) => {
     setRules((list) => list.filter((r) => r.id !== id))
     save()
@@ -384,7 +438,10 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               ariaLabel="Enabled"
               title="Enabled"
               checked={rule().enabled}
-              onChange={(checked) => { update(rule().id, (r) => ({ ...r, enabled: checked })); save() }}
+              onChange={(checked) => {
+                update(rule().id, (r) => ({ ...r, enabled: checked }))
+                save()
+              }}
             />
             <Input
               label="URL pattern"
@@ -417,7 +474,13 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
           </div>
         )}
       </Index>
-      <Show when={saving.error()}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
+      <Show when={saving.error()}>
+        {(message) => (
+          <Text tone="danger" wrap>
+            {message()}
+          </Text>
+        )}
+      </Show>
       <Button onPress={add}>Add rule</Button>
     </>
   )

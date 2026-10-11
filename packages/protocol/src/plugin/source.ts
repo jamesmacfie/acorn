@@ -8,19 +8,28 @@ export function describePluginSource(source: PluginInstallSource): string {
     ? `github:${source.github}${source.tag ? `@${source.tag}` : ''}`
     : 'npm' in source
       ? `npm:${source.npm}${source.version ? `@${source.version}` : ''}`
-      : 'url' in source ? source.url : `path:${source.path}`
+      : 'url' in source
+        ? source.url
+        : `path:${source.path}`
 }
 
 export function guardPluginUrl(raw: string): void {
   let url: URL
-  try { url = new URL(raw) } catch { throw new Error(`'${raw}' is not a URL.`) }
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error(`'${raw}' is not a URL.`)
+  }
   if (url.protocol === 'https:') return
   if (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]', '::1'].includes(url.hostname)) return
   throw new Error('A plugin package must be fetched over https (http is accepted only from localhost).')
 }
 
 /** Browser-safe source resolution. The host supplies fetch and owns byte limits and placement. */
-export async function resolvePluginSource(source: PluginInstallSource, fetcher: typeof fetch = fetch): Promise<ResolvedPluginSource> {
+export async function resolvePluginSource(
+  source: PluginInstallSource,
+  fetcher: typeof fetch = fetch,
+): Promise<ResolvedPluginSource> {
   if ('path' in source) throw new Error('A folder has no download URL.')
   if ('url' in source) {
     guardPluginUrl(source.url)
@@ -35,8 +44,12 @@ export async function resolvePluginSource(source: PluginInstallSource, fetcher: 
   if ('github' in source) {
     if (!/^[\w.-]+\/[\w.-]+$/.test(source.github)) throw new Error(`'${source.github}' is not an owner/repo pair.`)
     const base = `https://api.github.com/repos/${source.github}/releases`
-    const release = await json(source.tag ? `${base}/tags/${encodeURIComponent(source.tag)}` : `${base}/latest`, 'application/vnd.github+json') as {
-      tag_name?: string; assets?: { name?: string; browser_download_url?: string }[]
+    const release = (await json(
+      source.tag ? `${base}/tags/${encodeURIComponent(source.tag)}` : `${base}/latest`,
+      'application/vnd.github+json',
+    )) as {
+      tag_name?: string
+      assets?: { name?: string; browser_download_url?: string }[]
     }
     const asset = release.assets?.find((candidate) => candidate.name === RELEASE_ASSET)
     if (!asset?.browser_download_url) throw new Error(`That release has no ${RELEASE_ASSET} asset.`)
@@ -44,8 +57,12 @@ export async function resolvePluginSource(source: PluginInstallSource, fetcher: 
     return { url: asset.browser_download_url, provenance: { tag: release.tag_name ?? source.tag ?? 'latest' } }
   }
   if (!/^(@[\w.-]+\/)?[\w.-]+$/.test(source.npm)) throw new Error(`'${source.npm}' is not an npm package name.`)
-  const packument = await json(`https://registry.npmjs.org/${source.npm.replace('/', '%2f')}`, 'application/json') as {
-    'dist-tags'?: Record<string, string>; versions?: Record<string, { dist?: { tarball?: string; integrity?: string } }>
+  const packument = (await json(
+    `https://registry.npmjs.org/${source.npm.replace('/', '%2f')}`,
+    'application/json',
+  )) as {
+    'dist-tags'?: Record<string, string>
+    versions?: Record<string, { dist?: { tarball?: string; integrity?: string } }>
   }
   const version = source.version ?? packument['dist-tags']?.latest
   if (!version) throw new Error(`${source.npm} has no published version to install.`)

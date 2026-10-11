@@ -21,8 +21,10 @@ export const layoutKey = (defId: string): string => `plugin:workflows:layout:${d
 export const LAYOUT_WRITE_DELAY_MS = 400
 
 const isPosition = (value: unknown): value is NodePosition =>
-  !!value && typeof value === 'object'
-  && typeof (value as NodePosition).x === 'number' && typeof (value as NodePosition).y === 'number'
+  !!value &&
+  typeof value === 'object' &&
+  typeof (value as NodePosition).x === 'number' &&
+  typeof (value as NodePosition).y === 'number'
 
 export function readLayout(defId: string): WorkflowLayout {
   const raw = readLocal(layoutKey(defId))
@@ -30,7 +32,9 @@ export function readLayout(defId: string): WorkflowLayout {
   try {
     const parsed = JSON.parse(raw) as unknown
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
-    return Object.fromEntries(Object.entries(parsed as Record<string, unknown>).filter(([, value]) => isPosition(value))) as WorkflowLayout
+    return Object.fromEntries(
+      Object.entries(parsed as Record<string, unknown>).filter(([, value]) => isPosition(value)),
+    ) as WorkflowLayout
   } catch {
     return {}
   }

@@ -8,7 +8,7 @@ const HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i
 const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '::1'])
 
-const unbracket = (host: string): string => host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host
+const unbracket = (host: string): string => (host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host)
 
 export function normalizeWebviewHost(pattern: string): string {
   if (!pattern.length || pattern.length > WEBVIEW_HOST_MAX_LENGTH) {
@@ -24,7 +24,8 @@ export function normalizeWebviewHost(pattern: string): string {
     return host
   }
   if (IPV4.test(host)) {
-    if (wildcard || host.split('.').some((part) => Number(part) > 255)) throw new Error('webview host has an invalid IPv4 address')
+    if (wildcard || host.split('.').some((part) => Number(part) > 255))
+      throw new Error('webview host has an invalid IPv4 address')
     return host
   }
   if (!host.includes('.') || host.split('.').some((label) => !HOST_LABEL.test(label))) {

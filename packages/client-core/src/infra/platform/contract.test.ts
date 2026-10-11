@@ -1,6 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SEAM_GROUPS, seamProblems, type SeamGroup } from './contract'
-import { canPickFolder, canSetBadge, fleetBridge, hostHidden, nodeTransport, onHostVisibilityChange, pickFiles, pickFolder, saveFile, setBadge, showNotification } from './index'
+import {
+  canPickFolder,
+  canSetBadge,
+  fleetBridge,
+  hostHidden,
+  nodeTransport,
+  onHostVisibilityChange,
+  pickFiles,
+  pickFolder,
+  saveFile,
+  setBadge,
+  showNotification,
+} from './index'
 
 // The seam contract against a mock host. Each shell runs the same checker against its real host
 // object (apps/desktop/src/shell/bridge.test.ts). That half catches a renamed preload key, this half
@@ -29,15 +41,43 @@ const fullHost = () => ({
   nodeForget: vi.fn(),
   nodeReconnect: vi.fn(),
   nodeRestartLocal: vi.fn(),
-  plugins: { state: vi.fn(), cachePut: vi.fn(), install: vi.fn(), remove: vi.fn(), trustRecord: vi.fn(), trustForget: vi.fn(), devGrant: vi.fn() },
+  plugins: {
+    state: vi.fn(),
+    cachePut: vi.fn(),
+    install: vi.fn(),
+    remove: vi.fn(),
+    trustRecord: vi.fn(),
+    trustForget: vi.fn(),
+    devGrant: vi.fn(),
+  },
   config: { read: vi.fn(), write: vi.fn(), onChange: vi.fn(), location: vi.fn() },
   recovery: { openDataFolder: vi.fn(), quit: vi.fn() },
   folderPath: { pick: vi.fn(async () => '/tmp/picked') },
   files: { pick: vi.fn(async () => []), save: vi.fn(async () => true) },
   notify: { show: vi.fn(async () => true), onActivate: vi.fn(() => () => {}), setBadge: vi.fn() },
   rendererLayer: { update: vi.fn() },
-  preview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), evictAll: vi.fn(), onEvent: vi.fn() },
-  webview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn(), onBlocked: vi.fn() },
+  preview: {
+    ensure: vi.fn(),
+    setBounds: vi.fn(),
+    show: vi.fn(),
+    hide: vi.fn(),
+    load: vi.fn(),
+    command: vi.fn(),
+    evict: vi.fn(),
+    evictAll: vi.fn(),
+    onEvent: vi.fn(),
+  },
+  webview: {
+    ensure: vi.fn(),
+    setBounds: vi.fn(),
+    show: vi.fn(),
+    hide: vi.fn(),
+    load: vi.fn(),
+    command: vi.fn(),
+    evict: vi.fn(),
+    onEvent: vi.fn(),
+    onBlocked: vi.fn(),
+  },
 })
 
 const install = (acorn: unknown): void => {
@@ -102,7 +142,9 @@ describe('the platform seam contract', () => {
 
   it('fails a group that resolves on a host which does not declare it', () => {
     install(fullHost())
-    expect(seamProblems(SEAM_GROUPS.filter((g) => g !== 'recovery'))).toEqual(['recovery: resolved on a host that does not implement it'])
+    expect(seamProblems(SEAM_GROUPS.filter((g) => g !== 'recovery'))).toEqual([
+      'recovery: resolved on a host that does not implement it',
+    ])
   })
 
   // The discriminator rules the groups are built on, since the checker above only sees whole groups.
@@ -132,7 +174,9 @@ describe('the platform seam contract', () => {
     it('falls back to nothing for the file dialogs when there is no host and no page', async () => {
       install({})
       await expect(pickFiles()).resolves.toEqual([])
-      await expect(saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.txt', mimeType: 'text/plain' })).resolves.toBe(false)
+      await expect(
+        saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.txt', mimeType: 'text/plain' }),
+      ).resolves.toBe(false)
     })
 
     it('hands the file dialogs to the host when it installs them', async () => {
@@ -141,7 +185,9 @@ describe('the platform seam contract', () => {
       install({ files })
       await expect(pickFiles({ accept: ['md'] })).resolves.toEqual(picked)
       expect(files.pick).toHaveBeenCalledWith({ accept: ['md'] })
-      await expect(saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.md', mimeType: 'text/markdown' })).resolves.toBe(true)
+      await expect(
+        saveFile({ bytes: new Uint8Array([1]), suggestedName: 'x.md', mimeType: 'text/markdown' }),
+      ).resolves.toBe(true)
     })
 
     it('leaves the badge to a host that can draw one', async () => {
@@ -177,7 +223,15 @@ describe('the platform seam contract', () => {
   // one installs it, and the terminal's half is checked where it installs it (apps/tui/src/platform.ts).
   it('takes visibility from the host where it installed it, and counts no answer as visible', () => {
     const changed = vi.fn()
-    install({ visibility: { hidden: () => true, onChange: (cb: () => void) => { cb(); return () => {} } } })
+    install({
+      visibility: {
+        hidden: () => true,
+        onChange: (cb: () => void) => {
+          cb()
+          return () => {}
+        },
+      },
+    })
     expect(hostHidden()).toBe(true)
     onHostVisibilityChange(changed)
     expect(changed).toHaveBeenCalledOnce()

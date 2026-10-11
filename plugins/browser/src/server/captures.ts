@@ -16,21 +16,34 @@ import type { CaptureMetadata } from '../contract/captures'
 // beside the other data-retention settings.
 const KEEP_PER_TASK = 20
 
-export function captureStore(db: PluginDatabase, emit?: (frame: { channel: string } & Record<string, unknown>) => void): CaptureStore & {
+export function captureStore(
+  db: PluginDatabase,
+  emit?: (frame: { channel: string } & Record<string, unknown>) => void,
+): CaptureStore & {
   read(id: string): Promise<Capture | null>
   list(taskId: string): Promise<CaptureMetadata[]>
 } {
   return {
     async put({ taskId, mime, bytes }) {
       const id = randomUUID()
-      await db.insert(browserCaptures).values({ id, taskId, mime, bytes: bytes.byteLength, body: bytes, createdAt: Date.now() })
+      await db
+        .insert(browserCaptures)
+        .values({ id, taskId, mime, bytes: bytes.byteLength, body: bytes, createdAt: Date.now() })
       const keep = await db
         .select({ id: browserCaptures.id })
         .from(browserCaptures)
         .where(eq(browserCaptures.taskId, taskId))
         .orderBy(desc(browserCaptures.createdAt))
         .limit(KEEP_PER_TASK)
-      await db.delete(browserCaptures).where(and(eq(browserCaptures.taskId, taskId), notInArray(browserCaptures.id, keep.map((row) => row.id))))
+      await db.delete(browserCaptures).where(
+        and(
+          eq(browserCaptures.taskId, taskId),
+          notInArray(
+            browserCaptures.id,
+            keep.map((row) => row.id),
+          ),
+        ),
+      )
       // The collection is the durable contract: announce it only after the newest-20 sweep, so a
       // subscriber can immediately re-read the exact ordered answer. Keep the id event for one
       // compatibility period while existing consumers migrate.

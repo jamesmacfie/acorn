@@ -62,7 +62,9 @@ function readSnapshot(path: string): string[] {
 
 it('the private plugin facade matches its snapshot', () => {
   const actual = Object.entries(ENTRYPOINTS)
-    .flatMap(([entry, file]) => exportedNames(readFileSync(join(HERE, file), 'utf8')).map((name) => `${entry}: ${name}`))
+    .flatMap(([entry, file]) =>
+      exportedNames(readFileSync(join(HERE, file), 'utf8')).map((name) => `${entry}: ${name}`),
+    )
     .sort()
 
   // Anti-vacuity: the assertion below is an exact match against a file, so a parser that stopped

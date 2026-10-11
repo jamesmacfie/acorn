@@ -40,7 +40,13 @@ describe('service process RPC', () => {
     service.register('service.preview-rules', async (payload) => {
       const taskId = (payload as { taskId: unknown }).taskId
       return [
-        { id: String(taskId), enabled: true, urlPattern: '*', trigger: 'load', action: { type: 'fill', selector: '#q', value: 'x' } },
+        {
+          id: String(taskId),
+          enabled: true,
+          urlPattern: '*',
+          trigger: 'load',
+          action: { type: 'fill', selector: '#q', value: 'x' },
+        },
       ]
     })
 
@@ -65,7 +71,13 @@ describe('service process RPC', () => {
       send: (message) => sent.push(message),
       subscribe: (next) => ((listener = next), () => undefined),
     })
-    listener?.({ protocol: SERVICE_PROTOCOL_VERSION + 1, kind: 'request', id: 'bad', method: 'service.stop', payload: {} })
+    listener?.({
+      protocol: SERVICE_PROTOCOL_VERSION + 1,
+      kind: 'request',
+      id: 'bad',
+      method: 'service.stop',
+      payload: {},
+    })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(sent).toEqual([])
     peer.close()

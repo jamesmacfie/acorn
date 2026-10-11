@@ -43,7 +43,9 @@ describe('buildSystemPrompt', () => {
   })
 
   it('skips an example with no SQL, and needs no notes', () => {
-    const prompt = buildSystemPrompt('SCHEMA', { examples: [example({ sql: '  ' }), example({ id: 'q2', name: 'plain', notes: null })] })
+    const prompt = buildSystemPrompt('SCHEMA', {
+      examples: [example({ sql: '  ' }), example({ id: 'q2', name: 'plain', notes: null })],
+    })
     expect(prompt).not.toContain('recent paid orders')
     expect(prompt).toContain('-- plain\nSELECT * FROM orders WHERE status = 1;')
   })
@@ -55,7 +57,9 @@ describe('buildSystemPrompt', () => {
     })
     expect(prompt).toContain('SCHEMA')
     expect(prompt).not.toContain('dropped-example')
-    expect(prompt.length).toBeLessThanOrEqual(SQL_SYSTEM_PREAMBLE.length + 'SCHEMA'.length + GENERATE_MAX_CONTEXT_CHARS + 40)
+    expect(prompt.length).toBeLessThanOrEqual(
+      SQL_SYSTEM_PREAMBLE.length + 'SCHEMA'.length + GENERATE_MAX_CONTEXT_CHARS + 40,
+    )
   })
 })
 

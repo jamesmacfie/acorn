@@ -2,7 +2,10 @@ const MAX_BODY_BYTES = 5 * 1024 * 1024
 
 // Reads the body a chunk at a time so a huge or endless response cannot exhaust memory
 // (docs/http-client.md § Sending).
-export async function readCapped(res: Response, signal = new AbortController().signal): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+export async function readCapped(
+  res: Response,
+  signal = new AbortController().signal,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
   signal.throwIfAborted()
   if (!res.body) return { bytes: new Uint8Array(0), truncated: false }
   const chunks: Uint8Array[] = []
@@ -10,10 +13,15 @@ export async function readCapped(res: Response, signal = new AbortController().s
   let truncated = false
   const reader = res.body.getReader()
   let stopping: Promise<void> | undefined
-  const stop = () => stopping ??= reader.cancel().catch(() => {})
+  const stop = () => (stopping ??= reader.cancel().catch(() => {}))
   let retire!: () => void
-  const retired = new Promise<void>((resolve) => { retire = resolve })
-  const abort = () => { void stop(); retire() }
+  const retired = new Promise<void>((resolve) => {
+    retire = resolve
+  })
+  const abort = () => {
+    void stop()
+    retire()
+  }
   signal.addEventListener('abort', abort, { once: true })
   try {
     for (;;) {

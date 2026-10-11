@@ -44,9 +44,7 @@ const defaultGateway: OpenAIGatewayFactory = (apiKey) => {
   }
 }
 
-export const createOpenAIProviders = (
-  gateway: OpenAIGatewayFactory = defaultGateway,
-) => {
+export const createOpenAIProviders = (gateway: OpenAIGatewayFactory = defaultGateway) => {
   const connectionProvider = publicConnectionProvider({
     id: 'openai',
     label: 'OpenAI',
@@ -57,14 +55,16 @@ export const createOpenAIProviders = (
       connectable: true,
       disconnectable: true,
       maxConnections: 1,
-      fields: [{
-        id: 'apiKey',
-        label: 'API key',
-        type: 'password',
-        placeholder: 'sk-…',
-        hint: 'OpenAI Platform → API keys. acorn stores it encrypted.',
-        required: true,
-      }],
+      fields: [
+        {
+          id: 'apiKey',
+          label: 'API key',
+          type: 'password',
+          placeholder: 'sk-…',
+          hint: 'OpenAI Platform → API keys. acorn stores it encrypted.',
+          required: true,
+        },
+      ],
       async validate(credentials) {
         const secret = credentials.apiKey?.trim()
         if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
@@ -108,13 +108,16 @@ export const createOpenAIProviders = (
     recommendedModelId: OPENAI_RECOMMENDED_MODEL_ID,
     async generateText({ secret, input }) {
       try {
-        const response = await gateway(secret).createResponse({
-          model: input.modelId ?? OPENAI_RECOMMENDED_MODEL_ID,
-          instructions: input.system,
-          input: input.prompt,
-          max_output_tokens: input.maxOutputTokens,
-          store: false,
-        }, input.signal)
+        const response = await gateway(secret).createResponse(
+          {
+            model: input.modelId ?? OPENAI_RECOMMENDED_MODEL_ID,
+            instructions: input.system,
+            input: input.prompt,
+            max_output_tokens: input.maxOutputTokens,
+            store: false,
+          },
+          input.signal,
+        )
         return {
           text: response.output_text,
           modelId: response.model,
@@ -136,7 +139,5 @@ export const createOpenAIProviders = (
   return { connectionProvider, modelAdapter }
 }
 
-export const {
-  connectionProvider: openAIConnectionProvider,
-  modelAdapter: openAIModelProvider,
-} = createOpenAIProviders()
+export const { connectionProvider: openAIConnectionProvider, modelAdapter: openAIModelProvider } =
+  createOpenAIProviders()

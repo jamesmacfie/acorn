@@ -2,8 +2,16 @@ import { batch, createEffect, createMemo, createSignal, onCleanup, untrack, type
 import { createDiffLayoutIndex, type DiffLayoutBlock } from '../../kit/diff/layoutIndex'
 import { createDiffMeasureScheduler } from '../../kit/diff/measureScheduler'
 import {
-  DIFF_GAP_ROW_HEIGHT, DIFF_LINE_HEIGHT, DIFF_RESOLVED_THREAD_HEIGHT, DIFF_THREAD_HEIGHT,
-  isCodeRow, toBands, type CodeRow, type DiffThread, type Row, type ViewMode,
+  DIFF_GAP_ROW_HEIGHT,
+  DIFF_LINE_HEIGHT,
+  DIFF_RESOLVED_THREAD_HEIGHT,
+  DIFF_THREAD_HEIGHT,
+  isCodeRow,
+  toBands,
+  type CodeRow,
+  type DiffThread,
+  type Row,
+  type ViewMode,
 } from '../../kit/diff/diffModel'
 import { createScrollAuthor } from '../../kit/lib/timeline/scrollAuthor'
 import type { DiffItem } from './documentView'
@@ -42,7 +50,13 @@ export const DIFF_SCROLL_SETTLE_MS = 150
  * collapsed, resolved, or given a comment is a different height. What a person types into an open box
  * is not in it, because typing only happens while the block is mounted and measured.
  */
-export type DiffDynamicBlock = { id: string; kind: 'thread' | 'line'; at: number; fingerprint: string; estimate: number }
+export type DiffDynamicBlock = {
+  id: string
+  kind: 'thread' | 'line'
+  at: number
+  fingerprint: string
+  estimate: number
+}
 
 /**
  * Where the reader is. The item and the path are the anchor; the pixels are only the distance into it.
@@ -71,15 +85,27 @@ const lineNumber = (row: CodeRow) => (row.kind === 'delete' ? row.oldNo : row.ne
 
 /** A unified code row's block: its note, marks, and composer, which all draw inside the row. Null when
  *  it has none. The id ends with the path so a colon in it cannot make two ids equal. */
-export function lineBlock(row: CodeRow, inputs: DiffBlockInputs, itemKey = ''): { id: string; fingerprint: string } | null {
+export function lineBlock(
+  row: CodeRow,
+  inputs: DiffBlockInputs,
+  itemKey = '',
+): { id: string; fingerprint: string } | null {
   const extra = inputs.extra(row)
   const composer = inputs.composer(row, null)
   if (extra == null && !composer) return null
-  return { id: `l:${itemKey}:${lineSide(row)}:${lineNumber(row)}:${row.path}`, fingerprint: `${extra ?? ''}|${composer ? 1 : 0}` }
+  return {
+    id: `l:${itemKey}:${lineSide(row)}:${lineNumber(row)}:${row.path}`,
+    fingerprint: `${extra ?? ''}|${composer ? 1 : 0}`,
+  }
 }
 
 /** A split band's block: both columns' notes and composers, drawn inside the band. */
-export function bandBlock(left: CodeRow | null, right: CodeRow | null, inputs: DiffBlockInputs, itemKey = ''): { id: string; fingerprint: string } | null {
+export function bandBlock(
+  left: CodeRow | null,
+  right: CodeRow | null,
+  inputs: DiffBlockInputs,
+  itemKey = '',
+): { id: string; fingerprint: string } | null {
   const row = left ?? right
   if (!row) return null
   const leftExtra = left ? inputs.extra(left) : null
@@ -109,7 +135,12 @@ const fixedRowHeight = (row: Row) => (row.kind === 'gap' ? DIFF_GAP_ROW_HEIGHT :
 
 /** A loaded item's blocks, in the order they are drawn: threads where they are interleaved, and a
  *  line's block after its code line. */
-export function rowBlocks(rows: readonly Row[], mode: ViewMode, inputs: DiffBlockInputs, itemKey = ''): DiffDynamicBlock[] {
+export function rowBlocks(
+  rows: readonly Row[],
+  mode: ViewMode,
+  inputs: DiffBlockInputs,
+  itemKey = '',
+): DiffDynamicBlock[] {
   const out: DiffDynamicBlock[] = []
   let at = 0
   if (mode === 'unified') {
@@ -161,12 +192,18 @@ const sameBlocks = (a: readonly DiffDynamicBlock[] | undefined, b: readonly Diff
   if ((a?.length ?? 0) !== b.length) return false
   return b.every((block, at) => {
     const other = a![at]!
-    return other.id === block.id && other.at === block.at && other.fingerprint === block.fingerprint && other.estimate === block.estimate
+    return (
+      other.id === block.id &&
+      other.at === block.at &&
+      other.fingerprint === block.fingerprint &&
+      other.estimate === block.estimate
+    )
   })
 }
 
 const sameRange = (a: readonly DiffRangeItem[], b: readonly DiffRangeItem[]) =>
-  a.length === b.length && a.every((item, at) => {
+  a.length === b.length &&
+  a.every((item, at) => {
     const other = b[at]!
     return other.key === item.key && other.start === item.start && other.end === item.end
   })
@@ -228,7 +265,10 @@ export function createDiffLayout(props: {
         const top = block ? index.offsetOf({ index: at, block: place.id, offset }) : null
         if (top != null) return { top, substituted: false }
       }
-      return { top: index.offsetOf({ index: at, fixed: Math.min(place.fixed, index.fixedSize(at)) })!, substituted: place.at === 'block' }
+      return {
+        top: index.offsetOf({ index: at, fixed: Math.min(place.fixed, index.fixedSize(at)) })!,
+        substituted: place.at === 'block',
+      }
     }
     // The item has gone, as a collapsed file's segments do: its file's header, or whatever now holds
     // its position.
@@ -255,7 +295,8 @@ export function createDiffLayout(props: {
     counts.maxPixels = Math.max(counts.maxPixels, moved)
     // How far the browser left the reader from the place. A clamp against the end of the document is
     // not drift: there is no scrolling further.
-    if (found.top <= element.scrollHeight - element.clientHeight) counts.maxDrift = Math.max(counts.maxDrift, Math.abs(element.scrollTop - found.top))
+    if (found.top <= element.scrollHeight - element.clientHeight)
+      counts.maxDrift = Math.max(counts.maxDrift, Math.abs(element.scrollTop - found.top))
   }
 
   // --- The index --------------------------------------------------------------------------------
@@ -357,17 +398,19 @@ export function createDiffLayout(props: {
       return top != null && top + effective(projection, found.block) <= element.scrollTop
     },
     readerWait,
-    commit: (changes) => applyGeometry((projection) => {
-      const touched = new Set<string>()
-      for (const [id, height] of changes) {
-        const found = blockOf(projection, id)
-        if (!found) continue
-        projection.heights.set(id, { height, fingerprint: found.block.fingerprint, bucket })
-        touched.add(found.key)
-      }
-      for (const key of touched) projection.index.setBlocks(projection.keys.get(key)!, placed(projection, projection.lists.get(key)))
-      return touched.size > 0
-    }),
+    commit: (changes) =>
+      applyGeometry((projection) => {
+        const touched = new Set<string>()
+        for (const [id, height] of changes) {
+          const found = blockOf(projection, id)
+          if (!found) continue
+          projection.heights.set(id, { height, fingerprint: found.block.fingerprint, bucket })
+          touched.add(found.key)
+        }
+        for (const key of touched)
+          projection.index.setBlocks(projection.keys.get(key)!, placed(projection, projection.lists.get(key)))
+        return touched.size > 0
+      }),
     viewport: (width, height) => {
       setViewport(height)
       bucket = Math.floor(width / DIFF_WIDTH_BUCKET_PX)
@@ -380,21 +423,25 @@ export function createDiffLayout(props: {
 
   // --- The mounted range ------------------------------------------------------------------------
 
-  const range = createMemo<DiffRangeItem[]>(() => {
-    version()
-    const projection = current()
-    const { index } = projection
-    if (!index.count) return []
-    const top = scrollTop()
-    const first = index.indexAt(Math.max(0, top - DIFF_RUNWAY_PX))
-    const last = index.indexAt(top + viewport() + DIFF_RUNWAY_PX)
-    const out: DiffRangeItem[] = []
-    for (let at = first; at <= last; at++) {
-      const start = index.top(at)
-      out.push({ index: at, key: projection.items[at]!.key, start, end: start + index.size(at) })
-    }
-    return out
-  }, [], { equals: sameRange })
+  const range = createMemo<DiffRangeItem[]>(
+    () => {
+      version()
+      const projection = current()
+      const { index } = projection
+      if (!index.count) return []
+      const top = scrollTop()
+      const first = index.indexAt(Math.max(0, top - DIFF_RUNWAY_PX))
+      const last = index.indexAt(top + viewport() + DIFF_RUNWAY_PX)
+      const out: DiffRangeItem[] = []
+      for (let at = first; at <= last; at++) {
+        const start = index.top(at)
+        out.push({ index: at, key: projection.items[at]!.key, start, end: start + index.size(at) })
+      }
+      return out
+    },
+    [],
+    { equals: sameRange },
+  )
 
   // The source's own blocks, wherever they are: a thread arriving, resolving, or going away changes
   // its item's height whether or not it is mounted. Items already holding blocks are re-derived too,
@@ -482,7 +529,11 @@ export function createDiffLayout(props: {
     },
     scrollToIndex: (index: number) => {
       const element = scrollEl()
-      if (element) write(element, untrack(() => current().index.top(index)))
+      if (element)
+        write(
+          element,
+          untrack(() => current().index.top(index)),
+        )
     },
     /** The reader's place now, from the last scroll position seen. */
     place: (): DiffReadingPlace | null => untrack(() => capture(current(), scrollTop())),
@@ -518,7 +569,12 @@ export function createDiffLayout(props: {
           observedElements: scheduler.observedElements(),
           fixedRebuilds: projections.unified.index.stats.fixedRebuilds + projections.split.index.stats.fixedRebuilds,
         },
-        correction: { count: counts.corrections, maxPixels: counts.maxPixels, maxAnchorDrift: counts.maxDrift, substituted: counts.substituted },
+        correction: {
+          count: counts.corrections,
+          maxPixels: counts.maxPixels,
+          maxAnchorDrift: counts.maxDrift,
+          substituted: counts.substituted,
+        },
         mountedBlocks: blocks,
         pendingFrames: scheduler.pendingFrames() + author.pendingFrames(),
       }

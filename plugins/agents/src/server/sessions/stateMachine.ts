@@ -49,10 +49,7 @@ export const initialAgentMachineState = (): AgentMachineState => ({
 // returned: Claude Code did, five minutes past an `end_turn`, and the trailing message projected
 // 'working' onto a session with no turn left to complete it. `turn_completed` is the only event that
 // clears 'working', and it only fires as sendTurn's return value, so nothing was coming.
-export function projectAgentEvent(
-  event: AgentNormalizedEvent,
-  turnId: string | null,
-): AgentSessionProjection {
+export function projectAgentEvent(event: AgentNormalizedEvent, turnId: string | null): AgentSessionProjection {
   switch (event.type) {
     case 'session_state':
       return {
@@ -88,11 +85,8 @@ export function projectAgentEvent(
       if (event.blocked) return turnId ? { runtimeState: 'working', attention: 'unread' } : { attention: 'unread' }
       return {
         runtimeState: 'waiting',
-        attention: event.kind === 'permission'
-          ? 'permission'
-          : event.kind === 'workflow_gate'
-            ? 'workflow_gate'
-            : 'question',
+        attention:
+          event.kind === 'permission' ? 'permission' : event.kind === 'workflow_gate' ? 'workflow_gate' : 'question',
       }
     case 'request_resolved':
       return { runtimeState: 'working', attention: 'none' }
@@ -114,8 +108,7 @@ export function projectAgentEvent(
 // child at rest is resumable rather than finished, which is a display distinction, not a lifecycle one.
 const ACTIVE_SUBAGENT_STATUSES: readonly AgentSubagentStatus[] = ['pending', 'running']
 
-export const isActiveSubagent = (entry: AgentSubagent): boolean =>
-  ACTIVE_SUBAGENT_STATUSES.includes(entry.status)
+export const isActiveSubagent = (entry: AgentSubagent): boolean => ACTIVE_SUBAGENT_STATUSES.includes(entry.status)
 
 /**
  * How long a background child may go quiet before its row stops claiming to be running.
@@ -161,9 +154,11 @@ export function touchSubagentRoster(
 ): AgentSubagent[] | undefined {
   const existing = current.find((entry) => entry.id === subagentId)
   if (!existing || existing.status === 'completed' || existing.status === 'failed') return undefined
-  return current.map((entry) => entry.id === subagentId
-    ? { ...entry, status: entry.status === 'idle' ? 'running' : entry.status, updatedAt: timestamp }
-    : entry)
+  return current.map((entry) =>
+    entry.id === subagentId
+      ? { ...entry, status: entry.status === 'idle' ? 'running' : entry.status, updatedAt: timestamp }
+      : entry,
+  )
 }
 
 /**
@@ -219,16 +214,13 @@ export function foldSubagentRoster(
   // finish, and the child's own tool calls stream on well past it. Only a real completion summary
   // settles such a row, and a summary is the one update that carries the harness handle, so a terminal
   // status with no `providerAgentRef` on it is the launch receipt and must not settle the row.
-  const settlingFromLaunch = background
-    && (update.status === 'completed' || update.status === 'failed')
-    && update.providerAgentRef == null
+  const settlingFromLaunch =
+    background && (update.status === 'completed' || update.status === 'failed') && update.providerAgentRef == null
   const merged: AgentSubagent = {
     id: update.id,
     turnId: existing?.turnId ?? turnId,
     title: update.title || existing?.title || 'Subagent',
-    status: settlingFromLaunch
-      ? existing?.status ?? 'running'
-      : update.status ?? existing?.status ?? 'running',
+    status: settlingFromLaunch ? (existing?.status ?? 'running') : (update.status ?? existing?.status ?? 'running'),
     background: background || undefined,
     role: update.role ?? existing?.role,
     model: update.model ?? existing?.model,
@@ -239,9 +231,9 @@ export function foldSubagentRoster(
     startedAt: existing?.startedAt ?? timestamp,
     updatedAt: timestamp,
   }
-  return capSubagentRoster(existing
-    ? current.map((entry) => entry.id === update.id ? merged : entry)
-    : [...current, merged])
+  return capSubagentRoster(
+    existing ? current.map((entry) => (entry.id === update.id ? merged : entry)) : [...current, merged],
+  )
 }
 
 export function decideAgentCommand(state: AgentMachineState, command: AgentMachineCommand): AgentMachineDecision {
@@ -264,7 +256,11 @@ export function decideAgentCommand(state: AgentMachineState, command: AgentMachi
         : { ok: false, code: 'request_not_pending', message: 'The request is no longer pending.' }
     case 'handoff_terminal':
       return state.activeTurnId || state.runtimeState === 'connecting' || state.runtimeState === 'replaying'
-        ? { ok: false, code: 'controller_busy', message: 'Finish or cancel the active provider operation before terminal handoff.' }
+        ? {
+            ok: false,
+            code: 'controller_busy',
+            message: 'Finish or cancel the active provider operation before terminal handoff.',
+          }
         : { ok: true }
     case 'resume_managed':
       return state.runtimeState === 'working' || state.runtimeState === 'waiting'
@@ -284,9 +280,8 @@ export function evolveAgentState(
         ...state,
         runtimeState: event.state,
         attention: event.state === 'failed' ? 'error' : state.attention,
-        activeTurnId: event.state === 'ready' || event.state === 'stopped' || event.state === 'failed'
-          ? null
-          : state.activeTurnId,
+        activeTurnId:
+          event.state === 'ready' || event.state === 'stopped' || event.state === 'failed' ? null : state.activeTurnId,
       }
     case 'user_message': {
       const active = turnId ?? state.activeTurnId
@@ -310,16 +305,15 @@ export function evolveAgentState(
     case 'request': {
       if (event.blocked) {
         const active = turnId ?? state.activeTurnId
-        return active ? { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active } : { ...state, attention: 'unread' }
+        return active
+          ? { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active }
+          : { ...state, attention: 'unread' }
       }
       return {
         ...state,
         runtimeState: 'waiting',
-        attention: event.kind === 'permission'
-          ? 'permission'
-          : event.kind === 'workflow_gate'
-            ? 'workflow_gate'
-            : 'question',
+        attention:
+          event.kind === 'permission' ? 'permission' : event.kind === 'workflow_gate' ? 'workflow_gate' : 'question',
         pendingRequestIds: state.pendingRequestIds.includes(event.requestId)
           ? state.pendingRequestIds
           : [...state.pendingRequestIds, event.requestId],

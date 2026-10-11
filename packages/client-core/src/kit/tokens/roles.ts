@@ -151,8 +151,10 @@ const radius: Mapping<Radius> = {
   },
 }
 
-export const ROLE_MAP = { space, size, tone, text, border, radius } as const satisfies
-  Record<RoleName, { dom: Record<string, string>; tui: Record<string, TuiValue> }>
+export const ROLE_MAP = { space, size, tone, text, border, radius } as const satisfies Record<
+  RoleName,
+  { dom: Record<string, string>; tui: Record<string, TuiValue> }
+>
 
 /** The DOM value of a role, as something a style attribute can hold. */
 export const roleVar = <R extends RoleName>(role: R, value: keyof (typeof ROLE_MAP)[R]['dom']): string =>

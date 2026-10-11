@@ -1,7 +1,15 @@
 export { testGate } from './auth.ts'
 export { startControlPlaneStub } from './controlPlaneStub.ts'
 export type { ControlPlaneStub } from './controlPlaneStub.ts'
-export { EveryCredentialActive, makeTestCoreServices, makeTestDb, makeTestPluginDb, testCoreSeams, testEnv, testSecretEnv } from './db.ts'
+export {
+  EveryCredentialActive,
+  makeTestCoreServices,
+  makeTestDb,
+  makeTestPluginDb,
+  testCoreSeams,
+  testEnv,
+  testSecretEnv,
+} from './db.ts'
 export { beginTaskArchive, finishTaskArchive } from '../server/worktrees/archiveGate.ts'
 export type { TestDb, TestPluginDb } from './db.ts'
 export { seedProviderConnection } from './integration.ts'
@@ -10,7 +18,11 @@ export { mountCovers, registeredHandler } from './mountCoverage.ts'
 export { resetTelemetryForTest } from '../server/telemetry/collector.ts'
 export { makeTestNodeContext, makeTestRequestContext } from './pluginContext.ts'
 export type { TestNodeContext } from './pluginContext.ts'
-export { testAgentToolDescriptor, testContextSectionDescriptor, testCliCommandDescriptor } from './runtimeContributions.ts'
+export {
+  testAgentToolDescriptor,
+  testContextSectionDescriptor,
+  testCliCommandDescriptor,
+} from './runtimeContributions.ts'
 export { runDashboard } from '../server/dashboards/run.ts'
 
 // Seed authenticated legacy proposal records in migration fixtures.

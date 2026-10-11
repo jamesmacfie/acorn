@@ -34,7 +34,12 @@ export const actions = new Hono<AppEnv>()
         name: j.name,
         status: j.status,
         conclusion: j.conclusion,
-        steps: (j.steps ?? []).map((s) => ({ number: s.number, name: s.name, status: s.status, conclusion: s.conclusion })),
+        steps: (j.steps ?? []).map((s) => ({
+          number: s.number,
+          name: s.name,
+          status: s.status,
+          conclusion: s.conclusion,
+        })),
       })),
     }
     return c.json(body)

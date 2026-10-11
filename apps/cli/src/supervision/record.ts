@@ -1,5 +1,14 @@
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { configDir } from '@acorn/custody/local'
 
@@ -39,12 +48,22 @@ export function prepareServiceDir(dir: string): void {
 export function readServiceRecord(path: string, root: string): ServiceRecord | null {
   try {
     const row = JSON.parse(readFileSync(path, 'utf8')) as Partial<ServiceRecord>
-    if (row.root !== canonicalRoot(root) || !Number.isSafeInteger(row.pid) || row.pid! < 1 ||
-      typeof row.instanceId !== 'string' || typeof row.nodeId !== 'string' ||
-      typeof row.endpoint !== 'string' || typeof row.fingerprint !== 'string' ||
-      typeof row.logPath !== 'string' || !Number.isSafeInteger(row.startedAt)) return null
+    if (
+      row.root !== canonicalRoot(root) ||
+      !Number.isSafeInteger(row.pid) ||
+      row.pid! < 1 ||
+      typeof row.instanceId !== 'string' ||
+      typeof row.nodeId !== 'string' ||
+      typeof row.endpoint !== 'string' ||
+      typeof row.fingerprint !== 'string' ||
+      typeof row.logPath !== 'string' ||
+      !Number.isSafeInteger(row.startedAt)
+    )
+      return null
     return row as ServiceRecord
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 
 export function writeServiceRecord(path: string, record: ServiceRecord): void {
@@ -59,5 +78,7 @@ export function clearServiceRecord(path: string, instanceId: string): void {
   try {
     const row = JSON.parse(readFileSync(path, 'utf8')) as { instanceId?: unknown }
     if (row.instanceId === instanceId) rmSync(path, { force: true })
-  } catch { /* The record has already gone or changed. */ }
+  } catch {
+    /* The record has already gone or changed. */
+  }
 }

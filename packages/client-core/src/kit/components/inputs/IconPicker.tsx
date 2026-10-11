@@ -11,10 +11,38 @@ const MAX_RESULTS = 200
 // a-large-small, and so on: technically complete, useless in practice. These are what an empty
 // query shows.
 const LEAD = [
-  'circle-dot', 'git-pull-request', 'bug', 'wrench', 'rocket', 'flame', 'zap', 'star',
-  'flask-conical', 'beaker', 'microscope', 'shield', 'lock', 'key', 'database', 'server',
-  'globe', 'terminal', 'code', 'file-text', 'book-open', 'paintbrush', 'sparkles', 'brain',
-  'hammer', 'settings', 'gauge', 'trending-up', 'clock', 'calendar', 'flag', 'target',
+  'circle-dot',
+  'git-pull-request',
+  'bug',
+  'wrench',
+  'rocket',
+  'flame',
+  'zap',
+  'star',
+  'flask-conical',
+  'beaker',
+  'microscope',
+  'shield',
+  'lock',
+  'key',
+  'database',
+  'server',
+  'globe',
+  'terminal',
+  'code',
+  'file-text',
+  'book-open',
+  'paintbrush',
+  'sparkles',
+  'brain',
+  'hammer',
+  'settings',
+  'gauge',
+  'trending-up',
+  'clock',
+  'calendar',
+  'flag',
+  'target',
 ]
 
 // Whatever is drawable at the moment it is asked: the eager 87 before the full set has arrived, all
@@ -50,12 +78,15 @@ export default function IconPicker(props: IconPickerProps) {
   const results = (query: string) => {
     const q = query.trim()
     if (!q) return LEAD
-    return iconNames().map((name) => ({ name, score: fuzzyScore(q, name) }))
-      .filter((x): x is { name: string; score: number } => x.score !== null)
-      // Tie-break on brevity: for "bug", `bug` should beat `bug-play` and `bug-off`.
-      .sort((a, b) => b.score - a.score || a.name.length - b.name.length)
-      .slice(0, MAX_RESULTS)
-      .map((x) => x.name)
+    return (
+      iconNames()
+        .map((name) => ({ name, score: fuzzyScore(q, name) }))
+        .filter((x): x is { name: string; score: number } => x.score !== null)
+        // Tie-break on brevity: for "bug", `bug` should beat `bug-play` and `bug-off`.
+        .sort((a, b) => b.score - a.score || a.name.length - b.name.length)
+        .slice(0, MAX_RESULTS)
+        .map((x) => x.name)
+    )
   }
 
   return (
@@ -73,7 +104,12 @@ export default function IconPicker(props: IconPickerProps) {
       tools={
         <>
           <IconButton icon="dices" label="Random icon" onPress={() => props.onSelect(randomIconName())} />
-          <IconButton icon="rotate-ccw" label="Use the default icon" disabled={!props.value} onPress={() => props.onSelect(null)} />
+          <IconButton
+            icon="rotate-ccw"
+            label="Use the default icon"
+            disabled={!props.value}
+            onPress={() => props.onSelect(null)}
+          />
         </>
       }
     />

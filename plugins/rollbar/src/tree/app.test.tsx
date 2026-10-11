@@ -27,7 +27,9 @@ describe('RollbarPane', () => {
     const ops: TreeMutation[] = []
     const root = createRemoteRoot((batch) => ops.push(...batch))
     const bridge = {
-      api: { get: () => Promise.reject(Object.assign(new Error('provider_needs_auth'), { code: 'provider_needs_auth' })) },
+      api: {
+        get: () => Promise.reject(Object.assign(new Error('provider_needs_auth'), { code: 'provider_needs_auth' })),
+      },
       onSelect: () => () => {},
     } as unknown as AcornBridge
     solidTree(RollbarPane)(bridge, {
@@ -55,17 +57,30 @@ describe('RollbarPane', () => {
 
   it('keeps the item and selected tab visible while refresh runs or fails', async () => {
     const item = {
-      integrationId: 'connection', integrationLabel: 'Rollbar', identifier: '14395', itemId: 'item-1',
-      url: null, title: 'An error', level: 'error', environment: 'production', status: 'active',
-      totalOccurrences: 1, firstOccurrenceAt: null, lastOccurrenceAt: null,
-      resolvedInVersion: null, assignedTo: null,
+      integrationId: 'connection',
+      integrationLabel: 'Rollbar',
+      identifier: '14395',
+      itemId: 'item-1',
+      url: null,
+      title: 'An error',
+      level: 'error',
+      environment: 'production',
+      status: 'active',
+      totalOccurrences: 1,
+      firstOccurrenceAt: null,
+      lastOccurrenceAt: null,
+      resolvedInVersion: null,
+      assignedTo: null,
     }
     const pending: Array<{ path: string; resolve: (value: unknown) => void; reject: (error: Error) => void }> = []
     const root = createRemoteRoot(() => {})
     const bridge = {
-      api: { get: (path: string) => path.includes('refresh=true')
-        ? new Promise((resolve, reject) => pending.push({ path, resolve, reject }))
-        : Promise.resolve(path.includes('/occurrences') ? { occurrences: [] } : item) },
+      api: {
+        get: (path: string) =>
+          path.includes('refresh=true')
+            ? new Promise((resolve, reject) => pending.push({ path, resolve, reject }))
+            : Promise.resolve(path.includes('/occurrences') ? { occurrences: [] } : item),
+      },
       onSelect: () => () => {},
     } as unknown as AcornBridge
     solidTree(RollbarPane)(bridge, {
@@ -101,7 +116,8 @@ describe('RollbarPane', () => {
     expect(tabs()?.props.active).toBe('occurrences')
     expect(refresh()?.props.busy).toBe(true)
 
-    for (const request of pending.splice(0)) request.resolve(request.path.includes('/occurrences') ? { occurrences: [] } : item)
+    for (const request of pending.splice(0))
+      request.resolve(request.path.includes('/occurrences') ? { occurrences: [] } : item)
     await settle()
     expect(tabs()?.props.active).toBe('occurrences')
     expect(refresh()?.props.busy).toBe(false)
@@ -113,7 +129,9 @@ describe('RollbarPane', () => {
     await settle()
     expect(nodes().some((node) => node.type === 'Heading')).toBe(true)
     expect(tabs()?.props.active).toBe('occurrences')
-    expect(nodes().find((node) => node.type === 'Alert')?.props.title).toBe("Couldn't refresh this error. Showing the last data we got.")
+    expect(nodes().find((node) => node.type === 'Alert')?.props.title).toBe(
+      "Couldn't refresh this error. Showing the last data we got.",
+    )
     root.dispose()
   })
 })

@@ -29,7 +29,8 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
     // fetch failure; the node's own banner already covers an unreachable node.
     // `fetch` is bound for every `items` carrier and for no other, and only `items` carriers are
     // delivered into a `rows` point, so the guard is a type narrowing rather than a real branch.
-    (_node, _revision, signal) => props.contribution.fetch?.(signal).catch((): PluginExtensionItem[] => []) ?? Promise.resolve([]),
+    (_node, _revision, signal) =>
+      props.contribution.fetch?.(signal).catch((): PluginExtensionItem[] => []) ?? Promise.resolve([]),
     () => chromeDeps(props.contribution.pluginId),
     { nodeIds: [nodeId] },
   )

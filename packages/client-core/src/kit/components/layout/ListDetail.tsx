@@ -35,10 +35,12 @@ export function CollapseEdge(props: {
    *  since whoever can see it can also see which column it is on. */
   listLabel?: string
 }) {
-  const verb = () => props.collapsed ? 'Expand' : 'Collapse'
+  const verb = () => (props.collapsed ? 'Expand' : 'Collapse')
   return (
     <div class="ui-listdetail-edge" data-collapsed={props.collapsed ? '' : undefined}>
-      <Show when={!props.collapsed}><SplitHandle axis="x" drag={props.drag} /></Show>
+      <Show when={!props.collapsed}>
+        <SplitHandle axis="x" drag={props.drag} />
+      </Show>
       <Button
         variant="bare"
         size="xs"
@@ -108,7 +110,7 @@ export function ListDetail(props: {
   })
   const width = () => widthState()[0]()
   const setWidth = (value: number) => widthState()[1](value)
-  const collapse = () => props.collapseKey === undefined ? undefined : sidebarCollapse(props.collapseKey)
+  const collapse = () => (props.collapseKey === undefined ? undefined : sidebarCollapse(props.collapseKey))
   const collapsed = () => collapse()?.[0]() === true
   let root: HTMLDivElement | undefined
   let dragStart: number | null = null
@@ -125,26 +127,37 @@ export function ListDetail(props: {
   const drag = createSplitDrag({
     axis: 'x',
     label: 'Resize list',
-    onStart: () => { dragStart = currentListWidth() },
+    onStart: () => {
+      dragStart = currentListWidth()
+    },
     onDelta: (deltaPx) => {
       const from = dragStart ?? currentListWidth()
       setWidth(Math.min(Math.max(from + deltaPx, MIN_LIST_DETAIL_WIDTH), ceiling()))
     },
-    onCommit: () => { dragStart = null },
+    onCommit: () => {
+      dragStart = null
+    },
   })
   // A split with no collapse is the bare handle it always was, and the edge above appears only where
   // there is a second thing to hold. Most of this node's callers are two halves of a document rather
   // than a sidebar, and the grid's middle track is a contract they already keep.
   const edge = () => (
     <Show when={props.collapseKey !== undefined} fallback={<SplitHandle axis="x" drag={drag} />}>
-      <CollapseEdge collapsed={collapsed()} onToggle={() => collapse()?.[1](!collapsed())} drag={drag} listLabel={props.listLabel} />
+      <CollapseEdge
+        collapsed={collapsed()}
+        onToggle={() => collapse()?.[1](!collapsed())}
+        drag={drag}
+        listLabel={props.listLabel}
+      />
     </Show>
   )
   return (
     <div
       ref={root}
       class="ui-listdetail"
-      data-list={list() !== undefined || props.split ? (collapsed() ? 'collapsed' : (props.listWidth ?? 'default')) : undefined}
+      data-list={
+        list() !== undefined || props.split ? (collapsed() ? 'collapsed' : (props.listWidth ?? 'default')) : undefined
+      }
       data-collapse-to={props.collapseTo}
       style={width() && !collapsed() ? { 'grid-template-columns': `${width()}px 1px minmax(0, 1fr)` } : undefined}
     >
@@ -205,7 +218,11 @@ export function ListColumn(props: {
   return (
     <aside
       ref={(element) => {
-        if (props.scrollKey !== undefined) retainScroll(element, keyedScrollStore(() => props.scrollKey ?? ''))
+        if (props.scrollKey !== undefined)
+          retainScroll(
+            element,
+            keyedScrollStore(() => props.scrollKey ?? ''),
+          )
       }}
       class="ui-listdetail-list"
       data-scroll={props.scroll ? '' : undefined}

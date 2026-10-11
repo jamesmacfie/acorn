@@ -1,15 +1,25 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { attentionRegistry, attentionSources, compareAttention, type AttentionItem } from './attention'
 
-const item = (id: string, severity: AttentionItem['severity'], at: number): AttentionItem =>
-  ({ id, title: id, severity, at, target: { kind: 'test', resourceId: id } })
+const item = (id: string, severity: AttentionItem['severity'], at: number): AttentionItem => ({
+  id,
+  title: id,
+  severity,
+  at,
+  target: { kind: 'test', resourceId: id },
+})
 
 const disposables: { dispose(): void }[] = []
 afterEach(() => disposables.splice(0).forEach((d) => d.dispose()))
 
 describe('attentionSources', () => {
   it('sorts on the declared order with an id tiebreak, not on registration', () => {
-    for (const [id, order] of [['zebra', 1], ['aardvark', 99], ['b-tie', 5], ['a-tie', 5]] as const) {
+    for (const [id, order] of [
+      ['zebra', 1],
+      ['aardvark', 99],
+      ['b-tie', 5],
+      ['a-tie', 5],
+    ] as const) {
       disposables.push(attentionRegistry.register({ id, order, fetch: () => Promise.resolve([]) }))
     }
     expect(attentionSources().map((s) => s.id)).toEqual(['zebra', 'a-tie', 'b-tie', 'aardvark'])

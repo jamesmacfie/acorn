@@ -43,13 +43,20 @@ export function DiffToolbar(props: {
       </div>
       <Show when={props.find.findOpen()}>
         <FindBar
-          ref={(element) => { findInput = element }}
+          ref={(element) => {
+            findInput = element
+          }}
           placeholder="Find in diff…"
           query={props.find.findQuery()}
           onQuery={props.find.setFindQuery}
-          count={props.find.findQuery()
-            ? { current: props.find.matches().length ? props.find.matchIdx() + 1 : 0, total: props.find.matches().length }
-            : undefined}
+          count={
+            props.find.findQuery()
+              ? {
+                  current: props.find.matches().length ? props.find.matchIdx() + 1 : 0,
+                  total: props.find.matches().length,
+                }
+              : undefined
+          }
           onNext={() => props.find.gotoMatch(1)}
           onPrev={() => props.find.gotoMatch(-1)}
           onClose={props.find.closeFind}

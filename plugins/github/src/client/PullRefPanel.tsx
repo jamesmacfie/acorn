@@ -2,7 +2,13 @@ import { createMemo, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import {
-  CHECK_TONE, checksState, checksSummary, formatRelativeTime, openInAppUrl, railDotProps, type RefPanelProps,
+  CHECK_TONE,
+  checksState,
+  checksSummary,
+  formatRelativeTime,
+  openInAppUrl,
+  railDotProps,
+  type RefPanelProps,
 } from '@acorn/plugin-api/client'
 import { Button, EmptyState, Facts, Heading, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { RefPanelBox, RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
@@ -55,7 +61,11 @@ export default function PullRefPanel(props: RefPanelProps) {
           <EmptyState align="start" size="sm" busy={detail.isLoading}>
             {/* A displayId this panel cannot parse means the recogniser and the panel disagree,
                 which is a bug, not a missing pull request. Say so instead of spinning. */}
-            {!parts() ? "acorn can't read this pull request link." : detail.isLoading ? 'Loading…' : "Couldn't load this pull request."}
+            {!parts()
+              ? "acorn can't read this pull request link."
+              : detail.isLoading
+                ? 'Loading…'
+                : "Couldn't load this pull request."}
           </EmptyState>
         }
       >
@@ -70,7 +80,7 @@ export default function PullRefPanel(props: RefPanelProps) {
                   value: (
                     <Inline>
                       <StatusDot tone={loaded().draft ? 'muted' : loaded().state === 'open' ? 'ok' : 'accent'} />
-                      <Text>{loaded().draft ? 'Draft' : STATE_WORD[loaded().state] ?? loaded().state}</Text>
+                      <Text>{loaded().draft ? 'Draft' : (STATE_WORD[loaded().state] ?? loaded().state)}</Text>
                     </Inline>
                   ),
                 },
@@ -79,19 +89,30 @@ export default function PullRefPanel(props: RefPanelProps) {
                   ? [{ label: 'Updated', value: <Text>{formatRelativeTime(loaded().updatedAt)}</Text> }]
                   : []),
                 ...(loaded().headRef
-                  ? [{ label: 'Branch', value: <Text>{loaded().headRef} → {loaded().baseRef ?? ''}</Text> }]
+                  ? [
+                      {
+                        label: 'Branch',
+                        value: (
+                          <Text>
+                            {loaded().headRef} → {loaded().baseRef ?? ''}
+                          </Text>
+                        ),
+                      },
+                    ]
                   : []),
                 // Checks as one word, not a list. The list is the pane's job.
                 ...(checks().length
-                  ? [{
-                    label: 'Checks',
-                    value: (
-                      <Inline>
-                        <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
-                        <Text>{checksSummary(checks())}</Text>
-                      </Inline>
-                    ),
-                  }]
+                  ? [
+                      {
+                        label: 'Checks',
+                        value: (
+                          <Inline>
+                            <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
+                            <Text>{checksSummary(checks())}</Text>
+                          </Inline>
+                        ),
+                      },
+                    ]
                   : []),
               ]}
             />

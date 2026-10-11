@@ -13,19 +13,26 @@ const actions: ((command: string) => void)[] = []
 // `context` is the host's snapshot at connect, and `item` in it is the row that OPENED the pane: a task
 // pane has no URL to hold a selection, so a click or the palette's curl import arrives this way
 // (docs/plugins/tree-contract.md § The tree contract).
-const bridge = (item?: string) => ({
-  context: { surface: 'http', target: 'remote', nodeId: 'node-a', authority: 'node-a/http', ...(item ? { item } : {}) },
-  onSelect: (handler: (item: string) => void) => {
-    selects.push(handler)
-    return () => {}
-  },
-  onSurfaceAction: (handler: (command: string) => void) => {
-    actions.push(handler)
-    return () => {}
-  },
-  ui: { copy: vi.fn() },
-  api: { get: async () => [] },
-} as unknown as PanelSubject['bridge'])
+const bridge = (item?: string) =>
+  ({
+    context: {
+      surface: 'http',
+      target: 'remote',
+      nodeId: 'node-a',
+      authority: 'node-a/http',
+      ...(item ? { item } : {}),
+    },
+    onSelect: (handler: (item: string) => void) => {
+      selects.push(handler)
+      return () => {}
+    },
+    onSurfaceAction: (handler: (command: string) => void) => {
+      actions.push(handler)
+      return () => {}
+    },
+    ui: { copy: vi.fn() },
+    api: { get: async () => [] },
+  }) as unknown as PanelSubject['bridge']
 
 const defaultBridge = bridge()
 const subject = (over: Partial<PanelSubject> = {}): PanelSubject => ({
@@ -88,14 +95,20 @@ describe('the model both regions share', () => {
 })
 
 describe('groupByFolder', () => {
-  const row = (name: string, folder: string): HttpRequest => ({ id: name, folder, name } as HttpRequest)
+  const row = (name: string, folder: string): HttpRequest => ({ id: name, folder, name }) as HttpRequest
 
   it('puts the ungrouped first and sorts the rest by name', () => {
-    expect(groupByFolder([row('b', 'auth'), row('a', ''), row('a', 'auth')]).map((g) => [g.folder, g.requests.map((r) => r.name)]))
-      .toEqual([['', ['a']], ['auth', ['a', 'b']]])
+    expect(
+      groupByFolder([row('b', 'auth'), row('a', ''), row('a', 'auth')]).map((g) => [
+        g.folder,
+        g.requests.map((r) => r.name),
+      ]),
+    ).toEqual([
+      ['', ['a']],
+      ['auth', ['a', 'b']],
+    ])
   })
 })
-
 
 describe('mounted HTTP region leases', () => {
   const mounted = (subject: PanelSubject) => createRoot((dispose) => ({ model: httpPanelModel(subject), dispose }))
@@ -116,7 +129,12 @@ describe('mounted HTTP region leases', () => {
     const detail = bridge()
     let complete!: (value: unknown) => void
     const listPost = vi.fn()
-    const detailPost = vi.fn(() => new Promise((resolve) => { complete = resolve }))
+    const detailPost = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve
+        }),
+    )
     list.api.post = listPost as typeof list.api.post
     detail.api.post = detailPost as typeof detail.api.post
     const left = mounted(subject({ bridge: list }))
@@ -146,7 +164,12 @@ describe('mounted HTTP region leases', () => {
     const first = bridge()
     const second = bridge()
     const rejects: ((error: Error) => void)[] = []
-    const getFirst = vi.fn(() => new Promise((_resolve, reject) => { rejects.push(reject) }))
+    const getFirst = vi.fn(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejects.push(reject)
+        }),
+    )
     const getSecond = vi.fn(async () => [])
     first.api.get = getFirst as typeof first.api.get
     second.api.get = getSecond as typeof second.api.get

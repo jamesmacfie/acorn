@@ -10,10 +10,14 @@ import { BROWSE, MENU, PANES, SOURCE, TASKS, topology } from './topology'
 // each is a pure function of two signals: what is selected and whether the selected source draws a
 // list. A render test would have to reach five regions to say what these four cases say.
 
-const source = (id: string, list: boolean): Disposable => sourceRegistry.register({
-  id, label: id, glyph: 'circle', order: 1,
-  ...(list ? { regions: { list: () => null, detail: () => null } } : { component: () => null }),
-} as unknown as Parameters<typeof sourceRegistry.register>[0])
+const source = (id: string, list: boolean): Disposable =>
+  sourceRegistry.register({
+    id,
+    label: id,
+    glyph: 'circle',
+    order: 1,
+    ...(list ? { regions: { list: () => null, detail: () => null } } : { component: () => null }),
+  } as unknown as Parameters<typeof sourceRegistry.register>[0])
 
 describe('the shell topology', () => {
   const registered: Disposable[] = []

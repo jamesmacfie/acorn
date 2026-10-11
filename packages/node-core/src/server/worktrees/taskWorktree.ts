@@ -16,10 +16,24 @@ import { getProject, type ProjectRow } from '../projects'
 import { gitText } from '../core/git'
 import { getProjectConfig } from '../projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../repoConfigSnapshot'
-import { copyWorktreeFiles, ensureWorktree, listWorktrees, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
+import {
+  copyWorktreeFiles,
+  ensureWorktree,
+  listWorktrees,
+  staleWorktreeReason,
+  worktreeBranch,
+  worktreePorcelain,
+} from './worktrees'
 import { isTaskArchiving } from './archiveGate'
 import { broadcastTasksChanged } from '../notify'
-import { admitTaskHead, noticeTaskHead, pruneTaskHeads, resetTaskHeads, retireTaskHead, taskHeadScope } from './taskHeadObserver'
+import {
+  admitTaskHead,
+  noticeTaskHead,
+  pruneTaskHeads,
+  resetTaskHeads,
+  retireTaskHead,
+  taskHeadScope,
+} from './taskHeadObserver'
 import { invalidateWorktreeStatus, setWorktreeStatusCeiling } from './worktreeStatus'
 import { runHook } from '../pluginHost/hooks'
 import { BridgeError } from '../bridge'
@@ -118,11 +132,23 @@ export const contextInjectionEnabled = async (db: AppDatabase, userId: string): 
 export async function unclaimedWorktrees(db: AppDatabase, project: ProjectRow): Promise<ProjectWorktree[]> {
   if (project.vcs !== 'git' || !project.path || !isDir(project.path)) return []
   const identity = (path: string): string => {
-    try { return realpathSync(path) } catch { return resolve(path) }
+    try {
+      return realpathSync(path)
+    } catch {
+      return resolve(path)
+    }
   }
-  const claimed = (await db
-    .select({ id: schema.tasks.id, status: schema.tasks.status, worktreePath: schema.tasks.worktreePath, projectId: schema.tasks.projectId, branch: schema.tasks.branch })
-    .from(schema.tasks)).filter((row) => row.status === 'active' || isTaskArchiving(row.id))
+  const claimed = (
+    await db
+      .select({
+        id: schema.tasks.id,
+        status: schema.tasks.status,
+        worktreePath: schema.tasks.worktreePath,
+        projectId: schema.tasks.projectId,
+        branch: schema.tasks.branch,
+      })
+      .from(schema.tasks)
+  ).filter((row) => row.status === 'active' || isTaskArchiving(row.id))
   const taken = new Set(claimed.filter((row) => row.worktreePath).map((row) => identity(row.worktreePath!)))
   // A project-folder task has no stored worktree path. Its mapped project may itself be a linked
   // checkout, and another project alias can point at the same checkout.
@@ -138,12 +164,18 @@ export async function unclaimedWorktrees(db: AppDatabase, project: ProjectRow): 
     if (!owner?.path || owner.vcs !== 'git') continue
     try {
       const other = await gitText(['rev-parse', '--git-common-dir'], { cwd: owner.path, timeoutMs: 10_000 })
-      if (identity(resolve(owner.path, other)) === identity(resolve(project.path, repository))) reserved.add(row.branch!)
-    } catch { /* An unavailable project cannot claim this Git registration. */ }
+      if (identity(resolve(owner.path, other)) === identity(resolve(project.path, repository)))
+        reserved.add(row.branch!)
+    } catch {
+      /* An unavailable project cannot claim this Git registration. */
+    }
   }
   return roster.filter((wt) => {
-    try { return isDir(wt.path) && !taken.has(realpathSync(wt.path)) && !reserved.has(wt.branch) }
-    catch { return false }
+    try {
+      return isDir(wt.path) && !taken.has(realpathSync(wt.path)) && !reserved.has(wt.branch)
+    } catch {
+      return false
+    }
   })
 }
 
@@ -176,7 +208,15 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
       if (!isDir(path)) {
         retireTaskHead(row.id, generations[index]!)
         invalidateWorktreeStatus(path)
-        results[index] = { taskId: row.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true, branch: null, head: null }
+        results[index] = {
+          taskId: row.id,
+          worktreePath: path,
+          dirty: false,
+          dirtyCount: 0,
+          missing: true,
+          branch: null,
+          head: null,
+        }
         continue
       }
       const { dirty, count, branch, head } = await worktreePorcelain(path)
@@ -193,7 +233,10 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
 export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
   try {
     const missing = (await computeTaskStatuses(db)).filter((s) => s.missing)
-    if (missing.length) log.warn(`${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`)
+    if (missing.length)
+      log.warn(
+        `${missing.length} task worktree(s) missing on disk (needs repair): ${missing.map((m) => m.worktreePath).join(', ')}`,
+      )
   } catch {
     // best-effort: never block startup on status
   }
@@ -201,7 +244,10 @@ export async function reconcileWorktrees(db: AppDatabase): Promise<void> {
 
 // Repo / branch / PR context for a session, derived through the taskId → tasks join
 // (docs/workspaces-and-tasks.md). The session row no longer denormalizes repo/pull; this is the single read.
-export function taskContext(t: TaskRef | undefined, github?: { owner: string; name: string } | null): { repo?: { owner: string; name: string }; pull?: { number: number } } {
+export function taskContext(
+  t: TaskRef | undefined,
+  github?: { owner: string; name: string } | null,
+): { repo?: { owner: string; name: string }; pull?: { number: number } } {
   if (!t) return {}
   return {
     repo: github ?? undefined,
@@ -289,43 +335,57 @@ export async function resolveTaskCwd(
     const { prepareTask } = await import('./preparationTelemetry')
     return prepareTask(t.id, true, () => inflight)
   }
-  const create = import('./preparationTelemetry').then(({ prepareTask, prepareWorktreePhase }) => prepareTask(t.id, false, async () => {
-    const { owner, repo } = projectWorktreeIdentity(project!)
-    const wt = await ensureWorktree(
-      worktreesRoot,
-      checkout,
-      owner,
-      repo,
-      branch,
-      t.pullNumber,
-    )
-    // Falling back to the project root here put the task in the main checkout, on whatever branch
-    // the user last left it, silently, and typically alongside whatever other task lives there.
-    // The failures that reach this line (git refusing a branch already checked out in another
-    // worktree, a stale directory) are all ones the user has to act on, so say so instead.
-    if (!wt.ok) throw new BridgeError(409, 'worktree-unavailable', wt.reason)
-    await prepareWorktreePhase('worktree.validate', async () => assertOnBranch(wt.path, branch))
-    await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
-    // The task row just gained a worktree, and archive already announces losing one, so "worktree
-    // created / removed" folds into `tasks:changed`: a consumer re-reads `worktreePath`
-    // (docs/plugins/events.md § Hearing a core event).
-    broadcastTasksChanged({ taskId: t.id })
-    if (wt.created) {
-      const scripts = taskScripts(db)
-      scripts.newGeneration(t.id)
-      const setup = await projectSetup(db, t.projectId)
-      scripts.prepareSetup(t.id, setup.script, t.skipSetup ? 'user_skipped' : setup.trigger === 'off' ? 'disabled' : !setup.script?.trim() ? 'not_configured' : undefined)
-      await prepareWorktreePhase('files.copy', () => copyConfiguredFiles(db, t, checkout, wt.path))
-      // Awaited, not fired and forgotten: the hook admits the setup process before the next terminal opens.
-      // This awaits spawning, not completion; callers read task scripts for completion. The chain runner bounds each handler, so an
-      // interceptor that hangs delays this by its own timeout and no longer.
-      await prepareWorktreePhase('setup.admit', () => runHook('core:worktree-created', { taskId: t.id, path: wt.path }))
-      // No process owner accepted the admission (disabled/unavailable hook).
-      const pending = scripts.select(t.id, 'setup')
-      if (pending.state === 'starting' && pending.attemptId) scripts.report({ attemptId: pending.attemptId, generation: pending.generation }, { type: 'failed', reason: 'spawn_failed' })
-    }
-    return { cwd: wt.path, isWorktree: true, created: wt.created }
-  }))
+  const create = import('./preparationTelemetry').then(({ prepareTask, prepareWorktreePhase }) =>
+    prepareTask(t.id, false, async () => {
+      const { owner, repo } = projectWorktreeIdentity(project!)
+      const wt = await ensureWorktree(worktreesRoot, checkout, owner, repo, branch, t.pullNumber)
+      // Falling back to the project root here put the task in the main checkout, on whatever branch
+      // the user last left it, silently, and typically alongside whatever other task lives there.
+      // The failures that reach this line (git refusing a branch already checked out in another
+      // worktree, a stale directory) are all ones the user has to act on, so say so instead.
+      if (!wt.ok) throw new BridgeError(409, 'worktree-unavailable', wt.reason)
+      await prepareWorktreePhase('worktree.validate', async () => assertOnBranch(wt.path, branch))
+      await db
+        .update(schema.tasks)
+        .set({ worktreePath: wt.path, updatedAt: Date.now() })
+        .where(eq(schema.tasks.id, t.id))
+      // The task row just gained a worktree, and archive already announces losing one, so "worktree
+      // created / removed" folds into `tasks:changed`: a consumer re-reads `worktreePath`
+      // (docs/plugins/events.md § Hearing a core event).
+      broadcastTasksChanged({ taskId: t.id })
+      if (wt.created) {
+        const scripts = taskScripts(db)
+        scripts.newGeneration(t.id)
+        const setup = await projectSetup(db, t.projectId)
+        scripts.prepareSetup(
+          t.id,
+          setup.script,
+          t.skipSetup
+            ? 'user_skipped'
+            : setup.trigger === 'off'
+              ? 'disabled'
+              : !setup.script?.trim()
+                ? 'not_configured'
+                : undefined,
+        )
+        await prepareWorktreePhase('files.copy', () => copyConfiguredFiles(db, t, checkout, wt.path))
+        // Awaited, not fired and forgotten: the hook admits the setup process before the next terminal opens.
+        // This awaits spawning, not completion; callers read task scripts for completion. The chain runner bounds each handler, so an
+        // interceptor that hangs delays this by its own timeout and no longer.
+        await prepareWorktreePhase('setup.admit', () =>
+          runHook('core:worktree-created', { taskId: t.id, path: wt.path }),
+        )
+        // No process owner accepted the admission (disabled/unavailable hook).
+        const pending = scripts.select(t.id, 'setup')
+        if (pending.state === 'starting' && pending.attemptId)
+          scripts.report(
+            { attemptId: pending.attemptId, generation: pending.generation },
+            { type: 'failed', reason: 'spawn_failed' },
+          )
+      }
+      return { cwd: wt.path, isWorktree: true, created: wt.created }
+    }),
+  )
   inflightCreates.set(t.id, create)
   try {
     return await create
@@ -375,7 +435,10 @@ export { resolveInRoot } from '../core/fs'
 // the worktree at task creation, and 'terminal' leaves creation lazy. The script runs once when the
 // worktree is first created through the onWorktreeCreated hook.
 export type SetupTrigger = 'off' | 'created' | 'terminal'
-export async function projectSetup(db: AppDatabase, projectId: string): Promise<{ script: string | null; trigger: SetupTrigger }> {
+export async function projectSetup(
+  db: AppDatabase,
+  projectId: string,
+): Promise<{ script: string | null; trigger: SetupTrigger }> {
   const config = await getProjectConfig(db, projectId)
   return { script: config?.config.setupScript ?? null, trigger: config?.config.setupScriptTrigger ?? 'terminal' }
 }
@@ -383,7 +446,12 @@ export async function projectSetup(db: AppDatabase, projectId: string): Promise<
 // Copy files into a fresh worktree (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup): read the
 // config from the source checkout, since the entries are usually gitignored and only it has them.
 // Warnings are logged, never thrown, so a failed copy never blocks worktree creation.
-export async function copyConfiguredFiles(db: AppDatabase, t: Pick<TaskRef, 'projectId'>, checkout: string, worktreePath: string): Promise<void> {
+export async function copyConfiguredFiles(
+  db: AppDatabase,
+  t: Pick<TaskRef, 'projectId'>,
+  checkout: string,
+  worktreePath: string,
+): Promise<void> {
   try {
     // `copy` is repo/user config only, so this layer needs nothing from the project row.
     const cfg = loadRepoConfig(checkout, homedir(), {})
@@ -413,14 +481,26 @@ export async function repoFor(db: AppDatabase, taskId: string): Promise<string> 
   const t = await loadTask(db, taskId)
   if (!t) throw new Error('Task not found.')
   const project = await projectForTask(db, t)
-  return project?.githubOwner && project.githubName ? `${project.githubOwner}/${project.githubName}` : project?.name ?? ''
+  return project?.githubOwner && project.githubName
+    ? `${project.githubOwner}/${project.githubName}`
+    : (project?.name ?? '')
 }
 
 // Merged run-target config + the cwd to run in (the task worktree, created lazily like a terminal).
 export async function taskRunConfig(
   db: AppDatabase,
   taskId: string,
-): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null } | { error: string }> {
+): Promise<
+  | {
+      targets: RunTarget[]
+      cwd: string
+      errors: { source: string; message: string }[]
+      layouts: LayoutRecipe[]
+      repoTargetIds: string[]
+      repoConfigHash: string | null
+    }
+  | { error: string }
+> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
   const project = await projectForTask(db, t)
@@ -428,7 +508,7 @@ export async function taskRunConfig(
   if (!baseCheckout) return { error: 'No checkout mapped for this repo yet.' }
   let cwd: string
   try {
-    ({ cwd } = await resolveTaskCwd(db, t, baseCheckout))
+    ;({ cwd } = await resolveTaskCwd(db, t, baseCheckout))
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'No usable worktree for this task.' }
   }
@@ -441,12 +521,24 @@ export async function taskRunConfig(
     return { error: error instanceof Error ? error.message : 'Repository configuration could not be read safely.' }
   }
   const repoText = snapshot?.files.find((file) => file.path === '.acorn/config.toml')?.content ?? null
-  const cfg = loadRepoConfig(cwd, homedir(), {
-    devScript: project?.devScript,
-    devRestartScript: project?.devRestartScript,
-    runTargetsJson: project?.runTargets,
-  }, repoText)
-  return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts, repoTargetIds: cfg.repoTargetIds, repoConfigHash: snapshot?.hash ?? null }
+  const cfg = loadRepoConfig(
+    cwd,
+    homedir(),
+    {
+      devScript: project?.devScript,
+      devRestartScript: project?.devRestartScript,
+      runTargetsJson: project?.runTargets,
+    },
+    repoText,
+  )
+  return {
+    targets: cfg.runTargets,
+    cwd,
+    errors: cfg.errors,
+    layouts: cfg.layouts,
+    repoTargetIds: cfg.repoTargetIds,
+    repoConfigHash: snapshot?.hash ?? null,
+  }
 }
 
 function slugifyProjectName(name: string): string {

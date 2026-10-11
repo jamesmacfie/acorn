@@ -19,7 +19,9 @@ const NODE_PREF = 'agent_tool_permissions'
 const withLocalStorage = <T>(run: () => T): T => {
   const store = new Map<string, string>()
   ;(globalThis as { localStorage?: unknown }).localStorage = {
-    get length() { return store.size },
+    get length() {
+      return store.size
+    },
     key: (index: number) => [...store.keys()][index] ?? null,
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => void store.set(key, value),
@@ -59,7 +61,9 @@ describe('savePref', () => {
   it('does not let an older equal-value failure roll back a newer successful attempt', async () => {
     const client = new QueryClient()
     client.setQueryData(prefsKey, { [NODE_PREF]: 'light' })
-    mocks.writeJson.mockRejectedValueOnce(new Error('transient')).mockResolvedValueOnce({ key: NODE_PREF, value: 'dark' })
+    mocks.writeJson
+      .mockRejectedValueOnce(new Error('transient'))
+      .mockResolvedValueOnce({ key: NODE_PREF, value: 'dark' })
 
     const first = savePref(client, NODE_PREF, 'dark')
     const second = savePref(client, NODE_PREF, 'dark')
@@ -79,7 +83,9 @@ describe('savePref', () => {
       await expect(savePref(client, 'theme', 'dark')).resolves.toBe(true)
       expect(client.getQueryData(prefsKey)).toEqual({ theme: 'dark' })
       expect(mocks.writeJson).not.toHaveBeenCalled()
-      expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([['acorn-pref:acorn-1:theme', 'dark']])
+      expect([...(globalThis as { __store?: Map<string, string> }).__store!.entries()]).toEqual([
+        ['acorn-pref:acorn-1:theme', 'dark'],
+      ])
     })
   })
 
@@ -96,7 +102,9 @@ describe('savePref', () => {
       localStorage.setItem('acorn-pref:acorn-1:style', 'terminal')
       // The shape every reader actually observes: prefsOptions' select over the raw cache.
       const observer = new QueryObserver<Record<string, string>, Error, Record<string, string>>(client, {
-        queryKey: prefsKey, enabled: false, select: mergePrefs,
+        queryKey: prefsKey,
+        enabled: false,
+        select: mergePrefs,
       })
       const unsubscribe = observer.subscribe(() => {})
       try {
@@ -110,14 +118,25 @@ describe('savePref', () => {
 
   it('refuses an oversize descriptor value before writing', async () => {
     const registration = persistedStateRegistry.register({
-      id: 'test.bounded', key: 'test-bounded', scope: 'app', restore: 'view', version: 1,
-      codec: { parse: String, serialize: String }, empty: () => '', unknownIds: 'drop', maxBytes: 3,
+      id: 'test.bounded',
+      key: 'test-bounded',
+      scope: 'app',
+      restore: 'view',
+      version: 1,
+      codec: { parse: String, serialize: String },
+      empty: () => '',
+      unknownIds: 'drop',
+      maxBytes: 3,
     })
     try {
       const client = new QueryClient()
       await expect(savePref(client, 'test-bounded', 'four')).resolves.toBe(false)
       expect(mocks.writeJson).not.toHaveBeenCalled()
-      expect(mocks.pushBackgroundError).toHaveBeenCalledWith('', 'Could not save test.bounded', 'Persisted value exceeds 3 bytes.')
+      expect(mocks.pushBackgroundError).toHaveBeenCalledWith(
+        '',
+        'Could not save test.bounded',
+        'Persisted value exceeds 3 bytes.',
+      )
     } finally {
       registration.dispose()
     }

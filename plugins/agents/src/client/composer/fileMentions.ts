@@ -16,9 +16,7 @@ export function* fileMentionMatches(
   const expression = /(?:^|\s)@(?:"((?:[^"\\]|\\.)+)"((?::\d+(?:-\d+)?)?)|([^\s]+))/g
   for (const match of text.matchAll(expression)) {
     const quotedPath = match[1]?.replace(/\\(["\\])/g, '$1')
-    const token = quotedPath == null
-      ? match[3].replace(/[),.;]+$/, '')
-      : `${quotedPath}${match[2] ?? ''}`
+    const token = quotedPath == null ? match[3].replace(/[),.;]+$/, '') : `${quotedPath}${match[2] ?? ''}`
     const lines = /:(\d+)(?:-(\d+))?$/.exec(token)
     const path = lines ? token.slice(0, lines.index) : token
     if (!available.has(path) || path.startsWith('/') || path.split('/').includes('..') || path.includes('\\')) continue

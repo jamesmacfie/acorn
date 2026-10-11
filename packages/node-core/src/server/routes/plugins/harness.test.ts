@@ -9,7 +9,8 @@ import type { Env } from '../../bindings'
 const INTERNAL: Principal = { kind: 'internal', userId: 'local' }
 
 // The run bridge exposes task run targets. This proves its shared auth gate and error envelope.
-const app = (principal: Principal | null) => new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/tasks', harness)
+const app = (principal: Principal | null) =>
+  new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/tasks', harness)
 
 const req = (principal: Principal | null, method: string, path: string) =>
   app(principal).fetch(new Request(`http://acorn.test${path}`, { method }), {} as Env)

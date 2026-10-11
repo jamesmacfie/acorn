@@ -29,19 +29,37 @@ export function SettingsSection(props: SettingsSectionProps) {
   const labelId = createUniqueId()
   const actions = children(() => props.actions)
   return (
-    <section class="ui-settings-section" data-settings-section={props.id} data-tone={props.tone} aria-labelledby={labelId}>
+    <section
+      class="ui-settings-section"
+      data-settings-section={props.id}
+      data-tone={props.tone}
+      aria-labelledby={labelId}
+    >
       <div class="ui-settings-section-head">
-        <Show when={props.help} fallback={<h2 class="ui-settings-section-label" id={labelId}>{props.label}</h2>}>
+        <Show
+          when={props.help}
+          fallback={
+            <h2 class="ui-settings-section-label" id={labelId}>
+              {props.label}
+            </h2>
+          }
+        >
           {(help) => (
             <span class="ui-titled">
-              <h2 class="ui-settings-section-label" id={labelId}>{props.label}</h2>
+              <h2 class="ui-settings-section-label" id={labelId}>
+                {props.label}
+              </h2>
               <HelpMark text={help()} titleId={labelId} />
             </span>
           )}
         </Show>
-        <Show when={actions()}><span class="ui-settings-section-actions">{actions()}</span></Show>
+        <Show when={actions()}>
+          <span class="ui-settings-section-actions">{actions()}</span>
+        </Show>
       </div>
-      <Show when={props.description}><p class="ui-settings-section-description">{props.description}</p></Show>
+      <Show when={props.description}>
+        <p class="ui-settings-section-description">{props.description}</p>
+      </Show>
       <div class="ui-settings-section-rows">{props.children}</div>
     </section>
   )

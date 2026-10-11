@@ -36,18 +36,27 @@ export const thirdPartyNotices = (fileName: string): Plugin => ({
       }
     }
     const entries = [...roots].map((root) => {
-      const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { name: string; version: string; license?: string }
+      const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
+        name: string
+        version: string
+        license?: string
+      }
       const texts = readdirSync(root)
         .filter((name) => LICENCE_FILE.test(name))
         .sort()
         .map((name) => readFileSync(join(root, name), 'utf8').trim())
-      const text = texts.length > 0 ? texts.join('\n\n') : `No licence file is published with this package. Its package.json declares: ${manifest.license ?? 'nothing'}.`
+      const text =
+        texts.length > 0
+          ? texts.join('\n\n')
+          : `No licence file is published with this package. Its package.json declares: ${manifest.license ?? 'nothing'}.`
       return { heading: `${manifest.name}@${manifest.version} (${manifest.license ?? 'unknown'})`, text }
     })
     // One pnpm directory per peer-dependency set, so the same version can appear twice.
     const unique = [...new Map(entries.map((entry) => [entry.heading, entry])).values()]
     unique.sort((a, b) => a.heading.localeCompare(b.heading))
-    const source = unique.map(({ heading, text }) => `${heading}\n${'='.repeat(heading.length)}\n\n${text}\n`).join('\n')
+    const source = unique
+      .map(({ heading, text }) => `${heading}\n${'='.repeat(heading.length)}\n\n${text}\n`)
+      .join('\n')
     this.emitFile({ type: 'asset', fileName, source: `Third-party software bundled into this build.\n\n${source}` })
   },
 })

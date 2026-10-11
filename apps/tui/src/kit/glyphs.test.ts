@@ -3,9 +3,21 @@ import { stringWidth } from '../width'
 import { iconGlyph, spinnerGlyph } from './glyphs'
 
 const agentNames = [
-  'archive', 'circle', 'circle-alert', 'circle-check', 'circle-dashed', 'circle-question-mark',
-  'circle-stop', 'clipboard-pen', 'clock', 'list-plus', 'loader-circle', 'shield-question-mark',
-  'triangle-alert', 'workflow', 'x',
+  'archive',
+  'circle',
+  'circle-alert',
+  'circle-check',
+  'circle-dashed',
+  'circle-question-mark',
+  'circle-stop',
+  'clipboard-pen',
+  'clock',
+  'list-plus',
+  'loader-circle',
+  'shield-question-mark',
+  'triangle-alert',
+  'workflow',
+  'x',
 ]
 
 describe('terminal icon names', () => {

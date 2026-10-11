@@ -11,11 +11,17 @@ import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 // the manifest reached this device as a roster row, which is bytes a node sent.
 
 const surface = (over: Partial<PluginFrameSurface> = {}): PluginFrameSurface => ({
-  target: 'pane', id: 'board', label: 'Board', glyph: 'kanban', order: 500, formFactor: ['desktop'], ...over,
+  target: 'pane',
+  id: 'board',
+  label: 'Board',
+  glyph: 'kanban',
+  order: 500,
+  formFactor: ['desktop'],
+  ...over,
 })
 
 const document = (region: Omit<PluginDocumentRegion, 'languageId'>) =>
-  ({ kind: 'document', languageId: 'sql', ...region } as const)
+  ({ kind: 'document', languageId: 'sql', ...region }) as const
 
 const withDocument = (region: Omit<PluginDocumentRegion, 'languageId'>) =>
   surface({ id: 'scratch', layout: 'single', regions: { body: document(region) } })
@@ -52,11 +58,15 @@ describe('isHostOwnedSurface', () => {
   // same bundle in a worker, so it sits behind the same prompt as an iframe.
   it('is false for a pane with a remote region, which runs the same bundle in a worker', () => {
     expect(isHostOwnedSurface(remote)).toBe(false)
-    expect(isHostOwnedSurface(surface({
-      id: 'query',
-      layout: 'document-over-frame',
-      regions: { document: document({ read: '/v1/p/board/doc' }), frame: { kind: 'remote', entry: 'panel' } },
-    }))).toBe(false)
+    expect(
+      isHostOwnedSurface(
+        surface({
+          id: 'query',
+          layout: 'document-over-frame',
+          regions: { document: document({ read: '/v1/p/board/doc' }), frame: { kind: 'remote', entry: 'panel' } },
+        }),
+      ),
+    ).toBe(false)
   })
 })
 
@@ -82,12 +92,15 @@ describe('paneLayoutFor', () => {
   })
 
   it('refuses a layout name and a region set this build does not draw', () => {
-    expect(() => paneLayoutFor('board', surface({ layout: 'carousel', regions: { body: 'frame' } })))
-      .toThrow(/not a layout this build draws/)
-    expect(() => paneLayoutFor('board', surface({ layout: 'list-detail', regions: { list: 'frame' } })))
-      .toThrow(/needs a detail region/)
-    expect(() => paneLayoutFor('board', surface({ layout: 'single', regions: { body: 'frame', extra: 'frame' } })))
-      .toThrow(/has no extra region/)
+    expect(() => paneLayoutFor('board', surface({ layout: 'carousel', regions: { body: 'frame' } }))).toThrow(
+      /not a layout this build draws/,
+    )
+    expect(() => paneLayoutFor('board', surface({ layout: 'list-detail', regions: { list: 'frame' } }))).toThrow(
+      /needs a detail region/,
+    )
+    expect(() =>
+      paneLayoutFor('board', surface({ layout: 'single', regions: { body: 'frame', extra: 'frame' } })),
+    ).toThrow(/has no extra region/)
   })
 
   it('refuses a read route outside the namespace, because a roster row is bytes a node sent', () => {
@@ -98,8 +111,9 @@ describe('paneLayoutFor', () => {
   })
 
   it('refuses an escaping WRITE route even when the read route is fine', () => {
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', write: '/v1/p/other/doc' })))
-      .toThrow(/write route/)
+    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', write: '/v1/p/other/doc' }))).toThrow(
+      /write route/,
+    )
   })
 
   // A capability route is a route like any other: the host POSTs to it on the plugin's behalf on every
@@ -107,17 +121,33 @@ describe('paneLayoutFor', () => {
   // A remote region names a key of the object the bundle passed to `mountTree`, not a route, so there
   // is nothing to confine. A name with no renderer behind it draws the labelled placeholder.
   it('accepts a remote region without asking it for a route', () => {
-    expect(paneLayoutFor('board', remote)).toEqual({ layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } } })
+    expect(paneLayoutFor('board', remote)).toEqual({
+      layout: 'single',
+      regions: { body: { kind: 'remote', entry: 'pane' } },
+    })
   })
 
   it('refuses an escaping COMPLETIONS, HOVER, or DIAGNOSTICS route', () => {
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', completions: { route: '/v1/core/tasks', triggerCharacters: [] } })))
-      .toThrow(/completions route/)
-    expect(paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', completions: { route: '/v1/p/board/complete', triggerCharacters: [] } })))
-      .toMatchObject({ regions: { body: { completions: { route: '/v1/p/board/complete' } } } })
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', hover: { route: '/v1/p/other/hover' } })))
-      .toThrow(/outside board/)
-    expect(() => paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', diagnostics: { route: '/v1/core/tasks' } })))
-      .toThrow(/outside board/)
+    expect(() =>
+      paneLayoutFor(
+        'board',
+        withDocument({ read: '/v1/p/board/doc', completions: { route: '/v1/core/tasks', triggerCharacters: [] } }),
+      ),
+    ).toThrow(/completions route/)
+    expect(
+      paneLayoutFor(
+        'board',
+        withDocument({
+          read: '/v1/p/board/doc',
+          completions: { route: '/v1/p/board/complete', triggerCharacters: [] },
+        }),
+      ),
+    ).toMatchObject({ regions: { body: { completions: { route: '/v1/p/board/complete' } } } })
+    expect(() =>
+      paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', hover: { route: '/v1/p/other/hover' } })),
+    ).toThrow(/outside board/)
+    expect(() =>
+      paneLayoutFor('board', withDocument({ read: '/v1/p/board/doc', diagnostics: { route: '/v1/core/tasks' } })),
+    ).toThrow(/outside board/)
   })
 })

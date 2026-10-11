@@ -8,4 +8,3 @@ export const aiderProfile: AgentProfileContribution = {
   backendPreference: 'tmux',
   transport: 'pty',
 }
-

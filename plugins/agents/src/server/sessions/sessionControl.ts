@@ -22,7 +22,17 @@ export function createSessionControl(runtime: ControlRuntime, caller?: string): 
     },
     // Loaded on the first change, not at boot (./sessionConfig.ts).
     setConfig: async (taskId, sessionId, optionId, value) =>
-      (await import('./sessionConfig')).setSessionConfig(runtime, await owned(taskId, sessionId), optionId, value, caller),
+      (await import('./sessionConfig')).setSessionConfig(
+        runtime,
+        await owned(taskId, sessionId),
+        optionId,
+        value,
+        caller,
+      ),
   }
-  return caller ? control : Object.assign(control, { [BIND_CAPABILITY_CALLER]: (pluginId: string) => createSessionControl(runtime, pluginId) })
+  return caller
+    ? control
+    : Object.assign(control, {
+        [BIND_CAPABILITY_CALLER]: (pluginId: string) => createSessionControl(runtime, pluginId),
+      })
 }

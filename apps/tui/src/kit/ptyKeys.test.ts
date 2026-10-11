@@ -169,8 +169,7 @@ describe('the pty key encoder', () => {
     // `g` and `shift+g` are a letter and a capital, which the table records as `a` and `A`: the case
     // is in the modifier and the character is what the key types, so one row stands for every letter.
     const letters = /^(shift\+)?[a-z]$/
-    expect([...named].filter((spelling) => !recorded.has(spelling) && !letters.test(spelling)).sort())
-      .toEqual([])
+    expect([...named].filter((spelling) => !recorded.has(spelling) && !letters.test(spelling)).sort()).toEqual([])
     expect(recorded.size).toBeGreaterThan(50)
   })
 

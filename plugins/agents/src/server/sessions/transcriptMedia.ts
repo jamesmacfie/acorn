@@ -18,8 +18,10 @@ import type { AgentAttachmentStore } from './attachmentStore'
 
 const tooLarge = (byteSize: number | undefined): boolean => (byteSize ?? 0) > MAX_TRANSCRIPT_MEDIA_READ_BYTES
 
-const withBytes = (media: TranscriptMedia, bytes: Uint8Array): TranscriptMediaRead =>
-  ({ media, bytes: tooLarge(bytes.byteLength) ? null : bytes })
+const withBytes = (media: TranscriptMedia, bytes: Uint8Array): TranscriptMediaRead => ({
+  media,
+  bytes: tooLarge(bytes.byteLength) ? null : bytes,
+})
 
 export const createTranscriptMedia = (deps: {
   taskIdForSession(sessionId: string): Promise<string | null>
@@ -27,13 +29,17 @@ export const createTranscriptMedia = (deps: {
   artifacts: Pick<AgentArtifactStore, 'get' | 'read'>
 }): TranscriptMediaCapability => ({
   read: async ({ taskId, sessionId, kind, id }) => {
-    if (await deps.taskIdForSession(sessionId) !== taskId) return null
+    if ((await deps.taskIdForSession(sessionId)) !== taskId) return null
 
     if (kind === 'attachment') {
       const attachment = await deps.attachments.get(id)
-      if (attachment?.taskId !== taskId || !await deps.attachments.sentIn(sessionId, id)) return null
+      if (attachment?.taskId !== taskId || !(await deps.attachments.sentIn(sessionId, id))) return null
       const media: TranscriptMedia = {
-        kind, id, filename: attachment.filename, mediaType: transcriptMediaType(attachment.mediaType), byteSize: attachment.byteSize,
+        kind,
+        id,
+        filename: attachment.filename,
+        mediaType: transcriptMediaType(attachment.mediaType),
+        byteSize: attachment.byteSize,
       }
       if (tooLarge(media.byteSize)) return { media, bytes: null }
       const content = await deps.attachments.read(id)
@@ -44,7 +50,10 @@ export const createTranscriptMedia = (deps: {
       const artifact = await deps.artifacts.get(id)
       if (artifact?.sessionId !== sessionId) return null
       const media: TranscriptMedia = {
-        kind, id, filename: artifact.title, mediaType: transcriptMediaType(artifact.mediaType),
+        kind,
+        id,
+        filename: artifact.title,
+        mediaType: transcriptMediaType(artifact.mediaType),
         ...(artifact.byteSize == null ? {} : { byteSize: artifact.byteSize }),
       }
       if (tooLarge(media.byteSize)) return { media, bytes: null }

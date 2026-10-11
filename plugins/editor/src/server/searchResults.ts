@@ -41,9 +41,13 @@ export class RgResults {
   accept(raw: string): void {
     if (!raw) return
     let ev: RgEvent
-    try { ev = JSON.parse(raw) as RgEvent }
-    catch { throw new SearchFailure('invalid_output', 'Ripgrep returned an invalid JSON record.') }
-    if (!ev || typeof ev !== 'object' || !['begin', 'end', 'match', 'summary', 'context'].includes(ev.type)) throw new SearchFailure('invalid_output', 'Ripgrep returned an invalid record.')
+    try {
+      ev = JSON.parse(raw) as RgEvent
+    } catch {
+      throw new SearchFailure('invalid_output', 'Ripgrep returned an invalid JSON record.')
+    }
+    if (!ev || typeof ev !== 'object' || !['begin', 'end', 'match', 'summary', 'context'].includes(ev.type))
+      throw new SearchFailure('invalid_output', 'Ripgrep returned an invalid record.')
     if (ev.type === 'begin') {
       const rawPath = ev.data?.path?.text
       const path = rawPath?.startsWith('./') ? rawPath.slice(2) : rawPath
@@ -56,16 +60,25 @@ export class RgResults {
       const content = text.replace(/\r?\n$/, '')
       const preview = content.slice(0, MAX_PREVIEW_LEN)
       for (const sm of ev.data?.submatches ?? []) {
-        if (this.total >= MAX_TOTAL_HITS) { this.truncated = true; return }
+        if (this.total >= MAX_TOTAL_HITS) {
+          this.truncated = true
+          return
+        }
         if (!this.current.hits.length) this.files.push(this.current)
-        this.current.hits.push({ line, col: utf16OffsetAtUtf8Byte(content, sm.start) + 1,
-          endCol: utf16OffsetAtUtf8Byte(content, sm.end) + 1, preview })
+        this.current.hits.push({
+          line,
+          col: utf16OffsetAtUtf8Byte(content, sm.start) + 1,
+          endCol: utf16OffsetAtUtf8Byte(content, sm.end) + 1,
+          preview,
+        })
         this.total++
       }
     }
   }
 
-  result(): SearchResult { return { files: this.files, truncated: this.truncated } }
+  result(): SearchResult {
+    return { files: this.files, truncated: this.truncated }
+  }
 }
 
 export function parseRgJson(stdout: string): SearchResult {

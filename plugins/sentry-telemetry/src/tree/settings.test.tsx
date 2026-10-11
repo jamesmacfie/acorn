@@ -24,8 +24,10 @@ function applied(ops: TreeMutation[]): Map<string, TreeNode> {
   for (const op of ops) {
     if (op.op === 'insert') index(op.node)
     else if (op.op === 'patch') Object.assign(nodes.get(op.id)?.props ?? {}, op.props)
-    else if (op.op === 'text') { const node = nodes.get(op.id); if (node) node.props.value = op.value }
-    else if (op.op === 'remove') nodes.delete(op.id)
+    else if (op.op === 'text') {
+      const node = nodes.get(op.id)
+      if (node) node.props.value = op.value
+    } else if (op.op === 'remove') nodes.delete(op.id)
   }
   return nodes
 }
@@ -62,7 +64,13 @@ describe('the Sentry export settings page', () => {
     const page = mount(null)
     await settle()
     expect(page.checkboxes().map((node) => node.props.ariaLabel)).toEqual([
-      'Errors', 'Traces', 'Logs', 'Metrics', 'Events', 'Stack traces on errors', 'Task ids as tags',
+      'Errors',
+      'Traces',
+      'Logs',
+      'Metrics',
+      'Events',
+      'Stack traces on errors',
+      'Task ids as tags',
     ])
     page.root.dispose()
   })

@@ -166,7 +166,12 @@ for (const point of CORE_POINTS) points.set(point.id, point)
 
 /** What each handler's last run did, for the developer view and the roster row. Kept out of the
  *  registrations so a re-register does not wipe the record of why the previous one failed. */
-export type HookRunRecord = { at: number; ms: number; outcome: 'ok' | 'skipped' | 'timeout' | 'failed' | 'vetoed' | 'asked'; detail?: string }
+export type HookRunRecord = {
+  at: number
+  ms: number
+  outcome: 'ok' | 'skipped' | 'timeout' | 'failed' | 'vetoed' | 'asked'
+  detail?: string
+}
 
 const lastRun = new Map<string, HookRunRecord>()
 
@@ -175,7 +180,11 @@ const lastRun = new Map<string, HookRunRecord>()
 export function registerHookPoint(registration: HookPointRegistration): Disposable {
   if (points.has(registration.id)) throw new Error(`Hook point already declared: ${registration.id}`)
   points.set(registration.id, registration)
-  return { dispose: () => { if (points.get(registration.id) === registration) points.delete(registration.id) } }
+  return {
+    dispose: () => {
+      if (points.get(registration.id) === registration) points.delete(registration.id)
+    },
+  }
 }
 
 /** Register one handler on somebody else's point (or your own). Registering before the point is
@@ -183,7 +192,11 @@ export function registerHookPoint(registration: HookPointRegistration): Disposab
 export function registerHookHandler(registration: HookHandlerRegistration): Disposable {
   if (handlers.has(registration.id)) throw new Error(`Duplicate hook handler '${registration.id}'.`)
   handlers.set(registration.id, registration)
-  return { dispose: () => { if (handlers.get(registration.id) === registration) handlers.delete(registration.id) } }
+  return {
+    dispose: () => {
+      if (handlers.get(registration.id) === registration) handlers.delete(registration.id)
+    },
+  }
 }
 
 /** Drop everything this plugin declared and everything it registered. Both halves, because a plugin
@@ -236,7 +249,12 @@ const beginRun = (traceId: string): HookRun => ({ started: Date.now(), traceId, 
 // `note` was already a span in all but name: a start, an end and a closed outcome set. The owner is
 // the handler's plugin, stamped from the registration and never read off the handler's answer, the
 // same rule the verdict's `by` follows.
-const note = (handler: HookHandlerRegistration, run: HookRun, outcome: HookRunRecord['outcome'], detail?: string): void => {
+const note = (
+  handler: HookHandlerRegistration,
+  run: HookRun,
+  outcome: HookRunRecord['outcome'],
+  detail?: string,
+): void => {
   const at = Date.now()
   lastRun.set(handler.id, { at, ms: at - run.started, outcome, ...(detail ? { detail } : {}) })
   if (!telemetryEnabled()) return
@@ -281,7 +299,8 @@ async function callOne(
     // The handler runs inside its own span, so whatever it spawns or queries is filed under its
     // plugin and lands in the chain's trace (../telemetry/context.ts).
     const answer = runWithTelemetry({ traceId: run.traceId, spanId: run.spanId, owner: handler.pluginId }, () =>
-      handler.call(payload, controller.signal))
+      handler.call(payload, controller.signal),
+    )
     return await Promise.race([answer, deadline])
   } catch (error) {
     log.warn(`${handler.id} on '${handler.point}' failed: ${describeError(error).message}`)
@@ -366,11 +385,14 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
       continue
     }
     if (handler.mode === 'ask') {
-      const question = answer === 'timeout' ? null : answer as { ask?: unknown; reason?: unknown } | null
+      const question = answer === 'timeout' ? null : (answer as { ask?: unknown; reason?: unknown } | null)
       if (question?.ask === true) {
         note(handler, run, 'asked', displayText(question.reason))
         // `by` is stamped from the registration, the same rule a veto's follows.
-        asks.push({ reason: displayText(question.reason) ?? `${handler.pluginId} wants you to decide`, by: handler.pluginId })
+        asks.push({
+          reason: displayText(question.reason) ?? `${handler.pluginId} wants you to decide`,
+          by: handler.pluginId,
+        })
       } else {
         note(handler, run, answer === 'timeout' ? 'timeout' : 'ok')
       }

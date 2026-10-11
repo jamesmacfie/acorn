@@ -1,5 +1,15 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, type Component, type JSX } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+  untrack,
+  type Component,
+  type JSX,
+} from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
@@ -7,10 +17,18 @@ import type { PromoteTaskAction } from '@acorn/client-core/features/integrations
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createFleetQuery } from '@acorn/client-core/infra/node'
 import {
-  extensionDeliveries, extensionPointRegistry, type ExtensionContribution,
+  extensionDeliveries,
+  extensionPointRegistry,
+  type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
-import { compiledOwnerHost, createSlotChoice, GESTURE_WINDOW_MS, resolveSlot, type OwnerActions } from '@acorn/client-core/host/tree'
+import {
+  compiledOwnerHost,
+  createSlotChoice,
+  GESTURE_WINDOW_MS,
+  resolveSlot,
+  type OwnerActions,
+} from '@acorn/client-core/host/tree'
 import type { OverlayPalette } from '@acorn/client-core/host/palette'
 import { contextMenuItems, runContextMenuItem, selectionTooLarge } from '@acorn/client-core/host/registries/panes'
 import type { SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
@@ -19,7 +37,11 @@ import type { Renderable } from '../tree/compat'
 import { pressedWithin } from '../keys/stops'
 import { CORE_MARKDOWN_FENCE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import type { MarkdownFenceAdapter } from '@acorn/client-core/kit/lib/markdown'
-import { createFenceViewers, type FenceScope, type FenceViewer } from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
+import {
+  createFenceViewers,
+  type FenceScope,
+  type FenceViewer,
+} from '@acorn/client-core/host/markdownFences/fenceViewers.ts'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
 import { Badge, Icon, Lines, Row, Rows } from './showing'
@@ -82,8 +104,18 @@ export function Acorn(props: { label?: string }) {
  *  sources are rows in the rail, and choosing one opens the PTY where the pane goes
  *  (docs/tui/chrome.md § What is drawn bespoke). So the box stays and the geography
  *  goes, and `height` is ignored because a pixel count is not a thing a cell host can spend. */
-export function Drawer(props: { height: number; maximized?: boolean; ariaLabel: string; ref?: (element: HTMLElement) => void; children: JSX.Element }) {
-  return <box flexDirection="column" flexGrow={1}>{props.children}</box>
+export function Drawer(props: {
+  height: number
+  maximized?: boolean
+  ariaLabel: string
+  ref?: (element: HTMLElement) => void
+  children: JSX.Element
+}) {
+  return (
+    <box flexDirection="column" flexGrow={1}>
+      {props.children}
+    </box>
+  )
 }
 
 /** A palette overlay somebody else owns: the editor's file finder, github's shortcut sheet.
@@ -136,7 +168,12 @@ export function PaletteSurface<T>(props: {
 
 /** The box a reference panel is drawn in. A drawer over half the window on the desktop; a modal where
  *  the pane goes here, for the reason every other overlay flattens (../kit/grouping.tsx). */
-export default function RefPanelBoxDefault(props: { title: string; onClose: () => void; children: JSX.Element; footer?: JSX.Element }) {
+export default function RefPanelBoxDefault(props: {
+  title: string
+  onClose: () => void
+  children: JSX.Element
+  footer?: JSX.Element
+}) {
   return (
     <Modal onDismiss={props.onClose} title={props.title} size="lg">
       <ModalBody>{props.children}</ModalBody>
@@ -175,7 +212,11 @@ export type { PromoteTaskAction } from '@acorn/client-core/features/integrations
  *  Absent, and it says so. Core draws the list with the desktop's own controls, and it had no terminal
  *  form when it was a page of its own either. */
 export function McpConfigFiles() {
-  return <Line role="muted">The servers each CLI loads from its own config files are listed in the Config files section in the desktop app.</Line>
+  return (
+    <Line role="muted">
+      The servers each CLI loads from its own config files are listed in the Config files section in the desktop app.
+    </Line>
+  )
 }
 
 /** "Is there a task for this thing, and if not, start one".
@@ -239,7 +280,10 @@ export type SlotProps = {
  * of muted text rather than a `<span class="muted">`.
  */
 export function Slot(props: SlotProps) {
-  const choice = createSlotChoice(() => props.point, () => props.key)
+  const choice = createSlotChoice(
+    () => props.point,
+    () => props.key,
+  )
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
@@ -324,7 +368,12 @@ function CompiledWithHost(props: {
   onCleanup(presses.dispose)
   const host = compiledOwnerHost({ declared: props.declared, actions: props.actions, byPerson: presses.recent })
   return (
-    <box flexShrink={0} ref={(element: Renderable) => { container = element }}>
+    <box
+      flexShrink={0}
+      ref={(element: Renderable) => {
+        container = element
+      }}
+    >
       <Dynamic component={props.component} {...props.props()} host={host} />
     </box>
   )
@@ -369,7 +418,9 @@ function FenceView(props: { viewer: FenceViewer; scope: FenceScope }) {
                 props={() => viewer.props}
                 {...(props.scope.taskId ? { taskId: props.scope.taskId } : {})}
                 {...(props.scope.projectId ? { projectId: props.scope.projectId } : {})}
-                occupied={(occupied) => { if (!occupied && viewer.pluginId()) viewer.failed() }}
+                occupied={(occupied) => {
+                  if (!occupied && viewer.pluginId()) viewer.failed()
+                }}
               />
             </box>
           </Show>
@@ -417,7 +468,8 @@ function ExtensionGroupRows(props: { contribution: ExtensionContribution }) {
     { nodeIds: [nodeId] },
   )
   const items = createMemo(() =>
-    (result().rows[0]?.data ?? []).map((item) => ({ ...item, key: item.id, label: item.title })))
+    (result().rows[0]?.data ?? []).map((item) => ({ ...item, key: item.id, label: item.title })),
+  )
 
   return (
     <Show when={items().length}>
@@ -463,7 +515,10 @@ export function InlineSlot(props: { point: string; key?: string; taskId?: string
 
 // ── Selection actions ────────────────────────────────────────────────────────────────────────────
 
-export type { SelectedContent, SelectionActionsProps } from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
+export type {
+  SelectedContent,
+  SelectionActionsProps,
+} from '@acorn/client-core/host/registries/panes/SelectionActions.tsx'
 
 /**
  * Other plugins' actions on selected text (`content.selection`), in cells.
@@ -483,18 +538,33 @@ export function SelectionActions(props: SelectionActionsProps) {
     <>
       {props.children}
       <Show when={rows().length}>
-        <Menu ariaLabel="Actions for the whole text"
+        <Menu
+          ariaLabel="Actions for the whole text"
           trigger={({ toggle, open }) => (
-            <IconButton icon="ellipsis" label="Actions for the whole text" opens="menu" expanded={open()} onPress={toggle} />
+            <IconButton
+              icon="ellipsis"
+              label="Actions for the whole text"
+              opens="menu"
+              expanded={open()}
+              onPress={toggle}
+            />
           )}
         >
           {(menu) => {
             const opened = untrack(target)
             return (
-              <Show when={opened && !selectionTooLarge(opened.text)} fallback={opened && <Menu.Label>This text is over 64 KiB, so no action can take it.</Menu.Label>}>
+              <Show
+                when={opened && !selectionTooLarge(opened.text)}
+                fallback={opened && <Menu.Label>This text is over 64 KiB, so no action can take it.</Menu.Label>}
+              >
                 <For each={opened ? contextMenuItems('content.selection', opened) : []}>
                   {(row) => (
-                    <Menu.Item context={menu} onSelect={() => { if (opened && props.isCurrent(opened)) runContextMenuItem(row, opened) }}>
+                    <Menu.Item
+                      context={menu}
+                      onSelect={() => {
+                        if (opened && props.isCurrent(opened)) runContextMenuItem(row, opened)
+                      }}
+                    >
                       {row.label}
                     </Menu.Item>
                   )}

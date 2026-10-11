@@ -212,7 +212,7 @@ export function emptyAgentPricingPreferences(): AgentPricingPreferences {
 
 function asObject(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : null
 }
 
@@ -226,12 +226,7 @@ function readPrice(value: unknown, path: string, errors: string[]): AgentModelPr
   const price = {} as AgentModelPrice
   for (const field of fields) {
     const amount = object[field]
-    if (
-      typeof amount !== 'number'
-      || !Number.isFinite(amount)
-      || amount < 0
-      || amount > MAX_PRICE_PER_MILLION
-    ) {
+    if (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0 || amount > MAX_PRICE_PER_MILLION) {
       errors.push(`${path}.${field} must be between 0 and ${MAX_PRICE_PER_MILLION}.`)
       continue
     }
@@ -297,9 +292,10 @@ export function validateAgentPricingPreferences(
   const claudePricing = readProvider('Claude', claude, claudePriceCatalog)
   // Version 1 originally held Claude alone. An absent Codex block is an old valid value, not a reason
   // to throw away the owner's Claude overrides.
-  const codexPricing = root.codex === undefined
-    ? { overrides: [], customModels: [] }
-    : readProvider('Codex', asObject(root.codex), codexPriceCatalog)
+  const codexPricing =
+    root.codex === undefined
+      ? { overrides: [], customModels: [] }
+      : readProvider('Codex', asObject(root.codex), codexPriceCatalog)
 
   if (errors.length > 0) return { ok: false, errors }
   return { ok: true, value: { version: 1, claude: claudePricing, codex: codexPricing } }
@@ -330,8 +326,7 @@ export function claudeModelPrice(
   if (custom) return custom.price
   const catalog = claudePriceCatalog.find((entry) => entry.matches(model))
   if (!catalog) return null
-  return preferences.claude.overrides.find((entry) => entry.catalogId === catalog.id)?.price
-    ?? catalog.defaultPrice(at)
+  return preferences.claude.overrides.find((entry) => entry.catalogId === catalog.id)?.price ?? catalog.defaultPrice(at)
 }
 
 export function codexModelPrice(
@@ -345,8 +340,7 @@ export function codexModelPrice(
   if (custom) return custom.price
   const catalog = codexPriceCatalog.find((entry) => entry.matches(model))
   if (!catalog) return null
-  return preferences.codex.overrides.find((entry) => entry.catalogId === catalog.id)?.price
-    ?? catalog.defaultPrice(at)
+  return preferences.codex.overrides.find((entry) => entry.catalogId === catalog.id)?.price ?? catalog.defaultPrice(at)
 }
 
 export function agentModelPrice(

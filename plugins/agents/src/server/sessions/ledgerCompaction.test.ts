@@ -48,24 +48,40 @@ describe('ledger compaction', () => {
 
   // A session whose ledger was written one row per update, the way it was before the fold.
   const oldSession = async (events: Array<[turnId: string | null, event: AgentNormalizedEvent]>) => {
-    const { id } = await store.createSession({
-      taskId: randomUUID(),
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, PROVIDER)
+    const { id } = await store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      PROVIDER,
+    )
     for (const [index, [turnId, event]] of events.entries()) {
-      db.insert(schema.agentEvents).values({
-        id: randomUUID(), sessionId: id, turnId, seq: index + 1, schemaVersion: 1,
-        eventJson: JSON.stringify(event), searchText: agentEventSearchText(event), createdAt: index,
-      }).run()
+      db.insert(schema.agentEvents)
+        .values({
+          id: randomUUID(),
+          sessionId: id,
+          turnId,
+          seq: index + 1,
+          schemaVersion: 1,
+          eventJson: JSON.stringify(event),
+          searchText: agentEventSearchText(event),
+          createdAt: index,
+        })
+        .run()
     }
     db.update(schema.agentSessions).set({ lastEventSeq: events.length }).where(eq(schema.agentSessions.id, id)).run()
     return id
   }
-  const rows = (sessionId: string) => db.select().from(schema.agentEvents)
-    .where(eq(schema.agentEvents.sessionId, sessionId)).orderBy(asc(schema.agentEvents.seq)).all()
+  const rows = (sessionId: string) =>
+    db
+      .select()
+      .from(schema.agentEvents)
+      .where(eq(schema.agentEvents.sessionId, sessionId))
+      .orderBy(asc(schema.agentEvents.seq))
+      .all()
   const drawn = (sessionId: string) => buildConversationItems(rows(sessionId).map(mapAgentEvent))
 
   const turn = randomUUID()
@@ -74,7 +90,10 @@ describe('ledger compaction', () => {
     [turn, { type: 'user_message', text: 'Fix the build.' }],
     [turn, { type: 'tool', tool: { id: 'cmd', title: 'Build', status: 'pending', input: 'pnpm build' } }],
     [turn, { type: 'usage', usage: { inputTokens: 10 } }],
-    [turn, { type: 'tool', tool: { id: 'cmd', title: '', output: 'compiling\n', outputAppend: true, status: 'running' } }],
+    [
+      turn,
+      { type: 'tool', tool: { id: 'cmd', title: '', output: 'compiling\n', outputAppend: true, status: 'running' } },
+    ],
     [turn, { type: 'assistant_message', text: 'Building.' }],
     [turn, { type: 'tool', tool: { id: 'cmd', title: '', output: 'error TS2322\n', outputAppend: true } }],
     [turn, { type: 'file_change', path: 'a.ts', patch: '@@ -1 +1 @@\n-a\n+b', changeId: 'cmd' }],
@@ -138,7 +157,11 @@ describe('ledger compaction', () => {
     const sessionId = await oldSession(LEDGER)
     const controller = new AbortController()
     controller.abort()
-    expect(await compactLedgers(db, { steps: STEPS, signal: controller.signal })).toEqual({ sessions: 0, deleted: 0, rewritten: 0 })
+    expect(await compactLedgers(db, { steps: STEPS, signal: controller.signal })).toEqual({
+      sessions: 0,
+      deleted: 0,
+      rewritten: 0,
+    })
     expect(rows(sessionId)).toHaveLength(LEDGER.length)
     expect(db.select().from(schema.agentSessions).all()[0]!.ledgerCompactedAt).toBeNull()
   })
@@ -147,10 +170,18 @@ describe('ledger compaction', () => {
     const sessionId = await oldSession(LEDGER)
     // An update recorded now folds `cmd` itself, so the pass finds that card's rows gone and skips it.
     const frames: AgentEventRecord[] = rows(sessionId).map(mapAgentEvent)
-    frames.push(await store.recordEvent(sessionId, turn, { type: 'tool', tool: { id: 'cmd', title: '', output: 'retrying\n', outputAppend: true } }))
+    frames.push(
+      await store.recordEvent(sessionId, turn, {
+        type: 'tool',
+        tool: { id: 'cmd', title: '', output: 'retrying\n', outputAppend: true },
+      }),
+    )
     await compactLedgers(db, { steps: STEPS })
-    expect(rows(sessionId).filter((row) => JSON.parse(row.eventJson).tool?.id === 'cmd' && row.turnId === turn).map((row) => row.seq))
-      .toEqual([2, LEDGER.length + 1])
+    expect(
+      rows(sessionId)
+        .filter((row) => JSON.parse(row.eventJson).tool?.id === 'cmd' && row.turnId === turn)
+        .map((row) => row.seq),
+    ).toEqual([2, LEDGER.length + 1])
     expect(drawn(sessionId)).toEqual(buildConversationItems(frames))
   })
 })

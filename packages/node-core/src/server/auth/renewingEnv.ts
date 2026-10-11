@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { chmodSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { INTERNAL_TOKEN_LIFETIME_MS, mintInternalToken, renewInternalToken, verifyInternalToken, type InternalClaims, type InternalEnvFactory } from './internalTokens'
+import {
+  INTERNAL_TOKEN_LIFETIME_MS,
+  mintInternalToken,
+  renewInternalToken,
+  verifyInternalToken,
+  type InternalClaims,
+  type InternalEnvFactory,
+} from './internalTokens'
 import { sessionCredentialPath } from './credentialFile'
 import type { ActiveCredentials } from './activeCredentials'
 
@@ -41,7 +48,10 @@ export function renewingInternalEnv(
   // later pass renews only files it owns, so a token copied back to a removed session's path is deleted.
   const refresh = (adopt: boolean) => {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.endsWith('.tmp')) { rmSync(join(dir, entry.name), { force: true }); continue }
+      if (entry.name.endsWith('.tmp')) {
+        rmSync(join(dir, entry.name), { force: true })
+        continue
+      }
       if (entry.name.endsWith('.child')) {
         // A one-shot workflow child has no owner after a Node restart.
         if (!childFiles.has(join(dir, entry.name))) rmSync(join(dir, entry.name), { force: true })
@@ -51,12 +61,22 @@ export function renewingInternalEnv(
       const path = join(dir, entry.name)
       try {
         const owned = sessionFiles.get(path)
-        if ((!owned && !adopt) || Date.now() - lstatSync(path).mtimeMs > RETAIN_MS) { rmSync(path); continue }
+        if ((!owned && !adopt) || Date.now() - lstatSync(path).mtimeMs > RETAIN_MS) {
+          rmSync(path)
+          continue
+        }
         // A token from before credential ids gets one here, because renewal mints with the same claims.
         const renewed = renewInternalToken(key, readFileSync(path, 'utf8'))
         const claims = renewed ? verifyInternalToken(key, renewed) : null
-        if (!renewed || claims?.scope !== 'task' || !claims.taskId || !claims.sessionId || !claims.credentialId
-          || path !== sessionCredentialPath(dataDir, claims.taskId, claims.sessionId)) continue
+        if (
+          !renewed ||
+          claims?.scope !== 'task' ||
+          !claims.taskId ||
+          !claims.sessionId ||
+          !claims.credentialId ||
+          path !== sessionCredentialPath(dataDir, claims.taskId, claims.sessionId)
+        )
+          continue
         // A file rewritten with another token for the session isn't the Node's credential. Its id isn't
         // live, so it authenticates nothing, and renewing it would only extend a copy.
         if (owned && claims.credentialId !== owned) continue

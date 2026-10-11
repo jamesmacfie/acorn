@@ -1,34 +1,28 @@
 import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
 
-const sameValue = (
-  left: AgentConfigOption['values'][number],
-  right: AgentConfigOption['values'][number],
-): boolean =>
-  left.value === right.value
-  && left.label === right.label
-  && left.description === right.description
+const sameValue = (left: AgentConfigOption['values'][number], right: AgentConfigOption['values'][number]): boolean =>
+  left.value === right.value && left.label === right.label && left.description === right.description
 
 /**
  * Provider metadata is re-hydrated from SQLite for every session projection. Preserve the previous
  * array when its semantic content has not changed so open form controls keep their DOM identity.
  */
-export const sameAgentConfigOptions = (
-  left: AgentConfigOption[],
-  right: AgentConfigOption[],
-): boolean =>
-  left.length === right.length
-  && left.every((option, index) => {
+export const sameAgentConfigOptions = (left: AgentConfigOption[], right: AgentConfigOption[]): boolean =>
+  left.length === right.length &&
+  left.every((option, index) => {
     const candidate = right[index]
-    return candidate != null
-      && option.id === candidate.id
-      && option.label === candidate.label
-      && option.category === candidate.category
-      && option.currentValue === candidate.currentValue
-      && option.values.length === candidate.values.length
-      && option.values.every((value, valueIndex) => {
+    return (
+      candidate != null &&
+      option.id === candidate.id &&
+      option.label === candidate.label &&
+      option.category === candidate.category &&
+      option.currentValue === candidate.currentValue &&
+      option.values.length === candidate.values.length &&
+      option.values.every((value, valueIndex) => {
         const nextValue = candidate.values[valueIndex]
         return nextValue != null && sameValue(value, nextValue)
       })
+    )
   })
 
 /**
@@ -59,8 +53,8 @@ export const sessionModelSummary = (session: AgentSession): string | undefined =
   if (!Array.isArray(options)) return model
   const reasoning = (options as AgentConfigOption[]).find((option) => option.category === 'reasoning')
   if (!reasoning?.currentValue) return model
-  const effort = reasoning.values.find((value) => value.value === reasoning.currentValue)?.label
-    ?? reasoning.currentValue
+  const effort =
+    reasoning.values.find((value) => value.value === reasoning.currentValue)?.label ?? reasoning.currentValue
   return `${model} · ${effort}`
 }
 

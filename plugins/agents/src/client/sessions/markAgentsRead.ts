@@ -22,7 +22,9 @@ export async function markAgentsRead(): Promise<void> {
   markTargetsRead('managed-agent', new Set(sessions.map((session) => session.id)))
   // ponytail: one request per session; a bulk route if somebody clears hundreds at once.
   const results = await Promise.allSettled(
-    sessions.map((session) => managedAgentApi.patch(session.id, { lastReadSeq: managedAgentStore.lastEventSeq(session) })),
+    sessions.map((session) =>
+      managedAgentApi.patch(session.id, { lastReadSeq: managedAgentStore.lastEventSeq(session) }),
+    ),
   )
   let failed = 0
   for (const result of results) {

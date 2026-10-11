@@ -9,14 +9,32 @@ import type { LayoutRecipe, RunTarget } from '../runConfig'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { broadcastTasksChanged, broadcastWorktreeStatusChanged } from '../notify'
-import { loadTask, projectForTask, requireTaskRoot, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../worktrees/taskWorktree'
+import {
+  loadTask,
+  projectForTask,
+  requireTaskRoot,
+  resolveTaskCwd,
+  TASK_REF_COLUMNS,
+  taskRoot,
+  taskRunConfig,
+  toTaskRef,
+  workspaceIdFor,
+  type TaskRef,
+} from '../worktrees/taskWorktree'
 import { getProject, normalizeGithubPart } from '../projects'
 import { isTaskArchiving } from '../worktrees/archiveGate'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
 export type TaskRunConfig =
-  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null }
+  | {
+      targets: RunTarget[]
+      cwd: string
+      errors: { source: string; message: string }[]
+      layouts: LayoutRecipe[]
+      repoTargetIds: string[]
+      repoConfigHash: string | null
+    }
   | { error: string }
 
 // The three columns a `task_links` row is read for outside core: which provider, through which
@@ -63,7 +81,10 @@ export type TaskService = {
   // (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup). Takes the row rather than the id, because
   // the one caller already loaded it and re-reading would be a second query across a database
   // boundary.
-  resolveCwd(task: TaskRef | undefined, baseCheckout: string | undefined): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
+  resolveCwd(
+    task: TaskRef | undefined,
+    baseCheckout: string | undefined,
+  ): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
   // Run targets and cwd for a task: project settings merged with the project's committed
   // `.acorn/config.toml`. plugins/terminal's RuntimeService is the only consumer, and it can read
   // neither source itself, since one is a core table and the other needs the lazy worktree.
@@ -140,31 +161,61 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       const project = await getProject(db, projectId)
       if (!project) throw new Error('Project not found.')
       const title = seed.title.trim()
-      if (!title || !seed.origin.trim() || !intendedTaskId.trim()) throw new Error('Root task identity, title, and origin are required.')
-      const reserve = async () => db.transaction((tx) => {
-        const existing = tx.select().from(schema.tasks).where(eq(schema.tasks.id, intendedTaskId)).get()
-        const branches = tx.select({ id: schema.tasks.id, branch: schema.tasks.branch }).from(schema.tasks).all()
-          .flatMap(row => row.id !== intendedTaskId && row.branch ? [row.branch] : [])
-        const branch = project.vcs === 'git'
-          ? dedupeBranch(slugifyBranch(seed.branch || title) || `workflow-${intendedTaskId.slice(0, 8)}`, branches)
-          : null
-        if (existing) {
-          if (existing.parentId !== null || existing.projectId !== project.id || existing.title !== title
-            || existing.origin !== seed.origin || existing.branch !== branch) {
-            throw new Error(`Root task id '${intendedTaskId}' is already used by a different seed.`)
+      if (!title || !seed.origin.trim() || !intendedTaskId.trim())
+        throw new Error('Root task identity, title, and origin are required.')
+      const reserve = async () =>
+        db.transaction((tx) => {
+          const existing = tx.select().from(schema.tasks).where(eq(schema.tasks.id, intendedTaskId)).get()
+          const branches = tx
+            .select({ id: schema.tasks.id, branch: schema.tasks.branch })
+            .from(schema.tasks)
+            .all()
+            .flatMap((row) => (row.id !== intendedTaskId && row.branch ? [row.branch] : []))
+          const branch =
+            project.vcs === 'git'
+              ? dedupeBranch(slugifyBranch(seed.branch || title) || `workflow-${intendedTaskId.slice(0, 8)}`, branches)
+              : null
+          if (existing) {
+            if (
+              existing.parentId !== null ||
+              existing.projectId !== project.id ||
+              existing.title !== title ||
+              existing.origin !== seed.origin ||
+              existing.branch !== branch
+            ) {
+              throw new Error(`Root task id '${intendedTaskId}' is already used by a different seed.`)
+            }
+            return false
           }
-          return false
-        }
-        const value = tx.select({ value: max(schema.tasks.sort) }).from(schema.tasks).get()?.value
-        const at = Date.now()
-        tx.insert(schema.tasks).values({
-          id: intendedTaskId, title, icon: null, origin: seed.origin, projectId: project.id,
-          branch, pullNumber: null, worktreePath: null, status: 'active', parentId: null,
-          sort: (value ?? -1) + 1, createdAt: at, updatedAt: at, archivedAt: null,
-        }).run()
-        return true
-      })
-      const created = project.vcs === 'git' ? await (await import('../worktrees/taskBranch')).withBranchReservation(db, project, reserve, true) : await reserve()
+          const value = tx
+            .select({ value: max(schema.tasks.sort) })
+            .from(schema.tasks)
+            .get()?.value
+          const at = Date.now()
+          tx.insert(schema.tasks)
+            .values({
+              id: intendedTaskId,
+              title,
+              icon: null,
+              origin: seed.origin,
+              projectId: project.id,
+              branch,
+              pullNumber: null,
+              worktreePath: null,
+              status: 'active',
+              parentId: null,
+              sort: (value ?? -1) + 1,
+              createdAt: at,
+              updatedAt: at,
+              archivedAt: null,
+            })
+            .run()
+          return true
+        })
+      const created =
+        project.vcs === 'git'
+          ? await (await import('../worktrees/taskBranch')).withBranchReservation(db, project, reserve, true)
+          : await reserve()
       if (created) {
         await recordSetupDecision(db, intendedTaskId, false)
         broadcastWorktreeStatusChanged({ taskId: intendedTaskId })
@@ -179,7 +230,8 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         .where(and(eq(schema.tasks.status, 'archived'), lt(schema.tasks.archivedAt, before)))
       return rows.map((row) => row.id)
     },
-    deleted: async () => (await db.select({ id: schema.deletedTasks.id }).from(schema.deletedTasks)).map((row) => row.id),
+    deleted: async () =>
+      (await db.select({ id: schema.deletedTasks.id }).from(schema.deletedTasks)).map((row) => row.id),
     adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
       if (!branchToPull.size) return 0
       const candidates = await db
@@ -203,12 +255,19 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         const pullNumber = task.branch ? branchToPull.get(task.branch) : undefined
         return pullNumber == null
           ? []
-          : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(and(
-            eq(schema.tasks.id, task.id),
-            eq(schema.tasks.branch, task.branch!),
-            eq(schema.tasks.status, 'active'),
-            isNull(schema.tasks.pullNumber),
-          ))]
+          : [
+              db
+                .update(schema.tasks)
+                .set({ pullNumber, updatedAt: now })
+                .where(
+                  and(
+                    eq(schema.tasks.id, task.id),
+                    eq(schema.tasks.branch, task.branch!),
+                    eq(schema.tasks.status, 'active'),
+                    isNull(schema.tasks.pullNumber),
+                  ),
+                ),
+            ]
       })
       if (!updates.length) return 0
       // One batch within core's file, which is all the atomicity docs/data-layer.md permits here.
@@ -226,8 +285,12 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
     resolveCwd: (task, baseCheckout) => resolveTaskCwd(db, task, baseCheckout),
     runConfig: (taskId) => taskRunConfig(db, taskId),
     active: () => db.select(TASK_REF_COLUMNS).from(schema.tasks).where(eq(schema.tasks.status, 'active')),
-    branchClaims: async () => db.select({ ...TASK_REF_COLUMNS, status: schema.tasks.status }).from(schema.tasks).all()
-      .filter((task) => task.status === 'active' || isTaskArchiving(task.id)),
+    branchClaims: async () =>
+      db
+        .select({ ...TASK_REF_COLUMNS, status: schema.tasks.status })
+        .from(schema.tasks)
+        .all()
+        .filter((task) => task.status === 'active' || isTaskArchiving(task.id)),
     workspaceId: (taskId) => workspaceIdFor(db, taskId),
     // Built from the same two queries as `workspaceIdFor` rather than by catching its throw, because
     // catching cannot tell "no membership" from "the database is broken".
@@ -238,19 +301,35 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       return project?.workspaceId ?? null
     },
     idsForWorkspace: async (workspaceId) => {
-      const projectIds = (await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.workspaceId, workspaceId))).map((row) => row.id)
+      const projectIds = (
+        await db
+          .select({ id: schema.projects.id })
+          .from(schema.projects)
+          .where(eq(schema.projects.workspaceId, workspaceId))
+      ).map((row) => row.id)
       const projectTasks = projectIds.length
-        ? await db.selectDistinct({ id: schema.tasks.id }).from(schema.tasks).where(or(...projectIds.map((id) => eq(schema.tasks.projectId, id))))
+        ? await db
+            .selectDistinct({ id: schema.tasks.id })
+            .from(schema.tasks)
+            .where(or(...projectIds.map((id) => eq(schema.tasks.projectId, id))))
         : []
       return projectTasks.map((row) => row.id)
     },
     links: (taskId) =>
       db
-        .select({ provider: schema.taskLinks.provider, integrationId: schema.taskLinks.integrationId, identifier: schema.taskLinks.identifier })
+        .select({
+          provider: schema.taskLinks.provider,
+          integrationId: schema.taskLinks.integrationId,
+          identifier: schema.taskLinks.identifier,
+        })
         .from(schema.taskLinks)
         .where(eq(schema.taskLinks.taskId, taskId)),
     pulls: async (taskId) => {
-      const rows = await db.select().from(schema.taskPulls).where(eq(schema.taskPulls.taskId, taskId)).orderBy(schema.taskPulls.createdAt)
+      const rows = await db
+        .select()
+        .from(schema.taskPulls)
+        .where(eq(schema.taskPulls.taskId, taskId))
+        .orderBy(schema.taskPulls.createdAt)
       return rows.map((row) => ({
         taskId: row.taskId,
         repoOwner: row.repoOwner,
@@ -263,35 +342,45 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       }))
     },
     attachPull: async (taskId, input) => {
-      if (!Number.isSafeInteger(input.pullNumber) || input.pullNumber <= 0) throw new Error('Pull number must be a positive integer.')
+      if (!Number.isSafeInteger(input.pullNumber) || input.pullNumber <= 0)
+        throw new Error('Pull number must be a positive integer.')
       if (!input.sessionId.trim()) throw new Error('A managed agent session is required to attach a pull request.')
       const repoOwner = normalizeGithubPart(input.repoOwner)
       const repoName = normalizeGithubPart(input.repoName)
 
       const result = db.transaction((tx) => {
-        const task = tx.select({
-          id: schema.tasks.id,
-          pullNumber: schema.tasks.pullNumber,
-          projectOwner: schema.projects.githubOwner,
-          projectName: schema.projects.githubName,
-        })
+        const task = tx
+          .select({
+            id: schema.tasks.id,
+            pullNumber: schema.tasks.pullNumber,
+            projectOwner: schema.projects.githubOwner,
+            projectName: schema.projects.githubName,
+          })
           .from(schema.tasks)
           .leftJoin(schema.projects, eq(schema.projects.id, schema.tasks.projectId))
           .where(eq(schema.tasks.id, taskId))
           .get()
         if (!task) throw new Error('Task not found.')
         if (
-          !task.projectOwner || !task.projectName
-          || normalizeGithubPart(task.projectOwner) !== repoOwner
-          || normalizeGithubPart(task.projectName) !== repoName
-        ) throw new Error('Pull request repository does not match the task project.')
+          !task.projectOwner ||
+          !task.projectName ||
+          normalizeGithubPart(task.projectOwner) !== repoOwner ||
+          normalizeGithubPart(task.projectName) !== repoName
+        )
+          throw new Error('Pull request repository does not match the task project.')
 
-        const existing = tx.select().from(schema.taskPulls).where(and(
-          eq(schema.taskPulls.taskId, taskId),
-          eq(schema.taskPulls.repoOwner, repoOwner),
-          eq(schema.taskPulls.repoName, repoName),
-          eq(schema.taskPulls.pullNumber, input.pullNumber),
-        )).get()
+        const existing = tx
+          .select()
+          .from(schema.taskPulls)
+          .where(
+            and(
+              eq(schema.taskPulls.taskId, taskId),
+              eq(schema.taskPulls.repoOwner, repoOwner),
+              eq(schema.taskPulls.repoName, repoName),
+              eq(schema.taskPulls.pullNumber, input.pullNumber),
+            ),
+          )
+          .get()
         if (existing) {
           return {
             changed: false,
@@ -335,7 +424,9 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
           sessionId: input.sessionId,
           ...(input.requestId ? { requestId: input.requestId } : {}),
         }
-        tx.insert(schema.taskPulls).values({ ...relation, requestId: relation.requestId ?? null, createdAt: Date.now() }).run()
+        tx.insert(schema.taskPulls)
+          .values({ ...relation, requestId: relation.requestId ?? null, createdAt: Date.now() })
+          .run()
         return { changed: true, relation }
       })
       if (result.changed) broadcastTasksChanged({ taskId })
@@ -349,32 +440,67 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       if (!project) throw new Error('Parent task has no project.')
       const id = intendedChildId ?? randomUUID()
       const stem = slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`
-      const created = await withBranchReservation(db, project, async () => {
-        const existingTask = db.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()
-        // Replay keeps the first allocation even when Git or other task reservations have changed.
-        if (existingTask) {
-          const branchMatches = project.vcs !== 'git' ? existingTask.branch === null
-            : existingTask.branch === stem || (existingTask.branch?.startsWith(`${stem}-`)
-              && /^[0-9]+$/.test(existingTask.branch.slice(stem.length + 1)) && Number(existingTask.branch.slice(stem.length + 1)) >= 2)
-          if (existingTask.parentId !== parentTaskId || existingTask.projectId !== project.id
-            || existingTask.title !== seed.title || !branchMatches || existingTask.origin !== (seed.origin ?? 'local')) {
-            throw new Error(`Child task id '${id}' is already used by a different parent or seed.`)
+      const created = await withBranchReservation(
+        db,
+        project,
+        async () => {
+          const existingTask = db.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()
+          // Replay keeps the first allocation even when Git or other task reservations have changed.
+          if (existingTask) {
+            const branchMatches =
+              project.vcs !== 'git'
+                ? existingTask.branch === null
+                : existingTask.branch === stem ||
+                  (existingTask.branch?.startsWith(`${stem}-`) &&
+                    /^[0-9]+$/.test(existingTask.branch.slice(stem.length + 1)) &&
+                    Number(existingTask.branch.slice(stem.length + 1)) >= 2)
+            if (
+              existingTask.parentId !== parentTaskId ||
+              existingTask.projectId !== project.id ||
+              existingTask.title !== seed.title ||
+              !branchMatches ||
+              existingTask.origin !== (seed.origin ?? 'local')
+            ) {
+              throw new Error(`Child task id '${id}' is already used by a different parent or seed.`)
+            }
+            return false
           }
-          return false
-        }
-        return saveTaskBranch(db, project, { branch: project.vcs === 'git' ? stem : null, branchSource: 'derived', baseBranch: seed.baseBranch }, (branch) => {
-          const currentParent = db.select().from(schema.tasks).where(eq(schema.tasks.id, parentTaskId)).get()
-          if (currentParent?.status !== 'active' || isTaskArchiving(parentTaskId)) throw new Error('Parent task is not active or is being archived.')
-          const value = db.select({ value: max(schema.tasks.sort) }).from(schema.tasks).get()?.value
-          const at = Date.now()
-          db.insert(schema.tasks).values({
-            id, title: seed.title, origin: seed.origin ?? 'local', projectId: project.id, branch,
-            pullNumber: null, worktreePath: null, status: 'active', parentId: parentTaskId,
-            sort: (value ?? -1) + 1, createdAt: at, updatedAt: at, archivedAt: null,
-          }).run()
-          return true
-        })
-      }, !seed.baseBranch)
+          return saveTaskBranch(
+            db,
+            project,
+            { branch: project.vcs === 'git' ? stem : null, branchSource: 'derived', baseBranch: seed.baseBranch },
+            (branch) => {
+              const currentParent = db.select().from(schema.tasks).where(eq(schema.tasks.id, parentTaskId)).get()
+              if (currentParent?.status !== 'active' || isTaskArchiving(parentTaskId))
+                throw new Error('Parent task is not active or is being archived.')
+              const value = db
+                .select({ value: max(schema.tasks.sort) })
+                .from(schema.tasks)
+                .get()?.value
+              const at = Date.now()
+              db.insert(schema.tasks)
+                .values({
+                  id,
+                  title: seed.title,
+                  origin: seed.origin ?? 'local',
+                  projectId: project.id,
+                  branch,
+                  pullNumber: null,
+                  worktreePath: null,
+                  status: 'active',
+                  parentId: parentTaskId,
+                  sort: (value ?? -1) + 1,
+                  createdAt: at,
+                  updatedAt: at,
+                  archivedAt: null,
+                })
+                .run()
+              return true
+            },
+          )
+        },
+        !seed.baseBranch,
+      )
       if (!created) return id
       await recordSetupDecision(db, id, false)
       broadcastWorktreeStatusChanged({ taskId: id })
@@ -382,10 +508,16 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       return id
     },
     cancel: async (taskId) => {
-      const [task] = await db.select({ status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.id, taskId))
+      const [task] = await db
+        .select({ status: schema.tasks.status })
+        .from(schema.tasks)
+        .where(eq(schema.tasks.id, taskId))
       if (!task || task.status === 'cancelled') return
       taskScripts(db).interruptTask(taskId, 'cancelled')
-      await db.update(schema.tasks).set({ status: 'cancelled', updatedAt: Date.now() }).where(eq(schema.tasks.id, taskId))
+      await db
+        .update(schema.tasks)
+        .set({ status: 'cancelled', updatedAt: Date.now() })
+        .where(eq(schema.tasks.id, taskId))
       broadcastWorktreeStatusChanged({ taskId })
       broadcastTasksChanged({ taskId })
     },

@@ -38,7 +38,7 @@ export async function probeClaudeAuthentication(executable: string): Promise<boo
       maxBuffer: 64 * 1024,
     })
     const result = claudeAuthStatusSchema.safeParse(JSON.parse(stdout))
-    return result.success ? result.data.loggedIn ?? null : null
+    return result.success ? (result.data.loggedIn ?? null) : null
   } catch {
     return null
   }

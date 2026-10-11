@@ -1,15 +1,27 @@
 export {
-  clientEvents, consumePaneIntent, consumeTerminalFocusIntent, openPane,
+  clientEvents,
+  consumePaneIntent,
+  consumeTerminalFocusIntent,
+  openPane,
   requestTerminalFocusIntent,
 } from './clientEvents.ts'
 export type { PaneIntent } from './clientEvents.ts'
 export {
-  COMMAND_CLOSED, commandAvailable, commandRegistry, commandTitle,
-  executeCommand, registerCommands,
+  COMMAND_CLOSED,
+  commandAvailable,
+  commandRegistry,
+  commandTitle,
+  executeCommand,
+  registerCommands,
 } from './commands.ts'
 export type {
-  CommandContribution, CommandExecutionContext, CommandOutcome, ContributedCommand,
-  InputCommand, SearchCommand, SettingCommand,
+  CommandContribution,
+  CommandExecutionContext,
+  CommandOutcome,
+  ContributedCommand,
+  InputCommand,
+  SearchCommand,
+  SettingCommand,
 } from './commands.ts'
 export { appearanceCommands, notificationCommands, settingsPageCommands } from './coreCommands.ts'
 export { CREATE_TASK_ROUTE, PROJECT_ROUTE, TASK_ROUTE, projectPath } from './corePaths.ts'

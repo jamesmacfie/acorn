@@ -7,26 +7,51 @@ import { retainScroll } from './retainScroll'
 // refuses any offset until its content has "arrived", the way a browser clamps an empty list to zero.
 
 const offsets = new Map<string, number>()
-const store = (key: () => string) => ({ key, read: (at: string) => offsets.get(at) ?? 0, write: (at: string, offset: number) => { offsets.set(at, offset) } })
+const store = (key: () => string) => ({
+  key,
+  read: (at: string) => offsets.get(at) ?? 0,
+  write: (at: string, offset: number) => {
+    offsets.set(at, offset)
+  },
+})
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 const mounted: (() => void)[] = []
-afterEach(() => { mounted.splice(0).forEach((dispose) => dispose()); offsets.clear() })
+afterEach(() => {
+  mounted.splice(0).forEach((dispose) => dispose())
+  offsets.clear()
+})
 
 function mount(key: () => string, ready: () => boolean = () => true) {
   const host = document.createElement('div')
   document.body.append(host)
   let scroller!: HTMLDivElement
   let position = 0
-  const dispose = render(() => (
-    <div ref={(element) => {
-      scroller = element
-      Object.defineProperty(element, 'scrollTop', { configurable: true, get: () => position, set: (offset: number) => { position = ready() ? offset : 0 } })
-      retainScroll(element, store(key))
-    }}>
-      <Show when={ready()}><p>rows</p></Show>
-    </div>
-  ), host)
-  const unmount = () => { dispose(); host.remove() }
+  const dispose = render(
+    () => (
+      <div
+        ref={(element) => {
+          scroller = element
+          Object.defineProperty(element, 'scrollTop', {
+            configurable: true,
+            get: () => position,
+            set: (offset: number) => {
+              position = ready() ? offset : 0
+            },
+          })
+          retainScroll(element, store(key))
+        }}
+      >
+        <Show when={ready()}>
+          <p>rows</p>
+        </Show>
+      </div>
+    ),
+    host,
+  )
+  const unmount = () => {
+    dispose()
+    host.remove()
+  }
   mounted.push(unmount)
   return { scroller: () => scroller, position: () => position, unmount }
 }

@@ -15,10 +15,7 @@ const post = <T>(url: string, body?: unknown): Promise<T> =>
   })
 
 export const connectIntegration = (providerId: string, credentials: Record<string, string>) =>
-  post<{ integration: Integration }>(
-    integrationsRoute,
-    { providerId, credentials } satisfies ConnectIntegrationRequest,
-  )
+  post<{ integration: Integration }>(integrationsRoute, { providerId, credentials } satisfies ConnectIntegrationRequest)
 
 export const rotateIntegration = (id: string, credentials: Record<string, string>) =>
   writeJson<{ integration: Integration }>(integrationRoute(id), {
@@ -27,8 +24,7 @@ export const rotateIntegration = (id: string, credentials: Record<string, string
     body: JSON.stringify({ credentials }),
   })
 
-export const testIntegration = (id: string) =>
-  post<{ integration: Integration }>(integrationTestRoute(id))
+export const testIntegration = (id: string) => post<{ integration: Integration }>(integrationTestRoute(id))
 
 export const setIntegrationDisabled = (id: string, disabled: boolean) =>
   writeJson<{ integration: Integration }>(integrationRoute(id), {
@@ -45,4 +41,5 @@ export const renameIntegration = (id: string, name: string | null) =>
     body: JSON.stringify({ name }),
   })
 
-export const deleteIntegration = (id: string): Promise<void> => sendJson<void>(integrationRoute(id), { method: 'DELETE' })
+export const deleteIntegration = (id: string): Promise<void> =>
+  sendJson<void>(integrationRoute(id), { method: 'DELETE' })

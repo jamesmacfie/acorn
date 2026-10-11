@@ -27,7 +27,7 @@ export function Tabs(props: LayoutProps) {
   const [selected, setSelected] = layoutState(props.stateKey, 'tab', '')
   // Falls back rather than storing a default, so a pane whose tab set changes under a stored id lands
   // on its first tab instead of on nothing.
-  const active = () => (tabs().some((tab) => tab.id === selected()) ? selected() : tabs()[0]?.id ?? '')
+  const active = () => (tabs().some((tab) => tab.id === selected()) ? selected() : (tabs()[0]?.id ?? ''))
   return (
     <box
       flexDirection="column"
@@ -38,15 +38,19 @@ export function Tabs(props: LayoutProps) {
         // Ctrl, not the platform's primary modifier. macOS keeps Cmd for the terminal emulator and
         // never delivers it, so the desktop's Cmd+1 is Ctrl+1 here — the same substitution the
         // command layer makes for every chord in the intent table (../keys/commandLayer.ts § asCtrl).
-        bindKeys(element, Array.from({ length: CHORD_TABS }, (_, index) => ({
-          key: `ctrl+${index + 1}`,
-          cmd: () => {
-            const tab = tabs()[index]
-            if (!tab) return false
-            setSelected(tab.id)
-            return true
-          },
-        })), PANE)
+        bindKeys(
+          element,
+          Array.from({ length: CHORD_TABS }, (_, index) => ({
+            key: `ctrl+${index + 1}`,
+            cmd: () => {
+              const tab = tabs()[index]
+              if (!tab) return false
+              setSelected(tab.id)
+              return true
+            },
+          })),
+          PANE,
+        )
       }}
     >
       <TabStrip

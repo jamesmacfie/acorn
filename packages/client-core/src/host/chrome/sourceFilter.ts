@@ -6,7 +6,11 @@ export function filterSourceItems(items: PluginRailItem[], query: string): Plugi
   const text = query.trim().toLowerCase()
   if (!text) return items
   const identifierQuery = /^#\d+$/.test(text) ? text.slice(1) : text
-  return items.filter((item) => item.title.toLowerCase().includes(text)
-    || [item.short, item.task?.link?.identifier, item.task?.link?.ref?.displayId]
-      .some((identifier) => identifier?.toLowerCase().includes(identifierQuery)))
+  return items.filter(
+    (item) =>
+      item.title.toLowerCase().includes(text) ||
+      [item.short, item.task?.link?.identifier, item.task?.link?.ref?.displayId].some((identifier) =>
+        identifier?.toLowerCase().includes(identifierQuery),
+      ),
+  )
 }

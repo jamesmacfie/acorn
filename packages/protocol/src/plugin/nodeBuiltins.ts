@@ -1,9 +1,32 @@
 /** Public builtin families available to loaded code. Unknown and internal names fail closed.
  * Filesystem access still depends on the worker's exact Node permission grants. */
 const safeFamilies = new Set([
-  'assert', 'async_hooks', 'buffer', 'console', 'constants', 'crypto', 'diagnostics_channel',
-  'domain', 'events', 'fs', 'os', 'path', 'perf_hooks', 'process', 'punycode', 'querystring',
-  'readline', 'stream', 'string_decoder', 'timers', 'trace_events', 'tty', 'url', 'util', 'v8', 'zlib',
+  'assert',
+  'async_hooks',
+  'buffer',
+  'console',
+  'constants',
+  'crypto',
+  'diagnostics_channel',
+  'domain',
+  'events',
+  'fs',
+  'os',
+  'path',
+  'perf_hooks',
+  'process',
+  'punycode',
+  'querystring',
+  'readline',
+  'stream',
+  'string_decoder',
+  'timers',
+  'trace_events',
+  'tty',
+  'url',
+  'util',
+  'v8',
+  'zlib',
 ])
 const socketFamilies = new Set(['net', 'http', 'https', 'http2', 'tls', 'dgram', 'dns', 'quic'])
 

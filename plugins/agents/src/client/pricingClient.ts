@@ -1,8 +1,5 @@
 import { readJson, writeJson } from '@acorn/plugin-api/client'
-import {
-  agentPricingRoute,
-  type AgentPricingPreferences,
-} from '../shared/pricing'
+import { agentPricingRoute, type AgentPricingPreferences } from '../shared/pricing'
 
 export const agentPricingQueryKey = ['agents', 'pricing'] as const
 

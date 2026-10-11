@@ -6,12 +6,12 @@ import { isolateNodePlugin } from './isolation'
 import { preparePluginDbFiles } from './storage'
 
 vi.mock('node:fs', async (original) => ({
-  ...await original<typeof import('node:fs')>(),
+  ...(await original<typeof import('node:fs')>()),
   existsSync: vi.fn(),
   realpathSync: vi.fn(),
 }))
 vi.mock('node:worker_threads', async (original) => ({
-  ...await original<typeof import('node:worker_threads')>(),
+  ...(await original<typeof import('node:worker_threads')>()),
   MessageChannel: vi.fn(),
   Worker: vi.fn(),
 }))
@@ -24,16 +24,19 @@ afterEach(() => {
 })
 
 it.each(['22.23.1', '24.18.0', '26.5.0', '25.99.0', '28.0.0'])(
-  'refuses loaded Node workers on %s before filesystem, storage, or realm side effects', async (version) => {
+  'refuses loaded Node workers on %s before filesystem, storage, or realm side effects',
+  async (version) => {
     Object.defineProperty(process.versions, 'node', { ...versionDescriptor, value: version })
-    await expect(isolateNodePlugin({
-      entrypoint: '/unresolved/plugin/index.mjs',
-      pluginDir: '/unresolved/plugin',
-      plugin: 'test',
-      dataRoot: '/unresolved/data',
-      migrationsFolder: '/unresolved/migrations',
-      permissions: { core: [], capabilities: [], secrets: false, net: [], exec: false, sockets: false },
-    })).rejects.toThrow('Upgrade Node before loading plugins')
+    await expect(
+      isolateNodePlugin({
+        entrypoint: '/unresolved/plugin/index.mjs',
+        pluginDir: '/unresolved/plugin',
+        plugin: 'test',
+        dataRoot: '/unresolved/data',
+        migrationsFolder: '/unresolved/migrations',
+        permissions: { core: [], capabilities: [], secrets: false, net: [], exec: false, sockets: false },
+      }),
+    ).rejects.toThrow('Upgrade Node before loading plugins')
     expect(existsSync).not.toHaveBeenCalled()
     expect(realpathSync).not.toHaveBeenCalled()
     expect(preparePluginDbFiles).not.toHaveBeenCalled()

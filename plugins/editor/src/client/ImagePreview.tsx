@@ -17,7 +17,8 @@ export default function ImagePreview(props: { taskId: string; path: string }) {
     try {
       const image = await editorApi().readImage(props.taskId, props.path)
       if (disposed || signal.aborted) return
-      if (image.type.split(';', 1)[0]?.toLowerCase() !== imageTypeForPath(props.path)) throw new Error('Unexpected image type')
+      if (image.type.split(';', 1)[0]?.toLowerCase() !== imageTypeForPath(props.path))
+        throw new Error('Unexpected image type')
       const nextUrl = URL.createObjectURL(new Blob([image.bytes as BlobPart], { type: image.type }))
       const previous = currentUrl
       currentUrl = nextUrl
@@ -50,8 +51,20 @@ export default function ImagePreview(props: { taskId: string; path: string }) {
 
   return (
     <Stack grow>
-      <Show when={source()} fallback={<EmptyState busy={!error()}>{error() ? 'Unable to preview this image.' : 'Loading image…'}</EmptyState>}>
-        {(url) => <img src={url()} alt={props.path.split('/').pop() ?? props.path} onError={showError} style={{ 'max-width': '100%', 'max-height': '100%', 'object-fit': 'contain', margin: 'auto' }} />}
+      <Show
+        when={source()}
+        fallback={
+          <EmptyState busy={!error()}>{error() ? 'Unable to preview this image.' : 'Loading image…'}</EmptyState>
+        }
+      >
+        {(url) => (
+          <img
+            src={url()}
+            alt={props.path.split('/').pop() ?? props.path}
+            onError={showError}
+            style={{ 'max-width': '100%', 'max-height': '100%', 'object-fit': 'contain', margin: 'auto' }}
+          />
+        )}
       </Show>
     </Stack>
   )

@@ -69,26 +69,30 @@ describe('workflow dispatch authoring', () => {
       ],
       policies: [],
       profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true }],
-      workflows: [{
-        ref: { source: 'database', id: child.id },
-        name: child.name,
-        inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
-      }],
+      workflows: [
+        {
+          ref: { source: 'database', id: child.id },
+          name: child.name,
+          inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
+        },
+      ],
     }
     const generated: WorkflowDef = {
       baseline: 'acorn-1' as const,
       formatVersion: 1 as const,
       name: 'Dispatch review',
       inputs: [{ name: 'ticket', schema: { type: 'string' }, required: true }],
-      steps: [{
-        id: 'dispatch',
-        name: 'dispatch',
-        kind: 'workflow',
-        childWorkflow: {
-          ref: { source: 'database', id: child.id },
-          inputs: { ticket: { address: { from: 'input', name: 'ticket', pointer: '' } } },
+      steps: [
+        {
+          id: 'dispatch',
+          name: 'dispatch',
+          kind: 'workflow',
+          childWorkflow: {
+            ref: { source: 'database', id: child.id },
+            inputs: { ticket: { address: { from: 'input', name: 'ticket', pointer: '' } } },
+          },
         },
-      }],
+      ],
     }
     const answer = await generateWorkflowRequest({
       request: {

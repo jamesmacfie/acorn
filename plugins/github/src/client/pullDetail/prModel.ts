@@ -1,16 +1,39 @@
 import { createMemo, createRoot, createSignal, onCleanup } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  integrationsOptions, learnRefPrefixes, onPluginFrame, onScopeEvicted, openRefPanel, persistDraft,
-  refResolutionsOptions, scanContentRefs, summarizeFileStats,
+  integrationsOptions,
+  learnRefPrefixes,
+  onPluginFrame,
+  onScopeEvicted,
+  openRefPanel,
+  persistDraft,
+  refResolutionsOptions,
+  scanContentRefs,
+  summarizeFileStats,
 } from '@acorn/plugin-api/client'
 import {
-  fileSummariesOptions, mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions,
+  fileSummariesOptions,
+  mentionsOptions,
+  pullConflictsOptions,
+  pullDetailOptions,
+  repoLabelsOptions,
 } from '../queries'
 import { pullKey, pullDiffKey, fileSummariesKey, pullPrefixKey, pullsPrefixKey, type Label } from '../../shared/api'
 import {
-  addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel,
-  removeReviewer, reopenPr, requestReviewer, rerunFailed, setDraft, setViewed, submitReview,
+  addComment,
+  addLabel,
+  closePr,
+  disableAutoMerge,
+  enableAutoMerge,
+  mergePr,
+  removeLabel,
+  removeReviewer,
+  reopenPr,
+  requestReviewer,
+  rerunFailed,
+  setDraft,
+  setViewed,
+  submitReview,
 } from '../mutations'
 import { buildConversationEntries, reviewDecision } from './model'
 import { actionFailure, type ActionFailure } from '../actionErrors'
@@ -52,7 +75,11 @@ export function prModel(scope: PrScope): PrModel {
   const key = scopeKey(scope)
   const held = roots.get(key)
   if (held) return held.model
-  for (const [id, entry] of roots) if (id !== key) { entry.dispose(); roots.delete(id) }
+  for (const [id, entry] of roots)
+    if (id !== key) {
+      entry.dispose()
+      roots.delete(id)
+    }
   const entry = createRoot((dispose) => ({ model: build(scope), dispose }))
   roots.set(key, entry)
   return entry.model
@@ -87,9 +114,15 @@ function build(scope: PrScope) {
   const offPrSynced = onPluginFrame('github', 'plugin:github:pr-synced', (payload) => {
     if (!payload || typeof payload !== 'object') return
     const event = payload as { repoOwner?: unknown; repoName?: unknown; pullNumber?: unknown }
-    if (typeof event.repoOwner !== 'string' || typeof event.repoName !== 'string' || typeof event.pullNumber !== 'number') return
+    if (
+      typeof event.repoOwner !== 'string' ||
+      typeof event.repoName !== 'string' ||
+      typeof event.pullNumber !== 'number'
+    )
+      return
     if (event.pullNumber !== Number(number)) return
-    if (event.repoOwner.toLowerCase() !== owner.toLowerCase() || event.repoName.toLowerCase() !== repo.toLowerCase()) return
+    if (event.repoOwner.toLowerCase() !== owner.toLowerCase() || event.repoName.toLowerCase() !== repo.toLowerCase())
+      return
     void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })
     void queryClient.invalidateQueries({ queryKey: fileSummariesKey(owner, repo, number) })
     void queryClient.invalidateQueries({ queryKey: pullDiffKey(owner, repo, number) })
@@ -105,7 +138,8 @@ function build(scope: PrScope) {
   // files are computed locally (see the pullConflicts route). Only fetch when it does.
   const conflicting = () => detail.data?.pull?.mergeable === 'CONFLICTING'
   const conflicts = createQuery(() =>
-    pullConflictsOptions(owner, repo, number, detail.data?.pull?.baseRef ?? '', has() && conflicting()))
+    pullConflictsOptions(owner, repo, number, detail.data?.pull?.baseRef ?? '', has() && conflicting()),
+  )
 
   const fileList = () => files.data?.files ?? []
   const fileSummary = createMemo(() => summarizeFileStats(fileList()))
@@ -125,16 +159,24 @@ function build(scope: PrScope) {
   })
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
   const linearConnected = () =>
-    (integrations.data?.integrations ?? []).some((entry) => entry.providerId === 'linear' && entry.status === 'connected')
+    (integrations.data?.integrations ?? []).some(
+      (entry) => entry.providerId === 'linear' && entry.status === 'connected',
+    )
   // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § First-party for one specific reason). The
   // connection check stays because a 403 with no connection wastes a round trip when the "connect
   // Linear" fallback is what should render.
   const linearIssues = createQuery(() =>
-    refResolutionsOptions('linear', linearRefs().map((ref) => ref.item), linearConnected()))
+    refResolutionsOptions(
+      'linear',
+      linearRefs().map((ref) => ref.item),
+      linearConnected(),
+    ),
+  )
   const linearSummary = createMemo(() => new Map((linearIssues.data ?? []).map((issue) => [issue.identifier, issue])))
   // `openRefPanel` refuses when Linear is not installed on this device, which is why nothing here
   // checks first.
-  const showLinearIssue = (identifier: string): void => void openRefPanel({ providerId: 'linear', displayId: identifier })
+  const showLinearIssue = (identifier: string): void =>
+    void openRefPanel({ providerId: 'linear', displayId: identifier })
 
   // Which bare `CRA-404`-shaped tokens are safe to linkify here, and for whom. Learned from the refs
   // already confirmed in this pull by their full URLs, so the prefix is witnessed rather than guessed.
@@ -146,13 +188,16 @@ function build(scope: PrScope) {
 
   const labelResults = (query: string): Label[] => {
     const wanted = query.trim().toLowerCase()
-    return (repoLabels.data ?? []).filter((label) =>
-      !assignedLabels().has(label.name.toLowerCase()) && (!wanted || label.name.toLowerCase().includes(wanted)))
+    return (repoLabels.data ?? []).filter(
+      (label) =>
+        !assignedLabels().has(label.name.toLowerCase()) && (!wanted || label.name.toLowerCase().includes(wanted)),
+    )
   }
   const reviewerResults = (query: string): string[] => {
     const wanted = query.trim().toLowerCase()
-    return mentions().filter((login) =>
-      !requestedReviewers().has(login) && (!wanted || login.toLowerCase().includes(wanted)))
+    return mentions().filter(
+      (login) => !requestedReviewers().has(login) && (!wanted || login.toLowerCase().includes(wanted)),
+    )
   }
 
   // Refetch the detail, and the open-PR list too: a state change drops a pull out of it.
@@ -168,10 +213,12 @@ function build(scope: PrScope) {
   // `runThenClear`.
   const run = (work: Promise<unknown>) => work.then(refresh).catch(setActionError)
   const runThenClear = (work: Promise<unknown>, clear: () => void) =>
-    work.then(() => {
-      clear()
-      return refresh()
-    }).catch(setActionError)
+    work
+      .then(() => {
+        clear()
+        return refresh()
+      })
+      .catch(setActionError)
 
   const [mergeMethod, setMergeMethod] = createSignal('squash')
   const [draftText, setDraftText] = createSignal('')
@@ -201,7 +248,9 @@ function build(scope: PrScope) {
   }
 
   const merge = createMutation(() => ({ mutationFn: () => mergePr(owner, repo, number, mergeMethod()) }))
-  const autoMergeEnable = createMutation(() => ({ mutationFn: () => enableAutoMerge(owner, repo, number, mergeMethod()) }))
+  const autoMergeEnable = createMutation(() => ({
+    mutationFn: () => enableAutoMerge(owner, repo, number, mergeMethod()),
+  }))
   const autoMergeDisable = createMutation(() => ({ mutationFn: () => disableAutoMerge(owner, repo, number) }))
   const close = createMutation(() => ({ mutationFn: () => closePr(owner, repo, number) }))
   const reopen = createMutation(() => ({ mutationFn: () => reopenPr(owner, repo, number) }))
@@ -285,4 +334,3 @@ function build(scope: PrScope) {
     setViewed: (path: string, viewed: boolean) => run(setViewed(owner, repo, number, path, viewed)),
   }
 }
-

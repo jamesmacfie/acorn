@@ -27,24 +27,38 @@ export function Timeline(props: {
 }) {
   const earlier = () => (
     <Show when={props.hidden}>
-      {(hidden) => <Button variant="ghost" size="sm" onPress={() => props.onShowEarlier?.()}>{`Show earlier (${hidden()})`}</Button>}
+      {(hidden) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={() => props.onShowEarlier?.()}
+        >{`Show earlier (${hidden()})`}</Button>
+      )}
     </Show>
   )
-  if (!props.follow) return <box flexDirection="column" flexGrow={1}>{earlier()}{props.children}</box>
+  if (!props.follow)
+    return (
+      <box flexDirection="column" flexGrow={1}>
+        {earlier()}
+        {props.children}
+      </box>
+    )
   let view: Viewport | undefined
   // Explicit jumps use scrollTo; stickToBottom only follows arriving turns conditionally.
   props.controls?.({
     toTop: () => view?.scrollTo(0),
-    toBottom: () => { if (view) view.scrollTo(Math.max(0, view.scrollHeight - view.viewport.height)) },
+    toBottom: () => {
+      if (view) view.scrollTo(Math.max(0, view.scrollHeight - view.viewport.height))
+    },
   })
   return (
-    <ScrollViewport onBox={(box) => { view = box }}>
+    <ScrollViewport
+      onBox={(box) => {
+        view = box
+      }}
+    >
       {/* Size this box by its turns so follow reacts to content rather than viewport changes. */}
-      <box
-        flexDirection="column"
-        flexShrink={0}
-        onSizeChange={() => view?.stickToBottom()}
-      >
+      <box flexDirection="column" flexShrink={0} onSizeChange={() => view?.stickToBottom()}>
         {earlier()}
         {props.children}
       </box>
@@ -64,5 +78,9 @@ Timeline.Turn = (props: {
     if (typeof child !== 'function' || child.length === 0) return child as JSX.Element
     return untrack(() => (child as (near: Accessor<boolean>) => JSX.Element)(() => true))
   }
-  return <box flexDirection="column" marginTop={spaceLines('row')}>{content()}</box>
+  return (
+    <box flexDirection="column" marginTop={spaceLines('row')}>
+      {content()}
+    </box>
+  )
 }

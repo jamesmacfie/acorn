@@ -1,6 +1,39 @@
-import type { NodePluginPermissions, PluginInputLine, PluginSkillLine, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { DISCLOSED_NODE_POINTS, isExtensionPointKind, isHookMode, type CoreExclusiveSlot, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
-import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
+import type {
+  NodePluginPermissions,
+  PluginInputLine,
+  PluginSkillLine,
+  PluginAgentToolGrant,
+  PluginContextSectionGrant,
+  PluginContributions,
+  PluginCustomAgentGrant,
+  PluginExtensionGrant,
+  PluginHarnessGrant,
+  PluginKeyClaimGrant,
+  PluginNavigationDestinationGrant,
+  PluginScheduleGrant,
+  PluginTaskCheckGrant,
+  PluginWebviewGrant,
+} from '@acorn/protocol/api.ts'
+import {
+  DISCLOSED_NODE_POINTS,
+  isExtensionPointKind,
+  isHookMode,
+  type CoreExclusiveSlot,
+  type ExtensionPointKind,
+  type HookMode,
+} from '@acorn/protocol/extensionPoints.ts'
+import {
+  pluginAgentToolGrants,
+  pluginContextSectionGrants,
+  pluginCustomAgentGrants,
+  pluginExtensionGrants,
+  pluginHarnessGrants,
+  pluginKeyClaimGrants,
+  pluginNavigationDestinationGrants,
+  pluginScheduleGrants,
+  pluginTaskCheckGrants,
+  pluginWebviewGrants,
+} from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../../features/tasks/paneShortcuts'
 import { describeChannel } from '../frames/channels'
@@ -28,8 +61,12 @@ export type PermissionLine = {
 /** What a description table holds for one grant: the copy plus how the prompt draws it. */
 export type GrantDescription = { text: string; icon: string; high?: boolean }
 
-const line = (key: string, description: GrantDescription): PermissionLine =>
-  ({ key, text: description.text, icon: description.icon, high: description.high ?? false })
+const line = (key: string, description: GrantDescription): PermissionLine => ({
+  key,
+  text: description.text,
+  icon: description.icon,
+  high: description.high ?? false,
+})
 
 const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   fs: { text: 'Read and write task files', icon: 'file-text' },
@@ -38,7 +75,11 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   context: { text: 'Read task launch context', icon: 'info' },
   // High because it spends the owner's provider usage. The daily allowance on the plugin's page bounds
   // only the calls that let acorn pick the backend (docs/integrations/model-providers.md § Plugin model grants).
-  models: { text: 'Generate text with your model providers and installed agent CLIs, which spends their usage', icon: 'sparkles', high: true },
+  models: {
+    text: 'Generate text with your model providers and installed agent CLIs, which spends their usage',
+    icon: 'sparkles',
+    high: true,
+  },
   'data:query': { text: 'Query the databases you’ve connected', icon: 'database' },
   'data:write': { text: 'Change data in the databases you’ve connected', icon: 'database', high: true },
   prefs: { text: 'Read and write this plugin’s saved state', icon: 'database' },
@@ -47,11 +88,23 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   // A sink sees every record from every owner — core's request timings, another plugin's schedule
   // runs, and the log lines of packages the owner installed for a different reason
   // (docs/security/plugin-node-realm.md § Telemetry sinks). Writing telemetry needs no grant and gets no line.
-  telemetry: { text: 'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin', icon: 'activity', high: true },
+  telemetry: {
+    text: 'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin',
+    icon: 'activity',
+    high: true,
+  },
   // The three that hand over where code lives on disk, and the reason `high` exists.
-  'projects:read': { text: 'Read projects, including where every codebase lives on disk', icon: 'folder-tree', high: true },
+  'projects:read': {
+    text: 'Read projects, including where every codebase lives on disk',
+    icon: 'folder-tree',
+    high: true,
+  },
   'projects:config': { text: 'Read every project’s build, dev and database scripts', icon: 'file-cog', high: true },
-  'projects:write': { text: 'Create and update projects, including their on-disk locations', icon: 'folder-plus', high: true },
+  'projects:write': {
+    text: 'Create and update projects, including their on-disk locations',
+    icon: 'folder-plus',
+    high: true,
+  },
 }
 
 // The capabilities that act on something the owner is doing rather than read it, in the host's words.
@@ -84,25 +137,41 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
   const ignored = permissions.node.core.length - core.length
   return [
     ...(permissions.node.secrets
-      ? [line('node.secrets', { text: 'Use your saved credentials to make requests on its behalf', icon: 'key-round', high: true })]
+      ? [
+          line('node.secrets', {
+            text: 'Use your saved credentials to make requests on its behalf',
+            icon: 'key-round',
+            high: true,
+          }),
+        ]
       : []),
-    ...(permissions.node.exec ? [line('node.exec', { text: 'Run commands on the node', icon: 'square-terminal', high: true })] : []),
-    ...(permissions.node.sockets ? [line('node.sockets', { text: 'Open unrestricted network connections', icon: 'globe', high: true })] : []),
-    ...permissions.node.net.map((host) => line(`node.net:${host}`, {
-      text: host === '*' ? 'Send requests to any network host' : `Reach ${host}`,
-      icon: 'globe',
-      high: host === '*',
-    })),
+    ...(permissions.node.exec
+      ? [line('node.exec', { text: 'Run commands on the node', icon: 'square-terminal', high: true })]
+      : []),
+    ...(permissions.node.sockets
+      ? [line('node.sockets', { text: 'Open unrestricted network connections', icon: 'globe', high: true })]
+      : []),
+    ...permissions.node.net.map((host) =>
+      line(`node.net:${host}`, {
+        text: host === '*' ? 'Send requests to any network host' : `Reach ${host}`,
+        icon: 'globe',
+        high: host === '*',
+      }),
+    ),
     ...(permissions.node.env ?? []).map((name) =>
-      line(`node.env:${name}`, { text: `Read the node environment value ${name}`, icon: 'key-round', high: true })),
+      line(`node.env:${name}`, { text: `Read the node environment value ${name}`, icon: 'key-round', high: true }),
+    ),
     ...(permissions.node.files ?? []).map(({ env, access }) =>
       line(`node.file:${env}:${access}`, {
         text: `${access === 'read-write' ? 'Read and write' : 'Read'} the local file configured by ${env}`,
         icon: 'file-text',
         high: true,
-      })),
+      }),
+    ),
     ...core,
-    ...permissions.node.capabilities.map((id) => line(`node.capability:${id}`, CAPABILITY_DESCRIPTIONS[id] ?? { text: `Use capability ${id}`, icon: 'puzzle' })),
+    ...permissions.node.capabilities.map((id) =>
+      line(`node.capability:${id}`, CAPABILITY_DESCRIPTIONS[id] ?? { text: `Use capability ${id}`, icon: 'puzzle' }),
+    ),
     ...(ignored ? [ignoredLine('node.ignored', ignored, 'node permission')] : []),
   ]
 }
@@ -205,9 +274,10 @@ export const harnessPermissionLines = (grants: readonly PluginHarnessGrant[]): P
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
     .flatMap((grant) => {
-      const run = grant.kind === 'command'
-        ? `Run “${grant.run}” as the “${grant.label}” agent`
-        : `Run JavaScript this package ships (${grant.run}) as the “${grant.label}” agent`
+      const run =
+        grant.kind === 'command'
+          ? `Run “${grant.run}” as the “${grant.label}” agent`
+          : `Run JavaScript this package ships (${grant.run}) as the “${grant.label}” agent`
       const env = grant.env.length ? ` and pass it ${grant.env.join(', ')} from this node’s environment` : ''
       return [
         line(`harness:${grant.id}:${grant.kind}:${grant.run}:${grant.env.join(' ')}`, {
@@ -216,11 +286,13 @@ export const harnessPermissionLines = (grants: readonly PluginHarnessGrant[]): P
           high: true,
         }),
         ...(grant.oneShot
-          ? [line(`harness:${grant.id}:oneShot:${grant.oneShot}`, {
-            text: `Runs “${grant.oneShot}” to generate text`,
-            icon: 'sparkles',
-            high: true,
-          })]
+          ? [
+              line(`harness:${grant.id}:oneShot:${grant.oneShot}`, {
+                text: `Runs “${grant.oneShot}” to generate text`,
+                icon: 'sparkles',
+                high: true,
+              }),
+            ]
           : []),
       ]
     })
@@ -231,14 +303,13 @@ export const agentToolGrants = (contributions: PluginContributions): PluginAgent
 export const agentToolPermissionLines = (grants: readonly PluginAgentToolGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((grant) => line(
-      `agent-tool:${grant.id}:${grant.risk}:${grant.requiresSession}:${grant.maxOutputBytes}`,
-      {
+    .map((grant) =>
+      line(`agent-tool:${grant.id}:${grant.risk}:${grant.requiresSession}:${grant.maxOutputBytes}`, {
         text: `Offer a ${grant.risk} agent tool${grant.requiresSession ? ' only during an active agent session' : ''}: ${grant.description}`,
         icon: 'puzzle',
         high: grant.risk !== 'read',
-      },
-    ))
+      }),
+    )
 
 export const contextSectionGrants = (contributions: PluginContributions): PluginContextSectionGrant[] =>
   pluginContextSectionGrants(contributions)
@@ -246,13 +317,12 @@ export const contextSectionGrants = (contributions: PluginContributions): Plugin
 export const contextSectionPermissionLines = (grants: readonly PluginContextSectionGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((grant) => line(
-      `context-section:${grant.id}:${grant.defaultIncluded}:${grant.maxBytes}:${grant.maxTokens}`,
-      {
+    .map((grant) =>
+      line(`context-section:${grant.id}:${grant.defaultIncluded}:${grant.maxBytes}:${grant.maxTokens}`, {
         text: `${grant.defaultIncluded ? 'Include' : 'Offer'} “${grant.label}” in task context, bounded to ${grant.maxBytes} bytes and ${grant.maxTokens} tokens`,
         icon: 'notepad-text',
-      },
-    ))
+      }),
+    )
 
 export const customAgentGrants = (contributions: PluginContributions): PluginCustomAgentGrant[] =>
   pluginCustomAgentGrants(contributions)
@@ -264,15 +334,15 @@ export const customAgentGrants = (contributions: PluginContributions): PluginCus
 export const customAgentPermissionLines = (grants: readonly PluginCustomAgentGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
-    .map((grant) => line(
-      `custom-agent:${grant.id}:${grant.harness}:${grant.maxToolRisk ?? ''}:${grant.instructions ?? ''}`,
-      {
+    .map((grant) =>
+      line(`custom-agent:${grant.id}:${grant.harness}:${grant.maxToolRisk ?? ''}:${grant.instructions ?? ''}`, {
         text: `Add the “${grant.name}” agent to New, running on ${grant.harness}${
-          grant.instructions ? `, and tell every session started from it: “${grant.instructions}”` : ''}`,
+          grant.instructions ? `, and tell every session started from it: “${grant.instructions}”` : ''
+        }`,
         icon: 'bot',
         high: !!grant.instructions,
-      },
-    ))
+      }),
+    )
 
 export const keyClaimGrants = (contributions: PluginContributions): PluginKeyClaimGrant[] =>
   pluginKeyClaimGrants(contributions)
@@ -350,15 +420,16 @@ const fill = (template: string, grant: PluginExtensionGrant): string =>
 export function extensionPermissionLine(grant: PluginExtensionGrant): PermissionLine {
   const kind = isExtensionPointKind(grant.pointKind) ? grant.pointKind : null
   const mode = grant.kind === 'extends' && kind === 'hook' && isHookMode(grant.mode) ? grant.mode : null
-  const template = grant.kind === 'replaces'
-    ? `${CORE_SURFACE_COPY[grant.target as CoreExclusiveSlot] ?? `Offers to draw ${grant.target}`} — you choose in Settings`
-    : mode
-      ? HOOK_MODE_COPY[mode]
-      : kind
-        // The owner half of the reference is the point of the `extends` line. It names the package this
-        // one reaches into, so "this plugin extends that plugin" is on screen before anything runs.
-        ? (grant.kind === 'hosts' ? HOSTS_COPY : EXTENDS_COPY)[kind]
-        : UNKNOWN_KIND_COPY[grant.kind]
+  const template =
+    grant.kind === 'replaces'
+      ? `${CORE_SURFACE_COPY[grant.target as CoreExclusiveSlot] ?? `Offers to draw ${grant.target}`} — you choose in Settings`
+      : mode
+        ? HOOK_MODE_COPY[mode]
+        : kind
+          ? // The owner half of the reference is the point of the `extends` line. It names the package this
+            // one reaches into, so "this plugin extends that plugin" is on screen before anything runs.
+            (grant.kind === 'hosts' ? HOSTS_COPY : EXTENDS_COPY)[kind]
+          : UNKNOWN_KIND_COPY[grant.kind]
   // Kind, point kind, mode and target together, so a package that starts vetoing where it used to
   // observe, or reaches into a different plugin's point, reads as newly requested. The point kind and
   // the mode are omitted when there is none rather than spelled as a placeholder: `replaces` is the
@@ -367,7 +438,8 @@ export function extensionPermissionLine(grant: PluginExtensionGrant): Permission
   const key = parts.join(':')
   // A node point that spends the owner's resources has one fixed sentence, whatever the manifest's label.
   const disclosed = grant.kind === 'extends' && Object.hasOwn(DISCLOSED_NODE_POINTS, grant.target)
-  if (disclosed) return line(key, { text: DISCLOSED_NODE_POINTS[grant.target]!, icon: EXTENSION_KIND_ICON.extends, high: true })
+  if (disclosed)
+    return line(key, { text: DISCLOSED_NODE_POINTS[grant.target]!, icon: EXTENSION_KIND_ICON.extends, high: true })
   return line(key, {
     text: fill(template, grant).replace('%t', grant.target),
     icon: EXTENSION_KIND_ICON[grant.kind],
@@ -391,27 +463,28 @@ export const keyClaimPermissionLines = (grants: readonly PluginKeyClaimGrant[]):
       }),
     )
 
-export const navigationDestinationGrants = (
-  contributions: PluginContributions,
-): PluginNavigationDestinationGrant[] => pluginNavigationDestinationGrants(contributions)
+export const navigationDestinationGrants = (contributions: PluginContributions): PluginNavigationDestinationGrant[] =>
+  pluginNavigationDestinationGrants(contributions)
 
 export const navigationDestinationPermissionLines = (
   grants: readonly PluginNavigationDestinationGrant[],
-): PermissionLine[] => [...grants]
-  .sort((a, b) => a.surface.localeCompare(b.surface) || a.destination.localeCompare(b.destination))
-  .map((grant) => line(
-    `destination:${grant.surface}:${grant.destination}:${grant.targetKind}:${grant.noticeKind ?? ''}`,
-    {
-      text: `Open “${grant.label}” in another plugin`,
-      icon: 'puzzle',
-    },
-  ))
+): PermissionLine[] =>
+  [...grants]
+    .sort((a, b) => a.surface.localeCompare(b.surface) || a.destination.localeCompare(b.destination))
+    .map((grant) =>
+      line(`destination:${grant.surface}:${grant.destination}:${grant.targetKind}:${grant.noticeKind ?? ''}`, {
+        text: `Open “${grant.label}” in another plugin`,
+        icon: 'puzzle',
+      }),
+    )
 
 // What a plugin's derived sources read (docs/data-sources/derived-sources.md). The words come from the
 // input source's registration and its owner, which the node fills in, never from the reading plugin's
 // own label, so a plugin can't describe its reach more kindly than it is. The key carries the source and
 // the optional flag, because a grant covers exactly that pair and changing either asks again.
-export const inputPermissionLines = (inputs: readonly Pick<PluginInputLine, 'sourceId' | 'name' | 'source' | 'optional' | 'plural' | 'provider'>[]): PermissionLine[] =>
+export const inputPermissionLines = (
+  inputs: readonly Pick<PluginInputLine, 'sourceId' | 'name' | 'source' | 'optional' | 'plural' | 'provider'>[],
+): PermissionLine[] =>
   inputs.map((input) => {
     const what = input.plural?.toLowerCase() ?? input.source
     const from = input.provider ? ` from ${input.provider}` : ''
@@ -432,16 +505,20 @@ export const inputPermissionLines = (inputs: readonly Pick<PluginInputLine, 'sou
 // agent follows them when a task matches. One line naming every skill, keyed by each folder's digest, so
 // a version that changes one byte of a body asks again (docs/managed-agents/skills.md § Skills). Not
 // high: an agent reads a skill only when it chooses to, and a skill carries no access of its own.
-export const skillPermissionLines = (skills: readonly Pick<PluginSkillLine, 'name' | 'title' | 'digest'>[]): PermissionLine[] => {
+export const skillPermissionLines = (
+  skills: readonly Pick<PluginSkillLine, 'name' | 'title' | 'digest'>[],
+): PermissionLine[] => {
   if (!skills.length) return []
   const sorted = [...skills].sort((a, b) => a.name.localeCompare(b.name))
-  return [{
-    key: `skills:${sorted.map((skill) => `${skill.name}@${skill.digest}`).join(',')}`,
-    text: `Adds ${sorted.length} ${sorted.length === 1 ? 'procedure' : 'procedures'} your agents can load: ${sorted.map((skill) => skill.title).join(', ')}`,
-    detail: 'An agent reads one when a task matches its description. The plugin wrote the instructions in each.',
-    icon: 'scroll-text',
-    high: false,
-  }]
+  return [
+    {
+      key: `skills:${sorted.map((skill) => `${skill.name}@${skill.digest}`).join(',')}`,
+      text: `Adds ${sorted.length} ${sorted.length === 1 ? 'procedure' : 'procedures'} your agents can load: ${sorted.map((skill) => skill.title).join(', ')}`,
+      detail: 'An agent reads one when a task matches its description. The plugin wrote the instructions in each.',
+      icon: 'scroll-text',
+      high: false,
+    },
+  ]
 }
 
 /** Each data source the plugin registers. Its name is the plugin's own, which is what a person picks it by. */

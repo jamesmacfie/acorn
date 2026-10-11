@@ -2,7 +2,12 @@ import { createSignal } from 'solid-js'
 import { activeNodeId, latestSignal } from '@acorn/plugin-api/client'
 import type { AgentAttachment } from '../../contract/wire.ts'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
-import { composerDraftKey, deleteComposerPayload, readComposerPayload, writeComposerPayload } from './composerDraftStorage'
+import {
+  composerDraftKey,
+  deleteComposerPayload,
+  readComposerPayload,
+  writeComposerPayload,
+} from './composerDraftStorage'
 
 type Update<T> = T | ((current: T) => T)
 export type ComposerDraftState = ReturnType<typeof createDraft>
@@ -32,49 +37,104 @@ function createDraft(nodeId: string | null, sessionId: string) {
   const payload = () => ({ text: text(), attachmentIds, contexts: contexts() })
   const persist = (field: keyof ReturnType<typeof payload>) => valid && writeComposerPayload(key, payload(), field)
   const reap = () => {
-    if (!valid || preserveHydration || holders || sending() || uploading() || replacing() || capturing() || !hydrated()) return
+    if (!valid || preserveHydration || holders || sending() || uploading() || replacing() || capturing() || !hydrated())
+      return
     if (!text() && !attachmentIds.length && !contexts().length && states.get(key) === state) states.delete(key)
   }
   const state = {
-    nodeId, sessionId, key, text, attachments, contexts, error, sending, uploading, replacing, capturing,
+    nodeId,
+    sessionId,
+    key,
+    text,
+    attachments,
+    contexts,
+    error,
+    sending,
+    uploading,
+    replacing,
+    capturing,
     valid: () => valid,
     revisions: () => [textRevision, attachmentRevision, contextRevision] as const,
     startCapture: () => capture.next(),
     captureCurrent: (started: AbortSignal) => valid && !started.aborted,
     attachmentIds: () => attachmentIds,
-    setText(next: string) { if (!valid) return; textRevision++; setText(next); persist('text') },
+    setText(next: string) {
+      if (!valid) return
+      textRevision++
+      setText(next)
+      persist('text')
+    },
     setAttachments(next: Update<AgentAttachment[]>) {
       if (!valid) return
       attachmentRevision++
       setAttachments(next as never)
-      attachmentIds = attachments().map(item => item.id)
+      attachmentIds = attachments().map((item) => item.id)
       return persist('attachmentIds')
     },
     setContexts(next: Update<AgentContextSnapshot[]>) {
       if (!valid) return
-      contextRevision++; setContexts(next as never); persist('contexts')
+      contextRevision++
+      setContexts(next as never)
+      persist('contexts')
     },
-    setError(next: string) { if (valid) setError(next) },
-    setSending(next: boolean) { setSending(next); reap() },
-    setUploading(next: boolean) { setUploading(next); reap() },
-    setReplacing(next: string) { setReplacing(next); reap() },
-    setCapturing(next: string) { setCapturing(next); reap() },
+    setError(next: string) {
+      if (valid) setError(next)
+    },
+    setSending(next: boolean) {
+      setSending(next)
+      reap()
+    },
+    setUploading(next: boolean) {
+      setUploading(next)
+      reap()
+    },
+    setReplacing(next: string) {
+      setReplacing(next)
+      reap()
+    },
+    setCapturing(next: string) {
+      setCapturing(next)
+      reap()
+    },
     hydration: undefined as Promise<unknown> | undefined,
     automaticCapture: undefined as { key: string; run: Promise<AgentContextSnapshot[]> } | undefined,
     hydrated,
     // The Node still advertises pendingForkContext after hydration. Retain its consumed client
     // hydration until deletion, so reaping an empty draft cannot inject the same fork context again.
-    preserveForkHydration() { preserveHydration = true },
-    finishHydration(success = true) { setHydrated(success); reap() },
-    hold() { holders++; let released = false; return () => { if (!released) { released = true; holders--; reap() } } },
-    invalidate() { valid = false },
-    acknowledge(revisions: readonly number[], submittedAttachments: readonly AgentAttachment[], submittedContexts: readonly AgentContextSnapshot[]) {
+    preserveForkHydration() {
+      preserveHydration = true
+    },
+    finishHydration(success = true) {
+      setHydrated(success)
+      reap()
+    },
+    hold() {
+      holders++
+      let released = false
+      return () => {
+        if (!released) {
+          released = true
+          holders--
+          reap()
+        }
+      }
+    },
+    invalidate() {
+      valid = false
+    },
+    acknowledge(
+      revisions: readonly number[],
+      submittedAttachments: readonly AgentAttachment[],
+      submittedContexts: readonly AgentContextSnapshot[],
+    ) {
       if (!valid) return
       if (textRevision === revisions[0]) state.setText('')
-      state.setAttachments(attachmentRevision === revisions[1] ? []
-        : attachments().filter(item => !submittedAttachments.includes(item)))
-      state.setContexts(contextRevision === revisions[2] ? []
-        : contexts().filter(item => !submittedContexts.includes(item)))
+      state.setAttachments(
+        attachmentRevision === revisions[1] ? [] : attachments().filter((item) => !submittedAttachments.includes(item)),
+      )
+      state.setContexts(
+        contextRevision === revisions[2] ? [] : contexts().filter((item) => !submittedContexts.includes(item)),
+      )
       reap()
     },
   }
@@ -85,17 +145,27 @@ function createDraft(nodeId: string | null, sessionId: string) {
 export function composerDraftState(sessionId: string, nodeId: string | null = activeNodeId()): ComposerDraftState {
   const key = composerDraftKey(nodeId, sessionId)
   let state = states.get(key)
-  if (!state) { state = createDraft(nodeId, sessionId); states.set(key, state) }
+  if (!state) {
+    state = createDraft(nodeId, sessionId)
+    states.set(key, state)
+  }
   return state
 }
 
-export function hydrateComposerDraft(sessionId: string, load: () => Promise<unknown>, state = composerDraftState(sessionId)): void {
+export function hydrateComposerDraft(
+  sessionId: string,
+  load: () => Promise<unknown>,
+  state = composerDraftState(sessionId),
+): void {
   if (state.hydration) return
-  const run = load().then(() => state.finishHydration(), (error: unknown) => {
-    state.setError(error instanceof Error ? error.message : 'Unable to restore draft attachments.')
-    if (state.hydration === run) state.hydration = undefined
-    state.finishHydration(false)
-  })
+  const run = load().then(
+    () => state.finishHydration(),
+    (error: unknown) => {
+      state.setError(error instanceof Error ? error.message : 'Unable to restore draft attachments.')
+      if (state.hydration === run) state.hydration = undefined
+      state.finishHydration(false)
+    },
+  )
   state.hydration = run
 }
 

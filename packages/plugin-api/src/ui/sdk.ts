@@ -32,7 +32,15 @@ export type { TreeMount, TreeRender } from '@acorn/client-core/host/frames/sdk'
 // The remote root's mutators, as free functions. This is the surface a framework adapter binds to —
 // `acorn-plugin-sdk/remote` is Solid's, in a dozen lines — and vanilla code can call them directly.
 export {
-  createNode, createText, firstChild, insertNode, isTextNode, nextSibling, parentOf, removeNode,
-  setProperty, setText,
+  createNode,
+  createText,
+  firstChild,
+  insertNode,
+  isTextNode,
+  nextSibling,
+  parentOf,
+  removeNode,
+  setProperty,
+  setText,
 } from '@acorn/client-core/host/frames/remoteRoot.ts'
 export type { RemoteNode, RemoteRoot } from '@acorn/client-core/host/frames/remoteRoot.ts'

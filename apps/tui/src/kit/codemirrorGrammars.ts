@@ -30,9 +30,9 @@
 
 const absent = (what: string): never => {
   throw new Error(
-    `${what} is CodeMirror, and the terminal client has no DOM to draw it in. `
-    + 'This host draws documents with the `editor` rectangle instead '
-    + '(apps/tui/src/kit/codemirrorGrammars.ts, apps/tui/vite.config.ts).',
+    `${what} is CodeMirror, and the terminal client has no DOM to draw it in. ` +
+      'This host draws documents with the `editor` rectangle instead ' +
+      '(apps/tui/src/kit/codemirrorGrammars.ts, apps/tui/vite.config.ts).',
   )
 }
 

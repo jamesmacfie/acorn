@@ -89,7 +89,10 @@ function span(
 // not a secret.
 const hex = (bytes: number): string => {
   let out = ''
-  for (let index = 0; index < bytes; index += 1) out += Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+  for (let index = 0; index < bytes; index += 1)
+    out += Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, '0')
   return out
 }
 

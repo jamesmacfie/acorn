@@ -2,7 +2,15 @@ import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
 import { nodeRequest } from './nodeRequest'
-import { MAX_NODE_WS_MESSAGE_BYTES, decodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, wsViewerIdSchema, type WsClientFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
+import {
+  MAX_NODE_WS_MESSAGE_BYTES,
+  decodeIdFrame,
+  WS_PATH,
+  WS_VIEWERS_HEADER,
+  wsViewerIdSchema,
+  type WsClientFrame,
+  type WsSendOptions,
+} from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import {
   type NodeConnectionState,
@@ -220,13 +228,22 @@ export class NodeBroker {
 
   // --- HTTP ---
 
-  async fetch(nodeId: string, request: NodeFetchRequest, limits: { maxResponseBytes?: number } = {}): Promise<NodeFetchResponse> {
+  async fetch(
+    nodeId: string,
+    request: NodeFetchRequest,
+    limits: { maxResponseBytes?: number } = {},
+  ): Promise<NodeFetchResponse> {
     const connection = this.connections.get(nodeId)
     if (!connection) throw new Error(`Unknown node ${nodeId}`)
     // Types do not validate a helper message at runtime. In particular `//host/path` is accepted by
     // startsWith('/') but changes the origin when joined with the node endpoint. Never send the
     // paired-node bearer to an authority chosen by a path from the renderer.
-    if (!request.path.startsWith('/') || request.path.startsWith('//') || request.path.includes('\\') || request.path.includes('#')) {
+    if (
+      !request.path.startsWith('/') ||
+      request.path.startsWith('//') ||
+      request.path.includes('\\') ||
+      request.path.includes('#')
+    ) {
       throw new Error('Node request path must stay on the paired node.')
     }
     const target = new URL(request.path, connection.node.endpoint)
@@ -234,13 +251,21 @@ export class NodeBroker {
       throw new Error('Node request path must stay on the paired node.')
     }
 
-    return this.requests.fetch(nodeId, request, connection, {
-      result: (response) => this.noteHttpResult(connection, response),
-      failure: (error) => this.noteHttpFailure(connection, error),
-    }, limits)
+    return this.requests.fetch(
+      nodeId,
+      request,
+      connection,
+      {
+        result: (response) => this.noteHttpResult(connection, response),
+        failure: (error) => this.noteHttpFailure(connection, error),
+      },
+      limits,
+    )
   }
 
-  abort(requestId: string): void { this.requests.abort(requestId) }
+  abort(requestId: string): void {
+    this.requests.abort(requestId)
+  }
 
   // --- WebSocket ---
 
@@ -259,7 +284,11 @@ export class NodeBroker {
   }
 
   openViewer(nodeId: string, viewerId: string): boolean {
-    return this.send(nodeId, { channel: 'ws:viewer-open' }, { viewerId, intent: { key: 'ws:viewer', state: 'attached' } })
+    return this.send(
+      nodeId,
+      { channel: 'ws:viewer-open' },
+      { viewerId, intent: { key: 'ws:viewer', state: 'attached' } },
+    )
   }
 
   closeViewer(nodeId: string, viewerId?: string): void {
@@ -279,7 +308,10 @@ export class NodeBroker {
     // The bearer rides the upgrade request's headers, which a browser cannot set. One reason the
     // socket belongs to main rather than the renderer.
     const ws = new WebSocket(url, {
-      headers: { authorization: `Bearer ${connection.node.token}`, ...(connection.viewers.multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}) },
+      headers: {
+        authorization: `Bearer ${connection.node.token}`,
+        ...(connection.viewers.multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}),
+      },
       agent: connection.agent,
       maxPayload: MAX_NODE_WS_MESSAGE_BYTES,
       perMessageDeflate: false,
@@ -340,7 +372,10 @@ export class NodeBroker {
       // Checked before sending, so the count covers pings that already had a full interval to be
       // answered. Incrementing first would condemn the socket on a ping that never had its chance.
       if (connection.missedPongs >= MISSED_PONGS_BEFORE_DEAD) {
-        log.warn(`${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`, { 'node.id': connection.node.nodeId })
+        log.warn(
+          `${connection.node.nodeId} left ${connection.missedPongs} pings unanswered; treating it as unreachable`,
+          { 'node.id': connection.node.nodeId },
+        )
         emitEvent('core', 'broker.missed-pong', { 'node.id': connection.node.nodeId, missed: connection.missedPongs })
         ws.terminate()
         return
@@ -368,7 +403,8 @@ export class NodeBroker {
   private receiveBytes(connection: Connection, data: unknown): void {
     connection.lastSeenAt = Date.now()
     const frame = Array.isArray(data) ? Buffer.concat(data as Buffer[]) : (data as Buffer)
-    if (!connection.viewers.multiplexed) return this.events.bytes(connection.node.nodeId, frame, connection.viewers.legacyRecipient())
+    if (!connection.viewers.multiplexed)
+      return this.events.bytes(connection.node.nodeId, frame, connection.viewers.legacyRecipient())
     const tagged = decodeIdFrame(frame)
     if (!tagged || !wsViewerIdSchema.safeParse(tagged.id).success) return
     this.events.bytes(connection.node.nodeId, tagged.payload, connection.viewers.externalId(tagged.id))
@@ -396,11 +432,15 @@ export class NodeBroker {
       // to treat it as a reconnect and refetch.
       if (connection.seq !== 0 && seq !== connection.seq + 1) {
         if (!shed) {
-          log.warn(`frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`, { 'node.id': connection.node.nodeId })
+          log.warn(`frame gap on ${connection.node.nodeId}: expected ${connection.seq + 1}, got ${seq}`, {
+            'node.id': connection.node.nodeId,
+          })
           connection.ws?.close()
           return
         }
-        log.warn(`${connection.node.nodeId} shed frames under load: expected ${connection.seq + 1}, got ${seq}`, { 'node.id': connection.node.nodeId })
+        log.warn(`${connection.node.nodeId} shed frames under load: expected ${connection.seq + 1}, got ${seq}`, {
+          'node.id': connection.node.nodeId,
+        })
         emitEvent('core', 'broker.shed', { 'node.id': connection.node.nodeId, missing: seq - connection.seq - 1 })
       }
       connection.seq = seq
@@ -411,10 +451,24 @@ export class NodeBroker {
       this.events.frame(connection.node.nodeId, routed.frame, connection.viewers.externalId(routed.viewerId))
     } else if (connection.viewers.multiplexed && routed.channel === 'ws:viewer-error') {
       const error = frame as { viewerId?: unknown; code?: unknown; message?: unknown }
-      if (typeof error.viewerId === 'string' && wsViewerIdSchema.safeParse(error.viewerId).success && (error.code === 'viewer_limit' || error.code === 'viewers_unsupported') && typeof error.message === 'string') {
-        this.events.transportError?.(connection.node.nodeId, { code: error.code, message: error.message }, connection.viewers.externalId(error.viewerId))
+      if (
+        typeof error.viewerId === 'string' &&
+        wsViewerIdSchema.safeParse(error.viewerId).success &&
+        (error.code === 'viewer_limit' || error.code === 'viewers_unsupported') &&
+        typeof error.message === 'string'
+      ) {
+        this.events.transportError?.(
+          connection.node.nodeId,
+          { code: error.code, message: error.message },
+          connection.viewers.externalId(error.viewerId),
+        )
       }
-    } else this.events.frame(connection.node.nodeId, frame, connection.viewers.multiplexed ? undefined : connection.viewers.legacyRecipient())
+    } else
+      this.events.frame(
+        connection.node.nodeId,
+        frame,
+        connection.viewers.multiplexed ? undefined : connection.viewers.legacyRecipient(),
+      )
   }
 
   private scheduleReconnect(connection: Connection): void {
@@ -427,7 +481,11 @@ export class NodeBroker {
     const delay = base * (1 + (Math.random() * 2 - 1) * JITTER)
     connection.attempt += 1
     if (telemetryEnabled()) {
-      emitEvent('core', 'broker.reconnect', { 'node.id': connection.node.nodeId, attempt: connection.attempt, 'delay.ms': Math.round(delay) })
+      emitEvent('core', 'broker.reconnect', {
+        'node.id': connection.node.nodeId,
+        attempt: connection.attempt,
+        'delay.ms': Math.round(delay),
+      })
     }
     connection.reconnectTimer = setTimeout(() => {
       connection.reconnectTimer = null
@@ -469,11 +527,7 @@ export class NodeBroker {
 
   private noteHttpFailure(connection: Connection, error: unknown): void {
     const mismatch = isPinMismatch(error)
-    this.setState(
-      connection,
-      'offline',
-      mismatch ? { code: 'identity_mismatch' } : { code: 'unreachable' },
-    )
+    this.setState(connection, 'offline', mismatch ? { code: 'identity_mismatch' } : { code: 'unreachable' })
   }
 
   private noteSocketError(connection: Connection, error: unknown): void {
@@ -483,7 +537,9 @@ export class NodeBroker {
       connection.closed = true
       connection.ws?.terminate()
       this.setState(connection, 'offline', { code: 'unreachable' })
-      log.warn(`${connection.node.nodeId} sent a WebSocket message over the client limit`, { 'node.id': connection.node.nodeId })
+      log.warn(`${connection.node.nodeId} sent a WebSocket message over the client limit`, {
+        'node.id': connection.node.nodeId,
+      })
       return
     }
     if (isPinMismatch(error)) {
@@ -521,7 +577,11 @@ export class NodeBroker {
 }
 
 type HttpsAgentIdentityCheck = (host: string, cert: { fingerprint256: string }) => Error | undefined
-export type PinnedTlsOptions = { ca?: string[]; rejectUnauthorized: boolean; checkServerIdentity?: HttpsAgentIdentityCheck }
+export type PinnedTlsOptions = {
+  ca?: string[]
+  rejectUnauthorized: boolean
+  checkServerIdentity?: HttpsAgentIdentityCheck
+}
 
 // Certificate pinning. See docs/security.md, "Transport and auth".
 //

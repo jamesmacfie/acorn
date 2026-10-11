@@ -1,9 +1,7 @@
 import { createMemo, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import type { Task } from '@acorn/plugin-api/client'
-import {
-  Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Sections, Stack, Tabs,
-} from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, Icon, IconButton, Menu, Only, Sections, Stack, Tabs } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
 import { requestFileScroll, routeKey } from '../fileNavigation'
@@ -42,15 +40,19 @@ function PullStrip(props: { tabs: PrTabsModel }) {
   // Rebuilt when the strip's contents change and never when the selection does. `Tabs` draws with
   // `For`, which remounts a tab it is handed a new object for, and a remount under a keyboard user
   // drops the focus they were moving (docs/ui-design.md).
-  const defs = createMemo(() => tabs().tabs().map((tab) => {
-    const kind = destinationKind(tab, taskId())
-    return {
-      id: pullRefKey(tab.pull),
-      label: `#${tab.pull.number}`,
-      title: taskPullTabTooltip(tab, taskId()),
-      ...(kind ? { icon: DESTINATION_ICON[kind] } : {}),
-    }
-  }))
+  const defs = createMemo(() =>
+    tabs()
+      .tabs()
+      .map((tab) => {
+        const kind = destinationKind(tab, taskId())
+        return {
+          id: pullRefKey(tab.pull),
+          label: `#${tab.pull.number}`,
+          title: taskPullTabTooltip(tab, taskId()),
+          ...(kind ? { icon: DESTINATION_ICON[kind] } : {}),
+        }
+      }),
+  )
   const selected = () => tabs().selected()
   const kind = () => {
     const tab = selected()
@@ -93,7 +95,11 @@ function PullStrip(props: { tabs: PrTabsModel }) {
                     {(menu) => (
                       <For each={linked()}>
                         {(linkedTask) => (
-                          <Menu.Item context={menu} onSelect={() => tabs().openTask(linkedTask)} leading={<Icon name="list-checks" size={13} />}>
+                          <Menu.Item
+                            context={menu}
+                            onSelect={() => tabs().openTask(linkedTask)}
+                            leading={<Icon name="list-checks" size={13} />}
+                          >
                             {linkedTask.title}
                           </Menu.Item>
                         )}
@@ -114,7 +120,9 @@ function PullStrip(props: { tabs: PrTabsModel }) {
                     disabled={tabs().creatingTask() || !tabs().canCreateTask()}
                     tip={tabs().taskCreationTitle()}
                     onPress={() => void tabs().createSelectedTask()}
-                  >{tabs().creatingTask() ? 'Creating…' : 'Create task'}</Button>
+                  >
+                    {tabs().creatingTask() ? 'Creating…' : 'Create task'}
+                  </Button>
                 </Show>
               </>
             }
@@ -156,7 +164,13 @@ export function PrPane(props: { task: Task }) {
     () => {
       const scope = model()?.scope
       return scope
-        ? { owner: scope.owner, repo: scope.repo, number: scope.number, key: routeKey(scope.owner, scope.repo, scope.number), readOnly: !tabs.isPrimary() }
+        ? {
+            owner: scope.owner,
+            repo: scope.repo,
+            number: scope.number,
+            key: routeKey(scope.owner, scope.repo, scope.number),
+            readOnly: !tabs.isPrimary(),
+          }
         : null
     },
     null,
@@ -169,7 +183,14 @@ export function PrPane(props: { task: Task }) {
   }
 
   return (
-    <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+    <Show
+      when={model()}
+      fallback={
+        <EmptyState align="start" busy>
+          Loading…
+        </EmptyState>
+      }
+    >
       {(loaded) => (
         <>
           <Sections
@@ -181,7 +202,12 @@ export function PrPane(props: { task: Task }) {
               render: () => (
                 <Stack gap="section">
                   <PullStrip tabs={tabs} />
-                  <PrOverview model={loaded()} onOpenFile={select} onLinkClick={onLinkClick} hideNumber={tabs.tabs().length > 1} />
+                  <PrOverview
+                    model={loaded()}
+                    onOpenFile={select}
+                    onLinkClick={onLinkClick}
+                    hideNumber={tabs.tabs().length > 1}
+                  />
                 </Stack>
               ),
             }}
@@ -196,7 +222,9 @@ export function PrPane(props: { task: Task }) {
               label: 'Diff',
               render: () => (
                 <Show when={diffRoute()} keyed>
-                  {(route) => <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />}
+                  {(route) => (
+                    <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />
+                  )}
                 </Show>
               ),
             }}
@@ -209,7 +237,7 @@ export function PrPane(props: { task: Task }) {
                 repo={loaded().scope.repo}
                 runId={check().runId}
                 jobName={check().name}
-                    url={check().url}
+                url={check().url}
                 onClose={() => loaded().setOpenCheck(null)}
               />
             )}
@@ -219,4 +247,3 @@ export function PrPane(props: { task: Task }) {
     </Show>
   )
 }
-

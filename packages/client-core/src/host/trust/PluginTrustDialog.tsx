@@ -56,17 +56,20 @@ export default function PluginTrustDialog() {
     const current = request()
     if (!current?.previous || current.relation !== 'installed') return false
     if (current.source?.kind === 'device') return false
-    return current.sourceNodeIds.every((nodeId) =>
-      distribution().selectionsByNode.get(nodeId)?.get(current.row.name)?.hash === current.previous?.hash)
+    return current.sourceNodeIds.every(
+      (nodeId) => distribution().selectionsByNode.get(nodeId)?.get(current.row.name)?.hash === current.previous?.hash,
+    )
   }
   const fallbackCopy = () => {
     const current = request()
     if (!current) return ''
     if (skillsOnly()) return 'Until you decide, its other features keep working, and agents don’t get these skills.'
-    if (inputsOnly()) return 'Until you decide, its other features keep working, and its data sources read only what you approved before.'
+    if (inputsOnly())
+      return 'Until you decide, its other features keep working, and its data sources read only what you approved before.'
     if (current.source?.kind === 'device') return 'This device plugin stays unavailable until you accept this version.'
     if (previousStillActive()) return 'The current version keeps working until the node activates this update.'
-    if (current.relation === 'installed' && !current.previous) return 'Accepting now allows this interface to appear after the node starts this plugin.'
+    if (current.relation === 'installed' && !current.previous)
+      return 'Accepting now allows this interface to appear after the node starts this plugin.'
     return "This plugin's interface stays unavailable on the affected node until you accept this version or the node runs an accepted version."
   }
 
@@ -103,132 +106,211 @@ export default function PluginTrustDialog() {
 
   return (
     <Portal>
-    <Show when={request()}>
-      {(current) => (
-        <div class="overlay-backdrop">
-          <section
-            ref={(el) => {
-              dialog = el
-              // This prompt appears on its own at the end of a boot pass rather than from a click, so
-              // nothing has moved focus into it, and Escape is handled on this element, as is the Tab
-              // trap. Without this the footer's promise is simply false and Tab walks the page behind.
-              // Bare `autofocus` is unreliable under Solid; queueMicrotask is the pattern that holds.
-              queueMicrotask(() => el.focus())
-            }}
-            tabindex="-1"
-            class="overlay plugin-trust-dialog"
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="plugin-trust-title"
-            onClick={dismiss.onContainerClick}
-            onKeyDown={dismiss.onKeyDown}
-          >
-            <div class="overlay-title">{skillsOnly() ? skillsChanged() ? 'Plugin skills changed' : 'Approve this plugin’s skills' : inputsOnly() ? readsMore() ? 'Plugin reads more' : 'Approve what this plugin reads' : sameBundleReview() ? changedDeclaration() ? 'Plugin changed what it asks for' : 'Review plugin again' : previousVersion() ? 'Plugin update' : 'New plugin'}</div>
-            <div class="overlay-body plugin-trust-body">
-              <header class="plugin-trust-identity">
-                <span class="plugin-trust-glyph" aria-hidden="true">{current().row.name.slice(0, 1).toUpperCase()}</span>
-                <div>
-                  <h2 id="plugin-trust-title">
-                    <code>{current().row.name}</code>
-                    {skillsOnly() ? skillsChanged() ? ' changed the procedures it gives your agents' : ' wants to give your agents procedures' : inputsOnly() ? readsMore() ? ' wants to read more of your data' : ' wants to read your data' : sameBundleReview() ? changedDeclaration() ? ' changed what it asks for' : ' needs another review' : previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
-                  </h2>
-                  <p class="plugin-trust-meta">
-                    <Badge size="xs">{inputsOnly() ? current().row.installed?.version : sameBundleReview() ? current().row.installed?.version : previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}</Badge>
-                    <Badge size="xs">
-                      <Icon name="monitor" /> {current().source?.kind === 'device'
-                        ? current().sourceLabel?.startsWith('path:')
-                          ? 'From a folder on this device'
-                          : `From ${current().sourceLabel ?? 'a package'}`
-                        : `From ${current().sourceNodeIds.map(nodeLabel).join(', ')}`}
-                    </Badge>
-                    <Show when={!previousVersion() && !inputsOnly()}><Badge size="xs">New</Badge></Show>
-                  </p>
-                </div>
-              </header>
+      <Show when={request()}>
+        {(current) => (
+          <div class="overlay-backdrop">
+            <section
+              ref={(el) => {
+                dialog = el
+                // This prompt appears on its own at the end of a boot pass rather than from a click, so
+                // nothing has moved focus into it, and Escape is handled on this element, as is the Tab
+                // trap. Without this the footer's promise is simply false and Tab walks the page behind.
+                // Bare `autofocus` is unreliable under Solid; queueMicrotask is the pattern that holds.
+                queueMicrotask(() => el.focus())
+              }}
+              tabindex="-1"
+              class="overlay plugin-trust-dialog"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="plugin-trust-title"
+              onClick={dismiss.onContainerClick}
+              onKeyDown={dismiss.onKeyDown}
+            >
+              <div class="overlay-title">
+                {skillsOnly()
+                  ? skillsChanged()
+                    ? 'Plugin skills changed'
+                    : 'Approve this plugin’s skills'
+                  : inputsOnly()
+                    ? readsMore()
+                      ? 'Plugin reads more'
+                      : 'Approve what this plugin reads'
+                    : sameBundleReview()
+                      ? changedDeclaration()
+                        ? 'Plugin changed what it asks for'
+                        : 'Review plugin again'
+                      : previousVersion()
+                        ? 'Plugin update'
+                        : 'New plugin'}
+              </div>
+              <div class="overlay-body plugin-trust-body">
+                <header class="plugin-trust-identity">
+                  <span class="plugin-trust-glyph" aria-hidden="true">
+                    {current().row.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <h2 id="plugin-trust-title">
+                      <code>{current().row.name}</code>
+                      {skillsOnly()
+                        ? skillsChanged()
+                          ? ' changed the procedures it gives your agents'
+                          : ' wants to give your agents procedures'
+                        : inputsOnly()
+                          ? readsMore()
+                            ? ' wants to read more of your data'
+                            : ' wants to read your data'
+                          : sameBundleReview()
+                            ? changedDeclaration()
+                              ? ' changed what it asks for'
+                              : ' needs another review'
+                            : previousVersion()
+                              ? addedLines().length
+                                ? ' was updated — it asks for more'
+                                : ' was updated'
+                              : ' wants to run in acorn'}
+                    </h2>
+                    <p class="plugin-trust-meta">
+                      <Badge size="xs">
+                        {inputsOnly()
+                          ? current().row.installed?.version
+                          : sameBundleReview()
+                            ? current().row.installed?.version
+                            : previousVersion()
+                              ? `${previousVersion()} → ${current().row.installed?.version}`
+                              : current().row.installed?.version}
+                      </Badge>
+                      <Badge size="xs">
+                        <Icon name="monitor" />{' '}
+                        {current().source?.kind === 'device'
+                          ? current().sourceLabel?.startsWith('path:')
+                            ? 'From a folder on this device'
+                            : `From ${current().sourceLabel ?? 'a package'}`
+                          : `From ${current().sourceNodeIds.map(nodeLabel).join(', ')}`}
+                      </Badge>
+                      <Show when={!previousVersion() && !inputsOnly()}>
+                        <Badge size="xs">New</Badge>
+                      </Show>
+                    </p>
+                  </div>
+                </header>
 
-              {/* A security note, so it stays in the body rather than behind a help mark. */}
-              <Show when={current().source?.kind === 'device' && current().sourceLabel?.startsWith('path:')}>
-                <p class="muted plugin-trust-intro">A plugin from a folder isn't pinned to a version.</p>
-              </Show>
-              <p class="muted plugin-trust-intro">
-                <Show when={!inputsOnly()} fallback={skillsOnly()
-                  ? 'Agents see each one by name and description, and read it when a task matches. They get it at their next start.'
-                  : readsMore()
-                  ? `This version reads ${addedLines().length === 1 ? 'one source' : `${addedLines().length} sources`} you haven't approved. It reads only with accounts you choose for each panel.`
-                  : 'It reads only with accounts you choose for each panel.'}>
-                <Show
-                  when={previousVersion() && !sameBundleReview()}
-                  fallback={sameBundleReview()
-                    ? changedDeclaration()
-                      ? "The plugin's code is the same, but it asks for different things. Its interface stays hidden until you review it."
-                      : 'acorn needs you to approve this plugin again. Its interface stays hidden until you review it.'
-                    : 'None of its code has run yet. acorn asks again if the plugin changes.'}
-                >
-                  {(version) => (
+                {/* A security note, so it stays in the body rather than behind a help mark. */}
+                <Show when={current().source?.kind === 'device' && current().sourceLabel?.startsWith('path:')}>
+                  <p class="muted plugin-trust-intro">A plugin from a folder isn't pinned to a version.</p>
+                </Show>
+                <p class="muted plugin-trust-intro">
+                  <Show
+                    when={!inputsOnly()}
+                    fallback={
+                      skillsOnly()
+                        ? 'Agents see each one by name and description, and read it when a task matches. They get it at their next start.'
+                        : readsMore()
+                          ? `This version reads ${addedLines().length === 1 ? 'one source' : `${addedLines().length} sources`} you haven't approved. It reads only with accounts you choose for each panel.`
+                          : 'It reads only with accounts you choose for each panel.'
+                    }
+                  >
                     <Show
-                      when={addedLines().length}
-                      fallback={`You approved ${version()}. This version asks for nothing new, but its code changed.`}
+                      when={previousVersion() && !sameBundleReview()}
+                      fallback={
+                        sameBundleReview()
+                          ? changedDeclaration()
+                            ? "The plugin's code is the same, but it asks for different things. Its interface stays hidden until you review it."
+                            : 'acorn needs you to approve this plugin again. Its interface stays hidden until you review it.'
+                          : 'None of its code has run yet. acorn asks again if the plugin changes.'
+                      }
                     >
-                      {`You last approved ${version()}. This version asks for ${addedLines().length === 1 ? 'one thing' : `${addedLines().length} things`} it did not have before; everything else is unchanged.`}
-                    </Show>
-                  )}
-                </Show>
-                </Show>
-              </p>
-              <p class="muted plugin-trust-intro">{fallbackCopy()}</p>
-
-              <Show when={error()}><Alert>{error()}</Alert></Show>
-
-              <Show when={addedLines().length}>
-                <section class="plugin-trust-group" data-tier="new">
-                  <h3><span class="plugin-trust-dot" aria-hidden="true" />New in this version</h3>
-                  <ul class="plugin-trust-permissions" data-tier="new">
-                    <For each={addedLines()}>
-                      {(line) => (
-                        <li class="added" classList={{ high: line.high }}>
-                          <Icon name={line.icon} />
-                          <LineText line={line} />
-                          <Badge size="xs" tone={line.tier === 'declared' ? 'warn' : 'accent'}>
-                            {TIER_LABEL[line.tier]}
-                          </Badge>
-                        </li>
+                      {(version) => (
+                        <Show
+                          when={addedLines().length}
+                          fallback={`You approved ${version()}. This version asks for nothing new, but its code changed.`}
+                        >
+                          {`You last approved ${version()}. This version asks for ${addedLines().length === 1 ? 'one thing' : `${addedLines().length} things`} it did not have before; everything else is unchanged.`}
+                        </Show>
                       )}
-                    </For>
-                  </ul>
-                </section>
-              </Show>
+                    </Show>
+                  </Show>
+                </p>
+                <p class="muted plugin-trust-intro">{fallbackCopy()}</p>
 
-              {/* On an update the unchanged grants fold away, so the two lines that changed are not
-                  buried in the twenty that did not. On a first install there is nothing to fold. */}
-              <Show
-                when={addedLines().length}
-                fallback={<For each={keptTiers()}>{(tier) => <TierGroup tier={tier} />}</For>}
-              >
-                <Show when={keptTiers().length}>
-                  <details class="plugin-trust-unchanged">
-                    <summary>{previousVersion() ? `Everything ${previousVersion()} already had — unchanged` : 'Everything else — unchanged'}</summary>
-                    <For each={keptTiers()}>{(tier) => <TierGroup tier={tier} />}</For>
-                  </details>
+                <Show when={error()}>
+                  <Alert>{error()}</Alert>
                 </Show>
-              </Show>
-            </div>
-            <div class="ui-modal-actions">
-              <Button variant="ghost" tip={inputsOnly() ? 'Turns the plugin off on its node.' : undefined} disabled={saving()} onPress={() => void decide('rejected')}>
-                {previousVersion() && !inputsOnly() ? 'Reject update' : 'Reject plugin'}
-              </Button>
-              <ToolbarSpacer />
-              <Button variant="ghost" tip="acorn asks again next time it starts." disabled={saving()} onPress={() => {
-                const pending = request()
-                if (pending) resolvePendingTrust(pending.row.name, pending.hash)
-              }}>Not now</Button>
-              <Button variant="solid" disabled={saving()} onPress={() => void decide('accepted')}>
-                {saving() ? 'Saving…' : inputsOnly() ? 'Accept' : previousVersion() ? 'Accept update' : 'Accept plugin'}
-              </Button>
-            </div>
-          </section>
-        </div>
-      )}
-    </Show>
+
+                <Show when={addedLines().length}>
+                  <section class="plugin-trust-group" data-tier="new">
+                    <h3>
+                      <span class="plugin-trust-dot" aria-hidden="true" />
+                      New in this version
+                    </h3>
+                    <ul class="plugin-trust-permissions" data-tier="new">
+                      <For each={addedLines()}>
+                        {(line) => (
+                          <li class="added" classList={{ high: line.high }}>
+                            <Icon name={line.icon} />
+                            <LineText line={line} />
+                            <Badge size="xs" tone={line.tier === 'declared' ? 'warn' : 'accent'}>
+                              {TIER_LABEL[line.tier]}
+                            </Badge>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
+                  </section>
+                </Show>
+
+                {/* On an update the unchanged grants fold away, so the two lines that changed are not
+                  buried in the twenty that did not. On a first install there is nothing to fold. */}
+                <Show
+                  when={addedLines().length}
+                  fallback={<For each={keptTiers()}>{(tier) => <TierGroup tier={tier} />}</For>}
+                >
+                  <Show when={keptTiers().length}>
+                    <details class="plugin-trust-unchanged">
+                      <summary>
+                        {previousVersion()
+                          ? `Everything ${previousVersion()} already had — unchanged`
+                          : 'Everything else — unchanged'}
+                      </summary>
+                      <For each={keptTiers()}>{(tier) => <TierGroup tier={tier} />}</For>
+                    </details>
+                  </Show>
+                </Show>
+              </div>
+              <div class="ui-modal-actions">
+                <Button
+                  variant="ghost"
+                  tip={inputsOnly() ? 'Turns the plugin off on its node.' : undefined}
+                  disabled={saving()}
+                  onPress={() => void decide('rejected')}
+                >
+                  {previousVersion() && !inputsOnly() ? 'Reject update' : 'Reject plugin'}
+                </Button>
+                <ToolbarSpacer />
+                <Button
+                  variant="ghost"
+                  tip="acorn asks again next time it starts."
+                  disabled={saving()}
+                  onPress={() => {
+                    const pending = request()
+                    if (pending) resolvePendingTrust(pending.row.name, pending.hash)
+                  }}
+                >
+                  Not now
+                </Button>
+                <Button variant="solid" disabled={saving()} onPress={() => void decide('accepted')}>
+                  {saving()
+                    ? 'Saving…'
+                    : inputsOnly()
+                      ? 'Accept'
+                      : previousVersion()
+                        ? 'Accept update'
+                        : 'Accept plugin'}
+                </Button>
+              </div>
+            </section>
+          </div>
+        )}
+      </Show>
     </Portal>
   )
 }

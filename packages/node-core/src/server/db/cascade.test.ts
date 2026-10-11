@@ -31,10 +31,14 @@ describe('cascadeDeletePluginData', () => {
 
     await cascadeDeletePluginData(core.db, 'ntfy')
 
-    expect((await core.db.select().from(schema.prefs)).map((row) => row.key).sort())
-      .toEqual(['core:task-layouts', pluginStateKey('ntfy-pro', 'board')])
-    expect((await core.db.select().from(schema.scheduleState)).map((row) => row.key).sort())
-      .toEqual(['core:measures', 'ntfy-pro:sweep'])
+    expect((await core.db.select().from(schema.prefs)).map((row) => row.key).sort()).toEqual([
+      'core:task-layouts',
+      pluginStateKey('ntfy-pro', 'board'),
+    ])
+    expect((await core.db.select().from(schema.scheduleState)).map((row) => row.key).sort()).toEqual([
+      'core:measures',
+      'ntfy-pro:sweep',
+    ])
     expect((await core.db.select().from(schema.scheduleRuns)).map((row) => row.key)).toEqual(['core:measures'])
   })
 })

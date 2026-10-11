@@ -70,8 +70,7 @@ export const rememberDiffFileFilter = (scope: DiffViewScope, fileFilter: string)
   viewStates.set(key, { ...viewStates.get(key), fileFilter })
 }
 
-export const diffFileFilter = (scope: DiffViewScope): string =>
-  viewStates.get(diffScopeKey(scope))?.fileFilter ?? ''
+export const diffFileFilter = (scope: DiffViewScope): string => viewStates.get(diffScopeKey(scope))?.fileFilter ?? ''
 
 export function evictDiffViewStates(taskId: string): void {
   const prefix = `task:${taskId}:`

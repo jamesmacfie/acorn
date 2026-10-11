@@ -1,4 +1,9 @@
-import { DEFAULT_COMMAND_SCOPE, type CommandScope, type CommandSearchItem, type CommandSettingOption } from '@acorn/protocol/commands.ts'
+import {
+  DEFAULT_COMMAND_SCOPE,
+  type CommandScope,
+  type CommandSearchItem,
+  type CommandSettingOption,
+} from '@acorn/protocol/commands.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { hasHostCapability } from '../../../infra/node/hostCapabilities'
 import { startInteraction } from '../../../infra/telemetry/emitter'
@@ -77,9 +82,7 @@ export const DETACHED_COMMAND_CONTEXT: CommandExecutionContext = Object.freeze({
  * line to show, which is how a setting reports its new value without throwing the reader out of the
  * list. A throw or a rejected promise is neither: it is an error, and the frame stays open with it.
  */
-export type CommandOutcome =
-  | { effect: 'close' }
-  | { effect: 'stay'; status?: string }
+export type CommandOutcome = { effect: 'close' } | { effect: 'stay'; status?: string }
 
 export const COMMAND_CLOSED: CommandOutcome = Object.freeze({ effect: 'close' })
 
@@ -193,10 +196,14 @@ export const commandScope = (command: CommandContribution): CommandScope => comm
  */
 export const commandScopeSatisfied = (command: CommandContribution, context: CommandExecutionContext): boolean => {
   switch (commandScope(command)) {
-    case 'task': return context.taskId !== null
-    case 'project': return context.projectId !== null
-    case 'workspace': return context.workspaceId !== null
-    default: return true
+    case 'task':
+      return context.taskId !== null
+    case 'project':
+      return context.projectId !== null
+    case 'workspace':
+      return context.workspaceId !== null
+    default:
+      return true
   }
 }
 
@@ -206,8 +213,10 @@ export const isActionCommand = (command: CommandContribution): command is Action
 
 /** The owner is the host's word, never the contributor's: a plugin that could state one could claim
  *  another plugin's group as its parent. */
-export const stampCommandOwner = (command: ContributedCommand, ownerId: string): CommandContribution =>
-  ({ ...command, ownerId })
+export const stampCommandOwner = (command: ContributedCommand, ownerId: string): CommandContribution => ({
+  ...command,
+  ownerId,
+})
 
 /**
  * Run a leaf action and say what happened.
@@ -242,14 +251,16 @@ export function executeCommand(id: string, context?: CommandExecutionContext): P
     attrs: { seam: COMMAND_SPAN, 'command.id': command.id, 'command.category': command.category },
   })
   try {
-    return Promise.resolve(command.run(context ?? DETACHED_COMMAND_CONTEXT))
-      .then((outcome) => {
+    return Promise.resolve(command.run(context ?? DETACHED_COMMAND_CONTEXT)).then(
+      (outcome) => {
         span.end('ok')
         return outcome ?? COMMAND_CLOSED
-      }, (error: unknown) => {
+      },
+      (error: unknown) => {
         span.end('error')
         throw error
-      })
+      },
+    )
   } catch (error) {
     span.end('error')
     return Promise.reject(error)

@@ -40,7 +40,10 @@ export async function writeSkillFolder(root: string, skills: readonly Deliverabl
     const plugin = join(root, pluginId)
     if (!plugins.has(plugin)) {
       await mkdir(join(plugin, '.claude-plugin'), { recursive: true })
-      await writeFile(join(plugin, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: nativeSkillName(pluginId) }))
+      await writeFile(
+        join(plugin, '.claude-plugin', 'plugin.json'),
+        JSON.stringify({ name: nativeSkillName(pluginId) }),
+      )
       plugins.add(plugin)
     }
     const id = skill.name.slice(split + 1)

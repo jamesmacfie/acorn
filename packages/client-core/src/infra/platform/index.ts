@@ -10,7 +10,19 @@ import type {
   NodeStatus,
   NodeTransportError,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type {
+  NodePluginPermissions,
+  PluginAgentToolGrant,
+  PluginContextSectionGrant,
+  PluginCustomAgentGrant,
+  PluginExtensionGrant,
+  PluginHarnessGrant,
+  PluginKeyClaimGrant,
+  PluginNavigationDestinationGrant,
+  PluginScheduleGrant,
+  PluginTaskCheckGrant,
+  PluginWebviewGrant,
+} from '@acorn/protocol/api.ts'
 import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
@@ -65,7 +77,10 @@ export type FleetBridge = {
 export type PluginCustody = {
   state(): Promise<PluginHostState>
   cachePut(request: { nodeId: string; pluginId: string; hash: string; version: string }): Promise<PluginPutResult>
-  install(request: { source: import('@acorn/protocol/api.ts').PluginInstallSource; expectedPluginId?: string }): Promise<PluginDeviceInstallResult>
+  install(request: {
+    source: import('@acorn/protocol/api.ts').PluginInstallSource
+    expectedPluginId?: string
+  }): Promise<PluginDeviceInstallResult>
   remove(request: { pluginId: string }): Promise<void>
   trustRecord(request: PluginTrustDecision): Promise<void>
   trustForget(request: { pluginId: string; hash: string }): Promise<void>
@@ -172,7 +187,13 @@ export type PreviewViews = {
 
 // Host-owned page surface for an accepted loaded plugin. The sandboxed plugin frame never sees this;
 // PluginWebview and its broker are the only callers.
-export type PluginWebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
+export type PluginWebviewState = {
+  key: string
+  url: string
+  loading: boolean
+  canGoBack: boolean
+  canGoForward: boolean
+}
 export type PluginWebviewBlocked = { key: string; url: string; host: string }
 export type PluginWebviews = {
   ensure(key: string, url: string, hosts: readonly string[]): Promise<boolean>
@@ -232,14 +253,49 @@ export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {
 }
 // Which plugins this device is developing, and against which node. See docs/security/plugin-install.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.
-export type PluginDevGrant = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grantedAt: number }
-export type PluginDevGrantRequest = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grant: boolean }
+export type PluginDevGrant = {
+  pluginId: string
+  nodeId: string
+  source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
+  path?: string
+  grantedAt: number
+}
+export type PluginDevGrantRequest = {
+  pluginId: string
+  nodeId: string
+  source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
+  path?: string
+  grant: boolean
+}
 export type PluginHostState = {
-  cached: Record<string, { pluginId: string; version: string; bytes: number; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; installSource?: import('@acorn/protocol/api.ts').PluginInstallSource; sourceLabel?: string; manifest?: unknown; nodeIds?: string[] }>
+  cached: Record<
+    string,
+    {
+      pluginId: string
+      version: string
+      bytes: number
+      source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
+      installSource?: import('@acorn/protocol/api.ts').PluginInstallSource
+      sourceLabel?: string
+      manifest?: unknown
+      nodeIds?: string[]
+    }
+  >
   acks: PluginAckRecord[]
   devGrants: PluginDevGrant[]
 }
-export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch' }
+export type PluginPutResult =
+  | { hash: string }
+  | {
+      error:
+        | 'unreachable'
+        | 'not-found'
+        | 'too-large'
+        | 'hash-mismatch'
+        | 'has-node-half'
+        | 'invalid-manifest'
+        | 'plugin-id-mismatch'
+    }
 export type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
 
 // ── The desktop implementation ────────────────────────────────────────────────────────────────
@@ -360,7 +416,9 @@ export const fleetBridge = (): FleetBridge | null => {
       return adopt(request)
     },
     rename: async (nodeId, label) => (await acorn.nodeRename?.(nodeId, label)) ?? null,
-    forget: async (nodeId, revoke) => { await acorn.nodeForget?.(nodeId, revoke) },
+    forget: async (nodeId, revoke) => {
+      await acorn.nodeForget?.(nodeId, revoke)
+    },
     reconnect: (nodeId) => acorn.nodeReconnect?.(nodeId),
     restartLocal: async () => {
       const restart = acorn.nodeRestartLocal
@@ -408,11 +466,13 @@ export const pickFiles = async (options: { accept?: readonly string[] } = {}): P
     // the same outcome as the owner walking away from the dialog.
     input.oncancel = () => resolve([])
     input.onchange = () => {
-      void Promise.all([...(input.files ?? [])].map(async (file) => ({
-        name: file.name,
-        type: file.type || 'application/octet-stream',
-        bytes: new Uint8Array(await file.arrayBuffer()),
-      }))).then(resolve)
+      void Promise.all(
+        [...(input.files ?? [])].map(async (file) => ({
+          name: file.name,
+          type: file.type || 'application/octet-stream',
+          bytes: new Uint8Array(await file.arrayBuffer()),
+        })),
+      ).then(resolve)
     }
     input.click()
   })
@@ -507,7 +567,14 @@ export type OverlayPresentation = {
   generation: number
   viewport?: { width: number; height: number }
   pages: Array<{ bounds: VisibleElementRect; blockers: number[] }>
-  surfaces: Array<{ id: number; role: 'tooltip' | 'popover' | 'menu' | 'modal' | 'toast' | 'drawer' | 'custom'; bounds: VisibleElementRect; radius: number[]; interactive: boolean; modal: boolean }>
+  surfaces: Array<{
+    id: number
+    role: 'tooltip' | 'popover' | 'menu' | 'modal' | 'toast' | 'drawer' | 'custom'
+    bounds: VisibleElementRect
+    radius: number[]
+    interactive: boolean
+    modal: boolean
+  }>
 }
 export type RendererLayer = { update(presentation: OverlayPresentation): Promise<boolean> }
 export const rendererLayer = (): RendererLayer | null => acornGlobal()?.rendererLayer ?? null

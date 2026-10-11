@@ -27,8 +27,12 @@ export function HelpMark(props: { text: string; titleId: string; textId?: string
       >
         <Icon name="circle-question-mark" />
       </button>
-      <span id={aboutId} hidden>About</span>
-      <span id={textId()} hidden>{props.text}</span>
+      <span id={aboutId} hidden>
+        About
+      </span>
+      <span id={textId()} hidden>
+        {props.text}
+      </span>
     </>
   )
 }

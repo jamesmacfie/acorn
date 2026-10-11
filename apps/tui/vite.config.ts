@@ -34,8 +34,7 @@ const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 //     "No renderer found" from inside a component that is plainly under the provider.
 //
 // pnpm-workspace.yaml's catalog says the same thing about solid-js for the same reason.
-const isReactiveRuntime = (id: string) =>
-  id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/')
+const isReactiveRuntime = (id: string) => id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/')
 // Validation stays on the client boundary. Bundle it so unused Zod exports and locales can be
 // removed instead of making Node load the entire package before the first frame.
 const isValidationRuntime = (id: string) => id === 'zod' || id.startsWith('zod/')
@@ -43,17 +42,31 @@ const isValidationRuntime = (id: string) => id === 'zod' || id.startsWith('zod/'
 // The `@codemirror`, `@xterm` and `shiki` entries are the packages this host has no way to run and
 // no longer installs; every one of them is matched by a pattern in `resolve.alias`, so the list here
 // and the list there have to say the same thing.
-const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-static/icon-nodes.json'
-  || id.startsWith('@acorn/plugin-api/ui')
-  || id === '@acorn/client-core/features/dataSources/kit.ts'
-  || id.startsWith('@codemirror/lang-') || id.startsWith('@codemirror/legacy-modes')
-  || id === '@xterm/xterm' || id.startsWith('@xterm/xterm/')
-  || id === '@xterm/addon-fit' || id === '@xterm/addon-webgl'
-  || id === 'shiki' || id.startsWith('shiki/')
+const isAliased = (id: string) =>
+  id === '@solidjs/router' ||
+  id === 'lucide-static/icon-nodes.json' ||
+  id.startsWith('@acorn/plugin-api/ui') ||
+  id === '@acorn/client-core/features/dataSources/kit.ts' ||
+  id.startsWith('@codemirror/lang-') ||
+  id.startsWith('@codemirror/legacy-modes') ||
+  id === '@xterm/xterm' ||
+  id.startsWith('@xterm/xterm/') ||
+  id === '@xterm/addon-fit' ||
+  id === '@xterm/addon-webgl' ||
+  id === 'shiki' ||
+  id.startsWith('shiki/')
 // Archive-only entry bundles its parser closure; none of these packages enters startup.
-const isArchivePackage = (id: string) => ['tar', '@isaacs/fs-minipass', 'chownr', 'minipass', 'minizlib', 'yallist'].some((name) => id === name || id.startsWith(`${name}/`))
+const isArchivePackage = (id: string) =>
+  ['tar', '@isaacs/fs-minipass', 'chownr', 'minipass', 'minizlib', 'yallist'].some(
+    (name) => id === name || id.startsWith(`${name}/`),
+  )
 const externalizeBareImports = (id: string) =>
-  !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isValidationRuntime(id) && !isAliased(id)
+  !id.startsWith('.') &&
+  !isAbsolute(id) &&
+  !isWorkspacePackage(id) &&
+  !isReactiveRuntime(id) &&
+  !isValidationRuntime(id) &&
+  !isAliased(id)
 
 export default defineConfig({
   resolve: {
@@ -62,8 +75,14 @@ export default defineConfig({
     // `solid-js/dist/solid.js` again, forever.
     alias: [
       { find: /^@acorn\/plugin-api\/ui$/, replacement: resolve(import.meta.dirname, 'src/kit/ui.ts') },
-      { find: /^@acorn\/plugin-api\/ui\/data-sources$/, replacement: resolve(import.meta.dirname, 'src/kit/dataSources.ts') },
-      { find: /^@acorn\/client-core\/features\/dataSources\/kit\.ts$/, replacement: resolve(import.meta.dirname, 'src/kit/dataSourceKit.ts') },
+      {
+        find: /^@acorn\/plugin-api\/ui\/data-sources$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/dataSources.ts'),
+      },
+      {
+        find: /^@acorn\/client-core\/features\/dataSources\/kit\.ts$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/dataSourceKit.ts'),
+      },
       // …and the host's own surfaces beside it. `ui/host` is the palette chrome, the drawer, the
       // reference-panel box and the two cooperative-extension nodes, and the DOM's copies of them are
       // portals and `<ul>`s (src/kit/host.tsx).
@@ -121,7 +140,10 @@ export default defineConfig({
         find: /^@codemirror\/(?:lang-[^/]+|legacy-modes(?:\/.*)?)$/,
         replacement: resolve(import.meta.dirname, 'src/kit/codemirrorGrammars.ts'),
       },
-      { find: /^@xterm\/(?:xterm(?:\/.*)?|addon-fit|addon-webgl)$/, replacement: resolve(import.meta.dirname, 'src/kit/xterm.ts') },
+      {
+        find: /^@xterm\/(?:xterm(?:\/.*)?|addon-fit|addon-webgl)$/,
+        replacement: resolve(import.meta.dirname, 'src/kit/xterm.ts'),
+      },
       { find: /^shiki(?:\/.*)?$/, replacement: resolve(import.meta.dirname, 'src/kit/shiki.ts') },
     ],
   },
@@ -148,7 +170,8 @@ export default defineConfig({
         'archive-worker': resolve(import.meta.dirname, '../../packages/node-core/src/server/plugins/archiveWorker.ts'),
         pluginWorker: resolve(import.meta.dirname, 'src/plugins/pluginWorker.js'),
       },
-      external: (id: string) => (!isArchivePackage(id) && externalizeBareImports(id)) || builtinModules.includes(id.replace(/^node:/, '')),
+      external: (id: string) =>
+        (!isArchivePackage(id) && externalizeBareImports(id)) || builtinModules.includes(id.replace(/^node:/, '')),
       output: {
         format: 'es',
         entryFileNames: '[name].js',

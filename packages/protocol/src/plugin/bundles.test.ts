@@ -3,19 +3,36 @@ import { hasNodeHalf } from './bundles.ts'
 
 describe('device manifest admission', () => {
   it('accepts client-only contributions', () => {
-    expect(hasNodeHalf({ client: 'client.js', contributions: { frames: [{ id: 'pane' }], themes: [{ id: 'warm' }] } })).toBe(false)
-    expect(hasNodeHalf({ client: 'client.js', contributions: { sources: [{ id: 'board', tree: { list: 'list', detail: 'detail' } }] } })).toBe(false)
+    expect(
+      hasNodeHalf({ client: 'client.js', contributions: { frames: [{ id: 'pane' }], themes: [{ id: 'warm' }] } }),
+    ).toBe(false)
+    expect(
+      hasNodeHalf({
+        client: 'client.js',
+        contributions: { sources: [{ id: 'board', tree: { list: 'list', detail: 'detail' } }] },
+      }),
+    ).toBe(false)
   })
 
   it.each(['node', 'migrations'])('refuses a %s entry', (key) => {
     expect(hasNodeHalf({ [key]: 'entry.js', contributions: {} })).toBe(true)
   })
 
-  it.each(['routes', 'schedules', 'tools', 'agentTools', 'contextSections', 'providers', 'harnesses', 'taskChecks', 'auditActions', 'dataSources', 'dataSourceDiscoveries'])(
-    'refuses %s even if an older parser would strip it', (key) => {
-      expect(hasNodeHalf({ contributions: { [key]: [{ id: 'x' }] } })).toBe(true)
-    },
-  )
+  it.each([
+    'routes',
+    'schedules',
+    'tools',
+    'agentTools',
+    'contextSections',
+    'providers',
+    'harnesses',
+    'taskChecks',
+    'auditActions',
+    'dataSources',
+    'dataSourceDiscoveries',
+  ])('refuses %s even if an older parser would strip it', (key) => {
+    expect(hasNodeHalf({ contributions: { [key]: [{ id: 'x' }] } })).toBe(true)
+  })
 
   it('refuses declared node permissions', () => {
     expect(hasNodeHalf({ permissions: { node: { exec: true } }, contributions: {} })).toBe(true)

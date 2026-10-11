@@ -8,8 +8,13 @@ import { localSearch } from './localSearch'
 // reader types.
 
 const CONTEXT: CommandExecutionContext = {
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
-  paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId: 't-1',
+  paneId: null,
+  surfaceId: null,
 }
 
 const item = (id: string, over: Partial<CommandSearchItem> = {}): CommandSearchItem => ({ id, title: id, ...over })

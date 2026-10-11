@@ -20,9 +20,9 @@
 
 const absent = (what: string): never => {
   throw new Error(
-    `${what} is shiki, and the terminal client draws in the sixteen slots the reader's terminal chose `
-    + 'rather than in a theme of ours. Ask a role for a colour instead '
-    + '(apps/tui/src/kit/shiki.ts, apps/tui/vite.config.ts).',
+    `${what} is shiki, and the terminal client draws in the sixteen slots the reader's terminal chose ` +
+      'rather than in a theme of ours. Ask a role for a colour instead ' +
+      '(apps/tui/src/kit/shiki.ts, apps/tui/vite.config.ts).',
   )
 }
 

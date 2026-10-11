@@ -20,7 +20,9 @@ type Emit = (frame: { channel: string } & Record<string, unknown>) => void
 const announceNotes = async (db: PluginDatabase, taskId: string, emit?: Emit): Promise<void> => {
   if (!emit) return
   const [all] = await db.select({ value: count() }).from(reviewNotesTable).where(eq(reviewNotesTable.taskId, taskId))
-  const [unsent] = await db.select({ value: count() }).from(reviewNotesTable)
+  const [unsent] = await db
+    .select({ value: count() })
+    .from(reviewNotesTable)
     .where(and(eq(reviewNotesTable.taskId, taskId), isNull(reviewNotesTable.sentAt)))
   emit({
     channel: pluginChannel('git', 'review-notes-changed'),
@@ -64,7 +66,11 @@ const rowToNote = (r: Row): ReviewNote => ({
 export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>, emit?: Emit) =>
   new Hono<AppEnv>()
     .get('/:id/review-notes', async (c) => {
-      const rows = await db.select().from(reviewNotesTable).where(eq(reviewNotesTable.taskId, c.req.param('id'))).orderBy(reviewNotesTable.createdAt)
+      const rows = await db
+        .select()
+        .from(reviewNotesTable)
+        .where(eq(reviewNotesTable.taskId, c.req.param('id')))
+        .orderBy(reviewNotesTable.createdAt)
       return c.json(rows.map(rowToNote))
     })
     .post('/:id/review-notes', async (c) => {
@@ -95,12 +101,15 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
       if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
       const taskId = c.req.param('id')
       const noteId = c.req.param('noteId')
-      const [before] = await db.select({ body: reviewNotesTable.body, sentAt: reviewNotesTable.sentAt })
+      const [before] = await db
+        .select({ body: reviewNotesTable.body, sentAt: reviewNotesTable.sentAt })
         .from(reviewNotesTable)
         .where(and(eq(reviewNotesTable.id, noteId), eq(reviewNotesTable.taskId, taskId)))
       const body = parsed.data.body.trim()
       if (before && (before.body !== body || before.sentAt !== null)) {
-        await db.update(reviewNotesTable).set({ body, sentAt: null })
+        await db
+          .update(reviewNotesTable)
+          .set({ body, sentAt: null })
           .where(and(eq(reviewNotesTable.id, noteId), eq(reviewNotesTable.taskId, taskId)))
         await announceNotes(db, taskId, emit)
       }
@@ -124,7 +133,9 @@ export const reviewNotesRoutes = (db: PluginDatabase, core: Pick<CoreServices, '
       const changed = await db
         .update(reviewNotesTable)
         .set({ sentAt: Date.now() })
-        .where(and(eq(reviewNotesTable.taskId, taskId), inArray(reviewNotesTable.id, ids), isNull(reviewNotesTable.sentAt)))
+        .where(
+          and(eq(reviewNotesTable.taskId, taskId), inArray(reviewNotesTable.id, ids), isNull(reviewNotesTable.sentAt)),
+        )
         .returning({ id: reviewNotesTable.id })
       if (changed.length) await announceNotes(db, taskId, emit)
       return c.json({ ok: true })

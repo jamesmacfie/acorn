@@ -59,10 +59,8 @@ describe('automatic task context', () => {
 
     expect(updated?.label).toBe('Task context · updated')
     expect(updated?.content).toContain('may contain new or modified information')
-    expect(latestAutomaticTaskContext([
-      turn(1, previous ?? undefined),
-      turn(2),
-      turn(3, updated ?? undefined),
-    ])).toEqual(updated)
+    expect(
+      latestAutomaticTaskContext([turn(1, previous ?? undefined), turn(2), turn(3, updated ?? undefined)]),
+    ).toEqual(updated)
   })
 })

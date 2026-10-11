@@ -70,11 +70,13 @@ async function available(tool: AgentToolContribution, ctx: ToolContext, cache: A
 function hasRequiredSession(c: Context<AppEnv>, tool: AgentToolContribution): boolean {
   if (!tool.requiresSession) return true
   const principal = c.get('principal')
-  return principal?.kind === 'internal'
-    && principal.scope === 'task'
-    && !!principal.taskId
-    && principal.taskId === c.req.param('id')
-    && !!principal.sessionId
+  return (
+    principal?.kind === 'internal' &&
+    principal.scope === 'task' &&
+    !!principal.taskId &&
+    principal.taskId === c.req.param('id') &&
+    !!principal.sessionId
+  )
 }
 
 // Match the high-level MCP SDK's schema projection: draft-07 for argument-bearing tools, and its exact
@@ -93,7 +95,8 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   // 'device' is the interactive owner (the client's broker holds the bearer); 'internal' is a child this
   // node spawned. The two surfaces are mutually exclusive: an agent cannot reach renderer-only tools,
   // and the renderer cannot impersonate an agent.
-  if (opts.renderer ? principal?.kind !== 'device' : principal?.kind !== 'internal') return respondError(c, 404, 'not_found')
+  if (opts.renderer ? principal?.kind !== 'device' : principal?.kind !== 'internal')
+    return respondError(c, 404, 'not_found')
   // Task scope enforced against the credential, not the URL. toolContext() below reads the taskId from
   // the path, so before internal tokens carried a task a credential minted for task A could invoke task
   // B's tools: the token said nothing about which task it belonged to
@@ -116,7 +119,11 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   // plugin's turn to say no (server/pluginHost/hooks.ts, docs/plugins/hooks.md § Hooks). The arguments are not in
   // the payload, deliberately — a handler that saw them would be reading the agent's work, and the
   // decision this hook exists for is about the verb.
-  const verdict = await runHook('core:before-tool-call', { taskId: ctx.taskId, tool: tool.name, sessionId: ctx.sessionId ?? '' })
+  const verdict = await runHook('core:before-tool-call', {
+    taskId: ctx.taskId,
+    tool: tool.name,
+    sessionId: ctx.sessionId ?? '',
+  })
   if (!verdict.ok) return respondError(c, STATUS['needs-trust'], 'needs-trust', [`${verdict.by}: ${verdict.reason}`])
   if (tool.requiresSession && ctx.sessionId) {
     ctx.provenanceProof = issueAgentToolProvenance(ctx.taskId, ctx.sessionId, tool.name)
@@ -125,7 +132,10 @@ async function invoke(c: Context<AppEnv>, opts: { renderer: boolean }): Promise<
   // of it, and named for the plugin that contributed the tool rather than the one whose route this
   // is: an agent tool is arbitrary work an agent asked for, and the question is whose work was slow.
   // The arguments never ride along, for the reason the hook above does not see them either.
-  const span = startSpan(agentToolOwner(tool.name), { name: 'tool.call', attrs: { seam: 'tool.call', tool: tool.name, risk: tool.risk } })
+  const span = startSpan(agentToolOwner(tool.name), {
+    name: 'tool.call',
+    attrs: { seam: 'tool.call', tool: tool.name, risk: tool.risk },
+  })
   try {
     const answer = c.json((await tool.handler(parsed.data, ctx)) ?? null)
     span.end('ok', { outcome: 'ok' })
@@ -152,12 +162,18 @@ export const agentTools = new Hono<AppEnv>()
     const tools = []
     for (const tool of registry) {
       if (
-        !hasRequiredSession(c, tool)
-        || !isToolPermitted(tool, perms)
-        || !isToolWithinCeiling(tool, ctx.toolCeiling)
-        || !(await available(tool, ctx, availability))
-      ) continue
-      tools.push({ name: tool.name, description: tool.description, risk: tool.risk, inputSchema: mcpInputSchema(tool.input) })
+        !hasRequiredSession(c, tool) ||
+        !isToolPermitted(tool, perms) ||
+        !isToolWithinCeiling(tool, ctx.toolCeiling) ||
+        !(await available(tool, ctx, availability))
+      )
+        continue
+      tools.push({
+        name: tool.name,
+        description: tool.description,
+        risk: tool.risk,
+        inputSchema: mcpInputSchema(tool.input),
+      })
     }
     return c.json({ tools })
   })
@@ -169,7 +185,11 @@ export const agentToolsCatalog = new Hono<AppEnv>().get('/', (c) => {
   if (!registry) return respondError(c, 503, 'bridge-unavailable')
   return c.json({
     tools: registry.map((tool) => ({
-      name: tool.name, description: tool.description, risk: tool.risk, availability: tool.whenDescription, owner: agentToolOwner(tool.name),
+      name: tool.name,
+      description: tool.description,
+      risk: tool.risk,
+      availability: tool.whenDescription,
+      owner: agentToolOwner(tool.name),
     })),
   })
 })

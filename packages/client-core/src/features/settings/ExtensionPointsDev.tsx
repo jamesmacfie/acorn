@@ -18,7 +18,10 @@ import { slotChoices, withSlotChoice } from '../../host/tree/arbitration'
 import { treeFailure } from '../../host/tree/treeFailures'
 import { activeNodeId } from '../../infra/node/activeNode'
 import {
-  documentServiceCandidates, documentServiceChoiceKey, documentServiceRegistry, type DocumentServiceKind,
+  documentServiceCandidates,
+  documentServiceChoiceKey,
+  documentServiceRegistry,
+  type DocumentServiceKind,
 } from '../../host/registries/panes/documentServices'
 
 // Every extension point on this node, who fills it, and every contribution that fills nothing
@@ -47,8 +50,7 @@ const sentence = (text: string): string => `${text.charAt(0).toUpperCase()}${tex
 export default function ExtensionPointsDev() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
-  const points = createMemo(() =>
-    [...extensionPointRegistry.entries()].sort((a, b) => a.id.localeCompare(b.id)))
+  const points = createMemo(() => [...extensionPointRegistry.entries()].sort((a, b) => a.id.localeCompare(b.id)))
   const unmatched = createMemo(() => unmatchedExtensions())
   // Every language and service some plugin answers on the Node in view, with who answers it.
   const languageServices = createMemo(() => {
@@ -56,13 +58,16 @@ export default function ExtensionPointsDev() {
     const keys = new Map<string, { languageId: string; service: DocumentServiceKind }>()
     for (const entry of documentServiceRegistry.entries()) {
       for (const service of ['hover', 'diagnostics'] as const) {
-        if (entry[service]) keys.set(documentServiceChoiceKey(entry.languageId, service), { languageId: entry.languageId, service })
+        if (entry[service])
+          keys.set(documentServiceChoiceKey(entry.languageId, service), { languageId: entry.languageId, service })
       }
     }
-    return [...keys.entries()].sort(([a], [b]) => a.localeCompare(b)).flatMap(([key, { languageId, service }]) => {
-      const candidates = documentServiceCandidates(nodeId, languageId, service)
-      return candidates.length ? [{ key, languageId, service, candidates }] : []
-    })
+    return [...keys.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .flatMap(([key, { languageId, service }]) => {
+        const candidates = documentServiceCandidates(nodeId, languageId, service)
+        return candidates.length ? [{ key, languageId, service, candidates }] : []
+      })
   })
   const languageSave = createSettingSave()
 
@@ -73,7 +78,14 @@ export default function ExtensionPointsDev() {
         label="Available points"
         help="Places where a plugin lets other plugins add to it, and which plugins do."
       >
-        <Show when={points().length} fallback={<EmptyState align="start" size="sm">No plugin offers an extension point.</EmptyState>}>
+        <Show
+          when={points().length}
+          fallback={
+            <EmptyState align="start" size="sm">
+              No plugin offers an extension point.
+            </EmptyState>
+          }
+        >
           <ul class="plugin-point-list">
             <For each={points()}>
               {(point) => {
@@ -92,12 +104,20 @@ export default function ExtensionPointsDev() {
                       <span class="plugin-point-id">{point.id}</span>
                       <Badge>{point.kind}</Badge>
                       <Show when={point.mode}>{(mode) => <Badge>{mode()}</Badge>}</Show>
-                      <Show when={point.mode === 'stack'}><Badge>{`up to ${point.max}`}</Badge></Show>
+                      <Show when={point.mode === 'stack'}>
+                        <Badge>{`up to ${point.max}`}</Badge>
+                      </Show>
                     </span>
                     <Text emphasis="muted" wrap>
                       {sentence(KIND_HELP[point.kind] ?? point.label)}{' '}
-                      {filled().length ? `Used by ${filled().map((entry) => pluginLabel(entry.pluginId)).join(', ')}.` : 'Not used.'}
-                      <Show when={point.actions?.length}>{` Contributors can ask it to: ${point.actions!.join(', ')}.`}</Show>
+                      {filled().length
+                        ? `Used by ${filled()
+                            .map((entry) => pluginLabel(entry.pluginId))
+                            .join(', ')}.`
+                        : 'Not used.'}
+                      <Show
+                        when={point.actions?.length}
+                      >{` Contributors can ask it to: ${point.actions!.join(', ')}.`}</Show>
                       <Show when={point.mounts?.length}>
                         {` Drawn at ${point.mounts!.map((mount) => `the ${mount.region} of ${mount.surface}`).join(', ')}.`}
                       </Show>
@@ -120,13 +140,21 @@ export default function ExtensionPointsDev() {
                           value={slotChoices(stored())[point.id] ?? ''}
                           options={[
                             { value: '', label: `${pluginLabel(point.ownerId)}’s own` },
-                            ...tied().map((entry) => ({ value: entry.pluginId, label: `${entry.label} (${entry.pluginId})` })),
+                            ...tied().map((entry) => ({
+                              value: entry.pluginId,
+                              label: `${entry.label} (${entry.pluginId})`,
+                            })),
                           ]}
                           onChange={(value) =>
                             // Point-wide, not per key: this screen lists points, and "who draws this
                             // slot" is the decision a person is here to make. A slot resolves the
                             // per-key answer first and falls back to this one.
-                            void save.run(() => savePref(qc, PrefKeys.remoteSlots, withSlotChoice(stored(), point.id, value), { throwOnFailure: true }))}
+                            void save.run(() =>
+                              savePref(qc, PrefKeys.remoteSlots, withSlotChoice(stored(), point.id, value), {
+                                throwOnFailure: true,
+                              }),
+                            )
+                          }
                         />
                       </SettingRow>
                     </Show>
@@ -143,7 +171,14 @@ export default function ExtensionPointsDev() {
         label="Language services"
         help="Plugins that answer hover or diagnostics for Editor's files on this Node. When two answer the same language, neither runs until you pick one."
       >
-        <Show when={languageServices().length} fallback={<EmptyState align="start" size="sm">No plugin offers hover or diagnostics.</EmptyState>}>
+        <Show
+          when={languageServices().length}
+          fallback={
+            <EmptyState align="start" size="sm">
+              No plugin offers hover or diagnostics.
+            </EmptyState>
+          }
+        >
           <ul class="plugin-point-list">
             <For each={languageServices()}>
               {(row) => (
@@ -152,17 +187,39 @@ export default function ExtensionPointsDev() {
                     <span class="plugin-point-id">{row.languageId}</span>
                     <Badge>{row.service}</Badge>
                   </span>
-                  <Show when={row.candidates.length > 1} fallback={<Text emphasis="muted" wrap>{`${row.candidates[0]!.label} (${row.candidates[0]!.pluginId}).`}</Text>}>
-                    <SettingRow label={`Which plugin answers ${row.service} for ${row.languageId}`} error={languageSave.error()}>
+                  <Show
+                    when={row.candidates.length > 1}
+                    fallback={
+                      <Text
+                        emphasis="muted"
+                        wrap
+                      >{`${row.candidates[0]!.label} (${row.candidates[0]!.pluginId}).`}</Text>
+                    }
+                  >
+                    <SettingRow
+                      label={`Which plugin answers ${row.service} for ${row.languageId}`}
+                      error={languageSave.error()}
+                    >
                       <Select
                         label={`Which plugin answers ${row.service} for ${row.languageId}`}
                         value={slotChoices(prefs.data?.[PrefKeys.documentServices])[row.key] ?? ''}
                         options={[
                           { value: '', label: 'None' },
-                          ...row.candidates.map((entry) => ({ value: entry.pluginId, label: `${entry.label} (${entry.pluginId})` })),
+                          ...row.candidates.map((entry) => ({
+                            value: entry.pluginId,
+                            label: `${entry.label} (${entry.pluginId})`,
+                          })),
                         ]}
-                        onChange={(value) => void languageSave.run(() =>
-                          savePref(qc, PrefKeys.documentServices, withSlotChoice(prefs.data?.[PrefKeys.documentServices], row.key, value), { throwOnFailure: true }))}
+                        onChange={(value) =>
+                          void languageSave.run(() =>
+                            savePref(
+                              qc,
+                              PrefKeys.documentServices,
+                              withSlotChoice(prefs.data?.[PrefKeys.documentServices], row.key, value),
+                              { throwOnFailure: true },
+                            ),
+                          )
+                        }
                       />
                     </SettingRow>
                   </Show>
@@ -180,13 +237,19 @@ export default function ExtensionPointsDev() {
       >
         <Show
           when={unmatched().length}
-          fallback={<EmptyState align="start" size="sm">Everything contributed here has somewhere to go.</EmptyState>}
+          fallback={
+            <EmptyState align="start" size="sm">
+              Everything contributed here has somewhere to go.
+            </EmptyState>
+          }
         >
           <ul class="plugin-point-list">
             <For each={unmatched()}>
               {(miss) => (
                 <li class="plugin-point">
-                  <span class="plugin-point-id">{miss.entry.pluginId} → {miss.entry.point}</span>
+                  <span class="plugin-point-id">
+                    {miss.entry.pluginId} → {miss.entry.point}
+                  </span>
                   <Text emphasis="muted" wrap>
                     {sentence(miss.reason)}
                     <Show when={miss.suggestion}>{(suggestion) => ` Did you mean ${suggestion()}?`}</Show>

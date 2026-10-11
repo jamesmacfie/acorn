@@ -17,7 +17,14 @@ import type { NodePlugin, PluginStorage } from './types'
 // both have to survive the lifecycle table, which is the part a fake would never catch.
 
 const PLUGIN = 'acme'
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
+const NO_PERMISSIONS: NodePermissions = {
+  core: [],
+  capabilities: [],
+  secrets: false,
+  exec: false,
+  net: [],
+  sockets: false,
+}
 const storage: PluginStorage = {
   open: () => {
     throw new Error('this suite never opens a plugin database')
@@ -79,7 +86,12 @@ describe('plugin schedules', () => {
       scheduler,
       options: {
         capabilities,
-        core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
+        core: createCoreServices({
+          secrets: new SecretService('c'.repeat(64)),
+          db: core.db,
+          activeIdentity: memoryIdentityStore('owner-1'),
+          ...testCoreSeams(),
+        }),
         env: testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore('owner-1') }),
         dataDir: '',
       },
@@ -92,25 +104,37 @@ describe('plugin schedules', () => {
     const plugin: NodePlugin = {
       name: PLUGIN,
       init: (ctx) => {
-        ctx.routes.fetch(async (request, context) => {
-          seen.push({
-            method: request.method,
-            path: new URL(request.url).pathname,
-            body: await request.text(),
-            userId: context.userId,
-          })
-          return new Response(null, { status: 204 })
-        }, { prefix: '/schedules' })
+        ctx.routes.fetch(
+          async (request, context) => {
+            seen.push({
+              method: request.method,
+              path: new URL(request.url).pathname,
+              body: await request.text(),
+              userId: context.userId,
+            })
+            return new Response(null, { status: 204 })
+          },
+          { prefix: '/schedules' },
+        )
       },
     }
 
     try {
-      await initPlugins([plugin], { ...options, loaded: new Map([[PLUGIN, { permissions: NO_PERMISSIONS, storage, schedules: [declared] }]]) })
+      await initPlugins([plugin], {
+        ...options,
+        loaded: new Map([[PLUGIN, { permissions: NO_PERMISSIONS, storage, schedules: [declared] }]]),
+      })
       await scheduler.start()
 
       const rows = await scheduler.list()
       expect(rows).toHaveLength(1)
-      expect(rows[0]).toMatchObject({ key: 'acme:refresh', owner: 'plugin', pluginId: PLUGIN, name: 'Refresh the mirror', registered: true })
+      expect(rows[0]).toMatchObject({
+        key: 'acme:refresh',
+        owner: 'plugin',
+        pluginId: PLUGIN,
+        name: 'Refresh the mirror',
+        registered: true,
+      })
 
       await time.advance(3_600_000)
       // Mount-relative, exactly as an HTTP-served handler sees it, and as the node's own service
@@ -127,10 +151,14 @@ describe('plugin schedules', () => {
     const { core, time, scheduler, options } = world()
     const plugin: NodePlugin = {
       name: PLUGIN,
-      init: (ctx) => void ctx.routes.fetch(() => new Response('the mirror is down', { status: 502 }), { prefix: '/schedules' }),
+      init: (ctx) =>
+        void ctx.routes.fetch(() => new Response('the mirror is down', { status: 502 }), { prefix: '/schedules' }),
     }
     try {
-      await initPlugins([plugin], { ...options, loaded: new Map([[PLUGIN, { permissions: NO_PERMISSIONS, storage, schedules: [declared] }]]) })
+      await initPlugins([plugin], {
+        ...options,
+        loaded: new Map([[PLUGIN, { permissions: NO_PERMISSIONS, storage, schedules: [declared] }]]),
+      })
       await scheduler.start()
       await time.advance(3_600_000)
       const run = (await scheduler.runs('acme:refresh'))[0]
@@ -147,7 +175,14 @@ describe('plugin schedules', () => {
     const plugin: NodePlugin = {
       name: PLUGIN,
       // The compiled tier: a function, and seconds for the timeout exactly as the manifest spells it.
-      init: (ctx) => ctx.schedules.register({ scheduleId: 'poll', name: 'Poll', cadence: { every: 30 }, timeout: 30, run: async () => {} }),
+      init: (ctx) =>
+        ctx.schedules.register({
+          scheduleId: 'poll',
+          name: 'Poll',
+          cadence: { every: 30 },
+          timeout: 30,
+          run: async () => {},
+        }),
     }
     try {
       await initPlugins([plugin], options)
@@ -167,10 +202,14 @@ describe('plugin schedules', () => {
     const bodies: string[] = []
     const instance = (tag: string): NodePlugin => ({
       name: PLUGIN,
-      init: (ctx) => void ctx.routes.fetch(() => {
-        bodies.push(tag)
-        return new Response(null, { status: 204 })
-      }, { prefix: '/schedules' }),
+      init: (ctx) =>
+        void ctx.routes.fetch(
+          () => {
+            bodies.push(tag)
+            return new Response(null, { status: 204 })
+          },
+          { prefix: '/schedules' },
+        ),
     })
     const binding = { permissions: NO_PERMISSIONS, storage, schedules: [declared] }
     try {
@@ -209,7 +248,9 @@ describe('plugin schedules', () => {
       clearRegistrations(PLUGIN)
       const gone = (await scheduler.list())[0]
       expect(gone).toMatchObject({ key: 'acme:refresh', registered: false })
-      expect(await core.db.select().from(schema.scheduleState).where(eq(schema.scheduleState.key, 'acme:refresh'))).toHaveLength(1)
+      expect(
+        await core.db.select().from(schema.scheduleState).where(eq(schema.scheduleState.key, 'acme:refresh')),
+      ).toHaveLength(1)
 
       // Back it comes: same key, same pause, and no second registration despite the first host's run.
       await initPlugins([plugin], { ...options, loaded })

@@ -12,7 +12,15 @@ export function agentMapWorkflow(step: WorkflowStepDef): WorkflowDef {
     name: step.name,
     inputs: [{ name: 'item', schema: { type: 'object' }, required: true }],
     steps: [{ ...agent, id: 'agent', name: step.name, kind: 'agent', after: [], inputs: 'none' }],
-    outputs: agent.schema ? [{ name: 'result', schema: parseDataSchema(agent.schema), binding: { address: { from: 'step', stepId: 'agent', pointer: '' } } }] : undefined,
+    outputs: agent.schema
+      ? [
+          {
+            name: 'result',
+            schema: parseDataSchema(agent.schema),
+            binding: { address: { from: 'step', stepId: 'agent', pointer: '' } },
+          },
+        ]
+      : undefined,
   }
 }
 

@@ -11,5 +11,6 @@ export type AgentUsageClient = {
 export const agentUsageClient: AgentUsageClient = {
   read: () => readJson<AgentUsageSnapshot>(agentUsageRoute),
   refresh: () => writeJson<AgentUsageSnapshot>(agentUsageRefreshRoute, { method: 'POST' }),
-  refreshProvider: (providerId) => writeJson<AgentUsageSnapshot>(agentUsageProviderRefreshRoute(providerId), { method: 'POST' }),
+  refreshProvider: (providerId) =>
+    writeJson<AgentUsageSnapshot>(agentUsageProviderRefreshRoute(providerId), { method: 'POST' }),
 }

@@ -8,7 +8,14 @@ import { readBytes } from '../../infra/node/apiClient'
 vi.mock('../../infra/node/apiClient', () => ({ readBytes: vi.fn() }))
 const image = (id: string): WorkspaceAppearance => ({ version: 1, kind: 'image', imageId: id.repeat(64) })
 let dispose: (() => void) | undefined
-afterEach(async () => { dispose?.(); dispose = undefined; await Promise.resolve(); document.body.replaceChildren(); vi.restoreAllMocks(); vi.mocked(readBytes).mockReset() })
+afterEach(async () => {
+  dispose?.()
+  dispose = undefined
+  await Promise.resolve()
+  document.body.replaceChildren()
+  vi.restoreAllMocks()
+  vi.mocked(readBytes).mockReset()
+})
 
 it('shares immutable images per Node, releases URLs, and ignores late reads after replacement', async () => {
   const finish: ((value: { bytes: Uint8Array; type: string; filename: null }) => void)[] = []
@@ -20,7 +27,15 @@ it('shares immutable images per Node, releases URLs, and ignores late reads afte
   const [appearance, setAppearance] = createSignal(image('a'))
   const [node, setNode] = createSignal('node-a')
   const [name, setName] = createSignal('Runn')
-  dispose = render(() => <><WorkspaceIdentity name={name()} appearance={appearance()} nodeId={node()} /><WorkspaceIdentity name="Acorn" appearance={appearance()} nodeId={node()} /></>, document.body)
+  dispose = render(
+    () => (
+      <>
+        <WorkspaceIdentity name={name()} appearance={appearance()} nodeId={node()} />
+        <WorkspaceIdentity name="Acorn" appearance={appearance()} nodeId={node()} />
+      </>
+    ),
+    document.body,
+  )
   expect(readBytes).toHaveBeenCalledTimes(1)
   setName('Renamed')
   expect(readBytes).toHaveBeenCalledTimes(1)
@@ -42,7 +57,8 @@ it('shares immutable images per Node, releases URLs, and ignores late reads afte
   expect([...document.querySelectorAll('img')].map((img) => img.src)).toEqual(['blob:other-node', 'blob:other-node'])
   document.querySelector('img')!.dispatchEvent(new Event('error'))
   expect(document.body.textContent).toContain('RE')
-  dispose(); dispose = undefined
+  dispose()
+  dispose = undefined
   await Promise.resolve()
   expect(revoke).toHaveBeenCalledWith('blob:other-node')
 })

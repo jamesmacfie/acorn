@@ -17,7 +17,14 @@ import { PromoteToTaskModal } from '@acorn/plugin-api/ui/host'
 import { Field, Input, Select } from '@acorn/plugin-api/ui'
 import { workflowApi } from './workflowsClient'
 import { startWorkflow } from './startWorkflow'
-import { closeStartFromItem, collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
+import {
+  closeStartFromItem,
+  collectItemWorkflowInputs,
+  itemWorkflowInputsReady,
+  prefillFromItem,
+  prefillFromRecord,
+  startFromItemTarget,
+} from './startFromItem'
 
 // "Start workflow…" on an integration's row, drawn (docs/workflows/starting-runs.md § Starting a run).
 //
@@ -32,11 +39,7 @@ import { closeStartFromItem, collectItemWorkflowInputs, itemWorkflowInputsReady,
 
 /** The one mount point. Draws nothing until a row menu asks. */
 export default function StartFromItemHost() {
-  return (
-    <Show when={startFromItemTarget()}>
-      {(target) => <StartFromItem target={target()} />}
-    </Show>
-  )
+  return <Show when={startFromItemTarget()}>{(target) => <StartFromItem target={target()} />}</Show>
 }
 
 function StartFromItem(props: { target: import('./startFromItem').WorkflowSourceItemTarget }) {
@@ -54,8 +57,11 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
     () => workspace()?.id || null,
     async (workspaceId) => workflowApi.defsList(workspaceId),
   )
-  const definitions = createMemo(() => (defs()?.workflows ?? []).filter((entry) =>
-    !entry.problems?.length && (entry.source !== 'database' || !!entry.publishedRevision)))
+  const definitions = createMemo(() =>
+    (defs()?.workflows ?? []).filter(
+      (entry) => !entry.problems?.length && (entry.source !== 'database' || !!entry.publishedRevision),
+    ),
+  )
   const [defId, setDefId] = createSignal('')
   const selectedDefId = () => defId() || definitions()[0]?.id || ''
   const chosen = createMemo(() => definitions().find((entry) => entry.id === selectedDefId()))
@@ -64,20 +70,31 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
 
   const attachTasks = createMemo(() => {
     const projectIds = new Set(workspace()?.projects.map((project) => project.id) ?? [])
-    return (tasks.data ?? []).filter((task) =>
-      task.status === 'active' && (projectIds.size === 0 || projectIds.has(task.projectId)))
+    return (tasks.data ?? []).filter(
+      (task) => task.status === 'active' && (projectIds.size === 0 || projectIds.has(task.projectId)),
+    )
   })
 
-  const prefill = createMemo(() => ({ ...prefillFromItem({
-    title: props.target.title,
-    ...(props.target.body ? { body: props.target.body } : {}),
-    ...(props.target.link ? { link: props.target.link } : {}),
-  }), ...(props.target.record ? prefillFromRecord(props.target.record) : {}) }))
+  const prefill = createMemo(() => ({
+    ...prefillFromItem({
+      title: props.target.title,
+      ...(props.target.body ? { body: props.target.body } : {}),
+      ...(props.target.link ? { link: props.target.link } : {}),
+    }),
+    ...(props.target.record ? prefillFromRecord(props.target.record) : {}),
+  }))
 
   const seeded = createMemo(() => ({
-    ...Object.fromEntries(workflowInputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
-    ...Object.fromEntries(workflowInputs().filter((input) => prefill()[input.name] !== undefined)
-      .map((input) => [input.name, prefill()[input.name]])),
+    ...Object.fromEntries(
+      workflowInputs()
+        .filter((input) => input.default !== undefined)
+        .map((input) => [input.name, input.default!]),
+    ),
+    ...Object.fromEntries(
+      workflowInputs()
+        .filter((input) => prefill()[input.name] !== undefined)
+        .map((input) => [input.name, prefill()[input.name]]),
+    ),
   }))
   const valueOf = (name: string): string => {
     const value = values()[name] ?? seeded()[name]
@@ -129,21 +146,32 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
           label: 'run',
           ready,
           onTaskReady: (task) => start(task.id, selectedDefId(), filled()),
-          content: <>
-            <Field label="Workflow" group>
-              <Select size="sm" label="Workflow" value={selectedDefId()}
-                options={definitions().map((entry) => ({ value: entry.id, label: entry.name }))} onChange={setDefId} />
-            </Field>
-            <For each={workflowInputs()}>
-              {(input) => (
-                <Field label={input.required ? `${input.name} *` : input.name} hint={input.description} group>
-                  <Input size="sm" label={input.name} value={valueOf(input.name)}
-                    invalid={!!input.required && !valueOf(input.name).trim()}
-                    onInput={(value) => setValues((current) => ({ ...current, [input.name]: value }))} />
-                </Field>
-              )}
-            </For>
-          </>,
+          content: (
+            <>
+              <Field label="Workflow" group>
+                <Select
+                  size="sm"
+                  label="Workflow"
+                  value={selectedDefId()}
+                  options={definitions().map((entry) => ({ value: entry.id, label: entry.name }))}
+                  onChange={setDefId}
+                />
+              </Field>
+              <For each={workflowInputs()}>
+                {(input) => (
+                  <Field label={input.required ? `${input.name} *` : input.name} hint={input.description} group>
+                    <Input
+                      size="sm"
+                      label={input.name}
+                      value={valueOf(input.name)}
+                      invalid={!!input.required && !valueOf(input.name).trim()}
+                      onInput={(value) => setValues((current) => ({ ...current, [input.name]: value }))}
+                    />
+                  </Field>
+                )}
+              </For>
+            </>
+          ),
         }}
         onClose={closeStartFromItem}
         onCreated={land}

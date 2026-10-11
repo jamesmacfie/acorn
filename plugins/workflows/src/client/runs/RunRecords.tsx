@@ -1,8 +1,23 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { formatRelativeTime, latestSignal, onPluginFrame, pluginLabel, type Task } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Fold, Heading, Icon, Inline,
-  Row, Rows, SectionHeader, SegmentedControl, Stack, Text,
+  Alert,
+  Badge,
+  Button,
+  CodeBlock,
+  ConfirmButton,
+  EmptyState,
+  Facts,
+  Fold,
+  Heading,
+  Icon,
+  Inline,
+  Row,
+  Rows,
+  SectionHeader,
+  SegmentedControl,
+  Stack,
+  Text,
 } from '@acorn/plugin-api/ui'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type {
@@ -38,9 +53,9 @@ export function RunRecords(props: {
   // A page read or a refresh of the loaded rows. The newest one wins.
   const recordsRead = latestSignal()
 
-  const selected = createMemo(() => records().find(row => row.id === selectedId()))
+  const selected = createMemo(() => records().find((row) => row.id === selectedId()))
   const source = createMemo(() => page()?.provenance?.source)
-  const sourceLabel = () => source() ? `${pluginLabel(source()!.pluginId)} · ${source()!.sourceId}` : 'Records'
+  const sourceLabel = () => (source() ? `${pluginLabel(source()!.pluginId)} · ${source()!.sourceId}` : 'Records')
 
   const readPage = async (append: boolean): Promise<void> => {
     const signal = recordsRead.next()
@@ -49,8 +64,8 @@ export function RunRecords(props: {
     try {
       let result = await workflowApi.records(props.runId, {
         stepId: props.stepId,
-        selectionId: append ? page()?.selectionId ?? undefined : undefined,
-        after: append ? page()?.next ?? undefined : undefined,
+        selectionId: append ? (page()?.selectionId ?? undefined) : undefined,
+        after: append ? (page()?.next ?? undefined) : undefined,
         limit: 100,
         filter: filter(),
       })
@@ -58,8 +73,14 @@ export function RunRecords(props: {
       const loaded = [...result.records]
       // A return link may target any of the 500 retained rows. Walk bounded summary pages until that
       // row is present; record bodies and outputs still stay behind the selected-record request.
-      while (!append && props.initialRecordId && !loaded.some(row => row.id === props.initialRecordId)
-        && result.next !== null && result.selectionId && loaded.length < 500) {
+      while (
+        !append &&
+        props.initialRecordId &&
+        !loaded.some((row) => row.id === props.initialRecordId) &&
+        result.next !== null &&
+        result.selectionId &&
+        loaded.length < 500
+      ) {
         result = await workflowApi.records(props.runId, {
           stepId: props.stepId,
           selectionId: result.selectionId,
@@ -74,9 +95,10 @@ export function RunRecords(props: {
       const nextRecords = append ? [...records(), ...loaded] : loaded
       setPage(result)
       setRecords(nextRecords)
-      setSelectedId(previous => {
-        if (previous && nextRecords.some(row => row.id === previous)) return previous
-        if (props.initialRecordId && nextRecords.some(row => row.id === props.initialRecordId)) return props.initialRecordId
+      setSelectedId((previous) => {
+        if (previous && nextRecords.some((row) => row.id === previous)) return previous
+        if (props.initialRecordId && nextRecords.some((row) => row.id === props.initialRecordId))
+          return props.initialRecordId
         return nextRecords[0]?.id ?? null
       })
     } catch (caught) {
@@ -111,7 +133,9 @@ export function RunRecords(props: {
       if (signal.aborted || !latest) return
       setPage(latest)
       setRecords(loaded)
-      setSelectedId(previous => previous && loaded.some(row => row.id === previous) ? previous : loaded[0]?.id ?? null)
+      setSelectedId((previous) =>
+        previous && loaded.some((row) => row.id === previous) ? previous : (loaded[0]?.id ?? null),
+      )
     } catch (caught) {
       if (!signal.aborted) setError(caught instanceof Error ? caught.message : 'Record history could not be refreshed.')
     } finally {
@@ -131,48 +155,67 @@ export function RunRecords(props: {
 
   createEffect(() => {
     const row = selected()
-    if (!row) { setDetail(null); setAttempts([]); setAttemptNext(null); setPrepared(null); return }
+    if (!row) {
+      setDetail(null)
+      setAttempts([])
+      setAttemptNext(null)
+      setPrepared(null)
+      return
+    }
     const expected = row.id
     setDetail(null)
     setAttempts([])
     setAttemptNext(null)
     setPrepared(null)
-    void Promise.all([
-      workflowApi.record(props.runId, expected),
-      workflowApi.recordAttempts(props.runId, expected),
-    ]).then(([record, history]) => {
-      if (selectedId() !== expected) return
-      setDetail(record)
-      setAttempts(history.attempts)
-      setAttemptNext(history.next)
-    }).catch(caught => {
-      if (selectedId() === expected) setError(caught instanceof Error ? caught.message : 'Record detail could not be loaded.')
-    })
+    void Promise.all([workflowApi.record(props.runId, expected), workflowApi.recordAttempts(props.runId, expected)])
+      .then(([record, history]) => {
+        if (selectedId() !== expected) return
+        setDetail(record)
+        setAttempts(history.attempts)
+        setAttemptNext(history.next)
+      })
+      .catch((caught) => {
+        if (selectedId() === expected)
+          setError(caught instanceof Error ? caught.message : 'Record detail could not be loaded.')
+      })
   })
 
   const refresh = () => void refreshLoaded()
-  onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), payload => {
-    if ((payload as { runId?: string }).runId === props.runId) refresh()
-  }))
-  onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'child-changed'), payload => {
-    if ((payload as { parentRunId?: string }).parentRunId === props.runId) refresh()
-  }))
+  onCleanup(
+    onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), (payload) => {
+      if ((payload as { runId?: string }).runId === props.runId) refresh()
+    }),
+  )
+  onCleanup(
+    onPluginFrame('workflows', pluginChannel('workflows', 'child-changed'), (payload) => {
+      if ((payload as { parentRunId?: string }).parentRunId === props.runId) refresh()
+    }),
+  )
 
   const retry = async (row: WorkflowRecordHistory): Promise<void> => {
     if (!row.runId || !row.retryStepId) return
     setBusy(true)
     setError('')
-    try { await workflowApi.retry(row.runId, row.retryStepId); refresh() }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'This attempt could not be retried.') }
-    finally { setBusy(false) }
+    try {
+      await workflowApi.retry(row.runId, row.retryStepId)
+      refresh()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'This attempt could not be retried.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const prepare = async (row: WorkflowRecordHistory): Promise<void> => {
     setBusy(true)
     setError('')
-    try { setPrepared(await workflowApi.prepareReprocess(props.runId, row.id)) }
-    catch (caught) { setError(caught instanceof Error ? caught.message : 'This attempt could not be prepared for reprocessing.') }
-    finally { setBusy(false) }
+    try {
+      setPrepared(await workflowApi.prepareReprocess(props.runId, row.id))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'This attempt could not be prepared for reprocessing.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const reprocess = async (row: WorkflowRecordHistory): Promise<void> => {
@@ -186,7 +229,9 @@ export function RunRecords(props: {
       props.onOpen(result.taskId, result.runId, { rootRunId: props.runId, recordId: row.id })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'This record could not be reprocessed.')
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
 
   const loadAttempts = async (): Promise<void> => {
@@ -196,10 +241,13 @@ export function RunRecords(props: {
     setBusy(true)
     try {
       const history = await workflowApi.recordAttempts(props.runId, row.id, cursor)
-      setAttempts(current => [...current, ...history.attempts])
+      setAttempts((current) => [...current, ...history.attempts])
       setAttemptNext(history.next)
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Attempt history could not be loaded.') }
-    finally { setBusy(false) }
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Attempt history could not be loaded.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -210,47 +258,75 @@ export function RunRecords(props: {
           <Text emphasis="muted">{page() ? progressSummary(page()!.counts) : 'Loading records…'}</Text>
         </Inline>
         <Inline wrap>
-          <SegmentedControl ariaLabel="Record filter" size="sm" value={filter()} options={[...RECORD_FILTERS]} onChange={setFilter} />
+          <SegmentedControl
+            ariaLabel="Record filter"
+            size="sm"
+            value={filter()}
+            options={[...RECORD_FILTERS]}
+            onChange={setFilter}
+          />
           <Text emphasis="muted">{sourceLabel()}</Text>
-          <Show when={page()?.provenance?.completeness}>{value => <Badge size="xs">{value().kind}</Badge>}</Show>
+          <Show when={page()?.provenance?.completeness}>{(value) => <Badge size="xs">{value().kind}</Badge>}</Show>
         </Inline>
-        <Show when={error()}>{message => <Alert tone="warn" title={records().length ? 'Showing the last loaded records' : undefined}>{message()}</Alert>}</Show>
+        <Show when={error()}>
+          {(message) => (
+            <Alert tone="warn" title={records().length ? 'Showing the last loaded records' : undefined}>
+              {message()}
+            </Alert>
+          )}
+        </Show>
       </Stack>
 
       <Show
         when={records().length}
-        fallback={<EmptyState size="sm">{
-          busy() ? 'Loading records…'
-            : filter() !== 'all' ? 'No records match this filter.'
-              : page()?.emptyReason === 'all-skipped' ? 'All matches were already processed.'
-                : 'No records matched this run.'
-        }</EmptyState>}
+        fallback={
+          <EmptyState size="sm">
+            {busy()
+              ? 'Loading records…'
+              : filter() !== 'all'
+                ? 'No records match this filter.'
+                : page()?.emptyReason === 'all-skipped'
+                  ? 'All matches were already processed.'
+                  : 'No records matched this run.'}
+          </EmptyState>
+        }
       >
         <Rows
           virtual
           id={`workflows:records:${props.runId}:${props.stepId}:${filter()}`}
           ariaLabel="Workflow records"
-          items={records().map(row => ({ key: row.id, label: row.title }))}
+          items={records().map((row) => ({ key: row.id, label: row.title }))}
           selected={selectedId()}
           onSelect={setSelectedId}
           onActivate={setSelectedId}
         >
           {(item, itemProps, isSelected) => {
-            const row = () => records().find(candidate => candidate.id === item.key)!
-            const task = () => row().taskId ? props.tasks.find(candidate => candidate.id === row().taskId) : undefined
+            const row = () => records().find((candidate) => candidate.id === item.key)!
+            const task = () =>
+              row().taskId ? props.tasks.find((candidate) => candidate.id === row().taskId) : undefined
             return (
               <Row
                 item={itemProps}
                 selected={isSelected()}
                 density="compact"
-                leading={<Icon name={runGlyph(row().status ?? row().decision)} tone={runTone(row().status ?? row().decision)} spin={row().status === 'running'} />}
-                meta={<>
-                  <Text emphasis="muted">{recordStatus(row())}</Text>
-                  <Show when={row().reason}>{reason => <Text emphasis="muted">{reason()}</Text>}</Show>
-                  <Show when={row().result}>{result => <Text emphasis="muted">{result()}</Text>}</Show>
-                  <Show when={task()}>{child => <Text emphasis="muted">{`Task: ${child().title}`}</Text>}</Show>
-                  <Show when={row().taskId && !task()}><Text emphasis="muted">Task unavailable</Text></Show>
-                </>}
+                leading={
+                  <Icon
+                    name={runGlyph(row().status ?? row().decision)}
+                    tone={runTone(row().status ?? row().decision)}
+                    spin={row().status === 'running'}
+                  />
+                }
+                meta={
+                  <>
+                    <Text emphasis="muted">{recordStatus(row())}</Text>
+                    <Show when={row().reason}>{(reason) => <Text emphasis="muted">{reason()}</Text>}</Show>
+                    <Show when={row().result}>{(result) => <Text emphasis="muted">{result()}</Text>}</Show>
+                    <Show when={task()}>{(child) => <Text emphasis="muted">{`Task: ${child().title}`}</Text>}</Show>
+                    <Show when={row().taskId && !task()}>
+                      <Text emphasis="muted">Task unavailable</Text>
+                    </Show>
+                  </>
+                }
                 onPress={() => setSelectedId(row().id)}
               >
                 {row().title}
@@ -260,89 +336,214 @@ export function RunRecords(props: {
         </Rows>
       </Show>
       <Show when={page()?.next !== null && page()?.next !== undefined}>
-        <Button size="sm" disabled={busy()} onPress={() => void readPage(true)}>Show more</Button>
+        <Button size="sm" disabled={busy()} onPress={() => void readPage(true)}>
+          Show more
+        </Button>
       </Show>
 
       <Show when={selected()}>
-        {row => (
+        {(row) => (
           <Stack gap="row">
             <SectionHeader level="sub">{row().title}</SectionHeader>
             {/* What a reader checks first stays in view; how the record was read folds away. */}
-            <Facts grouping="rows" size="sm" items={[
-              { label: 'Status', value: recordStatus(row()) },
-              { label: 'Source', value: sourceLabel() },
-              ...(detail()?.provenance?.evaluationTime ? [{ label: 'Evaluated', value: formatRelativeTime(detail()!.provenance!.evaluationTime!) }] : []),
-            ]} />
+            <Facts
+              grouping="rows"
+              size="sm"
+              items={[
+                { label: 'Status', value: recordStatus(row()) },
+                { label: 'Source', value: sourceLabel() },
+                ...(detail()?.provenance?.evaluationTime
+                  ? [{ label: 'Evaluated', value: formatRelativeTime(detail()!.provenance!.evaluationTime!) }]
+                  : []),
+              ]}
+            />
             <Fold label="Details">
-              <Facts grouping="rows" size="sm" items={[
-                { label: 'Decision', value: row().decision },
-                ...(row().reason ? [{ label: 'Reason', value: row().reason }] : []),
-                ...(detail()?.provenance?.connectionId ? [{ label: 'Connection', value: detail()!.provenance!.connectionId! }] : []),
-                ...(detail()?.provenance?.sourceRevision ? [{ label: 'Source revision', value: detail()!.provenance!.sourceRevision! }] : []),
-                ...(detail()?.provenance?.savedQuery ? [{ label: 'Saved query', value: `${detail()!.provenance!.savedQuery!.id} · revision ${detail()!.provenance!.savedQuery!.revision}` }] : []),
-                ...(detail()?.provenance?.completeness ? [{ label: 'Completeness', value: `${detail()!.provenance!.completeness!.kind}${detail()!.provenance!.completeness!.cause ? ` · ${detail()!.provenance!.completeness!.cause}` : ''}` }] : []),
-                ...(detail()?.provenance?.readTime ? [{ label: 'Read', value: formatRelativeTime(detail()!.provenance!.readTime!) }] : []),
-              ]} />
+              <Facts
+                grouping="rows"
+                size="sm"
+                items={[
+                  { label: 'Decision', value: row().decision },
+                  ...(row().reason ? [{ label: 'Reason', value: row().reason }] : []),
+                  ...(detail()?.provenance?.connectionId
+                    ? [{ label: 'Connection', value: detail()!.provenance!.connectionId! }]
+                    : []),
+                  ...(detail()?.provenance?.sourceRevision
+                    ? [{ label: 'Source revision', value: detail()!.provenance!.sourceRevision! }]
+                    : []),
+                  ...(detail()?.provenance?.savedQuery
+                    ? [
+                        {
+                          label: 'Saved query',
+                          value: `${detail()!.provenance!.savedQuery!.id} · revision ${detail()!.provenance!.savedQuery!.revision}`,
+                        },
+                      ]
+                    : []),
+                  ...(detail()?.provenance?.completeness
+                    ? [
+                        {
+                          label: 'Completeness',
+                          value: `${detail()!.provenance!.completeness!.kind}${detail()!.provenance!.completeness!.cause ? ` · ${detail()!.provenance!.completeness!.cause}` : ''}`,
+                        },
+                      ]
+                    : []),
+                  ...(detail()?.provenance?.readTime
+                    ? [{ label: 'Read', value: formatRelativeTime(detail()!.provenance!.readTime!) }]
+                    : []),
+                ]}
+              />
             </Fold>
-            <Show when={row().result}>{result => <Fold label="Result"><CodeBlock wrap maxHeight="block">{result()}</CodeBlock></Fold>}</Show>
-            <Show when={detail()?.snapshot}>{snapshot => <Fold label="Input"><CodeBlock wrap maxHeight="block">{JSON.stringify(snapshot(), null, 2)}</CodeBlock></Fold>}</Show>
+            <Show when={row().result}>
+              {(result) => (
+                <Fold label="Result">
+                  <CodeBlock wrap maxHeight="block">
+                    {result()}
+                  </CodeBlock>
+                </Fold>
+              )}
+            </Show>
+            <Show when={detail()?.snapshot}>
+              {(snapshot) => (
+                <Fold label="Input">
+                  <CodeBlock wrap maxHeight="block">
+                    {JSON.stringify(snapshot(), null, 2)}
+                  </CodeBlock>
+                </Fold>
+              )}
+            </Show>
             <Show when={detail()?.record?.outputs.length}>
               <Fold label="Outputs" count={detail()!.record!.outputs.length}>
-                <Stack gap="row"><For each={detail()!.record!.outputs}>{output => <CodeBlock wrap maxHeight="block">{`${output.name}: ${output.preview}`}</CodeBlock>}</For></Stack>
+                <Stack gap="row">
+                  <For each={detail()!.record!.outputs}>
+                    {(output) => <CodeBlock wrap maxHeight="block">{`${output.name}: ${output.preview}`}</CodeBlock>}
+                  </For>
+                </Stack>
               </Fold>
             </Show>
             <Inline wrap>
               <Show when={row().agentSessionId && props.onOpenSession}>
-                <Button size="sm" onPress={() => props.onOpenSession?.(row().agentSessionId!)}>Open session</Button>
+                <Button size="sm" onPress={() => props.onOpenSession?.(row().agentSessionId!)}>
+                  Open session
+                </Button>
               </Show>
-              <Show when={row().taskId && row().runId && props.tasks.some(task => task.id === row().taskId)}>
-                <Button size="sm" onPress={() => props.onOpen(row().taskId!, row().runId!, { rootRunId: props.runId, recordId: row().id })}>
+              <Show when={row().taskId && row().runId && props.tasks.some((task) => task.id === row().taskId)}>
+                <Button
+                  size="sm"
+                  onPress={() =>
+                    props.onOpen(row().taskId!, row().runId!, { rootRunId: props.runId, recordId: row().id })
+                  }
+                >
                   {row().taskMode === 'parent' ? 'Open item run' : 'Open task and run'}
                 </Button>
               </Show>
-              <Show when={row().taskId && !props.tasks.some(task => task.id === row().taskId)}>
+              <Show when={row().taskId && !props.tasks.some((task) => task.id === row().taskId)}>
                 <Text emphasis="muted">The task is archived or gone. Its runs are still listed here.</Text>
               </Show>
               <Show when={recordCanRetry(row())}>
-                <ConfirmButton size="sm" confirmLabel="Retry attempt?" tip="Runs this failed attempt again from its original snapshot" disabled={busy()} onConfirm={() => void retry(row())}>Retry attempt</ConfirmButton>
+                <ConfirmButton
+                  size="sm"
+                  confirmLabel="Retry attempt?"
+                  tip="Runs this failed attempt again from its original snapshot"
+                  disabled={busy()}
+                  onConfirm={() => void retry(row())}
+                >
+                  Retry attempt
+                </ConfirmButton>
               </Show>
               <Show when={recordCanReprocess(row())}>
-                <Button size="sm" disabled={busy()} onPress={() => void prepare(row())}>Run again…</Button>
+                <Button size="sm" disabled={busy()} onPress={() => void prepare(row())}>
+                  Run again…
+                </Button>
               </Show>
             </Inline>
-            <Show when={prepared()}>{review => (
-              <Alert tone="warn" title={`Run ${review().title} again`}>
-                <Stack gap="row">
-                  <Text>This runs the record again with the same input. Other records don't run again.</Text>
-                  <ConfirmButton size="sm" confirmLabel="Run again?" disabled={busy()} onConfirm={() => void reprocess(row())}>Run again</ConfirmButton>
-                </Stack>
-              </Alert>
-            )}</Show>
+            <Show when={prepared()}>
+              {(review) => (
+                <Alert tone="warn" title={`Run ${review().title} again`}>
+                  <Stack gap="row">
+                    <Text>This runs the record again with the same input. Other records don't run again.</Text>
+                    <ConfirmButton
+                      size="sm"
+                      confirmLabel="Run again?"
+                      disabled={busy()}
+                      onConfirm={() => void reprocess(row())}
+                    >
+                      Run again
+                    </ConfirmButton>
+                  </Stack>
+                </Alert>
+              )}
+            </Show>
             <Show when={attempts().length}>
               <Fold label="Attempt history" count={attempts().length}>
                 <Stack gap="row">
-                  <For each={attempts()}>{attempt => (
-                    <Stack gap="row">
-                      <Inline wrap>
-                        <Badge size="xs" tone={attempt.status === 'failed' ? 'danger' : attempt.status === 'gated' ? 'warn' : undefined}>{statusLabel(attempt.status)}</Badge>
-                        <Text emphasis="muted">{formatRelativeTime(attempt.createdAt)}</Text>
-                        <Show when={attempt.agentSessionId && props.onOpenSession}>
-                          <Button size="sm" variant="bare" onPress={() => props.onOpenSession?.(attempt.agentSessionId!)}>Open session</Button>
+                  <For each={attempts()}>
+                    {(attempt) => (
+                      <Stack gap="row">
+                        <Inline wrap>
+                          <Badge
+                            size="xs"
+                            tone={
+                              attempt.status === 'failed' ? 'danger' : attempt.status === 'gated' ? 'warn' : undefined
+                            }
+                          >
+                            {statusLabel(attempt.status)}
+                          </Badge>
+                          <Text emphasis="muted">{formatRelativeTime(attempt.createdAt)}</Text>
+                          <Show when={attempt.agentSessionId && props.onOpenSession}>
+                            <Button
+                              size="sm"
+                              variant="bare"
+                              onPress={() => props.onOpenSession?.(attempt.agentSessionId!)}
+                            >
+                              Open session
+                            </Button>
+                          </Show>
+                          <Show
+                            when={props.tasks.some((task) => task.id === attempt.taskId)}
+                            fallback={<Text emphasis="muted">Task unavailable</Text>}
+                          >
+                            <Button
+                              size="sm"
+                              variant="bare"
+                              onPress={() =>
+                                props.onOpen(attempt.taskId, attempt.runId, {
+                                  rootRunId: props.runId,
+                                  recordId: row().id,
+                                })
+                              }
+                            >
+                              Open attempt
+                            </Button>
+                          </Show>
+                        </Inline>
+                        <Show when={attempt.error}>{(error) => <Text emphasis="muted">{error()}</Text>}</Show>
+                        <Show when={attempt.result}>
+                          {(result) => (
+                            <Fold label="Attempt result">
+                              <CodeBlock wrap maxHeight="block">
+                                {result()}
+                              </CodeBlock>
+                            </Fold>
+                          )}
                         </Show>
-                        <Show when={props.tasks.some(task => task.id === attempt.taskId)} fallback={<Text emphasis="muted">Task unavailable</Text>}>
-                          <Button size="sm" variant="bare" onPress={() => props.onOpen(attempt.taskId, attempt.runId, { rootRunId: props.runId, recordId: row().id })}>Open attempt</Button>
+                        <Show when={attempt.outputs.length}>
+                          <Fold label="Attempt outputs" count={attempt.outputs.length}>
+                            <Stack gap="row">
+                              <For each={attempt.outputs}>
+                                {(output) => (
+                                  <CodeBlock wrap maxHeight="block">{`${output.name}: ${output.preview}`}</CodeBlock>
+                                )}
+                              </For>
+                            </Stack>
+                          </Fold>
                         </Show>
-                      </Inline>
-                      <Show when={attempt.error}>{error => <Text emphasis="muted">{error()}</Text>}</Show>
-                      <Show when={attempt.result}>{result => <Fold label="Attempt result"><CodeBlock wrap maxHeight="block">{result()}</CodeBlock></Fold>}</Show>
-                      <Show when={attempt.outputs.length}>
-                        <Fold label="Attempt outputs" count={attempt.outputs.length}>
-                          <Stack gap="row"><For each={attempt.outputs}>{output => <CodeBlock wrap maxHeight="block">{`${output.name}: ${output.preview}`}</CodeBlock>}</For></Stack>
-                        </Fold>
-                      </Show>
-                    </Stack>
-                  )}</For>
-                  <Show when={attemptNext()}><Button size="sm" disabled={busy()} onPress={() => void loadAttempts()}>Show more</Button></Show>
+                      </Stack>
+                    )}
+                  </For>
+                  <Show when={attemptNext()}>
+                    <Button size="sm" disabled={busy()} onPress={() => void loadAttempts()}>
+                      Show more
+                    </Button>
+                  </Show>
                 </Stack>
               </Fold>
             </Show>

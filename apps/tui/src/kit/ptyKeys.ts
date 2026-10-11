@@ -185,9 +185,7 @@ export function encodeKeyText(key: PtyKey, modes: PtyModes): string {
     // Ctrl+Space is NUL, which is how a reader sets a mark in emacs. Ctrl+Return is `\r` — a legacy
     // terminal has never had another byte for it, which is the whole reason this app asks for the
     // kitty protocol on its *own* keyboard (docs/tui/keys.md § The adapter).
-    const byte = key.ctrl && key.name === 'backspace' ? '\b'
-      : key.ctrl && key.name === 'space' ? '\x00'
-        : single
+    const byte = key.ctrl && key.name === 'backspace' ? '\b' : key.ctrl && key.name === 'space' ? '\x00' : single
     // Alt is an ESC prefix, which is what "meta sends escape" means and what every terminal in this
     // decade does by default.
     return key.meta ? `${ESC}${byte}` : byte
@@ -202,7 +200,7 @@ export function encodeKeyText(key: PtyKey, modes: PtyModes): string {
   // Ctrl was held over is the *name*, and reading only the text would send a shell nothing at all
   // (../input/parser.ts § character, ../keyEvent.ts § pressedKey).
   const said = key.sequence ?? ''
-  const typed = said !== '' ? said : ([...key.name].length === 1 ? key.name : '')
+  const typed = said !== '' ? said : [...key.name].length === 1 ? key.name : ''
   if (typed === '') return ''
   if (key.ctrl) {
     const byte = controlByte(typed)

@@ -5,7 +5,8 @@ class Semaphore {
   readonly #waiting: (() => void)[] = []
 
   constructor(readonly limit: number) {
-    if (!Number.isInteger(limit) || limit < 1) throw new Error(`Semaphore limit must be a positive integer, got ${limit}.`)
+    if (!Number.isInteger(limit) || limit < 1)
+      throw new Error(`Semaphore limit must be a positive integer, got ${limit}.`)
   }
 
   async run<T>(operation: () => Promise<T>): Promise<T> {

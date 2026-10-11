@@ -15,16 +15,23 @@ const schema: DashboardDisplaySchema = {
     { id: 'size', name: 'Size', type: 'number' },
   ],
 }
-const row = (at: number, size = 1): DashboardDisplayRow =>
-  ({ id: `r${at}${size}`, pluginId: 'p', sourceId: 'c', values: { updated: at, size } })
+const row = (at: number, size = 1): DashboardDisplayRow => ({
+  id: `r${at}${size}`,
+  pluginId: 'p',
+  sourceId: 'c',
+  values: { updated: at, size },
+})
 
 describe('historyPoints', () => {
   it('draws the fortnight whatever the series covers, keeping the day’s last value', () => {
-    const points = historyPoints([
-      { bucket: day(1) + 3 * 3_600_000, value: 5 },
-      { bucket: day(1) + 9 * 3_600_000, value: 7 },
-      { bucket: day(0), value: 9 },
-    ], NOW)
+    const points = historyPoints(
+      [
+        { bucket: day(1) + 3 * 3_600_000, value: 5 },
+        { bucket: day(1) + 9 * 3_600_000, value: 7 },
+        { bucket: day(0), value: 9 },
+      ],
+      NOW,
+    )
 
     expect(points).toHaveLength(TREND_DAYS)
     expect(points[TREND_DAYS - 1]).toEqual({ day: day(0), value: 9 })
@@ -33,7 +40,13 @@ describe('historyPoints', () => {
   })
 
   it('leaves a day with no sample as a gap rather than interpolating it', () => {
-    const points = historyPoints([{ bucket: day(3), value: 4 }, { bucket: day(1), value: 6 }], NOW)
+    const points = historyPoints(
+      [
+        { bucket: day(3), value: 4 },
+        { bucket: day(1), value: 6 },
+      ],
+      NOW,
+    )
     expect(points[TREND_DAYS - 3]).toEqual({ day: day(2), value: null })
   })
 })
@@ -48,7 +61,12 @@ describe('activityPoints', () => {
   })
 
   it('uses the panel’s own measure, not a count it invented', () => {
-    const points = activityPoints([row(day(0), 3), row(day(0), 4)], schema, { kind: 'stat', aggregate: 'sum', field: 'size' }, NOW)
+    const points = activityPoints(
+      [row(day(0), 3), row(day(0), 4)],
+      schema,
+      { kind: 'stat', aggregate: 'sum', field: 'size' },
+      NOW,
+    )
     expect(points[TREND_DAYS - 1].value).toBe(7)
   })
 
@@ -58,7 +76,8 @@ describe('activityPoints', () => {
 })
 
 describe('sparkline', () => {
-  const points = (values: (number | null)[]) => values.map((value, index) => ({ day: day(values.length - 1 - index), value }))
+  const points = (values: (number | null)[]) =>
+    values.map((value, index) => ({ day: day(values.length - 1 - index), value }))
 
   it('breaks the line at a gap instead of drawing across it', () => {
     const mark = sparkline(points([1, 2, null, 4, 5]))!
@@ -128,6 +147,9 @@ describe('trendDelta', () => {
   })
 
   it('keeps no change neutral even where a direction is declared', () => {
-    expect(trendDelta(4, samples, { kind: 'stat', compare: 'week', good: 'up' }, NOW)).toEqual({ change: 0, tone: 'muted' })
+    expect(trendDelta(4, samples, { kind: 'stat', compare: 'week', good: 'up' }, NOW)).toEqual({
+      change: 0,
+      tone: 'muted',
+    })
   })
 })

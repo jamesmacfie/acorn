@@ -1,6 +1,13 @@
 import { expect, it } from 'vitest'
 import { clientEvents, setActiveNode } from '@acorn/plugin-api/client'
-import { dockerSelection, rememberDockerSelection, revealDockerResource, consumeDockerReveal, rememberDockerDetailState, dockerDetailState } from './dockerViewStore'
+import {
+  dockerSelection,
+  rememberDockerSelection,
+  revealDockerResource,
+  consumeDockerReveal,
+  rememberDockerDetailState,
+  dockerDetailState,
+} from './dockerViewStore'
 
 it('partitions same-ID task selection, detail state, and archive eviction by Node', () => {
   setActiveNode('a')

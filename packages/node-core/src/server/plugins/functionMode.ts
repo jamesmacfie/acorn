@@ -19,7 +19,10 @@ const SYNC_METHODS = ['normalize', 'toPublic', 'key', 'encode', 'decode', 'enabl
 const SYNC_CONTRACTS = /\.(externalIds|refs)\.[A-Za-z0-9_$]+$/
 
 const leafOf = (path: string): string =>
-  path.match(/\.([A-Za-z0-9_$]+)(?:\]|$)/g)?.at(-1)?.replace(/[.\]]/g, '') ?? ''
+  path
+    .match(/\.([A-Za-z0-9_$]+)(?:\]|$)/g)
+    ?.at(-1)
+    ?.replace(/[.\]]/g, '') ?? ''
 
 /** How a plugin-side function at `path` crosses to the host. Everything unnamed crosses as a promise,
  *  including route handlers, schedules, hooks and capability implementations. */

@@ -25,14 +25,20 @@ const saveFile = vi.fn()
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 vi.mock('./managedClient', () => ({ managedAgentApi: { attachment, attachmentPreview, attachmentContent } }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
   saveFile,
 }))
 
 const { default: AgentAttachmentCard } = await import('./AgentAttachmentCard')
 
-const row = (id: string, filename: string, mediaType: string): AgentAttachment =>
-  ({ id, taskId: 'task-1', filename, mediaType, byteSize: 2048, createdAt: 1 })
+const row = (id: string, filename: string, mediaType: string): AgentAttachment => ({
+  id,
+  taskId: 'task-1',
+  filename,
+  mediaType,
+  byteSize: 2048,
+  createdAt: 1,
+})
 
 // The media leases are one cache for the module (./agentMediaStore.ts), so each test names its own ids.
 const seen: TranscriptMediaProps[] = []
@@ -47,26 +53,55 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-const point = () => registered.push(extensionPointRegistry.register({
-  id: AGENT_TRANSCRIPT_ATTACHMENT_POINT, ownerId: 'agents', label: 'Sent attachment', kind: 'remote', mode: 'replace', max: 1,
-}))
+const point = () =>
+  registered.push(
+    extensionPointRegistry.register({
+      id: AGENT_TRANSCRIPT_ATTACHMENT_POINT,
+      ownerId: 'agents',
+      label: 'Sent attachment',
+      kind: 'remote',
+      mode: 'replace',
+      max: 1,
+    }),
+  )
 
-const contributor = (pluginId: string, matches: string[]) => registered.push(extensionRegistry.register({
-  id: `plugin:${pluginId}:transcript-attachment`, pluginId, point: AGENT_TRANSCRIPT_ATTACHMENT_POINT, label: `${pluginId} viewer`,
-  order: 500, carrier: 'component', matches,
-  component: (props: TranscriptMediaProps) => { seen.push({ ...props }); return <span>drawn by {pluginId} for {props.media.id}</span> },
-} as ExtensionContribution))
+const contributor = (pluginId: string, matches: string[]) =>
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:transcript-attachment`,
+      pluginId,
+      point: AGENT_TRANSCRIPT_ATTACHMENT_POINT,
+      label: `${pluginId} viewer`,
+      order: 500,
+      carrier: 'component',
+      matches,
+      component: (props: TranscriptMediaProps) => {
+        seen.push({ ...props })
+        return (
+          <span>
+            drawn by {pluginId} for {props.media.id}
+          </span>
+        )
+      },
+    } as ExtensionContribution),
+  )
 
 const draw = (attachmentId: () => string, transcript = true) => {
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => (
-    <AgentAttachmentCard
-      attachmentId={attachmentId()}
-      transcript={transcript ? { taskId: 'task-1', sessionId: 'session-1' } : undefined}
-    />
-  ), host)
-  hosts.push(() => { dispose(); host.remove() })
+  const dispose = render(
+    () => (
+      <AgentAttachmentCard
+        attachmentId={attachmentId()}
+        transcript={transcript ? { taskId: 'task-1', sessionId: 'session-1' } : undefined}
+      />
+    ),
+    host,
+  )
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 
@@ -81,7 +116,11 @@ describe('a sent attachment', () => {
 
   it('hands the body to a plugin and keeps the name, size and download outside it', async () => {
     attachment.mockResolvedValue(row('t1a', 'data.json', 'application/json'))
-    attachmentContent.mockResolvedValue({ bytes: Uint8Array.from([123, 125]), type: 'application/json', filename: 'data.json' })
+    attachmentContent.mockResolvedValue({
+      bytes: Uint8Array.from([123, 125]),
+      type: 'application/json',
+      filename: 'data.json',
+    })
     point()
     contributor('json', ['application/json'])
     const host = draw(() => 't1a')
@@ -93,9 +132,13 @@ describe('a sent attachment', () => {
     })
     expect(host.textContent).toContain('2 KiB · Download →')
     host.querySelector<HTMLElement>('[role="button"]')?.click()
-    await vi.waitFor(() => expect(saveFile).toHaveBeenCalledWith({
-      bytes: Uint8Array.from([123, 125]), mimeType: 'application/json', suggestedName: 'data.json',
-    }))
+    await vi.waitFor(() =>
+      expect(saveFile).toHaveBeenCalledWith({
+        bytes: Uint8Array.from([123, 125]),
+        mimeType: 'application/json',
+        suggestedName: 'data.json',
+      }),
+    )
   })
 
   it('fetches no thumbnail while a plugin draws an image', async () => {
@@ -120,9 +163,13 @@ describe('a sent attachment', () => {
   // A replaced tile must not briefly draw the previous attachment's answer.
   it('drops a late answer for the attachment it no longer shows', async () => {
     let finishFirst!: (value: AgentAttachment) => void
-    attachment.mockImplementation((id: string) => id === 't4a'
-      ? new Promise((resolve) => { finishFirst = resolve })
-      : Promise.resolve(row('t4b', 'second.json', 'application/json')))
+    attachment.mockImplementation((id: string) =>
+      id === 't4a'
+        ? new Promise((resolve) => {
+            finishFirst = resolve
+          })
+        : Promise.resolve(row('t4b', 'second.json', 'application/json')),
+    )
     point()
     contributor('json', ['application/json'])
     const [id, setId] = createSignal('t4a')
@@ -138,7 +185,8 @@ describe('a sent attachment', () => {
 
   it('reads the attachment again from the Node it switched to', async () => {
     attachment.mockImplementation((id: string, origin: { nodeId: string | null }) =>
-      Promise.resolve(row(id, `${origin.nodeId}.json`, 'application/json')))
+      Promise.resolve(row(id, `${origin.nodeId}.json`, 'application/json')),
+    )
     setActiveNode('node-A')
     point()
     contributor('json', ['application/json'])

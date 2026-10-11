@@ -132,14 +132,18 @@ render(
                 <Route path="/" component={noop} />
                 <Route path="/t/:taskId" component={noop} />
                 <Route path="/settings/projects" component={noop} />
-                {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
+                {sourceRouteContributions().map((route) => (
+                  <Route path={route.path} component={noop} />
+                ))}
                 {/* A loaded plugin's project-scoped surfaces, whose patterns the host minted from the plugin
                     id (client-core/host/registries/commands/corePaths.ts). Read here rather than folded into the line above
                     because they belong to a surface rather than to a rail source, and they arrive later than
                     compiled routes do. The distribution pass settles after the first paint, and this
                     expression is inside the Router's `children` memo, so a route registered then is picked up
                     rather than missed. */}
-                {projectSurfaceRoutes().map((route) => <Route path={route.path} component={noop} />)}
+                {projectSurfaceRoutes().map((route) => (
+                  <Route path={route.path} component={noop} />
+                ))}
               </Router>
             </PaneModelHost>
           </QueryCacheProvider>

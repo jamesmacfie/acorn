@@ -27,22 +27,30 @@ export function sessionCursor(cursor: number | string, format?: 'tuple-v1'): Ses
   throw new Error('Invalid session cursor.')
 }
 
-export const sessionListQuerySchema = z.object({
-  taskId: z.string().uuid().optional(),
-  workspaceId: z.string().uuid().optional(),
-  archived: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
-  attention: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
-  search: z.string().trim().max(500).optional(),
-  cursor: z.string().max(64).optional(),
-  cursorFormat: z.literal('tuple-v1').optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-}).transform((filter, ctx): SessionListFilter => {
-  if (filter.cursor === undefined) return filter
-  try {
-    const parsed = sessionCursor(filter.cursor, filter.cursorFormat)
-    return { ...filter, cursor: typeof parsed === 'number' ? parsed : filter.cursor }
-  } catch {
-    ctx.addIssue({ code: 'custom', path: ['cursor'], message: 'Invalid session cursor.' })
-    return z.NEVER
-  }
-})
+export const sessionListQuerySchema = z
+  .object({
+    taskId: z.string().uuid().optional(),
+    workspaceId: z.string().uuid().optional(),
+    archived: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
+    attention: z
+      .enum(['true', 'false'])
+      .transform((value) => value === 'true')
+      .optional(),
+    search: z.string().trim().max(500).optional(),
+    cursor: z.string().max(64).optional(),
+    cursorFormat: z.literal('tuple-v1').optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .transform((filter, ctx): SessionListFilter => {
+    if (filter.cursor === undefined) return filter
+    try {
+      const parsed = sessionCursor(filter.cursor, filter.cursorFormat)
+      return { ...filter, cursor: typeof parsed === 'number' ? parsed : filter.cursor }
+    } catch {
+      ctx.addIssue({ code: 'custom', path: ['cursor'], message: 'Invalid session cursor.' })
+      return z.NEVER
+    }
+  })

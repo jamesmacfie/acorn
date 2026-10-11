@@ -9,8 +9,19 @@ import { isAppDark, token } from '../../tokens/appearance'
 // directive can hold `url(https://…)`, and a `click` line can hold a link. Every reference that is not
 // to an element inside the diagram itself (`#id`, `url(#id)`) goes.
 const FETCHING_ELEMENTS = new Set([
-  'audio', 'embed', 'feimage', 'iframe', 'image', 'img', 'link', 'object', 'picture', 'script',
-  'source', 'track', 'video',
+  'audio',
+  'embed',
+  'feimage',
+  'iframe',
+  'image',
+  'img',
+  'link',
+  'object',
+  'picture',
+  'script',
+  'source',
+  'track',
+  'video',
 ])
 const REFERENCE_ATTRIBUTES = new Set(['action', 'formaction', 'href', 'poster', 'src', 'srcset', 'xlink:href'])
 // CSS that could fetch. A backslash is refused outright because a CSS escape spells `url` or

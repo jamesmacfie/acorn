@@ -18,13 +18,24 @@ describe('parseInAppTarget', () => {
   it('recognises GitHub PR links (ignoring trailing path)', () => {
     // `item`/`providerId` make the reference panel reachable (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and
     // the UI kit). The spelling matches the pulls collection's row id.
-    expect(parseInAppTarget('https://github.com/runn/acorn/pull/42/files'))
-      .toEqual({ kind: 'pr', providerId: 'github', owner: 'runn', repo: 'acorn', number: '42', item: 'runn/acorn#42' })
+    expect(parseInAppTarget('https://github.com/runn/acorn/pull/42/files')).toEqual({
+      kind: 'pr',
+      providerId: 'github',
+      owner: 'runn',
+      repo: 'acorn',
+      number: '42',
+      item: 'runn/acorn#42',
+    })
   })
   it('recognises bare GitHub repo links but not deep paths or profiles', () => {
     // No provider on this one: docs/github-integration/tasks-and-references.md § Content links explains why a repo has no
     // reference panel.
-    expect(parseInAppTarget('https://github.com/runn/acorn')).toEqual({ kind: 'repo', providerId: undefined, owner: 'runn', repo: 'acorn' })
+    expect(parseInAppTarget('https://github.com/runn/acorn')).toEqual({
+      kind: 'repo',
+      providerId: undefined,
+      owner: 'runn',
+      repo: 'acorn',
+    })
     expect(parseInAppTarget('https://github.com/runn/acorn/issues')).toBeNull()
     expect(parseInAppTarget('https://github.com/octocat')).toBeNull()
   })
@@ -184,8 +195,8 @@ describe('openInAppUrl over github rows', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-// Real casing, not an invented spelling: docs/github-integration/tasks-and-references.md § Content links covers why the
-// comparison must be case-insensitive.
+  // Real casing, not an invented spelling: docs/github-integration/tasks-and-references.md § Content links covers why the
+  // comparison must be case-insensitive.
   it('matches owner and repo case-insensitively, as GitHub does', () => {
     setProjectsLookup(() => [project('proj-runn', 'runn-fast', 'runn')])
     const navigate = vi.fn()

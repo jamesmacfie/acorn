@@ -68,9 +68,17 @@ class IdleDriver implements AgentDriver {
       sendTurn: async () => {
         active = true
         const plan = this.plan
-        if (plan === 'hold') await new Promise<never>((_, reject) => { release = reject })
+        if (plan === 'hold')
+          await new Promise<never>((_, reject) => {
+            release = reject
+          })
         if (plan === 'fail') {
-          await options.onEvent({ type: 'error', code: 'test_turn_failed', message: 'The model call failed.', retryable: false })
+          await options.onEvent({
+            type: 'error',
+            code: 'test_turn_failed',
+            message: 'The model call failed.',
+            retryable: false,
+          })
           active = false
           throw new Error('The model call failed.')
         }
@@ -165,22 +173,29 @@ describe('stopping idle provider processes', () => {
     ctx.cleanup()
   })
 
-  const open = () => runtime.createSession({
-    taskId,
-    providerId: driver.providerId,
-    profileId: driver.profileId,
-    kind: 'interactive',
-    config: {},
-  })
-  const prompt = (sessionId: string, text = 'Do the thing.') => runtime.enqueueTurn(sessionId, {
-    input: [{ type: 'text', text }],
-    source: 'interactive',
-    effectivePolicy: {},
-    idempotencyKey: randomUUID(),
-  })
+  const open = () =>
+    runtime.createSession({
+      taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+  const prompt = (sessionId: string, text = 'Do the thing.') =>
+    runtime.enqueueTurn(sessionId, {
+      input: [{ type: 'text', text }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
   const settle = async (sessionId: string) => {
-    await vi.waitFor(async () => expect((await runtime.store.snapshot(sessionId)).turns.every((turn) =>
-      !['queued', 'dispatching', 'active'].includes(turn.status))).toBe(true))
+    await vi.waitFor(async () =>
+      expect(
+        (await runtime.store.snapshot(sessionId)).turns.every(
+          (turn) => !['queued', 'dispatching', 'active'].includes(turn.status),
+        ),
+      ).toBe(true),
+    )
   }
   const idleSession = async () => {
     const session = await open()
@@ -280,15 +295,23 @@ describe('stopping idle provider processes', () => {
     expect(driver.stopped).toEqual([session.id])
     const after = await runtime.store.snapshot(session.id)
     expect(after.session.runtimeState).toBe('failed')
-    expect(after.events.some((record) => record.event.type === 'session_state' && record.event.state === 'stopped')).toBe(false)
+    expect(
+      after.events.some((record) => record.event.type === 'session_state' && record.event.state === 'stopped'),
+    ).toBe(false)
   })
 
   it('reads the limit at sweep time, and Never keeps every process', async () => {
     const session = await idleSession()
-    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), stopIdleAfterMinutes: 0 })
+    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, {
+      ...defaultAgentSessionDefaults(),
+      stopIdleAfterMinutes: 0,
+    })
     expect(await runtime.upkeep.stopIdleSessions(later(24 * 60))).toEqual([])
 
-    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), stopIdleAfterMinutes: 15 })
+    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, {
+      ...defaultAgentSessionDefaults(),
+      stopIdleAfterMinutes: 15,
+    })
     expect(await runtime.upkeep.stopIdleSessions(later(16))).toEqual([session.id])
     expect((await runtime.store.snapshot(session.id)).events.at(-1)?.event).toMatchObject({
       detail: 'The provider process stopped after 15 minutes idle to free memory. Send a prompt to resume.',
@@ -307,7 +330,10 @@ describe('stopping idle provider processes', () => {
   })
 
   it('stops every idle session now when asked, whatever the limit, and leaves a busy one', async () => {
-    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), stopIdleAfterMinutes: 0 })
+    await writeAgentSessionDefaults(ctx.core.prefs, OWNER, {
+      ...defaultAgentSessionDefaults(),
+      stopIdleAfterMinutes: 0,
+    })
     const idle = await idleSession()
     const busy = await open()
     driver.plan = 'hold'

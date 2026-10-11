@@ -12,7 +12,9 @@ export function isValidBrowserRule(v: unknown): v is BrowserRule {
   if (typeof r.urlPattern !== 'string' || !r.urlPattern.trim()) return false
   if (r.trigger !== 'load') return false
   const a = r.action
-  return !!a && a.type === 'fill' && typeof a.selector === 'string' && !!a.selector.trim() && typeof a.value === 'string'
+  return (
+    !!a && a.type === 'fill' && typeof a.selector === 'string' && !!a.selector.trim() && typeof a.value === 'string'
+  )
 }
 
 // Defensive parse: a malformed DB value degrades to [] rather than throwing into a route.
@@ -36,6 +38,9 @@ export function matchesUrlPattern(url: string, pattern: string): boolean {
   const body = anchored ? p.slice(0, -1) : p
   if (!body) return false
   if (!body.includes('*')) return anchored ? url.endsWith(body) : url.includes(body)
-  const re = body.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')
+  const re = body
+    .split('*')
+    .map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.*')
   return new RegExp(anchored ? `(?:${re})$` : re).test(url)
 }

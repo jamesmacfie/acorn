@@ -10,5 +10,9 @@ export type ActionPickerRequest = {
 // a menu. The callback stays attached to the pinned row observation, not a later selection.
 const [request, setRequest] = createSignal<ActionPickerRequest | null>(null)
 export const actionPickerRequest = request
-export const openActionPicker = (next: ActionPickerRequest): void => { setRequest(next) }
-export const closeActionPicker = (): void => { setRequest(null) }
+export const openActionPicker = (next: ActionPickerRequest): void => {
+  setRequest(next)
+}
+export const closeActionPicker = (): void => {
+  setRequest(null)
+}

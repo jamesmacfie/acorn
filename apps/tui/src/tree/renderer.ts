@@ -214,7 +214,9 @@ export function Dynamic<T extends Record<string, unknown>>(
   return createMemo(() => {
     const component = chosen()
     // Untracked, so the chosen component's own reads belong to its own owner rather than to this memo.
-    return component ? untrack(() => createComponent(component as unknown as (props: T) => Node, rest as unknown as T)) : undefined
+    return component
+      ? untrack(() => createComponent(component as unknown as (props: T) => Node, rest as unknown as T))
+      : undefined
   }) as unknown as SolidJSX.Element
 }
 

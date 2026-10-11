@@ -11,7 +11,22 @@ import type { PluginStorage } from './storage.js'
 import type { PluginBroadcast } from './events.js'
 import type { CoreServices } from './coreServices.js'
 import type { Logger, PluginTelemetry } from './telemetry.js'
-import type { DataSourceCatalog, DataSourceDiscoveryPage, DataSourceDiscoveryRequest, DataSourceRegistration, DataSourceRequest, DataSourceResponse, DataSourceScope, QueryBindingContext, QueryConsumer, QueryPublicationRequest, QueryPublicationResult, QueryReference, QueryScope, ResolvedQuery } from './data.js'
+import type {
+  DataSourceCatalog,
+  DataSourceDiscoveryPage,
+  DataSourceDiscoveryRequest,
+  DataSourceRegistration,
+  DataSourceRequest,
+  DataSourceResponse,
+  DataSourceScope,
+  QueryBindingContext,
+  QueryConsumer,
+  QueryPublicationRequest,
+  QueryPublicationResult,
+  QueryReference,
+  QueryScope,
+  ResolvedQuery,
+} from './data.js'
 
 // ── The two entry points ──────────────────────────────────────────────────────────────────────────
 
@@ -46,12 +61,35 @@ export type NodePluginContext<Conn = unknown, Items = unknown> = {
   dataSources: {
     register(source: DataSourceRegistration): void
     discover(discovery: { discoveryId: string; handler: string; providerId?: string }): void
-    list(scope: DataSourceScope, invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal }): Promise<DataSourceCatalog>
-    discoverAvailable(request: DataSourceDiscoveryRequest, invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal }): Promise<DataSourceDiscoveryPage>
-    invoke<R extends DataSourceRequest>(request: R, invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal }): Promise<DataSourceResponse<R>>
-    resolveQuery(scope: QueryScope, reference: QueryReference, context: QueryBindingContext, invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal }): Promise<ResolvedQuery>
-    setQueryConsumer(scope: QueryScope, queryId: string, consumer: Omit<QueryConsumer, 'pluginId'>, invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal }, remove?: boolean): Promise<void>
-    queryPublication(request: QueryPublicationRequest, invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal }): Promise<QueryPublicationResult>
+    list(
+      scope: DataSourceScope,
+      invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },
+    ): Promise<DataSourceCatalog>
+    discoverAvailable(
+      request: DataSourceDiscoveryRequest,
+      invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },
+    ): Promise<DataSourceDiscoveryPage>
+    invoke<R extends DataSourceRequest>(
+      request: R,
+      invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },
+    ): Promise<DataSourceResponse<R>>
+    resolveQuery(
+      scope: QueryScope,
+      reference: QueryReference,
+      context: QueryBindingContext,
+      invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },
+    ): Promise<ResolvedQuery>
+    setQueryConsumer(
+      scope: QueryScope,
+      queryId: string,
+      consumer: Omit<QueryConsumer, 'pluginId'>,
+      invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },
+      remove?: boolean,
+    ): Promise<void>
+    queryPublication(
+      request: QueryPublicationRequest,
+      invocation: { principal: PluginRequestContext['principal']; signal: AbortSignal },
+    ): Promise<QueryPublicationResult>
   }
   taskChecks: PluginTaskCheckRegistry
   runs: PluginRunRegistry

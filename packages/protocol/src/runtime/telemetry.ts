@@ -41,7 +41,14 @@ export type TelemetryAttrs = z.infer<typeof telemetryAttrsSchema>
 export function telemetryHistogramKey(owner: string, seam: string, unit: string, attrs?: TelemetryAttrs): string {
   const dimensions = `${owner.length}:${owner}${seam.length}:${seam}${unit.length}:${unit}`
   if (!attrs || Object.keys(attrs).length === 0) return dimensions
-  return dimensions + JSON.stringify(Object.keys(attrs).sort().map(key => [key, attrs[key]]))
+  return (
+    dimensions +
+    JSON.stringify(
+      Object.keys(attrs)
+        .sort()
+        .map((key) => [key, attrs[key]]),
+    )
+  )
 }
 
 /** W3C sizes: 32 hex characters for a trace, 16 for a span, so a `traceparent` header round-trips
@@ -205,7 +212,6 @@ export function parseTraceparent(header: string | undefined | null): Traceparent
 export const formatTraceparent = (traceId: string, spanId: string, sampled = true): string =>
   `00-${traceId}-${spanId}-${sampled ? '01' : '00'}`
 
-
 /** Split on encoded bytes, not record count: multibyte messages and a full attribute map can
  * exceed the route cap even in an ordinary flush. A single oversized record is dropped with a
  * counter, so it cannot keep an otherwise valid queue retrying a 413 forever. */
@@ -220,7 +226,10 @@ export function encodeTelemetryBatches(runtime: PostedTelemetryRuntime, records:
   const append = (record: TelemetryRecord) => {
     const json = JSON.stringify(record)
     const size = encoder.encode(json).byteLength
-    if (size + overhead > TELEMETRY_BATCH_MAX_BYTES) { dropped += 1; return }
+    if (size + overhead > TELEMETRY_BATCH_MAX_BYTES) {
+      dropped += 1
+      return
+    }
     if (bytes + size + (parts.length ? 1 : 0) > TELEMETRY_BATCH_MAX_BYTES) {
       batches.push(prefix + parts.join(',') + ']}')
       parts = []
@@ -230,7 +239,15 @@ export function encodeTelemetryBatches(runtime: PostedTelemetryRuntime, records:
     parts.push(json)
   }
   for (const record of records) append(record)
-  if (dropped) append({ kind: 'metric', at: Date.now(), name: 'telemetry.dropped', type: 'count', value: dropped, attrs: { owner: 'core', runtime, reason: 'record-too-large' } })
+  if (dropped)
+    append({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.dropped',
+      type: 'count',
+      value: dropped,
+      attrs: { owner: 'core', runtime, reason: 'record-too-large' },
+    })
   if (parts.length) batches.push(prefix + parts.join(',') + ']}')
   return batches
 }

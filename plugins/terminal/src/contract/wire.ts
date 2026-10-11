@@ -66,14 +66,26 @@ export type ServerMsg =
   | { type: 'error'; code: string; message: string }
 
 const terminalSessionSchema: z.ZodType<TerminalSession> = z.object({
-  id: z.string(), title: z.string(), kind: z.enum(['shell', 'agent']), profileId: z.string(),
-  backend: z.enum(['node-pty', 'tmux']), status: z.enum(['running', 'exited']), idle: z.boolean(),
+  id: z.string(),
+  title: z.string(),
+  kind: z.enum(['shell', 'agent']),
+  profileId: z.string(),
+  backend: z.enum(['node-pty', 'tmux']),
+  status: z.enum(['running', 'exited']),
+  idle: z.boolean(),
   agentState: z.enum(['starting', 'working', 'waiting', 'idle', 'blocked', 'permission', 'done', 'unknown']),
-  isWorktree: z.boolean(), taskId: z.string(), agentSessionId: z.string().optional(),
-  cwd: z.string(), command: z.string(), tmuxSession: z.string().optional(),
+  isWorktree: z.boolean(),
+  taskId: z.string(),
+  agentSessionId: z.string().optional(),
+  cwd: z.string(),
+  command: z.string(),
+  tmuxSession: z.string().optional(),
   repo: z.object({ owner: z.string(), name: z.string() }).optional(),
-  pull: z.object({ number: z.number() }).optional(), cols: z.number(), rows: z.number(),
-  createdAt: z.number(), exitCode: z.number().nullable(),
+  pull: z.object({ number: z.number() }).optional(),
+  cols: z.number(),
+  rows: z.number(),
+  createdAt: z.number(),
+  exitCode: z.number().nullable(),
 })
 
 export const terminalServerMsgSchema: z.ZodType<ServerMsg> = z.discriminatedUnion('type', [

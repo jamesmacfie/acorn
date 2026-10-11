@@ -30,7 +30,8 @@ import type {
 const MARKER = (at: number) => `@@acorn-multiline-${at}@@`
 // Anything a literal block cannot hold: its own delimiter, a trailing quote that would run into the
 // closing one, or a control character other than tab and the two newline bytes.
-const literalSafe = (value: string) => !value.includes("'''") && !value.endsWith("'") && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
+const literalSafe = (value: string) =>
+  !value.includes("'''") && !value.endsWith("'") && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)
 
 // Only `undefined` goes. An empty array is not the same as an absent one: `after = []` is how a step
 // says it is a root, and dropping it would change what the file means.
@@ -64,16 +65,19 @@ const tomlBinding = (binding: WorkflowValueBinding): Record<string, unknown> => 
   return { binding_json: JSON.stringify(dataBindingSchema.parse(binding)) }
 }
 
-const tomlBindings = (bindings: Record<string, WorkflowValueBinding> | undefined): Record<string, unknown> | undefined =>
+const tomlBindings = (
+  bindings: Record<string, WorkflowValueBinding> | undefined,
+): Record<string, unknown> | undefined =>
   bindings && Object.keys(bindings).length
     ? Object.fromEntries(Object.entries(bindings).map(([name, binding]) => [name, tomlBinding(binding)]))
     : undefined
 
 const tomlChildWorkflow = (child: ChildWorkflowConfig | undefined): Record<string, unknown> | undefined => {
   if (!child) return undefined
-  const ref = child.ref.source === 'repo'
-    ? { source: child.ref.source, path: child.ref.path }
-    : { source: child.ref.source, id: child.ref.id }
+  const ref =
+    child.ref.source === 'repo'
+      ? { source: child.ref.source, path: child.ref.path }
+      : { source: child.ref.source, id: child.ref.id }
   return drop({ ref, inputs: tomlBindings(child.inputs) })
 }
 
@@ -85,7 +89,19 @@ const tomlTitle = (title: WorkflowBoundTemplate | undefined): Record<string, unk
 
 // A workflow input, and a gate form's field, which is declared the same way.
 const tomlInput = (input: WorkflowInput): Record<string, unknown> =>
-  drop({ name: input.name, connection_json: input.connection ? JSON.stringify(input.connection) : undefined, label: input.label, description: input.description, required: input.required === true ? true : undefined, ...(input.schema ? { schema_json: JSON.stringify(input.schema), default_json: input.default === undefined ? undefined : JSON.stringify(input.default) } : { default: input.default }) })
+  drop({
+    name: input.name,
+    connection_json: input.connection ? JSON.stringify(input.connection) : undefined,
+    label: input.label,
+    description: input.description,
+    required: input.required === true ? true : undefined,
+    ...(input.schema
+      ? {
+          schema_json: JSON.stringify(input.schema),
+          default_json: input.default === undefined ? undefined : JSON.stringify(input.default),
+        }
+      : { default: input.default }),
+  })
 
 const tomlForm = (form: WorkflowGateForm | undefined): Record<string, unknown> | undefined =>
   form ? drop({ fields: form.fields.map(tomlInput), values: tomlBindings(form.values) }) : undefined
@@ -115,9 +131,17 @@ const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
     max_iterations: step.maxIterations,
     requires_run: step.requiresRun,
     branches: some(step.branches),
-    agent: step.agent ? drop({ prompt: step.agent.prompt, goal: step.agent.goal, profile: step.agent.profileId, model: step.agent.model,
-      config_options: some(step.agent.configOptions), schema_json: step.agent.schema ? JSON.stringify(step.agent.schema) : undefined,
-      on_failure: step.agent.onFailure }) : undefined,
+    agent: step.agent
+      ? drop({
+          prompt: step.agent.prompt,
+          goal: step.agent.goal,
+          profile: step.agent.profileId,
+          model: step.agent.model,
+          config_options: some(step.agent.configOptions),
+          schema_json: step.agent.schema ? JSON.stringify(step.agent.schema) : undefined,
+          on_failure: step.agent.onFailure,
+        })
+      : undefined,
     child_workflow: tomlChildWorkflow(step.childWorkflow),
     items: tomlMapSource(step.items),
     item_key: step.itemKey,
@@ -140,24 +164,27 @@ export function writeWorkflowToml(def: WorkflowDef): string {
       return MARKER(blocks.length - 1)
     }
     if (Array.isArray(value)) return value.map(mark)
-    if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mark(item)]))
+    if (value && typeof value === 'object')
+      return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mark(item)]))
     return value
   }
 
-  const doc = mark(drop({
-    baseline: def.baseline,
-    format_version: def.formatVersion,
-    name: def.name,
-    posture: def.posture,
-    trigger: def.trigger,
-    tools: tomlTools(def.tools),
-    budget: tomlBudget(def.budget),
-    max_descendants: def.maxDescendants,
-    max_concurrency: def.maxConcurrency,
-    inputs: some(def.inputs)?.map(tomlInput),
-    outputs_json: def.outputs ? JSON.stringify(def.outputs) : undefined,
-    steps: def.steps.map(tomlStep),
-  }))
+  const doc = mark(
+    drop({
+      baseline: def.baseline,
+      format_version: def.formatVersion,
+      name: def.name,
+      posture: def.posture,
+      trigger: def.trigger,
+      tools: tomlTools(def.tools),
+      budget: tomlBudget(def.budget),
+      max_descendants: def.maxDescendants,
+      max_concurrency: def.maxConcurrency,
+      inputs: some(def.inputs)?.map(tomlInput),
+      outputs_json: def.outputs ? JSON.stringify(def.outputs) : undefined,
+      steps: def.steps.map(tomlStep),
+    }),
+  )
 
   let text = stringify(doc as Record<string, unknown>)
   // A function replacement, because `$'` and `$&` in a prompt are special in a replacement string.
@@ -168,7 +195,12 @@ export function writeWorkflowToml(def: WorkflowDef): string {
 /** A file id from a definition name. Slug-shaped, so it is also a legal step-reference target and
  *  cannot address anything but a file inside the folder. */
 export function workflowSlug(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48).replace(/-+$/, '')
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+    .replace(/-+$/, '')
   return slug || 'workflow'
 }
 

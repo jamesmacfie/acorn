@@ -51,7 +51,10 @@ describe('providerError', () => {
   // module holds. `instanceof` was false for every one of them, and a rejected Linear key came back
   // as "provider unavailable" with nothing anywhere saying otherwise.
   class ForeignProviderOperationError extends Error {
-    constructor(readonly code: string, readonly status: number) {
+    constructor(
+      readonly code: string,
+      readonly status: number,
+    ) {
       super(code)
       this.name = 'ProviderOperationError'
     }

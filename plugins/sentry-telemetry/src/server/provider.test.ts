@@ -34,7 +34,11 @@ describe('the descriptor', () => {
 describe('validate', () => {
   it('parses the DSN and proves the host answers', async () => {
     const fetchImpl = answers(200)
-    const validated = await provider(fetchImpl).connection.validate({ dsn: ` ${DSN} `, environment: ' staging ', release: '' })
+    const validated = await provider(fetchImpl).connection.validate({
+      dsn: ` ${DSN} `,
+      environment: ' staging ',
+      release: '',
+    })
     expect(validated).toMatchObject({
       dsn: { host: 'o42.ingest.us.sentry.io', projectId: '1234567', publicKey: 'abc123' },
       environment: 'staging',
@@ -47,8 +51,10 @@ describe('validate', () => {
 
   it('refuses a malformed DSN without making a request', async () => {
     const fetchImpl = answers(200)
-    await expect(provider(fetchImpl).connection.validate({ dsn: 'not-a-dsn' }))
-      .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
+    await expect(provider(fetchImpl).connection.validate({ dsn: 'not-a-dsn' })).rejects.toMatchObject({
+      code: 'provider_bad_config',
+      status: 400,
+    })
     expect(fetchImpl).not.toHaveBeenCalled()
   })
 
@@ -59,21 +65,37 @@ describe('validate', () => {
     [429, 'provider_rate_limited'],
     [400, 'provider_bad_config'],
   ])('turns a %i into %s', async (status, code) => {
-    const failed = await provider(answers(status)).connection.validate({ dsn: DSN }).catch((error: unknown) => error)
+    const failed = await provider(answers(status))
+      .connection.validate({ dsn: DSN })
+      .catch((error: unknown) => error)
     expect(failed).toBeInstanceOf(ProviderOperationError)
     expect(failed).toMatchObject({ code })
   })
 
   it('reports an unreachable host rather than a bad key', async () => {
-    const offline = vi.fn(async () => { throw new Error('ENOTFOUND') }) as unknown as typeof fetch
-    await expect(provider(offline).connection.validate({ dsn: DSN })).rejects.toMatchObject({ code: 'provider_unavailable' })
+    const offline = vi.fn(async () => {
+      throw new Error('ENOTFOUND')
+    }) as unknown as typeof fetch
+    await expect(provider(offline).connection.validate({ dsn: DSN })).rejects.toMatchObject({
+      code: 'provider_unavailable',
+    })
   })
 })
 
 describe('normalize', () => {
   it('labels the row by host and project, and never by key', () => {
     const contract = provider(answers(200)).connection
-    const validated = { dsn: { protocol: 'https' as const, publicKey: 'abc123', host: 'o42.ingest.us.sentry.io', path: '', projectId: '1234567' }, environment: 'staging', release: 'acorn@1.0.0' }
+    const validated = {
+      dsn: {
+        protocol: 'https' as const,
+        publicKey: 'abc123',
+        host: 'o42.ingest.us.sentry.io',
+        path: '',
+        projectId: '1234567',
+      },
+      environment: 'staging',
+      release: 'acorn@1.0.0',
+    }
     const normalized = contract.normalize({ dsn: DSN }, validated)
     expect(normalized.label).toBe('Sentry · o42.ingest.us.sentry.io/1234567')
     expect(normalized.label).not.toContain('abc123')
@@ -95,13 +117,19 @@ describe('test', () => {
   })
 
   it('answers bad config for a stored DSN that no longer parses', async () => {
-    expect(await provider(answers(200)).connection.test('rubbish', {})).toEqual({ ok: false, error: 'provider_bad_config' })
+    expect(await provider(answers(200)).connection.test('rubbish', {})).toEqual({
+      ok: false,
+      error: 'provider_bad_config',
+    })
   })
 })
 
 describe('connectionConfig', () => {
   it('reads the two non-secret fields back off the row', () => {
-    expect(connectionConfig('{"environment":"staging","release":"acorn@1"}')).toEqual({ environment: 'staging', release: 'acorn@1' })
+    expect(connectionConfig('{"environment":"staging","release":"acorn@1"}')).toEqual({
+      environment: 'staging',
+      release: 'acorn@1',
+    })
   })
 
   it('answers empty for a row written before either field existed, or for nonsense', () => {

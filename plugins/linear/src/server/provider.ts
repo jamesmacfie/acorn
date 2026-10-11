@@ -27,13 +27,32 @@ import {
   linearFetch,
   linearUploadTarget,
 } from './'
-import { type CachedExternalItem, type CachedItemCodec, type CodecResult, defaultBudgets, encodeCached, externalIdsFor, isRecord, type MirroredResourceContribution, parseCached, ProviderOperationError, type ProviderItemComment, type ProviderItemDetail, type ProviderItemImage, type ProviderProjectSource, publicProvider } from '@acorn/plugin-api/node'
+import {
+  type CachedExternalItem,
+  type CachedItemCodec,
+  type CodecResult,
+  defaultBudgets,
+  encodeCached,
+  externalIdsFor,
+  isRecord,
+  type MirroredResourceContribution,
+  parseCached,
+  ProviderOperationError,
+  type ProviderItemComment,
+  type ProviderItemDetail,
+  type ProviderItemImage,
+  type ProviderProjectSource,
+  publicProvider,
+} from '@acorn/plugin-api/node'
 
 type LinearValidated = { viewer: Viewer; secret: string }
 type LinearCached = CachedExternalItem<LinearIssueSummary, LinearIssueDetail>
 
 const validSummary = (value: unknown): value is LinearIssueSummary =>
-  isRecord(value) && typeof value.identifier === 'string' && typeof value.title === 'string' && typeof value.url === 'string'
+  isRecord(value) &&
+  typeof value.identifier === 'string' &&
+  typeof value.title === 'string' &&
+  typeof value.url === 'string'
 
 export const linearSummaryOf = (detail: LinearIssueDetail): LinearIssueSummary => ({
   identifier: detail.identifier,
@@ -47,15 +66,32 @@ function buildActivity(node: LinearNode): LinearActivity[] {
   const labels = new Map((node.labels?.nodes ?? []).map((label) => [label.id, label.name]))
   const items: LinearActivity[] = []
   if (node.createdAt) {
-    items.push({ id: 'created', actor: node.creator?.name ?? null, text: 'created the issue', createdAt: Date.parse(node.createdAt) || null, icon: 'created' })
+    items.push({
+      id: 'created',
+      actor: node.creator?.name ?? null,
+      text: 'created the issue',
+      createdAt: Date.parse(node.createdAt) || null,
+      icon: 'created',
+    })
   }
   for (const history of node.history?.nodes ?? []) {
     const actor = history.actor?.name ?? history.botActor?.name ?? null
     const createdAt = Date.parse(history.createdAt) || null
     const push = (icon: string, text: string, color?: string) =>
       items.push({ id: `${history.id}:${items.length}`, actor, text, createdAt, icon, color })
-    if (history.toState) push('state', history.fromState ? `moved from ${history.fromState.name} to ${history.toState.name}` : `moved to ${history.toState.name}`, history.toState.color)
-    if (history.toAssignee) push('assignee', history.toAssignee.name === actor ? 'self-assigned the issue' : `assigned to ${history.toAssignee.name}`)
+    if (history.toState)
+      push(
+        'state',
+        history.fromState
+          ? `moved from ${history.fromState.name} to ${history.toState.name}`
+          : `moved to ${history.toState.name}`,
+        history.toState.color,
+      )
+    if (history.toAssignee)
+      push(
+        'assignee',
+        history.toAssignee.name === actor ? 'self-assigned the issue' : `assigned to ${history.toAssignee.name}`,
+      )
     else if (history.fromAssignee) push('assignee', 'unassigned the issue')
     for (const id of history.addedLabelIds ?? []) push('label', `added label ${labels.get(id) ?? '—'}`)
     for (const id of history.removedLabelIds ?? []) push('label', `removed label ${labels.get(id) ?? '—'}`)
@@ -74,7 +110,13 @@ const relatedIssueOf = (node: LinearRelatedNode): LinearRelatedIssue => ({
 function buildAttachments(node: LinearNode): LinearAttachment[] {
   return (node.attachments?.nodes ?? [])
     .filter((a) => a.url)
-    .map((a) => ({ id: a.id, title: a.title || a.url, subtitle: a.subtitle ?? null, url: a.url, sourceType: a.sourceType ?? null }))
+    .map((a) => ({
+      id: a.id,
+      title: a.title || a.url,
+      subtitle: a.subtitle ?? null,
+      url: a.url,
+      sourceType: a.sourceType ?? null,
+    }))
 }
 
 // Normalize the issue graph. Outgoing `relations` read forward (this issue blocks X); `inverseRelations`
@@ -116,13 +158,16 @@ export function linearNodeToDetail(node: LinearNode): LinearIssueDetail {
     state: node.state,
     assignee: node.assignee?.name ?? null,
     description: node.description ?? null,
-    comments: (node.comments?.nodes ?? []).map((comment) => ({
-      id: comment.id,
-      author: comment.user?.name ?? null,
-      body: comment.body,
-      createdAt: Date.parse(comment.createdAt) || null,
-      parentId: comment.parent?.id ?? null,
-    }) satisfies LinearComment),
+    comments: (node.comments?.nodes ?? []).map(
+      (comment) =>
+        ({
+          id: comment.id,
+          author: comment.user?.name ?? null,
+          body: comment.body,
+          createdAt: Date.parse(comment.createdAt) || null,
+          parentId: comment.parent?.id ?? null,
+        }) satisfies LinearComment,
+    ),
     activity: buildActivity(node),
     labels: (node.labels?.nodes ?? []).map((l) => ({ id: l.id, name: l.name, color: l.color })),
     createdAt: node.createdAt ? Date.parse(node.createdAt) || null : null,
@@ -146,7 +191,10 @@ export function linearNodeToDetail(node: LinearNode): LinearIssueDetail {
 function parseLinear(raw: unknown, ref: ExternalRef): CodecResult<LinearCached> {
   if (isRecord(raw) && raw.schemaVersion === 1 && validSummary(raw.summary)) {
     const detailRaw = raw.detail
-    const detail = isRecord(detailRaw) && validSummary(detailRaw) && typeof (detailRaw as Record<string, unknown>).id === 'string' ? (detailRaw as LinearIssueDetail) : undefined
+    const detail =
+      isRecord(detailRaw) && validSummary(detailRaw) && typeof (detailRaw as Record<string, unknown>).id === 'string'
+        ? (detailRaw as LinearIssueDetail)
+        : undefined
     return {
       ok: true,
       value: {
@@ -175,13 +223,23 @@ const linearCodec: CachedItemCodec<LinearIssueSummary, LinearIssueDetail, Linear
   schemaVersion: 1,
   parse: parseLinear,
   mergeSummary(existing, ref, summary, fetchedAt) {
-    return { ref, summary, detail: existing?.detail, detailFetchedAt: existing?.detailFetchedAt, listFetchedAt: fetchedAt, schemaVersion: 1 }
+    return {
+      ref,
+      summary,
+      detail: existing?.detail,
+      detailFetchedAt: existing?.detailFetchedAt,
+      listFetchedAt: fetchedAt,
+      schemaVersion: 1,
+    }
   },
   withDetail(ref, summary, detail, fetchedAt) {
     return { ref, summary, detail, detailFetchedAt: fetchedAt, listFetchedAt: fetchedAt, schemaVersion: 1 }
   },
   toPublic(item) {
-    return item.detail ?? ({ ...item.summary, id: '', description: null, comments: [], activity: [] } satisfies LinearIssueDetail)
+    return (
+      item.detail ??
+      ({ ...item.summary, id: '', description: null, comments: [], activity: [] } satisfies LinearIssueDetail)
+    )
   },
   summary: (item) => item.summary,
 }
@@ -208,16 +266,31 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
     try {
       const response = await linearFetch(context.secret, ISSUE_DETAIL_QUERY, { filter })
       const error = linearError(response)
-      if (error) return { ok: false, failure: { error: error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status: error.status } }
+      if (error)
+        return {
+          ok: false,
+          failure: {
+            error: error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable',
+            status: error.status,
+          },
+        }
       const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(response)
       const node = issues.nodes[0]
       if (!node) return { ok: false, failure: { error: 'provider_resource_not_found', status: 404 } }
       const detail = linearNodeToDetail(node)
       const ref = refForIdentifier(context.connection.id, detail.identifier, detail.url)
-      const data = encodeCached(linearCodec.withDetail(ref, linearSummaryOf(detail), detail, context.now), context.limits.maxCachedItemBytes)
+      const data = encodeCached(
+        linearCodec.withDetail(ref, linearSummaryOf(detail), detail, context.now),
+        context.limits.maxCachedItemBytes,
+      )
       // `write` is an upsert keyed on (owner, connection, identifier), kept in one place because two
       // providers share the table.
-      await context.items.write({ connectionId: context.connection.id, identifier: detail.identifier, data, fetchedAt: context.now })
+      await context.items.write({
+        connectionId: context.connection.id,
+        identifier: detail.identifier,
+        data,
+        fetchedAt: context.now,
+      })
       return { ok: true }
     } catch {
       return { ok: false, failure: { error: 'provider_unavailable', status: 502 } }
@@ -232,13 +305,17 @@ const linearIssuesResource: MirroredResourceContribution<LinearResourceInput, Li
 // Core asks every connected workspace in turn, so a ticket that lives in another one is null rather
 // than an error. Anything else is this workspace refusing, and that is worth saying out loud.
 const linearItemDetail: ProviderItemDetail = async (context, identifier) => {
-  const result = await context.resource<LinearResourceInput, LinearIssueDetail>(LINEAR_ISSUES_RESOURCE, { kind: 'detail', identifier })
+  const result = await context.resource<LinearResourceInput, LinearIssueDetail>(LINEAR_ISSUES_RESOURCE, {
+    kind: 'detail',
+    identifier,
+  })
   if (result.ok) return result.value
   if (result.failure.status === 404) return null
   throw new Error(result.failure.error)
 }
 
-const failureOf = (status: 401 | 502) => new ProviderOperationError(status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status)
+const failureOf = (status: 401 | 502) =>
+  new ProviderOperationError(status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status)
 
 // One comment, from the pane's route or the agent's `issue_comment`. `id` is optional and ours to
 // choose; see COMMENT_CREATE.
@@ -259,7 +336,11 @@ export async function createLinearComment(
 const linearComment: ProviderItemComment = async (context, identifier, body) => {
   const issue = (await linearItemDetail(context, identifier)) as LinearIssueDetail | null
   if (!issue) return null
-  return createLinearComment(context.secret, { issueId: issue.id, body, ...(context.idempotencyKey ? { id: context.idempotencyKey } : {}) })
+  return createLinearComment(context.secret, {
+    issueId: issue.id,
+    body,
+    ...(context.idempotencyKey ? { id: context.idempotencyKey } : {}),
+  })
 }
 
 // What `issue_image` reads through. A screenshot pasted into a ticket lives on Linear's private upload
@@ -280,7 +361,11 @@ const linearImage: ProviderItemImage = async ({ secret }, url) => {
 const linearScopeQuery = async <T>(secret: string, query: string): Promise<T> => {
   const response = await linearFetch(secret, query, {})
   const error = linearError(response)
-  if (error) throw new ProviderOperationError(error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', error.status)
+  if (error)
+    throw new ProviderOperationError(
+      error.status === 401 ? 'provider_needs_auth' : 'provider_unavailable',
+      error.status,
+    )
   return linearData<T>(response)
 }
 
@@ -405,7 +490,11 @@ export const linearProvider = publicProvider({
   refs: {
     detectRefs(text) {
       const re = /https?:\/\/linear\.app\/[^/\s"'<>]+\/issue\/([A-Z][A-Z0-9]*-\d+)/g
-      return [...text.matchAll(re)].map((match) => ({ displayId: match[1], url: match[0], confidence: 'exact-url' as const }))
+      return [...text.matchAll(re)].map((match) => ({
+        displayId: match[1],
+        url: match[0],
+        confidence: 'exact-url' as const,
+      }))
     },
     toRef(connectionId, candidate) {
       return refForIdentifier(connectionId, candidate.displayId, candidate.url)
@@ -413,25 +502,43 @@ export const linearProvider = publicProvider({
     canAutoLink: () => 'linkify-only',
   },
   budgets: { ...defaultBudgets, maxResolutionBatch: 50, maxContextItems: 50 },
-  memory: { linkedItems: true, mutations: ['linear.comment'], triggers: [], summarize: 'context-formatter', acceptedWrites: false },
+  memory: {
+    linkedItems: true,
+    mutations: ['linear.comment'],
+    triggers: [],
+    summarize: 'context-formatter',
+    acceptedWrites: false,
+  },
   conformance: {
     ref: refForIdentifier('linear-test', 'ENG-42', 'https://linear.app/acme/issue/ENG-42'),
     cachedItem: {
       ref: refForIdentifier('linear-test', 'ENG-42', 'https://linear.app/acme/issue/ENG-42'),
       summary: {
-        identifier: 'ENG-42', title: 'Detailed issue', url: 'https://linear.app/acme/issue/ENG-42',
-        state: { name: 'In Progress', type: 'started', color: '#55f' }, assignee: null,
+        identifier: 'ENG-42',
+        title: 'Detailed issue',
+        url: 'https://linear.app/acme/issue/ENG-42',
+        state: { name: 'In Progress', type: 'started', color: '#55f' },
+        assignee: null,
       },
       schemaVersion: 1,
     } satisfies LinearCached,
     summary: {
-      identifier: 'ENG-42', title: 'Updated summary', url: 'https://linear.app/acme/issue/ENG-42',
-      state: { name: 'In Progress', type: 'started', color: '#55f' }, assignee: null,
+      identifier: 'ENG-42',
+      title: 'Updated summary',
+      url: 'https://linear.app/acme/issue/ENG-42',
+      state: { name: 'In Progress', type: 'started', color: '#55f' },
+      assignee: null,
     } satisfies LinearIssueSummary,
     detail: {
-      id: 'issue-uuid', identifier: 'ENG-42', title: 'Detailed issue', url: 'https://linear.app/acme/issue/ENG-42',
-      state: { name: 'In Progress', type: 'started', color: '#55f' }, assignee: null,
-      description: 'Keep this description', comments: [], activity: [],
+      id: 'issue-uuid',
+      identifier: 'ENG-42',
+      title: 'Detailed issue',
+      url: 'https://linear.app/acme/issue/ENG-42',
+      state: { name: 'In Progress', type: 'started', color: '#55f' },
+      assignee: null,
+      description: 'Keep this description',
+      comments: [],
+      activity: [],
     } satisfies LinearIssueDetail,
   },
 })

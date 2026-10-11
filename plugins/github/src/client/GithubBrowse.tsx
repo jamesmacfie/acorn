@@ -25,7 +25,14 @@ import { githubCreateRoute } from './clientRoutes'
 import { prFilterFor } from './pullList/filterStore'
 import { pullsOptions } from './queries'
 import {
-  Button, DetailColumn, EmptyState, Icon, IconButton, ListColumn, ListDetail, SectionHeader,
+  Button,
+  DetailColumn,
+  EmptyState,
+  Icon,
+  IconButton,
+  ListColumn,
+  ListDetail,
+  SectionHeader,
 } from '@acorn/plugin-api/ui'
 
 // Heavy surfaces stay behind their navigation intent so Shiki, diff rendering and the create-pull
@@ -41,13 +48,16 @@ const ComparePreview = lazy(() => import('./ComparePreview'))
  *  said once, in the detail; the list stays empty beside it. */
 function WhenLinked(props: { scope: ReturnType<typeof createBrowseScope>; quiet?: boolean; children: JSX.Element }) {
   return (
-    <Show when={props.scope.linked()} fallback={
-      <Show when={!props.quiet}>
-        <Show when={props.scope.emptyMessage()} fallback={<Acorn />}>
-          {(message) => <EmptyState title={message().title}>{message().body}</EmptyState>}
+    <Show
+      when={props.scope.linked()}
+      fallback={
+        <Show when={!props.quiet}>
+          <Show when={props.scope.emptyMessage()} fallback={<Acorn />}>
+            {(message) => <EmptyState title={message().title}>{message().body}</EmptyState>}
+          </Show>
         </Show>
-      </Show>
-    }>
+      }
+    >
       {props.children}
     </Show>
   )
@@ -86,8 +96,16 @@ export function GithubBrowseList() {
             <Button
               tip="New pull request"
               onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(scope.projectId())))}
-            ><Icon name="plus" /> New</Button>
-            <IconButton icon="refresh-cw" tip="Refresh pull requests" label="Refresh pull requests" busy={refreshing()} onPress={refreshAllPulls} />
+            >
+              <Icon name="plus" /> New
+            </Button>
+            <IconButton
+              icon="refresh-cw"
+              tip="Refresh pull requests"
+              label="Refresh pull requests"
+              busy={refreshing()}
+              onPress={refreshAllPulls}
+            />
           </>
         }
       >
@@ -121,18 +139,24 @@ export function GithubBrowseDetail() {
             {/* No split written here any more. A pull request is a header, its sections and its diff,
                 and `Sections` is the node that says so — so this region is the gate and `PullDetail`
                 is the surface (client-core/kit/components/layout/Sections.tsx). */}
-            <Suspense fallback={null}><PullDetail /></Suspense>
+            <Suspense fallback={null}>
+              <PullDetail />
+            </Suspense>
           </Show>
         }
       >
         <ListDetail split listWidth="wide">
           <ListColumn scroll label="New pull request">
             <SectionHeader>New pull request</SectionHeader>
-            <Suspense fallback={null}><CreatePullForm /></Suspense>
+            <Suspense fallback={null}>
+              <CreatePullForm />
+            </Suspense>
           </ListColumn>
           <DetailColumn>
             <SectionHeader>Compare</SectionHeader>
-            <Suspense fallback={null}><ComparePreview /></Suspense>
+            <Suspense fallback={null}>
+              <ComparePreview />
+            </Suspense>
           </DetailColumn>
         </ListDetail>
       </Show>

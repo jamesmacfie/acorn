@@ -43,10 +43,18 @@ export function createModelService(db: AppDatabase, secrets: SecretService): Mod
       try {
         backend = parseBackendId(backendId)
       } catch {
-        throw new ProviderOperationError('provider_bad_config', 400, 'Backend ID must be connection:<id> or harness:<id>.')
+        throw new ProviderOperationError(
+          'provider_bad_config',
+          400,
+          'Backend ID must be connection:<id> or harness:<id>.',
+        )
       }
       if (backend.kind === 'harness') {
-        return generateTextForHarness({ profileId: backend.id, input: request.input, ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}) })
+        return generateTextForHarness({
+          profileId: backend.id,
+          input: request.input,
+          ...(request.timeoutMs !== undefined ? { timeoutMs: request.timeoutMs } : {}),
+        })
       }
       return generateTextForConnection({ ...request, connectionId: backend.id, db, secrets })
     },

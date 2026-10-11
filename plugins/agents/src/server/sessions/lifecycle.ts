@@ -1,7 +1,15 @@
 import { and, asc, eq, sql } from 'drizzle-orm'
 import { createLogger, describeError, type PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { AgentConfigOption, AgentNormalizedEvent, AgentRequest, AgentRequestBlocked, AgentSession, AgentSubagent, AgentTurn } from '../../contract/wire.ts'
+import type {
+  AgentConfigOption,
+  AgentNormalizedEvent,
+  AgentRequest,
+  AgentRequestBlocked,
+  AgentSession,
+  AgentSubagent,
+  AgentTurn,
+} from '../../contract/wire.ts'
 import type {
   AgentActivityState,
   AgentActivityUsage,
@@ -28,18 +36,14 @@ export class AgentLifecycle {
   readonly #sentUsage = new Map<string, AgentActivityUsage>()
   // Loaded on the first tool, subagent, or usage event, not at boot.
   #activityLoad: Promise<typeof import('./activity')> | null = null
-  readonly #activityModule = () => this.#activityLoad ??= import('./activity')
+  readonly #activityModule = () => (this.#activityLoad ??= import('./activity'))
 
   constructor(
     private readonly db: PluginDatabase,
     private readonly publish?: AgentLifecyclePublisher,
   ) {}
 
-  announceSession(
-    session: AgentSession,
-    changes: AgentSessionChange[],
-    renameSource?: SessionRenameSource,
-  ): void {
+  announceSession(session: AgentSession, changes: AgentSessionChange[], renameSource?: SessionRenameSource): void {
     if (!changes.length) return
     this.publish?.({
       channel: 'plugin:agents:sessions-changed',
@@ -93,19 +97,21 @@ export class AgentLifecycle {
     if (!this.publish || (event.type !== 'tool' && event.type !== 'subagent' && event.type !== 'usage')) return
     const publish = this.publish
     // One promise for every frame, so they go out in commit order.
-    this.#activityModule().then(({ activityItem }) => {
-      const item = activityItem(event, stored, roster, turnId)
-      if (!item) return
-      if (item.kind !== 'usage') return publish({ channel: 'plugin:agents:activity', taskId, sessionId, ...item })
-      const sent = this.#sentUsage.get(sessionId)
-      const usage = {
-        contextUsed: item.usage.contextUsed ?? sent?.contextUsed ?? null,
-        contextSize: item.usage.contextSize ?? sent?.contextSize ?? null,
-      }
-      if (sent?.contextUsed === usage.contextUsed && sent.contextSize === usage.contextSize) return
-      this.#sentUsage.set(sessionId, usage)
-      publish({ channel: 'plugin:agents:activity', taskId, sessionId, kind: 'usage', usage })
-    }).catch((error: unknown) => log.warn(`failed to announce activity: ${describeError(error).message}`))
+    this.#activityModule()
+      .then(({ activityItem }) => {
+        const item = activityItem(event, stored, roster, turnId)
+        if (!item) return
+        if (item.kind !== 'usage') return publish({ channel: 'plugin:agents:activity', taskId, sessionId, ...item })
+        const sent = this.#sentUsage.get(sessionId)
+        const usage = {
+          contextUsed: item.usage.contextUsed ?? sent?.contextUsed ?? null,
+          contextSize: item.usage.contextSize ?? sent?.contextSize ?? null,
+        }
+        if (sent?.contextUsed === usage.contextUsed && sent.contextSize === usage.contextSize) return
+        this.#sentUsage.set(sessionId, usage)
+        publish({ channel: 'plugin:agents:activity', taskId, sessionId, kind: 'usage', usage })
+      })
+      .catch((error: unknown) => log.warn(`failed to announce activity: ${describeError(error).message}`))
   }
 
   /** The frames' items rebuilt from the ledger (./activity.ts). */
@@ -118,10 +124,12 @@ export class AgentLifecycle {
       .select({ turn: schema.agentTurns })
       .from(schema.agentTurns)
       .innerJoin(schema.agentSessions, eq(schema.agentTurns.sessionId, schema.agentSessions.id))
-      .where(and(
-        eq(schema.agentSessions.taskId, filter.taskId),
-        filter.sessionId ? eq(schema.agentTurns.sessionId, filter.sessionId) : undefined,
-      ))
+      .where(
+        and(
+          eq(schema.agentSessions.taskId, filter.taskId),
+          filter.sessionId ? eq(schema.agentTurns.sessionId, filter.sessionId) : undefined,
+        ),
+      )
       .orderBy(asc(schema.agentTurns.createdAt))
     return rows.map(({ turn: row }) => this.turnState(filter.taskId, mapAgentTurn(row)))
   }
@@ -131,10 +139,12 @@ export class AgentLifecycle {
       .select({ request: schema.agentRequests })
       .from(schema.agentRequests)
       .innerJoin(schema.agentSessions, eq(schema.agentRequests.sessionId, schema.agentSessions.id))
-      .where(and(
-        eq(schema.agentSessions.taskId, filter.taskId),
-        filter.sessionId ? eq(schema.agentRequests.sessionId, filter.sessionId) : undefined,
-      ))
+      .where(
+        and(
+          eq(schema.agentSessions.taskId, filter.taskId),
+          filter.sessionId ? eq(schema.agentRequests.sessionId, filter.sessionId) : undefined,
+        ),
+      )
       .orderBy(asc(schema.agentRequests.createdAt))
     return rows.map(({ request: row }) => this.requestState(filter.taskId, mapAgentRequest(row)))
   }
@@ -158,7 +168,9 @@ export class AgentLifecycle {
         title: session.title,
         runtimeState: session.runtimeState,
         attention: session.attention,
-        configOptions: Array.isArray(session.config.configOptions) ? session.config.configOptions as AgentConfigOption[] : [],
+        configOptions: Array.isArray(session.config.configOptions)
+          ? (session.config.configOptions as AgentConfigOption[])
+          : [],
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
       }
@@ -171,11 +183,13 @@ export class AgentLifecycle {
       .select({ turn: schema.agentTurns })
       .from(schema.agentTurns)
       .innerJoin(schema.agentSessions, eq(schema.agentTurns.sessionId, schema.agentSessions.id))
-      .where(and(
-        eq(schema.agentSessions.taskId, ref.taskId),
-        eq(schema.agentSessions.id, ref.sessionId),
-        eq(schema.agentTurns.id, ref.turnId),
-      ))
+      .where(
+        and(
+          eq(schema.agentSessions.taskId, ref.taskId),
+          eq(schema.agentSessions.id, ref.sessionId),
+          eq(schema.agentTurns.id, ref.turnId),
+        ),
+      )
       .limit(1)
     if (!row) return { available: false, reason: 'not-found' }
     const turn = mapAgentTurn(row.turn)
@@ -184,11 +198,13 @@ export class AgentLifecycle {
     const events = await this.db
       .select({ eventJson: schema.agentEvents.eventJson })
       .from(schema.agentEvents)
-      .where(and(
-        eq(schema.agentEvents.sessionId, ref.sessionId),
-        eq(schema.agentEvents.turnId, ref.turnId),
-        sql`json_extract(${schema.agentEvents.eventJson}, '$.type') = 'assistant_message'`,
-      ))
+      .where(
+        and(
+          eq(schema.agentEvents.sessionId, ref.sessionId),
+          eq(schema.agentEvents.turnId, ref.turnId),
+          sql`json_extract(${schema.agentEvents.eventJson}, '$.type') = 'assistant_message'`,
+        ),
+      )
       .orderBy(asc(schema.agentEvents.seq))
     // Loaded on the first review, not at boot.
     const { finalAssistantText, reviewUserText } = await import('./reviewInput')
@@ -222,10 +238,12 @@ export class AgentLifecycle {
       .select({ request: schema.agentRequests, taskId: schema.agentSessions.taskId })
       .from(schema.agentRequests)
       .innerJoin(schema.agentSessions, eq(schema.agentRequests.sessionId, schema.agentSessions.id))
-      .where(and(
-        eq(schema.agentRequests.sessionId, sessionId),
-        eq(schema.agentRequests.providerRequestId, providerRequestId),
-      ))
+      .where(
+        and(
+          eq(schema.agentRequests.sessionId, sessionId),
+          eq(schema.agentRequests.providerRequestId, providerRequestId),
+        ),
+      )
       .limit(1)
     return row ? { taskId: row.taskId, request: mapAgentRequest(row.request) } : null
   }

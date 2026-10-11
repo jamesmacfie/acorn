@@ -86,8 +86,12 @@ export const wholeOf = (buffer: Buffer): Clip => ({ x0: 0, y0: 0, x1: buffer.col
 
 /** A rectangle as a clip. A negative left stays negative here and is dealt with by the intersection
  *  below, because the rectangle is where the content goes and the clip is what is allowed to show. */
-export const clipOf = (rect: { x: number; y: number; w: number; h: number }): Clip =>
-  ({ x0: rect.x, y0: rect.y, x1: rect.x + rect.w, y1: rect.y + rect.h })
+export const clipOf = (rect: { x: number; y: number; w: number; h: number }): Clip => ({
+  x0: rect.x,
+  y0: rect.y,
+  x1: rect.x + rect.w,
+  y1: rect.y + rect.h,
+})
 
 /** Both, which is what a child may draw in. Empty where they do not meet, and an empty clip lets
  *  nothing through rather than everything. */
@@ -204,7 +208,10 @@ export function bufferRuns(buffer: Buffer): Run[][] {
       if (!cell) continue
       const last = runs.at(-1)
       // The second cell of a wide glyph: a column of the run before it, and no character.
-      if (cell.char === '' && last) { last.width += 1; continue }
+      if (cell.char === '' && last) {
+        last.width += 1
+        continue
+      }
       if (last && last.attrs === cell.attrs && sameColor(last.fg, cell.fg) && sameColor(last.bg, cell.bg)) {
         last.text += cell.char
         last.width += 1

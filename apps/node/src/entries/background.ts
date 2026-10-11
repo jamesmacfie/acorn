@@ -7,9 +7,16 @@ const MAX_LOG_BYTES = 8 * 1024 * 1024
 export function installBackgroundLog(path: string): void {
   let fd = openSync(path, 'a', 0o600)
   chmodSync(path, 0o600)
-  const write = (chunk: string | Uint8Array, encoding?: BufferEncoding | ((error?: Error | null) => void), callback?: (error?: Error | null) => void): boolean => {
+  const write = (
+    chunk: string | Uint8Array,
+    encoding?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void,
+  ): boolean => {
     const done = typeof encoding === 'function' ? encoding : callback
-    const bytes = typeof chunk === 'string' ? Buffer.from(chunk, typeof encoding === 'string' ? encoding : 'utf8') : Buffer.from(chunk)
+    const bytes =
+      typeof chunk === 'string'
+        ? Buffer.from(chunk, typeof encoding === 'string' ? encoding : 'utf8')
+        : Buffer.from(chunk)
     try {
       const body = bytes.length > MAX_LOG_BYTES ? bytes.subarray(bytes.length - MAX_LOG_BYTES) : bytes
       if (fstatSync(fd).size + body.length > MAX_LOG_BYTES) {

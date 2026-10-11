@@ -29,7 +29,13 @@ describe('agent note contributions', () => {
   it('defaults writes to task scope and stamps agent provenance', async () => {
     // `workspaceId` throws here: nothing below asks for the workspace scope, so a call to it would
     // be the bug this fails on rather than a silently different location.
-    const core = { tasks: { workspaceId: async () => { throw new Error('no workspace scope in this test') } } } as never
+    const core = {
+      tasks: {
+        workspaceId: async () => {
+          throw new Error('no workspace scope in this test')
+        },
+      },
+    } as never
     const tools = notesAgentTools(notesStore, core)
     const append = tools.find((tool) => tool.name === 'notes_append')!
     const write = tools.find((tool) => tool.name === 'notes_write')!
@@ -39,7 +45,10 @@ describe('agent note contributions', () => {
     await write.handler({ slug: 'handoff', body: 'replaced' }, context)
 
     expect(await notesStore.read({ scope: 'task', taskId: 'task1' }, 'handoff')).toMatchObject({
-      body: 'replaced', author: 'agent', originSessionId: 'session-1', originTaskId: 'task1',
+      body: 'replaced',
+      author: 'agent',
+      originSessionId: 'session-1',
+      originTaskId: 'task1',
     })
     await expect(notesStore.read({ scope: 'global' }, 'handoff')).rejects.toThrow()
   })
@@ -74,7 +83,14 @@ describe('the full agent-tool manifest', () => {
     'issue_image',
   ]
   // Preview tools remain a desktop-only capability exposed through the same assembled tool manifest.
-  const BROWSER_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
+  const BROWSER_TOOLS = [
+    'browser_navigate',
+    'browser_snapshot',
+    'browser_click',
+    'browser_fill',
+    'browser_screenshot',
+    'browser_console',
+  ]
   const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
   const NOTES_TOOLS = ['notes_list', 'notes_read', 'notes_write', 'notes_append']
   const MEMORY_TOOLS = ['memory_list', 'memory_search', 'memory_get', 'memory_write', 'memory_delete']
@@ -94,7 +110,9 @@ describe('the full agent-tool manifest', () => {
       ]
       // No duplicates: the registry throws on one, so a collision would break the boot, not a call.
       expect(new Set(names).size).toBe(names.length)
-      expect([...names].sort()).toEqual([...CORE_TOOLS, ...CHANGES_TOOLS, ...MEMORY_TOOLS, ...NOTES_TOOLS, ...BROWSER_TOOLS, ...TERMINAL_TOOLS].sort())
+      expect([...names].sort()).toEqual(
+        [...CORE_TOOLS, ...CHANGES_TOOLS, ...MEMORY_TOOLS, ...NOTES_TOOLS, ...BROWSER_TOOLS, ...TERMINAL_TOOLS].sort(),
+      )
     } finally {
       testDb.cleanup()
     }
@@ -111,12 +129,16 @@ describe('the full agent-tool manifest', () => {
   it('adds typed-source metadata reads when host bindings are available', () => {
     const testDb = makeTestDb()
     try {
-      const tools = buildAgentTools({ db: testDb.db, secrets: testDb.secrets, env: {} as never })
-        .filter(tool => tool.name.startsWith('data_source'))
-      expect(tools.map(tool => tool.name)).toEqual([
-        'data_sources_list', 'data_source_describe', 'data_sources_discover', 'data_source_options',
+      const tools = buildAgentTools({ db: testDb.db, secrets: testDb.secrets, env: {} as never }).filter((tool) =>
+        tool.name.startsWith('data_source'),
+      )
+      expect(tools.map((tool) => tool.name)).toEqual([
+        'data_sources_list',
+        'data_source_describe',
+        'data_sources_discover',
+        'data_source_options',
       ])
-      expect(tools.every(tool => tool.scope === 'task' && tool.risk === 'read')).toBe(true)
+      expect(tools.every((tool) => tool.scope === 'task' && tool.risk === 'read')).toBe(true)
     } finally {
       testDb.cleanup()
     }

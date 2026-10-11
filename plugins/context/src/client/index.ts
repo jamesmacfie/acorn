@@ -28,7 +28,11 @@ export const contextClientPlugin: ClientPlugin = {
     // rows rather than standing in for them, and `max` is 2 because a section is a summary and a
     // third guest in it would be a pane of somebody else's.
     ctx.extensionPoints.register({
-      id: 'section', label: 'Context section', kind: 'remote', mode: 'stack', max: 2,
+      id: 'section',
+      label: 'Context section',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
     })
     ctx.agentContexts.register(taskContextAgentContribution)
     ctx.persistedStateSlices.register(contextSelectionSlice)

@@ -33,7 +33,12 @@ const def = (): WorkflowDef => ({
     { id: 'reproduce', name: 'Reproduce', after: [], prompt: 'Reproduce ${inputs.issue}' },
     { id: 'recent-changes', name: 'Recent changes', after: [], kind: 'terminal:command', with: { command: 'git log' } },
     { id: 'history', name: 'History', after: ['recent-changes'], prompt: 'Given ${steps.recent-changes.output}, why?' },
-    { id: 'synthesise', name: 'Synthesise', after: ['reproduce', 'history'], prompt: 'Both said: ${steps.reproduce.output}' },
+    {
+      id: 'synthesise',
+      name: 'Synthesise',
+      after: ['reproduce', 'history'],
+      prompt: 'Both said: ${steps.reproduce.output}',
+    },
   ],
 })
 
@@ -42,11 +47,17 @@ const draft = (selection?: WorkflowDraft['selection']): WorkflowDraft => ({
   ...(selection ? { selection } : {}),
 })
 
-const step = (current: WorkflowDraft, id: string) => current.def.steps.find((entry) => entry.id === id || (!entry.id && entry.name === id))
+const step = (current: WorkflowDraft, id: string) =>
+  current.def.steps.find((entry) => entry.id === id || (!entry.id && entry.name === id))
 
 describe('the graph a definition describes', () => {
   it('reads a missing `after` as the step declared before it, so an old file keeps its chain', () => {
-    const chain: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'chain', steps: [{ name: 'a' }, { name: 'b' }, { name: 'c' }] }
+    const chain: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'chain',
+      steps: [{ name: 'a' }, { name: 'b' }, { name: 'c' }],
+    }
     expect(effectiveAfter(chain, 0)).toEqual([])
     expect(effectiveAfter(chain, 1)).toEqual(['a'])
     expect(effectiveAfter(chain, 2)).toEqual(['b'])
@@ -62,14 +73,21 @@ describe('the graph a definition describes', () => {
   })
 
   it('indents a branch target under the step that chooses it', () => {
-    const branching: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'branching',
+    const branching: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'branching',
       steps: [
         { id: 'check', name: 'check', kind: 'if', branches: { true: 'yes' } },
         { id: 'yes', name: 'yes', after: ['check'] },
         { id: 'then', name: 'then', after: ['yes'] },
       ],
     }
-    expect(graphOrder(branching).map((row) => [row.name, row.depth])).toEqual([['check', 0], ['yes', 1], ['then', 1]])
+    expect(graphOrder(branching).map((row) => [row.name, row.depth])).toEqual([
+      ['check', 0],
+      ['yes', 1],
+      ['then', 1],
+    ])
   })
 
   it('marks the node that waits on more than one step', () => {
@@ -77,9 +95,14 @@ describe('the graph a definition describes', () => {
   })
 
   it('still draws every node when the graph has a cycle, so the footer is not the only sign', () => {
-    const cyclic: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const cyclic: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'cyclic',
-      steps: [{ name: 'a', after: ['b'] }, { name: 'b', after: ['a'] }],
+      steps: [
+        { name: 'a', after: ['b'] },
+        { name: 'b', after: ['a'] },
+      ],
     }
     expect(graphOrder(cyclic).map((row) => row.name)).toEqual(['a', 'b'])
   })
@@ -94,7 +117,9 @@ describe('renaming a node', () => {
   })
 
   it('rewrites a reference inside a `with` value as well as a prompt', () => {
-    const start = newDraft({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const start = newDraft({
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'w',
       steps: [
         { name: 'one', after: [] },
@@ -105,7 +130,9 @@ describe('renaming a node', () => {
   })
 
   it('rewrites structured binding and map-source references', () => {
-    const start = newDraft({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const start = newDraft({
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'w',
       steps: [
         { name: 'tickets', after: [], schema: { type: 'object' } },
@@ -159,7 +186,12 @@ describe('adding and deleting', () => {
   })
 
   it('writes an explicit `after` on the steps it did not touch, so nothing inherits the new step', () => {
-    const chain = newDraft({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'chain', steps: [{ name: 'a' }, { name: 'b' }] })
+    const chain = newDraft({
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'chain',
+      steps: [{ name: 'a' }, { name: 'b' }],
+    })
     const added = addNode(chain, 'agent')
     expect(step(added, 'b')?.after).toEqual(['a'])
     expect(added.def.steps.at(-1)?.after).toEqual([])
@@ -177,15 +209,22 @@ describe('adding and deleting', () => {
   })
 
   it('adds a configured For each after Find records as one stable graph edit', () => {
-    const start = newDraft({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'records', steps: [{ id: 'find', name: 'Find', kind: 'find-records', after: [] }] })
+    const start = newDraft({
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'records',
+      steps: [{ id: 'find', name: 'Find', kind: 'find-records', after: [] }],
+    })
     const added = addForEach(start, 'find')
-    expect(added.def.steps.at(-1)).toEqual(expect.objectContaining({ kind: 'workflow-map', after: ['find'], items: { step: 'find', pointer: '/records' } }))
+    expect(added.def.steps.at(-1)).toEqual(
+      expect.objectContaining({ kind: 'workflow-map', after: ['find'], items: { step: 'find', pointer: '/records' } }),
+    )
     expect(added.def.steps.at(-1)?.id).toBeTruthy()
   })
 
   it('reorders declaration rows without changing the explicit graph', () => {
     const moved = moveNode(draft(), 'history', -1)
-    expect(moved.def.steps.map(entry => entry.name)).toEqual(['Reproduce', 'History', 'Recent changes', 'Synthesise'])
+    expect(moved.def.steps.map((entry) => entry.name)).toEqual(['Reproduce', 'History', 'Recent changes', 'Synthesise'])
     expect(step(moved, 'history')?.after).toEqual(['recent-changes'])
     expect(step(moved, 'synthesise')?.after).toEqual(['reproduce', 'history'])
   })
@@ -224,12 +263,19 @@ describe('setting a field', () => {
     const cleared = setField(draft(), 'reproduce', 'agent', 'prompt', '')
     expect('prompt' in (step(cleared, 'reproduce') ?? {})).toBe(false)
   })
-
 })
 
 describe('the JSON tab', () => {
   it('replaces the draft atomically when the document is a definition', () => {
-    const applied = applyJson(draft(), JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Other', steps: [{ name: 'only' }] }))
+    const applied = applyJson(
+      draft(),
+      JSON.stringify({
+        baseline: 'acorn-1' as const,
+        formatVersion: 1 as const,
+        name: 'Other',
+        steps: [{ name: 'only' }],
+      }),
+    )
     expect('draft' in applied && applied.draft.def.name).toBe('Other')
   })
 
@@ -241,27 +287,51 @@ describe('the JSON tab', () => {
   })
 
   it('drops a selection the new document has no node for', () => {
-    const applied = applyJson(draft({ kind: 'node', name: 'history' }), JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'x', steps: [{ name: 'only' }] }))
+    const applied = applyJson(
+      draft({ kind: 'node', name: 'history' }),
+      JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'x', steps: [{ name: 'only' }] }),
+    )
     expect('draft' in applied && applied.draft.selection).toEqual({ kind: 'definition' })
   })
 })
 
 describe('required fields', () => {
   const describeFor = (kind: string) =>
-    (kind === 'terminal:command' ? { fields: [{ id: 'command', label: 'Command', type: 'textarea' as const, required: true }] } : undefined)
+    kind === 'terminal:command'
+      ? { fields: [{ id: 'command', label: 'Command', type: 'textarea' as const, required: true }] }
+      : undefined
 
   it('names the step and the field, so Save can go grey before the node is asked', () => {
-    expect(missingRequiredFields({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command' }] }, describeFor))
-      .toEqual(["step 'run' needs Command"])
+    expect(
+      missingRequiredFields(
+        {
+          baseline: 'acorn-1' as const,
+          formatVersion: 1 as const,
+          name: 'w',
+          steps: [{ name: 'run', kind: 'terminal:command' }],
+        },
+        describeFor,
+      ),
+    ).toEqual(["step 'run' needs Command"])
   })
 
   it('says nothing once the box has something in it', () => {
-    const filled: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', with: { command: 'ls' } }] }
+    const filled: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'w',
+      steps: [{ name: 'run', kind: 'terminal:command', with: { command: 'ls' } }],
+    }
     expect(missingRequiredFields(filled, describeFor)).toEqual([])
   })
 
   it('treats whitespace as empty', () => {
-    const blank: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', with: { command: '  ' } }] }
+    const blank: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
+      name: 'w',
+      steps: [{ name: 'run', kind: 'terminal:command', with: { command: '  ' } }],
+    }
     expect(missingRequiredFields(blank, describeFor)).toHaveLength(1)
   })
 })
@@ -270,7 +340,10 @@ describe('undo history', () => {
   it('is bounded, and keeps the newest entries', () => {
     let stack: WorkflowDraft[] = []
     for (let n = 0; n < UNDO_DEPTH + 10; n += 1) {
-      stack = pushUndo(stack, newDraft({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: `v${n}`, steps: [] }))
+      stack = pushUndo(
+        stack,
+        newDraft({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: `v${n}`, steps: [] }),
+      )
     }
     expect(stack).toHaveLength(UNDO_DEPTH)
     expect(stack[0].def.name).toBe('v10')

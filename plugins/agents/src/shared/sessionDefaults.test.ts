@@ -69,8 +69,10 @@ describe('stored defaults', () => {
   })
 
   it('fills the fields a write left out', () => {
-    expect(parseAgentSessionDefaults('{"followLastSession":false}'))
-      .toEqual({ ...defaultAgentSessionDefaults(), followLastSession: false })
+    expect(parseAgentSessionDefaults('{"followLastSession":false}')).toEqual({
+      ...defaultAgentSessionDefaults(),
+      followLastSession: false,
+    })
   })
 
   it('refuses a value that is not a string, and an over-long id', () => {
@@ -79,11 +81,20 @@ describe('stored defaults', () => {
     expect(validateAgentSessionDefaults({ followLastSession: 'yes' }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ continueAfterUsageLimit: 'yes' }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ stopIdleAfterMinutes: 45 }).ok).toBe(false)
-    expect(validateAgentSessionDefaults({ stopIdleAfterMinutes: 0 })).toEqual({ ok: true, value: { stopIdleAfterMinutes: 0 } })
+    expect(validateAgentSessionDefaults({ stopIdleAfterMinutes: 0 })).toEqual({
+      ok: true,
+      value: { stopIdleAfterMinutes: 0 },
+    })
     expect(validateAgentSessionDefaults({ warnRepeatedToolCallsAfter: 4 }).ok).toBe(false)
-    expect(validateAgentSessionDefaults({ warnRepeatedToolCallsAfter: 0 })).toEqual({ ok: true, value: { warnRepeatedToolCallsAfter: 0 } })
+    expect(validateAgentSessionDefaults({ warnRepeatedToolCallsAfter: 0 })).toEqual({
+      ok: true,
+      value: { warnRepeatedToolCallsAfter: 0 },
+    })
     expect(validateAgentSessionDefaults({ keepArchivedHistoryDays: 7 }).ok).toBe(false)
-    expect(validateAgentSessionDefaults({ keepArchivedHistoryDays: 365 })).toEqual({ ok: true, value: { keepArchivedHistoryDays: 365 } })
+    expect(validateAgentSessionDefaults({ keepArchivedHistoryDays: 365 })).toEqual({
+      ok: true,
+      value: { keepArchivedHistoryDays: 365 },
+    })
     expect(validateAgentSessionDefaults([]).ok).toBe(false)
   })
 
@@ -93,20 +104,30 @@ describe('stored defaults', () => {
   })
 
   it('upgrades an earlier saved row with parent inheritance without losing its ordinary defaults', () => {
-    const saved = parseAgentSessionDefaults(JSON.stringify({
-      followLastSession: false, pinned: { codex: { reasoning: 'high' } },
-    }))
+    const saved = parseAgentSessionDefaults(
+      JSON.stringify({
+        followLastSession: false,
+        pinned: { codex: { reasoning: 'high' } },
+      }),
+    )
     expect(saved.spawned).toEqual({ mode: 'inherit', profileId: null, pinned: {} })
     expect(saved.pinned).toEqual({ codex: { reasoning: 'high' } })
   })
 
   it('accepts independent spawn defaults and refuses malformed or unbounded choices', () => {
-    const spawned = { mode: 'explicit', profileId: 'claude-code', pinned: { claude: { model: 'opus', effort: 'high' } } }
+    const spawned = {
+      mode: 'explicit',
+      profileId: 'claude-code',
+      pinned: { claude: { model: 'opus', effort: 'high' } },
+    }
     expect(validateAgentSessionDefaults({ spawned })).toEqual({ ok: true, value: { spawned } })
     for (const invalid of [
-      [], { ...spawned, mode: 'last' }, { ...spawned, profileId: 1 },
+      [],
+      { ...spawned, mode: 'last' },
+      { ...spawned, profileId: 1 },
       { ...spawned, pinned: { claude: { model: 1 } } },
       { ...spawned, pinned: { claude: { model: 'x'.repeat(501) } } },
-    ]) expect(validateAgentSessionDefaults({ spawned: invalid }).ok).toBe(false)
+    ])
+      expect(validateAgentSessionDefaults({ spawned: invalid }).ok).toBe(false)
   })
 })

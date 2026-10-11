@@ -16,9 +16,11 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
   const taskById = createMemo(() => new Map((tasks.data ?? []).map((task) => [task.id, task])))
   // Archiving a task only stops children with a running process, so an idle child of an archived
   // task stays `ready`. Hide it once the active task list has loaded, because open() can't reach it.
-  const children = createMemo(() => liveDelegatedChildren(
-    props.parentSessionId, managedAgentStore.sessions(), managedAgentStore.delegations(),
-  ).filter((child) => !tasks.data || taskById().has(child.taskId)))
+  const children = createMemo(() =>
+    liveDelegatedChildren(props.parentSessionId, managedAgentStore.sessions(), managedAgentStore.delegations()).filter(
+      (child) => !tasks.data || taskById().has(child.taskId),
+    ),
+  )
 
   // The roster carries attention, while a held snapshot gives its exact pending request kind.
   // Read only children that need input; the agent socket updates both projections after that.
@@ -39,8 +41,10 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
     for (const id of requestedSnapshots) if (!waiting.has(id)) requestedSnapshots.delete(id)
   })
 
-  const requestKind = (sessionId: string) => managedAgentStore.snapshots()[sessionId]?.requests
-    .find((request) => request.status === 'pending' || request.status === 'resolving')?.kind
+  const requestKind = (sessionId: string) =>
+    managedAgentStore
+      .snapshots()
+      [sessionId]?.requests.find((request) => request.status === 'pending' || request.status === 'resolving')?.kind
   const open = (sessionId: string) => {
     const child = children().find((candidate) => candidate.id === sessionId)
     const task = child && taskById().get(child.taskId)
@@ -62,7 +66,7 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
           const child = () => children().find((candidate) => candidate.id === item.key)
           const attention = () => {
             const state = child()?.attention
-            return state && (['permission', 'question'].includes(state) ? requestKind(item.key) ?? state : state)
+            return state && (['permission', 'question'].includes(state) ? (requestKind(item.key) ?? state) : state)
           }
           return (
             <Show when={child()}>
@@ -73,9 +77,11 @@ export default function ManagedChildRows(props: { parentSessionId: string; paren
                   density="compact"
                   title={current().title}
                   leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
-                  trailing={<Show when={!['none', 'unread'].includes(attention() ?? 'none') ? attention() : undefined}>
-                    {(reason) => <Icon {...attentionMark(reason())} />}
-                  </Show>}
+                  trailing={
+                    <Show when={!['none', 'unread'].includes(attention() ?? 'none') ? attention() : undefined}>
+                      {(reason) => <Icon {...attentionMark(reason())} />}
+                    </Show>
+                  }
                   onPress={() => open(item.key)}
                 >
                   <Text emphasis="strong">{current().title}</Text>

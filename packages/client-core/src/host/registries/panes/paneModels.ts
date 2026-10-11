@@ -65,12 +65,21 @@ function releaseModel(paneId: string, entry: Held): void {
 }
 
 /** Build in a detached root that inherits provider context and retires with its captured shell. */
-export function paneModel<M>(paneId: string, taskId: string, build: () => M, owner = 'core', scope = paneModelScope()): M {
+export function paneModel<M>(
+  paneId: string,
+  taskId: string,
+  build: () => M,
+  owner = 'core',
+  scope = paneModelScope(),
+): M {
   const entry = held.get(paneId)
   if (entry && entry.taskId === taskId && entry.scope === scope && !scope.retired) return entry.model as M
   if (entry) releaseModel(paneId, entry)
   if (scope.retired) throw new Error('Cannot build a pane model in a retired Node shell.')
-  const span = startSpan(owner, { name: 'pane.model', attrs: { seam: 'pane.model', 'pane.id': paneId, 'task.id': taskId } })
+  const span = startSpan(owner, {
+    name: 'pane.model',
+    attrs: { seam: 'pane.model', 'pane.id': paneId, 'task.id': taskId },
+  })
   let disposeRoot: (() => void) | undefined
   try {
     const next = createRoot((dispose) => {
@@ -89,7 +98,8 @@ export function paneModel<M>(paneId: string, taskId: string, build: () => M, own
 }
 
 const [drawn, setDrawn] = createSignal<ReadonlyMap<string, number>>(new Map())
-const drawnKey = (scope: PaneModelScope, paneId: string, taskId: string): string => `${scope.id}\u0000${paneId}\u0000${taskId}`
+const drawnKey = (scope: PaneModelScope, paneId: string, taskId: string): string =>
+  `${scope.id}\u0000${paneId}\u0000${taskId}`
 
 function countDrawn(key: string, by: number): void {
   setDrawn((current) => {

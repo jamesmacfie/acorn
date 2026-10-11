@@ -1,5 +1,15 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { runInNewContext } from 'node:vm'
 import { MessageChannel } from 'node:worker_threads'
@@ -12,7 +22,16 @@ import { parsePluginManifest } from '@acorn/node-core/server/plugins'
 import { loadExternalPlugins, pluginInstallDir } from '@acorn/node-core/server/plugins'
 // @ts-expect-error: the scaffold is published standalone with zero dependencies, so it's plain
 // JavaScript with no declarations. This suite is the only thing in the repository that imports it.
-import { API_VERSION, BASELINE, KNOWN_SOURCES, SCHEMA_URL, SDK_VERSION, scaffoldFiles, toInputName, toPluginId } from './index.mjs'
+import {
+  API_VERSION,
+  BASELINE,
+  KNOWN_SOURCES,
+  SCHEMA_URL,
+  SDK_VERSION,
+  scaffoldFiles,
+  toInputName,
+  toPluginId,
+} from './index.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PACKAGES = join(HERE, '..')
@@ -56,7 +75,9 @@ const TSC = join(PACKAGES, 'protocol', 'node_modules', '.bin', 'tsc')
 
 function unpackPublishedPackage(name: string, destination: string): void {
   const output = execFileSync('pnpm', ['pack', '--pack-destination', dirname(destination)], {
-    cwd: join(PACKAGES, name), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: join(PACKAGES, name),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
   const tarball = output.trim().split('\n').at(-1)
   if (!tarball?.endsWith('.tgz')) throw new Error(`pnpm pack did not return a tarball: ${output}`)
@@ -86,7 +107,9 @@ it('writes the baseline this node admits', () => {
 it('points $schema at the schema this repository actually publishes', () => {
   // The other hardcoded copy, for the same reason as API_VERSION. A stale URL is worse than none: the
   // author's editor validates against a contract that is no longer the host's and says nothing.
-  const generated = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../plugin-types/acorn-plugin.schema.json'), 'utf8'))
+  const generated = JSON.parse(
+    readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../plugin-types/acorn-plugin.schema.json'), 'utf8'),
+  )
   expect(SCHEMA_URL).toBe(generated.$id)
 })
 
@@ -104,7 +127,7 @@ it('keeps copyable manifest examples compatible with the host major', () => {
   expect(speaksApiVersion(typesExample.apiVersion)).toBe(true)
 })
 
-it('points the README at the running host\'s extension discovery and the tested example', () => {
+it("points the README at the running host's extension discovery and the tested example", () => {
   // The scaffold can't list points itself: they are registered in client code and change with the
   // host. So it names the three places that read them live, and the path the example test checks.
   const readme = (scaffoldFiles('my-widget') as Record<string, string>)['README.md']!
@@ -125,14 +148,26 @@ it('emits a manifest the host parses, cross-field rules and all', () => {
 it('emits an owned tree pane that the command can open', () => {
   const files = scaffoldFiles('my-widget', 'My widget') as Record<string, string>
   const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
-  expect(manifest.contributions.frames).toEqual([{
-    target: 'pane', id: 'my-widget', label: 'My widget', glyph: 'puzzle', order: 800,
-    layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
-  }])
-  expect(manifest.contributions.commands).toEqual([{
-    id: 'open', kind: 'action', title: 'Open My widget', category: 'pane',
-    action: { verb: 'openPane', pane: 'my-widget' },
-  }])
+  expect(manifest.contributions.frames).toEqual([
+    {
+      target: 'pane',
+      id: 'my-widget',
+      label: 'My widget',
+      glyph: 'puzzle',
+      order: 800,
+      layout: 'single',
+      regions: { body: { kind: 'remote', entry: 'pane' } },
+    },
+  ])
+  expect(manifest.contributions.commands).toEqual([
+    {
+      id: 'open',
+      kind: 'action',
+      title: 'Open My widget',
+      category: 'pane',
+      action: { verb: 'openPane', pane: 'my-widget' },
+    },
+  ])
   expect(manifest.contributions.extensions).toBeUndefined()
   expect(files['client.js']).toContain("entries: ['pane']")
   expect(files['server/routes.js']).toContain("pathname !== '/greeting'")
@@ -146,14 +181,24 @@ it('emits a rectangle plugin under --rectangle, as a layout with a frame region'
   expect(manifest.contributions.extensions).toBeUndefined()
   expect(manifest.contributions.frames).toEqual([
     {
-      target: 'pane', id: 'my-widget', label: 'My widget', glyph: 'puzzle', order: 800,
-      layout: 'single', regions: { body: 'frame' },
+      target: 'pane',
+      id: 'my-widget',
+      label: 'My widget',
+      glyph: 'puzzle',
+      order: 800,
+      layout: 'single',
+      regions: { body: 'frame' },
     },
   ])
-  expect(manifest.contributions.commands).toEqual([{
-    id: 'open', kind: 'action', title: 'Open My widget', category: 'pane',
-    action: { verb: 'openPane', pane: 'my-widget' },
-  }])
+  expect(manifest.contributions.commands).toEqual([
+    {
+      id: 'open',
+      kind: 'action',
+      title: 'Open My widget',
+      category: 'pane',
+      action: { verb: 'openPane', pane: 'my-widget' },
+    },
+  ])
   expect(parsePluginManifest(manifest).ok).toBe(true)
 })
 
@@ -176,10 +221,15 @@ it('emits a node half that loads and satisfies the structural plugin check', asy
 
     const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
     expect(failures).toEqual([])
-    expect(loaded.map((entry) => entry.manifest.contributions.commands[0])).toMatchObject([{
-      id: 'open', kind: 'action', title: 'Open My widget', category: 'pane',
-      action: { verb: 'openPane', pane: 'my-widget' },
-    }])
+    expect(loaded.map((entry) => entry.manifest.contributions.commands[0])).toMatchObject([
+      {
+        id: 'open',
+        kind: 'action',
+        title: 'Open My widget',
+        category: 'pane',
+        action: { verb: 'openPane', pane: 'my-widget' },
+      },
+    ])
     await loaded[0]?.plugin.dispose?.()
 
     // The client behavior runs in scaffoldClient.test.ts. Keep syntax checks here for both variants.
@@ -206,21 +256,28 @@ it('reloads an edited route module in a fresh isolated worker', async () => {
     try {
       await plugin.init({
         log: { info: () => {} },
-        routes: { fetch: (handler: typeof handle) => { handle = handler } },
+        routes: {
+          fetch: (handler: typeof handle) => {
+            handle = handler
+          },
+        },
         schedules: { register: () => {} },
         providers: {},
         events: {},
         core: { tasks: { load: async () => null } },
       } as never)
       const response = await handle!(new Request('https://node.invalid/greeting'), { userId: 'owner' })
-      return await response.json() as { text: string }
+      return (await response.json()) as { text: string }
     } finally {
       await plugin.dispose?.()
     }
   }
   try {
     expect((await greeting()).text).toBe('Hello from the node')
-    writeFileSync(join(dir, 'server/routes.js'), files['server/routes.js']!.replace('Hello from the node', 'Hello after reload'))
+    writeFileSync(
+      join(dir, 'server/routes.js'),
+      files['server/routes.js']!.replace('Hello from the node', 'Hello after reload'),
+    )
     expect((await greeting()).text).toBe('Hello after reload')
   } finally {
     rmSync(dataRoot, { recursive: true, force: true })
@@ -261,23 +318,26 @@ it('runs the packed scaffold and type-checks it against the packed declarations 
     expect(readdirSync(join(types, 'dist')).sort()).toEqual(['contracts', 'index.d.ts'])
     expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toContain('"apiVersion": "4"')
 
-    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
-      compilerOptions: {
-        target: 'ES2023',
-        module: 'NodeNext',
-        moduleResolution: 'NodeNext',
-        lib: ['ES2023'],
-        // The declared peer, and the reason it is declared: without it the package's own
-        // `NodeJS.Signals` is an error in a file the author never wrote.
-        types: ['node'],
-        allowJs: true,
-        checkJs: true,
-        noEmit: true,
-        strict: true,
-        skipLibCheck: false,
-      },
-      include: ['node'],
-    }))
+    writeFileSync(
+      join(dir, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          target: 'ES2023',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          lib: ['ES2023'],
+          // The declared peer, and the reason it is declared: without it the package's own
+          // `NodeJS.Signals` is an error in a file the author never wrote.
+          types: ['node'],
+          allowJs: true,
+          checkJs: true,
+          noEmit: true,
+          strict: true,
+          skipLibCheck: false,
+        },
+        include: ['node'],
+      }),
+    )
     // Only @types/node comes from the workspace store. The two packages under test are tarball bytes.
     cpSync(NODE_TYPES, join(dir, 'node_modules'), { recursive: true, dereference: true })
 
@@ -300,40 +360,56 @@ it('imports and type-checks both packed client SDK exports outside the repositor
     unpackPublishedPackage('plugin-sdk', sdk)
     // The remote entry imports Solid at runtime. Supply that declared peer from the local store;
     // the SDK itself still resolves only from bytes unpacked from its tarball.
-    symlinkSync(realpathSync(join(PACKAGES, 'plugin-sdk', 'node_modules', 'solid-js')),
-      join(root, 'node_modules', 'solid-js'), 'dir')
+    symlinkSync(
+      realpathSync(join(PACKAGES, 'plugin-sdk', 'node_modules', 'solid-js')),
+      join(root, 'node_modules', 'solid-js'),
+      'dir',
+    )
     writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }))
-    const output = execFileSync(process.execPath, [
-      '--input-type=module', '-e',
-      "const [sdk, remote] = await Promise.all([import('acorn-plugin-sdk'), import('acorn-plugin-sdk/remote')]); console.log(typeof sdk.connect, typeof sdk.mountTree, typeof remote.solidTree, typeof remote.Card)",
-    ], { cwd: root, encoding: 'utf8' })
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        "const [sdk, remote] = await Promise.all([import('acorn-plugin-sdk'), import('acorn-plugin-sdk/remote')]); console.log(typeof sdk.connect, typeof sdk.mountTree, typeof remote.solidTree, typeof remote.Card)",
+      ],
+      { cwd: root, encoding: 'utf8' },
+    )
     expect(output.trim()).toBe('function function function function')
 
-    writeFileSync(join(root, 'consumer.ts'), [
-      "import { mountTree, type AcornBridge } from 'acorn-plugin-sdk'",
-      "import { Card, solidTree, type KitNodeProps } from 'acorn-plugin-sdk/remote'",
-      'const props: KitNodeProps = { children: "Plugin content" }',
-      'const pane = solidTree(({ bridge }: { bridge: AcornBridge }) => Card({ ...props, children: bridge.context.surface }))',
-      'mountTree({ pane })',
-    ].join('\n'))
-    writeFileSync(join(root, 'tsconfig.json'), JSON.stringify({
-      compilerOptions: {
-        target: 'ES2023',
-        module: 'NodeNext',
-        moduleResolution: 'NodeNext',
-        lib: ['ES2023', 'DOM'],
-        noEmit: true,
-        strict: true,
-        skipLibCheck: false,
-      },
-      include: ['consumer.ts'],
-    }))
+    writeFileSync(
+      join(root, 'consumer.ts'),
+      [
+        "import { mountTree, type AcornBridge } from 'acorn-plugin-sdk'",
+        "import { Card, solidTree, type KitNodeProps } from 'acorn-plugin-sdk/remote'",
+        'const props: KitNodeProps = { children: "Plugin content" }',
+        'const pane = solidTree(({ bridge }: { bridge: AcornBridge }) => Card({ ...props, children: bridge.context.surface }))',
+        'mountTree({ pane })',
+      ].join('\n'),
+    )
+    writeFileSync(
+      join(root, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          target: 'ES2023',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          lib: ['ES2023', 'DOM'],
+          noEmit: true,
+          strict: true,
+          skipLibCheck: false,
+        },
+        include: ['consumer.ts'],
+      }),
+    )
     try {
       execFileSync(TSC, ['--noEmit'], { cwd: root, stdio: 'pipe' })
     } catch (error) {
-      throw new Error(String((error as { stdout?: Buffer; stderr?: Buffer }).stdout
-        ?? (error as { stderr?: Buffer }).stderr
-        ?? error))
+      throw new Error(
+        String(
+          (error as { stdout?: Buffer; stderr?: Buffer }).stdout ?? (error as { stderr?: Buffer }).stderr ?? error,
+        ),
+      )
     }
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -361,29 +437,34 @@ it('type-checks the complete documented plugin example outside the workspace', (
     const types = join(dir, 'node_modules', 'acorn-plugin-types')
     unpackPublishedPackage('plugin-types', types)
     cpSync(NODE_TYPES, join(dir, 'node_modules'), { recursive: true, dereference: true })
-    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
-      compilerOptions: {
-        target: 'ES2023',
-        module: 'NodeNext',
-        moduleResolution: 'NodeNext',
-        lib: ['ES2023', 'DOM'],
-        types: ['node'],
-        allowJs: true,
-        checkJs: true,
-        noEmit: true,
-        strict: true,
-        skipLibCheck: false,
-      },
-      include: ['node', 'server'],
-    }))
+    writeFileSync(
+      join(dir, 'tsconfig.json'),
+      JSON.stringify({
+        compilerOptions: {
+          target: 'ES2023',
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          lib: ['ES2023', 'DOM'],
+          types: ['node'],
+          allowJs: true,
+          checkJs: true,
+          noEmit: true,
+          strict: true,
+          skipLibCheck: false,
+        },
+        include: ['node', 'server'],
+      }),
+    )
 
     try {
       execFileSync(TSC, ['--noEmit'], { cwd: dir, stdio: 'pipe' })
       execFileSync(process.execPath, ['--check', join(dir, 'client.js')], { stdio: 'pipe' })
     } catch (error) {
-      throw new Error(String((error as { stdout?: Buffer; stderr?: Buffer }).stdout
-        ?? (error as { stderr?: Buffer }).stderr
-        ?? error))
+      throw new Error(
+        String(
+          (error as { stdout?: Buffer; stderr?: Buffer }).stdout ?? (error as { stderr?: Buffer }).stderr ?? error,
+        ),
+      )
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -422,14 +503,20 @@ it('builds, type-checks, and runs the documented extension example from the pack
     unpackPublishedPackage('plugin-sdk', join(modules, 'acorn-plugin-sdk'))
     unpackPublishedPackage('plugin-types', join(modules, 'acorn-plugin-types'))
     cpSync(NODE_TYPES, modules, { recursive: true, dereference: true })
-    for (const [from, tool] of [['plugin-sdk', 'vite'], ['plugin-sdk', 'solid-js'], ['client-core', 'vite-plugin-solid']] as const) {
+    for (const [from, tool] of [
+      ['plugin-sdk', 'vite'],
+      ['plugin-sdk', 'solid-js'],
+      ['client-core', 'vite-plugin-solid'],
+    ] as const) {
       symlinkSync(realpathSync(join(PACKAGES, from, 'node_modules', tool)), join(modules, tool), 'dir')
     }
     const run = (command: string, args: string[]) => {
       try {
         return execFileSync(command, args, { cwd: dir, encoding: 'utf8', stdio: 'pipe' })
       } catch (error) {
-        throw new Error(`${args.join(' ')}: ${String((error as { stdout?: string }).stdout ?? '')}${String((error as { stderr?: string }).stderr ?? error)}`)
+        throw new Error(
+          `${args.join(' ')}: ${String((error as { stdout?: string }).stdout ?? '')}${String((error as { stderr?: string }).stderr ?? error)}`,
+        )
       }
     }
     run(process.execPath, [join(modules, 'vite', 'bin', 'vite.js'), 'build', '--logLevel', 'error'])
@@ -440,55 +527,101 @@ it('builds, type-checks, and runs the documented extension example from the pack
     expect(bundle).not.toMatch(/^\s*(import|export)\b/m)
     let hello: ((event: { data: unknown; ports: unknown[] }) => void) | undefined
     runInNewContext(bundle, {
-      addEventListener: (_kind: string, listener: typeof hello) => { hello = listener },
-      TextDecoder, URLSearchParams, queueMicrotask, setTimeout, clearTimeout,
+      addEventListener: (_kind: string, listener: typeof hello) => {
+        hello = listener
+      },
+      TextDecoder,
+      URLSearchParams,
+      queueMicrotask,
+      setTimeout,
+      clearTimeout,
     })
     const bridge = new MessageChannel()
     const tree = new MessageChannel()
-    const ready = new Promise<{ entries?: string[] }>((resolve) => tree.port1.on('message', (message) => {
-      if (message.kind === 'tree:ready') resolve(message)
-    }))
+    const ready = new Promise<{ entries?: string[] }>((resolve) =>
+      tree.port1.on('message', (message) => {
+        if (message.kind === 'tree:ready') resolve(message)
+      }),
+    )
     try {
       hello!({ data: { acornBridge: 1 }, ports: [bridge.port2, tree.port2] })
       bridge.port1.postMessage({ kind: 'ready', context: {} })
-      const named = [manifest.contributions.frames[0]!.regions.body.entry, ...manifest.contributions.extensions.flatMap((entry) => entry.remote ?? [])]
-      expect([...(await ready).entries ?? []].sort()).toEqual(named.sort())
+      const named = [
+        manifest.contributions.frames[0]!.regions.body.entry,
+        ...manifest.contributions.extensions.flatMap((entry) => entry.remote ?? []),
+      ]
+      expect([...((await ready).entries ?? [])].sort()).toEqual(named.sort())
     } finally {
-      bridge.port1.close(); tree.port1.close()
+      bridge.port1.close()
+      tree.port1.close()
     }
 
     // The Node half, with the two ctx members it uses. Each call is a route the manifest names.
     const sent: unknown[] = []
     let handle: ((request: Request) => Promise<Response>) | undefined
-    const node = (await import(pathToFileURL(join(dir, 'node.js')).href)) as { default: { name: string; init(ctx: unknown): void } }
+    const node = (await import(pathToFileURL(join(dir, 'node.js')).href)) as {
+      default: { name: string; init(ctx: unknown): void }
+    }
     expect(node.default.name).toBe('acme-review')
     node.default.init({
-      routes: { fetch: (handler: typeof handle) => { handle = handler } },
+      routes: {
+        fetch: (handler: typeof handle) => {
+          handle = handler
+        },
+      },
       events: { send: (event: unknown) => void sent.push(event) },
       capabilities: { get: () => ({ read: async () => ({ bytes: new TextEncoder().encode('a,b\n1,2\n') }) }) },
     })
     const call = async (path: string, body?: unknown) => {
-      const response = await handle!(new Request(`https://node.invalid${path}`, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) }))
+      const response = await handle!(
+        new Request(
+          `https://node.invalid${path}`,
+          body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) },
+        ),
+      )
       return { status: response.status, text: await response.text() }
     }
     const file = { kind: 'file', taskId: 't1', projectId: 'p1', path: 'src/a.ts', directory: false, readOnly: false }
     expect((await call('/add', { resource: file })).status).toBe(200)
     expect(sent).toEqual([{ channel: 'plugin:acme-review:changed' }])
     expect(JSON.parse((await call('/files?taskId=t1')).text)).toEqual({ files: ['src/a.ts'] })
-    expect(JSON.parse((await call('/tools/files', { arguments: {}, origin: { taskId: 't1' } })).text)).toEqual({ files: ['src/a.ts'] })
-    expect(JSON.parse((await call('/marks', { keys: [{ taskId: 't1', path: 'src/a.ts' }, { taskId: 't1', path: 'b.ts' }] })).text).items)
-      .toEqual([{ key: { taskId: 't1', path: 'src/a.ts' }, severity: 'warn', text: 'Under review', icon: 'eye' }])
+    expect(JSON.parse((await call('/tools/files', { arguments: {}, origin: { taskId: 't1' } })).text)).toEqual({
+      files: ['src/a.ts'],
+    })
+    expect(
+      JSON.parse(
+        (
+          await call('/marks', {
+            keys: [
+              { taskId: 't1', path: 'src/a.ts' },
+              { taskId: 't1', path: 'b.ts' },
+            ],
+          })
+        ).text,
+      ).items,
+    ).toEqual([{ key: { taskId: 't1', path: 'src/a.ts' }, severity: 'warn', text: 'Under review', icon: 'eye' }])
     expect((await call('/artifact?taskId=t1&sessionId=s1&id=a1')).text).toBe('a,b\n1,2\n')
-    expect(JSON.parse((await call(`/docs?url=${encodeURIComponent('https://docs.example.com/guide/review')}`)).text).title).toBe('Review guide')
-    expect((await call(`/docs?url=${encodeURIComponent('https://elsewhere.example.com/guide/review')}`)).status).toBe(404)
+    expect(
+      JSON.parse((await call(`/docs?url=${encodeURIComponent('https://docs.example.com/guide/review')}`)).text).title,
+    ).toBe('Review guide')
+    expect((await call(`/docs?url=${encodeURIComponent('https://elsewhere.example.com/guide/review')}`)).status).toBe(
+      404,
+    )
     expect(JSON.parse((await call('/issue?item=ENG-1')).text)).toEqual({ status: 'Approved by Acme review' })
     const todo = { start: { line: 2, column: 3 }, end: { line: 2, column: 7 } }
     expect(JSON.parse((await call('/diagnostics', { text: '# Notes\n- TODO: check\n', revision: 4 })).text)).toEqual({
-      revision: 4, items: [{ range: todo, severity: 'warning', message: 'Unresolved TODO', source: 'acme' }],
+      revision: 4,
+      items: [{ range: todo, severity: 'warning', message: 'Unresolved TODO', source: 'acme' }],
     })
-    expect(JSON.parse((await call('/hover', { text: '# Notes\n- TODO: check\n', position: { line: 2, column: 5 }, revision: 4 })).text))
-      .toMatchObject({ revision: 4, range: todo, contents: { kind: 'markdown' } })
-    expect((await call('/hover', { text: '# Notes\n', position: { line: 1, column: 1 }, revision: 4 })).text).toBe('null')
+    expect(
+      JSON.parse(
+        (await call('/hover', { text: '# Notes\n- TODO: check\n', position: { line: 2, column: 5 }, revision: 4 }))
+          .text,
+      ),
+    ).toMatchObject({ revision: 4, range: todo, contents: { kind: 'markdown' } })
+    expect((await call('/hover', { text: '# Notes\n', position: { line: 1, column: 1 }, revision: 4 })).text).toBe(
+      'null',
+    )
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -512,30 +645,46 @@ it('--rectangle picks the render path, wherever it sits in the argv', () => {
 
 it('scaffolds an owned tree pane by default', () => {
   const { manifest } = runCli('sink three')
-  const contributions = manifest.contributions as { frames?: { regions?: Record<string, unknown> }[]; extensions?: unknown[] }
+  const contributions = manifest.contributions as {
+    frames?: { regions?: Record<string, unknown> }[]
+    extensions?: unknown[]
+  }
   expect(contributions.frames?.[0]?.regions).toEqual({ body: { kind: 'remote', entry: 'pane' } })
   expect(contributions.extensions).toBeUndefined()
 })
 
 // ── --data-source ─────────────────────────────────────────────────────────────────────────────────
 
-const readiness = { row: 'Issue', inputs: [{ source: 'linear:issues' }, { source: 'github:pull-requests', optional: true }] }
+const readiness = {
+  row: 'Issue',
+  inputs: [{ source: 'linear:issues' }, { source: 'github:pull-requests', optional: true }],
+}
 
 it('lists the sources the SDK has field lists for, and depends on the SDK release that has them', () => {
-  const lists = JSON.parse(readFileSync(join(PACKAGES, 'plugin-sdk/src/testing/sourceFields.json'), 'utf8')) as
-    Record<string, { name: string; fields: { pointer: string; display?: { role?: string } }[] }>
-  expect(KNOWN_SOURCES).toEqual(Object.entries(lists).map(([source, list]) => {
-    const title = list.fields.find((field) => field.display?.role === 'title')?.pointer.slice(1)
-    return { source, name: list.name, ...(title ? { title } : {}) }
-  }))
+  const lists = JSON.parse(readFileSync(join(PACKAGES, 'plugin-sdk/src/testing/sourceFields.json'), 'utf8')) as Record<
+    string,
+    { name: string; fields: { pointer: string; display?: { role?: string } }[] }
+  >
+  expect(KNOWN_SOURCES).toEqual(
+    Object.entries(lists).map(([source, list]) => {
+      const title = list.fields.find((field) => field.display?.role === 'title')?.pointer.slice(1)
+      return { source, name: list.name, ...(title ? { title } : {}) }
+    }),
+  )
   expect(SDK_VERSION).toBe(JSON.parse(readFileSync(join(PACKAGES, 'plugin-sdk/package.json'), 'utf8')).version)
   expect(toInputName('github:pull-requests')).toBe('pullRequests')
   const taken = new Set<string>()
-  expect([toInputName('core:local-branches', taken), toInputName('github:local-branches', taken)]).toEqual(['localBranches', 'localBranches2'])
+  expect([toInputName('core:local-branches', taken), toInputName('github:local-branches', taken)]).toEqual([
+    'localBranches',
+    'localBranches2',
+  ])
 })
 
 it('emits a data source manifest the host parses, with the inputs it reads', () => {
-  const files = scaffoldFiles('release-readiness', 'Release readiness', { dataSource: readiness }) as Record<string, string>
+  const files = scaffoldFiles('release-readiness', 'Release readiness', { dataSource: readiness }) as Record<
+    string,
+    string
+  >
   const result = parsePluginManifest(JSON.parse(files['acorn-plugin.json']!))
   expect(result.ok ? null : result.reason).toBe(null)
   expect(JSON.parse(files['acorn-plugin.json']!).contributions.dataSources[0].inputs).toEqual({
@@ -544,10 +693,16 @@ it('emits a data source manifest the host parses, with the inputs it reads', () 
   })
   expect(files['src/source.ts']).toContain('await inputs.pullRequests?.all()')
   // A typed answer lands in generated code, so anything that could break out of a string is refused.
-  expect(() => scaffoldFiles('x-y', 'X', { dataSource: { row: 'Row', inputs: [{ source: "a:b'); process.exit(1); ('" }] } }))
-    .toThrow("isn't a source id")
-  expect((scaffoldFiles('x-y', "Bob's view", { dataSource: { row: "Bob's row", inputs: [{ source: 'acme:deploys' }] } }) as Record<string, string>)['src/source.ts'])
-    .toContain("name: 'Bob\\'s view'")
+  expect(() =>
+    scaffoldFiles('x-y', 'X', { dataSource: { row: 'Row', inputs: [{ source: "a:b'); process.exit(1); ('" }] } }),
+  ).toThrow("isn't a source id")
+  expect(
+    (
+      scaffoldFiles('x-y', "Bob's view", {
+        dataSource: { row: "Bob's row", inputs: [{ source: 'acme:deploys' }] },
+      }) as Record<string, string>
+    )['src/source.ts'],
+  ).toContain("name: 'Bob\\'s view'")
 })
 
 it('builds, tests, and loads a data source package from the packed SDK outside the repository', async () => {
@@ -555,7 +710,10 @@ it('builds, tests, and loads a data source package from the packed SDK outside t
   // packed SDK, builds, writes the manifest entry the scaffold already wrote, and loads.
   const root = mkdtempSync(join(tmpdir(), 'scaffold-data-'))
   try {
-    const files = scaffoldFiles('release-readiness', 'Release readiness', { dataSource: readiness }) as Record<string, string>
+    const files = scaffoldFiles('release-readiness', 'Release readiness', { dataSource: readiness }) as Record<
+      string,
+      string
+    >
     const dir = join(root, 'release-readiness')
     for (const [path, contents] of Object.entries(files)) {
       mkdirSync(dirname(join(dir, path)), { recursive: true })
@@ -565,13 +723,24 @@ it('builds, tests, and loads a data source package from the packed SDK outside t
     unpackPublishedPackage('plugin-types', join(dir, 'node_modules', 'acorn-plugin-types'))
     // The build tools come from the workspace store. The two packages under test are tarball bytes.
     for (const tool of ['vite', 'vitest']) {
-      symlinkSync(realpathSync(join(PACKAGES, 'plugin-sdk', 'node_modules', tool)), join(dir, 'node_modules', tool), 'dir')
+      symlinkSync(
+        realpathSync(join(PACKAGES, 'plugin-sdk', 'node_modules', tool)),
+        join(dir, 'node_modules', tool),
+        'dir',
+      )
     }
     const run = (...args: string[]) => {
       try {
-        return execFileSync(process.execPath, args, { cwd: dir, encoding: 'utf8', stdio: 'pipe', env: { ...process.env, CI: '1' } })
+        return execFileSync(process.execPath, args, {
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: 'pipe',
+          env: { ...process.env, CI: '1' },
+        })
       } catch (error) {
-        throw new Error(`${args.join(' ')}: ${String((error as { stdout?: string }).stdout ?? '')}${String((error as { stderr?: string }).stderr ?? error)}`)
+        throw new Error(
+          `${args.join(' ')}: ${String((error as { stdout?: string }).stdout ?? '')}${String((error as { stderr?: string }).stderr ?? error)}`,
+        )
       }
     }
     expect(run('node_modules/vitest/vitest.mjs', 'run')).toMatch(/1 passed/)
@@ -595,7 +764,9 @@ it('builds, tests, and loads a data source package from the packed SDK outside t
     cpSync(join(dir, 'dist'), join(installed, 'dist'), { recursive: true })
     const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
     expect(failures).toEqual([])
-    expect(loaded[0]?.manifest.contributions.dataSources?.[0]?.inputs).toMatchObject({ issues: { source: 'linear:issues' } })
+    expect(loaded[0]?.manifest.contributions.dataSources?.[0]?.inputs).toMatchObject({
+      issues: { source: 'linear:issues' },
+    })
     await loaded[0]?.plugin.dispose?.()
   } finally {
     rmSync(root, { recursive: true, force: true })
@@ -605,10 +776,20 @@ it('builds, tests, and loads a data source package from the packed SDK outside t
 it('asks what a row is and what it reads under --data-source', () => {
   const cwd = mkdtempSync(join(tmpdir(), 'acorn scaffold-'))
   try {
-    execFileSync(process.execPath, [CLI, 'readiness', '--data-source'], { cwd, input: 'Issue\n9, 8\n8\n', stdio: 'pipe' })
+    execFileSync(process.execPath, [CLI, 'readiness', '--data-source'], {
+      cwd,
+      input: 'Issue\n9, 8\n8\n',
+      stdio: 'pipe',
+    })
     const manifest = JSON.parse(readFileSync(join(cwd, 'readiness', 'acorn-plugin.json'), 'utf8'))
-    expect(manifest.contributions.dataSources[0]).toMatchObject({ singular: 'Issue', plural: 'Issues', inputs: {
-      issues: { source: 'linear:issues' }, pullRequests: { source: 'github:pull-requests', optional: true } } })
+    expect(manifest.contributions.dataSources[0]).toMatchObject({
+      singular: 'Issue',
+      plural: 'Issues',
+      inputs: {
+        issues: { source: 'linear:issues' },
+        pullRequests: { source: 'github:pull-requests', optional: true },
+      },
+    })
   } finally {
     rmSync(cwd, { recursive: true, force: true })
   }

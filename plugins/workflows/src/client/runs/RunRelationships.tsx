@@ -11,16 +11,20 @@ type OpenTarget = (taskId: string, runId?: string) => void
 
 const taskLink = (tasks: readonly Task[], taskId: string, onOpen: OpenTarget) => {
   const task = tasks.find((candidate) => candidate.id === taskId)
-  return task
-    ? <Link onPress={() => onOpen(taskId)}>{task.title}</Link>
-    : <Text emphasis="muted">Task archived or deleted</Text>
+  return task ? (
+    <Link onPress={() => onOpen(taskId)}>{task.title}</Link>
+  ) : (
+    <Text emphasis="muted">Task archived or deleted</Text>
+  )
 }
 
 const runLink = (tasks: readonly Task[], taskId: string, runId: string, label: string, onOpen: OpenTarget) => {
   const task = tasks.find((candidate) => candidate.id === taskId)
-  return task
-    ? <Link onPress={() => onOpen(taskId, runId)}>{label}</Link>
-    : <Text emphasis="muted">Its task is archived or deleted</Text>
+  return task ? (
+    <Link onPress={() => onOpen(taskId, runId)}>{label}</Link>
+  ) : (
+    <Text emphasis="muted">Its task is archived or deleted</Text>
+  )
 }
 
 /** Explicit ancestor links for a child run. */
@@ -36,7 +40,13 @@ export function RunLineage(props: {
           <Inline wrap>
             <Text emphasis="muted">Started by:</Text>
             {taskLink(props.tasks, props.run!.parentTaskId!, props.onOpen)}
-            {runLink(props.tasks, props.run!.parentTaskId!, props.run!.parentRunId!, props.run!.parentRunName ?? 'its run', props.onOpen)}
+            {runLink(
+              props.tasks,
+              props.run!.parentTaskId!,
+              props.run!.parentRunId!,
+              props.run!.parentRunName ?? 'its run',
+              props.onOpen,
+            )}
           </Inline>
           <Show when={props.run!.rootRunId !== props.run!.parentRunId}>
             <Inline wrap>
@@ -51,16 +61,11 @@ export function RunLineage(props: {
   )
 }
 
-const childLabel = (child: WorkflowChildRunSummary): string => child.itemKey
-  ? `${child.name ?? 'Child workflow'} · ${child.itemKey}`
-  : child.name ?? 'Child workflow'
+const childLabel = (child: WorkflowChildRunSummary): string =>
+  child.itemKey ? `${child.name ?? 'Child workflow'} · ${child.itemKey}` : (child.name ?? 'Child workflow')
 
 /** Progress, navigation, results, and failures for a workflow dispatch step. */
-export function ChildRuns(props: {
-  step: WorkflowStepProjection
-  tasks: readonly Task[]
-  onOpen: OpenTarget
-}) {
+export function ChildRuns(props: { step: WorkflowStepProjection; tasks: readonly Task[]; onOpen: OpenTarget }) {
   const children = () => props.step.children ?? []
   const finished = () => children().filter((child) => child.runStatus && TERMINAL.has(child.runStatus)).length
   const failed = () => children().filter((child) => child.runStatus && FAILED.has(child.runStatus)).length
@@ -71,21 +76,49 @@ export function ChildRuns(props: {
       <Stack gap="row">
         <Inline wrap>
           <Text emphasis="strong">Child runs</Text>
-          <Text emphasis="muted">{finished()} of {children().length} finished</Text>
-          <Show when={gated()}>{(count) => <Badge size="xs" tone="warn">{count()} need approval</Badge>}</Show>
-          <Show when={failed()}>{(count) => <Badge size="xs" tone="danger">{count()} failed</Badge>}</Show>
+          <Text emphasis="muted">
+            {finished()} of {children().length} finished
+          </Text>
+          <Show when={gated()}>
+            {(count) => (
+              <Badge size="xs" tone="warn">
+                {count()} need approval
+              </Badge>
+            )}
+          </Show>
+          <Show when={failed()}>
+            {(count) => (
+              <Badge size="xs" tone="danger">
+                {count()} failed
+              </Badge>
+            )}
+          </Show>
         </Inline>
         <For each={children()}>
           {(child) => (
             <Card
               pad="sm"
-              stripe={child.runStatus === 'gated' ? 'warn' : child.runStatus && FAILED.has(child.runStatus) ? 'danger' : child.runStatus === 'done' ? 'ok' : undefined}
+              stripe={
+                child.runStatus === 'gated'
+                  ? 'warn'
+                  : child.runStatus && FAILED.has(child.runStatus)
+                    ? 'danger'
+                    : child.runStatus === 'done'
+                      ? 'ok'
+                      : undefined
+              }
             >
               <Stack gap="row">
                 <Inline wrap>
-                  <Icon name={runGlyph(child.runStatus ?? child.dispatchState)} tone={runTone(child.runStatus ?? child.dispatchState)} spin={child.runStatus === 'running'} />
+                  <Icon
+                    name={runGlyph(child.runStatus ?? child.dispatchState)}
+                    tone={runTone(child.runStatus ?? child.dispatchState)}
+                    spin={child.runStatus === 'running'}
+                  />
                   <Text emphasis="strong">{childLabel(child)}</Text>
-                  <Badge size="xs" tone={child.runStatus === 'gated' ? 'warn' : undefined}>{statusLabel(child.runStatus ?? child.dispatchState)}</Badge>
+                  <Badge size="xs" tone={child.runStatus === 'gated' ? 'warn' : undefined}>
+                    {statusLabel(child.runStatus ?? child.dispatchState)}
+                  </Badge>
                   <Show when={formatUsage(child.usage)}>{(usage) => <Text emphasis="muted">{usage()}</Text>}</Show>
                 </Inline>
                 <Inline wrap>
@@ -97,9 +130,21 @@ export function ChildRuns(props: {
                 <Show when={child.runStatus === 'gated'}>
                   <Alert title="Needs approval">Open the child run to approve it.</Alert>
                 </Show>
-                <Show when={child.error}>{(error) => <Alert tone="danger" title="Child run failed">{error()}</Alert>}</Show>
+                <Show when={child.error}>
+                  {(error) => (
+                    <Alert tone="danger" title="Child run failed">
+                      {error()}
+                    </Alert>
+                  )}
+                </Show>
                 <Show when={child.resultSummary}>
-                  {(result) => <Fold label="Result"><CodeBlock wrap maxHeight="block">{result()}</CodeBlock></Fold>}
+                  {(result) => (
+                    <Fold label="Result">
+                      <CodeBlock wrap maxHeight="block">
+                        {result()}
+                      </CodeBlock>
+                    </Fold>
+                  )}
                 </Show>
               </Stack>
             </Card>

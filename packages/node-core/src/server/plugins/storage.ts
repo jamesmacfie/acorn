@@ -8,7 +8,17 @@
 //      manifest. Core owns the file either way.
 //   2. The handle stays in the owning plugin's closure, not on `Env`. `c.env` reaches every core and
 //      plugin route, so a per-plugin DB there would be readable by all of them.
-import { closeSync, constants, existsSync, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync, renameSync } from 'node:fs'
+import {
+  closeSync,
+  constants,
+  existsSync,
+  fchmodSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  renameSync,
+} from 'node:fs'
 import { join, resolve } from 'node:path'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import type { PluginStorage } from '../pluginHost/types'
@@ -28,7 +38,8 @@ export type PluginDatabase = ReturnType<typeof drizzleOverSqlite> & {
   close: () => void
 }
 
-export const pluginDbPath = (dataDir: string, plugin: string): string => join(resolve(dataDir), PLUGIN_DB_DIR, `${plugin}.sqlite`)
+export const pluginDbPath = (dataDir: string, plugin: string): string =>
+  join(resolve(dataDir), PLUGIN_DB_DIR, `${plugin}.sqlite`)
 
 /** Give a renamed built-in the database it had under its old id. Moves the files once, before
  *  anything opens either one, and does nothing when there is no old database or the new id already
@@ -56,7 +67,10 @@ export function preparePluginDbFiles(dataDir: string, plugin: string): readonly 
   // The data root can be a host alias, such as /var on macOS. Its immediate plugins directory
   // must itself be a real directory, rather than a link redirecting every owned database path.
   if (!lstatSync(dir).isDirectory()) throw new Error('Plugin database directory must be a directory.')
-  const fd = openSync(dir, constants.O_RDONLY | (constants.O_DIRECTORY ?? 0) | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
+  const fd = openSync(
+    dir,
+    constants.O_RDONLY | (constants.O_DIRECTORY ?? 0) | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0),
+  )
   try {
     if (!fstatSync(fd).isDirectory()) throw new Error('Plugin database directory must be a directory.')
     // Windows directory handles cannot be fchmodded. Access there is governed by the data
@@ -68,7 +82,11 @@ export function preparePluginDbFiles(dataDir: string, plugin: string): readonly 
   return securePluginDbFiles(databasePath, true)
 }
 
-export function openPluginDb(dataDir: string, plugin: string, options: { migrationsFolder: string; prepared?: boolean; loaded?: boolean }): PluginDatabase {
+export function openPluginDb(
+  dataDir: string,
+  plugin: string,
+  options: { migrationsFolder: string; prepared?: boolean; loaded?: boolean },
+): PluginDatabase {
   // The plugin id becomes a filename, so validate it here rather than trusting the caller. Same rule
   // the route registry applies to a plugin's namespace.
   if (!PLUGIN_ID_RE.test(plugin)) throw new Error(`Plugin database id must match ${PLUGIN_ID_RE.source}: '${plugin}'.`)
@@ -80,9 +98,10 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
   if (!options.prepared) preparePluginDbFiles(dataDir, plugin)
   validatePluginDbFiles(databasePath)
 
-  const sqlite = openSqlite(databasePath, options.loaded
-    ? { initialize: installPluginStoragePolicy, allowBackup: false }
-    : {})
+  const sqlite = openSqlite(
+    databasePath,
+    options.loaded ? { initialize: installPluginStoragePolicy, allowBackup: false } : {},
+  )
   try {
     sqlite.pragma('journal_mode = WAL')
     sqlite.pragma('busy_timeout = 5000')
@@ -137,7 +156,9 @@ export function builtinPluginStorage(dataDir: string, plugin: string, moduleUrl:
   // (server/plugins/migrations.ts). Checked here because fileURLToPath otherwise throws a bare "Invalid
   // URL" that names no plugin.
   if (!moduleUrl.startsWith('file:')) {
-    throw new Error(`Plugin '${plugin}' declares migrationsModule '${moduleUrl}'; it must be that module's own import.meta.url.`)
+    throw new Error(
+      `Plugin '${plugin}' declares migrationsModule '${moduleUrl}'; it must be that module's own import.meta.url.`,
+    )
   }
   return { open: () => openPluginDb(dataDir, plugin, { migrationsFolder: pluginMigrationsFolder(plugin, moduleUrl) }) }
 }

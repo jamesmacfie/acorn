@@ -22,21 +22,23 @@ export function SectionHeader(props: SectionHeaderProps) {
   const label = children(() => props.children)
   const labelId = createUniqueId()
   return (
-    <div
-      class="section-header"
-      data-level={props.level ?? 'pane'}
-      data-sticky={props.sticky ? '' : undefined}
-    >
+    <div class="section-header" data-level={props.level ?? 'pane'} data-sticky={props.sticky ? '' : undefined}>
       <Show when={props.help} fallback={<span class="ui-section-header-label">{label()}</span>}>
         {(help) => (
           <span class="ui-titled">
-            <span class="ui-section-header-label" id={labelId}>{label()}</span>
+            <span class="ui-section-header-label" id={labelId}>
+              {label()}
+            </span>
             <HelpMark text={help()} titleId={labelId} />
           </span>
         )}
       </Show>
-      <Show when={props.count != null}><span class="ui-section-header-count">{props.count}</span></Show>
-      <Show when={actions()}><span class="ui-section-header-actions">{actions()}</span></Show>
+      <Show when={props.count != null}>
+        <span class="ui-section-header-count">{props.count}</span>
+      </Show>
+      <Show when={actions()}>
+        <span class="ui-section-header-actions">{actions()}</span>
+      </Show>
     </div>
   )
 }

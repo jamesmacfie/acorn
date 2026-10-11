@@ -9,10 +9,40 @@
 // design system stops being able to change.
 
 export {
-  Alert, Badge, Button, Card, Checkbox, Chip, CodeBlock, ConfirmButton, DescriptionList, EmptyState,
-  DetailColumn, Field, FilterBar, Input, Kbd, ListColumn, ListDetail, Meter, Row, SectionHeader,
-  SegmentedControl, Select, Spinner, SplitHandle, StatusDot, Table, TableCell, TableHead, TableRow,
-  Textarea, ToggleButton, Toolbar, ToolbarSpacer, TreeRow,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  Chip,
+  CodeBlock,
+  ConfirmButton,
+  DescriptionList,
+  EmptyState,
+  DetailColumn,
+  Field,
+  FilterBar,
+  Input,
+  Kbd,
+  ListColumn,
+  ListDetail,
+  Meter,
+  Row,
+  SectionHeader,
+  SegmentedControl,
+  Select,
+  Spinner,
+  SplitHandle,
+  StatusDot,
+  Table,
+  TableCell,
+  TableHead,
+  TableRow,
+  Textarea,
+  ToggleButton,
+  Toolbar,
+  ToolbarSpacer,
+  TreeRow,
 } from '@acorn/client-core/kit/components/primitives.tsx'
 export { default as Icon } from '@acorn/client-core/kit/components/content/Icon.tsx'
 // The small square affordance: one mark, a required accessible name, and the bar's own size
@@ -59,7 +89,11 @@ export { copyText } from '@acorn/client-core/kit/lib'
 // is the short form (one list of logins after `@`); `sources` and `segments` are the general one, and
 // what the agents composer's `@file` / `/command` / `$skill` draft is written against.
 export { default as MentionTextarea } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
-export type { MentionSegment, MentionSource, MentionSuggestion } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
+export type {
+  MentionSegment,
+  MentionSource,
+  MentionSuggestion,
+} from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'
 export { Modal, ModalActions, ModalBody } from '@acorn/client-core/kit/components/overlays'
 export { Tabs, TabPanel } from '@acorn/client-core/kit/components/layout'
 export type { TabDef } from '@acorn/client-core/kit/components/layout'

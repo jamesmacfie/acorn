@@ -6,7 +6,11 @@ import { agentToolContributions } from '../agentTools/registry'
 import { getContextSections } from '../agentTools/contextSections'
 import { auditVocabulary } from '../audit'
 import { createCoreServices, SecretService } from '../core'
-import { registerDiscoveredSource, registeredDataSourceDiscoveries, registeredDataSources } from '../dataSources/registry'
+import {
+  registerDiscoveredSource,
+  registeredDataSourceDiscoveries,
+  registeredDataSources,
+} from '../dataSources/registry'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providerShared'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { integrationProviderRegistry } from '../integrations/registry'
@@ -21,7 +25,13 @@ import { wsBroadcast } from '../transport/wsHub'
 import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry } from './capabilities'
 import { AGENTS_CUSTOM_AGENT_REGISTRY } from './customAgents'
-import { extensionPointId, extensionsFor, openExtensionPoint, openExtensionPoints, type ExtensionPointId } from './extensionPoints'
+import {
+  extensionPointId,
+  extensionsFor,
+  openExtensionPoint,
+  openExtensionPoints,
+  type ExtensionPointId,
+} from './extensionPoints'
 import { AGENTS_HARNESS_REGISTRY } from './harnesses'
 import { hookHandlers, hookPoints } from './hooks'
 import { initPlugins, type LoadedPluginBinding } from './host'
@@ -67,32 +77,38 @@ const tracked = (keys: Set<string>, key: string) => {
   return { dispose: () => void keys.delete(key) }
 }
 
-const provider = (id: string, capabilities: { textGeneration?: true } = {}) => publicProvider({
-  id,
-  label: 'Teardown provider',
-  glyph: 'T',
-  kind: 'issue-tracker',
-  connection: {
-    authKind: 'api-key' as const,
-    fields: [],
-    connectable: true,
-    disconnectable: true,
-    async validate() { return 'secret' },
-    normalize(_credentials, secret) {
-      return { secret, label: 'Teardown provider', account: null, scopes: [], config: {}, capabilities: {} }
+const provider = (id: string, capabilities: { textGeneration?: true } = {}) =>
+  publicProvider({
+    id,
+    label: 'Teardown provider',
+    glyph: 'T',
+    kind: 'issue-tracker',
+    connection: {
+      authKind: 'api-key' as const,
+      fields: [],
+      connectable: true,
+      disconnectable: true,
+      async validate() {
+        return 'secret'
+      },
+      normalize(_credentials, secret) {
+        return { secret, label: 'Teardown provider', account: null, scopes: [], config: {}, capabilities: {} }
+      },
+      async test() {
+        return { ok: true as const }
+      },
     },
-    async test() { return { ok: true as const } },
-  },
-  externalIds: externalIdsFor(id),
-  capabilities,
-  resources: [],
-  budgets: defaultBudgets,
-  memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
-})
+    externalIds: externalIdsFor(id),
+    capabilities,
+    resources: [],
+    budgets: defaultBudgets,
+    memory: { linkedItems: false, mutations: [], triggers: [], summarize: 'none' as const, acceptedWrites: false },
+  })
 
 let heard = false
 let searched = false
-const routeAt = (prefix: string) => pluginRouteContributions().some((route) => route.plugin === PLUGIN && route.prefix === prefix)
+const routeAt = (prefix: string) =>
+  pluginRouteContributions().some((route) => route.plugin === PLUGIN && route.prefix === prefix)
 
 type Probe = {
   register(ctx: HostPluginContext): void
@@ -112,13 +128,25 @@ const PROBES: Record<string, Probe> = {
     present: () => routeAt('/fetch'),
   },
   'tools.register': {
-    register: (ctx) => ctx.tools.register({
-      name: 'teardown_tool', description: 'A tool', input: z.object({}), scope: 'task', risk: 'read', handler: async () => null,
-    }),
+    register: (ctx) =>
+      ctx.tools.register({
+        name: 'teardown_tool',
+        description: 'A tool',
+        input: z.object({}),
+        scope: 'task',
+        risk: 'read',
+        handler: async () => null,
+      }),
     present: () => agentToolContributions().some((tool) => tool.name === 'teardown_tool'),
   },
   'schedules.register': {
-    register: (ctx) => ctx.schedules.register({ scheduleId: 'tick', name: 'Tick', cadence: { every: '1h' } as never, run: async () => {} }),
+    register: (ctx) =>
+      ctx.schedules.register({
+        scheduleId: 'tick',
+        name: 'Tick',
+        cadence: { every: '1h' } as never,
+        run: async () => {},
+      }),
     present: () => scheduled.has(`${PLUGIN}:tick`),
   },
   'schedules.registerTarget': {
@@ -127,21 +155,38 @@ const PROBES: Record<string, Probe> = {
     compiledOnly: true,
   },
   'dataSources.register': {
-    register: (ctx) => ctx.dataSources.register({
-      sourceId: 'records', name: 'Records', singular: 'Record', plural: 'Records', identityScope: 'Stable', handler: `/v1/p/${PLUGIN}/source`,
-    }),
-    present: () => registeredDataSources().some((source) => source.pluginId === PLUGIN && source.sourceId === 'records'),
+    register: (ctx) =>
+      ctx.dataSources.register({
+        sourceId: 'records',
+        name: 'Records',
+        singular: 'Record',
+        plural: 'Records',
+        identityScope: 'Stable',
+        handler: `/v1/p/${PLUGIN}/source`,
+      }),
+    present: () =>
+      registeredDataSources().some((source) => source.pluginId === PLUGIN && source.sourceId === 'records'),
   },
   // A discovery and a source it found, which goes with it.
   'dataSources.discover': {
     register: (ctx) => {
       ctx.dataSources.discover({ discoveryId: 'dynamic', handler: `/v1/p/${PLUGIN}/discover` })
-      registerDiscoveredSource(PLUGIN, {
-        sourceId: 'found', name: 'Found', singular: 'Found', plural: 'Found', identityScope: 'Stable', handler: `/v1/p/${PLUGIN}/discover`,
-      }, { parameters: {} } as never)
+      registerDiscoveredSource(
+        PLUGIN,
+        {
+          sourceId: 'found',
+          name: 'Found',
+          singular: 'Found',
+          plural: 'Found',
+          identityScope: 'Stable',
+          handler: `/v1/p/${PLUGIN}/discover`,
+        },
+        { parameters: {} } as never,
+      )
     },
-    present: () => registeredDataSourceDiscoveries().some((discovery) => discovery.pluginId === PLUGIN)
-      || registeredDataSources().some((source) => source.pluginId === PLUGIN && source.sourceId === 'found'),
+    present: () =>
+      registeredDataSourceDiscoveries().some((discovery) => discovery.pluginId === PLUGIN) ||
+      registeredDataSources().some((source) => source.pluginId === PLUGIN && source.sourceId === 'found'),
   },
   'nodeActions.register': {
     register: (ctx) => ctx.nodeActions.register({ actionId: 'act', name: 'Act', path: '/act' }),
@@ -152,7 +197,15 @@ const PROBES: Record<string, Probe> = {
     present: () => taskChecks().some((check) => check.pluginId === PLUGIN),
   },
   'search.register': {
-    register: (ctx) => ctx.search.register({ id: 'find', label: 'Find', search: async () => { searched = true; return [] } }),
+    register: (ctx) =>
+      ctx.search.register({
+        id: 'find',
+        label: 'Find',
+        search: async () => {
+          searched = true
+          return []
+        },
+      }),
     present: async () => {
       searched = false
       await searchProviders({ text: 'x', limit: 1, taskIds: [] })
@@ -164,7 +217,8 @@ const PROBES: Record<string, Probe> = {
     present: () => runSources().some((source) => source.pluginId === PLUGIN),
   },
   'harnesses.register': {
-    register: (ctx) => ctx.harnesses.register({ id: 'cli', label: 'CLI', spawn: { command: 'cli', args: [] } } as never),
+    register: (ctx) =>
+      ctx.harnesses.register({ id: 'cli', label: 'CLI', spawn: { command: 'cli', args: [] } } as never),
     present: () => harnesses.has(`${PLUGIN}:cli`),
   },
   'customAgents.register': {
@@ -172,7 +226,15 @@ const PROBES: Record<string, Probe> = {
     present: () => customAgents.has(`${PLUGIN}:agent`),
   },
   'skills.register': {
-    register: (ctx) => ctx.skills.register({ id: 'skill', dir: '/skill', file: '/skill/SKILL.md', name: 'Skill', description: 'A skill', digest: '0' }),
+    register: (ctx) =>
+      ctx.skills.register({
+        id: 'skill',
+        dir: '/skill',
+        file: '/skill/SKILL.md',
+        name: 'Skill',
+        description: 'A skill',
+        digest: '0',
+      }),
     present: () => catalogueSkills(PLUGIN).length > 0,
   },
   'extensionPoints.declare': {
@@ -188,7 +250,8 @@ const PROBES: Record<string, Probe> = {
     present: () => hookPoints().some((point) => point.id === `${PLUGIN}:gate`),
   },
   'hooks.handle': {
-    register: (ctx) => ctx.hooks.handle('host-fixture:gate', { id: 'watch', mode: 'observe', run: async () => ({}) } as never),
+    register: (ctx) =>
+      ctx.hooks.handle('host-fixture:gate', { id: 'watch', mode: 'observe', run: async () => ({}) } as never),
     present: () => hookHandlers().some((handler) => handler.pluginId === PLUGIN),
   },
   'audit.declare': {
@@ -196,17 +259,25 @@ const PROBES: Record<string, Probe> = {
     present: () => auditVocabulary().some((entry) => entry.pluginId === PLUGIN),
   },
   'contextSections.register': {
-    register: (ctx) => ctx.contextSections.register({
-      id: 'teardown-section', order: 999, label: 'Teardown', defaultIncluded: false, budget: {}, assemble: async () => ({}), format: () => '',
-    } as never),
+    register: (ctx) =>
+      ctx.contextSections.register({
+        id: 'teardown-section',
+        order: 999,
+        label: 'Teardown',
+        defaultIncluded: false,
+        budget: {},
+        assemble: async () => ({}),
+        format: () => '',
+      } as never),
     present: () => getContextSections().some((section) => section.id === 'teardown-section'),
   },
   // The connection provider, the integration provider and the route, each undone on its own.
   'providers.integration': {
     register: (ctx) => ctx.providers.integration(provider('teardown-tracker'), () => new Response()),
-    present: () => connectionProviderRegistry.get('teardown-tracker') !== undefined
-      || integrationProviderRegistry.get('teardown-tracker') !== undefined
-      || integrationProviderRegistry.routes().some((route) => route.providerId === 'teardown-tracker'),
+    present: () =>
+      connectionProviderRegistry.get('teardown-tracker') !== undefined ||
+      integrationProviderRegistry.get('teardown-tracker') !== undefined ||
+      integrationProviderRegistry.routes().some((route) => route.providerId === 'teardown-tracker'),
   },
   'providers.connection': {
     register: (ctx) => ctx.providers.connection(provider('teardown-connection')),
@@ -216,7 +287,11 @@ const PROBES: Record<string, Probe> = {
   'providers.model': {
     register: (ctx) => {
       ctx.providers.connection(provider('teardown-model', { textGeneration: true }))
-      ctx.providers.model({ providerId: 'teardown-model', recommendedModelId: 'model', generateText: async () => ({ text: '', modelId: 'model' }) })
+      ctx.providers.model({
+        providerId: 'teardown-model',
+        recommendedModelId: 'model',
+        generateText: async () => ({ text: '', modelId: 'model' }),
+      })
     },
     present: () => modelProviderRegistry.get('teardown-model') !== undefined,
   },
@@ -225,7 +300,10 @@ const PROBES: Record<string, Probe> = {
     present: () => nodeProviders().some((entry) => entry.pluginId === PLUGIN),
   },
   'events.on': {
-    register: (ctx) => void ctx.events.on('plugins:changed', () => { heard = true }),
+    register: (ctx) =>
+      void ctx.events.on('plugins:changed', () => {
+        heard = true
+      }),
     present: () => {
       heard = false
       wsBroadcast({ channel: 'plugins:changed' })
@@ -237,7 +315,8 @@ const PROBES: Record<string, Probe> = {
     present: () => wsSlots.channels.has('teardown'),
   },
   'events.streams': {
-    register: (ctx) => ctx.events.streams({ input: () => {}, attach: () => {}, detach: () => {}, streamTaskId: () => null }),
+    register: (ctx) =>
+      ctx.events.streams({ input: () => {}, attach: () => {}, detach: () => {}, streamTaskId: () => null }),
     present: () => wsSlots.streams,
   },
   'core.telemetry.onBatch': {
@@ -249,16 +328,33 @@ const PROBES: Record<string, Probe> = {
 // Members that register nothing, so teardown has nothing to take back.
 const NOT_REGISTRATIONS = new Set([
   // Reads.
-  'dataSources.list', 'dataSources.discoverAvailable', 'dataSources.queryPublication', 'dataSources.resolveQuery', 'dataSources.invoke',
-  'extensionPoints.handlers', 'hooks.run', 'hooks.handlers', 'providers.withConnection',
-  'capabilities.get', 'capabilities.require', 'capabilities.ids', 'core.telemetry.enabled',
+  'dataSources.list',
+  'dataSources.discoverAvailable',
+  'dataSources.queryPublication',
+  'dataSources.resolveQuery',
+  'dataSources.invoke',
+  'extensionPoints.handlers',
+  'hooks.run',
+  'hooks.handlers',
+  'providers.withConnection',
+  'capabilities.get',
+  'capabilities.require',
+  'capabilities.ids',
+  'core.telemetry.enabled',
   // Writes to a table, which outlive the plugin on purpose.
-  'dataSources.setQueryConsumer', 'datasets.writeForTask', 'audit.record',
+  'dataSources.setQueryConsumer',
+  'datasets.writeForTask',
+  'audit.record',
   // Broadcasts, which are gone once sent.
-  'events.send', 'events.status', 'events.worktreeStatus', 'events.repoConfigTrustNotice', 'events.notice',
+  'events.send',
+  'events.status',
+  'events.worktreeStatus',
+  'events.repoConfigTrustNotice',
+  'events.notice',
   // Handles the plugin owns. The host closes storage itself, after dispose. A capability stays until its
   // provider disposes it, because a neighbour may still call it from its own dispose.
-  'storage.open', 'capabilities.provide',
+  'storage.open',
+  'capabilities.provide',
 ])
 
 // `ctx.telemetry` and `ctx.log` write about the plugin's own work, and `core` is host services. The one
@@ -297,7 +393,12 @@ describe('plugin teardown', () => {
     let captured!: HostPluginContext
     const host = await initPlugins([{ name: PLUGIN, init: (ctx) => void (captured = ctx as HostPluginContext) }], {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: db.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
+      core: createCoreServices({
+        secrets: new SecretService('a'.repeat(64)),
+        db: db.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir: '',
       ...(loaded ? { loaded: new Map([[PLUGIN, loaded]]) } : {}),
     })
@@ -306,11 +407,18 @@ describe('plugin teardown', () => {
 
   const tiers: [tier: string, loaded: LoadedPluginBinding | undefined][] = [
     ['built-in', undefined],
-    ['loaded', {
-      permissions: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
-      events: ['plugins:changed'],
-      storage: { open: () => { throw new Error('test storage is not configured') } },
-    }],
+    [
+      'loaded',
+      {
+        permissions: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+        events: ['plugins:changed'],
+        storage: {
+          open: () => {
+            throw new Error('test storage is not configured')
+          },
+        },
+      },
+    ],
   ]
 
   it('takes back every registration, on both context types', async () => {
@@ -318,7 +426,10 @@ describe('plugin teardown', () => {
     for (const [tier, loaded] of tiers) {
       const { ctx, host } = await boot(loaded)
       const members = membersOf(ctx)
-      expect(members.filter((member) => !(member in PROBES) && !NOT_REGISTRATIONS.has(member)), `${tier} members with no probe`).toEqual([])
+      expect(
+        members.filter((member) => !(member in PROBES) && !NOT_REGISTRATIONS.has(member)),
+        `${tier} members with no probe`,
+      ).toEqual([])
 
       const probes = members.filter((member) => member in PROBES).map((member) => [member, PROBES[member]] as const)
       for (const [member, probe] of probes) {
@@ -333,7 +444,8 @@ describe('plugin teardown', () => {
       }
 
       await host.dispose()
-      for (const [member, probe] of probes) expect(await probe.present(), `${tier} ${member} after teardown`).toBe(false)
+      for (const [member, probe] of probes)
+        expect(await probe.present(), `${tier} ${member} after teardown`).toBe(false)
     }
     // And no probe outlives the member it was written for.
     expect(Object.keys(PROBES).filter((member) => !covered.has(member))).toEqual([])

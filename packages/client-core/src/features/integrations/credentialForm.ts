@@ -69,11 +69,9 @@ export function createCredentialForm(
 
   const fields = () => provider()?.connection.fields ?? []
   const value = (fieldId: string) => credentials()[fieldId] ?? ''
-  const setValue = (fieldId: string, next: string) =>
-    setCredentials((current) => ({ ...current, [fieldId]: next }))
+  const setValue = (fieldId: string, next: string) => setCredentials((current) => ({ ...current, [fieldId]: next }))
 
-  const complete = () =>
-    !!provider() && fields().every((field) => !field.required || !!value(field.id).trim())
+  const complete = () => !!provider() && fields().every((field) => !field.required || !!value(field.id).trim())
 
   const reset = () => {
     setCredentials({})

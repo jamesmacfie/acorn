@@ -10,7 +10,10 @@ import type { AgentSession } from '../../contract/wire.ts'
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }) }))
 
 const uploadAttachment = vi.fn(async (_taskId: string, file: File) => ({
-  id: 'att-1', filename: file.name, mediaType: file.type, byteSize: file.size,
+  id: 'att-1',
+  filename: file.name,
+  mediaType: file.type,
+  byteSize: file.size,
 }))
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
@@ -34,7 +37,12 @@ const { clearComposerDrafts } = await import('./composerState')
 const { selectManagedSession } = await import('../sessions/managedSelection')
 
 const session = {
-  id: 's1', taskId: 't1', title: 'A session', config: {}, runtimeState: 'ready', controller: 'acorn',
+  id: 's1',
+  taskId: 't1',
+  title: 'A session',
+  config: {},
+  runtimeState: 'ready',
+  controller: 'acorn',
 } as unknown as AgentSession
 
 const cleanups: (() => void)[] = []
@@ -51,10 +59,20 @@ afterEach(() => {
 const mount = (options: { session?: () => AgentSession; autoFocus?: boolean; disabled?: boolean } = {}) => {
   const host = document.createElement('div')
   document.body.append(host)
-  cleanups.push(render(() => (
-    <AgentComposer session={options.session?.() ?? session} autoFocus={options.autoFocus}
-      disabled={options.disabled} onSessionUpdated={() => {}} onSent={() => {}} />
-  ), host))
+  cleanups.push(
+    render(
+      () => (
+        <AgentComposer
+          session={options.session?.() ?? session}
+          autoFocus={options.autoFocus}
+          disabled={options.disabled}
+          onSessionUpdated={() => {}}
+          onSent={() => {}}
+        />
+      ),
+      host,
+    ),
+  )
   cleanups.push(() => host.remove())
   return host
 }
@@ -120,8 +138,9 @@ describe('attaching files', () => {
   })
 
   it('uploads the bytes the host dialog returned', async () => {
-    const pick = vi.fn(async (_options: { accept?: readonly string[] }) =>
-      [{ name: 'notes.md', type: 'text/markdown', bytes: new Uint8Array([104, 105]) }])
+    const pick = vi.fn(async (_options: { accept?: readonly string[] }) => [
+      { name: 'notes.md', type: 'text/markdown', bytes: new Uint8Array([104, 105]) },
+    ])
     vi.stubGlobal('window', Object.assign(globalThis.window, { acorn: { files: { pick, save: vi.fn() } } }))
 
     const host = mount()
@@ -138,8 +157,7 @@ describe('attaching files', () => {
   })
 
   it('shows what one composer attached in every composer open on the session', async () => {
-    const pick = vi.fn(async () =>
-      [{ name: 'notes.md', type: 'text/markdown', bytes: new Uint8Array([104, 105]) }])
+    const pick = vi.fn(async () => [{ name: 'notes.md', type: 'text/markdown', bytes: new Uint8Array([104, 105]) }])
     vi.stubGlobal('window', Object.assign(globalThis.window, { acorn: { files: { pick, save: vi.fn() } } }))
 
     // What the Workflows run pane and the Agent pane are, side by side on one session.
@@ -155,7 +173,10 @@ describe('attaching files', () => {
   })
 
   it('uploads nothing when the owner dismisses the dialog', async () => {
-    vi.stubGlobal('window', Object.assign(globalThis.window, { acorn: { files: { pick: async () => [], save: vi.fn() } } }))
+    vi.stubGlobal(
+      'window',
+      Object.assign(globalThis.window, { acorn: { files: { pick: async () => [], save: vi.fn() } } }),
+    )
     const host = mount()
     attachButton(host).click()
     await Promise.resolve()
@@ -183,10 +204,24 @@ describe('the worktree file list', () => {
 
 describe('unguarded commands warning', () => {
   it('draws the danger border and warning mark only while the mode skips both sandbox and approval', async () => {
-    const withMode = (value: string) => ({ ...session, config: { configOptions: [{
-      id: 'mode', label: 'Mode', category: 'mode', currentValue: value,
-      values: [{ value: 'default', label: 'Default' }, { value: 'bypassPermissions', label: 'Bypass Permissions' }],
-    }] } }) as unknown as AgentSession
+    const withMode = (value: string) =>
+      ({
+        ...session,
+        config: {
+          configOptions: [
+            {
+              id: 'mode',
+              label: 'Mode',
+              category: 'mode',
+              currentValue: value,
+              values: [
+                { value: 'default', label: 'Default' },
+                { value: 'bypassPermissions', label: 'Bypass Permissions' },
+              ],
+            },
+          ],
+        },
+      }) as unknown as AgentSession
     const [current, setCurrent] = createSignal(withMode('bypassPermissions'))
     const host = mount({ session: current })
     const box = host.querySelector<HTMLElement>('.ui-mentionfield')!

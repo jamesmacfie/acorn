@@ -182,7 +182,11 @@ export function occurrenceSummary(detail: RollbarOccurrenceDetail): RollbarOccur
   }
 }
 
-export function normalizeSummary(integrationId: string, integrationLabel: string, raw: RollbarApiItem): RollbarItemSummary {
+export function normalizeSummary(
+  integrationId: string,
+  integrationLabel: string,
+  raw: RollbarApiItem,
+): RollbarItemSummary {
   return {
     integrationId,
     integrationLabel,
@@ -197,15 +201,14 @@ export function normalizeSummary(integrationId: string, integrationLabel: string
     firstOccurrenceAt: asMillis(raw.first_occurrence_timestamp),
     lastOccurrenceAt: asMillis(raw.last_occurrence_timestamp),
     ...(cleanString(raw.framework) ? { framework: cleanString(raw.framework)! } : {}),
-    ...(asMillis(raw.last_activated_timestamp) != null ? { lastActivatedAt: asMillis(raw.last_activated_timestamp) } : {}),
+    ...(asMillis(raw.last_activated_timestamp) != null
+      ? { lastActivatedAt: asMillis(raw.last_activated_timestamp) }
+      : {}),
     ...(asNumber(raw.unique_occurrences) != null ? { uniqueOccurrences: asNumber(raw.unique_occurrences)! } : {}),
   }
 }
 
-export function normalizeItemMetadata(
-  summary: RollbarItemSummary,
-  item: RollbarApiItem,
-): RollbarItemMetadata {
+export function normalizeItemMetadata(summary: RollbarItemSummary, item: RollbarApiItem): RollbarItemMetadata {
   return {
     ...summary,
     resolvedInVersion: asString(item.resolved_in_version),

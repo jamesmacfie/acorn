@@ -8,8 +8,16 @@ import type { DockerServerFrame, DockerStatsSample } from '../shared/wsFrames'
 const dockerChangedSubs = new Set<(scopes: string[]) => void>()
 // Log/stats stream subscribers, keyed `${kind}:${id}`: the first-attach / last-detach contract,
 // and the set the reconnect reattach below is computed from.
-export type DockerStreamEvent = { kind: 'log'; data: string } | { kind: 'stats'; sample: DockerStatsSample } | { kind: 'end' }
-type Stream = { owner: DockerScopeOwner; kind: 'logs' | 'stats'; id: string; listeners: Set<(event: DockerStreamEvent) => void> }
+export type DockerStreamEvent =
+  | { kind: 'log'; data: string }
+  | { kind: 'stats'; sample: DockerStatsSample }
+  | { kind: 'end' }
+type Stream = {
+  owner: DockerScopeOwner
+  kind: 'logs' | 'stats'
+  id: string
+  listeners: Set<(event: DockerStreamEvent) => void>
+}
 const dockerStreamSubs = new Map<string, Stream>()
 const streamKey = (kind: string, id: string): string => JSON.stringify([activeNodeId(), kind, id])
 // Interactive docker-exec PTYs: one listener per execId, and no reconnect reattach. The PTY dies
@@ -32,7 +40,14 @@ export function wsOnDockerChanged(cb: (scopes: string[]) => void): () => void {
 
 // Open an interactive docker-exec PTY; returns a dispose that kills it. Input/resize ride the
 // same socket via the exported senders.
-export function wsDockerExecOpen(execId: string, ref: string, cols: number, rows: number, cb: (event: DockerExecEvent) => void, owner = captureDockerScope()): () => void {
+export function wsDockerExecOpen(
+  execId: string,
+  ref: string,
+  cols: number,
+  rows: number,
+  cb: (event: DockerExecEvent) => void,
+  owner = captureDockerScope(),
+): () => void {
   const key = execKey(execId)
   if (!owner.current()) return () => {}
   const entry = { owner, callback: cb }
@@ -53,7 +68,8 @@ export function wsDockerExecInput(execId: string, data: string, owner = captureD
 
 export function wsDockerExecResize(execId: string, cols: number, rows: number, owner = captureDockerScope()): void {
   const entry = dockerExecSubs.get(execKey(execId))
-  if (owner.current() && entry?.owner.current()) sendOwned(entry.owner, { channel: 'docker:exec:resize', execId, cols, rows })
+  if (owner.current() && entry?.owner.current())
+    sendOwned(entry.owner, { channel: 'docker:exec:resize', execId, cols, rows })
 }
 
 // Subscribe to a docker log/stats stream; returns an unsubscribe. First local subscriber per
@@ -103,22 +119,33 @@ registerWsChannel(
       case 'docker:changed':
         return dockerChangedSubs.forEach((cb) => cb(frame.scopes))
       case 'docker:log':
-        return void dockerStreamSubs.get(streamKey('logs', frame.id))?.listeners.forEach((cb) => cb({ kind: 'log', data: frame.data }))
+        return void dockerStreamSubs
+          .get(streamKey('logs', frame.id))
+          ?.listeners.forEach((cb) => cb({ kind: 'log', data: frame.data }))
       case 'docker:stats':
-        return void dockerStreamSubs.get(streamKey('stats', frame.id))?.listeners.forEach((cb) => cb({ kind: 'stats', sample: frame.sample }))
+        return void dockerStreamSubs
+          .get(streamKey('stats', frame.id))
+          ?.listeners.forEach((cb) => cb({ kind: 'stats', sample: frame.sample }))
       case 'docker:stream-end':
-        return void dockerStreamSubs.get(streamKey(frame.kind, frame.id))?.listeners.forEach((cb) => cb({ kind: 'end' }))
+        return void dockerStreamSubs
+          .get(streamKey(frame.kind, frame.id))
+          ?.listeners.forEach((cb) => cb({ kind: 'end' }))
       case 'docker:exec:out':
         return dockerExecSubs.get(execKey(frame.execId))?.callback({ kind: 'out', data: frame.data })
       case 'docker:exec:exit':
         return dockerExecSubs.get(execKey(frame.execId))?.callback({ kind: 'exit' })
     }
   },
-  () => [...dockerStreamSubs.values()].filter(entry => entry.owner.current()).map(({ kind, id }) => ({ channel: `docker:${kind}:attach`, id })),
+  () =>
+    [...dockerStreamSubs.values()]
+      .filter((entry) => entry.owner.current())
+      .map(({ kind, id }) => ({ channel: `docker:${kind}:attach`, id })),
   (frame) => {
     if (typeof frame.id !== 'string') return
-    if (frame.channel === 'docker:logs:attach' || frame.channel === 'docker:logs:detach') return { key: `docker:logs:${frame.id}`, state: frame.channel.endsWith(':attach') ? 'attached' : 'detached' }
-    if (frame.channel === 'docker:stats:attach' || frame.channel === 'docker:stats:detach') return { key: `docker:stats:${frame.id}`, state: frame.channel.endsWith(':attach') ? 'attached' : 'detached' }
+    if (frame.channel === 'docker:logs:attach' || frame.channel === 'docker:logs:detach')
+      return { key: `docker:logs:${frame.id}`, state: frame.channel.endsWith(':attach') ? 'attached' : 'detached' }
+    if (frame.channel === 'docker:stats:attach' || frame.channel === 'docker:stats:detach')
+      return { key: `docker:stats:${frame.id}`, state: frame.channel.endsWith(':attach') ? 'attached' : 'detached' }
   },
 )
 

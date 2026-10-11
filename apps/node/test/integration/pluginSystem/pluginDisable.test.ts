@@ -50,7 +50,17 @@ type Snapshot = {
   capabilities: string[]
   databases: string[]
 }
-const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'integrationProviders', 'providerRoutes', 'modelProviders', 'capabilities', 'databases'] as const
+const SNAPSHOT_KEYS = [
+  'routes',
+  'tools',
+  'sections',
+  'connectionProviders',
+  'integrationProviders',
+  'providerRoutes',
+  'modelProviders',
+  'capabilities',
+  'databases',
+] as const
 
 // The full boot's contribution set, and what each optional plugin owns within it: every entry that
 // must vanish when it's disabled, and by omission every entry that must not. Recorded in
@@ -82,7 +92,8 @@ const without = (from: readonly string[], expected: readonly string[] = []): str
   const { rest, unmatched } = minus(from, expected)
   // An expectation that matched nothing means the ledger and the code disagree about what this plugin
   // owns.
-  if (unmatched.length) throw new Error(`ledger names entries that the full boot never produced: ${unmatched.join(', ')}`)
+  if (unmatched.length)
+    throw new Error(`ledger names entries that the full boot never produced: ${unmatched.join(', ')}`)
   return rest
 }
 
@@ -108,7 +119,14 @@ describe('disabling a node plugin', () => {
     for (const root of dataRoots) rmSync(root, { recursive: true, force: true })
   })
 
-  const start = async (disabled?: readonly string[]): Promise<{ enabled: readonly string[]; skipped: readonly string[]; roster: readonly PluginRosterEntry[]; snapshot: Snapshot }> => {
+  const start = async (
+    disabled?: readonly string[],
+  ): Promise<{
+    enabled: readonly string[]
+    skipped: readonly string[]
+    roster: readonly PluginRosterEntry[]
+    snapshot: Snapshot
+  }> => {
     const dataDir = mkdtempSync(join(tmpdir(), 'acorn-plugin-disable-'))
     dataRoots.push(dataDir)
     const { initPlugins } = await import('@acorn/node-core/server/pluginHost/host.ts')
@@ -121,9 +139,14 @@ describe('disabling a node plugin', () => {
     capabilities.provide(SCHEDULER, new Scheduler(coreDb.db))
     const result = await initPlugins(buildPlugins(dataDir), {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
-        // The host opens every plugin database under this root, which is what the `databases`
-        // snapshot below reads back.
+      core: createCoreServices({
+        secrets: new SecretService('0'.repeat(64)),
+        db: coreDb.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
+      // The host opens every plugin database under this root, which is what the `databases`
+      // snapshot below reads back.
       dataDir,
       disabled,
     })
@@ -133,8 +156,12 @@ describe('disabling a node plugin', () => {
       skipped: result.skipped,
       roster: result.roster,
       snapshot: {
-        routes: pluginRouteContributions().map((c) => `${c.plugin}${c.prefix}`).sort(),
-        tools: agentToolContributions().map((t) => t.name).sort(),
+        routes: pluginRouteContributions()
+          .map((c) => `${c.plugin}${c.prefix}`)
+          .sort(),
+        tools: agentToolContributions()
+          .map((t) => t.name)
+          .sort(),
         sections: getContextSections().map((s) => s.id),
         // The three provider registries. For why connection and integration are separate, see
         // docs/integrations/contributions.md § Connection and integration contributions. `modelProviders` comes out
@@ -142,10 +169,22 @@ describe('disabling a node plugin', () => {
         // boot had started registering an adapter again. `providerRoutes` strands first if host.ts
         // clears the registries in the wrong order, being the last thing
         // `ctx.providers.integration(p, router)` registers.
-        connectionProviders: connectionProviderRegistry.list().map((p) => p.id).sort(),
-        integrationProviders: integrationProviderRegistry.list().map((p) => p.id).sort(),
-        providerRoutes: integrationProviderRegistry.routes().map((r) => `${r.providerId}${r.prefix}`).sort(),
-        modelProviders: modelProviderRegistry.list().map((a) => a.providerId).sort(),
+        connectionProviders: connectionProviderRegistry
+          .list()
+          .map((p) => p.id)
+          .sort(),
+        integrationProviders: integrationProviderRegistry
+          .list()
+          .map((p) => p.id)
+          .sort(),
+        providerRoutes: integrationProviderRegistry
+          .routes()
+          .map((r) => `${r.providerId}${r.prefix}`)
+          .sort(),
+        modelProviders: modelProviderRegistry
+          .list()
+          .map((a) => a.providerId)
+          .sort(),
         // The typed capability registry, which for some plugins is the whole contribution. `preview`
         // provides its page rules here and registers nothing else, so without this key the
         // anti-vacuity check below would call disabling it meaningless.
@@ -213,7 +252,9 @@ describe('disabling a node plugin', () => {
   it('gives every compiled plugin a name for people', () => {
     // Settings, the shortcut sheet and the tool list show this instead of the id
     // (docs/plugins/activation.md § What the owner sees).
-    const unnamed = buildPlugins(join(tmpdir(), 'acorn-plugin-labels')).filter((plugin) => !plugin.label?.trim()).map((plugin) => plugin.name)
+    const unnamed = buildPlugins(join(tmpdir(), 'acorn-plugin-labels'))
+      .filter((plugin) => !plugin.label?.trim())
+      .map((plugin) => plugin.name)
     expect(unnamed).toEqual([])
   })
 
@@ -249,7 +290,9 @@ describe('disabling a node plugin', () => {
       // The golden lists. A plugin filling in for a disabled sibling breaks the equality too.
       const owned = golden().owned[name]
       for (const key of SNAPSHOT_KEYS) {
-        expect(reduced.snapshot[key], `${key} after disabling '${name}'`).toEqual(without(full.snapshot[key], owned?.[key]))
+        expect(reduced.snapshot[key], `${key} after disabling '${name}'`).toEqual(
+          without(full.snapshot[key], owned?.[key]),
+        )
       }
       // Routes carry their owner in the key. See docs/plugins/adding-a-contribution.md § The golden lists.
       const lostRoutes = owned?.routes ?? []
@@ -285,7 +328,12 @@ describe('disabling a node plugin', () => {
     // row. Pick any two optional plugins, in roster order.
     const { roster } = await start(['docker', 'git'])
     expect(roster.map((entry) => entry.name)).toEqual(all.map((p) => p.name))
-    expect(roster.filter((entry) => entry.required).map((entry) => entry.name).sort()).toEqual(required.sort())
+    expect(
+      roster
+        .filter((entry) => entry.required)
+        .map((entry) => entry.name)
+        .sort(),
+    ).toEqual(required.sort())
     expect(roster.filter((entry) => entry.disabled).map((entry) => entry.name)).toEqual(['docker', 'git'])
   })
 })

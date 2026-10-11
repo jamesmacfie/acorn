@@ -3,7 +3,14 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetWorktreeStatus, invalidateWorktreeStatus, parseWorktreeStatus, setWorktreeStatusCeiling, worktreeGitText, worktreeStatus } from './worktreeStatus'
+import {
+  _resetWorktreeStatus,
+  invalidateWorktreeStatus,
+  parseWorktreeStatus,
+  setWorktreeStatusCeiling,
+  worktreeGitText,
+  worktreeStatus,
+} from './worktreeStatus'
 import { removeWorktree } from './worktrees'
 
 // Real git subprocesses, because what is being counted is real git subprocesses.
@@ -176,7 +183,10 @@ describe('the coalesced worktree status read', () => {
     rmSync(join(worktree, '.git'))
     writeFileSync(join(worktree, 'leftover.txt'), 'copied config\n')
 
-    expect(await removeWorktree(checkout, worktree, false, dir)).toEqual({ ok: false, reason: 'The worktree folder is no longer linked to git. Confirm to delete it.' })
+    expect(await removeWorktree(checkout, worktree, false, dir)).toEqual({
+      ok: false,
+      reason: 'The worktree folder is no longer linked to git. Confirm to delete it.',
+    })
     expect(existsSync(worktree)).toBe(true)
 
     expect(await removeWorktree(checkout, worktree, true, dir)).toEqual({ ok: true, path: worktree })
@@ -198,8 +208,10 @@ describe('the coalesced worktree status read', () => {
     const numstat = ['diff', '--numstat']
     const staged = ['diff', '--staged', '--numstat']
     const [left, right] = await Promise.all([
-      worktreeGitText(worktree, numstat), worktreeGitText(worktree, numstat),
-      worktreeGitText(worktree, staged), worktreeGitText(worktree, staged),
+      worktreeGitText(worktree, numstat),
+      worktreeGitText(worktree, numstat),
+      worktreeGitText(worktree, staged),
+      worktreeGitText(worktree, staged),
     ])
     expect(diffs()).toBe(2)
     expect(left).toBe(right)
@@ -234,16 +246,24 @@ describe('the coalesced worktree status read', () => {
 
 describe('the porcelain parser', () => {
   it('reads the branch headers and counts only entries', () => {
-    expect(parseWorktreeStatus([
-      '# branch.oid abc123',
-      '# branch.head feat-x',
-      '1 .M N... 100644 100644 100644 aaa bbb src/a.ts',
-      '? untracked.txt',
-    ].join('\n'))).toEqual({ dirty: true, count: 2, branch: 'feat-x', head: 'abc123' })
+    expect(
+      parseWorktreeStatus(
+        [
+          '# branch.oid abc123',
+          '# branch.head feat-x',
+          '1 .M N... 100644 100644 100644 aaa bbb src/a.ts',
+          '? untracked.txt',
+        ].join('\n'),
+      ),
+    ).toEqual({ dirty: true, count: 2, branch: 'feat-x', head: 'abc123' })
   })
 
   it('reports a detached head and an unborn tree as null', () => {
-    expect(parseWorktreeStatus('# branch.oid (initial)\n# branch.head (detached)\n'))
-      .toEqual({ dirty: false, count: 0, branch: null, head: null })
+    expect(parseWorktreeStatus('# branch.oid (initial)\n# branch.head (detached)\n')).toEqual({
+      dirty: false,
+      count: 0,
+      branch: null,
+      head: null,
+    })
   })
 })

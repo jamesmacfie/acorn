@@ -57,7 +57,12 @@ describe('openRefPanel', () => {
     // overlay. Degrading at render was never the same as declining, because declining is what lets
     // `openContentTarget` try the pane rung or the real URL.
     let running = false
-    const panel = refPanelRegistry.register({ id: 'board-ref', providerId: 'board', when: () => running, component: () => null })
+    const panel = refPanelRegistry.register({
+      id: 'board-ref',
+      providerId: 'board',
+      when: () => running,
+      component: () => null,
+    })
 
     expect(openRefPanel({ providerId: 'board', displayId: 'ENG-42' })).toBe(false)
     expect(activeRefPanel()).toBeNull()

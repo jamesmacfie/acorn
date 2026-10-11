@@ -36,7 +36,8 @@ const titleFor = (row: NodePluginRow): string => {
 const SETTINGS_TARGET = { kind: 'settings', resourceId: 'plugins' } as const
 
 // The generic sentence, used only when the node sends no reason.
-const FALLBACK_DETAIL = 'It is installed on this node but its start-up threw. Its routes and contributions are not registered.'
+const FALLBACK_DETAIL =
+  'It is installed on this node but its start-up threw. Its routes and contributions are not registered.'
 
 export const pluginFailureAttention: AttentionSourceContribution = {
   id: 'core.pluginFailures',

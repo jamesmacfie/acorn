@@ -45,7 +45,9 @@ afterEach(() => {
 
 describe('openPane', () => {
   it('opens a task pane with the clicked row retained as its selection', () => {
-    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    disposables.push(
+      paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }),
+    )
     setActiveTaskId('task-1')
     runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item })
     expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'conn-1:ENG-42' })
@@ -54,11 +56,16 @@ describe('openPane', () => {
   it('takes the reader to the task the click site named, and selects the row there', () => {
     // A dashboard row is drawn outside every task, so without the named task this would open the pane in
     // whatever task happened to be on screen, never the one the row is about.
-    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    disposables.push(
+      paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }),
+    )
     setTaskLookup((taskId) => (taskId === 'task-2' ? ({ id: 'task-2', links: [] } as unknown as Task) : undefined))
     setActiveTaskId('task-1')
     const navigate = vi.fn()
-    runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-2', navigate })
+    runChromeAction(
+      { verb: 'openPane', pane: 'board' },
+      { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-2', navigate },
+    )
     expect(navigate).toHaveBeenCalledWith('/t/task-2')
     expect(consumePaneIntent('task-2', 'board')).toEqual({ kind: 'plugin:select', item: 'conn-1:ENG-42' })
     evictPendingIntents('task-2')
@@ -67,21 +74,31 @@ describe('openPane', () => {
   it('still navigates when the named task is the active one but a Source browse is on screen', () => {
     // activeTaskId is sticky: it names whichever task you last had open, not whichever screen you're
     // looking at. A dashboard row for that same task must still take the reader back to it.
-    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    disposables.push(
+      paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }),
+    )
     setTaskLookup((taskId) => (taskId === 'task-1' ? ({ id: 'task-1', links: [] } as unknown as Task) : undefined))
     setActiveTaskId('task-1')
     setSelectedSource('pulls')
     const navigate = vi.fn()
-    runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-1', navigate })
+    runChromeAction(
+      { verb: 'openPane', pane: 'board' },
+      { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-1', navigate },
+    )
     expect(navigate).toHaveBeenCalledWith('/t/task-1')
     expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'conn-1:ENG-42' })
   })
 
   it('refuses a task this node does not have, rather than opening the pane somewhere else', () => {
-    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    disposables.push(
+      paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }),
+    )
     setTaskLookup(() => undefined)
     setActiveTaskId('task-1')
-    runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-2' })
+    runChromeAction(
+      { verb: 'openPane', pane: 'board' },
+      { pluginId: 'board', nodeId: 'node-a', item, taskId: 'task-2' },
+    )
     expect(consumePaneIntent('task-1', 'board')).toBeUndefined()
     expect(consumePaneIntent('task-2', 'board')).toBeUndefined()
   })
@@ -115,7 +132,10 @@ describe('surfaceAction', () => {
   it('emits the command id to the named surface, addressed by plugin', async () => {
     const heard: unknown[] = []
     const off = clientEvents.on('plugin:surface-action', (event) => void heard.push(event))
-    runChromeAction({ verb: 'surfaceAction', surface: 'database' }, { pluginId: 'database', nodeId: 'node-a', commandId: 'execute' })
+    runChromeAction(
+      { verb: 'surfaceAction', surface: 'database' },
+      { pluginId: 'database', nodeId: 'node-a', commandId: 'execute' },
+    )
     off()
     expect(heard).toEqual([{ pluginId: 'database', surface: 'database', command: 'execute' }])
   })
@@ -133,30 +153,59 @@ describe('surfaceAction', () => {
 
 describe('navigate', () => {
   it('addresses the item inside the project-scoped surface, with no task anywhere', () => {
-    disposables.push(projectSurfaceRegistry.register({
-      id: 'board-card', path: '/p/:projectId/x/board/cards/:key', item: 'key', order: 500, component: () => null,
-    }))
+    disposables.push(
+      projectSurfaceRegistry.register({
+        id: 'board-card',
+        path: '/p/:projectId/x/board/cards/:key',
+        item: 'key',
+        order: 500,
+        component: () => null,
+      }),
+    )
     const navigate = vi.fn()
-    runChromeAction({ verb: 'navigate', surface: 'board-card' }, {
-      pluginId: 'board', nodeId: 'node-a', item, projectId: 'project-web', navigate,
-    })
+    runChromeAction(
+      { verb: 'navigate', surface: 'board-card' },
+      {
+        pluginId: 'board',
+        nodeId: 'node-a',
+        item,
+        projectId: 'project-web',
+        navigate,
+      },
+    )
     expect(navigate).toHaveBeenCalledWith('/p/project-web/x/board/cards/conn-1%3AENG-42')
   })
 
   it('says so rather than navigating nowhere when no project is routed', () => {
-    disposables.push(projectSurfaceRegistry.register({
-      id: 'board-card', path: '/p/:projectId/x/board/cards/:key', item: 'key', order: 500, component: () => null,
-    }))
+    disposables.push(
+      projectSurfaceRegistry.register({
+        id: 'board-card',
+        path: '/p/:projectId/x/board/cards/:key',
+        item: 'key',
+        order: 500,
+        component: () => null,
+      }),
+    )
     const navigate = vi.fn()
-    runChromeAction({ verb: 'navigate', surface: 'board-card' }, { pluginId: 'board', nodeId: 'node-a', item, navigate })
+    runChromeAction(
+      { verb: 'navigate', surface: 'board-card' },
+      { pluginId: 'board', nodeId: 'node-a', item, navigate },
+    )
     expect(navigate).not.toHaveBeenCalled()
   })
 
   it('does nothing for a surface this device never registered', () => {
     const navigate = vi.fn()
-    runChromeAction({ verb: 'navigate', surface: 'board-card' }, {
-      pluginId: 'board', nodeId: 'node-a', item, projectId: 'project-web', navigate,
-    })
+    runChromeAction(
+      { verb: 'navigate', surface: 'board-card' },
+      {
+        pluginId: 'board',
+        nodeId: 'node-a',
+        item,
+        projectId: 'project-web',
+        navigate,
+      },
+    )
     expect(navigate).not.toHaveBeenCalled()
   })
 })
@@ -166,21 +215,39 @@ describe('navigate', () => {
 // (docs/plugins/commands.md § Command kinds).
 describe('the answer a verb gives back', () => {
   it('waits for the node before saying an action worked', async () => {
-    const answered = runChromeAction({ verb: 'runNodeAction', path: '/v1/p/database/run' }, {
-      pluginId: 'database', nodeId: 'node-a', item,
-    })
-    expect(sendRaw).toHaveBeenCalledWith('/v1/p/database/run', expect.objectContaining({
-      method: 'POST', nodeId: 'node-a', body: JSON.stringify({ item: 'conn-1:ENG-42' }),
-    }))
+    const answered = runChromeAction(
+      { verb: 'runNodeAction', path: '/v1/p/database/run' },
+      {
+        pluginId: 'database',
+        nodeId: 'node-a',
+        item,
+      },
+    )
+    expect(sendRaw).toHaveBeenCalledWith(
+      '/v1/p/database/run',
+      expect.objectContaining({
+        method: 'POST',
+        nodeId: 'node-a',
+        body: JSON.stringify({ item: 'conn-1:ENG-42' }),
+      }),
+    )
     expect(await answered).toEqual({ ok: true })
     expect(toasted).toEqual([])
   })
 
   it('carries the node’s own failure back, and still toasts it where the click was', async () => {
-    sendRaw.mockResolvedValueOnce({ ok: false, status: 409, error: { code: 'busy', message: 'a query is already running' } })
-    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v1/p/database/run' }, {
-      pluginId: 'database', nodeId: 'node-a',
+    sendRaw.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      error: { code: 'busy', message: 'a query is already running' },
     })
+    const result = await runChromeAction(
+      { verb: 'runNodeAction', path: '/v1/p/database/run' },
+      {
+        pluginId: 'database',
+        nodeId: 'node-a',
+      },
+    )
     expect(result).toEqual({ ok: false, message: 'action failed: a query is already running' })
     // The old click sites read nothing and are unchanged: this is still how they report it.
     expect(toasted).toEqual(['database: action failed'])
@@ -188,23 +255,33 @@ describe('the answer a verb gives back', () => {
 
   it('carries a thrown transport failure back too', async () => {
     sendRaw.mockRejectedValueOnce(new Error('This node is offline, so nothing was sent.'))
-    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v1/p/database/run' }, {
-      pluginId: 'database', nodeId: 'node-a',
-    })
+    const result = await runChromeAction(
+      { verb: 'runNodeAction', path: '/v1/p/database/run' },
+      {
+        pluginId: 'database',
+        nodeId: 'node-a',
+      },
+    )
     expect(result).toEqual({ ok: false, message: 'action failed: This node is offline, so nothing was sent.' })
   })
 
   it('refuses a path outside the plugin’s namespace without asking the node', async () => {
-    const result = await runChromeAction({ verb: 'runNodeAction', path: '/v1/tasks' }, {
-      pluginId: 'database', nodeId: 'node-a',
-    })
+    const result = await runChromeAction(
+      { verb: 'runNodeAction', path: '/v1/tasks' },
+      {
+        pluginId: 'database',
+        nodeId: 'node-a',
+      },
+    )
     expect(sendRaw).not.toHaveBeenCalled()
     expect(result).toEqual({ ok: false, message: 'refused an action outside its own namespace' })
   })
 
   it('says which refusal it was, for the frame that has to show one', async () => {
     setActiveTaskId(null)
-    disposables.push(paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }))
+    disposables.push(
+      paneRegistry.register({ id: 'board', label: 'Board', glyph: 'kanban', order: 500, component: () => null }),
+    )
     const result = await runChromeAction({ verb: 'openPane', pane: 'board' }, { pluginId: 'board', nodeId: 'node-a' })
     expect(result).toEqual({
       ok: false,

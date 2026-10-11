@@ -49,8 +49,16 @@ export function overlayKeys(bindings: readonly { key: string; cmd: () => boolean
 export function trapKeys(dismiss: () => void): void {
   const engine = keymap<Renderable, KeyEvent>()
   if (!engine) return
-  onCleanup(engine.registerLayer({
-    priority: TRAP,
-    bindings: keysFor().dismiss.map((key) => ({ key, cmd: () => { dismiss(); return true } })),
-  }))
+  onCleanup(
+    engine.registerLayer({
+      priority: TRAP,
+      bindings: keysFor().dismiss.map((key) => ({
+        key,
+        cmd: () => {
+          dismiss()
+          return true
+        },
+      })),
+    }),
+  )
 }

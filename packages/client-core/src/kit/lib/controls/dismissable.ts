@@ -35,10 +35,18 @@ export function createDismissable(opts: {
   if (on.includes('escape') && typeof document !== 'undefined') {
     // `live` keeps a torn-down overlay out of the running: a ref stays pointing at its old element,
     // so an overlay that is no longer in the document must not answer for the one that is.
-    const entry = { live: () => (opts.container ? !!opts.container()?.isConnected : true), dismiss: () => opts.onDismiss() }
+    const entry = {
+      live: () => (opts.container ? !!opts.container()?.isConnected : true),
+      dismiss: () => opts.onDismiss(),
+    }
     const onDocumentKeyDown = (event: KeyboardEvent) => {
       const root = opts.container?.()
-      if (event.key === 'Tab' && trap && root && anchoredSurfacesWithin(root).some((surface) => surface.contains(document.activeElement))) {
+      if (
+        event.key === 'Tab' &&
+        trap &&
+        root &&
+        anchoredSurfacesWithin(root).some((surface) => surface.contains(document.activeElement))
+      ) {
         if (escapeStack.filter((e) => e.live()).at(-1) === entry) trapTab(event, root)
       }
       if (event.key !== 'Escape' || event.defaultPrevented) return

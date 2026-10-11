@@ -33,7 +33,13 @@ export type WorkflowDefinitionRef =
 /** Untrusted drafts remain wide enough to produce a field-located diagnostic. Runtime readers parse
  * the DataBinding branch and never translate another object shape. */
 export type WorkflowValueBinding = DataBinding | Record<string, unknown>
-export type WorkflowOutput = { name: string; label?: string; schema: DataSchema; required?: boolean; binding: DataBinding }
+export type WorkflowOutput = {
+  name: string
+  label?: string
+  schema: DataSchema
+  required?: boolean
+  binding: DataBinding
+}
 
 export type WorkflowBoundTemplate = {
   template: string

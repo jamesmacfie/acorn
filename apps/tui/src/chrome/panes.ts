@@ -10,10 +10,19 @@
 // here invents a second layout state: `layoutForTask` stays the durable truth on both hosts, and a
 // task opened in the app afterwards finds the pane this shell left it on.
 
-import { dispatchLayout, layoutForTask, activeTaskId, focusedPane, setFocusedPane } from '@acorn/client-core/features/tasks/tasks.ts'
+import {
+  dispatchLayout,
+  layoutForTask,
+  activeTaskId,
+  focusedPane,
+  setFocusedPane,
+} from '@acorn/client-core/features/tasks/tasks.ts'
 import { defaultLayout } from '@acorn/client-core/features/tasks'
 import {
-  paneAvailable, paneContribution, paneContributions, type PaneContribution,
+  paneAvailable,
+  paneContribution,
+  paneContributions,
+  type PaneContribution,
 } from '@acorn/client-core/host/registries/panes/panes.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 
@@ -59,7 +68,7 @@ export function cyclePane(task: Task | null, delta: 1 | -1): boolean {
   if (panes.length < 2) return false
   const current = shownPane(task)
   const at = panes.findIndex((pane) => pane.id === current?.id)
-  const next = panes[(((at < 0 ? 0 : at) + delta) + panes.length) % panes.length]
+  const next = panes[((at < 0 ? 0 : at) + delta + panes.length) % panes.length]
   if (!next) return false
   showPane(task, next.id)
   return true

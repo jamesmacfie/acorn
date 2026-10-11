@@ -26,12 +26,17 @@ const settle = () => new Promise<void>((resolve) => queueMicrotask(resolve))
 
 const mount = (body: () => ReturnType<typeof Modal>) => {
   const [open, setOpen] = createSignal(false)
-  dispose = render(() => (
-    <>
-      <button type="button" id="opener" onClick={() => setOpen(true)}>open</button>
-      <Show when={open()}>{body()}</Show>
-    </>
-  ), host)
+  dispose = render(
+    () => (
+      <>
+        <button type="button" id="opener" onClick={() => setOpen(true)}>
+          open
+        </button>
+        <Show when={open()}>{body()}</Show>
+      </>
+    ),
+    host,
+  )
   const opener = host.querySelector<HTMLButtonElement>('#opener')!
   opener.focus()
   return { opener, open: () => setOpen(true), close: () => setOpen(false) }
@@ -42,8 +47,12 @@ describe('a Modal without autoFocus', () => {
     let close = () => {}
     const view = mount(() => (
       <Modal title="Rename session" onDismiss={() => close()}>
-        <Modal.Body><input aria-label="Name" /></Modal.Body>
-        <Modal.Actions><Button variant="solid">Save</Button></Modal.Actions>
+        <Modal.Body>
+          <input aria-label="Name" />
+        </Modal.Body>
+        <Modal.Actions>
+          <Button variant="solid">Save</Button>
+        </Modal.Actions>
       </Modal>
     ))
     close = view.close
@@ -60,7 +69,9 @@ describe('a Modal without autoFocus', () => {
         <Modal.Body>Archive it?</Modal.Body>
         <Modal.Actions>
           <Button variant="ghost">Cancel</Button>
-          <Button variant="solid" tone="danger">Archive</Button>
+          <Button variant="solid" tone="danger">
+            Archive
+          </Button>
         </Modal.Actions>
       </Modal>
     ))

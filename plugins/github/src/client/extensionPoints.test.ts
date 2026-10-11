@@ -10,17 +10,17 @@ import { DIFF_LINE_KEY, DIFF_LINE_POINT, SUMMARY_BADGES_MAX, SUMMARY_BADGES_POIN
 // three-string list would be the coupling this seam exists to avoid. The pairing is held from the
 // other end too, in client-core's annotationKey.test.ts.
 describe('the diff-line annotation point', () => {
-  it('is keyed by the three fields the viewer mints, in the viewer\'s order', () => {
+  it("is keyed by the three fields the viewer mints, in the viewer's order", () => {
     expect(DIFF_LINE_KEY).toEqual(['file', 'line', 'side'])
   })
 
-  it('is addressed under this plugin\'s own name, which the host mints', () => {
+  it("is addressed under this plugin's own name, which the host mints", () => {
     expect(DIFF_LINE_POINT).toBe('github:diff-line')
   })
 })
 
 describe('the summary-badges slot', () => {
-  it('is addressed under this plugin\'s own name', () => {
+  it("is addressed under this plugin's own name", () => {
     expect(SUMMARY_BADGES_POINT).toBe('github:summary-badges')
   })
 

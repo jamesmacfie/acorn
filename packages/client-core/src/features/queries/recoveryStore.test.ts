@@ -5,16 +5,42 @@ import { queryRecoveryStore } from './recoveryStore'
 function storage() {
   const values = new Map<string, string>()
   return {
-    get length() { return values.size },
+    get length() {
+      return values.size
+    },
     key: (index: number) => [...values.keys()][index] ?? null,
     getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => { values.set(key, value) },
-    removeItem: (key: string) => { values.delete(key) },
+    setItem: (key: string, value: string) => {
+      values.set(key, value)
+    },
+    removeItem: (key: string) => {
+      values.delete(key)
+    },
   }
 }
-const content = queryContentSchema.parse({ name: 'Draft', parameters: { type: 'object', additionalProperties: false }, query: { source: { pluginId: 'missing', sourceId: 'items' }, scope: { workspaceId: 'workspace' } } })
-const copy: QueryRecovery = { nodeId: 'node', entityId: 'query', baseRevision: 1, baseContent: content, content, savedAt: 1 }
-const remote: QueryDraft = { id: 'query', workspaceId: 'workspace', content, draftRevision: 2, publishedRevision: null, basePublishedRevision: null, createdAt: 1, updatedAt: 2 }
+const content = queryContentSchema.parse({
+  name: 'Draft',
+  parameters: { type: 'object', additionalProperties: false },
+  query: { source: { pluginId: 'missing', sourceId: 'items' }, scope: { workspaceId: 'workspace' } },
+})
+const copy: QueryRecovery = {
+  nodeId: 'node',
+  entityId: 'query',
+  baseRevision: 1,
+  baseContent: content,
+  content,
+  savedAt: 1,
+}
+const remote: QueryDraft = {
+  id: 'query',
+  workspaceId: 'workspace',
+  content,
+  draftRevision: 2,
+  publishedRevision: null,
+  basePublishedRevision: null,
+  createdAt: 1,
+  updatedAt: 2,
+}
 
 describe('query draft recovery', () => {
   it('restores by entity even after the Node base revision changes and isolates Nodes', () => {
@@ -38,6 +64,13 @@ describe('query draft recovery', () => {
   })
   it('reports storage failure honestly and never promotes a local write to Node acknowledgment', () => {
     expect(queryRecoveryStore().save(copy)).toBe('not-saved')
-    expect(queryRecoveryStore({ ...storage(), setItem: () => { throw new Error('quota') } }).save(copy)).toBe('not-saved')
+    expect(
+      queryRecoveryStore({
+        ...storage(),
+        setItem: () => {
+          throw new Error('quota')
+        },
+      }).save(copy),
+    ).toBe('not-saved')
   })
 })

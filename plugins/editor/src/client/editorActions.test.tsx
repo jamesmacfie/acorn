@@ -8,12 +8,17 @@ Range.prototype.getClientRects ??= () => Object.assign([], { item: () => null })
 Range.prototype.getBoundingClientRect ??= () => new DOMRect()
 
 const views: EditorView[] = []
-afterEach(() => { for (const view of views.splice(0)) view.destroy() })
+afterEach(() => {
+  for (const view of views.splice(0)) view.destroy()
+})
 const makeView = (readOnly = false) => {
   const parent = document.createElement('div')
   document.body.append(parent)
   const view = new EditorView({
-    state: EditorState.create({ doc: 'first\nsecond\n', extensions: [engine.basicSetup, EditorState.readOnly.of(readOnly)] }),
+    state: EditorState.create({
+      doc: 'first\nsecond\n',
+      extensions: [engine.basicSetup, EditorState.readOnly.of(readOnly)],
+    }),
     parent,
   })
   views.push(view)
@@ -25,10 +30,17 @@ describe('editor actions', () => {
     const editable = makeView()
     const readOnly = makeView(true)
     const availability: readonly [EditorAction, boolean, boolean][] = [
-      ['find', true, true], ['replace', true, false], ['comment', true, false],
-      ['duplicate', true, false], ['move-up', true, false], ['move-down', true, false],
-      ['select-next', true, true], ['undo', false, false], ['redo', false, false],
-      ['indent', true, false], ['outdent', true, false],
+      ['find', true, true],
+      ['replace', true, false],
+      ['comment', true, false],
+      ['duplicate', true, false],
+      ['move-up', true, false],
+      ['move-down', true, false],
+      ['select-next', true, true],
+      ['undo', false, false],
+      ['redo', false, false],
+      ['indent', true, false],
+      ['outdent', true, false],
     ]
     for (const [action, canEdit, canRead] of availability) {
       expect(actionAvailable(engine, editable, action)).toBe(canEdit)

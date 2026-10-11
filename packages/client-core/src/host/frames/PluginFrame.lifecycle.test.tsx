@@ -6,10 +6,13 @@ const observed = vi.hoisted(() => ({ bridges: [] as { onMisbehaving: (reason: st
 vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
 vi.mock('./broker', async (original) => {
   const module = await original<typeof import('./broker')>()
-  return { ...module, createFrameBridge: (options: Parameters<typeof module.createFrameBridge>[0]) => {
-    observed.bridges.push(options as never)
-    return module.createFrameBridge(options)
-  } }
+  return {
+    ...module,
+    createFrameBridge: (options: Parameters<typeof module.createFrameBridge>[0]) => {
+      observed.bridges.push(options as never)
+      return module.createFrameBridge(options)
+    },
+  }
 })
 import PluginFrame from './PluginFrame'
 import { clientEvents } from '../registries/commands/clientEvents'
@@ -19,31 +22,73 @@ class Port {
   posts: unknown[] = []
   closes = 0
   start() {}
-  close() { this.closes++ }
-  postMessage(data: unknown) { this.posts.push(data) }
+  close() {
+    this.closes++
+  }
+  postMessage(data: unknown) {
+    this.posts.push(data)
+  }
 }
 const channels: { port1: Port; port2: Port }[] = []
 class Channel {
-  port1 = new Port(); port2 = new Port()
-  constructor() { channels.push(this) }
+  port1 = new Port()
+  port2 = new Port()
+  constructor() {
+    channels.push(this)
+  }
 }
 const stops: (() => void)[] = []
 afterEach(() => {
   stops.splice(0).forEach((stop) => stop())
-  channels.length = 0; observed.bridges.length = 0
-  vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers()
+  channels.length = 0
+  observed.bridges.length = 0
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+  vi.useRealTimers()
 })
 const mount = (subscribe: () => () => void) => {
   vi.stubGlobal('MessageChannel', Channel)
   const qc = new QueryClient()
-  const host = document.createElement('div'); document.body.append(host)
-  const stop = render(() => createComponent(QueryClientProvider, { client: qc, get children() { return <PluginFrame hash={'a'.repeat(64)} binding={{ pluginId: 'audit', surface: 'audit.pane', target: 'pane', nodeId: 'node-a', taskId: 'task', api: [], events: ['runtime:task-archived'], panes: [], claimsKeys: [] }} webview={{ navigate: async () => true, command: async () => true, subscribe }} /> } }), host)
-  stops.push(() => { stop(); host.remove(); qc.clear() })
+  const host = document.createElement('div')
+  document.body.append(host)
+  const stop = render(
+    () =>
+      createComponent(QueryClientProvider, {
+        client: qc,
+        get children() {
+          return (
+            <PluginFrame
+              hash={'a'.repeat(64)}
+              binding={{
+                pluginId: 'audit',
+                surface: 'audit.pane',
+                target: 'pane',
+                nodeId: 'node-a',
+                taskId: 'task',
+                api: [],
+                events: ['runtime:task-archived'],
+                panes: [],
+                claimsKeys: [],
+              }}
+              webview={{ navigate: async () => true, command: async () => true, subscribe }}
+            />
+          )
+        },
+      }),
+    host,
+  )
+  stops.push(() => {
+    stop()
+    host.remove()
+    qc.clear()
+  })
   return { host, stop }
 }
 it('drains all load resources when an external cleanup throws and prevents retired event pushes', () => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
-  const detach = vi.fn(() => { throw new Error('external unsubscribe failed') })
+  const detach = vi.fn(() => {
+    throw new Error('external unsubscribe failed')
+  })
   const frame = mount(() => detach)
   const iframe = frame.host.querySelector('iframe')!
   iframe.contentWindow!.postMessage = () => {}
@@ -61,7 +106,9 @@ it('drains all load resources when an external cleanup throws and prevents retir
 })
 it('releases partially connected resources on setup failure and shows the original failure', () => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
-  const frame = mount(() => { throw new Error('original setup failure') })
+  const frame = mount(() => {
+    throw new Error('original setup failure')
+  })
   const iframe = frame.host.querySelector('iframe')!
   iframe.contentWindow!.postMessage = () => {}
   iframe.dispatchEvent(new Event('load'))
@@ -74,7 +121,12 @@ it('ignores a held old-load failure and deadline after a replacement load', () =
   vi.useFakeTimers()
   const listeners: EventListener[] = []
   const real = HTMLIFrameElement.prototype.addEventListener
-  vi.spyOn(HTMLIFrameElement.prototype, 'addEventListener').mockImplementation(function (this: HTMLIFrameElement, kind: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) {
+  vi.spyOn(HTMLIFrameElement.prototype, 'addEventListener').mockImplementation(function (
+    this: HTMLIFrameElement,
+    kind: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions,
+  ) {
     if (kind === 'load') listeners.push(listener as EventListener)
     real.call(this, kind, listener, options)
   })

@@ -11,20 +11,27 @@ import { z } from 'zod'
 
 export const harnessUsageProbeSchema = z.object({
   plan: z.string().max(120).nullish(),
-  quotas: z.array(z.object({
-    // Use `session` for the one the compact indicator shows; anything else is a second row in the pane.
-    id: z.string().min(1).max(64),
-    label: z.string().min(1).max(80),
-    percentRemaining: z.number(),
-    // A timestamp when the harness knows one, otherwise the sentence it would print. acorn prefers the
-    // timestamp and turns it into a live countdown.
-    resetsAt: z.number().int().nullish(),
-    resetText: z.string().max(200).nullish(),
-  })).max(8).default([]),
-  account: z.object({
-    email: z.string().max(320).nullish(),
-    organization: z.string().max(200).nullish(),
-  }).nullish(),
+  quotas: z
+    .array(
+      z.object({
+        // Use `session` for the one the compact indicator shows; anything else is a second row in the pane.
+        id: z.string().min(1).max(64),
+        label: z.string().min(1).max(80),
+        percentRemaining: z.number(),
+        // A timestamp when the harness knows one, otherwise the sentence it would print. acorn prefers the
+        // timestamp and turns it into a live countdown.
+        resetsAt: z.number().int().nullish(),
+        resetText: z.string().max(200).nullish(),
+      }),
+    )
+    .max(8)
+    .default([]),
+  account: z
+    .object({
+      email: z.string().max(320).nullish(),
+      organization: z.string().max(200).nullish(),
+    })
+    .nullish(),
 })
 
 export const harnessAuthProbeSchema = z.object({

@@ -11,18 +11,15 @@ import capture from './__fixtures__/codexSubagentWire.json' with { type: 'json' 
 import type { JsonRpcNotification } from './jsonRpcProcess'
 import { evolveAgentState, initialAgentMachineState } from '../sessions/stateMachine'
 import { normalizeCodexNotification } from './codexNormalizer'
-import {
-  CodexChildRouter,
-  codexNotificationThreadId,
-  routeCodexChildNotification,
-} from './codexChildRouting'
+import { CodexChildRouter, codexNotificationThreadId, routeCodexChildNotification } from './codexChildRouting'
 
 const notifications = capture.notifications as JsonRpcNotification[]
 const rootThreadId = capture.rootThreadId
 const childThreadIds = new Set(capture.childThreadIds)
 
 const childNotifications = notifications.filter((notification) =>
-  childThreadIds.has(codexNotificationThreadId(notification) ?? ''))
+  childThreadIds.has(codexNotificationThreadId(notification) ?? ''),
+)
 
 const replay = (): { router: CodexChildRouter; rosterFor: (id: string) => Array<Record<string, unknown>> } => {
   const router = new CodexChildRouter()
@@ -65,9 +62,11 @@ describe('the captured Codex fan-out', () => {
 
   it('emits child traffic BEFORE the item that registers the child', () => {
     const firstChild = notifications.findIndex((notification) =>
-      childThreadIds.has(codexNotificationThreadId(notification) ?? ''))
-    const firstRegistration = notifications.findIndex((notification) =>
-      (notification.params.item as { type?: string } | undefined)?.type === 'subAgentActivity')
+      childThreadIds.has(codexNotificationThreadId(notification) ?? ''),
+    )
+    const firstRegistration = notifications.findIndex(
+      (notification) => (notification.params.item as { type?: string } | undefined)?.type === 'subAgentActivity',
+    )
     expect(firstChild).toBeGreaterThanOrEqual(0)
     expect(firstChild).toBeLessThan(firstRegistration)
   })
@@ -121,7 +120,10 @@ describe('CodexChildRouter over the capture', () => {
     for (const [threadId, name] of [...childThreadIds].map((id, index) => [id, ['alpha', 'beta'][index]] as const)) {
       const updates = rosterFor(threadId)
       expect(updates.length, threadId).toBeGreaterThan(0)
-      expect(updates.some((update) => update.title === name), `${threadId} named ${name}`).toBe(true)
+      expect(
+        updates.some((update) => update.title === name),
+        `${threadId} named ${name}`,
+      ).toBe(true)
     }
   })
 
@@ -130,7 +132,7 @@ describe('CodexChildRouter over the capture', () => {
     // all. Reporting it as completed would tell the reader the subagent is gone.
     const { rosterFor } = replay()
     for (const threadId of childThreadIds) {
-      const statuses = rosterFor(threadId).flatMap((update) => update.status ? [update.status] : [])
+      const statuses = rosterFor(threadId).flatMap((update) => (update.status ? [update.status] : []))
       expect(statuses, threadId).toContain('running')
       expect(statuses[statuses.length - 1], threadId).toBe('idle')
     }
@@ -141,7 +143,7 @@ describe('CodexChildRouter over the capture', () => {
     // flashes "Idle" on a subagent that has not done anything yet.
     const { rosterFor } = replay()
     for (const threadId of childThreadIds) {
-      const statuses = rosterFor(threadId).flatMap((update) => update.status ? [update.status] : [])
+      const statuses = rosterFor(threadId).flatMap((update) => (update.status ? [update.status] : []))
       expect(statuses.indexOf('idle'), threadId).toBeGreaterThan(statuses.indexOf('running'))
     }
   })
@@ -149,7 +151,7 @@ describe('CodexChildRouter over the capture', () => {
   it('reports each child’s own token usage', () => {
     const { rosterFor } = replay()
     for (const threadId of childThreadIds) {
-      const usages = rosterFor(threadId).flatMap((update) => update.usage ? [update.usage] : [])
+      const usages = rosterFor(threadId).flatMap((update) => (update.usage ? [update.usage] : []))
       expect(usages.length, threadId).toBeGreaterThan(0)
     }
   })
@@ -157,8 +159,10 @@ describe('CodexChildRouter over the capture', () => {
   it('leaves the parent’s own traffic on the parent path', () => {
     const router = new CodexChildRouter()
     router.setRootThread(rootThreadId)
-    const rootTurnCompleted = notifications.find((notification) =>
-      notification.method === 'turn/completed' && codexNotificationThreadId(notification) === rootThreadId)
+    const rootTurnCompleted = notifications.find(
+      (notification) =>
+        notification.method === 'turn/completed' && codexNotificationThreadId(notification) === rootThreadId,
+    )
     expect(rootTurnCompleted).toBeDefined()
     for (const notification of notifications) {
       const routed = router.route(notification)
@@ -195,10 +199,12 @@ describe('CodexChildRouter guards', () => {
     const router = new CodexChildRouter()
     router.setRootThread('root-1')
     router.route(activity('child-1', 'root-1', '/root'))
-    expect(router.route({
-      method: 'turn/completed',
-      params: { threadId: 'root-1', turn: { status: 'completed' } },
-    }).to).toBe('parent')
+    expect(
+      router.route({
+        method: 'turn/completed',
+        params: { threadId: 'root-1', turn: { status: 'completed' } },
+      }).to,
+    ).toBe('parent')
   })
 
   it('treats an unknown non-root thread as a child rather than the parent', () => {
@@ -240,10 +246,12 @@ describe('CodexChildRouter guards', () => {
     expect(routed.to).toBe('subagent')
     const events = routed.to === 'subagent' ? routed.events : []
     expect(events.some((event) => event.type === 'error')).toBe(false)
-    expect(events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: 'subagent', subagent: expect.objectContaining({ status: 'failed' }) }),
-      expect.objectContaining({ type: 'diagnostic', message: expect.stringContaining('alpha') }),
-    ]))
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'subagent', subagent: expect.objectContaining({ status: 'failed' }) }),
+        expect.objectContaining({ type: 'diagnostic', message: expect.stringContaining('alpha') }),
+      ]),
+    )
   })
 
   it('attributes a child’s file change to that child', () => {

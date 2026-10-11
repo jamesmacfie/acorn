@@ -6,8 +6,19 @@
 // confirmation stays on each row so it cannot follow selection to another request.
 import { For, Show } from 'solid-js'
 import {
-  Button, ConfirmButton, EmptyState, Icon, IconButton, Inline, SectionHeader, Section, SegmentedControl, Stack, Text,
-  Toolbar, TreeRow,
+  Button,
+  ConfirmButton,
+  EmptyState,
+  Icon,
+  IconButton,
+  Inline,
+  SectionHeader,
+  Section,
+  SegmentedControl,
+  Stack,
+  Text,
+  Toolbar,
+  TreeRow,
 } from '@acorn/plugin-api/ui/tree'
 import type { HttpRequest } from '../shared/model'
 import type { HttpPanelModel, Selection } from './panelModel'
@@ -27,7 +38,10 @@ export default function HttpList(props: { model: HttpPanelModel }) {
           size="sm"
           ariaLabel="Show"
           value={view()}
-          options={[{ value: 'requests', label: 'Requests' }, { value: 'variables', label: 'Variables' }]}
+          options={[
+            { value: 'requests', label: 'Requests' },
+            { value: 'variables', label: 'Variables' },
+          ]}
           onChange={(value: string) => {
             if (value === view()) return
             if (value === 'variables') {
@@ -44,16 +58,27 @@ export default function HttpList(props: { model: HttpPanelModel }) {
       <Stack gap="row">
         <Show when={model().recoveries().length}>
           <Section label="Recover unsaved edits">
-            <For each={model().recoveries()}>{(entry) =>
-              <Button variant="bare" size="sm" onPress={() => model().recover(entry.key)}>{entry.name}</Button>
-            }</For>
+            <For each={model().recoveries()}>
+              {(entry) => (
+                <Button variant="bare" size="sm" onPress={() => model().recover(entry.key)}>
+                  {entry.name}
+                </Button>
+              )}
+            </For>
           </Section>
         </Show>
         <Show when={model().taskId}>
-          <Section label="This task" help="Requests you make here stay with this task until you save them to the project.">
+          <Section
+            label="This task"
+            help="Requests you make here stay with this task until you save them to the project."
+          >
             <Show
               when={(model().adhoc() ?? []).length}
-              fallback={<EmptyState align="start" size="sm">No requests in this task</EmptyState>}
+              fallback={
+                <EmptyState align="start" size="sm">
+                  No requests in this task
+                </EmptyState>
+              }
             >
               <For each={model().adhoc()}>{(row) => <RequestRow model={model()} row={row} />}</For>
             </Show>
@@ -71,7 +96,9 @@ export default function HttpList(props: { model: HttpPanelModel }) {
         </For>
 
         <Show when={model().saved.state === 'ready' && !(model().saved() ?? []).length && !model().taskId}>
-          <EmptyState align="start" size="sm">No saved requests in this project</EmptyState>
+          <EmptyState align="start" size="sm">
+            No saved requests in this project
+          </EmptyState>
         </Show>
       </Stack>
     </>

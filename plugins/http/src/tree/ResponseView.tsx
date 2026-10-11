@@ -1,7 +1,19 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import {
-  Alert, Badge, Checkbox, CodeBlock, CopyButton, EmptyState, Facts, SectionHeader, Stack, TabPanel, Tabs, Text,
-  Toolbar, ToolbarSpacer,
+  Alert,
+  Badge,
+  Checkbox,
+  CodeBlock,
+  CopyButton,
+  EmptyState,
+  Facts,
+  SectionHeader,
+  Stack,
+  TabPanel,
+  Tabs,
+  Text,
+  Toolbar,
+  ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import { formatSize, type SendFailure, type SendResult, type SendSuccess, type TimelineEntry } from '../shared/model'
 import { decodeBody } from './httpClient'
@@ -38,19 +50,24 @@ const GROUP_LABEL = { sent: 'Sent', received: 'Received' } as const
  *  which is what `Facts` means, as rows under a heading for each side of the exchange. */
 function Timeline(props: { entries: TimelineEntry[] }) {
   // Consecutive entries with the same group, so a heading lands where the side changes.
-  const runs = () => props.entries.reduce<{ group?: TimelineEntry['group']; entries: TimelineEntry[] }[]>((out, entry) => {
-    const last = out[out.length - 1]
-    if (last && last.group === entry.group) last.entries.push(entry)
-    else out.push({ group: entry.group, entries: [entry] })
-    return out
-  }, [])
+  const runs = () =>
+    props.entries.reduce<{ group?: TimelineEntry['group']; entries: TimelineEntry[] }[]>((out, entry) => {
+      const last = out[out.length - 1]
+      if (last && last.group === entry.group) last.entries.push(entry)
+      else out.push({ group: entry.group, entries: [entry] })
+      return out
+    }, [])
   return (
     <Stack gap="row">
       <For each={runs()}>
         {(run) => (
           <Stack gap="none">
             <Show when={run.group}>{(group) => <SectionHeader level="sub">{GROUP_LABEL[group()]}</SectionHeader>}</Show>
-            <Facts size="sm" grouping="rows" items={run.entries.map((entry) => ({ label: entry.label, value: entry.detail, mono: true }))} />
+            <Facts
+              size="sm"
+              grouping="rows"
+              items={run.entries.map((entry) => ({ label: entry.label, value: entry.detail, mono: true }))}
+            />
           </Stack>
         )}
       </For>
@@ -62,7 +79,9 @@ function SuccessResponse(props: { result: SendSuccess; onCopy: (text: string) =>
   const [tab, setTab] = createSignal<ResponseTab>('body')
   const [raw, setRaw] = createSignal(false)
 
-  const contentType = createMemo(() => props.result.headers.find(([k]) => k.toLowerCase() === 'content-type')?.[1] ?? '')
+  const contentType = createMemo(
+    () => props.result.headers.find(([k]) => k.toLowerCase() === 'content-type')?.[1] ?? '',
+  )
   const decoded = createMemo(() => decodeBody(props.result.bodyBase64))
   const bodyText = createMemo(() => {
     const d = decoded()
@@ -105,7 +124,13 @@ function SuccessResponse(props: { result: SendSuccess; onCopy: (text: string) =>
         </Show>
       </Toolbar>
 
-      <Tabs tabs={tabs()} active={tab()} onChange={(id: string) => setTab(id as ResponseTab)} idPrefix="http-response" ariaLabel="Response" />
+      <Tabs
+        tabs={tabs()}
+        active={tab()}
+        onChange={(id: string) => setTab(id as ResponseTab)}
+        idPrefix="http-response"
+        ariaLabel="Response"
+      />
 
       <TabPanel idPrefix="http-response" id={tab()} active={tab()}>
         <Show when={tab() === 'body'}>
@@ -115,7 +140,11 @@ function SuccessResponse(props: { result: SendSuccess; onCopy: (text: string) =>
         </Show>
 
         <Show when={tab() === 'headers'}>
-          <Facts size="sm" grouping="rows" items={props.result.headers.map(([name, value]) => ({ label: name, value, mono: true }))} />
+          <Facts
+            size="sm"
+            grouping="rows"
+            items={props.result.headers.map(([name, value]) => ({ label: name, value, mono: true }))}
+          />
         </Show>
 
         <Show when={tab() === 'timeline'}>
@@ -134,22 +163,31 @@ function FailedResponse(props: { result: SendFailure }) {
     { id: 'error', label: 'Error' },
     { id: 'timeline', label: 'Timeline', count: props.result.timeline.length },
   ]
-  const facts = () => [
-    { label: 'URL', value: props.result.url, mono: true },
-    props.result.code ? { label: 'Code', value: props.result.code, mono: true } : null,
-    props.result.detail && props.result.detail !== props.result.error
-      ? { label: 'Detail', value: props.result.detail, mono: true }
-      : null,
-  ].filter((fact) => fact !== null)
+  const facts = () =>
+    [
+      { label: 'URL', value: props.result.url, mono: true },
+      props.result.code ? { label: 'Code', value: props.result.code, mono: true } : null,
+      props.result.detail && props.result.detail !== props.result.error
+        ? { label: 'Detail', value: props.result.detail, mono: true }
+        : null,
+    ].filter((fact) => fact !== null)
 
   return (
     <Stack gap="row" grow>
       <Toolbar variant="bar" size="sm" ariaLabel="Response status">
-        <Badge tone="danger" shape="pill">Network error</Badge>
+        <Badge tone="danger" shape="pill">
+          Network error
+        </Badge>
         <Text tone="muted">{`${props.result.durationMs} ms`}</Text>
       </Toolbar>
 
-      <Tabs tabs={tabs()} active={tab()} onChange={(id: string) => setTab(id as FailureTab)} idPrefix="http-response-failure" ariaLabel="Failed request" />
+      <Tabs
+        tabs={tabs()}
+        active={tab()}
+        onChange={(id: string) => setTab(id as FailureTab)}
+        idPrefix="http-response-failure"
+        ariaLabel="Failed request"
+      />
 
       <TabPanel idPrefix="http-response-failure" id={tab()} active={tab()}>
         <Show when={tab() === 'error'}>
@@ -190,13 +228,20 @@ export default function ResponseView(props: {
       fallback={
         <Show
           when={props.error}
-          fallback={<EmptyState busy={props.sending}>{props.sending ? 'Sending…' : 'Send the request to see the response.'}</EmptyState>}
+          fallback={
+            <EmptyState busy={props.sending}>
+              {props.sending ? 'Sending…' : 'Send the request to see the response.'}
+            </EmptyState>
+          }
         >
           <Alert variant="banner">{props.error}</Alert>
         </Show>
       }
     >
-      <Show when={success()} fallback={<Show when={failure()}>{(result) => <FailedResponse result={result()} />}</Show>}>
+      <Show
+        when={success()}
+        fallback={<Show when={failure()}>{(result) => <FailedResponse result={result()} />}</Show>}
+      >
         {(result) => <SuccessResponse result={result()} onCopy={props.onCopy} />}
       </Show>
     </Show>

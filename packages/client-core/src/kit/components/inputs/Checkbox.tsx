@@ -36,7 +36,9 @@ export function Checkbox(props: {
   })
   const input = (
     <input
-      ref={(el) => { ref = el }}
+      ref={(el) => {
+        ref = el
+      }}
       type="checkbox"
       class="ui-check-box"
       data-size={size()}
@@ -54,12 +56,12 @@ export function Checkbox(props: {
         const box = event.currentTarget
         const write = props.onChange?.(box.checked)
         if (write instanceof Promise) {
-            void write.then((saved) => {
-              if (saved !== false) return
-              box.checked = !!props.checked
-              box.indeterminate = !!props.indeterminate
-            })
-          }
+          void write.then((saved) => {
+            if (saved !== false) return
+            box.checked = !!props.checked
+            box.indeterminate = !!props.indeterminate
+          })
+        }
       }}
     />
   )
@@ -75,7 +77,9 @@ export function Checkbox(props: {
         {input}
         <span class="ui-check-label">
           {props.label}
-          <Show when={props.hint}><small class="ui-check-hint">{props.hint}</small></Show>
+          <Show when={props.hint}>
+            <small class="ui-check-hint">{props.hint}</small>
+          </Show>
         </span>
       </label>
     </Show>

@@ -44,8 +44,8 @@ export function historyPoints(samples: readonly MeasureSample[], now: number): T
  *  there is. Exported because it is also the editor's gate, so a schema with no datetime is never
  *  offered the activity trend and a trend that cannot draw is unrepresentable rather than validated. */
 export const activityField = (schema: DashboardDisplaySchema): DashboardDisplayField | undefined =>
-  schema.fields.find((field) => field.role === 'updated' && field.type === 'datetime')
-    ?? schema.fields.find((field) => field.type === 'datetime')
+  schema.fields.find((field) => field.role === 'updated' && field.type === 'datetime') ??
+  schema.fields.find((field) => field.type === 'datetime')
 
 /** The activity tier: the panel's own measure over the rows that changed each day, from the rows
  *  already on screen. Zero store involvement, and the same `dayBucket` the line chart uses. */
@@ -74,7 +74,7 @@ export function activityPoints(
 
   return windowDays(now).map((day) => {
     const dayRows = byDay.get(day)
-    return { day, value: dayRows ? aggregateRows(dayRows, schema, view) ?? 0 : 0 }
+    return { day, value: dayRows ? (aggregateRows(dayRows, schema, view) ?? 0) : 0 }
   })
 }
 
@@ -203,6 +203,6 @@ export function trendDelta(
   const baseline = baselineValue(samples, view.compare, now)
   if (baseline === undefined) return undefined
   const change = current - baseline
-  const tone = !view.good || change === 0 ? 'muted' : (change > 0) === (view.good === 'up') ? 'ok' : 'bad'
+  const tone = !view.good || change === 0 ? 'muted' : change > 0 === (view.good === 'up') ? 'ok' : 'bad'
   return { change, tone }
 }

@@ -31,12 +31,12 @@ export type EditorLineMarkerProvider = {
 export const EDITOR_LINE_MARKERS = extensionPointId<EditorLineMarkerProvider>('editor:line-markers')
 
 export const isEditorRelativePath = (path: string): boolean =>
-  typeof path === 'string'
-  && !!path
-  && !path.startsWith('/')
-  && !path.startsWith('-')
-  && !path.split('/').includes('..')
-  && !path.includes('\0')
+  typeof path === 'string' &&
+  !!path &&
+  !path.startsWith('/') &&
+  !path.startsWith('-') &&
+  !path.split('/').includes('..') &&
+  !path.includes('\0')
 
 export type UnifiedDiffHunk = {
   oldStart: number
@@ -63,7 +63,9 @@ export function unifiedDiffHunks(patch: string): UnifiedDiffHunk[] {
 
 export function normalizedLineRanges(ranges: readonly EditorLineRange[]): EditorLineRange[] {
   const sorted = ranges
-    .filter((range) => Number.isInteger(range.from) && Number.isInteger(range.to) && range.from > 0 && range.to >= range.from)
+    .filter(
+      (range) => Number.isInteger(range.from) && Number.isInteger(range.to) && range.from > 0 && range.to >= range.from,
+    )
     .map((range) => ({ ...range }))
     .sort((a, b) => a.from - b.from || a.to - b.to)
   const out: EditorLineRange[] = []
@@ -77,16 +79,14 @@ export function normalizedLineRanges(ranges: readonly EditorLineRange[]): Editor
 
 /** With zero context, each new-side hunk range is exactly the changed line run. */
 export function changedLineRanges(patch: string): EditorLineRange[] {
-  return normalizedLineRanges(unifiedDiffHunks(patch).flatMap((hunk) => hunk.newLines > 0
-    ? [{ from: hunk.newStart, to: hunk.newStart + hunk.newLines - 1 }]
-    : []))
+  return normalizedLineRanges(
+    unifiedDiffHunks(patch).flatMap((hunk) =>
+      hunk.newLines > 0 ? [{ from: hunk.newStart, to: hunk.newStart + hunk.newLines - 1 }] : [],
+    ),
+  )
 }
 
-const intersections = (
-  ranges: readonly EditorLineRange[],
-  from: number,
-  to: number,
-): EditorLineRange[] => {
+const intersections = (ranges: readonly EditorLineRange[], from: number, to: number): EditorLineRange[] => {
   if (to < from) return []
   return ranges.flatMap((range) => {
     const start = Math.max(range.from, from)
@@ -103,10 +103,7 @@ const intersections = (
  * become a differently sized block. Pure local insertions shift later markers without acquiring the
  * pull-request marker themselves, and locally deleted marked lines disappear.
  */
-export function translateLineRanges(
-  ranges: readonly EditorLineRange[],
-  worktreePatch: string,
-): EditorLineRange[] {
+export function translateLineRanges(ranges: readonly EditorLineRange[], worktreePatch: string): EditorLineRange[] {
   const source = normalizedLineRanges(ranges)
   if (!source.length) return []
   const translated: EditorLineRange[] = []

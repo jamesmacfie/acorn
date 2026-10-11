@@ -32,7 +32,9 @@ export function Grid(props: {
   // writes it back as an inline height, which beats any stylesheet rule.
   const [rowH, setRowH] = createSignal(rowHeightSm())
   const virt = createVirtualizer({
-    get count() { return props.rows.length },
+    get count() {
+      return props.rows.length
+    },
     getScrollElement: () => scrollEl() ?? null,
     estimateSize: () => rowH(),
     overscan: 16,
@@ -40,10 +42,12 @@ export function Grid(props: {
   // Re-read the density token when the style pack changes, and measure again against it. Watched here
   // rather than passed in: this component is always the host's, on both render paths, so there is always
   // a shell signal to watch. A plugin drawing a `Grid` in a tree is not drawing it — the host is.
-  onCleanup(watchAppearance(() => {
-    setRowH(rowHeightSm())
-    virt.measure()
-  }))
+  onCleanup(
+    watchAppearance(() => {
+      setRowH(rowHeightSm())
+      virt.measure()
+    }),
+  )
 
   let frame = 0
   onCleanup(() => cancelAnimationFrame(frame))
@@ -54,11 +58,17 @@ export function Grid(props: {
     })
   }
   // Re-measure and go back to the top when the data is swapped out.
-  createEffect(on(() => [props.columns, props.rows] as const, () => {
-    const el = scrollEl()
-    if (el) el.scrollTop = 0
-    frame = requestAnimationFrame(() => virt.measure())
-  }, { defer: true }))
+  createEffect(
+    on(
+      () => [props.columns, props.rows] as const,
+      () => {
+        const el = scrollEl()
+        if (el) el.scrollTop = 0
+        frame = requestAnimationFrame(() => virt.measure())
+      },
+      { defer: true },
+    ),
+  )
 
   const template = () => `repeat(${props.columns.length}, var(--kit-grid-col))`
 
@@ -69,22 +79,32 @@ export function Grid(props: {
   const step = (delta: number, absolute?: 'first' | 'last'): boolean => {
     if (!props.rows.length || !props.onSelect) return false
     const at = props.selected ?? -1
-    const next = absolute === 'first' ? 0
-      : absolute === 'last' ? props.rows.length - 1
-      : Math.min(Math.max((at < 0 ? 0 : at) + delta, 0), props.rows.length - 1)
+    const next =
+      absolute === 'first'
+        ? 0
+        : absolute === 'last'
+          ? props.rows.length - 1
+          : Math.min(Math.max((at < 0 ? 0 : at) + delta, 0), props.rows.length - 1)
     props.onSelect(next)
     virt.scrollToIndex(next)
     return true
   }
   const handle = (intent: Intent): boolean => {
     switch (intent) {
-      case 'next': return step(1)
-      case 'prev': return step(-1)
-      case 'first': return step(0, 'first')
-      case 'last': return step(0, 'last')
-      case 'pageNext': return step(10)
-      case 'pagePrev': return step(-10)
-      default: return false
+      case 'next':
+        return step(1)
+      case 'prev':
+        return step(-1)
+      case 'first':
+        return step(0, 'first')
+      case 'last':
+        return step(0, 'last')
+      case 'pageNext':
+        return step(10)
+      case 'pagePrev':
+        return step(-10)
+      default:
+        return false
     }
   }
   const GRID_INTENTS: readonly Intent[] = ['next', 'prev', 'first', 'last', 'pageNext', 'pagePrev']
@@ -92,7 +112,10 @@ export function Grid(props: {
   return (
     <div
       class="ui-grid-scroll"
-      ref={(el) => { publish(el); bindIntents(el, GRID_INTENTS, handle) }}
+      ref={(el) => {
+        publish(el)
+        bindIntents(el, GRID_INTENTS, handle)
+      }}
       role="grid"
       tabindex="0"
       aria-label={props.ariaLabel}
@@ -101,7 +124,13 @@ export function Grid(props: {
     >
       <div class="ui-grid">
         <div class="ui-grid-head" role="row" style={{ 'grid-template-columns': template() }}>
-          <For each={props.columns}>{(column) => <span class="ui-grid-hcell" role="columnheader" title={column}>{column}</span>}</For>
+          <For each={props.columns}>
+            {(column) => (
+              <span class="ui-grid-hcell" role="columnheader" title={column}>
+                {column}
+              </span>
+            )}
+          </For>
         </div>
         <div class="ui-grid-body" style={{ height: `${virt.getTotalSize()}px` }}>
           <For each={virt.getVirtualItems()}>
@@ -113,11 +142,19 @@ export function Grid(props: {
                 aria-rowindex={item.index + 1}
                 aria-selected={props.selected === item.index}
                 data-selected={props.selected === item.index ? '' : undefined}
-                style={{ transform: `translateY(${item.start}px)`, height: `${rowH()}px`, 'grid-template-columns': template() }}
+                style={{
+                  transform: `translateY(${item.start}px)`,
+                  height: `${rowH()}px`,
+                  'grid-template-columns': template(),
+                }}
                 onClick={() => props.onSelect?.(item.index)}
               >
                 <For each={props.rows[item.index]}>
-                  {(cell) => <span class="ui-grid-cell" role="gridcell" title={cell}>{cell}</span>}
+                  {(cell) => (
+                    <span class="ui-grid-cell" role="gridcell" title={cell}>
+                      {cell}
+                    </span>
+                  )}
                 </For>
               </div>
             )}

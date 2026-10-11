@@ -42,9 +42,27 @@ export function Palette(props: { session: CommandSession }) {
   })
 
   overlayKeys([
-    { key: 'down', cmd: () => { props.session.move(1); return true } },
-    { key: 'up', cmd: () => { props.session.move(-1); return true } },
-    { key: 'return', cmd: () => { props.session.activate(); return true } },
+    {
+      key: 'down',
+      cmd: () => {
+        props.session.move(1)
+        return true
+      },
+    },
+    {
+      key: 'up',
+      cmd: () => {
+        props.session.move(-1)
+        return true
+      },
+    },
+    {
+      key: 'return',
+      cmd: () => {
+        props.session.activate()
+        return true
+      },
+    },
   ])
 
   return (
@@ -64,7 +82,9 @@ export function Palette(props: { session: CommandSession }) {
             onInput={(value) => props.session.setQuery(value)}
           />
         </box>
-        <Show when={props.session.status()}><Alert>{props.session.status()}</Alert></Show>
+        <Show when={props.session.status()}>
+          <Alert>{props.session.status()}</Alert>
+        </Show>
         <For
           each={window().rows}
           fallback={<Line role="muted">{props.session.busy() ? 'Loading…' : 'No matches.'}</Line>}

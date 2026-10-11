@@ -23,8 +23,12 @@ export class OutputRing {
     const encoded = Buffer.from(data, 'utf8')
     // An aligned ordinary block already owns exactly its storage. Adopt it without a second
     // allocation or copy. Pooled or oversized backing storage still takes the bounded copy path.
-    if (this.cursor % RING_BLOCK_BYTES === 0 && encoded.length === RING_BLOCK_BYTES &&
-        encoded.byteOffset === 0 && encoded.buffer.byteLength === RING_BLOCK_BYTES) {
+    if (
+      this.cursor % RING_BLOCK_BYTES === 0 &&
+      encoded.length === RING_BLOCK_BYTES &&
+      encoded.byteOffset === 0 &&
+      encoded.buffer.byteLength === RING_BLOCK_BYTES
+    ) {
       this.blocks[this.cursor / RING_BLOCK_BYTES] = encoded
       this.cursor = (this.cursor + RING_BLOCK_BYTES) % RING_CAP
       this.total = Math.min(RING_CAP, this.total + RING_BLOCK_BYTES)
@@ -110,7 +114,12 @@ export const launchCommandLine = (command: string, launchArgs: string[] = []): s
 
 // Parse `tmux list-sessions -F '#{session_name}'` into the set of our session names.
 export const parseTmuxSessions = (stdout: string): Set<string> =>
-  new Set(stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith(TMUX_PREFIX)))
+  new Set(
+    stdout
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith(TMUX_PREFIX)),
+  )
 
 // Idle threshold (docs/terminal/activity.md § Activity and status).
 export const IDLE_MS = 10_000
@@ -131,12 +140,7 @@ export const resolveBackend = (preference: 'node-pty' | 'tmux', tmuxAvailable: b
 const ANSI_RE = /\x1b(?:\[[0-9;?]*[a-zA-Z~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[()][A-Z0-9])/g
 const SPINNER_RE = /[⠁⠂⠄⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◓◑◒]/g
 
-const BLOCKED_PATTERNS: RegExp[] = [
-  /\(y\/n\)/i,
-  /\[y\/n\]/i,
-  /do you want to proceed/i,
-  /press enter/i,
-]
+const BLOCKED_PATTERNS: RegExp[] = [/\(y\/n\)/i, /\[y\/n\]/i, /do you want to proceed/i, /press enter/i]
 
 export const TAIL_SCAN_LINES = 12
 

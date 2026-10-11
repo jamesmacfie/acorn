@@ -55,7 +55,9 @@ export type CoreProcService = {
 
 export type CoreServices = {
   /** Verify provenance that the authenticated tool route minted for one signed invocation. */
-  agentToolProvenance?: { verify(input: import('../agentTools/provenance').AgentToolProvenance): boolean | Promise<boolean> }
+  agentToolProvenance?: {
+    verify(input: import('../agentTools/provenance').AgentToolProvenance): boolean | Promise<boolean>
+  }
   // Path confinement for anything a caller names: worktree-relative reads/writes, agent file mentions.
   fs: CoreFsService
   // The one git seam: GIT_TERMINAL_PROMPT=0, SSH_AUTH_SOCK passthrough, bounded output.
@@ -103,12 +105,19 @@ export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects' | 'mo
   secretPublication?: SecretPublicationGate
   checkoutAdmission: CheckoutAdmission
   /** Serializes repository metadata writes with task branch reservations for the same Git object store. */
-  repositoryMetadata: { write<T>(projectId: string, action: (repository: string, commonDirectory: string) => Promise<T>): Promise<T> }
+  repositoryMetadata: {
+    write<T>(projectId: string, action: (repository: string, commonDirectory: string) => Promise<T>): Promise<T>
+  }
   taskScripts: TaskScriptEvidenceService
   tasks: CompiledTaskService
   projects: CompiledProjectService
   // `forPlugin` is the owner-bound facet scopeCore hands a loaded plugin (../modelProviders/grants.ts).
-  models: ModelService & { forPlugin(pluginId: string): { generateText(request: PluginGenerateTextRequest): ReturnType<ModelService['generateText']>; available: ModelService['available'] } }
+  models: ModelService & {
+    forPlugin(pluginId: string): {
+      generateText(request: PluginGenerateTextRequest): ReturnType<ModelService['generateText']>
+      available: ModelService['available']
+    }
+  }
 }
 
 export function createCoreServices(options: {
@@ -125,29 +134,34 @@ export function createCoreServices(options: {
 }): CompiledCoreServices {
   const rawTasks = createTaskService(options.db)
   const projects = createProjectService(options.db, options.activeIdentity)
-  const checkoutAdmission = createCheckoutAdmission(rawTasks, projects, git,
-    async () => options.db.select(TASK_REF_COLUMNS).from(schema.tasks).all())
+  const checkoutAdmission = createCheckoutAdmission(rawTasks, projects, git, async () =>
+    options.db.select(TASK_REF_COLUMNS).from(schema.tasks).all(),
+  )
   checkoutAdmission.registerOwner('setup', async (taskIds) => setupCheckoutActivity(options.db, taskIds))
   registerCheckoutAdmission(options.db, checkoutAdmission)
   const tasks: CompiledTaskService = {
     ...rawTasks,
     root: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.root(taskId)),
     requireRoot: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.requireRoot(taskId)),
-    resolveCwd: (task, baseCheckout) => task
-      ? checkoutAdmission.admitWork(task.id, () => rawTasks.resolveCwd(task, baseCheckout))
-      : rawTasks.resolveCwd(task, baseCheckout),
+    resolveCwd: (task, baseCheckout) =>
+      task
+        ? checkoutAdmission.admitWork(task.id, () => rawTasks.resolveCwd(task, baseCheckout))
+        : rawTasks.resolveCwd(task, baseCheckout),
     runConfig: (taskId) => checkoutAdmission.admitWork(taskId, () => rawTasks.runConfig(taskId)),
   }
   const identity = createIdentityService(options.activeIdentity)
   const models = createModelService(options.db, options.secrets)
   const prefs = createPrefService(options.db)
   let gate: Promise<SecretPublicationGate> | undefined
-  const secretGate = () => gate ??= import('../secretChecks/gate').then((module) => module.createSecretPublicationGate({ db: options.db, prefs, identity }))
+  const secretGate = () =>
+    (gate ??= import('../secretChecks/gate').then((module) =>
+      module.createSecretPublicationGate({ db: options.db, prefs, identity }),
+    ))
   return {
     agentToolProvenance: { verify: verifyAgentToolProvenance },
     agentTools: {
-      catalog: async () => (await import('../agentTools/registry')).agentToolContributions()
-        .map(({ name, risk }) => ({ name, risk })),
+      catalog: async () =>
+        (await import('../agentTools/registry')).agentToolContributions().map(({ name, risk }) => ({ name, risk })),
     },
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
     // real modules rather than a second declaration that can drift off them.
@@ -159,10 +173,14 @@ export function createCoreServices(options: {
         const { repositoryMetadataKey, withBranchReservation } = await import('../worktrees/taskBranch')
         const project = await getProject(options.db, projectId)
         if (!project?.path || project.vcs !== 'git') throw new Error('Git project is unavailable on this Node.')
-        return withBranchReservation(options.db, project, async () => action(
-          realpathSync(await git.gitText(['rev-parse', '--show-toplevel'], { cwd: project.path!, timeoutMs: 10_000 })),
-          await repositoryMetadataKey(project),
-        ))
+        return withBranchReservation(options.db, project, async () =>
+          action(
+            realpathSync(
+              await git.gitText(['rev-parse', '--show-toplevel'], { cwd: project.path!, timeoutMs: 10_000 }),
+            ),
+            await repositoryMetadataKey(project),
+          ),
+        )
       },
     },
     proc: proc satisfies CoreProcService,
@@ -175,7 +193,9 @@ export function createCoreServices(options: {
       // The grant runtime loads on a loaded plugin's first call, not at boot.
       forPlugin: (pluginId) => ({
         generateText: async (request) =>
-          (await import('../modelProviders/grants')).pluginModelService(options.db, models, identity, pluginId).generateText(request),
+          (await import('../modelProviders/grants'))
+            .pluginModelService(options.db, models, identity, pluginId)
+            .generateText(request),
         available: (userId) => models.available(userId),
       }),
     },
@@ -203,7 +223,16 @@ export function createCoreServices(options: {
 }
 
 export { SecretService }
-export type { AttachTaskPullInput, ChildTaskSeed, CompiledTaskService, RootTaskSeed, TaskLinkRef, TaskPullRelation, TaskRunConfig, TaskService } from './tasks'
+export type {
+  AttachTaskPullInput,
+  ChildTaskSeed,
+  CompiledTaskService,
+  RootTaskSeed,
+  TaskLinkRef,
+  TaskPullRelation,
+  TaskRunConfig,
+  TaskService,
+} from './tasks'
 export type { IdentityService } from './identity'
 export type { CompiledProjectService, ProjectService } from './projectRefs'
 // The shapes ProjectService hands back and takes in. A plugin that calls the seam has to name them,

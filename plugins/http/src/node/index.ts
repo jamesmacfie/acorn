@@ -23,8 +23,10 @@ export const httpPlugin = (): NodePlugin => ({
     const db = ctx.storage.open()
     ctx.routes.fetch(createHttpFetch(db, ctx.core, ctx.events.send), { prefix: '', note: '/projects/:projectId/*' })
     // The task's ad-hoc requests. One saved to the repo tree has no task id and stays.
-    registerDeletedTaskPurge(ctx, async (taskIds) =>
-      (await db.delete(httpRequests).where(inArray(httpRequests.taskId, [...taskIds]))).changes)
+    registerDeletedTaskPurge(
+      ctx,
+      async (taskIds) => (await db.delete(httpRequests).where(inArray(httpRequests.taskId, [...taskIds]))).changes,
+    )
     // The `http:request` workflow step (./workflowStep.ts). Contributed rather than granted: workflows
     // opens the point and any plugin may fill it, so this needs no special case in that package.
     //
@@ -32,7 +34,11 @@ export const httpPlugin = (): NodePlugin => ({
     // never read — and nothing here throws if workflows inits after this plugin does.
     ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, {
       id: 'request',
-      value: { handler: httpStepHandler(db, ctx.core, ctx.audit.record), validate: validateHttpStep, describe: describeHttpStep },
+      value: {
+        handler: httpStepHandler(db, ctx.core, ctx.audit.record),
+        validate: validateHttpStep,
+        describe: describeHttpStep,
+      },
     })
   },
 })

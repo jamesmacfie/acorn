@@ -14,16 +14,27 @@ beforeEach(async () => {
   setCacheStorage({ getItem: async () => undefined, setItem: async () => {}, removeItem: async () => {} })
   targets.length = 0
   respond = async () => true
-  vi.stubGlobal('window', { acorn: {
-    fleetList: async () => ({ nodes: ['A', 'B'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: 'https://synthetic.invalid' })), statuses: ['A', 'B'].map((nodeId) => ({ nodeId, state: 'online' })) }),
-    onNodeStatus: () => () => {},
-    nodeFetch: async (nodeId: string, request: { body: { kind: 'bytes'; bytes: Uint8Array } }) => {
-      const body = JSON.parse(new TextDecoder().decode(request.body.bytes))
-      targets.push({ nodeId, value: body.value })
-      const ok = await respond(nodeId, body.value)
-      return { status: ok ? 200 : 500, headers: {}, body: new TextEncoder().encode(JSON.stringify(ok ? body : { error: { code: 'fixture_failure', message: 'failed' } })) }
+  vi.stubGlobal('window', {
+    acorn: {
+      fleetList: async () => ({
+        nodes: ['A', 'B'].map((nodeId) => ({ nodeId, label: nodeId, endpoint: 'https://synthetic.invalid' })),
+        statuses: ['A', 'B'].map((nodeId) => ({ nodeId, state: 'online' })),
+      }),
+      onNodeStatus: () => () => {},
+      nodeFetch: async (nodeId: string, request: { body: { kind: 'bytes'; bytes: Uint8Array } }) => {
+        const body = JSON.parse(new TextDecoder().decode(request.body.bytes))
+        targets.push({ nodeId, value: body.value })
+        const ok = await respond(nodeId, body.value)
+        return {
+          status: ok ? 200 : 500,
+          headers: {},
+          body: new TextEncoder().encode(
+            JSON.stringify(ok ? body : { error: { code: 'fixture_failure', message: 'failed' } }),
+          ),
+        }
+      },
     },
-  } })
+  })
   await refreshFleet()
   setActiveNode('A')
 })
@@ -58,12 +69,16 @@ describe('preference origin custody', () => {
   })
 
   it('keeps independent same-key confirmation, ordering, and rollback for A and B', async () => {
-    const qA = clientFor('A').client, qB = clientFor('B').client
+    const qA = clientFor('A').client,
+      qB = clientFor('B').client
     qA.setQueryData(prefsKey, { same: 'A-confirmed' })
     qB.setQueryData(prefsKey, { same: 'B-confirmed' })
     let releaseA!: () => void
     respond = async (id, value) => {
-      if (id === 'A' && value === 'A-new-confirmed') await new Promise<void>((resolve) => { releaseA = resolve })
+      if (id === 'A' && value === 'A-new-confirmed')
+        await new Promise<void>((resolve) => {
+          releaseA = resolve
+        })
       return value === 'A-new-confirmed'
     }
     const a1 = savePref(qA, 'same', 'A-new-confirmed')
@@ -81,7 +96,9 @@ describe('preference origin custody', () => {
 
   it('preserves direct browser setPref and origin partition semantics', async () => {
     vi.unstubAllGlobals()
-    const fetch = vi.fn(async (_path: string, options: { body: Uint8Array }) => Response.json(JSON.parse(new TextDecoder().decode(options.body))))
+    const fetch = vi.fn(async (_path: string, options: { body: Uint8Array }) =>
+      Response.json(JSON.parse(new TextDecoder().decode(options.body))),
+    )
     vi.stubGlobal('fetch', fetch)
     setActiveNode('B')
     await setPref('node-owned', 'direct')

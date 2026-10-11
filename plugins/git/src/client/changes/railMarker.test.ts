@@ -2,8 +2,14 @@ import { describe, expect, it } from 'vitest'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import { changesDot } from './railMarker'
 
-const change = (over: Partial<LocalChange>): LocalChange =>
-  ({ path: 'a.ts', status: 'modified', staged: false, additions: 0, deletions: 0, ...over })
+const change = (over: Partial<LocalChange>): LocalChange => ({
+  path: 'a.ts',
+  status: 'modified',
+  staged: false,
+  additions: 0,
+  deletions: 0,
+  ...over,
+})
 
 describe('changesDot', () => {
   it('says nothing about a clean tree', () => {

@@ -1,5 +1,10 @@
 // The settings form's working copy of one server, and the two conversions it needs.
-import type { AgentMcpManagedPackage, AgentMcpServer, AgentMcpServerInput, AgentMcpTransport } from '../../shared/mcpServers'
+import type {
+  AgentMcpManagedPackage,
+  AgentMcpServer,
+  AgentMcpServerInput,
+  AgentMcpTransport,
+} from '../../shared/mcpServers'
 
 /** `stored` marks a secret the node already holds. Left empty, it is kept. */
 export type AgentMcpPairDraft = { name: string; value: string; secret: boolean; stored: boolean }
@@ -54,17 +59,22 @@ export const agentMcpServerDraft = (server: AgentMcpServer): AgentMcpServerDraft
 export function agentMcpServerInput(draft: AgentMcpServerDraft): AgentMcpServerInput {
   const values = draft.values
     .filter((pair) => pair.name.trim())
-    .map((pair) => (pair.secret && pair.stored && pair.value === ''
-      ? { name: pair.name.trim(), secret: true }
-      : { name: pair.name.trim(), value: pair.value, secret: pair.secret }))
+    .map((pair) =>
+      pair.secret && pair.stored && pair.value === ''
+        ? { name: pair.name.trim(), secret: true }
+        : { name: pair.name.trim(), value: pair.value, secret: pair.secret },
+    )
   return draft.transport === 'stdio'
     ? {
-      transport: 'stdio',
-      command: draft.command.trim(),
-      args: draft.args.split('\n').map((arg) => arg.trim()).filter(Boolean),
-      values,
-      enabled: draft.enabled,
-      reviewTools: draft.reviewTools,
-    }
+        transport: 'stdio',
+        command: draft.command.trim(),
+        args: draft.args
+          .split('\n')
+          .map((arg) => arg.trim())
+          .filter(Boolean),
+        values,
+        enabled: draft.enabled,
+        reviewTools: draft.reviewTools,
+      }
     : { transport: 'http', url: draft.url.trim(), values, enabled: draft.enabled, reviewTools: draft.reviewTools }
 }

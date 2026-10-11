@@ -44,7 +44,8 @@ describe('createLogger', () => {
     setTelemetryDataRoot(dataRoot)
     const text = `${token} ${homedir()}/private ${dataRoot}/private\u001b\nnext\tline`
     const log = createLogger(text, 'http')
-    for (const level of ['debug', 'info', 'warn', 'error'] as const) log[level](text, { [text]: text, retry: false, count: 3, empty: null, owner: 'spoof', 'runtime\u0000': 'spoof' })
+    for (const level of ['debug', 'info', 'warn', 'error'] as const)
+      log[level](text, { [text]: text, retry: false, count: 3, empty: null, owner: 'spoof', 'runtime\u0000': 'spoof' })
     const lines = [...warn.mock.calls, ...error.mock.calls].map(([line]) => String(line))
     expect(lines).toHaveLength(4)
     for (const line of lines) {
@@ -64,7 +65,9 @@ describe('createLogger', () => {
 
   it('caps fields, attribute count, and the complete UTF-8 stderr line', async () => {
     const records = await collecting()
-    const attrs = Object.fromEntries(Array.from({ length: 100 }, (_, index) => [`key${index}${'k'.repeat(100)}`, '🦉'.repeat(1_000)]))
+    const attrs = Object.fromEntries(
+      Array.from({ length: 100 }, (_, index) => [`key${index}${'k'.repeat(100)}`, '🦉'.repeat(1_000)]),
+    )
     createLogger('t'.repeat(2_000)).info('🦉'.repeat(3_000), attrs)
     const line = String(error.mock.calls[0]?.[0])
     expect(Buffer.byteLength(line)).toBeLessThanOrEqual(4_000)
@@ -77,13 +80,23 @@ describe('createLogger', () => {
       expect(key.length).toBeLessThanOrEqual(ATTR_KEY_MAX)
       if (typeof value === 'string') expect(value.length).toBeLessThanOrEqual(ATTR_VALUE_MAX)
     }
-    expect(records()).toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'metric', name: 'telemetry.truncated', value: expect.any(Number) })]))
+    expect(records()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'metric', name: 'telemetry.truncated', value: expect.any(Number) }),
+      ]),
+    )
   })
 
   it('scrubs keys and protects attribution on direct collector calls', async () => {
     const records = await collecting()
     const token = 'sk-syntheticCollectorKey12345'
-    emitLog('http', { at: 0, level: 'info', logger: token, body: 'normal diagnostic', attrs: { [token]: 'safe', 'owner\u0000': 'spoof', 'runtime\u0000': 'spoof', count: 4 } })
+    emitLog('http', {
+      at: 0,
+      level: 'info',
+      logger: token,
+      body: 'normal diagnostic',
+      attrs: { [token]: 'safe', 'owner\u0000': 'spoof', 'runtime\u0000': 'spoof', count: 4 },
+    })
     const record = records().find((value): value is TelemetryLog => value.kind === 'log')!
     expect(Object.keys(record.attrs)).toContain('<redacted>')
     expect(JSON.stringify(record)).not.toContain(token)

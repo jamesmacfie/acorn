@@ -2,8 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSession } from '../../contract/wire.ts'
 
 const mocks = vi.hoisted(() => ({
-  sessions: vi.fn(), patch: vi.fn(), upsertSession: vi.fn(),
-  markAttentionSeen: vi.fn(), markTargetsRead: vi.fn(), toast: vi.fn(),
+  sessions: vi.fn(),
+  patch: vi.fn(),
+  upsertSession: vi.fn(),
+  markAttentionSeen: vi.fn(),
+  markTargetsRead: vi.fn(),
+  toast: vi.fn(),
 }))
 vi.mock('./managedClient', () => ({ managedAgentApi: { patch: mocks.patch } }))
 vi.mock('./managedStore', () => ({
@@ -32,7 +36,10 @@ describe('mark all agents read', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.sessions.mockReturnValue([
-      session('done', 'completed'), session('broke', 'error'), session('asking', 'permission'), session('quiet', 'none'),
+      session('done', 'completed'),
+      session('broke', 'error'),
+      session('asking', 'permission'),
+      session('quiet', 'none'),
     ])
     mocks.patch.mockImplementation(async (id: string) => session(id, 'none'))
   })
@@ -43,9 +50,15 @@ describe('mark all agents read', () => {
 
   it('reads each to its end, retires its inbox row and marks its notices read', async () => {
     await markAgentsRead()
-    expect(mocks.patch.mock.calls).toEqual([['done', { lastReadSeq: 7 }], ['broke', { lastReadSeq: 7 }]])
+    expect(mocks.patch.mock.calls).toEqual([
+      ['done', { lastReadSeq: 7 }],
+      ['broke', { lastReadSeq: 7 }],
+    ])
     expect(mocks.upsertSession).toHaveBeenCalledTimes(2)
-    expect(mocks.markAttentionSeen.mock.calls).toEqual([['node-1', 'agents.sessions:done'], ['node-1', 'agents.sessions:broke']])
+    expect(mocks.markAttentionSeen.mock.calls).toEqual([
+      ['node-1', 'agents.sessions:done'],
+      ['node-1', 'agents.sessions:broke'],
+    ])
     expect(mocks.markTargetsRead).toHaveBeenCalledWith('managed-agent', new Set(['done', 'broke']))
     expect(mocks.toast).not.toHaveBeenCalled()
   })

@@ -64,7 +64,10 @@ export type PluginProviderResourceRequest<TInput> = {
   requireFresh?: boolean
 }
 
-export type PluginProviderConnectionVisitor<T, Conn = unknown> = (connection: Conn, secret: string) => Promise<T | undefined>
+export type PluginProviderConnectionVisitor<T, Conn = unknown> = (
+  connection: Conn,
+  secret: string,
+) => Promise<T | undefined>
 
 export type PluginProviderRuntime<Conn = unknown, Items = unknown> = {
   resource<TInput, TOutput>(args: PluginProviderResourceRequest<TInput>): Promise<RouteResult<TOutput>>

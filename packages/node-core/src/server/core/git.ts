@@ -68,10 +68,10 @@ const spec = (args: readonly string[], opts: GitOptions) => ({
 // the selected executable and must reach the caller unchanged.
 const commandLineToolsGit = '/Library/Developer/CommandLineTools/usr/bin/git'
 const xcodeLicenseBlocked = (result: ProcResult): boolean =>
-  process.platform === 'darwin'
-  && result.code === 69
-  && /You have not agreed to the Xcode license agreements/.test(result.stderr)
-  && existsSync(commandLineToolsGit)
+  process.platform === 'darwin' &&
+  result.code === 69 &&
+  /You have not agreed to the Xcode license agreements/.test(result.stderr) &&
+  existsSync(commandLineToolsGit)
 
 // A histogram per subcommand rather than per argument list: a status ping spawns `git status` and
 // two `git diff` per active worktree per connected client and nothing counted them, which is the
@@ -92,9 +92,7 @@ export const git = (args: readonly string[], opts: GitOptions): Promise<ProcResu
   measure('core', seam(args), async () => {
     const command = spec(args, opts)
     const result = await runProcess(command)
-    return xcodeLicenseBlocked(result)
-      ? runProcess({ ...command, file: commandLineToolsGit })
-      : result
+    return xcodeLicenseBlocked(result) ? runProcess({ ...command, file: commandLineToolsGit }) : result
   })
 
 // For the callers that treat a non-zero exit as an error.
@@ -110,4 +108,5 @@ export const gitOrThrow = (args: readonly string[], opts: GitOptions): Promise<P
   })
 
 // stdout of a successful command, trimmed, which is the shape most call sites wanted.
-export const gitText = async (args: readonly string[], opts: GitOptions): Promise<string> => (await gitOrThrow(args, opts)).stdout.trim()
+export const gitText = async (args: readonly string[], opts: GitOptions): Promise<string> =>
+  (await gitOrThrow(args, opts)).stdout.trim()

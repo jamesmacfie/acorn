@@ -12,7 +12,11 @@ import { isStale, reportPatches } from './inlineDiff/patchStatus.ts'
 import { installManagedHandoff } from '../contract/handoffClient'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentApi } from './sessions/managedClient'
-import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents, agentAttentionItemId } from './sessions/managedSelection'
+import {
+  activateManagedAgentNoticeTargets,
+  activateManagedAgentPaneIntents,
+  agentAttentionItemId,
+} from './sessions/managedSelection'
 import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { agentPaneContribution } from './paneContribution'
@@ -45,8 +49,13 @@ export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
   required: true,
   init: (ctx) => {
-    ctx.contentLinks.register({ id: 'agents.session', providerId: 'agents', parse: () => null,
-      target: item => ({ kind: 'agents.session', item, pane: 'agent' }), presentations: ['pane'] })
+    ctx.contentLinks.register({
+      id: 'agents.session',
+      providerId: 'agents',
+      parse: () => null,
+      target: (item) => ({ kind: 'agents.session', item, pane: 'agent' }),
+      presentations: ['pane'],
+    })
     // The harnesses' own marks, so a provider reads as itself wherever it is named. The node's
     // descriptors point their `glyph` at these names (server/drivers/claudeHarness.ts, codexDriver.ts).
     //
@@ -55,8 +64,16 @@ export const agentsClientPlugin: ClientPlugin = {
     // would put the literal string `brand:model-providers/openai` on screen the moment that package is
     // disabled. See docs/ui-design.md section Icons. From simple-icons (CC0 artwork; each trademark
     // remains its owner's).
-    ctx.brandMarks.register({ id: 'agents/claude', color: '#D97757', d: 'M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z' })
-    ctx.brandMarks.register({ id: 'agents/codex', color: '#412991', d: 'M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z' })
+    ctx.brandMarks.register({
+      id: 'agents/claude',
+      color: '#D97757',
+      d: 'M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z',
+    })
+    ctx.brandMarks.register({
+      id: 'agents/codex',
+      color: '#412991',
+      d: 'M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z',
+    })
     ctx.panes.register(agentPaneContribution)
     ctx.agentContexts.register(sessionContextContribution)
     // Anyone with a session id, or with the id of a workflow step that started one, can draw its
@@ -64,7 +81,9 @@ export const agentsClientPlugin: ClientPlugin = {
     // node it has selected, so a step reads the same way in either place.
     ctx.capabilities.provide(AGENTS_CONVERSATION, { Conversation: AgentConversation })
     ctx.capabilities.provide(AGENTS_INLINE_DIFF, {
-      prime: (taskId) => { void managedAgentStore.loadTask(taskId).catch(() => undefined) },
+      prime: (taskId) => {
+        void managedAgentStore.loadTask(taskId).catch(() => undefined)
+      },
       sessionsForTask: managedAgentStore.sessionsForTask,
       reportPatches,
       isStale,
@@ -75,7 +94,11 @@ export const agentsClientPlugin: ClientPlugin = {
     // attachment chip by the file's media type; the composer's action bar takes everyone who has
     // something to offer a draft, up to the owner's ceiling because it is the owner's bar.
     ctx.extensionPoints.register({
-      id: 'tool-card', label: 'Agent tool call', kind: 'remote', mode: 'replace', max: 1,
+      id: 'tool-card',
+      label: 'Agent tool call',
+      kind: 'remote',
+      mode: 'replace',
+      max: 1,
     })
     // `replace` is the one thing a contributor may ask this pane to do (docs/plugins/remote-points.md § Asking the
     // owner). An editor that draws an attachment has to be able to hand back an altered one, and props
@@ -83,38 +106,68 @@ export const agentsClientPlugin: ClientPlugin = {
     // The composer binds the handler per attachment and decides whether to accept
     // (./composer/AgentComposer.tsx).
     ctx.extensionPoints.register({
-      id: 'attachment', label: 'Agent turn attachment', kind: 'remote', mode: 'replace', max: 1,
+      id: 'attachment',
+      label: 'Agent turn attachment',
+      kind: 'remote',
+      mode: 'replace',
+      max: 1,
       actions: ['replace'],
     })
     // The body of a sent attachment's tile and of an artifact card, keyed by media type
     // (../contract/transcriptMedia.ts). No actions: stored media is read-only, and the card keeps its
     // name, size and download outside the slot.
     ctx.extensionPoints.register({
-      id: 'transcript-attachment', label: 'Sent attachment', kind: 'remote', mode: 'replace', max: 1,
+      id: 'transcript-attachment',
+      label: 'Sent attachment',
+      kind: 'remote',
+      mode: 'replace',
+      max: 1,
     })
     ctx.extensionPoints.register({
-      id: 'artifact', label: 'Agent artifact', kind: 'remote', mode: 'replace', max: 1,
+      id: 'artifact',
+      label: 'Agent artifact',
+      kind: 'remote',
+      mode: 'replace',
+      max: 1,
     })
     ctx.extensionPoints.register({
-      id: 'composer-actions', label: 'Agent composer', kind: 'remote', mode: 'stack', max: 4,
+      id: 'composer-actions',
+      label: 'Agent composer',
+      kind: 'remote',
+      mode: 'stack',
+      max: 4,
     })
     ctx.extensionPoints.register({
-      id: 'session-header', label: 'Agent session header', kind: 'remote', mode: 'stack', max: 2,
+      id: 'session-header',
+      label: 'Agent session header',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
     })
     // A note on a request waiting for the person, such as a policy plugin's warning. Below the card's
     // own buttons, which stay the owner's (./sessions/AgentRequestCard.tsx).
     ctx.extensionPoints.register({
-      id: 'request-card', label: 'Agent request card', kind: 'remote', mode: 'stack', max: 2,
+      id: 'request-card',
+      label: 'Agent request card',
+      kind: 'remote',
+      mode: 'stack',
+      max: 2,
     })
     // The task row's agent state, in the rail's top-right corner (railMarkerContribution.ts). The host
     // owns the corner and the collision rules; this plugin only says what is true.
     ctx.railMarkers.register(agentRailMarkerContribution)
     ctx.sources.register(agentCenterSourceContribution)
     ctx.contextMenus.register({
-      id: 'agents.sessions.mark-read', location: 'rail.source', surface: 'agents',
-      label: 'Mark all agents read', icon: 'check', order: 110,
+      id: 'agents.sessions.mark-read',
+      location: 'rail.source',
+      surface: 'agents',
+      label: 'Mark all agents read',
+      icon: 'check',
+      order: 110,
       when: () => clearableAgents().length > 0,
-      run: () => { void markAgentsRead() },
+      run: () => {
+        void markAgentsRead()
+      },
     })
     // A terminal running one of this plugin's harness CLIs (./terminalProfileCommands.ts). The shell
     // keeps the drawer toggle and the plain shell; it no longer knows a harness by name.
@@ -132,21 +185,65 @@ export const agentsClientPlugin: ClientPlugin = {
     // The Agents group's pages, each with the sections and rows it draws for search (each page's file
     // draws the same ones). Core's Tools and permissions (order 30) sits between them.
     ctx.settingsPages.register({
-      id: 'agent-defaults', label: 'Harnesses and defaults', category: 'agents', scope: 'node', icon: 'sliders-horizontal', order: 10, requires: { plugin: 'agents' },
+      id: 'agent-defaults',
+      label: 'Harnesses and defaults',
+      category: 'agents',
+      scope: 'node',
+      icon: 'sliders-horizontal',
+      order: 10,
+      requires: { plugin: 'agents' },
       // A section per installed harness is drawn as well, and left out because it depends on the node.
-      keywords: ['harness', 'claude code', 'codex', 'model', 'effort', 'reasoning', 'usage limit', 'fold', 'collapse', 'idle', 'stuck', 'retention'],
+      keywords: [
+        'harness',
+        'claude code',
+        'codex',
+        'model',
+        'effort',
+        'reasoning',
+        'usage limit',
+        'fold',
+        'collapse',
+        'idle',
+        'stuck',
+        'retention',
+      ],
       sections: [
         { id: 'harnesses', label: 'Harnesses', keywords: ['installed', 'cli'] },
         { id: 'usage', label: 'Usage limits', rows: ['Continue when usage resets'] },
         { id: 'idle', label: 'Idle agents', rows: ['Stop idle agents after'], keywords: ['memory', 'stop'] },
-        { id: 'repeated-calls', label: 'Stuck agents', rows: ['Warn when an agent repeats a tool call'], keywords: ['loop', 'repeat', 'stuck'] },
-        { id: 'archived', label: 'Archived tasks', rows: ['Keep agent history for archived tasks'], keywords: ['retention', 'delete history', 'disk'] },
-        { id: 'generate', label: 'Generating text', rows: ['Generate with'], keywords: ['default model', 'this device', 'commit message', 'sql generation', 'workflow drafts'] },
+        {
+          id: 'repeated-calls',
+          label: 'Stuck agents',
+          rows: ['Warn when an agent repeats a tool call'],
+          keywords: ['loop', 'repeat', 'stuck'],
+        },
+        {
+          id: 'archived',
+          label: 'Archived tasks',
+          rows: ['Keep agent history for archived tasks'],
+          keywords: ['retention', 'delete history', 'disk'],
+        },
+        {
+          id: 'generate',
+          label: 'Generating text',
+          rows: ['Generate with'],
+          keywords: ['default model', 'this device', 'commit message', 'sql generation', 'workflow drafts'],
+        },
         // The switch's label reads "Send task context at startup", which a search for the words people
         // use for it would miss, so the section names them and search lands on the switch's section.
-        { id: 'new-sessions', label: 'New sessions', rows: ["Carry my last session's settings forward", 'Send task context at startup', 'MCP servers'], keywords: ['startup context', 'task context'] },
+        {
+          id: 'new-sessions',
+          label: 'New sessions',
+          rows: ["Carry my last session's settings forward", 'Send task context at startup', 'MCP servers'],
+          keywords: ['startup context', 'task context'],
+        },
         { id: 'inline', label: 'Inline diff chats', rows: ['Provider'] },
-        { id: 'spawned', label: 'Spawned agents', rows: ['Spawn settings', 'Spawned agent harness'], keywords: ['subtasks', 'subagents', 'inherit', 'model', 'effort', 'reasoning'] },
+        {
+          id: 'spawned',
+          label: 'Spawned agents',
+          rows: ['Spawn settings', 'Spawned agent harness'],
+          keywords: ['subtasks', 'subagents', 'inherit', 'model', 'effort', 'reasoning'],
+        },
         { id: 'transcript', label: 'Transcript', rows: ['Tool call display'], keywords: ['tool output'] },
       ],
       component: AgentSessionDefaultsSettings,
@@ -155,7 +252,13 @@ export const agentsClientPlugin: ClientPlugin = {
     // (docs/managed-agents/custom-agents.md § Custom agents). "From plugins" is left out: it is only drawn while a
     // plugin contributes an agent.
     ctx.settingsPages.register({
-      id: 'custom-agents', label: 'Custom agents', category: 'agents', scope: 'node', icon: 'bot', order: 20, requires: { plugin: 'agents' },
+      id: 'custom-agents',
+      label: 'Custom agents',
+      category: 'agents',
+      scope: 'node',
+      icon: 'bot',
+      order: 20,
+      requires: { plugin: 'agents' },
       keywords: ['instructions', 'system prompt', 'harness', 'preset'],
       sections: [{ id: 'agents', label: 'Your agents' }],
       component: CustomAgentsSettings,
@@ -163,9 +266,25 @@ export const agentsClientPlugin: ClientPlugin = {
     // Two sections: the servers acorn adds to every session, and the ones each CLI loads by itself,
     // which was core's MCP config files page. Its old id is an alias for the config files section.
     ctx.settingsPages.register({
-      id: 'agent-mcp-servers', label: 'MCP', category: 'agents', scope: 'node', icon: 'server-cog', order: 40, requires: { plugin: 'agents' },
+      id: 'agent-mcp-servers',
+      label: 'MCP',
+      category: 'agents',
+      scope: 'node',
+      icon: 'server-cog',
+      order: 40,
+      requires: { plugin: 'agents' },
       aliases: ['mcp#files'],
-      keywords: ['mcp', 'model context protocol', 'tools', 'stdio', 'http', '/mcp', '.mcp.json', 'claude.json', 'cursor'],
+      keywords: [
+        'mcp',
+        'model context protocol',
+        'tools',
+        'stdio',
+        'http',
+        '/mcp',
+        '.mcp.json',
+        'claude.json',
+        'cursor',
+      ],
       sections: [
         { id: 'servers', label: 'Servers' },
         { id: 'files', label: 'Config files', rows: ['Project', 'Starter file'] },
@@ -175,20 +294,29 @@ export const agentsClientPlugin: ClientPlugin = {
     // This plugin's numbers on core's Settings > Storage and memory page: running agents, their
     // memory, and the stop for idle ones (./settings/AgentStorageSection.tsx).
     ctx.extensions.register({
-      id: 'agents.storage', point: CORE_STORAGE_POINT, label: 'Running agents', order: 10,
+      id: 'agents.storage',
+      point: CORE_STORAGE_POINT,
+      label: 'Running agents',
+      order: 10,
       requires: { plugin: 'agents' },
       component: AgentStorageSection,
     })
     // The instruction file check's switch, on core's Settings > Security and backup page
     // (./settings/AgentSecuritySection.tsx).
     ctx.extensions.register({
-      id: 'agents.security', point: CORE_SECURITY_POINT, label: 'Agent instruction files', order: 10,
+      id: 'agents.security',
+      point: CORE_SECURITY_POINT,
+      label: 'Agent instruction files',
+      order: 10,
       requires: { plugin: 'agents' },
       component: AgentSecuritySection,
     })
     // Which harnesses a plugin's tool hooks reach, on that plugin's own page (./settings/LoopCoverageSection.tsx).
     ctx.extensions.register({
-      id: 'agents.loop-coverage', point: CORE_PLUGIN_PAGE_POINT, label: 'Agents it reaches', order: 10,
+      id: 'agents.loop-coverage',
+      point: CORE_PLUGIN_PAGE_POINT,
+      label: 'Agents it reaches',
+      order: 10,
       requires: { plugin: 'agents' },
       component: LoopCoverageSection,
     })
@@ -196,9 +324,28 @@ export const agentsClientPlugin: ClientPlugin = {
     // remembered page or another plugin's `openSettings('agent-pricing')` lands on its section here.
     // "Unpriced models" is left out: it is only drawn while recent usage names a model with no price.
     ctx.settingsPages.register({
-      id: 'agent-limits', label: 'Limits and cost', category: 'agents', scope: 'node', icon: 'gauge', order: 60, requires: { plugin: 'agents' },
+      id: 'agent-limits',
+      label: 'Limits and cost',
+      category: 'agents',
+      scope: 'node',
+      icon: 'gauge',
+      order: 60,
+      requires: { plugin: 'agents' },
       aliases: ['agent-concurrency#limits', 'agent-pricing#claude'],
-      keywords: ['concurrency', 'parallel', 'queue', 'limit', 'turns', 'cost', 'pricing', 'price', 'tokens', 'usd', 'estimate', 'cache'],
+      keywords: [
+        'concurrency',
+        'parallel',
+        'queue',
+        'limit',
+        'turns',
+        'cost',
+        'pricing',
+        'price',
+        'tokens',
+        'usd',
+        'estimate',
+        'cache',
+      ],
       sections: [
         { id: 'limits', label: 'Turns at once', rows: ['Turns at once per provider', 'Turns at once per scope'] },
         { id: 'claude', label: 'Claude prices', rows: ['Built-in models', 'Other models'], keywords: ['anthropic'] },
@@ -209,7 +356,9 @@ export const agentsClientPlugin: ClientPlugin = {
     // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,
     // because the card exists to show several nodes at once.
     ctx.nodeStats.register({
-      id: 'agents.active', order: 10, label: ['agent running', 'agents running'],
+      id: 'agents.active',
+      order: 10,
+      label: ['agent running', 'agents running'],
       fetch: async (nodeId, signal) =>
         (await managedAgentApi.sessions({ archived: false }, { nodeId, signal })).sessions.filter(isActiveAgent).length,
     })
@@ -217,7 +366,8 @@ export const agentsClientPlugin: ClientPlugin = {
     // blocked until the owner answers. `attention: true` is a server-side filter the route already
     // supports, so this is one request per node rather than a full roster fetch and a client filter.
     ctx.attentionSources.register({
-      id: 'agents.sessions', order: 10,
+      id: 'agents.sessions',
+      order: 10,
       fetch: async (nodeId, signal) => {
         const page = await managedAgentApi.sessions({ attention: true, archived: false }, { nodeId, signal })
         return page.sessions.filter(needsAttention).map((session) => {
@@ -256,6 +406,8 @@ export const agentsClientPlugin: ClientPlugin = {
       activateManagedAgentNoticeTargets(),
       activateManagedAgentPaneIntents(),
     ]
-    return () => { for (const stop of stops.reverse()) stop() }
+    return () => {
+      for (const stop of stops.reverse()) stop()
+    }
   },
 }

@@ -64,9 +64,15 @@ export async function docker(args: string[], opts: { timeout?: number; maxBuffer
     const e = err as ExecErr
     if (e.code === 'ENOENT') throw new DockerCliError('not_installed', 'docker CLI not found on PATH')
     const stderr = (e.stderr ?? '').trim()
-    if (DAEMON_DOWN_RE.test(stderr)) throw new DockerCliError('daemon_down', 'docker daemon is not reachable', null, stderr)
+    if (DAEMON_DOWN_RE.test(stderr))
+      throw new DockerCliError('daemon_down', 'docker daemon is not reachable', null, stderr)
     const exitCode = typeof e.code === 'number' ? e.code : null
     const tail = stderr.split('\n').slice(-4).join('\n')
-    throw new DockerCliError('failed', tail || (e.killed ? `docker ${args[0]} timed out` : e.message ?? 'docker command failed'), exitCode, stderr)
+    throw new DockerCliError(
+      'failed',
+      tail || (e.killed ? `docker ${args[0]} timed out` : (e.message ?? 'docker command failed')),
+      exitCode,
+      stderr,
+    )
   }
 }

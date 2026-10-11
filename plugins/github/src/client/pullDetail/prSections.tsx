@@ -1,10 +1,27 @@
 import { For, Show } from 'solid-js'
 import {
-  CHECK_TONE, checkStatusTone, checkStatusWord, checksState, checksSummary, clientEvents, FAILED_STATUSES,
+  CHECK_TONE,
+  checkStatusTone,
+  checkStatusWord,
+  checksState,
+  checksSummary,
+  clientEvents,
+  FAILED_STATUSES,
   railDotProps,
 } from '@acorn/plugin-api/client'
 import {
-  Button, Chip, ChipRow, CopyButton, Inline, Picker, Row, Rows, Stack, StatusDot, Text, UserAvatar,
+  Button,
+  Chip,
+  ChipRow,
+  CopyButton,
+  Inline,
+  Picker,
+  Row,
+  Rows,
+  Stack,
+  StatusDot,
+  Text,
+  UserAvatar,
   type KitSection,
 } from '@acorn/plugin-api/ui'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
@@ -49,17 +66,24 @@ function LinkedIssues(props: { model: PrModel }) {
             variant="ghost"
             size="sm"
             onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}
-          >Connect Linear</Button>
+          >
+            Connect Linear
+          </Button>
         </Inline>
       </Show>
       <Rows
         id={`gh-integrations:${model().scope.number}`}
         ariaLabel="Linked issues"
-        items={model().linearRefs().map((ref) => ({ key: ref.item, label: ref.item }))}
+        items={model()
+          .linearRefs()
+          .map((ref) => ({ key: ref.item, label: ref.item }))}
       >
         {(item, itemProps) => {
           const summary = () => model().linearSummary().get(item.key)
-          const url = () => model().linearRefs().find((ref) => ref.item === item.key)?.url ?? ''
+          const url = () =>
+            model()
+              .linearRefs()
+              .find((ref) => ref.item === item.key)?.url ?? ''
           return (
             <Row
               item={itemProps}
@@ -70,7 +94,11 @@ function LinkedIssues(props: { model: PrModel }) {
               meta={
                 <Show when={summary()?.state}>
                   {/* The same visual the linear frame draws. */}
-                  {(state) => <Chip size="xs" color={state().color}>{state().name}</Chip>}
+                  {(state) => (
+                    <Chip size="xs" color={state().color}>
+                      {state().name}
+                    </Chip>
+                  )}
                 </Show>
               }
             >
@@ -99,7 +127,9 @@ function Labels(props: { model: PrModel }) {
                 reveal
                 color={label.color ? `#${label.color}` : undefined}
                 {...(model().readOnly ? {} : { onRemove: () => model().removeLabel(label.name) })}
-              >{label.name}</Chip>
+              >
+                {label.name}
+              </Chip>
             )}
           </For>
         </ChipRow>
@@ -126,7 +156,9 @@ function Checks(props: { model: PrModel }) {
     <Rows
       id={`gh-checks:${model().scope.number}`}
       ariaLabel="Checks"
-      items={model().checks().map((check, index) => ({ key: `${index}:${check.name}`, label: check.name }))}
+      items={model()
+        .checks()
+        .map((check, index) => ({ key: `${index}:${check.name}`, label: check.name }))}
     >
       {(item, itemProps) => {
         const check = () => model().checks()[Number(item.key.split(':')[0])]
@@ -137,19 +169,32 @@ function Checks(props: { model: PrModel }) {
             label={check()?.name}
             leading={<StatusDot tone={checkStatusTone(check()?.status)} />}
             {...(check()?.runId != null
-              ? { onPress: () => model().setOpenCheck({ runId: check()!.runId!, name: check()!.name, url: check()!.url }) }
+              ? {
+                  onPress: () =>
+                    model().setOpenCheck({ runId: check()!.runId!, name: check()!.name, url: check()!.url }),
+                }
               : {})}
             meta={<Text emphasis="muted">{checkStatusWord(check()?.status)}</Text>}
             trailing={
-              <Show when={!model().readOnly && FAILED_STATUSES.has((check()?.status ?? '').toLowerCase()) && check()?.runId != null}>
+              <Show
+                when={
+                  !model().readOnly &&
+                  FAILED_STATUSES.has((check()?.status ?? '').toLowerCase()) &&
+                  check()?.runId != null
+                }
+              >
                 <Button
                   size="sm"
                   disabled={model().rerunned().has(check()!.runId!)}
                   onPress={() => model().triggerRerun(check()!.runId!)}
-                >{model().rerunned().has(check()!.runId!) ? 'Re-run queued' : 'Re-run'}</Button>
+                >
+                  {model().rerunned().has(check()!.runId!) ? 'Re-run queued' : 'Re-run'}
+                </Button>
               </Show>
             }
-          >{check()?.name}</Row>
+          >
+            {check()?.name}
+          </Row>
         )
       }}
     </Rows>
@@ -168,7 +213,9 @@ function Reviewers(props: { model: PrModel }) {
                 reveal
                 leading={<UserAvatar login={login} />}
                 {...(model().readOnly ? {} : { onRemove: () => model().removeReviewer(login) })}
-              >{login}</Chip>
+              >
+                {login}
+              </Chip>
             )}
           </For>
         </ChipRow>
@@ -206,26 +253,43 @@ export function prSections(input: {
 }): KitSection[] {
   const model = input.model
   return [
-    ...(model.pull()?.body ? [{
-      id: 'description',
-      label: 'Description',
-      actions: () => <CopyButton text={model.descriptionText} title="Copy description" />,
-      render: () => <Description model={model} onLinkClick={input.onLinkClick} />,
-    }] : []),
-    ...(model.linearRefs().length ? [{
-      id: 'integrations',
-      label: 'Linked issues',
-      count: model.linearRefs().length,
-      render: () => <LinkedIssues model={model} />,
-    }] : []),
+    ...(model.pull()?.body
+      ? [
+          {
+            id: 'description',
+            label: 'Description',
+            actions: () => <CopyButton text={model.descriptionText} title="Copy description" />,
+            render: () => <Description model={model} onLinkClick={input.onLinkClick} />,
+          },
+        ]
+      : []),
+    ...(model.linearRefs().length
+      ? [
+          {
+            id: 'integrations',
+            label: 'Linked issues',
+            count: model.linearRefs().length,
+            render: () => <LinkedIssues model={model} />,
+          },
+        ]
+      : []),
     { id: 'labels', label: 'Labels', count: model.labels().length, render: () => <Labels model={model} /> },
-    ...(model.checks().length ? [{
-      id: 'checks',
-      label: 'Checks',
-      count: model.checks().length,
-      meta: () => <StatusDot {...railDotProps(CHECK_TONE[checksState(model.checks())])} tip={checksSummary(model.checks())} />,
-      render: () => <Checks model={model} />,
-    }] : []),
+    ...(model.checks().length
+      ? [
+          {
+            id: 'checks',
+            label: 'Checks',
+            count: model.checks().length,
+            meta: () => (
+              <StatusDot
+                {...railDotProps(CHECK_TONE[checksState(model.checks())])}
+                tip={checksSummary(model.checks())}
+              />
+            ),
+            render: () => <Checks model={model} />,
+          },
+        ]
+      : []),
     { id: 'reviewers', label: 'Reviewers', count: model.reviewers().length, render: () => <Reviewers model={model} /> },
     {
       id: 'files',

@@ -8,4 +8,3 @@ export const shellProfile: AgentProfileContribution = {
   backendPreference: 'node-pty',
   transport: 'pty',
 }
-

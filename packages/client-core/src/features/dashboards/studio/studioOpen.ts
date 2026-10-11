@@ -9,6 +9,6 @@ export const isPanelStudioOpen = (): boolean => open() > 0
 
 /** Called from the studio's setup: counts it open until its scope is disposed. */
 export function markPanelStudioOpen(): void {
-  setOpen(count => count + 1)
-  onCleanup(() => setOpen(count => count - 1))
+  setOpen((count) => count + 1)
+  onCleanup(() => setOpen((count) => count - 1))
 }

@@ -22,7 +22,15 @@ export default function TypedValueField(props: {
   const textSchema = () => !props.schema || props.schema.type === 'string'
   const [text, setText] = createSignal('')
   const [error, setError] = createSignal<string>()
-  createEffect(() => setText(props.value === undefined ? '' : textSchema() && typeof props.value === 'string' ? props.value : JSON.stringify(props.value)))
+  createEffect(() =>
+    setText(
+      props.value === undefined
+        ? ''
+        : textSchema() && typeof props.value === 'string'
+          ? props.value
+          : JSON.stringify(props.value),
+    ),
+  )
   const update = (raw: string): void => {
     setText(raw)
     try {
@@ -37,9 +45,19 @@ export default function TypedValueField(props: {
       props.onValidity?.(false)
     }
   }
-  const hint = () => [props.hint, textSchema() ? undefined : 'Enter a JSON value.'].filter(Boolean).join(' ') || undefined
+  const hint = () =>
+    [props.hint, textSchema() ? undefined : 'Enter a JSON value.'].filter(Boolean).join(' ') || undefined
   const shown = () => error() ?? props.error
-  return <Field label={props.label} error={shown()} hint={hint()} group>
-    <Input size={props.size ?? 'md'} label={props.label} disabled={props.disabled} value={text()} invalid={!!shown()} onInput={update} />
-  </Field>
+  return (
+    <Field label={props.label} error={shown()} hint={hint()} group>
+      <Input
+        size={props.size ?? 'md'}
+        label={props.label}
+        disabled={props.disabled}
+        value={text()}
+        invalid={!!shown()}
+        onInput={update}
+      />
+    </Field>
+  )
 }

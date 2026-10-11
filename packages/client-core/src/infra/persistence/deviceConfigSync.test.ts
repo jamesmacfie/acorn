@@ -8,21 +8,30 @@ import { savePref } from '../../features/settings/savePref'
 
 const values = new Map<string, string>()
 const storage = {
-  get length() { return values.size },
+  get length() {
+    return values.size
+  },
   key: (index: number) => [...values.keys()][index] ?? null,
   getItem: (key: string) => values.get(key) ?? null,
   setItem: (key: string, value: string) => void values.set(key, value),
   removeItem: (key: string) => void values.delete(key),
   clear: () => values.clear(),
 }
-afterEach(() => { vi.unstubAllGlobals(); values.clear() })
+afterEach(() => {
+  vi.unstubAllGlobals()
+  values.clear()
+})
 
 describe('device config synchronization', () => {
   it('applies file values through device prefs and treats plugin entries as install offers', async () => {
     vi.stubGlobal('localStorage', storage)
     const write = vi.fn(async () => ({ config: {} }))
-    const read = vi.fn(async () => ({ config: { style: 'modern', plugins: [{ id: 'board', source: { github: 'owner/board' } }] } }))
-    vi.stubGlobal('window', { acorn: { config: { read, write, onChange: () => () => {}, location: async () => '/tmp/acorn.json' } } })
+    const read = vi.fn(async () => ({
+      config: { style: 'modern', plugins: [{ id: 'board', source: { github: 'owner/board' } }] },
+    }))
+    vi.stubGlobal('window', {
+      acorn: { config: { read, write, onChange: () => () => {}, location: async () => '/tmp/acorn.json' } },
+    })
     const client = new QueryClient()
     client.setQueryData(prefsKey, {})
     const stop = await startDeviceConfigSync(() => client)

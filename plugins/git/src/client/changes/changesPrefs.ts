@@ -56,8 +56,8 @@ export const changeViewSlice: PersistedStateSlice<Record<string, unknown>> = {
   codec: {
     parse: (raw) => {
       try {
-        const value = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw
-        return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+        const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
+        return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
       } catch {
         return {}
       }

@@ -38,7 +38,16 @@ export const pluginAuthoringSection: ContextSectionContribution = {
   budget: { maxItems: 1, maxBytesPerItem: 40_000, overflow: 'truncate-tail' },
   assemble: async () => {
     const { renderPluginAuthoring } = await import('./pluginAuthoring.ts')
-    return { items: [{ id: PLUGIN_AUTHORING_SECTION, kind: 'guide', label: 'Writing an acorn plugin', body: renderPluginAuthoring() }] }
+    return {
+      items: [
+        {
+          id: PLUGIN_AUTHORING_SECTION,
+          kind: 'guide',
+          label: 'Writing an acorn plugin',
+          body: renderPluginAuthoring(),
+        },
+      ],
+    }
   },
   format: (items) => items[0]?.body ?? '',
 }

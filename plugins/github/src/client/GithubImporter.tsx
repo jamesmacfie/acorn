@@ -1,19 +1,34 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  activeNodeId, canAddProjectFromFolder, canPickFolder, clientEvents, integrationsOptions, pickFolder, type ProjectImporterProps,
-  projectsKey, projectsOptions, workspacesKey, writeJson,
+  activeNodeId,
+  canAddProjectFromFolder,
+  canPickFolder,
+  clientEvents,
+  integrationsOptions,
+  pickFolder,
+  type ProjectImporterProps,
+  projectsKey,
+  projectsOptions,
+  workspacesKey,
+  writeJson,
 } from '@acorn/plugin-api/client'
 import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
 import {
-  githubImportRoute, reposKey, type GithubImportAction, type GithubImportItem,
-  type GithubImportResponse, type Repo,
+  githubImportRoute,
+  reposKey,
+  type GithubImportAction,
+  type GithubImportItem,
+  type GithubImportResponse,
+  type Repo,
 } from '../shared/api'
 import { reposOptions } from './queries'
 
 const connectedGithub = (integrations: IntegrationsResponse) =>
-  integrations.integrations.some((integration) => integration.providerId === 'github' && integration.status === 'connected')
+  integrations.integrations.some(
+    (integration) => integration.providerId === 'github' && integration.status === 'connected',
+  )
 
 const githubAccount = (integrations: IntegrationsResponse | undefined) =>
   integrations?.integrations.find((integration) => integration.providerId === 'github')?.account?.label ?? null
@@ -38,8 +53,12 @@ export default function GithubImporter(props: ProjectImporterProps) {
   // Which project already holds each repository, so a row says so. Owner and name compare without
   // case, because GitHub's do.
   const projects = createQuery(() => projectsOptions(true))
-  const projectFor = (repo: Repo) => (projects.data ?? []).find((project) =>
-    project.github?.owner.toLowerCase() === repo.owner.toLowerCase() && project.github?.name.toLowerCase() === repo.name.toLowerCase())
+  const projectFor = (repo: Repo) =>
+    (projects.data ?? []).find(
+      (project) =>
+        project.github?.owner.toLowerCase() === repo.owner.toLowerCase() &&
+        project.github?.name.toLowerCase() === repo.name.toLowerCase(),
+    )
 
   const importOne = async (repo: Repo, action: GithubImportAction) => {
     if (running()) return
@@ -57,16 +76,19 @@ export default function GithubImporter(props: ProjectImporterProps) {
       setError('The active Node changed. Choose the folder again.')
       return
     }
-    const item: GithubImportItem = action === 'map'
-      ? { repoId: repo.id, action, path }
-      : { repoId: repo.id, action, parentDir: path }
+    const item: GithubImportItem =
+      action === 'map' ? { repoId: repo.id, action, path } : { repoId: repo.id, action, parentDir: path }
     setRunning({ repoId: repo.id, action })
     try {
-      const response = await writeJson<GithubImportResponse>(githubImportRoute, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repositories: [item] }),
-      }, () => "Couldn't add that repository. Try again.")
+      const response = await writeJson<GithubImportResponse>(
+        githubImportRoute,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ repositories: [item] }),
+        },
+        () => "Couldn't add that repository. Try again.",
+      )
       const result = response.results[0]
       if (!result?.ok) {
         setError(result?.error ?? "Couldn't add that repository.")
@@ -98,7 +120,9 @@ export default function GithubImporter(props: ProjectImporterProps) {
           tone="muted"
           variant="banner"
           actions={
-            <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Connect GitHub</Button>
+            <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
+              Connect GitHub
+            </Button>
           }
         >
           Connect GitHub to add its repositories as projects.
@@ -110,12 +134,29 @@ export default function GithubImporter(props: ProjectImporterProps) {
         </Show>
         <Show
           when={canAddProjectFromFolder()}
-          fallback={<Text emphasis="muted">{canPickFolder() ? 'Choose the local Node to import from GitHub.' : 'To choose a folder, use the desktop app.'}</Text>}
+          fallback={
+            <Text emphasis="muted">
+              {canPickFolder()
+                ? 'Choose the local Node to import from GitHub.'
+                : 'To choose a folder, use the desktop app.'}
+            </Text>
+          }
         >
-          <Show when={!repos.isLoading} fallback={<EmptyState align="start" size="sm" busy>Loading GitHub repositories…</EmptyState>}>
+          <Show
+            when={!repos.isLoading}
+            fallback={
+              <EmptyState align="start" size="sm" busy>
+                Loading GitHub repositories…
+              </EmptyState>
+            }
+          >
             <Show
               when={repos.data?.length}
-              fallback={<EmptyState align="start" size="sm">No repositories to show.</EmptyState>}
+              fallback={
+                <EmptyState align="start" size="sm">
+                  No repositories to show.
+                </EmptyState>
+              }
             >
               <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
               <Text emphasis="muted" wrap>
@@ -134,8 +175,24 @@ export default function GithubImporter(props: ProjectImporterProps) {
                       ].join(' · ')}
                     >
                       <Inline gap="row">
-                        <Button variant="ghost" size="sm" busy={busy(repo, 'clone')} disabled={!!running()} onPress={() => void importOne(repo, 'clone')}>Clone</Button>
-                        <Button variant="ghost" size="sm" busy={busy(repo, 'map')} disabled={!!running()} onPress={() => void importOne(repo, 'map')}>Link folder</Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          busy={busy(repo, 'clone')}
+                          disabled={!!running()}
+                          onPress={() => void importOne(repo, 'clone')}
+                        >
+                          Clone
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          busy={busy(repo, 'map')}
+                          disabled={!!running()}
+                          onPress={() => void importOne(repo, 'map')}
+                        >
+                          Link folder
+                        </Button>
                       </Inline>
                     </SettingRow>
                   )}
@@ -154,7 +211,9 @@ export default function GithubImporter(props: ProjectImporterProps) {
         <Stack gap="stack">
           <Inline spread>
             <Heading level={3}>Import from GitHub</Heading>
-            <Button variant="ghost" size="sm" onPress={props.onClose}>Close</Button>
+            <Button variant="ghost" size="sm" onPress={props.onClose}>
+              Close
+            </Button>
           </Inline>
           {body()}
         </Stack>

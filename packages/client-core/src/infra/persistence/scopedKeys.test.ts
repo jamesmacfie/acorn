@@ -38,7 +38,7 @@ describe('scopeIdFromStorageKey', () => {
     expect(scopeIdFromStorageKey(taskSlice, storageKeyFor(taskSlice, 'task-1'))).toBe('task-1')
   })
 
-  it('REFUSES another node\'s key, so its layouts cannot hydrate into this node\'s store', () => {
+  it("REFUSES another node's key, so its layouts cannot hydrate into this node's store", () => {
     // The whole point. Two nodes holding a task with the same UUID is legal by construction;
     // without this filter the restore would load node B's pane layout for node A's task.
     setActiveNode('node-a')
@@ -60,7 +60,7 @@ describe('scopeIdFromStorageKey', () => {
     expect(scopeIdFromStorageKey(taskSlice, key)).toBe('task-1/pane-2')
   })
 
-  it('is null for another slice\'s key and for junk', () => {
+  it("is null for another slice's key and for junk", () => {
     setActiveNode('node-a')
     expect(scopeIdFromStorageKey(taskSlice, 'editor:open-files:node-a/task-1')).toBeNull()
     expect(scopeIdFromStorageKey(taskSlice, 'core:task-layouts:%E0%A4%A')).toBeNull()

@@ -7,16 +7,22 @@ import { previewConfigured } from './configuredStore'
 const PreviewTaskPane = lazy(async () => ({ default: (await import('./PreviewTaskPane')).PreviewTaskPane }))
 
 export const previewPaneContribution: PaneLayoutContribution = {
-  id: 'preview', label: 'Preview', glyph: 'globe', description: 'The app running in this task', order: 80,
+  id: 'preview',
+  label: 'Preview',
+  glyph: 'globe',
+  description: 'The app running in this task',
+  order: 80,
   // The gate is the seam that actually backs the pane, not "am I the desktop"
   // (docs/frontend/registries.md § Gates). The pane is a child webview the shell positions over the client, and
   // a desktop shell may ship without preview views — so a host that has not installed the group
   // never lists the pane at all, rather than listing it and then saying it cannot draw it.
-  defaultChord: 'meta+shift+b', requires: { seam: 'preview' },
+  defaultChord: 'meta+shift+b',
+  requires: { seam: 'preview' },
   // A task with no preview URL configured has nothing to draw here (./configuredStore.ts).
   when: (task) => previewConfigured(task.id),
   // `single`, so the pane inherits the host's frame, focus group and padding rules rather than the
   // `<section class="pane workspace-preview">` it used to write for itself.
-  layout: 'single', regions: { body: PreviewTaskPane },
+  layout: 'single',
+  regions: { body: PreviewTaskPane },
   minWidth: 320,
 }

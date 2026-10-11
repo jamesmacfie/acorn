@@ -82,10 +82,13 @@ describe('POST /v1/core/telemetry', () => {
     await collecting()
     // A record claiming to be the node's own. If this survived, a sink could not tell a renderer's
     // words from the collector's.
-    await post(DEVICE, JSON.stringify({
-      runtime: 'renderer',
-      records: [record({ runtime: 'node', owner: 'agents' })],
-    }))
+    await post(
+      DEVICE,
+      JSON.stringify({
+        runtime: 'renderer',
+        records: [record({ runtime: 'node', owner: 'agents' })],
+      }),
+    )
     const [only] = flushed()
     expect(only.attrs.runtime).toBe('renderer')
     // The owner survives, because only the runtime that emitted the record knows which plugin's
@@ -95,10 +98,22 @@ describe('POST /v1/core/telemetry', () => {
 
   it('scrubs a log body again on this side', async () => {
     await collecting()
-    await post(DEVICE, JSON.stringify({
-      runtime: 'renderer',
-      records: [{ kind: 'log', at: 1, level: 'warn', logger: 'plugins', body: 'token ghp_0123456789abcdefghijklmnopqrstuvwxyz', attrs: {} }],
-    }))
+    await post(
+      DEVICE,
+      JSON.stringify({
+        runtime: 'renderer',
+        records: [
+          {
+            kind: 'log',
+            at: 1,
+            level: 'warn',
+            logger: 'plugins',
+            body: 'token ghp_0123456789abcdefghijklmnopqrstuvwxyz',
+            attrs: {},
+          },
+        ],
+      }),
+    )
     const [only] = flushed()
     expect(only.kind).toBe('log')
     expect(only.kind === 'log' && only.body).not.toContain('ghp_0123456789')
@@ -120,10 +135,13 @@ describe('POST /v1/core/telemetry', () => {
 
   it('refuses a whole batch for one malformed record', async () => {
     await collecting()
-    const res = await post(DEVICE, JSON.stringify({
-      runtime: 'renderer',
-      records: [record(), { kind: 'event', at: 1, name: 'x', attrs: { nested: { body: 'secret' } } }],
-    }))
+    const res = await post(
+      DEVICE,
+      JSON.stringify({
+        runtime: 'renderer',
+        records: [record(), { kind: 'event', at: 1, name: 'x', attrs: { nested: { body: 'secret' } } }],
+      }),
+    )
     expect(res.status).toBe(400)
     expect(flushed()).toEqual([])
   })
@@ -150,9 +168,15 @@ describe('POST /v1/core/telemetry', () => {
 describe('GET /v1/core/telemetry/summary', () => {
   it('counts what was collected, per owner and kind', async () => {
     await collecting()
-    await post(DEVICE, JSON.stringify({ runtime: 'renderer', records: [record({ owner: 'github' }), record({ owner: 'github' }), record()] }))
+    await post(
+      DEVICE,
+      JSON.stringify({
+        runtime: 'renderer',
+        records: [record({ owner: 'github' }), record({ owner: 'github' }), record()],
+      }),
+    )
 
-    const summary = await (await get(DEVICE, '/v1/core/telemetry/summary')).json() as TelemetrySummary
+    const summary = (await (await get(DEVICE, '/v1/core/telemetry/summary')).json()) as TelemetrySummary
     expect(summary.collecting).toBe(true)
     expect(summary.enabled).toBe(true)
     const rows = Object.fromEntries(summary.records.map((row) => [`${row.owner}:${row.kind}`, row.count]))
@@ -166,11 +190,13 @@ describe('GET /v1/core/telemetry/summary', () => {
 
   it('names the plugins reading the stream, and says when nothing is', async () => {
     // The sink in `beforeEach` registered with no owner, which is what core's own do.
-    expect((await (await get(DEVICE, '/v1/core/telemetry/summary')).json() as TelemetrySummary).sinks).toEqual(['core'])
+    expect(((await (await get(DEVICE, '/v1/core/telemetry/summary')).json()) as TelemetrySummary).sinks).toEqual([
+      'core',
+    ])
 
     resetTelemetryForTest()
     startTelemetry({ node: 'node-1', version: '9.9.9' })
-    const summary = await (await get(DEVICE, '/v1/core/telemetry/summary')).json() as TelemetrySummary
+    const summary = (await (await get(DEVICE, '/v1/core/telemetry/summary')).json()) as TelemetrySummary
     expect(summary.sinks).toEqual([])
     expect(summary.collecting).toBe(false)
     expect(summary.records).toEqual([])

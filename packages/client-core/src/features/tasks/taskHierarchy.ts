@@ -13,7 +13,9 @@ export type WorkflowTaskHierarchyRow<T> = TaskHierarchyRow<T> & {
  * can still nest normally. This makes corrupt or partially-restored lineage visible and selectable
  * instead of dropping it or recursing forever.
  */
-export function taskHierarchy<T extends { id: string; parentId: string | null }>(tasks: readonly T[]): TaskHierarchyRow<T>[] {
+export function taskHierarchy<T extends { id: string; parentId: string | null }>(
+  tasks: readonly T[],
+): TaskHierarchyRow<T>[] {
   const byId = new Map(tasks.map((task) => [task.id, task]))
   const cycleIds = new Set<string>()
 
@@ -42,7 +44,7 @@ export function taskHierarchy<T extends { id: string; parentId: string | null }>
   for (const task of tasks) {
     const parent = parentFor(task)
     if (!parent) roots.push(task)
-    else children.set(parent.id, [...children.get(parent.id) ?? [], task])
+    else children.set(parent.id, [...(children.get(parent.id) ?? []), task])
   }
 
   const rows: TaskHierarchyRow<T>[] = []
@@ -67,9 +69,11 @@ export function workflowTaskHierarchy<T extends { id: string; parentId: string |
   activeId: string | null,
 ): WorkflowTaskHierarchyRow<T>[] {
   const rows = taskHierarchy(tasks)
-  const byId = new Map(tasks.map(task => [task.id, task]))
+  const byId = new Map(tasks.map((task) => [task.id, task]))
   const children = new Map<string, T[]>()
-  for (const task of tasks) if (task.parentId && byId.has(task.parentId)) children.set(task.parentId, [...children.get(task.parentId) ?? [], task])
+  for (const task of tasks)
+    if (task.parentId && byId.has(task.parentId))
+      children.set(task.parentId, [...(children.get(task.parentId) ?? []), task])
 
   const groupByMember = new Map<string, string>()
   const membersByRoot = new Map<string, Set<string>>()
@@ -97,15 +101,17 @@ export function workflowTaskHierarchy<T extends { id: string; parentId: string |
     current = current.parentId ? byId.get(current.parentId) : undefined
   }
 
-  return rows.flatMap(row => {
+  return rows.flatMap((row) => {
     const workflowRootId = groupByMember.get(row.task.id) ?? (membersByRoot.has(row.task.id) ? row.task.id : null)
     const rootId = groupByMember.get(row.task.id)
     if (rootId && !expandedRoots.has(rootId) && !revealed.has(row.task.id)) return []
-    return [{
-      ...row,
-      workflowDescendants: membersByRoot.get(row.task.id)?.size ?? 0,
-      workflowRootId,
-      expanded: !!workflowRootId && expandedRoots.has(workflowRootId),
-    }]
+    return [
+      {
+        ...row,
+        workflowDescendants: membersByRoot.get(row.task.id)?.size ?? 0,
+        workflowRootId,
+        expanded: !!workflowRootId && expandedRoots.has(workflowRootId),
+      },
+    ]
   })
 }

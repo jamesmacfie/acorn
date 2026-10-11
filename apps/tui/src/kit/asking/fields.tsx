@@ -22,9 +22,11 @@ const fieldColors = () => ({
 export function Input(props: InputProps) {
   let field: Renderable | undefined
   const autofocus = createMemo(() => props.autofocus)
-  createEffect(on(autofocus, (active) => {
-    if (active && field && !field.isDestroyed) onCleanup(requestRenderableFocus(field))
-  }))
+  createEffect(
+    on(autofocus, (active) => {
+      if (active && field && !field.isDestroyed) onCleanup(requestRenderableFocus(field))
+    }),
+  )
   const install = fieldRef({
     value: () => (props.value === undefined ? '' : String(props.value)),
     newline: false,
@@ -39,11 +41,13 @@ export function Input(props: InputProps) {
       flexGrow={props.width === 'narrow' ? 0 : 1}
       {...fieldColors()}
       placeholder={props.placeholder ?? ''}
-      ref={(element: Renderable) => { field = element; install(element) }}
+      ref={(element: Renderable) => {
+        field = element
+        install(element)
+      }}
     />
   )
 }
-
 
 type TextareaProps = {
   size?: Extract<Size, 'sm' | 'md'>
@@ -89,17 +93,24 @@ function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void
   // `commit` is a chord — Ctrl+Return on this host — so it reaches a focused field: it is one of
   // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
   // in `focus` mode, so a composer inside a list does not answer for the list.
-  onCleanup(registerIntentLayer(element, ['commit', ...(props.onToggleExpand ? ['maximize'] as const : [])], (intent) => {
-    if (intent === 'maximize') {
-      if (props.disabled || !props.onToggleExpand) return false
-      props.onToggleExpand()
-      return true
-    }
-    if (props.disabled || props.readOnly || (!props.onCommit && !props.onSubmit)) return false
-    if (props.onCommit) props.onCommit()
-    else props.onSubmit?.(element.plainText)
-    return true
-  }, { priority: STOP, mode: 'focus' }))
+  onCleanup(
+    registerIntentLayer(
+      element,
+      ['commit', ...(props.onToggleExpand ? (['maximize'] as const) : [])],
+      (intent) => {
+        if (intent === 'maximize') {
+          if (props.disabled || !props.onToggleExpand) return false
+          props.onToggleExpand()
+          return true
+        }
+        if (props.disabled || props.readOnly || (!props.onCommit && !props.onSubmit)) return false
+        if (props.onCommit) props.onCommit()
+        else props.onSubmit?.(element.plainText)
+        return true
+      },
+      { priority: STOP, mode: 'focus' },
+    ),
+  )
 }
 
 export function Textarea(props: TextareaProps) {
@@ -112,11 +123,13 @@ export function Textarea(props: TextareaProps) {
   // Read off the region store rather than off an event, because that is where focus is on a host with
   // no pointer (../../keys/regions.ts). Deferred, so a field that mounts unfocused does not report a
   // blur nobody performed.
-  createEffect(on(
-    () => focusWithin(box()),
-    (has) => (has ? props.onFocus?.() : props.onBlur?.()),
-    { defer: true },
-  ))
+  createEffect(
+    on(
+      () => focusWithin(box()),
+      (has) => (has ? props.onFocus?.() : props.onBlur?.()),
+      { defer: true },
+    ),
+  )
   const install = fieldRef({
     value: () => props.value ?? '',
     newline: true,

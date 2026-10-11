@@ -46,8 +46,7 @@ describe('token axes are disjoint', () => {
 
   it('declares only theme tokens in tokens-theme.css', () => {
     // --dark-* are inert value holders that the two dark mapping blocks alias; not an axis token.
-    const stray = [...declaredIn(sheet('tokens-theme.css'))]
-      .filter((t) => !t.startsWith('--dark-') && !theme.has(t))
+    const stray = [...declaredIn(sheet('tokens-theme.css'))].filter((t) => !t.startsWith('--dark-') && !theme.has(t))
     expect(stray).toEqual([])
   })
 
@@ -164,9 +163,7 @@ describe('cross-axis selectors are banned', () => {
     // (0,3,0) would beat both axis files and re-introduce the combinatorial matrix the disjoint
     // sets exist to avoid. A pack that needs theme-specific behaviour needs a token, not this.
     for (const file of readStyleSheets()) {
-      const compound = file.text.match(
-        /\[data-theme=[^\]]*\]\s*\[data-style|\[data-style=[^\]]*\]\s*\[data-theme/g,
-      )
+      const compound = file.text.match(/\[data-theme=[^\]]*\]\s*\[data-style|\[data-style=[^\]]*\]\s*\[data-theme/g)
       expect(compound, `${file.name} has a compound axis selector`).toBeNull()
     }
   })

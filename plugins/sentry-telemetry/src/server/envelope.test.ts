@@ -1,6 +1,15 @@
 import type { TelemetryBatch, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { describe, expect, it } from 'vitest'
-import { buildEnvelopes, groupSpans, monitorSlug, probeEnvelope, sentrySpans, serializeEnvelope, traceKept, type EnvelopeOptions } from './envelope'
+import {
+  buildEnvelopes,
+  groupSpans,
+  monitorSlug,
+  probeEnvelope,
+  sentrySpans,
+  serializeEnvelope,
+  traceKept,
+  type EnvelopeOptions,
+} from './envelope'
 import { DEFAULT_SETTINGS } from '../shared/settings'
 
 const TRACE = 'a'.repeat(32)
@@ -161,14 +170,28 @@ describe('spans', () => {
     const command = span({ traceId: 'd'.repeat(32), spanId: hex16('5'), name: 'command' })
     const commandRequest = span({ traceId: command.traceId, spanId: hex16('6'), name: 'api.request', durationMs: 5 })
 
-    expect(sentrySpans([routineApi, routineHttp, slowApi, failedHttp, command, commandRequest] as never))
-      .toEqual([slowApi, failedHttp, command, commandRequest])
+    expect(sentrySpans([routineApi, routineHttp, slowApi, failedHttp, command, commandRequest] as never)).toEqual([
+      slowApi,
+      failedHttp,
+      command,
+      commandRequest,
+    ])
   })
 
   it('never exports successful telemetry and preference request spans', () => {
     const telemetry = span({ name: 'http.request', durationMs: 5_000, attrs: { route: '/v1/core/telemetry' } })
-    const prefs = span({ spanId: hex16('2'), name: 'http.request', durationMs: 5_000, attrs: { route: '/v1/core/prefs' } })
-    const failed = span({ spanId: hex16('3'), name: 'http.request', status: 'error', attrs: { route: '/v1/core/telemetry' } })
+    const prefs = span({
+      spanId: hex16('2'),
+      name: 'http.request',
+      durationMs: 5_000,
+      attrs: { route: '/v1/core/prefs' },
+    })
+    const failed = span({
+      spanId: hex16('3'),
+      name: 'http.request',
+      status: 'error',
+      attrs: { route: '/v1/core/telemetry' },
+    })
     expect(sentrySpans([telemetry, prefs, failed] as never)).toEqual([failed])
   })
 })
@@ -181,7 +204,15 @@ describe('startup and feature spans', () => {
     spanId: hex16('2'),
     start: navigation,
     durationMs: 1_840.5,
-    attrs: { owner: 'core', runtime: 'renderer', seam: 'renderer.startup.usable', visibility: 'visible', proxy: false, features: 2, outcome: 'usable' },
+    attrs: {
+      owner: 'core',
+      runtime: 'renderer',
+      seam: 'renderer.startup.usable',
+      visibility: 'visible',
+      proxy: false,
+      features: 2,
+      outcome: 'usable',
+    },
   })
   const phase = span({
     name: 'renderer.startup.phase',
@@ -197,7 +228,15 @@ describe('startup and feature spans', () => {
     spanId: hex16('4'),
     start: navigation + 5_000,
     durationMs: 120,
-    attrs: { owner: 'editor', runtime: 'renderer', seam: 'ui.feature.open', 'feature.id': 'editor', first: true, state: 'content', outcome: 'usable' },
+    attrs: {
+      owner: 'editor',
+      runtime: 'renderer',
+      seam: 'ui.feature.open',
+      'feature.id': 'editor',
+      first: true,
+      state: 'content',
+      outcome: 'usable',
+    },
   })
 
   it('keeps the original millisecond times, the labels, and the phase children', () => {
@@ -212,8 +251,13 @@ describe('startup and feature spans', () => {
       release: 'acorn@1.0.0',
       environment: 'development',
     })
-    expect(transaction.spans).toMatchObject([{ op: 'renderer.startup.phase', start_timestamp: (navigation + 900) / 1000, data: { phase: 'content' } }])
-    expect(payloadOf(feature)).toMatchObject({ transaction: 'ui.feature.open', tags: { 'feature.id': 'editor', first: 'true', state: 'content' } })
+    expect(transaction.spans).toMatchObject([
+      { op: 'renderer.startup.phase', start_timestamp: (navigation + 900) / 1000, data: { phase: 'content' } },
+    ])
+    expect(payloadOf(feature)).toMatchObject({
+      transaction: 'ui.feature.open',
+      tags: { 'feature.id': 'editor', first: 'true', state: 'content' },
+    })
   })
 
   it('samples them by trace like any other span', () => {
@@ -295,7 +339,10 @@ describe('check-ins', () => {
   })
 
   it('reports a failed run as error', () => {
-    const [, finished] = buildEnvelopes(batchOf([span({ name: 'schedule.run', status: 'error', attrs: { 'schedule.key': 'a:b' } })]), options())
+    const [, finished] = buildEnvelopes(
+      batchOf([span({ name: 'schedule.run', status: 'error', attrs: { 'schedule.key': 'a:b' } })]),
+      options(),
+    )
     expect(payloadOf(finished).status).toBe('error')
   })
 })
@@ -368,15 +415,29 @@ describe('logs and events', () => {
   it('sends an event as a log line at info as well as a breadcrumb', () => {
     const event: TelemetryRecord = { kind: 'event', at: 5, name: 'ws.shed', attrs: { channel: 'tasks' } }
     const [envelope] = buildEnvelopes(batchOf([event]), options())
-    expect((payloadOf(envelope).items as Array<Record<string, unknown>>)[0]).toMatchObject({ level: 'info', body: 'ws.shed' })
+    expect((payloadOf(envelope).items as Array<Record<string, unknown>>)[0]).toMatchObject({
+      level: 'info',
+      body: 'ws.shed',
+    })
   })
 
   it('keeps interaction work as an error breadcrumb without exporting a standalone log', () => {
-    const work: TelemetryRecord = { kind: 'event', at: 4, name: 'ui.interaction.work', attrs: { operation: 'cache.write', calls: 7 } }
+    const work: TelemetryRecord = {
+      kind: 'event',
+      at: 4,
+      name: 'ui.interaction.work',
+      attrs: { operation: 'cache.write', calls: 7 },
+    }
     expect(buildEnvelopes(batchOf([work]), options())).toEqual([])
 
     const failure: TelemetryRecord = {
-      kind: 'error', at: 5, name: 'RangeError', message: 'stack', level: 'error', handled: true, attrs: {},
+      kind: 'error',
+      at: 5,
+      name: 'RangeError',
+      message: 'stack',
+      level: 'error',
+      handled: true,
+      attrs: {},
     }
     const [envelope] = buildEnvelopes(batchOf([work, failure]), options())
     expect(payloadOf(envelope).breadcrumbs.values[0]).toMatchObject({ category: 'ui.interaction.work' })
@@ -395,7 +456,10 @@ describe('metrics', () => {
   })
 
   it('sends a count as a counter and a gauge as a gauge, in one trace_metric item', () => {
-    const envelopes = buildEnvelopes(batchOf([metric({}), metric({ name: 'queue.depth', type: 'gauge', value: 12 })]), options())
+    const envelopes = buildEnvelopes(
+      batchOf([metric({}), metric({ name: 'queue.depth', type: 'gauge', value: 12 })]),
+      options(),
+    )
     expect(envelopes).toHaveLength(1)
     expect(envelopes[0].items[0].header).toEqual({
       type: 'trace_metric',
@@ -428,13 +492,27 @@ describe('metrics', () => {
   })
 
   it('names durations and sizes with Sentry units and keeps the labels a release query needs', () => {
-    const duration = metric({ name: 'ui.page.layout', type: 'histogram', unit: 'ms', value: { count: 1, sum: 3, min: 3, max: 3, p50: 3, p95: 3 } })
+    const duration = metric({
+      name: 'ui.page.layout',
+      type: 'histogram',
+      unit: 'ms',
+      value: { count: 1, sum: 3, min: 3, max: 3, p50: 3, p95: 3 },
+    })
     const bytes = metric({
       name: 'app.bundle.bytes',
       type: 'gauge',
       unit: 'byte',
       value: 227_251_472,
-      attrs: { owner: 'core', runtime: 'node', artifact: 'installed', component: 'helper', release: '1.0.0', platform: 'darwin', arch: 'arm64', method: 'walk' },
+      attrs: {
+        owner: 'core',
+        runtime: 'node',
+        artifact: 'installed',
+        component: 'helper',
+        release: '1.0.0',
+        platform: 'darwin',
+        arch: 'arm64',
+        method: 'walk',
+      },
     })
     const [envelope] = buildEnvelopes(batchOf([duration, bytes]), options())
     const items = payloadOf(envelope).items
@@ -463,7 +541,11 @@ describe('serializeEnvelope', () => {
   it('writes a header line, an item header with its byte length, and the payload', () => {
     const [envelope] = buildEnvelopes(batchOf([span()]), options())
     const lines = serializeEnvelope(envelope, { dsn: 'https://k@h/1', sent_at: '2026-09-11T00:00:00.000Z' }).split('\n')
-    expect(JSON.parse(lines[0])).toMatchObject({ dsn: 'https://k@h/1', sent_at: '2026-09-11T00:00:00.000Z', event_id: 'id-2' })
+    expect(JSON.parse(lines[0])).toMatchObject({
+      dsn: 'https://k@h/1',
+      sent_at: '2026-09-11T00:00:00.000Z',
+      event_id: 'id-2',
+    })
     const itemHeader = JSON.parse(lines[1])
     expect(itemHeader.type).toBe('transaction')
     // Declared rather than inferred from the next newline, so an escaped string in a payload cannot

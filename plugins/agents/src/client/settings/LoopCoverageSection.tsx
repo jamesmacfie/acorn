@@ -20,7 +20,11 @@ const describe = (harness: AgentLoopCoverage['harnesses'][number]): string =>
 export default function LoopCoverageSection(props: { pluginId: string; nodeId?: string | null }) {
   const [coverage] = createResource(
     () => ({ pluginId: props.pluginId, nodeId: props.nodeId ?? undefined }),
-    ({ pluginId, nodeId }) => readJson<AgentLoopCoverage>(`/v1/p/agents/loop-coverage/${encodeURIComponent(pluginId)}`, nodeId ? { nodeId } : {}),
+    ({ pluginId, nodeId }) =>
+      readJson<AgentLoopCoverage>(
+        `/v1/p/agents/loop-coverage/${encodeURIComponent(pluginId)}`,
+        nodeId ? { nodeId } : {},
+      ),
   )
   return (
     <Show when={coverage.error || coverage()?.harnesses.length}>
@@ -29,7 +33,9 @@ export default function LoopCoverageSection(props: { pluginId: string; nodeId?: 
         label="Agents it reaches"
         help="A harness acorn can bridge runs this plugin's tool rules on every call. Any other harness reaches them only when it asks you for permission. A rule added while a session runs reaches it after its next resume."
       >
-        <Show when={coverage.error}><Alert tone="danger">Couldn't read which agents this plugin reaches.</Alert></Show>
+        <Show when={coverage.error}>
+          <Alert tone="danger">Couldn't read which agents this plugin reaches.</Alert>
+        </Show>
         <For each={coverage()?.harnesses ?? []}>
           {(harness) => <SettingRow label={harness.label} description={describe(harness)} />}
         </For>

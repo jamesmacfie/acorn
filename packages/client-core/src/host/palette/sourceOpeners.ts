@@ -29,32 +29,42 @@ export function registerHiddenSourceOpeners(workspaceId: () => string | null): v
   const scope = createSourceScope(workspaceId)
 
   const hidden = createMemo(
-    () => hiddenSourcesToOpen(availableSources(integrations.data?.integrations, scope()), prefs.data?.[PrefKeys.railVisibility]),
+    () =>
+      hiddenSourcesToOpen(
+        availableSources(integrations.data?.integrations, scope()),
+        prefs.data?.[PrefKeys.railVisibility],
+      ),
     [],
     // Re-registering rewrites the command registry, which this memo reads. Comparing ids and labels
     // stops that write from coming back round as a change.
-    { equals: (a, b) => a.length === b.length && a.every((source, index) => source.id === b[index].id && source.label === b[index].label) },
+    {
+      equals: (a, b) =>
+        a.length === b.length &&
+        a.every((source, index) => source.id === b[index].id && source.label === b[index].label),
+    },
   )
 
   createEffect(() => {
-    const commands = registerCommands(hidden().map((source): ContributedCommand => ({
-      id: `core.rail.open.${source.id}`,
-      title: `Open ${source.label}`,
-      hint: 'hidden from the left rail',
-      keywords: [source.label, 'rail', 'source'],
-      category: 'navigation',
-      palette: true,
-      scope: 'none',
-      // The rail click's rule (features/tabs/TabRail.tsx § selectSource): a routed project stays, and a
-      // task route moves to the task's project, because a browse source scopes itself to the routed one.
-      run: (context) => {
-        if (sourceIsProjectScoped(source.id) && !params.projectId && !context.projectId) {
-          throw new Error(`${source.label} shows one project at a time. Open a project first.`)
-        }
-        setSelectedSource(source.id)
-        if (!params.projectId && context.projectId) navigate(projectPath(context.projectId))
-      },
-    })))
+    const commands = registerCommands(
+      hidden().map((source): ContributedCommand => ({
+        id: `core.rail.open.${source.id}`,
+        title: `Open ${source.label}`,
+        hint: 'hidden from the left rail',
+        keywords: [source.label, 'rail', 'source'],
+        category: 'navigation',
+        palette: true,
+        scope: 'none',
+        // The rail click's rule (features/tabs/TabRail.tsx § selectSource): a routed project stays, and a
+        // task route moves to the task's project, because a browse source scopes itself to the routed one.
+        run: (context) => {
+          if (sourceIsProjectScoped(source.id) && !params.projectId && !context.projectId) {
+            throw new Error(`${source.label} shows one project at a time. Open a project first.`)
+          }
+          setSelectedSource(source.id)
+          if (!params.projectId && context.projectId) navigate(projectPath(context.projectId))
+        },
+      })),
+    )
     onCleanup(() => commands.dispose())
   })
 }

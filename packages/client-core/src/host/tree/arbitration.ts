@@ -8,7 +8,11 @@
 // draw the owner's default until the user says which, because a package that could take a box by
 // registering for it could take one from another package by registering later.
 import type { ArbitrationMode } from '@acorn/protocol/extensionPoints.ts'
-import { extensionDeliveries, type ExtensionContribution, type ExtensionPointContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionDeliveries,
+  type ExtensionContribution,
+  type ExtensionPointContribution,
+} from '../registries/extensionPoints/extensionPoints'
 
 /**
  * Does this contributor's `matches` cover the key the owner passed?

@@ -17,7 +17,9 @@ const producers = new Map<string, { emits: readonly PluginEmit[] }>()
 export function declareEmits(pluginId: string, emits: readonly PluginEmit[]): () => void {
   const declaration = { emits }
   producers.set(pluginId, declaration)
-  return () => { if (producers.get(pluginId) === declaration) producers.delete(pluginId) }
+  return () => {
+    if (producers.get(pluginId) === declaration) producers.delete(pluginId)
+  }
 }
 
 /** The declared verbs of a producer, or undefined when no such plugin is running. */
@@ -30,7 +32,9 @@ export function assertSubscribableVerb(channel: string, subscriber: string): voi
   if (!parsed || parsed.pluginId === subscriber) return
   const declared = producers.get(parsed.pluginId)?.emits
   if (declared && !declared.some((emit) => emit.verb === parsed.verb)) {
-    throw new Error(`plugin '${parsed.pluginId}' does not declare '${parsed.verb}' in its emits, so '${subscriber}' cannot subscribe to it`)
+    throw new Error(
+      `plugin '${parsed.pluginId}' does not declare '${parsed.verb}' in its emits, so '${subscriber}' cannot subscribe to it`,
+    )
   }
 }
 

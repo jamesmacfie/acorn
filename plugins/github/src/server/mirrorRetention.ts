@@ -1,7 +1,18 @@
 import type { BatchItem } from 'drizzle-orm/batch'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
-import { checks as checksTable, comments as commentsTable, prCommits, prFiles, prLabels, pullRequests, repos as reposTable, reviewRequests, reviewThreads, reviews as reviewsTable } from '../node/schema'
+import {
+  checks as checksTable,
+  comments as commentsTable,
+  prCommits,
+  prFiles,
+  prLabels,
+  pullRequests,
+  repos as reposTable,
+  reviewRequests,
+  reviewThreads,
+  reviews as reviewsTable,
+} from '../node/schema'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 
 export type MirrorPullKey = { userId: string; repoId: number; number: number }
@@ -26,7 +37,11 @@ export function deletePullMirrorStatements(db: PluginDatabase, keys: MirrorPullK
   ])
 }
 
-export function deleteRepoMirrorStatements(db: PluginDatabase, userId: string, repoIds: number[]): BatchItem<'sqlite'>[] {
+export function deleteRepoMirrorStatements(
+  db: PluginDatabase,
+  userId: string,
+  repoIds: number[],
+): BatchItem<'sqlite'>[] {
   if (!repoIds.length) return []
   const whereRepo = (table: { userId: SQLiteColumn; repoId: SQLiteColumn }) =>
     and(eq(table.userId, userId), inArray(table.repoId, repoIds))
@@ -54,15 +69,25 @@ export type MirrorRepairResult = { removedPulls: number }
 export async function pruneOrphanedGithubMirror(db: PluginDatabase): Promise<MirrorRepairResult> {
   const [repos, pulls, files, labels, reviews, requests, comments, commits, checks, threads] = await Promise.all([
     db.select({ userId: reposTable.userId, repoId: reposTable.id }).from(reposTable),
-    db.select({ userId: pullRequests.userId, repoId: pullRequests.repoId, number: pullRequests.number }).from(pullRequests),
+    db
+      .select({ userId: pullRequests.userId, repoId: pullRequests.repoId, number: pullRequests.number })
+      .from(pullRequests),
     db.select({ userId: prFiles.userId, repoId: prFiles.repoId, number: prFiles.number }).from(prFiles),
     db.select({ userId: prLabels.userId, repoId: prLabels.repoId, number: prLabels.number }).from(prLabels),
-    db.select({ userId: reviewsTable.userId, repoId: reviewsTable.repoId, number: reviewsTable.number }).from(reviewsTable),
-    db.select({ userId: reviewRequests.userId, repoId: reviewRequests.repoId, number: reviewRequests.number }).from(reviewRequests),
-    db.select({ userId: commentsTable.userId, repoId: commentsTable.repoId, number: commentsTable.number }).from(commentsTable),
+    db
+      .select({ userId: reviewsTable.userId, repoId: reviewsTable.repoId, number: reviewsTable.number })
+      .from(reviewsTable),
+    db
+      .select({ userId: reviewRequests.userId, repoId: reviewRequests.repoId, number: reviewRequests.number })
+      .from(reviewRequests),
+    db
+      .select({ userId: commentsTable.userId, repoId: commentsTable.repoId, number: commentsTable.number })
+      .from(commentsTable),
     db.select({ userId: prCommits.userId, repoId: prCommits.repoId, number: prCommits.number }).from(prCommits),
     db.select({ userId: checksTable.userId, repoId: checksTable.repoId, number: checksTable.number }).from(checksTable),
-    db.select({ userId: reviewThreads.userId, repoId: reviewThreads.repoId, number: reviewThreads.number }).from(reviewThreads),
+    db
+      .select({ userId: reviewThreads.userId, repoId: reviewThreads.repoId, number: reviewThreads.number })
+      .from(reviewThreads),
   ])
 
   const repoKeys = new Set(repos.map(repoKey))

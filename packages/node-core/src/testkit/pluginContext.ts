@@ -21,12 +21,25 @@ import { buildPluginContext } from '../server/pluginHost/context'
 import { clearRegistrations, recordRegistrationUndo } from '../server/pluginHost/host'
 import { flushTelemetry, onTelemetryBatch, setTelemetryPref } from '../server/telemetry/collector'
 import { pluginRequestContext } from '../server/pluginHost/requestContext'
-import type { CompiledNodePluginContext, NodePlugin, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
+import type {
+  CompiledNodePluginContext,
+  NodePlugin,
+  PluginProviderRuntime,
+  PluginRequestContext,
+  PluginStorage,
+} from '../server/pluginHost/types'
 import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations, testCoreSeams } from './db'
 
 // Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/plugin/contract.ts), so
 // this is what `permissions: {}` means in a config, and a test opts into each grant by name.
-const NO_PERMISSIONS: NodePermissions = { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false }
+const NO_PERMISSIONS: NodePermissions = {
+  core: [],
+  capabilities: [],
+  secrets: false,
+  exec: false,
+  net: [],
+  sockets: false,
+}
 
 export type TestNodeContextOptions = {
   // The plugin under test. A NodePlugin satisfies this, so `{ plugin: rollbarPlugin() }` reads well.
@@ -85,7 +98,12 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   const dataDir = options.dataDir ?? mkdtempSync(join(tmpdir(), `acorn-testkit-${name}-`))
   const permissions = options.permissions ? { ...NO_PERMISSIONS, ...options.permissions } : undefined
   const secrets = new SecretService(TEST_ENCRYPTION_KEY)
-  const services: CompiledCoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore(options.userId ?? null), ...testCoreSeams() })
+  const services: CompiledCoreServices = createCoreServices({
+    secrets,
+    db: core.db,
+    activeIdentity: memoryIdentityStore(options.userId ?? null),
+    ...testCoreSeams(),
+  })
 
   // The same lazy, one-handle-per-boot shape the host builds for both tiers (server/pluginHost/host.ts): one
   // file named for the plugin id under the data root, migrated with the plugin's own chain on first open.
@@ -94,7 +112,9 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     open: () => {
       const migrations = options.migrations ?? workspacePluginMigrations(name)
       if (!migrations) {
-        throw new Error(`makeTestNodeContext({ plugin: '${name}' }) found no chain at plugins/${name}/migrations, so ctx.storage.open() has nothing to run. Pass { migrations }.`)
+        throw new Error(
+          `makeTestNodeContext({ plugin: '${name}' }) found no chain at plugins/${name}/migrations, so ctx.storage.open() has nothing to run. Pass { migrations }.`,
+        )
       }
       opened ??= openPluginDb(dataDir, name, { migrationsFolder: migrations })
       return opened
@@ -125,7 +145,9 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
     onUndo: (undo) => recordRegistrationUndo(name, undo),
     // Both tiers get storage passed the same way as in production: the caller derives the handle and
     // the binding carries the loader's raw one (server/pluginHost/context.ts).
-    ...(permissions ? { loaded: { permissions, storage, ...(options.destinations ? { destinations: options.destinations } : {}) } } : {}),
+    ...(permissions
+      ? { loaded: { permissions, storage, ...(options.destinations ? { destinations: options.destinations } : {}) } }
+      : {}),
     storage,
   })
 

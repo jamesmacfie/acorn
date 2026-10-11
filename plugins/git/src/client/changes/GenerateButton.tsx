@@ -1,7 +1,5 @@
 import { Show } from 'solid-js'
-import {
-  ConfirmButton, Icon, Inline, ModelBackendPicker,
-} from '@acorn/plugin-api/ui'
+import { ConfirmButton, Icon, Inline, ModelBackendPicker } from '@acorn/plugin-api/ui'
 import { ModelPickerPopover } from '@acorn/plugin-api/ui/host'
 import type { ChangesModel } from './changesModel'
 
@@ -57,12 +55,18 @@ export function GenerateButton(props: { model: ChangesModel }) {
             skipConfirm={!model().draft().trim()}
             busy={model().generating()}
             disabled={empty()}
-            tip={empty() ? 'Nothing staged or changed to describe' : `Write the message from the diff, using ${labelFor(model())}`}
+            tip={
+              empty()
+                ? 'Nothing staged or changed to describe'
+                : `Write the message from the diff, using ${labelFor(model())}`
+            }
             tipSub={model().commitMode() === 'staged' ? 'git diff --staged' : 'git diff'}
-            onConfirm={() => void model().generate(
-              { backendId: chosen().backendId, ...(chosen().modelId ? { modelId: chosen().modelId } : {}) },
-              pickedBackend(model()),
-            )}
+            onConfirm={() =>
+              void model().generate(
+                { backendId: chosen().backendId, ...(chosen().modelId ? { modelId: chosen().modelId } : {}) },
+                pickedBackend(model()),
+              )
+            }
           >
             <Icon name="sparkles" />
           </ConfirmButton>

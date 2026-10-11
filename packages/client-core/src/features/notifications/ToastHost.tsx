@@ -41,15 +41,38 @@ function ToastRow(props: { entry: Toast }) {
       // A toast that vanishes while being read is worse than no toast. Hover and keyboard focus both
       // hold it open.
       role={props.entry.tone === 'danger' ? 'alert' : 'status'}
-      onPointerEnter={() => { setPaused(true); stop() }}
-      onPointerLeave={() => { setPaused(false); start() }}
-      onFocusIn={() => { setPaused(true); stop() }}
-      onFocusOut={() => { setPaused(false); start() }}
+      onPointerEnter={() => {
+        setPaused(true)
+        stop()
+      }}
+      onPointerLeave={() => {
+        setPaused(false)
+        start()
+      }}
+      onFocusIn={() => {
+        setPaused(true)
+        stop()
+      }}
+      onFocusOut={() => {
+        setPaused(false)
+        start()
+      }}
     >
       <span class="ui-toast-message">{props.entry.message}</span>
-      <Show when={props.entry.action}>{action => (
-        <Button size="xs" variant="ghost" onPress={() => { dismissToast(props.entry.id); action().onPress() }}>{action().label}</Button>
-      )}</Show>
+      <Show when={props.entry.action}>
+        {(action) => (
+          <Button
+            size="xs"
+            variant="ghost"
+            onPress={() => {
+              dismissToast(props.entry.id)
+              action().onPress()
+            }}
+          >
+            {action().label}
+          </Button>
+        )}
+      </Show>
       <IconButton icon="x" label="Dismiss" size="xs" onPress={() => dismissToast(props.entry.id)} />
     </div>
   )

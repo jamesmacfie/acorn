@@ -1,7 +1,16 @@
 import { and, asc, eq, inArray, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
-import { createProjectRef, getProject, projectByGithub, toProjectRef, updateProjectRef, type ProjectCreateRefInput, type ProjectRef, type ProjectUpdateRefInput } from '../projects'
+import {
+  createProjectRef,
+  getProject,
+  projectByGithub,
+  toProjectRef,
+  updateProjectRef,
+  type ProjectCreateRefInput,
+  type ProjectRef,
+  type ProjectUpdateRefInput,
+} from '../projects'
 import type { ProjectConfigResponse } from '@acorn/protocol/api.ts'
 import { getProjectConfig } from '../projectConfig'
 import { assertProjectRepoConfigTrusted, assertRepoConfigTrusted } from '../repoConfigTrust'
@@ -53,18 +62,20 @@ export function createProjectService(db: AppDatabase, activeIdentity: ActiveIden
       const row = await projectByGithub(db, owner, name)
       return row ? toProjectRef(row) : null
     },
-    byWorkspace: async (workspaceId) => db
-      .select()
-      .from(schema.projects)
-      .where(eq(schema.projects.workspaceId, workspaceId))
-      .orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt))
-      .then((rows) => rows.map(toProjectRef)),
-    checkouts: async () => db
-      .select({ id: schema.projects.id, path: schema.projects.path })
-      .from(schema.projects)
-      .where(isNotNull(schema.projects.path))
-      .orderBy(asc(schema.projects.createdAt), asc(schema.projects.id))
-      .then((rows) => rows.flatMap((row) => row.path ? [{ id: row.id, path: row.path }] : [])),
+    byWorkspace: async (workspaceId) =>
+      db
+        .select()
+        .from(schema.projects)
+        .where(eq(schema.projects.workspaceId, workspaceId))
+        .orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt))
+        .then((rows) => rows.map(toProjectRef)),
+    checkouts: async () =>
+      db
+        .select({ id: schema.projects.id, path: schema.projects.path })
+        .from(schema.projects)
+        .where(isNotNull(schema.projects.path))
+        .orderBy(asc(schema.projects.createdAt), asc(schema.projects.id))
+        .then((rows) => rows.flatMap((row) => (row.path ? [{ id: row.id, path: row.path }] : []))),
     externalProjects: (workspaceId, providerIds) => {
       // An empty owner set must stay empty. In particular, it must not be interpreted as the optional
       // "all providers" form used by core-owned callers.
@@ -77,14 +88,13 @@ export function createProjectService(db: AppDatabase, activeIdentity: ActiveIden
         })
         .from(schema.workspaceExternalProjects)
         .innerJoin(schema.integrations, eq(schema.integrations.id, schema.workspaceExternalProjects.integrationId))
-        .where(and(
-          eq(schema.workspaceExternalProjects.workspaceId, workspaceId),
-          providerIds ? inArray(schema.integrations.provider, [...providerIds]) : undefined,
-        ))
-        .orderBy(
-          asc(schema.workspaceExternalProjects.integrationId),
-          asc(schema.workspaceExternalProjects.externalId),
+        .where(
+          and(
+            eq(schema.workspaceExternalProjects.workspaceId, workspaceId),
+            providerIds ? inArray(schema.integrations.provider, [...providerIds]) : undefined,
+          ),
         )
+        .orderBy(asc(schema.workspaceExternalProjects.integrationId), asc(schema.workspaceExternalProjects.externalId))
     },
     create: (input) => createProjectRef(db, input, activeIdentity.get() ?? ''),
     update: (id, patch) => updateProjectRef(db, id, patch),

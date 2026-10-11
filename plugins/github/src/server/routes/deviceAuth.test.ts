@@ -38,7 +38,9 @@ const env = () =>
   }) as unknown as Env
 
 const post = (path: string, body?: unknown, principal: Principal = PRINCIPAL) => {
-  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/github', githubDeviceAuth(githubClientId))
+  const app = new Hono<AppEnv>()
+    .use('/api/*', ...testGate(principal))
+    .route('/api/github', githubDeviceAuth(githubClientId))
   return app.fetch(
     new Request(`http://acorn.test/api/github${path}`, {
       method: 'POST',
@@ -59,7 +61,13 @@ describe('github device flow — start', () => {
   ])('starts the code flow with client ID $clientId', async ({ override, clientId }) => {
     vi.stubEnv('GITHUB_CLIENT_ID', override)
     fetchMock.mockResolvedValueOnce(
-      json({ device_code: 'dc', user_code: 'WDJB-MJHT', verification_uri: 'https://github.com/login/device', expires_in: 899, interval: 5 }),
+      json({
+        device_code: 'dc',
+        user_code: 'WDJB-MJHT',
+        verification_uri: 'https://github.com/login/device',
+        expires_in: 899,
+        interval: 5,
+      }),
     )
     const res = await post('/auth/device/start')
     expect(res.status).toBe(200)
@@ -125,7 +133,9 @@ describe('github device flow — poll', () => {
     vi.stubEnv('GITHUB_CLIENT_ID', undefined)
     fetchMock
       .mockResolvedValueOnce(json({ access_token: 'gho_realtoken' })) // token exchange
-      .mockResolvedValueOnce(json({ login: 'james', name: 'James', avatar_url: null }, { headers: { 'x-oauth-scopes': 'repo, read:org' } }))
+      .mockResolvedValueOnce(
+        json({ login: 'james', name: 'James', avatar_url: null }, { headers: { 'x-oauth-scopes': 'repo, read:org' } }),
+      )
 
     const res = await post('/auth/device/poll', pollBody)
     expect(res.status).toBe(200)
@@ -145,7 +155,9 @@ describe('github device flow — poll', () => {
   it('never echoes the access token back to the client', async () => {
     fetchMock
       .mockResolvedValueOnce(json({ access_token: 'gho_realtoken' }))
-      .mockResolvedValueOnce(json({ login: 'james', name: null, avatar_url: null }, { headers: { 'x-oauth-scopes': 'repo' } }))
+      .mockResolvedValueOnce(
+        json({ login: 'james', name: null, avatar_url: null }, { headers: { 'x-oauth-scopes': 'repo' } }),
+      )
     expect(await (await post('/auth/device/poll', pollBody)).text()).not.toContain('gho_realtoken')
   })
 

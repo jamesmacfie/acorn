@@ -21,7 +21,21 @@ import {
 } from '@acorn/plugin-api/client'
 import { Acorn, Wizard } from '@acorn/plugin-api/ui/host'
 import {
-  Alert, Badge, Button, Card, DescriptionList, Field, Heading, Inline, Input, Kbd, Modal, SegmentedControl, Select, Stack, Text,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  DescriptionList,
+  Field,
+  Heading,
+  Inline,
+  Input,
+  Kbd,
+  Modal,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
 } from '@acorn/plugin-api/ui'
 
 import { AddedTally } from './AddedTally'
@@ -101,7 +115,9 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [mode, setMode] = createSignal<WorkspacesMode | undefined>(
-    props.workspacesPreference === 'on' || props.workspacesPreference === 'off' ? props.workspacesPreference : undefined,
+    props.workspacesPreference === 'on' || props.workspacesPreference === 'off'
+      ? props.workspacesPreference
+      : undefined,
   )
   const [choice, setChoice] = createSignal<WorkspacesMode>('off')
   // Read once: a Node that had its answer before the wizard opened never shows the question, while
@@ -116,12 +132,16 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   })
   const nodeId = activeNodeId()
   let disposed = false
-  onCleanup(() => { disposed = true })
+  onCleanup(() => {
+    disposed = true
+  })
   const stillHere = () => !disposed && activeNodeId() === nodeId
 
   const added = createMemo(() => {
     const byId = new Map((projects.data ?? []).map((project) => [project.id, project]))
-    return addedIds().map((id) => byId.get(id)).filter((project): project is Project => !!project)
+    return addedIds()
+      .map((id) => byId.get(id))
+      .filter((project): project is Project => !!project)
   })
   const nameOf = (project: Project): string => names()[project.id] ?? project.name
   const blankNames = () => added().filter((project) => !nameOf(project).trim()).length
@@ -131,9 +151,10 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   // error the reader could do nothing about.
   const githubOffered = () => {
     const data = integrations.data
-    return !!data && (
-      data.providers.some((provider) => provider.id === 'github' && provider.connection.connectable) ||
-      data.integrations.some((entry) => entry.providerId === 'github')
+    return (
+      !!data &&
+      (data.providers.some((provider) => provider.id === 'github' && provider.connection.connectable) ||
+        data.integrations.some((entry) => entry.providerId === 'github'))
     )
   }
 
@@ -180,7 +201,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
       const selected = choice()
       // The Node stores this preference before projects are added. Do not start project creation until it
       // has accepted the answer; an optimistic cache update alone is not enough.
-      if (!await savePref(queryClient, WORKSPACES_PREF_KEY, selected, { throwOnFailure: true })) return
+      if (!(await savePref(queryClient, WORKSPACES_PREF_KEY, selected, { throwOnFailure: true }))) return
       if (!stillHere()) return
       setMode(selected)
       go('add')
@@ -290,10 +311,14 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   // What the host's Next says on each step. A blocked step says what would unblock it.
   const nextLabel = (): string => {
     switch (step()) {
-      case 'welcome': return 'Get started'
-      case 'add': return canAdvance() ? 'Continue' : 'Add a project to continue'
-      case 'github': return canAdvance() ? 'Done adding' : 'Add a repository to continue'
-      default: return 'Continue'
+      case 'welcome':
+        return 'Get started'
+      case 'add':
+        return canAdvance() ? 'Continue' : 'Add a project to continue'
+      case 'github':
+        return canAdvance() ? 'Done adding' : 'Add a repository to continue'
+      default:
+        return 'Continue'
     }
   }
 
@@ -304,8 +329,8 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
           <Acorn />
           <Heading level={2}>Welcome to acorn</Heading>
           <Text emphasis="muted" wrap>
-            acorn is where you run coding tasks on your projects, with agents, terminals, and editors side
-            by side. Let's get you set up. It takes about a minute.
+            acorn is where you run coding tasks on your projects, with agents, terminals, and editors side by side.
+            Let's get you set up. It takes about a minute.
           </Text>
         </Stack>
       </Show>
@@ -313,10 +338,20 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
       <Show when={step() === 'arrange'}>
         <Stack gap="row">
           <Heading level={2}>Choose a layout</Heading>
-          <Show when={!mode()} fallback={<Text emphasis="muted" wrap>{mode() === 'on'
-            ? "Your projects are grouped into workspaces. You can't switch back to separate projects."
-            : 'Your projects stay separate. You can group them into workspaces later in Settings.'}</Text>}>
-            <Text emphasis="muted" wrap>Pick how acorn organizes your projects. You can group projects into workspaces later, but you can't separate them again.</Text>
+          <Show
+            when={!mode()}
+            fallback={
+              <Text emphasis="muted" wrap>
+                {mode() === 'on'
+                  ? "Your projects are grouped into workspaces. You can't switch back to separate projects."
+                  : 'Your projects stay separate. You can group them into workspaces later in Settings.'}
+              </Text>
+            }
+          >
+            <Text emphasis="muted" wrap>
+              Pick how acorn organizes your projects. You can group projects into workspaces later, but you can't
+              separate them again.
+            </Text>
             <SegmentedControl
               ariaLabel="How to arrange projects"
               options={[
@@ -335,23 +370,29 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
         <Stack gap="row">
           <Heading
             level={2}
-            help={githubOffered()
-              ? 'Not sure? Open a folder. If you connect GitHub later, acorn links it to the folders you already added.'
-              : undefined}
+            help={
+              githubOffered()
+                ? 'Not sure? Open a folder. If you connect GitHub later, acorn links it to the folders you already added.'
+                : undefined
+            }
           >
             {added().length ? 'Add another project' : 'Add your first project'}
           </Heading>
           <Text emphasis="muted" wrap>
-            A project is a folder on your computer. It doesn't need Git or GitHub, but acorn uses them
-            when they're there.
+            A project is a folder on your computer. It doesn't need Git or GitHub, but acorn uses them when they're
+            there.
           </Text>
           <AddedTally added={added()} />
           <Inline gap="stack" even>
             <Card interactive disabled={!canAddProjectFromFolder() || busy()} onPress={() => void openFolder()}>
               <Stack gap="row">
-                <Show when={githubOffered()}><Text emphasis="eyebrow">Recommended</Text></Show>
+                <Show when={githubOffered()}>
+                  <Text emphasis="eyebrow">Recommended</Text>
+                </Show>
                 <Text emphasis="strong">Open a folder</Text>
-                <Text emphasis="muted" wrap>Choose a folder on this computer.</Text>
+                <Text emphasis="muted" wrap>
+                  Choose a folder on this computer.
+                </Text>
               </Stack>
             </Card>
             <Show when={githubOffered()}>
@@ -359,7 +400,9 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
                 <Stack gap="row">
                   <Text emphasis="eyebrow">Optional</Text>
                   <Text emphasis="strong">Connect GitHub</Text>
-                  <Text emphasis="muted" wrap>Clone your repositories, or link ones you already have on this computer.</Text>
+                  <Text emphasis="muted" wrap>
+                    Clone your repositories, or link ones you already have on this computer.
+                  </Text>
                 </Stack>
               </Card>
             </Show>
@@ -373,11 +416,7 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
 
       <Show when={step() === 'github'}>
         <Suspense fallback={<Text emphasis="muted">Loading…</Text>}>
-          <GithubConnect
-            onBack={back}
-            onImported={(ids) => void afterImport(ids)}
-            added={added()}
-          />
+          <GithubConnect onBack={back} onImported={(ids) => void afterImport(ids)} added={added()} />
         </Suspense>
       </Show>
 
@@ -385,12 +424,21 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
         <Stack gap="row">
           <Heading
             level={2}
-            help={mode() === 'on' ? 'A workspace is a group of projects. The switcher at the top of the window shows one workspace at a time.' : undefined}
+            help={
+              mode() === 'on'
+                ? 'A workspace is a group of projects. The switcher at the top of the window shows one workspace at a time.'
+                : undefined
+            }
           >
             {added().length > 1 ? 'Name your projects' : 'Name your project'}
           </Heading>
-          <Text emphasis="muted" wrap>Renaming a project doesn't change its folder.</Text>
-          <Show when={added().length} fallback={<Text emphasis="muted">No project yet. You can add one later in Settings.</Text>}>
+          <Text emphasis="muted" wrap>
+            Renaming a project doesn't change its folder.
+          </Text>
+          <Show
+            when={added().length}
+            fallback={<Text emphasis="muted">No project yet. You can add one later in Settings.</Text>}
+          >
             {/* Index, not For: these are editable inputs, and For keys by object identity, so a
                 refetch would destroy the row mid-typing along with the caret. */}
             <Index each={added()}>
@@ -400,13 +448,23 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
                     {/* The folder is what tells two cards apart, so it is the card's title. */}
                     <Inline gap="inline" wrap>
                       <Show when={current().path} fallback={<Badge tone="warn">No folder</Badge>}>
-                        {(path) => <Text emphasis="strong" wrap>{path()}</Text>}
+                        {(path) => (
+                          <Text emphasis="strong" wrap>
+                            {path()}
+                          </Text>
+                        )}
                       </Show>
-                      <Show when={current().vcs === 'git'}><Badge>Git</Badge></Show>
-                      <Show when={current().github}><Badge>GitHub</Badge></Show>
+                      <Show when={current().vcs === 'git'}>
+                        <Badge>Git</Badge>
+                      </Show>
+                      <Show when={current().github}>
+                        <Badge>GitHub</Badge>
+                      </Show>
                     </Inline>
                     <Show when={!current().path}>
-                      <Text emphasis="muted" wrap>No folder yet. You can add one later in Settings.</Text>
+                      <Text emphasis="muted" wrap>
+                        No folder yet. You can add one later in Settings.
+                      </Text>
                     </Show>
                     <Inline gap="stack" even>
                       <Field
@@ -420,46 +478,52 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
                       </Field>
                       {/* In grouped mode each project can choose a different workspace. */}
                       <Show when={mode() === 'on'}>
-                        <Show when={drafts()[current().id] === undefined}
-                        fallback={
-                          <Stack gap="row">
-                            <Field label="New workspace">
-                              <Input
-                                placeholder="Workspace name"
-                                value={drafts()[current().id] ?? ''}
-                                ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-                                onInput={(value) => setDrafts((all) => ({ ...all, [current().id]: value }))}
-                                onSubmit={(value) => {
-                                  if (value.trim()) void createHome(current(), value.trim())
-                                }}
-                              />
-                            </Field>
-                            <Inline gap="row">
-                              <Button
-                                busy={busy()}
-                                disabled={!drafts()[current().id]?.trim()}
-                                onPress={() => void createHome(current(), drafts()[current().id]!.trim())}
-                              >
-                                Create
-                              </Button>
-                              <Button variant="ghost" onPress={() => dropDraft(current())}>Cancel</Button>
-                            </Inline>
-                          </Stack>
-                        }
-                      >
-                        <Field label="Workspace">
-                          <Select
-                            value={homes()[current().id] ?? current().workspaceId}
-                            options={[
-                              ...(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name })),
-                              { value: NEW_WORKSPACE, label: 'New workspace…' },
-                            ]}
-                            onChange={(value) => {
-                              if (value === NEW_WORKSPACE) setDrafts((all) => ({ ...all, [current().id]: '' }))
-                              else setHomes((all) => ({ ...all, [current().id]: value }))
-                            }}
-                          />
-                        </Field>
+                        <Show
+                          when={drafts()[current().id] === undefined}
+                          fallback={
+                            <Stack gap="row">
+                              <Field label="New workspace">
+                                <Input
+                                  placeholder="Workspace name"
+                                  value={drafts()[current().id] ?? ''}
+                                  ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
+                                  onInput={(value) => setDrafts((all) => ({ ...all, [current().id]: value }))}
+                                  onSubmit={(value) => {
+                                    if (value.trim()) void createHome(current(), value.trim())
+                                  }}
+                                />
+                              </Field>
+                              <Inline gap="row">
+                                <Button
+                                  busy={busy()}
+                                  disabled={!drafts()[current().id]?.trim()}
+                                  onPress={() => void createHome(current(), drafts()[current().id]!.trim())}
+                                >
+                                  Create
+                                </Button>
+                                <Button variant="ghost" onPress={() => dropDraft(current())}>
+                                  Cancel
+                                </Button>
+                              </Inline>
+                            </Stack>
+                          }
+                        >
+                          <Field label="Workspace">
+                            <Select
+                              value={homes()[current().id] ?? current().workspaceId}
+                              options={[
+                                ...(workspaces.data ?? []).map((workspace) => ({
+                                  value: workspace.id,
+                                  label: workspace.name,
+                                })),
+                                { value: NEW_WORKSPACE, label: 'New workspace…' },
+                              ]}
+                              onChange={(value) => {
+                                if (value === NEW_WORKSPACE) setDrafts((all) => ({ ...all, [current().id]: '' }))
+                                else setHomes((all) => ({ ...all, [current().id]: value }))
+                              }}
+                            />
+                          </Field>
                         </Show>
                       </Show>
                     </Inline>
@@ -483,14 +547,14 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
       <Show when={step() === 'done'}>
         <Stack gap="row">
           <Heading level={2}>You're set</Heading>
-          <Text emphasis="muted" wrap>Start a task whenever you like. These keys help you get around:</Text>
+          <Text emphasis="muted" wrap>
+            Start a task whenever you like. These keys help you get around:
+          </Text>
           {/* The chord is the label and the words are the value, so the key caps line up in one
               column the way a shortcut sheet does. */}
           <DescriptionList layout="columns">
             <Index each={SHORTCUTS}>
-              {(entry) => (
-                <DescriptionList.Item label={<Kbd>{entry()[0]}</Kbd>}>{entry()[1]}</DescriptionList.Item>
-              )}
+              {(entry) => <DescriptionList.Item label={<Kbd>{entry()[0]}</Kbd>}>{entry()[1]}</DescriptionList.Item>}
             </Index>
           </DescriptionList>
         </Stack>
@@ -517,7 +581,9 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
         onFinish={() => void finish()}
         skipLabel="Skip setup"
         skipTip="You can do all of this later in Settings."
-        onSkip={() => { if (!busy()) void skip() }}
+        onSkip={() => {
+          if (!busy()) void skip()
+        }}
         regions={{ step: () => <StepBody /> }}
       />
     </Modal>

@@ -64,10 +64,7 @@ export function completeMention(
  * rather than `scrollIntoView`, which is free to scroll every ancestor as well and would drag the
  * surface behind the field.
  */
-export function scrollDeltaFor(
-  list: { top: number; bottom: number },
-  row: { top: number; bottom: number },
-): number {
+export function scrollDeltaFor(list: { top: number; bottom: number }, row: { top: number; bottom: number }): number {
   if (row.top < list.top) return row.top - list.top
   if (row.bottom > list.bottom) return row.bottom - list.bottom
   return 0

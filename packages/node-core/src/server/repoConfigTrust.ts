@@ -25,17 +25,28 @@ export const isRepoConfigTrustError = (error: unknown): error is RepoConfigTrust
   error instanceof RepoConfigTrustError ||
   (!!error && typeof error === 'object' && 'code' in error && error.code === NEEDS_CONFIG_TRUST)
 
-async function taskSnapshot(db: AppDatabase, taskId: string): Promise<{ projectId: string; snapshot: RepoConfigSnapshot } | null> {
+async function taskSnapshot(
+  db: AppDatabase,
+  taskId: string,
+): Promise<{ projectId: string; snapshot: RepoConfigSnapshot } | null> {
   const task = await loadTask(db, taskId)
   if (!task) return null
   const project = await projectForTask(db, task)
-  const repoDir = task.worktreePath && isDir(task.worktreePath) ? task.worktreePath : project?.path && isDir(project.path) ? project.path : null
+  const repoDir =
+    task.worktreePath && isDir(task.worktreePath)
+      ? task.worktreePath
+      : project?.path && isDir(project.path)
+        ? project.path
+        : null
   if (!repoDir) return null
   const snapshot = readRepoConfigSnapshot(repoDir, project)
   return snapshot && project ? { projectId: project.id, snapshot } : null
 }
 
-async function projectSnapshot(db: AppDatabase, projectId: string): Promise<{ projectId: string; snapshot: RepoConfigSnapshot } | null> {
+async function projectSnapshot(
+  db: AppDatabase,
+  projectId: string,
+): Promise<{ projectId: string; snapshot: RepoConfigSnapshot } | null> {
   const project = await db.select().from(schema.projects).where(eq(schema.projects.id, projectId)).get()
   if (!project) throw new Error('Project not found.')
   if (!project.path || !isDir(project.path)) return null
@@ -46,9 +57,11 @@ async function projectSnapshot(db: AppDatabase, projectId: string): Promise<{ pr
 export async function assertProjectRepoConfigTrusted(db: AppDatabase, projectId: string): Promise<void> {
   const current = await projectSnapshot(db, projectId)
   if (!current) return
-  const ack = await db.select({ hash: schema.configAcks.hash }).from(schema.configAcks).where(and(
-    eq(schema.configAcks.projectId, current.projectId), eq(schema.configAcks.hash, current.snapshot.hash),
-  )).get()
+  const ack = await db
+    .select({ hash: schema.configAcks.hash })
+    .from(schema.configAcks)
+    .where(and(eq(schema.configAcks.projectId, current.projectId), eq(schema.configAcks.hash, current.snapshot.hash)))
+    .get()
   if (!ack) throw new Error('Repository configuration must be reviewed and trusted before this schedule can dispatch.')
 }
 
@@ -58,7 +71,13 @@ export async function repoConfigTrustReview(db: AppDatabase, taskId: string): Pr
   const [ack] = await db
     .select()
     .from(schema.configAcks)
-    .where(and(isNotNull(schema.configAcks.projectId), eq(schema.configAcks.projectId, current.projectId), eq(schema.configAcks.hash, current.snapshot.hash)))
+    .where(
+      and(
+        isNotNull(schema.configAcks.projectId),
+        eq(schema.configAcks.projectId, current.projectId),
+        eq(schema.configAcks.hash, current.snapshot.hash),
+      ),
+    )
     .limit(1)
   const [previous] = await db
     .select()
@@ -71,19 +90,28 @@ export async function repoConfigTrustReview(db: AppDatabase, taskId: string): Pr
     projectId: current.projectId,
     trusted: !!ack,
     current: current.snapshot,
-    previous: previous && previous.hash !== current.snapshot.hash ? { hash: previous.hash, text: previous.snapshot, ackedAt: previous.ackedAt } : null,
+    previous:
+      previous && previous.hash !== current.snapshot.hash
+        ? { hash: previous.hash, text: previous.snapshot, ackedAt: previous.ackedAt }
+        : null,
   }
 }
 
 export async function assertRepoConfigTrusted(db: AppDatabase, taskId: string, expectedHash?: string): Promise<void> {
   const review = await repoConfigTrustReview(db, taskId)
-  if (!review.trusted || (expectedHash !== undefined && review.current?.hash !== expectedHash)) throw new RepoConfigTrustError(taskId)
+  if (!review.trusted || (expectedHash !== undefined && review.current?.hash !== expectedHash))
+    throw new RepoConfigTrustError(taskId)
 }
 
-export async function acknowledgeRepoConfig(db: AppDatabase, taskId: string, hash: string): Promise<RepoConfigTrustReview> {
+export async function acknowledgeRepoConfig(
+  db: AppDatabase,
+  taskId: string,
+  hash: string,
+): Promise<RepoConfigTrustReview> {
   const review = await repoConfigTrustReview(db, taskId)
   if (!review.current || !review.projectId) return review
-  if (review.current.hash !== hash) throw new Error('Repo configuration changed while it was being reviewed. Review the new diff before trusting it.')
+  if (review.current.hash !== hash)
+    throw new Error('Repo configuration changed while it was being reviewed. Review the new diff before trusting it.')
   await db
     .insert(schema.configAcks)
     .values({ projectId: review.projectId, hash, snapshot: review.current.text, ackedAt: Date.now() })

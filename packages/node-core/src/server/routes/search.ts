@@ -16,7 +16,10 @@ export const search = new Hono<AppEnv>().get('/', async (c) => {
   const db = getDb(c.env)
   const workspaceId = c.req.query('workspaceId')
   const inWorkspace = workspaceId
-    ? inArray(schema.tasks.projectId, db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.workspaceId, workspaceId)))
+    ? inArray(
+        schema.tasks.projectId,
+        db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.workspaceId, workspaceId)),
+      )
     : undefined
   const rows = await db
     .select({ id: schema.tasks.id, title: schema.tasks.title, branch: schema.tasks.branch })

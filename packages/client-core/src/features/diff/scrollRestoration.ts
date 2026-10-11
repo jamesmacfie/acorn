@@ -67,10 +67,10 @@ export function createDiffScrollRestoration(options: DiffScrollRestorationOption
   const prepare = () => {
     const saved = diffScroll(options.scope)
     if (
-      !options.selectedPath()
-      && saved
-      && saved.viewMode === options.viewMode()
-      && saved.filesSignature === options.filesSignature()
+      !options.selectedPath() &&
+      saved &&
+      saved.viewMode === options.viewMode() &&
+      saved.filesSignature === options.filesSignature()
     ) {
       pending = saved
       retry()

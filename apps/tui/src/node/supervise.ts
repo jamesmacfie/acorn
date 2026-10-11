@@ -66,7 +66,8 @@ function nodeEntry(): { command: string; args: string[]; cwd?: string } {
   if (built) return { command: process.execPath, args: [built] }
   const app = join(findWorkspaceRoot(fileURLToPath(import.meta.url)), 'apps/node')
   const source = join(app, 'src/entries/standalone.ts')
-  if (!existsSync(source)) throw new Error(`acorn could not find a node to start: none of ${[...packaged, source].join(', ')} exists.`)
+  if (!existsSync(source))
+    throw new Error(`acorn could not find a node to start: none of ${[...packaged, source].join(', ')} exists.`)
   // From apps/node, because that is where `tsx` is a dependency and where `pnpm dev:node` runs it.
   return { command: process.execPath, args: ['--import', 'tsx', source], cwd: app }
 }
@@ -110,7 +111,11 @@ export function startNode(dataDir: string, deviceToken?: string): SupervisedNode
         const parsed = JSON.parse(line) as Partial<Handshake>
         if (!parsed.nodeId || !parsed.endpoint || !parsed.deviceToken) return
         if (parsed.baseline !== ACORN_BASELINE || parsed.protocolVersion !== NODE_PROTOCOL_VERSION) {
-          reject(new Error(`The node has no matching ${ACORN_BASELINE} baseline or protocol. Reset or rebuild it before starting.`))
+          reject(
+            new Error(
+              `The node has no matching ${ACORN_BASELINE} baseline or protocol. Reset or rebuild it before starting.`,
+            ),
+          )
           lines.close()
           child.kill('SIGTERM')
           return

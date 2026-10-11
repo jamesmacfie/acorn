@@ -10,8 +10,13 @@ import { StateEffect, type Extension } from '@codemirror/state'
 import { EditorView, ViewPlugin, hoverTooltip, type Tooltip, type ViewUpdate } from '@codemirror/view'
 import { setDiagnostics, type Diagnostic } from '@codemirror/lint'
 import {
-  LANGUAGE_REQUEST_TOO_LARGE, languageRequestTooLarge, requestDiagnostics, requestHover,
-  type CheckedHover, type DocumentServiceRoute, type DocumentServiceRoutes,
+  LANGUAGE_REQUEST_TOO_LARGE,
+  languageRequestTooLarge,
+  requestDiagnostics,
+  requestHover,
+  type CheckedHover,
+  type DocumentServiceRoute,
+  type DocumentServiceRoutes,
 } from '../../host/registries/panes/documentServices'
 import { renderMarkdown } from '../../kit/lib/rendering/markdown'
 import { sanitizedHtmlFragment } from '../../kit/lib/rendering/sanitizedHtml'
@@ -31,11 +36,17 @@ export const refreshLanguageServices = StateEffect.define<null>()
 
 const DIAGNOSTICS_DEBOUNCE_MS = 500
 
-const SEVERITY: Record<string, Diagnostic['severity']> = { error: 'error', warning: 'warning', information: 'info', hint: 'hint' }
+const SEVERITY: Record<string, Diagnostic['severity']> = {
+  error: 'error',
+  warning: 'warning',
+  information: 'info',
+  hint: 'hint',
+}
 
 // The host credits the plugin, and the provider's own `source` and `code` follow it. A provider can't
 // write the credit, so it can't pass its marks off as another tool's.
-const credit = (route: DocumentServiceRoute, ...parts: (string | undefined)[]): string => [route.label, ...parts].filter(Boolean).join(' · ')
+const credit = (route: DocumentServiceRoute, ...parts: (string | undefined)[]): string =>
+  [route.label, ...parts].filter(Boolean).join(' · ')
 
 function hoverDom(hover: CheckedHover | string, route: DocumentServiceRoute): HTMLElement {
   const dom = document.createElement('div')
@@ -63,64 +74,81 @@ export function hoverSource(source: LanguageServiceSource): (view: EditorView, p
     read?.abort()
     if (!route) return null
     const text = view.state.doc.toString()
-    if (languageRequestTooLarge(text)) return { pos, above: true, create: () => ({ dom: hoverDom(LANGUAGE_REQUEST_TOO_LARGE, route) }) }
+    if (languageRequestTooLarge(text))
+      return { pos, above: true, create: () => ({ dom: hoverDom(LANGUAGE_REQUEST_TOO_LARGE, route) }) }
     const revision = source.revision()
     if (revision === undefined) return null
-    const current = read = new AbortController()
+    const current = (read = new AbortController())
     const checked = await requestHover(route.route, source.nodeId, { text, revision, offset: pos }, current.signal)
     if (!checked || current.signal.aborted || source.revision() !== revision) return null
-    return { pos: checked.from ?? pos, ...(checked.to !== undefined ? { end: checked.to } : {}), above: true, create: () => ({ dom: hoverDom(checked, route) }) }
+    return {
+      pos: checked.from ?? pos,
+      ...(checked.to !== undefined ? { end: checked.to } : {}),
+      above: true,
+      create: () => ({ dom: hoverDom(checked, route) }),
+    }
   }
 }
 
 function diagnostics(source: LanguageServiceSource): Extension {
-  return ViewPlugin.fromClass(class {
-    timer: ReturnType<typeof setTimeout> | undefined
-    read: AbortController | undefined
-    destroyed = false
-    // A new view, or a pooled state put back on screen, asks at once, so marks never outlive a
-    // provider that went away while the file was in the background.
-    constructor(readonly view: EditorView) { this.schedule(0) }
+  return ViewPlugin.fromClass(
+    class {
+      timer: ReturnType<typeof setTimeout> | undefined
+      read: AbortController | undefined
+      destroyed = false
+      // A new view, or a pooled state put back on screen, asks at once, so marks never outlive a
+      // provider that went away while the file was in the background.
+      constructor(readonly view: EditorView) {
+        this.schedule(0)
+      }
 
-    update(update: ViewUpdate): void {
-      const refreshed = update.transactions.some((transaction) => transaction.effects.some((effect) => effect.is(refreshLanguageServices)))
-      if (update.docChanged || refreshed) this.schedule(refreshed ? 0 : DIAGNOSTICS_DEBOUNCE_MS)
-    }
+      update(update: ViewUpdate): void {
+        const refreshed = update.transactions.some((transaction) =>
+          transaction.effects.some((effect) => effect.is(refreshLanguageServices)),
+        )
+        if (update.docChanged || refreshed) this.schedule(refreshed ? 0 : DIAGNOSTICS_DEBOUNCE_MS)
+      }
 
-    destroy(): void {
-      this.destroyed = true
-      clearTimeout(this.timer)
-      this.read?.abort()
-    }
+      destroy(): void {
+        this.destroyed = true
+        clearTimeout(this.timer)
+        this.read?.abort()
+      }
 
-    schedule(delay: number): void {
-      clearTimeout(this.timer)
-      this.read?.abort()
-      this.timer = setTimeout(() => void this.run(), delay)
-    }
+      schedule(delay: number): void {
+        clearTimeout(this.timer)
+        this.read?.abort()
+        this.timer = setTimeout(() => void this.run(), delay)
+      }
 
-    // Empty, failed, and refused answers all clear this provider's marks. Nothing else in the editor
-    // is touched: completion, saving, the selection, and other marks are separate state.
-    show(items: Diagnostic[]): void {
-      if (!this.destroyed) this.view.dispatch(setDiagnostics(this.view.state, items))
-    }
+      // Empty, failed, and refused answers all clear this provider's marks. Nothing else in the editor
+      // is touched: completion, saving, the selection, and other marks are separate state.
+      show(items: Diagnostic[]): void {
+        if (!this.destroyed) this.view.dispatch(setDiagnostics(this.view.state, items))
+      }
 
-    async run(): Promise<void> {
-      const route = source.routes().diagnostics
-      const text = this.view.state.doc.toString()
-      const tooLarge = !!route && languageRequestTooLarge(text)
-      source.onUnavailable?.(tooLarge ? LANGUAGE_REQUEST_TOO_LARGE : null)
-      const revision = source.revision()
-      if (!route || tooLarge || revision === undefined) return this.show([])
-      const read = this.read = new AbortController()
-      const items = await requestDiagnostics(route.route, source.nodeId, { text, revision }, read.signal)
-      if (read.signal.aborted || this.destroyed || source.revision() !== revision) return
-      this.show((items ?? []).map((item) => ({
-        from: item.from, to: item.to, severity: SEVERITY[item.severity] ?? 'info', message: item.message,
-        source: credit(route, item.source, item.code),
-      })))
-    }
-  })
+      async run(): Promise<void> {
+        const route = source.routes().diagnostics
+        const text = this.view.state.doc.toString()
+        const tooLarge = !!route && languageRequestTooLarge(text)
+        source.onUnavailable?.(tooLarge ? LANGUAGE_REQUEST_TOO_LARGE : null)
+        const revision = source.revision()
+        if (!route || tooLarge || revision === undefined) return this.show([])
+        const read = (this.read = new AbortController())
+        const items = await requestDiagnostics(route.route, source.nodeId, { text, revision }, read.signal)
+        if (read.signal.aborted || this.destroyed || source.revision() !== revision) return
+        this.show(
+          (items ?? []).map((item) => ({
+            from: item.from,
+            to: item.to,
+            severity: SEVERITY[item.severity] ?? 'info',
+            message: item.message,
+            source: credit(route, item.source, item.code),
+          })),
+        )
+      }
+    },
+  )
 }
 
 const languageServiceTheme = EditorView.baseTheme({
@@ -129,5 +157,8 @@ const languageServiceTheme = EditorView.baseTheme({
 })
 
 /** Hover and diagnostics for one editor state. Asks nothing while `routes()` names neither. */
-export const languageServices = (source: LanguageServiceSource): Extension =>
-  [hoverTooltip(hoverSource(source)), diagnostics(source), languageServiceTheme]
+export const languageServices = (source: LanguageServiceSource): Extension => [
+  hoverTooltip(hoverSource(source)),
+  diagnostics(source),
+  languageServiceTheme,
+]

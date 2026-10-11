@@ -21,7 +21,9 @@ type Client = {
   prepare(sql: string): Statement
   exec(sql: string): void
   pragma(statement: string): void
-  transaction<A extends unknown[], R>(fn: (...args: A) => R): ((...args: A) => R) & {
+  transaction<A extends unknown[], R>(
+    fn: (...args: A) => R,
+  ): ((...args: A) => R) & {
     deferred(...args: A): R
     immediate(...args: A): R
     exclusive(...args: A): R
@@ -29,14 +31,14 @@ type Client = {
   close(): void
 }
 
-const plainRow = (row: unknown): unknown =>
-  row && typeof row === 'object' && !Array.isArray(row) ? { ...row } : row
+const plainRow = (row: unknown): unknown => (row && typeof row === 'object' && !Array.isArray(row) ? { ...row } : row)
 
 const wrapStatement = (statement: StatementSync): Statement => {
   const wrapped: Statement = {
-    run: (...params) => statement.run(...params as SQLInputValue[]) as { changes: number | bigint; lastInsertRowid: number | bigint },
-    all: (...params) => statement.all(...params as SQLInputValue[]).map(plainRow),
-    get: (...params) => plainRow(statement.get(...params as SQLInputValue[])),
+    run: (...params) =>
+      statement.run(...(params as SQLInputValue[])) as { changes: number | bigint; lastInsertRowid: number | bigint },
+    all: (...params) => statement.all(...(params as SQLInputValue[])).map(plainRow),
+    get: (...params) => plainRow(statement.get(...(params as SQLInputValue[]))),
     raw(toggle = true) {
       statement.setReturnArrays(toggle)
       return wrapped
@@ -56,22 +58,24 @@ const openClient = (path: string): Client => {
   }
   let depth = 0
   const transaction = <A extends unknown[], R>(fn: (...args: A) => R) => {
-    const run = (begin: string) => (...args: A): R => {
-      const nested = depth > 0
-      const name = `acorn_sp_${depth}`
-      sqlite.exec(nested ? `SAVEPOINT ${name}` : begin)
-      depth += 1
-      try {
-        const result = fn(...args)
-        sqlite.exec(nested ? `RELEASE ${name}` : 'COMMIT')
-        return result
-      } catch (error) {
-        sqlite.exec(nested ? `ROLLBACK TO ${name}` : 'ROLLBACK')
-        throw error
-      } finally {
-        depth -= 1
+    const run =
+      (begin: string) =>
+      (...args: A): R => {
+        const nested = depth > 0
+        const name = `acorn_sp_${depth}`
+        sqlite.exec(nested ? `SAVEPOINT ${name}` : begin)
+        depth += 1
+        try {
+          const result = fn(...args)
+          sqlite.exec(nested ? `RELEASE ${name}` : 'COMMIT')
+          return result
+        } catch (error) {
+          sqlite.exec(nested ? `ROLLBACK TO ${name}` : 'ROLLBACK')
+          throw error
+        } finally {
+          depth -= 1
+        }
       }
-    }
     return Object.assign(run('BEGIN'), {
       deferred: run('BEGIN'),
       immediate: run('BEGIN IMMEDIATE'),

@@ -71,7 +71,13 @@ describe('SlotHost', () => {
 
   it('drops a contribution the host cannot satisfy', () => {
     capabilities.desktop = false
-    register({ id: 'native', slot: 'topbar.left', order: 0, requires: 'desktop', component: () => <span data-mark="native" /> })
+    register({
+      id: 'native',
+      slot: 'topbar.left',
+      order: 0,
+      requires: 'desktop',
+      component: () => <span data-mark="native" />,
+    })
     register({ id: 'portable', slot: 'topbar.left', order: 1, component: () => <span data-mark="portable" /> })
 
     mount(() => <SlotHost slot="topbar.left" context={context()} />)

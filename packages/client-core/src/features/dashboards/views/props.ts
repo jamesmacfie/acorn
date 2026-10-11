@@ -1,17 +1,13 @@
-import type {
-  DashboardDisplayField,
-  DashboardDisplayRow,
-  DashboardDisplaySchema,
-} from '@acorn/dashboards-core/render'
+import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from '@acorn/dashboards-core/render'
 import type { PanelTone, PanelView } from '../model'
 import type { DisplayPlanGroup } from '@acorn/dashboards-core/plan.ts'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { PlanRecordItem } from '@acorn/dashboards-core/plan.ts'
 import type { PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 
-  /** What every view is handed: rows already shaped and fields already projected. The shaping
-   *  layer runs once per panel, not once per view, which is what lets a person flip between views
-   *  without losing their filters (docs/dashboards/views.md § Views are derived, not chosen from a menu). */
+/** What every view is handed: rows already shaped and fields already projected. The shaping
+ *  layer runs once per panel, not once per view, which is what lets a person flip between views
+ *  without losing their filters (docs/dashboards/views.md § Views are derived, not chosen from a menu). */
 export type PanelViewProps = {
   view: PanelView
   /** The definition's id, for the one view that reads something keyed by it: a stat's history trend
@@ -53,10 +49,14 @@ export type PanelViewProps = {
 /** A row's press handler: only when the row declares a verb and the host can run it. */
 export const rowPress = (props: PanelViewProps, row: DashboardDisplayRow): (() => void) | undefined => {
   const activate = props.onActivate
-  return (props.canActivate ? props.canActivate(row) : row.action || row.target || row.taskId || props.pressConfigured) && activate ? () => activate(row) : undefined
+  return (props.canActivate
+    ? props.canActivate(row)
+    : row.action || row.target || row.taskId || props.pressConfigured) && activate
+    ? () => activate(row)
+    : undefined
 }
 
 /** A panel tone as StatusDot's. The dashboards vocabulary comes off the wire, where a plugin says
  *  `bad`; the kit's is a role token. One translation, so both views spell it the same way. */
 export const panelDotTone = (tone: PanelTone): 'ok' | 'warn' | 'danger' | 'muted' | 'accent' =>
-  (tone === 'bad' ? 'danger' : tone)
+  tone === 'bad' ? 'danger' : tone

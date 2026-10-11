@@ -22,7 +22,12 @@ export default function GithubConnect(props: {
   const integrations = createQuery(() => integrationsOptions(true))
   const connected = () =>
     !!integrations.data?.integrations.some((entry) => entry.providerId === 'github' && entry.status === 'connected')
-  const flow = createDeviceFlow(() => 'github', async () => { await integrations.refetch() })
+  const flow = createDeviceFlow(
+    () => 'github',
+    async () => {
+      await integrations.refetch()
+    },
+  )
   const importer = createMemo(() => projectImporterRegistry.get('github'))
   const githubVerification = (value: string): URL | null => {
     const url = safeVerificationUrl(value)
@@ -41,7 +46,9 @@ export default function GithubConnect(props: {
             >
               Connect GitHub
             </Heading>
-            <Text emphasis="muted" wrap>Enter a code at GitHub to sign in. acorn never sees your password.</Text>
+            <Text emphasis="muted" wrap>
+              Enter a code at GitHub to sign in. acorn never sees your password.
+            </Text>
             <Show
               when={flow.device()}
               fallback={
@@ -55,8 +62,18 @@ export default function GithubConnect(props: {
               {(started) => (
                 <Card>
                   <Stack gap="row">
-                    <Show when={githubVerification(started().verificationUri)} fallback={<Alert>GitHub sent a sign-in link that acorn doesn't trust. Cancel and try again.</Alert>}>
-                      {(url) => <Text emphasis="muted">{url().host}{url().pathname}</Text>}
+                    <Show
+                      when={githubVerification(started().verificationUri)}
+                      fallback={
+                        <Alert>GitHub sent a sign-in link that acorn doesn't trust. Cancel and try again.</Alert>
+                      }
+                    >
+                      {(url) => (
+                        <Text emphasis="muted">
+                          {url().host}
+                          {url().pathname}
+                        </Text>
+                      )}
                     </Show>
                     {/* The code is the thing to read, so it gets the emphasis. */}
                     <Inline gap="inline">
@@ -69,7 +86,9 @@ export default function GithubConnect(props: {
                       <Show when={githubVerification(started().verificationUri)}>
                         {(url) => <Button href={url().href}>Open GitHub</Button>}
                       </Show>
-                      <Button variant="ghost" onPress={flow.cancel}>Cancel</Button>
+                      <Button variant="ghost" onPress={flow.cancel}>
+                        Cancel
+                      </Button>
                     </Toolbar>
                     <Text emphasis="muted">Waiting for you to approve on GitHub…</Text>
                   </Stack>
@@ -83,13 +102,20 @@ export default function GithubConnect(props: {
         <Stack gap="row">
           <Heading level={2}>Choose repositories</Heading>
           <Text emphasis="muted" wrap>
-            Clone a repository, or link one you already have on this computer. You can import more later
-            in Settings.
+            Clone a repository, or link one you already have on this computer. You can import more later in Settings.
           </Text>
-          <Show when={importer()} fallback={<Text emphasis="muted">GitHub import isn't available on this computer.</Text>}>
+          <Show
+            when={importer()}
+            fallback={<Text emphasis="muted">GitHub import isn't available on this computer.</Text>}
+          >
             {(entry) => (
               // showClose: the wizard's own chrome already has back and skip.
-              <Dynamic component={entry().component} onClose={props.onBack} onImported={props.onImported} showClose={false} />
+              <Dynamic
+                component={entry().component}
+                onClose={props.onBack}
+                onImported={props.onImported}
+                showClose={false}
+              />
             )}
           </Show>
           {/* The running tally is the whole reason this screen can stay put: without it, adding a third

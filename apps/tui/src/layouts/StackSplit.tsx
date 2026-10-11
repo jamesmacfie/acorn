@@ -55,7 +55,12 @@ export function StackSplit(props: LayoutProps) {
       <Panel grow scroll title="Top" onBox={regionFocus({ paneId: props.stateKey, regionId: 'top' }, 0)}>
         {props.regions.top?.()}
       </Panel>
-      <Panel rows={split.size()} scroll title="Bottom" onBox={regionFocus({ paneId: props.stateKey, regionId: 'bottom' }, 1)}>
+      <Panel
+        rows={split.size()}
+        scroll
+        title="Bottom"
+        onBox={regionFocus({ paneId: props.stateKey, regionId: 'bottom' }, 1)}
+      >
         {props.regions.bottom?.()}
       </Panel>
     </box>

@@ -20,26 +20,31 @@ const change = (path: string, staged: boolean, status: LocalChange['status'] = '
 })
 
 const commit = vi.fn(async () => ({ ok: true }) as { ok: boolean; reason?: string })
-const commitMessage = vi.fn(async () => ({ message: 'feat: written for you', providerId: 'anthropic', modelId: 'a-model' }))
+const commitMessage = vi.fn(async () => ({
+  message: 'feat: written for you',
+  providerId: 'anthropic',
+  modelId: 'a-model',
+}))
 const headCommit = vi.fn(async () => ({ sha: 'abc123', message: 'feat: the last one\n\nwith a body' }))
 const onError = vi.fn()
 const onCommitted = vi.fn()
 
 const disposers: (() => void)[] = []
 
-const build = (changes: LocalChange[], over: Partial<CommitDeps> = {}) => createRoot((dispose) => {
-  disposers.push(dispose)
-  return createCommitState({
-    taskId: 'task-1',
-    groups: () => groupChanges(changes),
-    headCommit,
-    commit,
-    commitMessage,
-    onError,
-    onCommitted,
-    ...over,
+const build = (changes: LocalChange[], over: Partial<CommitDeps> = {}) =>
+  createRoot((dispose) => {
+    disposers.push(dispose)
+    return createCommitState({
+      taskId: 'task-1',
+      groups: () => groupChanges(changes),
+      headCommit,
+      commit,
+      commitMessage,
+      onError,
+      onCommitted,
+      ...over,
+    })
   })
-})
 
 beforeEach(() => {
   localStorage.clear()
@@ -81,7 +86,12 @@ describe('what the button will do', () => {
     await clean.toggleAmend()
     expect(clean.canCommit()).toBe(true)
     await clean.commit()
-    expect(commit).toHaveBeenCalledWith('feat: nothing to see', { all: false, amend: true, signoff: false, noVerify: false })
+    expect(commit).toHaveBeenCalledWith('feat: nothing to see', {
+      all: false,
+      amend: true,
+      signoff: false,
+      noVerify: false,
+    })
   })
 
   it('carries sign-off and skip-hooks through as they are set', async () => {
@@ -121,7 +131,12 @@ describe('amend', () => {
   it('turns amend on and commits in one call, for the chord', async () => {
     const state = build([change('a.ts', true)])
     await state.amendCommit()
-    expect(commit).toHaveBeenCalledWith('feat: the last one\n\nwith a body', { all: false, amend: true, signoff: false, noVerify: false })
+    expect(commit).toHaveBeenCalledWith('feat: the last one\n\nwith a body', {
+      all: false,
+      amend: true,
+      signoff: false,
+      noVerify: false,
+    })
   })
 })
 
@@ -169,7 +184,13 @@ describe('the draft on this device', () => {
     const other = createRoot((dispose) => {
       disposers.push(dispose)
       return createCommitState({
-        taskId: 'task-2', groups: () => groupChanges([]), headCommit, commit, commitMessage, onError, onCommitted,
+        taskId: 'task-2',
+        groups: () => groupChanges([]),
+        headCommit,
+        commit,
+        commitMessage,
+        onError,
+        onCommitted,
       })
     })
     expect(other.draft()).toBe('')
@@ -188,12 +209,18 @@ describe('a message somebody else wrote', () => {
     expect(localStorage.getItem(`${DRAFT_PREFIX}task-1`)).toBe('feat: written for you')
 
     await state.commit()
-    expect(commit).toHaveBeenCalledWith('feat: written for you', { all: false, amend: false, signoff: false, noVerify: false })
+    expect(commit).toHaveBeenCalledWith('feat: written for you', {
+      all: false,
+      amend: false,
+      signoff: false,
+      noVerify: false,
+    })
   })
 
   it('puts a refusal in the alert and leaves the field alone', async () => {
     const state = build([change('a.ts', true)], {
-      commitMessage: () => Promise.reject(Object.assign(new Error('The tree is clean.'), { code: 'nothing_to_commit' })),
+      commitMessage: () =>
+        Promise.reject(Object.assign(new Error('The tree is clean.'), { code: 'nothing_to_commit' })),
     })
     state.setDraft('feat: mine')
     await state.generate({ backendId: 'conn-1' })
@@ -208,15 +235,18 @@ describe('a message somebody else wrote', () => {
       commitMessage: () => Promise.reject(Object.assign(new Error('x'), { code: 'provider_unavailable' })),
     })
     await state.generate({ backendId: 'harness:claude-code' }, { kind: 'harness', label: 'Claude Code' })
-    expect(onError).toHaveBeenLastCalledWith('Claude Code did not answer. Run it once in a terminal to check it is signed in.')
+    expect(onError).toHaveBeenLastCalledWith(
+      'Claude Code did not answer. Run it once in a terminal to check it is signed in.',
+    )
   })
 
   it('refuses a second press while a provider is still writing', async () => {
     let release = () => {}
     const state = build([change('a.ts', true)], {
-      commitMessage: () => new Promise((resolve) => {
-        release = () => resolve({ message: 'feat: late', providerId: 'p', modelId: 'm' })
-      }),
+      commitMessage: () =>
+        new Promise((resolve) => {
+          release = () => resolve({ message: 'feat: late', providerId: 'p', modelId: 'm' })
+        }),
     })
     const first = state.generate({ backendId: 'conn-1' })
     expect(state.generating()).toBe(true)

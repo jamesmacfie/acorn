@@ -1,9 +1,21 @@
 import { decodeIdFrame } from '@acorn/protocol/ws.ts'
-import { activeNodeId, onScopeEvicted, registerWsBinaryHandler, registerWsChannel, wsSend, wsSendToNode } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  onScopeEvicted,
+  registerWsBinaryHandler,
+  registerWsChannel,
+  wsSend,
+  wsSendToNode,
+} from '@acorn/plugin-api/client'
 import { terminalServerMsgSchema, type ServerMsg } from '../contract/wire'
 
 type Subscriber = (message: ServerMsg) => void
-type Attached = { id: string; nodeId: string | null; subscribers: Set<Subscriber>; size?: { cols: number; rows: number } }
+type Attached = {
+  id: string
+  nodeId: string | null
+  subscribers: Set<Subscriber>
+  size?: { cols: number; rows: number }
+}
 const attached = new Map<string, Attached>()
 const decoder = new TextDecoder()
 const node = (): string | null => activeNodeId()
@@ -36,29 +48,49 @@ export function initPtyChannel(): () => void {
     if (event.from !== undefined) retire(event.from)
     else for (const slot of [...attached.values()]) if (slot.nodeId !== node()) retire(slot.nodeId)
   })
-  const json = registerWsChannel('term', (frame) => {
-    if (frame.channel !== 'term:out' || typeof frame.id !== 'string') return
-    receive(frame.id, frame.msg)
-  }, () => [...attached].filter(([, slot]) => slot.nodeId === node())
-    .map(([, slot]) => ({ channel: 'term:attach', id: slot.id, ...slot.size })), (frame) => {
+  const json = registerWsChannel(
+    'term',
+    (frame) => {
+      if (frame.channel !== 'term:out' || typeof frame.id !== 'string') return
+      receive(frame.id, frame.msg)
+    },
+    () =>
+      [...attached]
+        .filter(([, slot]) => slot.nodeId === node())
+        .map(([, slot]) => ({ channel: 'term:attach', id: slot.id, ...slot.size })),
+    (frame) => {
       if (typeof frame.id !== 'string' || (frame.channel !== 'term:attach' && frame.channel !== 'term:detach')) return
       return { key: `term:${frame.id}`, state: frame.channel === 'term:attach' ? 'attached' : 'detached' }
-    })
+    },
+  )
   const binary = registerWsBinaryHandler((frame) => {
     const tagged = decodeIdFrame(frame)
     if (tagged) receive(tagged.id, { type: 'output', data: decoder.decode(tagged.payload) })
   })
-  return () => { for (const slot of [...attached.values()]) retire(slot.nodeId); scope(); json.dispose(); binary.dispose() }
+  return () => {
+    for (const slot of [...attached.values()]) retire(slot.nodeId)
+    scope()
+    json.dispose()
+    binary.dispose()
+  }
 }
 
 // `size` rides on the attach frame so the node sizes the session before it takes the snapshot. A
 // node from before that ignores it, which is why the surface still checks the size `ready` reports.
-export function wsAttach(id: string, on: Subscriber, size?: { cols: number; rows: number }, selected: string | null = node()): () => void {
+export function wsAttach(
+  id: string,
+  on: Subscriber,
+  size?: { cols: number; rows: number },
+  selected: string | null = node(),
+): () => void {
   if (selected !== node()) return () => {}
   const address = key(selected, id)
   let slot = attached.get(address)
   const first = !slot
-  if (!slot) { slot = { id, nodeId: selected, subscribers: new Set(), size }; attached.set(address, slot) }
+  if (!slot) {
+    slot = { id, nodeId: selected, subscribers: new Set(), size }
+    attached.set(address, slot)
+  }
   slot.subscribers.add(on)
   if (first) send(selected, { channel: 'term:attach', id, ...size })
   let released = false

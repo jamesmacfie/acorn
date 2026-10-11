@@ -1,7 +1,12 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { extensionPointRegistry, extensionRegistry, type Disposable, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type Disposable,
+  type ExtensionContribution,
+} from '@acorn/plugin-api/testkit/client'
 import { PREVIEW_TOOLBAR_ACTIONS_POINT, type PreviewToolbarProps } from '../contract/toolbarActions'
 import PreviewPane from './PreviewPane'
 
@@ -16,7 +21,11 @@ const views = vi.hoisted(() => ({
   onEvent: vi.fn((_listener: (state: object) => void) => () => {}),
 }))
 
-const page = vi.hoisted(() => ({ update: undefined as ((rect: { x: number; y: number; width: number; height: number }, covered: boolean) => void) | undefined }))
+const page = vi.hoisted(() => ({
+  update: undefined as
+    | ((rect: { x: number; y: number; width: number; height: number }, covered: boolean) => void)
+    | undefined,
+}))
 
 const node = vi.hoisted(() => ({ id: 'node-a' as string | null }))
 
@@ -27,10 +36,15 @@ vi.mock('@acorn/plugin-api/client', async (original) => ({
   activeNodeId: () => node.id,
   elementRectKey: () => '0:0:300:200',
   previewViews: () => views,
-  observeNativePage: (_element: HTMLElement, update: (rect: { x: number; y: number; width: number; height: number }, covered: boolean) => void) => {
+  observeNativePage: (
+    _element: HTMLElement,
+    update: (rect: { x: number; y: number; width: number; height: number }, covered: boolean) => void,
+  ) => {
     page.update = update
     update({ x: 0, y: 0, width: 300, height: 200 }, false)
-    return () => { page.update = undefined }
+    return () => {
+      page.update = undefined
+    }
   },
   visibleElementRect: () => ({ x: 0, y: 0, width: 300, height: 200 }),
 }))
@@ -81,13 +95,22 @@ it('evicts a local view and removes its address controls when the active node be
   expect(views.show).not.toHaveBeenCalled()
 })
 
-const settled = async () => { await Promise.resolve(); await Promise.resolve() }
+const settled = async () => {
+  await Promise.resolve()
+  await Promise.resolve()
+}
 
 it('restores toolbar state after subscribing without waiting for page navigation', async () => {
   views.ensure.mockImplementation(async () => {
     expect(views.onEvent).toHaveBeenCalledOnce()
     const listener = views.onEvent.mock.calls[0][0] as unknown as (state: object) => void
-    listener({ taskId: 'task-1', url: 'http://localhost:5173/settings', loading: false, canGoBack: true, canGoForward: false })
+    listener({
+      taskId: 'task-1',
+      url: 'http://localhost:5173/settings',
+      loading: false,
+      canGoBack: true,
+      canGoForward: false,
+    })
     return true
   })
   dispose = render(() => <PreviewPane taskId="task-1" url="http://localhost:5173" remoteBlocked={false} />, host)
@@ -99,22 +122,29 @@ it('restores toolbar state after subscribing without waiting for page navigation
 
 it('does not retry failed ensures during overlay visibility changes and offers an explicit retry', async () => {
   views.ensure.mockResolvedValue(false)
-    dispose = render(() => <PreviewPane taskId="task-1" url="http://localhost:5173" remoteBlocked={false} />, host)
-    await settled()
-    expect(host.textContent).toContain('Could not open the preview')
-    coverPage(true)
-    coverPage(false)
-    expect(views.ensure).toHaveBeenCalledOnce()
-    views.ensure.mockResolvedValue(true)
-    Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Retry preview')!.click()
-    await settled()
-    expect(views.ensure).toHaveBeenCalledTimes(2)
-    expect(host.textContent).not.toContain('Could not open the preview')
+  dispose = render(() => <PreviewPane taskId="task-1" url="http://localhost:5173" remoteBlocked={false} />, host)
+  await settled()
+  expect(host.textContent).toContain('Could not open the preview')
+  coverPage(true)
+  coverPage(false)
+  expect(views.ensure).toHaveBeenCalledOnce()
+  views.ensure.mockResolvedValue(true)
+  Array.from(host.querySelectorAll('button'))
+    .find((button) => button.textContent === 'Retry preview')!
+    .click()
+  await settled()
+  expect(views.ensure).toHaveBeenCalledTimes(2)
+  expect(host.textContent).not.toContain('Could not open the preview')
 })
 
 it('hides only the disposed task and rejects a late ensure completion', async () => {
   let finish!: (value: boolean) => void
-  views.ensure.mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+  views.ensure.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+  )
   dispose = render(() => <PreviewPane taskId="task-1" url="http://localhost:5173" remoteBlocked={false} />, host)
   dispose()
   dispose = undefined
@@ -157,16 +187,16 @@ it('accepts only the latest target completion when the configured port changes',
 })
 
 it('defers a changed configured home until the overlay uncovers the pane', async () => {
-    const [url, setUrl] = createSignal('http://localhost:5173')
-    dispose = render(() => <PreviewPane taskId="task-1" url={url()} remoteBlocked={false} />, host)
-    await settled()
-    coverPage(true)
-    setUrl('http://localhost:5174')
-    expect(views.ensure).toHaveBeenCalledOnce()
-    coverPage(false)
-    await settled()
-    expect(views.ensure).toHaveBeenCalledTimes(2)
-    expect(views.ensure).toHaveBeenLastCalledWith('task-1', 'http://localhost:5174')
+  const [url, setUrl] = createSignal('http://localhost:5173')
+  dispose = render(() => <PreviewPane taskId="task-1" url={url()} remoteBlocked={false} />, host)
+  await settled()
+  coverPage(true)
+  setUrl('http://localhost:5174')
+  expect(views.ensure).toHaveBeenCalledOnce()
+  coverPage(false)
+  await settled()
+  expect(views.ensure).toHaveBeenCalledTimes(2)
+  expect(views.ensure).toHaveBeenLastCalledWith('task-1', 'http://localhost:5174')
 })
 
 describe('the preview:toolbar-actions point', () => {
@@ -182,11 +212,19 @@ describe('the preview:toolbar-actions point', () => {
 
   const contributor = (pluginId: string) => {
     const registration = extensionRegistry.register({
-      id: `plugin:${pluginId}:reload`, pluginId, point: PREVIEW_TOOLBAR_ACTIONS_POINT, label: pluginId, order: 500,
+      id: `plugin:${pluginId}:reload`,
+      pluginId,
+      point: PREVIEW_TOOLBAR_ACTIONS_POINT,
+      label: pluginId,
+      order: 500,
       carrier: 'component',
       component: (props: Drawn['props']) => {
         drawn.push({ pluginId, props })
-        return <button type="button" data-contributor={pluginId}>{pluginId}</button>
+        return (
+          <button type="button" data-contributor={pluginId}>
+            {pluginId}
+          </button>
+        )
       },
     } as ExtensionContribution)
     registered.push(registration)
@@ -197,15 +235,24 @@ describe('the preview:toolbar-actions point', () => {
    *  capturing listener the slot registered on that contributor's element with the browser's bit. */
   const press = (pluginId: string): void => {
     const button = host.querySelector(`[data-contributor="${pluginId}"]`)!
-    const index = listen.mock.calls.findIndex(([type]: unknown[], call: number) => type === 'pointerdown'
-      && (listen.mock.contexts[call] as Element).tagName === 'SPAN' && (listen.mock.contexts[call] as Element).contains(button))
+    const index = listen.mock.calls.findIndex(
+      ([type]: unknown[], call: number) =>
+        type === 'pointerdown' &&
+        (listen.mock.contexts[call] as Element).tagName === 'SPAN' &&
+        (listen.mock.contexts[call] as Element).contains(button),
+    )
     ;(listen.mock.calls[index]![1] as EventListener)({ isTrusted: true } as Event)
   }
-  const latest = (pluginId: string): Drawn['props'] => drawn.filter((entry) => entry.pluginId === pluginId).at(-1)!.props
-  const page = (taskId: string, url: string) => report({ taskId, url, loading: false, canGoBack: true, canGoForward: false })
+  const latest = (pluginId: string): Drawn['props'] =>
+    drawn.filter((entry) => entry.pluginId === pluginId).at(-1)!.props
+  const page = (taskId: string, url: string) =>
+    report({ taskId, url, loading: false, canGoBack: true, canGoForward: false })
 
   const mount = async (taskId = () => 'task-1') => {
-    dispose = render(() => <PreviewPane taskId={taskId()} projectId="project-1" url="http://localhost:5173" remoteBlocked={false} />, host)
+    dispose = render(
+      () => <PreviewPane taskId={taskId()} projectId="project-1" url="http://localhost:5173" remoteBlocked={false} />,
+      host,
+    )
     report = views.onEvent.mock.calls[0]![0] as unknown as (state: object) => void
     await settled()
   }
@@ -213,10 +260,17 @@ describe('the preview:toolbar-actions point', () => {
   beforeEach(() => {
     drawn.length = 0
     node.id = 'node-a'
-    registered.push(extensionPointRegistry.register({
-      id: PREVIEW_TOOLBAR_ACTIONS_POINT, ownerId: 'preview', label: 'Preview toolbar', kind: 'remote', mode: 'stack', max: 4,
-      actions: ['reload'],
-    }))
+    registered.push(
+      extensionPointRegistry.register({
+        id: PREVIEW_TOOLBAR_ACTIONS_POINT,
+        ownerId: 'preview',
+        label: 'Preview toolbar',
+        kind: 'remote',
+        mode: 'stack',
+        max: 4,
+        actions: ['reload'],
+      }),
+    )
     listen = vi.spyOn(HTMLElement.prototype, 'addEventListener')
   })
   afterEach(() => {
@@ -230,14 +284,34 @@ describe('the preview:toolbar-actions point', () => {
     page('task-1', 'http://localhost:5173/settings')
 
     const toolbar = host.querySelector('[role="toolbar"]')!
-    const labels = [...toolbar.querySelectorAll('button')].map((button) => button.getAttribute('aria-label') ?? button.textContent)
-    expect(labels).toEqual(['Back', 'Forward', 'Reload the page', "Go to the app's start page", 'Copy page address', 'Show developer tools', 'a', 'b', 'c', 'd'])
+    const labels = [...toolbar.querySelectorAll('button')].map(
+      (button) => button.getAttribute('aria-label') ?? button.textContent,
+    )
+    expect(labels).toEqual([
+      'Back',
+      'Forward',
+      'Reload the page',
+      "Go to the app's start page",
+      'Copy page address',
+      'Show developer tools',
+      'a',
+      'b',
+      'c',
+      'd',
+    ])
     expect(toolbar.textContent).toContain('1 more from other plugins')
     expect(toolbar.querySelector('input')?.value).toBe('http://localhost:5173/settings')
     expect(host.querySelector('[data-kind="webview"]')?.hasAttribute('hidden')).toBe(false)
-    expect(latest('a')).toEqual(expect.objectContaining({
-      taskId: 'task-1', projectId: 'project-1', url: 'http://localhost:5173/settings', loading: false, canGoBack: true, canGoForward: false,
-    }))
+    expect(latest('a')).toEqual(
+      expect.objectContaining({
+        taskId: 'task-1',
+        projectId: 'project-1',
+        url: 'http://localhost:5173/settings',
+        loading: false,
+        canGoBack: true,
+        canGoForward: false,
+      }),
+    )
   })
 
   it('offers no page until the native view reports one, and refuses a reload with nothing live', async () => {
@@ -246,8 +320,10 @@ describe('the preview:toolbar-actions point', () => {
     await mount()
     expect(latest('reloader').url).toBeUndefined()
     press('reloader')
-    await expect(latest('reloader').host.invoke('reload', { expectedUrl: 'http://localhost:5173' }))
-      .resolves.toEqual({ ok: false, reason: 'unsupported' })
+    await expect(latest('reloader').host.invoke('reload', { expectedUrl: 'http://localhost:5173' })).resolves.toEqual({
+      ok: false,
+      reason: 'unsupported',
+    })
     expect(views.command).not.toHaveBeenCalled()
   })
 
@@ -258,15 +334,28 @@ describe('the preview:toolbar-actions point', () => {
     page('task-1', 'http://localhost:5173/settings')
     const reloader = latest('reloader').host
 
-    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/settings' })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/settings' })).resolves.toEqual({
+      ok: false,
+      reason: 'needs_person',
+    })
     press('other')
-    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/settings' })).resolves.toEqual({ ok: false, reason: 'needs_person' })
+    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/settings' })).resolves.toEqual({
+      ok: false,
+      reason: 'needs_person',
+    })
     press('reloader')
-    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/' })).resolves.toEqual({ ok: false, reason: 'changed' })
-    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/settings' })).resolves.toEqual({ ok: true })
+    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/' })).resolves.toEqual({
+      ok: false,
+      reason: 'changed',
+    })
+    await expect(reloader.invoke('reload', { expectedUrl: 'http://localhost:5173/settings' })).resolves.toEqual({
+      ok: true,
+    })
     expect(views.command.mock.calls).toEqual([['task-1', 'reload']])
     // No way to ask for navigation: only the declared action reaches Preview.
-    await expect(reloader.invoke('load', { url: 'https://example.com' })).rejects.toMatchObject({ code: 'unknown_action' })
+    await expect(reloader.invoke('load', { url: 'https://example.com' })).rejects.toMatchObject({
+      code: 'unknown_action',
+    })
     expect(views.load).not.toHaveBeenCalled()
   })
 
@@ -282,17 +371,26 @@ describe('the preview:toolbar-actions point', () => {
     host.querySelector('input')!.value = 'http://localhost:5173/typed'
     host.querySelector('input')!.dispatchEvent(new Event('input'))
     page('task-1', 'http://localhost:5173/b')
-    await expect(mounted.invoke('reload', { expectedUrl: 'http://localhost:5173/a' })).resolves.toEqual({ ok: false, reason: 'changed' })
+    await expect(mounted.invoke('reload', { expectedUrl: 'http://localhost:5173/a' })).resolves.toEqual({
+      ok: false,
+      reason: 'changed',
+    })
 
     node.id = 'node-b'
-    await expect(mounted.invoke('reload', { expectedUrl: 'http://localhost:5173/b' })).resolves.toEqual({ ok: false, reason: 'changed' })
+    await expect(mounted.invoke('reload', { expectedUrl: 'http://localhost:5173/b' })).resolves.toEqual({
+      ok: false,
+      reason: 'changed',
+    })
     node.id = 'node-a'
 
     setTaskId('task-2')
     await settled()
     page('task-2', 'http://localhost:5173/b')
     expect(latest('reloader').host).not.toBe(mounted)
-    await expect(mounted.invoke('reload', { expectedUrl: 'http://localhost:5173/b' })).resolves.toEqual({ ok: false, reason: 'changed' })
+    await expect(mounted.invoke('reload', { expectedUrl: 'http://localhost:5173/b' })).resolves.toEqual({
+      ok: false,
+      reason: 'changed',
+    })
     expect(views.command).not.toHaveBeenCalled()
   })
 

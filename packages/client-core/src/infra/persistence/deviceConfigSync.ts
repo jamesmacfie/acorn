@@ -26,7 +26,11 @@ export async function startDeviceConfigSync(
   const apply = async (state: DeviceConfigState): Promise<void> => {
     const signal = applying.next()
     if (state.error) {
-      pushBackgroundError('', 'Could not read acorn.json', `${state.error.message} (line ${state.error.line}, column ${state.error.column}).`)
+      pushBackgroundError(
+        '',
+        'Could not read acorn.json',
+        `${state.error.message} (line ${state.error.line}, column ${state.error.column}).`,
+      )
       return
     }
     onApplied?.(state.config)
@@ -38,7 +42,11 @@ export async function startDeviceConfigSync(
   }
   await apply(await bridge.read())
   const off = bridge.onChange((state) => void apply(state))
-  const stop = () => { applying.abort(); off(); if (stopped === stop) stopped = undefined }
+  const stop = () => {
+    applying.abort()
+    off()
+    if (stopped === stop) stopped = undefined
+  }
   stopped?.()
   stopped = stop
   return stop

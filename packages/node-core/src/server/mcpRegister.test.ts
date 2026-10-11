@@ -7,7 +7,10 @@ const devLauncher = launcherSpec('/Applications/acorn.app/Contents/MacOS/node', 
 // A stand-in for a harness's declaration. The real ones live beside their harnesses
 // (plugins/agents/src/server/profiles/mcpCommands.ts, and its test); core is only meant to run them.
 const cli: McpCommands = {
-  add: (name, spec) => ({ file: 'toy', args: ['mcp', 'add', name, ...envFlags(spec), '--', spec.command, ...spec.args] }),
+  add: (name, spec) => ({
+    file: 'toy',
+    args: ['mcp', 'add', name, ...envFlags(spec), '--', spec.command, ...spec.args],
+  }),
   remove: (name) => ({ file: 'toy', args: ['mcp', 'remove', name] }),
 }
 
@@ -34,12 +37,25 @@ describe('register/remove round-trip through a stubbed exec', () => {
     const res = await registerAcornMcp(cli, 'acorn', launcher, exec)
     expect(res).toEqual({ ok: true })
     expect(calls[0]).toEqual(['toy', 'mcp', 'remove', 'acorn'])
-    expect(calls[1]).toEqual(['toy', 'mcp', 'add', 'acorn', '--env', 'ACORN_MCP_NAME=acorn', '--', '/Applications/acorn.app/Contents/MacOS/node', '/app/helper/mcp.js'])
+    expect(calls[1]).toEqual([
+      'toy',
+      'mcp',
+      'add',
+      'acorn',
+      '--env',
+      'ACORN_MCP_NAME=acorn',
+      '--',
+      '/Applications/acorn.app/Contents/MacOS/node',
+      '/app/helper/mcp.js',
+    ])
   })
   it('missing CLI → a reason naming the command the harness declared', async () => {
     const exec = vi.fn(async () => {
       throw new Error('spawn toy ENOENT')
     })
-    expect(await registerAcornMcp(cli, 'acorn', launcher, exec)).toEqual({ ok: false, reason: "'toy' CLI not found on PATH." })
+    expect(await registerAcornMcp(cli, 'acorn', launcher, exec)).toEqual({
+      ok: false,
+      reason: "'toy' CLI not found on PATH.",
+    })
   })
 })

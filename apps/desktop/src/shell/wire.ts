@@ -46,9 +46,7 @@ export type HelperReplyTiming = {
   /** Monotonic time spent awaiting and executing the helper handler. */
   handlerMs: number
 }
-export type HelperReply = (
-  { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string }
-) & {
+export type HelperReply = ({ id: number; ok: true; value: unknown } | { id: number; ok: false; error: string }) & {
   /** Optional so a renderer can tolerate a helper from before this diagnostic field existed. */
   timing?: HelperReplyTiming
 }
@@ -109,7 +107,10 @@ export function decodeBytes(value: string): Uint8Array {
 // ends agree on and the helper re-parses the decoded value against the real schema.
 export type WireFetchBody =
   | { kind: 'bytes'; bytes: string }
-  | { kind: 'form'; parts: ({ name: string; value: string } | { name: string; filename: string; type: string; bytes: string })[] }
+  | {
+      kind: 'form'
+      parts: ({ name: string; value: string } | { name: string; filename: string; type: string; bytes: string })[]
+    }
 export type WireFetchRequest = {
   requestId: string
   path: string

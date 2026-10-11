@@ -84,7 +84,9 @@ export function wheelAt(root: Renderable, x: number, y: number, direction: 'up' 
     y,
     scroll: { direction, delta: WHEEL_ROWS },
     preventDefault: () => {},
-    stopPropagation: () => { stopped = true },
+    stopPropagation: () => {
+      stopped = true
+    },
   }
   let scrolled = false
   for (let at: Node | null = target; at && !stopped; at = at.parent) {
@@ -136,9 +138,11 @@ export function pressAt(root: Renderable, x: number, y: number): void {
     button: LEFT,
     target,
     preventDefault: () => {},
-    stopPropagation: () => { stopped = true },
+    stopPropagation: () => {
+      stopped = true
+    },
   }
   for (let at: Node | null = target; at && !stopped; at = at.parent) {
-    (at as Pressed).onMouseDown?.(event)
+    ;(at as Pressed).onMouseDown?.(event)
   }
 }

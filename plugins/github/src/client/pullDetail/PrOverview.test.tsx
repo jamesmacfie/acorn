@@ -32,26 +32,32 @@ const opened: string[] = []
 // heading is the facts table. Cast because `PrModel` is what `build()` returns: nothing here needs
 // the twenty-odd mutations the toolbar would have asked for.
 const idle = { isPending: false, mutateAsync: async () => {} }
-const model = (title: string, overrides: Record<string, unknown> = {}): PrModel => ({
-  scope: { taskId: 't1', owner: 'runn-fast', repo: 'acorn', number: 7 },
-  readOnly: true,
-  pull: () => ({ title, state: 'open', draft: false, updatedAt: null }),
-  fileSummary: () => ({ count: 0, additions: 0, deletions: 0 }),
-  reviewers: () => [],
-  reviewDecision: () => ({ state: 'none', reviewers: [] }),
-  labels: () => [],
-  checks: () => [],
-  linearRefs: () => [],
-  conflicting: () => false,
-  actionError: () => '',
-  actionNeedsReconnect: () => false,
-  mergeMethod: () => 'squash',
-  refPrefixes: () => new Map([['CRA', 'linear']]),
-  showLinearIssue: (id: string) => opened.push(id),
-  merge: idle, autoMergeEnable: idle, autoMergeDisable: idle, close: idle, reopen: idle, draft: idle,
-  run: () => {},
-  ...overrides,
-} as unknown as PrModel)
+const model = (title: string, overrides: Record<string, unknown> = {}): PrModel =>
+  ({
+    scope: { taskId: 't1', owner: 'runn-fast', repo: 'acorn', number: 7 },
+    readOnly: true,
+    pull: () => ({ title, state: 'open', draft: false, updatedAt: null }),
+    fileSummary: () => ({ count: 0, additions: 0, deletions: 0 }),
+    reviewers: () => [],
+    reviewDecision: () => ({ state: 'none', reviewers: [] }),
+    labels: () => [],
+    checks: () => [],
+    linearRefs: () => [],
+    conflicting: () => false,
+    actionError: () => '',
+    actionNeedsReconnect: () => false,
+    mergeMethod: () => 'squash',
+    refPrefixes: () => new Map([['CRA', 'linear']]),
+    showLinearIssue: (id: string) => opened.push(id),
+    merge: idle,
+    autoMergeEnable: idle,
+    autoMergeDisable: idle,
+    close: idle,
+    reopen: idle,
+    draft: idle,
+    run: () => {},
+    ...overrides,
+  }) as unknown as PrModel
 
 let host: HTMLElement
 const disposers: (() => void)[] = []
@@ -68,15 +74,14 @@ afterEach(() => {
 })
 
 const draw = (title: string, overrides?: Record<string, unknown>) => {
-  disposers.push(render(
-    () => <PrOverview model={model(title, overrides)} onOpenFile={() => {}} onLinkClick={() => {}} />,
-    host,
-  ))
+  disposers.push(
+    render(() => <PrOverview model={model(title, overrides)} onOpenFile={() => {}} onLinkClick={() => {}} />, host),
+  )
   return host
 }
 
 describe('a ref token in a pull title', () => {
-  it('renders as a kit link on the heading\'s own text baseline', () => {
+  it("renders as a kit link on the heading's own text baseline", () => {
     const heading = draw('Fix CRA-404 in the rail').querySelector('.ui-heading')
     const link = heading?.querySelector('.ui-link')
     expect(link).not.toBeNull()
@@ -115,14 +120,22 @@ describe('the merge box', () => {
   })
 
   it('offers Ready for review instead of Merge on a draft', () => {
-    const node = draw('Fix the rail', { readOnly: false, pull: () => ({ title: 'Fix the rail', state: 'open', draft: true, updatedAt: null }) })
+    const node = draw('Fix the rail', {
+      readOnly: false,
+      pull: () => ({ title: 'Fix the rail', state: 'open', draft: true, updatedAt: null }),
+    })
     expect(named(node, 'Merge')).toBeUndefined()
     expect(named(node, 'Ready for review')?.dataset.variant).toBe('solid')
     expect(node.querySelector('[aria-label="Merge method"]')).toBeNull()
   })
 
   it('disables Merge while the branch conflicts', () => {
-    const node = draw('Fix the rail', { readOnly: false, conflicting: () => true, conflicts: () => undefined, conflictsLoading: () => true })
+    const node = draw('Fix the rail', {
+      readOnly: false,
+      conflicting: () => true,
+      conflicts: () => undefined,
+      conflictsLoading: () => true,
+    })
     expect(named(node, 'Merge')?.disabled).toBe(true)
     expect(node.textContent).toContain('This branch has conflicts')
   })
@@ -138,7 +151,10 @@ describe('the overview facts', () => {
   it('states the review decision and the checks in words', () => {
     const node = draw('Fix the rail', {
       reviewDecision: () => ({ state: 'changes-requested', reviewers: ['grace'] }),
-      checks: () => [{ name: 'test', status: 'FAILURE' }, { name: 'lint', status: 'SUCCESS' }],
+      checks: () => [
+        { name: 'test', status: 'FAILURE' },
+        { name: 'lint', status: 'SUCCESS' },
+      ],
     })
     const text = node.textContent ?? ''
     expect(text).toContain('Open')
@@ -155,4 +171,3 @@ describe('the overview facts', () => {
     expect(text).toContain('No checks')
   })
 })
-

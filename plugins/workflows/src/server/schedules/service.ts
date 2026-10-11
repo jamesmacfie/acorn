@@ -43,25 +43,49 @@ export type WorkflowScheduleScheduler = {
 }
 
 const validTimezone = (timezone: string): boolean => {
-  try { new Intl.DateTimeFormat('en', { timeZone: timezone }).format(); return true } catch { return false }
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: timezone }).format()
+    return true
+  } catch {
+    return false
+  }
 }
 
-const frozenInputs = (graph: ResolvedWorkflowGraph, supplied: Record<string, DataValue>): Record<string, DataValue> => ({
-  ...Object.fromEntries((graph.root.inputs ?? []).flatMap(input => input.default === undefined ? [] : [[input.name, input.default]])),
+const frozenInputs = (
+  graph: ResolvedWorkflowGraph,
+  supplied: Record<string, DataValue>,
+): Record<string, DataValue> => ({
+  ...Object.fromEntries(
+    (graph.root.inputs ?? []).flatMap((input) => (input.default === undefined ? [] : [[input.name, input.default]])),
+  ),
   ...supplied,
 })
 
 function applyLimits(graph: ResolvedWorkflowGraph, limits: WorkflowScheduleLimits): ResolvedWorkflowGraph {
-  const root = { ...graph.root, maxDescendants: limits.maxDescendants, maxConcurrency: limits.maxConcurrency, budget: limits.budget }
-  const nodes = graph.nodes.map((node, index) => index === 0 ? { ...node, definition: root } : node)
-  return { ...graph, root, nodes, fingerprint: workflowContentFingerprint(nodes.map(({ path, definition, provenance, defaultInputs }) => ({ path, definition, provenance, defaultInputs }))) }
+  const root = {
+    ...graph.root,
+    maxDescendants: limits.maxDescendants,
+    maxConcurrency: limits.maxConcurrency,
+    budget: limits.budget,
+  }
+  const nodes = graph.nodes.map((node, index) => (index === 0 ? { ...node, definition: root } : node))
+  return {
+    ...graph,
+    root,
+    nodes,
+    fingerprint: workflowContentFingerprint(
+      nodes.map(({ path, definition, provenance, defaultInputs }) => ({ path, definition, provenance, defaultInputs })),
+    ),
+  }
 }
 
 const state = (row: Schedule): WorkflowScheduleState => row.state as WorkflowScheduleState
 
 const admissionNeedsReview = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error)
-  return /forbidden|connection-required|not published|no longer exists|must be reviewed and trusted|select .+ before running/i.test(message)
+  return /forbidden|connection-required|not published|no longer exists|must be reviewed and trusted|select .+ before running/i.test(
+    message,
+  )
 }
 
 export class WorkflowScheduleService {
@@ -134,7 +158,11 @@ export class WorkflowScheduleService {
         cadence: input.cadence,
       })
       schedulerKey = created.key
-      this.db.update(schema.workflowSchedules).set({ schedulerKey }).where(eq(schema.workflowSchedules.id, row.id)).run()
+      this.db
+        .update(schema.workflowSchedules)
+        .set({ schedulerKey })
+        .where(eq(schema.workflowSchedules.id, row.id))
+        .run()
     }
     await scheduler.patch(schedulerKey, {
       enabled: false,
@@ -149,9 +177,17 @@ export class WorkflowScheduleService {
     const prepared = await this.starts.prepareScheduled(input.projectId, input.workflowId, input.inputs ?? {})
     const supplied = frozenInputs(prepared.graph, input.inputs ?? {})
     const row = input.id ? this.get(input.id) : null
-    const loops = await describeScheduleLoops(prepared.graph, prepared.scope, supplied, this.editor.describeSource, input.loops ?? (row ? this.configuredLoops(row) : []))
-    const approved = row?.approvedGraphJson ? JSON.parse(row.approvedGraphJson) as ResolvedWorkflowGraph : null
-    const configured = loops.length ? applyScheduleLoopSettings(prepared.graph, loops, input.loops ?? (row ? this.configuredLoops(row) : [])) : prepared.graph
+    const loops = await describeScheduleLoops(
+      prepared.graph,
+      prepared.scope,
+      supplied,
+      this.editor.describeSource,
+      input.loops ?? (row ? this.configuredLoops(row) : []),
+    )
+    const approved = row?.approvedGraphJson ? (JSON.parse(row.approvedGraphJson) as ResolvedWorkflowGraph) : null
+    const configured = loops.length
+      ? applyScheduleLoopSettings(prepared.graph, loops, input.loops ?? (row ? this.configuredLoops(row) : []))
+      : prepared.graph
     return {
       workflowName: prepared.graph.root.name,
       limits: effectiveScheduleLimits(prepared.graph, input.limits),
@@ -169,7 +205,13 @@ export class WorkflowScheduleService {
     const prepared = await this.starts.prepareScheduled(row.projectId, row.workflowId, requestedInputs)
     const limits = effectiveScheduleLimits(prepared.graph, JSON.parse(row.limitsJson))
     const available = this.editor.describeSource
-      ? await describeScheduleLoops(prepared.graph, prepared.scope, frozenInputs(prepared.graph, requestedInputs), this.editor.describeSource, this.configuredLoops(row))
+      ? await describeScheduleLoops(
+          prepared.graph,
+          prepared.scope,
+          frozenInputs(prepared.graph, requestedInputs),
+          this.editor.describeSource,
+          this.configuredLoops(row),
+        )
       : []
     const configuredGraph = available.length
       ? applyScheduleLoopSettings(prepared.graph, available, this.configuredLoops(row))
@@ -177,35 +219,48 @@ export class WorkflowScheduleService {
     const graph = applyLimits(configuredGraph, limits)
     const generation = row.generation + 1
     const epoch = freshEpoch ? randomUUID() : row.epoch
-    this.db.update(schema.workflowSchedules).set({
-      workspaceId: prepared.scope.workspaceId,
-      inputsJson: JSON.stringify(frozenInputs(graph, requestedInputs)),
-      limitsJson: JSON.stringify(limits),
-      approvedGraphJson: JSON.stringify(graph),
-      approvedGraphDigest: graph.fingerprint,
-      generation,
-      epoch,
-      state: firstCheck === 'track-now' ? 'baselining' : 'active',
-      firstCheck,
-      error: null,
-      updatedAt: Date.now(),
-    }).where(eq(schema.workflowSchedules.id, id)).run()
+    this.db
+      .update(schema.workflowSchedules)
+      .set({
+        workspaceId: prepared.scope.workspaceId,
+        inputsJson: JSON.stringify(frozenInputs(graph, requestedInputs)),
+        limitsJson: JSON.stringify(limits),
+        approvedGraphJson: JSON.stringify(graph),
+        approvedGraphDigest: graph.fingerprint,
+        generation,
+        epoch,
+        state: firstCheck === 'track-now' ? 'baselining' : 'active',
+        firstCheck,
+        error: null,
+        updatedAt: Date.now(),
+      })
+      .where(eq(schema.workflowSchedules.id, id))
+      .run()
     if (firstCheck === 'track-now') {
-      const occurrence = this.reserve(this.require(id), { reason: 'manual', requestKey: `baseline:${generation}` }, true)
+      const occurrence = this.reserve(
+        this.require(id),
+        { reason: 'manual', requestKey: `baseline:${generation}` },
+        true,
+      )
       try {
         await this.resume(occurrence)
       } catch (error) {
         if (state(this.require(id)) !== 'needs-review') {
-          this.db.update(schema.workflowSchedules).set({
-            state: 'baseline-failed',
-            error: error instanceof Error ? error.message : 'Baseline check could not start.',
-            updatedAt: Date.now(),
-          }).where(and(eq(schema.workflowSchedules.id, id), eq(schema.workflowSchedules.generation, generation))).run()
+          this.db
+            .update(schema.workflowSchedules)
+            .set({
+              state: 'baseline-failed',
+              error: error instanceof Error ? error.message : 'Baseline check could not start.',
+              updatedAt: Date.now(),
+            })
+            .where(and(eq(schema.workflowSchedules.id, id), eq(schema.workflowSchedules.generation, generation)))
+            .run()
         }
         throw error
       }
     }
-    if (firstCheck === 'process-current' && row.schedulerKey) await this.editor.scheduler?.().patch(row.schedulerKey, { enabled: true })
+    if (firstCheck === 'process-current' && row.schedulerKey)
+      await this.editor.scheduler?.().patch(row.schedulerKey, { enabled: true })
     return this.require(id)
   }
 
@@ -233,7 +288,11 @@ export class WorkflowScheduleService {
   }
 
   async views(): Promise<WorkflowScheduleView[]> {
-    return Promise.all(this.list().filter(row => state(row) !== 'deleted').map(row => this.view(row)))
+    return Promise.all(
+      this.list()
+        .filter((row) => state(row) !== 'deleted')
+        .map((row) => this.view(row)),
+    )
   }
 
   async view(rowOrId: Schedule | string): Promise<WorkflowScheduleView> {
@@ -260,31 +319,51 @@ export class WorkflowScheduleService {
   async remove(id: string): Promise<void> {
     const row = this.get(id)
     if (!row) return
-    this.db.update(schema.workflowSchedules).set({ state: 'deleted', updatedAt: Date.now() })
-      .where(eq(schema.workflowSchedules.id, id)).run()
+    this.db
+      .update(schema.workflowSchedules)
+      .set({ state: 'deleted', updatedAt: Date.now() })
+      .where(eq(schema.workflowSchedules.id, id))
+      .run()
   }
 
   async settleRun(runId: string): Promise<void> {
-    const occurrence = this.db.select().from(schema.workflowScheduleOccurrences)
-      .where(eq(schema.workflowScheduleOccurrences.runId, runId)).get()
+    const occurrence = this.db
+      .select()
+      .from(schema.workflowScheduleOccurrences)
+      .where(eq(schema.workflowScheduleOccurrences.runId, runId))
+      .get()
     if (!occurrence) return
     const run = this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, runId)).get()
-    if (!run || ACTIVE_RUN.includes(run.status as typeof ACTIVE_RUN[number])) return
+    if (!run || ACTIVE_RUN.includes(run.status as (typeof ACTIVE_RUN)[number])) return
     // The root is the tree's schedule-overlap owner. Keep that ownership until every descendant
     // is terminal as well, even if a malformed/legacy runner settles the root prematurely.
-    const activeDescendant = this.db.select({ id: schema.workflowRuns.id }).from(schema.workflowRuns).where(and(
-      eq(schema.workflowRuns.rootRunId, runId), inArray(schema.workflowRuns.status, [...ACTIVE_RUN]),
-    )).get()
+    const activeDescendant = this.db
+      .select({ id: schema.workflowRuns.id })
+      .from(schema.workflowRuns)
+      .where(and(eq(schema.workflowRuns.rootRunId, runId), inArray(schema.workflowRuns.status, [...ACTIVE_RUN])))
+      .get()
     if (activeDescendant) return
-    this.db.update(schema.workflowScheduleOccurrences).set({ state: 'terminal', detail: run.error, updatedAt: Date.now() })
-      .where(eq(schema.workflowScheduleOccurrences.id, occurrence.id)).run()
+    this.db
+      .update(schema.workflowScheduleOccurrences)
+      .set({ state: 'terminal', detail: run.error, updatedAt: Date.now() })
+      .where(eq(schema.workflowScheduleOccurrences.id, occurrence.id))
+      .run()
     if (occurrence.kind === 'baseline') {
       const ok = run.status === 'done' || run.status === 'completed-with-failures'
-      this.db.update(schema.workflowSchedules).set({
-        state: ok ? 'active' : 'baseline-failed',
-        error: ok ? null : run.error ?? 'Baseline check failed.',
-        updatedAt: Date.now(),
-      }).where(and(eq(schema.workflowSchedules.id, occurrence.scheduleId), eq(schema.workflowSchedules.generation, occurrence.generation))).run()
+      this.db
+        .update(schema.workflowSchedules)
+        .set({
+          state: ok ? 'active' : 'baseline-failed',
+          error: ok ? null : (run.error ?? 'Baseline check failed.'),
+          updatedAt: Date.now(),
+        })
+        .where(
+          and(
+            eq(schema.workflowSchedules.id, occurrence.scheduleId),
+            eq(schema.workflowSchedules.generation, occurrence.generation),
+          ),
+        )
+        .run()
       if (ok) {
         const schedule = this.get(occurrence.scheduleId)
         if (schedule?.schedulerKey) await this.editor.scheduler?.().patch(schedule.schedulerKey, { enabled: true })
@@ -295,10 +374,17 @@ export class WorkflowScheduleService {
   }
 
   async reconcile(scheduleId?: string): Promise<void> {
-    const rows = this.db.select().from(schema.workflowScheduleOccurrences)
-      .where(scheduleId
-        ? and(eq(schema.workflowScheduleOccurrences.scheduleId, scheduleId), inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]))
-        : inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]))
+    const rows = this.db
+      .select()
+      .from(schema.workflowScheduleOccurrences)
+      .where(
+        scheduleId
+          ? and(
+              eq(schema.workflowScheduleOccurrences.scheduleId, scheduleId),
+              inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]),
+            )
+          : inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]),
+      )
       .all()
     for (const row of rows) {
       if (row.state === 'run-started') await this.settleRun(row.runId)
@@ -307,10 +393,13 @@ export class WorkflowScheduleService {
   }
 
   private reserve(row: Schedule, context: RunContext, baseline: boolean): Occurrence {
-    if (context.reason !== 'manual' && context.dueAt === undefined) throw new Error('Scheduled occurrences require their persisted due instant.')
-    const requestKey = baseline ? context.requestKey! : context.reason === 'manual'
-      ? `manual:${context.requestKey ?? randomUUID()}`
-      : `due:${row.generation}:${context.dueAt}`
+    if (context.reason !== 'manual' && context.dueAt === undefined)
+      throw new Error('Scheduled occurrences require their persisted due instant.')
+    const requestKey = baseline
+      ? context.requestKey!
+      : context.reason === 'manual'
+        ? `manual:${context.requestKey ?? randomUUID()}`
+        : `due:${row.generation}:${context.dueAt}`
     const graph = JSON.parse(row.approvedGraphJson!) as ResolvedWorkflowGraph
     const payload: WorkflowSchedulePayload = {
       graph,
@@ -318,27 +407,54 @@ export class WorkflowScheduleService {
       limits: JSON.parse(row.limitsJson),
       baseline,
     }
-    const fingerprint = workflowContentFingerprint({ scheduleId: row.id, generation: row.generation, requestKey, payload })
-    return this.db.transaction(tx => {
-      const existing = tx.select().from(schema.workflowScheduleOccurrences).where(and(
-        eq(schema.workflowScheduleOccurrences.scheduleId, row.id), eq(schema.workflowScheduleOccurrences.requestKey, requestKey),
-      )).get()
+    const fingerprint = workflowContentFingerprint({
+      scheduleId: row.id,
+      generation: row.generation,
+      requestKey,
+      payload,
+    })
+    return this.db.transaction((tx) => {
+      const existing = tx
+        .select()
+        .from(schema.workflowScheduleOccurrences)
+        .where(
+          and(
+            eq(schema.workflowScheduleOccurrences.scheduleId, row.id),
+            eq(schema.workflowScheduleOccurrences.requestKey, requestKey),
+          ),
+        )
+        .get()
       if (existing) {
-        if (existing.payloadFingerprint !== fingerprint) throw new Error('Occurrence request key was reused with different content.')
+        if (existing.payloadFingerprint !== fingerprint)
+          throw new Error('Occurrence request key was reused with different content.')
         return existing
       }
-      const active = tx.select().from(schema.workflowScheduleOccurrences).where(and(
-        eq(schema.workflowScheduleOccurrences.scheduleId, row.id), inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]),
-      )).get()
+      const active = tx
+        .select()
+        .from(schema.workflowScheduleOccurrences)
+        .where(
+          and(
+            eq(schema.workflowScheduleOccurrences.scheduleId, row.id),
+            inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]),
+          ),
+        )
+        .get()
       const at = Date.now()
       const values = {
-        id: randomUUID(), scheduleId: row.id, generation: row.generation,
+        id: randomUUID(),
+        scheduleId: row.id,
+        generation: row.generation,
         kind: baseline ? 'baseline' : context.reason,
-        dueAt: context.dueAt ?? null, requestKey, payloadFingerprint: fingerprint,
-        payloadJson: JSON.stringify(payload), taskId: randomUUID(), runId: randomUUID(),
+        dueAt: context.dueAt ?? null,
+        requestKey,
+        payloadFingerprint: fingerprint,
+        payloadJson: JSON.stringify(payload),
+        taskId: randomUUID(),
+        runId: randomUUID(),
         state: active ? 'skipped' : 'claimed',
         detail: active ? `Skipped: previous run still active (${active.runId}).` : null,
-        createdAt: at, updatedAt: at,
+        createdAt: at,
+        updatedAt: at,
       }
       tx.insert(schema.workflowScheduleOccurrences).values(values).run()
       return values as Occurrence
@@ -346,12 +462,20 @@ export class WorkflowScheduleService {
   }
 
   private async resume(initial: Occurrence): Promise<Occurrence> {
-    let row = this.db.select().from(schema.workflowScheduleOccurrences).where(eq(schema.workflowScheduleOccurrences.id, initial.id)).get() ?? initial
-    if (!ACTIVE_OCCURRENCE.includes(row.state as typeof ACTIVE_OCCURRENCE[number])) return row
+    let row =
+      this.db
+        .select()
+        .from(schema.workflowScheduleOccurrences)
+        .where(eq(schema.workflowScheduleOccurrences.id, initial.id))
+        .get() ?? initial
+    if (!ACTIVE_OCCURRENCE.includes(row.state as (typeof ACTIVE_OCCURRENCE)[number])) return row
     const schedule = this.require(row.scheduleId)
     if (schedule.generation !== row.generation || ['deleted', 'needs-review'].includes(schedule.state)) {
-      this.db.update(schema.workflowScheduleOccurrences).set({ state: 'blocked', detail: 'Schedule approval changed before dispatch.', updatedAt: Date.now() })
-        .where(eq(schema.workflowScheduleOccurrences.id, row.id)).run()
+      this.db
+        .update(schema.workflowScheduleOccurrences)
+        .set({ state: 'blocked', detail: 'Schedule approval changed before dispatch.', updatedAt: Date.now() })
+        .where(eq(schema.workflowScheduleOccurrences.id, row.id))
+        .run()
       throw new ScheduleSkipped('schedule approval changed before dispatch')
     }
     const payload = JSON.parse(row.payloadJson) as WorkflowSchedulePayload
@@ -365,29 +489,49 @@ export class WorkflowScheduleService {
         if (!admissionNeedsReview(error)) throw error
         const detail = error instanceof Error ? error.message : 'Workflow authority changed before dispatch.'
         this.needsReview(schedule.id, detail)
-        this.db.update(schema.workflowScheduleOccurrences).set({ state: 'blocked', detail, updatedAt: Date.now() })
-          .where(eq(schema.workflowScheduleOccurrences.id, row.id)).run()
+        this.db
+          .update(schema.workflowScheduleOccurrences)
+          .set({ state: 'blocked', detail, updatedAt: Date.now() })
+          .where(eq(schema.workflowScheduleOccurrences.id, row.id))
+          .run()
         throw new ScheduleSkipped(detail)
       }
       const available = this.editor.describeSource
-        ? await describeScheduleLoops(current.graph, current.scope, payload.inputs, this.editor.describeSource, this.configuredLoops(schedule))
+        ? await describeScheduleLoops(
+            current.graph,
+            current.scope,
+            payload.inputs,
+            this.editor.describeSource,
+            this.configuredLoops(schedule),
+          )
         : []
       const currentGraph = available.length
         ? applyScheduleLoopSettings(current.graph, available, this.configuredLoops(schedule))
         : current.graph
       if (applyLimits(currentGraph, payload.limits).fingerprint !== schedule.approvedGraphDigest) {
         this.needsReview(schedule.id, 'Published workflow dependencies changed before dispatch.')
-        this.db.update(schema.workflowScheduleOccurrences).set({ state: 'blocked', detail: 'Approval changed before dispatch.', updatedAt: Date.now() })
-          .where(eq(schema.workflowScheduleOccurrences.id, row.id)).run()
+        this.db
+          .update(schema.workflowScheduleOccurrences)
+          .set({ state: 'blocked', detail: 'Approval changed before dispatch.', updatedAt: Date.now() })
+          .where(eq(schema.workflowScheduleOccurrences.id, row.id))
+          .run()
         throw new ScheduleSkipped('workflow approval changed — review to resume')
       }
-      await this.core.tasks.createRoot(schedule.projectId, {
-        title: `${payload.graph.root.name} · scheduled`,
-        branch: `workflow-${row.id.slice(0, 8)}`,
-        origin: 'workflows:schedule',
-      }, row.taskId)
+      await this.core.tasks.createRoot(
+        schedule.projectId,
+        {
+          title: `${payload.graph.root.name} · scheduled`,
+          branch: `workflow-${row.id.slice(0, 8)}`,
+          origin: 'workflows:schedule',
+        },
+        row.taskId,
+      )
       this.advance(row.id, 'claimed', 'task-created')
-      row = this.db.select().from(schema.workflowScheduleOccurrences).where(eq(schema.workflowScheduleOccurrences.id, row.id)).get()!
+      row = this.db
+        .select()
+        .from(schema.workflowScheduleOccurrences)
+        .where(eq(schema.workflowScheduleOccurrences.id, row.id))
+        .get()!
     }
     if (row.state === 'task-created') {
       try {
@@ -405,30 +549,52 @@ export class WorkflowScheduleService {
         if (!admissionNeedsReview(error)) throw error
         const detail = error instanceof Error ? error.message : 'Workflow authority changed before start.'
         this.needsReview(schedule.id, detail)
-        this.db.update(schema.workflowScheduleOccurrences).set({ state: 'blocked', detail, updatedAt: Date.now() })
-          .where(eq(schema.workflowScheduleOccurrences.id, row.id)).run()
+        this.db
+          .update(schema.workflowScheduleOccurrences)
+          .set({ state: 'blocked', detail, updatedAt: Date.now() })
+          .where(eq(schema.workflowScheduleOccurrences.id, row.id))
+          .run()
         throw new ScheduleSkipped(detail)
       }
       this.advance(row.id, 'task-created', 'run-started')
-      row = this.db.select().from(schema.workflowScheduleOccurrences).where(eq(schema.workflowScheduleOccurrences.id, row.id)).get()!
+      row = this.db
+        .select()
+        .from(schema.workflowScheduleOccurrences)
+        .where(eq(schema.workflowScheduleOccurrences.id, row.id))
+        .get()!
     }
     return row
   }
 
   private advance(id: string, from: string, to: string): void {
-    this.db.update(schema.workflowScheduleOccurrences).set({ state: to, detail: null, updatedAt: Date.now() })
-      .where(and(eq(schema.workflowScheduleOccurrences.id, id), eq(schema.workflowScheduleOccurrences.state, from))).run()
+    this.db
+      .update(schema.workflowScheduleOccurrences)
+      .set({ state: to, detail: null, updatedAt: Date.now() })
+      .where(and(eq(schema.workflowScheduleOccurrences.id, id), eq(schema.workflowScheduleOccurrences.state, from)))
+      .run()
   }
 
   private activeOccurrence(scheduleId: string): Occurrence | null {
-    return this.db.select().from(schema.workflowScheduleOccurrences).where(and(
-      eq(schema.workflowScheduleOccurrences.scheduleId, scheduleId), inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]),
-    )).get() ?? null
+    return (
+      this.db
+        .select()
+        .from(schema.workflowScheduleOccurrences)
+        .where(
+          and(
+            eq(schema.workflowScheduleOccurrences.scheduleId, scheduleId),
+            inArray(schema.workflowScheduleOccurrences.state, [...ACTIVE_OCCURRENCE]),
+          ),
+        )
+        .get() ?? null
+    )
   }
 
   private needsReview(id: string, error: string): void {
-    this.db.update(schema.workflowSchedules).set({ state: 'needs-review', error, updatedAt: Date.now() })
-      .where(eq(schema.workflowSchedules.id, id)).run()
+    this.db
+      .update(schema.workflowSchedules)
+      .set({ state: 'needs-review', error, updatedAt: Date.now() })
+      .where(eq(schema.workflowSchedules.id, id))
+      .run()
   }
 
   private require(id: string): Schedule {

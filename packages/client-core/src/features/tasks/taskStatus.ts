@@ -18,13 +18,13 @@ export const taskStatusRevision = statusRevision
 export const taskStatus = (id: string): TaskStatus | undefined => statuses()[id]
 
 const sameTaskStatus = (left: TaskStatus, right: TaskStatus): boolean =>
-  left.taskId === right.taskId
-  && left.worktreePath === right.worktreePath
-  && left.dirty === right.dirty
-  && left.dirtyCount === right.dirtyCount
-  && left.missing === right.missing
-  && left.branch === right.branch
-  && left.head === right.head
+  left.taskId === right.taskId &&
+  left.worktreePath === right.worktreePath &&
+  left.dirty === right.dirty &&
+  left.dirtyCount === right.dirtyCount &&
+  left.missing === right.missing &&
+  left.branch === right.branch &&
+  left.head === right.head
 
 export function taskStatusesChanged(
   current: Readonly<Record<string, TaskStatus>>,
@@ -41,14 +41,12 @@ export function taskStatusesChanged(
  * always moves so consumers of the full working tree can refresh on the same clock. */
 export function publishTaskStatuses(list: readonly TaskStatus[]): void {
   setStatuses((current) =>
-    taskStatusesChanged(current, list) ? Object.fromEntries(list.map((status) => [status.taskId, status])) : current)
+    taskStatusesChanged(current, list) ? Object.fromEntries(list.map((status) => [status.taskId, status])) : current,
+  )
   setStatusRevision((revision) => revision + 1)
 }
 
-export const refreshTaskStatuses = latestOnly(
-  async () => taskBridge().task.statuses(),
-  publishTaskStatuses,
-)
+export const refreshTaskStatuses = latestOnly(async () => taskBridge().task.statuses(), publishTaskStatuses)
 
 // Start polling; returns an unsubscribe.
 //

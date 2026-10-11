@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import {
-  DISPLAY_RESET,
-  HeadlessTerminalScreen,
-  TerminalDisplay,
-  type TerminalScreen,
-} from './terminalDisplay'
+import { DISPLAY_RESET, HeadlessTerminalScreen, TerminalDisplay, type TerminalScreen } from './terminalDisplay'
 import { OutputRing } from './terminalUtils'
 
 const session: TerminalSession = {
@@ -125,7 +120,11 @@ describe('TerminalDisplay', () => {
     const display = new TerminalDisplay(20, 5, () => screen)
     const frames: ServerMsg[] = []
     display.write('raw cursor history')
-    display.attach((message) => frames.push(message), session, () => '')
+    display.attach(
+      (message) => frames.push(message),
+      session,
+      () => '',
+    )
     display.publish({ type: 'output', data: 'live' })
 
     expect(frames).toEqual([{ type: 'ready', session, replayed: true }])
@@ -160,7 +159,11 @@ describe('TerminalDisplay', () => {
     const screen = new DeferredScreen()
     const display = new TerminalDisplay(20, 5, () => screen)
     const frames: ServerMsg[] = []
-    display.attach((message) => frames.push(message), session, () => '')
+    display.attach(
+      (message) => frames.push(message),
+      session,
+      () => '',
+    )
     display.publish({ type: 'output', data: 'first' })
 
     expect(frames).toEqual([
@@ -176,7 +179,11 @@ describe('TerminalDisplay', () => {
     // resize with no emulator is remembered and applied to whatever the next attach builds — the case
     // below.
     display.write('history')
-    display.attach(() => {}, session, () => 'history')
+    display.attach(
+      () => {},
+      session,
+      () => 'history',
+    )
 
     display.resize(40, 10)
     display.dispose()
@@ -214,8 +221,16 @@ describe('TerminalDisplay emulates only while an attach is restoring', () => {
     display.write('history')
 
     // Two attaches in flight share one emulator, built from the ring once.
-    display.attach((message) => first.push(message), session, () => 'history')
-    display.attach((message) => second.push(message), session, () => 'history')
+    display.attach(
+      (message) => first.push(message),
+      session,
+      () => 'history',
+    )
+    display.attach(
+      (message) => second.push(message),
+      session,
+      () => 'history',
+    )
     expect(screens).toHaveLength(1)
     expect(screens[0].writes).toEqual(['history'])
 
@@ -232,7 +247,11 @@ describe('TerminalDisplay emulates only while an attach is restoring', () => {
     expect(second.at(-1)).toEqual({ type: 'output', data: 'more' })
 
     // The next attach, a reconnect or another window, rebuilds from the ring.
-    display.attach(() => {}, session, () => 'history more')
+    display.attach(
+      () => {},
+      session,
+      () => 'history more',
+    )
     expect(screens).toHaveLength(2)
     expect(screens[1].writes).toEqual(['history more'])
   })
@@ -256,7 +275,11 @@ describe('TerminalDisplay emulates only while an attach is restoring', () => {
       built += 1
       return new DeferredScreen()
     })
-    display.attach(() => {}, session, () => '')
+    display.attach(
+      () => {},
+      session,
+      () => '',
+    )
     display.write('first output')
 
     expect(built).toBe(0)
@@ -273,7 +296,11 @@ describe('TerminalDisplay emulates only while an attach is restoring', () => {
 
     display.resize(120, 40)
     display.write('history')
-    display.attach(() => {}, session, () => 'history')
+    display.attach(
+      () => {},
+      session,
+      () => 'history',
+    )
 
     expect(screens[0].resizes).toEqual([[120, 40]])
     expect(screens[0].writes).toEqual(['history'])
@@ -301,7 +328,11 @@ describe('TerminalDisplay emulates only while an attach is restoring', () => {
 
     const screenOf = async (display: TerminalDisplay, ring: OutputRing): Promise<string> => {
       const frames: ServerMsg[] = []
-      display.attach((message) => frames.push(message), session, () => ring.tail())
+      display.attach(
+        (message) => frames.push(message),
+        session,
+        () => ring.tail(),
+      )
       for (let turn = 0; turn < 5; turn += 1) await nextTurn()
       const output = frames.find((frame) => frame.type === 'output')
       return output?.type === 'output' ? output.data : ''

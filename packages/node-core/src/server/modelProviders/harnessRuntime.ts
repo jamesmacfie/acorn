@@ -61,15 +61,20 @@ export async function harnessBackends(): Promise<{ backends: ModelBackend[]; mis
         const catalog = await profile.listModels(resolveCommand(profile))
         models = catalog.models
         catalogUnavailable = catalog.unavailable ?? false
+      } catch {
+        catalogUnavailable = true
       }
-      catch { catalogUnavailable = true }
     }
     backends.push(harnessBackend(profile, models, catalogUnavailable))
   }
   return { backends, missing }
 }
 
-const harnessBackend = (profile: ProfileDef, models = profile.models ?? [], catalogUnavailable = false): ModelBackend => ({
+const harnessBackend = (
+  profile: ProfileDef,
+  models = profile.models ?? [],
+  catalogUnavailable = false,
+): ModelBackend => ({
   id: `${HARNESS_BACKEND_PREFIX}${profile.id}`,
   kind: 'harness',
   label: profile.label,

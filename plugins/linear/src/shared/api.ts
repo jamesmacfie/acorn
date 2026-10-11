@@ -10,13 +10,38 @@
 import type { PluginRailItem } from '@acorn/protocol/api.ts'
 
 export type LinearIssueState = { name: string; type: string; color: string } | null
-export type LinearIssueSummary = { identifier: string; title: string; url: string; state: LinearIssueState; assignee: string | null }
-export type LinearComment = { id: string; author: string | null; body: string; createdAt: number | null; parentId: string | null }
+export type LinearIssueSummary = {
+  identifier: string
+  title: string
+  url: string
+  state: LinearIssueState
+  assignee: string | null
+}
+export type LinearComment = {
+  id: string
+  author: string | null
+  body: string
+  createdAt: number | null
+  parentId: string | null
+}
 // One activity-feed entry. `icon` is a kind key (created|state|assignee|label|title) the client
 // maps to a glyph; `color` tints state changes.
-export type LinearActivity = { id: string; actor: string | null; text: string; createdAt: number | null; icon: string; color?: string }
+export type LinearActivity = {
+  id: string
+  actor: string | null
+  text: string
+  createdAt: number | null
+  icon: string
+  color?: string
+}
 export type LinearLabel = { id: string; name: string; color: string }
-export type LinearAttachment = { id: string; title: string; subtitle: string | null; url: string; sourceType: string | null }
+export type LinearAttachment = {
+  id: string
+  title: string
+  subtitle: string | null
+  url: string
+  sourceType: string | null
+}
 // A lightweight reference to another issue (parent, sub-issue, or relation target).
 export type LinearRelatedIssue = { id: string; identifier: string; title: string; state: LinearIssueState }
 // A typed link between issues. `kind` is direction-aware (blocked-by is the inverse of blocks);
@@ -85,7 +110,8 @@ export const linearProjectsRoute = '/v1/p/linear/projects'
 // (server/index.ts's `linearTeamScopeId`).
 export const linearProjectIssuesRoute = (integrationId: string, scopeIds: string[]) =>
   `/v1/p/linear/project-issues?integration=${encodeURIComponent(integrationId)}&ids=${encodeURIComponent(scopeIds.join(','))}`
-const connectionQuery = (connectionId?: string) => (connectionId ? `&integration=${encodeURIComponent(connectionId)}` : '')
+const connectionQuery = (connectionId?: string) =>
+  connectionId ? `&integration=${encodeURIComponent(connectionId)}` : ''
 export const linearIssueRoute = (identifier: string, connectionId?: string) =>
   `/v1/p/linear/issues/${encodeURIComponent(identifier)}?refresh=1${connectionQuery(connectionId)}`
 export const linearCommentsRoute = (identifier: string, connectionId?: string) =>

@@ -34,10 +34,15 @@ describe('run routes (harness RunBridge)', () => {
 
   it('lists targets, starts/stops, and reads status', async () => {
     let started: { taskId: string; target: string } | null = null
-    setRunBridge(fake({ start: async (taskId, target) => ((started = { taskId, target }), { ok: true, sessionId: 's1' }) }))
+    setRunBridge(
+      fake({ start: async (taskId, target) => ((started = { taskId, target }), { ok: true, sessionId: 's1' }) }),
+    )
     const app = authed()
     expect((await app.fetch(req('/api/tasks/task1/run'), {} as Env)).status).toBe(200)
-    expect(await (await app.fetch(req('/api/tasks/task1/run/dev/start', 'POST'), {} as Env)).json()).toEqual({ ok: true, sessionId: 's1' })
+    expect(await (await app.fetch(req('/api/tasks/task1/run/dev/start', 'POST'), {} as Env)).json()).toEqual({
+      ok: true,
+      sessionId: 's1',
+    })
     expect(started).toEqual({ taskId: 'task1', target: 'dev' })
     expect((await app.fetch(req('/api/tasks/task1/run/dev/status'), {} as Env)).status).toBe(200)
   })
@@ -50,7 +55,9 @@ describe('run routes (harness RunBridge)', () => {
 
   it('nulls the default URL when there is no default target', async () => {
     setRunBridge(fake({ defaultUrl: async () => undefined }))
-    expect(await (await authed().fetch(req('/api/tasks/task1/run/default-url'), {} as Env)).json()).toEqual({ url: null })
+    expect(await (await authed().fetch(req('/api/tasks/task1/run/default-url'), {} as Env)).json()).toEqual({
+      url: null,
+    })
   })
 
   it('401s without a principal; 503s without a bridge', async () => {

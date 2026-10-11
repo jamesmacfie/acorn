@@ -62,7 +62,11 @@ describe('postEnvelope', () => {
   it('reads rate limits off a 200, because Sentry sends them on any response', async () => {
     const result = await postEnvelope({
       fetch: answer(200, { 'x-sentry-rate-limits': '60:log_item:key' }),
-      dsn: DSN, envelope: probeEnvelope(), client: 'acorn/1', sdk: SDK, now: NOW,
+      dsn: DSN,
+      envelope: probeEnvelope(),
+      client: 'acorn/1',
+      sdk: SDK,
+      now: NOW,
     })
     expect(result).toMatchObject({ status: 200, limits: [{ categories: ['log_item'], untilMs: NOW + 60_000 }] })
   })
@@ -70,28 +74,51 @@ describe('postEnvelope', () => {
   it('falls back to Retry-After on a 429 with no rate-limit header', async () => {
     const result = await postEnvelope({
       fetch: answer(429, { 'retry-after': '45' }),
-      dsn: DSN, envelope: probeEnvelope(), client: 'acorn/1', sdk: SDK, now: NOW,
+      dsn: DSN,
+      envelope: probeEnvelope(),
+      client: 'acorn/1',
+      sdk: SDK,
+      now: NOW,
     })
     expect(result.limits).toEqual([{ categories: 'all', untilMs: NOW + 45_000 }])
   })
 
   it('falls back to sixty seconds on a 429 with neither header', async () => {
     const result = await postEnvelope({
-      fetch: answer(429), dsn: DSN, envelope: probeEnvelope(), client: 'acorn/1', sdk: SDK, now: NOW,
+      fetch: answer(429),
+      dsn: DSN,
+      envelope: probeEnvelope(),
+      client: 'acorn/1',
+      sdk: SDK,
+      now: NOW,
     })
     expect(result.limits).toEqual([{ categories: 'all', untilMs: NOW + 60_000 }])
   })
 
   it('reports a network failure as a null status, which is the case worth retrying', async () => {
-    const fetchImpl = vi.fn(async () => { throw new Error('ENOTFOUND') })
-    expect(await postEnvelope({ fetch: fetchImpl, dsn: DSN, envelope: probeEnvelope(), client: 'acorn/1', sdk: SDK, now: NOW }))
-      .toEqual({ status: null, limits: [], detail: null })
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('ENOTFOUND')
+    })
+    expect(
+      await postEnvelope({
+        fetch: fetchImpl,
+        dsn: DSN,
+        envelope: probeEnvelope(),
+        client: 'acorn/1',
+        sdk: SDK,
+        now: NOW,
+      }),
+    ).toEqual({ status: null, limits: [], detail: null })
   })
 
   it("passes back Relay's own explanation of a rejected envelope", async () => {
     const result = await postEnvelope({
       fetch: answer(400, { 'x-sentry-error': 'invalid item header' }),
-      dsn: DSN, envelope: probeEnvelope(), client: 'acorn/1', sdk: SDK, now: NOW,
+      dsn: DSN,
+      envelope: probeEnvelope(),
+      client: 'acorn/1',
+      sdk: SDK,
+      now: NOW,
     })
     expect(result.detail).toBe('invalid item header')
   })

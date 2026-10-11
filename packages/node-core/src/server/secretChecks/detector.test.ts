@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { decodeSecretInput, MAX_SECRET_FINDINGS, redactSecretText, scanSecretText, SECRET_REDACTION, secretReport } from './detector'
+import {
+  decodeSecretInput,
+  MAX_SECRET_FINDINGS,
+  redactSecretText,
+  scanSecretText,
+  SECRET_REDACTION,
+  secretReport,
+} from './detector'
 
 // Synthetic credentials, assembled at runtime so no literal token sits in this file for a provider's
 // push protection, or this detector, to find. None of them was ever issued.
@@ -83,7 +90,13 @@ describe('decodeSecretInput', () => {
 describe('secretReport', () => {
   it('keeps exact counts past the finding limit and puts high findings first', () => {
     const findings = [
-      ...Array.from({ length: MAX_SECRET_FINDINGS }, () => ({ rule: 'jwt', confidence: 'heuristic' as const, location: 'a', line: 1, column: 1 })),
+      ...Array.from({ length: MAX_SECRET_FINDINGS }, () => ({
+        rule: 'jwt',
+        confidence: 'heuristic' as const,
+        location: 'a',
+        line: 1,
+        column: 1,
+      })),
       { rule: 'npm-token', confidence: 'high' as const, location: 'b', line: 2, column: 1 },
     ]
     const report = secretReport({ digest: 'd', findings })
@@ -94,7 +107,10 @@ describe('secretReport', () => {
   })
 
   it('is incomplete when anything was unscanned or the check stopped', () => {
-    expect(secretReport({ digest: 'd', findings: [], unscanned: [{ location: 'a.png', reason: 'Binary content.' }] }).complete).toBe(false)
+    expect(
+      secretReport({ digest: 'd', findings: [], unscanned: [{ location: 'a.png', reason: 'Binary content.' }] })
+        .complete,
+    ).toBe(false)
     expect(secretReport({ digest: 'd', findings: [], stopped: true }).complete).toBe(false)
   })
 })

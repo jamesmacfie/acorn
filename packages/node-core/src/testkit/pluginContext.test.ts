@@ -46,7 +46,9 @@ describe('makeTestNodeContext', () => {
       builtIn.telemetry.event('cache-miss')
       flushTelemetry()
       // The owner is closed over by the host, so a plugin cannot file under another's name.
-      expect(seen.filter((record) => record.kind === 'event').map((record) => record.attrs.owner)).toEqual(['testkit-probe'])
+      expect(seen.filter((record) => record.kind === 'event').map((record) => record.attrs.owner)).toEqual([
+        'testkit-probe',
+      ])
     } finally {
       loaded.cleanup()
       builtIn.cleanup()
@@ -54,7 +56,7 @@ describe('makeTestNodeContext', () => {
     }
   })
 
-  it('records what the plugin emitted, with no sink of the test\'s own', () => {
+  it("records what the plugin emitted, with no sink of the test's own", () => {
     // The recorder is the reason a plugin test does not stand up the collector by hand: three
     // suites used to (docs/plugin-authoring/testing.md § In tests).
     const ctx = makeTestNodeContext({ plugin })
@@ -120,7 +122,7 @@ describe('makeTestNodeContext', () => {
     }
   })
 
-  it('confines a loaded plugin\'s broadcast to its own channel namespace', () => {
+  it("confines a loaded plugin's broadcast to its own channel namespace", () => {
     // `send` used to be handed over raw, which let a loaded package post on `term:` or `workflow:` and
     // impersonate core's own streams. The confinement is also the definition of the namespace its frames
     // may subscribe to (client-core/host/plugins/pluginChannel.ts).
@@ -137,7 +139,7 @@ describe('makeTestNodeContext', () => {
     }
   })
 
-  it('leaves a built-in\'s broadcast alone, because it owns real prefixes', () => {
+  it("leaves a built-in's broadcast alone, because it owns real prefixes", () => {
     const ctx = makeTestNodeContext({ plugin })
     try {
       expect(() => ctx.events.send({ channel: 'term:status' })).not.toThrow()
@@ -158,7 +160,7 @@ describe('makeTestNodeContext', () => {
     }
   })
 
-  it('resolves a workspace plugin\'s chain from its id alone', () => {
+  it("resolves a workspace plugin's chain from its id alone", () => {
     // The default that replaced twenty `migrationsDir()` call sites: a real chain, really migrated, with
     // the test naming nothing but the plugin id.
     const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })

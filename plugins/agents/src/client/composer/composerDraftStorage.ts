@@ -9,24 +9,40 @@ export const composerDraftKey = (nodeId: string | null, sessionId: string): stri
   `acorn.agent-payload.${JSON.stringify([nodeId, sessionId])}`
 const fields: readonly DraftField[] = ['text', 'attachmentIds', 'contexts']
 const fieldKey = (key: string, field: DraftField) => `${key}.${field}`
-const legacyKeys = (id: string) => [`acorn.agent-draft.${id}`, `acorn.agent-attachments.${id}`, `acorn.agent-context.${id}`]
+const legacyKeys = (id: string) => [
+  `acorn.agent-draft.${id}`,
+  `acorn.agent-attachments.${id}`,
+  `acorn.agent-context.${id}`,
+]
 const parse = (value: string | null): unknown => {
-  try { return JSON.parse(value ?? 'null') } catch { return null }
+  try {
+    return JSON.parse(value ?? 'null')
+  } catch {
+    return null
+  }
 }
-const arrayFrom = (value: unknown): unknown[] => Array.isArray(value) ? value : []
-const contextsFrom = (value: unknown): AgentContextSnapshot[] => arrayFrom(value).filter((item): item is AgentContextSnapshot =>
-  typeof item === 'object' && item !== null && (item as { type?: unknown }).type === 'context')
-const idsFrom = (value: unknown): string[] => arrayFrom(value).filter((item): item is string => typeof item === 'string')
+const arrayFrom = (value: unknown): unknown[] => (Array.isArray(value) ? value : [])
+const contextsFrom = (value: unknown): AgentContextSnapshot[] =>
+  arrayFrom(value).filter(
+    (item): item is AgentContextSnapshot =>
+      typeof item === 'object' && item !== null && (item as { type?: unknown }).type === 'context',
+  )
+const idsFrom = (value: unknown): string[] =>
+  arrayFrom(value).filter((item): item is string => typeof item === 'string')
 
 export function readComposerPayload(nodeId: string | null, sessionId: string): StoredComposerDraft {
   const key = composerDraftKey(nodeId, sessionId)
   const [textKey, attachmentsKey, contextsKey] = legacyKeys(sessionId)
   const claimKey = `acorn.agent-legacy-owner.${sessionId}`
   const claimed = claims.get(sessionId) ?? readLocal(claimKey)
-  const legacy = claimed && claimed !== key ? { text: '', attachmentIds: [], contexts: [] } : {
-    text: readLocal(textKey) ?? '', attachmentIds: idsFrom(parse(readLocal(attachmentsKey))),
-    contexts: contextsFrom(parse(readLocal(contextsKey))),
-  }
+  const legacy =
+    claimed && claimed !== key
+      ? { text: '', attachmentIds: [], contexts: [] }
+      : {
+          text: readLocal(textKey) ?? '',
+          attachmentIds: idsFrom(parse(readLocal(attachmentsKey))),
+          contexts: contextsFrom(parse(readLocal(contextsKey))),
+        }
   const storedText = readLocal(fieldKey(key, 'text'))
   const storedAttachments = readLocal(fieldKey(key, 'attachmentIds'))
   const storedContexts = readLocal(fieldKey(key, 'contexts'))
@@ -61,14 +77,14 @@ export function writeComposerPayload(key: string, payload: StoredComposerDraft, 
     pendingMigrations.delete(key)
   }
   if (success && !payload.text && !payload.attachmentIds.length && !payload.contexts.length) {
-    fields.forEach(part => clearLocal(fieldKey(key, part)))
+    fields.forEach((part) => clearLocal(fieldKey(key, part)))
   }
   return success
 }
 
 export function deleteComposerPayload(nodeId: string | null, sessionId: string): void {
   const key = composerDraftKey(nodeId, sessionId)
-  fields.forEach(part => clearLocal(fieldKey(key, part)))
+  fields.forEach((part) => clearLocal(fieldKey(key, part)))
   pendingMigrations.delete(key)
   if ((claims.get(sessionId) ?? readLocal(`acorn.agent-legacy-owner.${sessionId}`)) === key) {
     legacyKeys(sessionId).forEach(clearLocal)

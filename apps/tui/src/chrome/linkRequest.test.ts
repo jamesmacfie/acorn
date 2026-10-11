@@ -4,7 +4,10 @@ import { startLinkRequest } from './linkRequest'
 const deferred = <T>() => {
   let resolve!: (value: T) => void
   let reject!: (reason: unknown) => void
-  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no })
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
   return { promise, resolve, reject }
 }
 
@@ -14,9 +17,14 @@ describe('deferred terminal link request', () => {
     const switched = deferred<string>()
     const apply = vi.fn()
     let currentNodeId = 'node-1'
-    const request = (load: () => Promise<string>) => startLinkRequest({
-      load, apply, currentNodeId: () => currentNodeId, nodeId: 'node-1', onError: vi.fn(),
-    })
+    const request = (load: () => Promise<string>) =>
+      startLinkRequest({
+        load,
+        apply,
+        currentNodeId: () => currentNodeId,
+        nodeId: 'node-1',
+        onError: vi.fn(),
+      })
 
     const cancel = request(() => outgoing.promise)
     cancel()
@@ -34,8 +42,11 @@ describe('deferred terminal link request', () => {
     const failure = deferred<unknown>()
     const onError = vi.fn()
     startLinkRequest({
-      load: () => failure.promise, apply: vi.fn(), currentNodeId: () => 'node-1',
-      nodeId: 'node-1', onError,
+      load: () => failure.promise,
+      apply: vi.fn(),
+      currentNodeId: () => 'node-1',
+      nodeId: 'node-1',
+      onError,
     })
     const error = new Error('missing chunk')
     failure.reject(error)

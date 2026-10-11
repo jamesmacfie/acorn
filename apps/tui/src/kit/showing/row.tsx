@@ -32,7 +32,9 @@ const SHRINK = { title: 1, meta: 20, trailing: 100 }
 function Part(props: { shrink: number; children: JSX.Element }) {
   return (
     <Show when={props.children}>
-      <box flexDirection="row" gap={1} flexShrink={props.shrink} overflow="hidden">{slot(props.children)}</box>
+      <box flexDirection="row" gap={1} flexShrink={props.shrink} overflow="hidden">
+        {slot(props.children)}
+      </box>
     </Show>
   )
 }
@@ -105,16 +107,43 @@ export function Row(props: {
         element.focusable = true
         props.item.ref(element)
         const actionKeys = [
-          ...(props.onRename ? [{ key: 'f2', cmd: () => { props.onRename?.(); return true } }] : []),
-          ...(props.onCreate ? [{ key: 'ctrl+n', cmd: () => { props.onCreate?.(); return true } }] : []),
+          ...(props.onRename
+            ? [
+                {
+                  key: 'f2',
+                  cmd: () => {
+                    props.onRename?.()
+                    return true
+                  },
+                },
+              ]
+            : []),
+          ...(props.onCreate
+            ? [
+                {
+                  key: 'ctrl+n',
+                  cmd: () => {
+                    props.onCreate?.()
+                    return true
+                  },
+                },
+              ]
+            : []),
         ]
-        if (actionKeys.length) bindKeys(element, actionKeys.map((binding) => ({
-          key: binding.key,
-          cmd: () => focusedRenderable() === element && binding.cmd(),
-        })), PANE)
+        if (actionKeys.length)
+          bindKeys(
+            element,
+            actionKeys.map((binding) => ({
+              key: binding.key,
+              cmd: () => focusedRenderable() === element && binding.cmd(),
+            })),
+            PANE,
+          )
       }}
     >
-      <box flexShrink={0}><Line tone="accent">{isActive() ? '›' : ' '}</Line></box>
+      <box flexShrink={0}>
+        <Line tone="accent">{isActive() ? '›' : ' '}</Line>
+      </box>
       <Part shrink={0}>{props.leading}</Part>
       {/* Words get the row's own role; a tree brought its own, and the row only decides how the parts
           sit. `stacked` is a title over a subtitle, which is what it is on the DOM — drawing both on
@@ -135,7 +164,9 @@ export function Row(props: {
               its natural width in a box that does not shrink, and the box above clips it. Shrunk
               texts each clip their own content, and the gap between them closed: "#100Older pull". */}
           <Show when={props.variant !== 'stacked'} fallback={slot(props.children)}>
-            <box flexDirection="row" gap={1} flexShrink={0}>{slot(props.children)}</box>
+            <box flexDirection="row" gap={1} flexShrink={0}>
+              {slot(props.children)}
+            </box>
           </Show>
         </Show>
       </box>
@@ -189,7 +220,12 @@ export function TreeRow(props: {
       onPress={props.onPress}
       onRename={props.onRename}
       onCreate={props.onCreate}
-      leading={<box flexDirection="row" gap={1}><Line>{props.expandable ? (props.expanded ? '▾' : '▸') : ' '}</Line>{slot(props.leading)}</box>}
+      leading={
+        <box flexDirection="row" gap={1}>
+          <Line>{props.expandable ? (props.expanded ? '▾' : '▸') : ' '}</Line>
+          {slot(props.leading)}
+        </box>
+      }
     >
       {props.children}
     </Row>
@@ -214,8 +250,21 @@ export function RowActions(props: {
   onOpenChange?: (open: boolean) => void
   children: (menu: { close: () => void }) => JSX.Element
 }) {
-  if (props.open) return <Menu ariaLabel={props.ariaLabel} open={props.open}
-    onBeforeOpen={props.onBeforeOpen} onOpenChange={props.onOpenChange}
-    trigger={() => <Line>[Actions]</Line>}>{props.children}</Menu>
-  return <box flexDirection="row" gap={1}>{props.children({ close: () => {} })}</box>
+  if (props.open)
+    return (
+      <Menu
+        ariaLabel={props.ariaLabel}
+        open={props.open}
+        onBeforeOpen={props.onBeforeOpen}
+        onOpenChange={props.onOpenChange}
+        trigger={() => <Line>[Actions]</Line>}
+      >
+        {props.children}
+      </Menu>
+    )
+  return (
+    <box flexDirection="row" gap={1}>
+      {props.children({ close: () => {} })}
+    </box>
+  )
 }

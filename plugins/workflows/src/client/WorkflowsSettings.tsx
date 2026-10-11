@@ -39,12 +39,20 @@ export default function WorkflowsSettings() {
       label="Loaded workflows"
       description="Workflows the open task can run, and any that failed to load."
       help="acorn reads .acorn/workflows in the repo and ~/.acorn/workflows. To write or edit one, open Workflows in the left rail. To run one, use the command palette."
-      actions={<Button size="sm" onPress={() => void refetch()}>Rescan</Button>}
+      actions={
+        <Button size="sm" onPress={() => void refetch()}>
+          Rescan
+        </Button>
+      }
     >
       <Show when={failure()}>{(message) => <Alert>{`Could not read the workflows: ${message()}`}</Alert>}</Show>
       <Show
         when={workflows().length}
-        fallback={<EmptyState align="start" size="sm">{taskId() ? 'No workflows found.' : 'No workflows found. Open a task to check its worktree.'}</EmptyState>}
+        fallback={
+          <EmptyState align="start" size="sm">
+            {taskId() ? 'No workflows found.' : 'No workflows found. Open a task to check its worktree.'}
+          </EmptyState>
+        }
       >
         <For each={workflows()}>
           {(wf) => (
@@ -59,7 +67,13 @@ export default function WorkflowsSettings() {
       <Show when={errors().length}>
         <SettingRow label="Problems" layout="stacked">
           <Stack gap="row">
-            <For each={errors()}>{(e) => <Alert tone="warn">{e.source}: {e.message}</Alert>}</For>
+            <For each={errors()}>
+              {(e) => (
+                <Alert tone="warn">
+                  {e.source}: {e.message}
+                </Alert>
+              )}
+            </For>
           </Stack>
         </SettingRow>
       </Show>

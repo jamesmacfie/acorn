@@ -9,7 +9,9 @@ import { ignoredEntries } from './ignoredEntries'
 
 const run = promisify(execFile)
 const roots: string[] = []
-afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
 
 it('reads ignore rules in one filename-safe batch and keeps non-Git listings usable', async () => {
   const root = await mkdtemp(join(tmpdir(), 'editor-ignore-'))
@@ -23,5 +25,7 @@ it('reads ignore rules in one filename-safe batch and keeps non-Git listings usa
   expect(await ignoredEntries(core, 'task', '', ['../escape'])).toMatchObject({ available: false })
   const other = await mkdtemp(join(tmpdir(), 'editor-nongit-'))
   roots.push(other)
-  expect(await ignoredEntries({ ...core, tasks: { root: async () => other } }, 'task', '', ['file'])).toMatchObject({ available: false })
+  expect(await ignoredEntries({ ...core, tasks: { root: async () => other } }, 'task', '', ['file'])).toMatchObject({
+    available: false,
+  })
 })

@@ -17,28 +17,36 @@ import { focusRenderable } from '../keys/regions'
 import { openSettings, placeFor } from './settingsStore'
 import type { ShellModel } from './model'
 
-type Destination = Exclude<Address, { kind: 'open' }> |
-  { kind: 'project-route'; projectId: string; path: string } |
-  { kind: 'refused'; reason: string }
+type Destination =
+  | Exclude<Address, { kind: 'open' }>
+  | { kind: 'project-route'; projectId: string; path: string }
+  | { kind: 'refused'; reason: string }
 
 export type ResolvedTerminalLink = { destination: Destination; projectId?: string }
 
 /** Claim an outside URL once, after this Node's contributions have registered. */
 export function resolveTerminalLink(address: Address, model: ShellModel): ResolvedTerminalLink {
-  if (address.kind === 'task') return {
-    destination: address,
-    projectId: model.allTasks().find((task) => task.id === address.taskId)?.projectId,
-  }
+  if (address.kind === 'task')
+    return {
+      destination: address,
+      projectId: model.allTasks().find((task) => task.id === address.taskId)?.projectId,
+    }
   if (address.kind === 'project') return { destination: address, projectId: address.projectId }
   if (address.kind !== 'open') return { destination: address }
   const claim = claimFor(address.url)
   if (!claim) return { destination: { kind: 'refused', reason: `No content-link recogniser accepts ${address.url}.` } }
   const path = claim.contribution.path?.(claim.target)
-  if (!path) return { destination: { kind: 'refused', reason: 'This content link has no terminal view. Open it in the desktop app.' } }
+  if (!path)
+    return {
+      destination: { kind: 'refused', reason: 'This content link has no terminal view. Open it in the desktop app.' },
+    }
   const task = matchRoute(TASK_ROUTE, path)
   if (task?.taskId) return resolveTerminalLink({ nodeId: address.nodeId, kind: 'task', taskId: task.taskId }, model)
   const projectId = path.startsWith('/p/') ? decodeURIComponent(path.split('/')[2] ?? '') : ''
-  if (!projectId) return { destination: { kind: 'refused', reason: 'This content link has no terminal view. Open it in the desktop app.' } }
+  if (!projectId)
+    return {
+      destination: { kind: 'refused', reason: 'This content link has no terminal view. Open it in the desktop app.' },
+    }
   return { destination: { kind: 'project-route', projectId, path }, projectId }
 }
 
@@ -67,14 +75,17 @@ export function openTerminalLink(resolved: ResolvedTerminalLink, model: ShellMod
     batch(() => {
       if (model.workspace()?.id !== owner.id) model.chooseWorkspace(owner.id)
       setActiveTaskId(null)
-      const selected = unavailable ? model.sources()[0]?.id : sourceId ?? model.sources()[0]?.id
+      const selected = unavailable ? model.sources()[0]?.id : (sourceId ?? model.sources()[0]?.id)
       if (selected) selectLinkedSource(selected, owner.id)
       else setSelectedSource(null)
       navigate(destination)
     })
-    if (unavailable) refuse(surface
-      ? `The plugin page ${surface.id} has no terminal view; opened the project.`
-      : `The project page ${path} is unavailable; opened the project.`)
+    if (unavailable)
+      refuse(
+        surface
+          ? `The plugin page ${surface.id} has no terminal view; opened the project.`
+          : `The project page ${path} is unavailable; opened the project.`,
+      )
   }
 
   switch (address.kind) {
@@ -83,10 +94,13 @@ export function openTerminalLink(resolved: ResolvedTerminalLink, model: ShellMod
     case 'task': {
       const task = model.allTasks().find((entry) => entry.id === address.taskId)
       if (!task) return refuse(`No task ${address.taskId} on this node.`)
-      const owner = model.workspaces().find((workspace) => workspace.projects.some((project) => project.id === task.projectId))
+      const owner = model
+        .workspaces()
+        .find((workspace) => workspace.projects.some((project) => project.id === task.projectId))
       if (!owner) return refuse(`No project for task ${address.taskId} on this node.`)
       const pane = address.pane ? paneContribution(address.pane) : undefined
-      if (address.pane && (!pane || !paneAvailable(pane, task))) return refuse(`The pane ${address.pane} is not available in this terminal.`)
+      if (address.pane && (!pane || !paneAvailable(pane, task)))
+        return refuse(`The pane ${address.pane} is not available in this terminal.`)
       batch(() => {
         if (model.workspace()?.id !== owner.id) model.chooseWorkspace(owner.id)
         activateTaskSignals(task)
@@ -102,12 +116,18 @@ export function openTerminalLink(resolved: ResolvedTerminalLink, model: ShellMod
       return
     }
     case 'project':
-      return openProjectPath(`${projectPath(address.projectId)}${address.rest.map((part) => `/${encodeURIComponent(part)}`).join('')}`, address.projectId)
+      return openProjectPath(
+        `${projectPath(address.projectId)}${address.rest.map((part) => `/${encodeURIComponent(part)}`).join('')}`,
+        address.projectId,
+      )
     case 'project-route':
       return openProjectPath(address.path, address.projectId)
     case 'settings': {
-      const target = address.pageId ? `settings/${address.pageId}${address.sectionId ? `#${address.sectionId}` : ''}` : undefined
-      if (target && !placeFor(target)) return refuse(`The settings page ${address.pageId} is not available in this terminal.`)
+      const target = address.pageId
+        ? `settings/${address.pageId}${address.sectionId ? `#${address.sectionId}` : ''}`
+        : undefined
+      if (target && !placeFor(target))
+        return refuse(`The settings page ${address.pageId} is not available in this terminal.`)
       openSettings(target)
       return
     }

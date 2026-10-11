@@ -50,9 +50,20 @@ describe('removing the agent history of long-archived tasks', () => {
     })
     await ctx.db.insert(coreSchema.workspaces).values({ id: 'workspace', name: 'W', createdAt: now, updatedAt: now })
     await ctx.db.insert(coreSchema.projects).values({
-      id: 'project', name: 'app', path: null, workspaceId: 'workspace', sort: 0, hidden: false, vcs: 'git',
-      defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project',
+      name: 'app',
+      path: null,
+      workspaceId: 'workspace',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
   })
 
@@ -63,34 +74,80 @@ describe('removing the agent history of long-archived tasks', () => {
 
   const task = async (id: string, status: 'active' | 'archived', archivedAt: number | null) => {
     await ctx.db.insert(coreSchema.tasks).values({
-      id, title: id, origin: 'local', projectId: 'project', branch: id, worktreePath: null,
-      status, createdAt: now, updatedAt: now, archivedAt,
+      id,
+      title: id,
+      origin: 'local',
+      projectId: 'project',
+      branch: id,
+      worktreePath: null,
+      status,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt,
     })
     return id
   }
 
   // A session with a searchable conversation, a turn holding an attachment, a request, and an artifact.
   const session = async (taskId: string, word: string) => {
-    const { id } = await runtime.store.createSession({
-      taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', title: `${word} session`, config: {},
-    }, PROVIDER)
+    const { id } = await runtime.store.createSession(
+      {
+        taskId,
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        title: `${word} session`,
+        config: {},
+      },
+      PROVIDER,
+    )
     const turnId = randomUUID()
-    db.insert(schema.agentTurns).values({
-      id: turnId, sessionId: id, ordinal: 1, source: 'interactive', status: 'completed', inputJson: '[]',
-      idempotencyKey: randomUUID(), createdAt: now,
-    }).run()
+    db.insert(schema.agentTurns)
+      .values({
+        id: turnId,
+        sessionId: id,
+        ordinal: 1,
+        source: 'interactive',
+        status: 'completed',
+        inputJson: '[]',
+        idempotencyKey: randomUUID(),
+        createdAt: now,
+      })
+      .run()
     await runtime.store.recordEvent(id, turnId, { type: 'user_message', text: `Please fix the ${word} bug.` })
     for (let index = 0; index < 4; index++) {
-      await runtime.store.recordEvent(id, turnId, { type: 'tool', tool: { id: `t${index}`, title: `Read ${word}.ts`, status: 'completed' } })
+      await runtime.store.recordEvent(id, turnId, {
+        type: 'tool',
+        tool: { id: `t${index}`, title: `Read ${word}.ts`, status: 'completed' },
+      })
     }
     await runtime.store.recordEvent(id, turnId, { type: 'assistant_message', text: `Fixed the ${word} bug.` })
-    db.insert(schema.agentRequests).values({
-      id: randomUUID(), sessionId: id, turnId, providerRequestId: randomUUID(), kind: 'question',
-      status: 'resolved', title: 'Which one?', createdAt: now,
-    }).run()
-    const attachment = await runtime.attachments.upload(taskId, `${word}.txt`, 'text/plain', Buffer.from(`${word} notes`))
+    db.insert(schema.agentRequests)
+      .values({
+        id: randomUUID(),
+        sessionId: id,
+        turnId,
+        providerRequestId: randomUUID(),
+        kind: 'question',
+        status: 'resolved',
+        title: 'Which one?',
+        createdAt: now,
+      })
+      .run()
+    const attachment = await runtime.attachments.upload(
+      taskId,
+      `${word}.txt`,
+      'text/plain',
+      Buffer.from(`${word} notes`),
+    )
     db.insert(schema.agentAttachmentRefs).values({ attachmentId: attachment.id, turnId, position: 0 }).run()
-    const artifact = await runtime.artifacts.putText({ sessionId: id, turnId, kind: 'command_output', title: 'Output', text: `${word} output` })
+    const artifact = await runtime.artifacts.putText({
+      sessionId: id,
+      turnId,
+      kind: 'command_output',
+      title: 'Output',
+      text: `${word} output`,
+    })
     const stored = db.select().from(schema.agentAttachments).where(eq(schema.agentAttachments.id, attachment.id)).get()!
     const output = db.select().from(schema.agentArtifacts).where(eq(schema.agentArtifacts.id, artifact.id)).get()!
     return {
@@ -104,17 +161,23 @@ describe('removing the agent history of long-archived tasks', () => {
     db.get<{ n: number }>(sql`SELECT count(*) AS n FROM ${sql.identifier(table)} WHERE session_id = ${sessionId}`)!.n
   const indexed = (sessionId: string) =>
     db.get<{ n: number }>(sql`SELECT count(*) AS n FROM agent_events_fts WHERE session_id = ${sessionId}`)!.n
-  const row = (sessionId: string) => db.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()!
-  const keep = (days: number) => writeAgentSessionDefaults(ctx.core.prefs, OWNER, { ...defaultAgentSessionDefaults(), keepArchivedHistoryDays: days })
+  const row = (sessionId: string) =>
+    db.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()!
+  const keep = (days: number) =>
+    writeAgentSessionDefaults(ctx.core.prefs, OWNER, {
+      ...defaultAgentSessionDefaults(),
+      keepArchivedHistoryDays: days,
+    })
   // A small batch, so a session takes several steps.
-  const prune = () => removeExpiredHistory({
-    runtime,
-    prefs: ctx.core.prefs,
-    userId: OWNER,
-    archivedBefore: (before) => ctx.core.tasks.archivedBefore(before),
-    signal: new AbortController().signal,
-    batch: 2,
-  })
+  const prune = () =>
+    removeExpiredHistory({
+      runtime,
+      prefs: ctx.core.prefs,
+      userId: OWNER,
+      archivedBefore: (before) => ctx.core.tasks.archivedBefore(before),
+      signal: new AbortController().signal,
+      batch: 2,
+    })
 
   it('removes only the sessions of tasks archived past the limit, and keeps their rows', async () => {
     const old = await session(await task('old', 'archived', now - 100 * DAY), 'kettle')
@@ -122,7 +185,11 @@ describe('removing the agent history of long-archived tasks', () => {
     const active = await session(await task('active', 'active', null), 'saucer')
     // Archived long ago and then restored: restoring clears the archive date.
     const restored = await session(await task('restored', 'active', null), 'spoon')
-    const untouched = [recent, active, restored].map(({ id }) => ({ id, events: count('agent_events', id), indexed: indexed(id) }))
+    const untouched = [recent, active, restored].map(({ id }) => ({
+      id,
+      events: count('agent_events', id),
+      indexed: indexed(id),
+    }))
     await keep(30)
 
     expect(await prune()).toBe('removed the history of 1 sessions (6 events)')
@@ -179,7 +246,9 @@ describe('removing the agent history of long-archived tasks', () => {
     expect(() => db.run(sql`INSERT INTO agent_events_fts (agent_events_fts) VALUES ('integrity-check')`)).not.toThrow()
     // The archive page's search no longer finds the removed conversation, and still finds the rest.
     expect(await runtime.store.searchTaskSessions('kettle bug', ['old', 'recent'], 10)).toEqual([])
-    expect((await runtime.store.searchTaskSessions('teapot bug', ['old', 'recent'], 10)).map((hit) => hit.taskId)).toEqual(['recent'])
+    expect(
+      (await runtime.store.searchTaskSessions('teapot bug', ['old', 'recent'], 10)).map((hit) => hit.taskId),
+    ).toEqual(['recent'])
   })
 
   it('does nothing while the owner keeps history forever, which is the default', async () => {
@@ -246,7 +315,11 @@ describe('removing the agent history of long-archived tasks', () => {
       userId: OWNER,
       archivedBefore: async (before) => {
         // Restored after the first step.
-        if (++asked === 2) await ctx.db.update(coreSchema.tasks).set({ status: 'active', archivedAt: null }).where(eq(coreSchema.tasks.id, 'old'))
+        if (++asked === 2)
+          await ctx.db
+            .update(coreSchema.tasks)
+            .set({ status: 'active', archivedAt: null })
+            .where(eq(coreSchema.tasks.id, 'old'))
         return ctx.core.tasks.archivedBefore(before)
       },
       signal: new AbortController().signal,
@@ -262,22 +335,45 @@ describe('removing the agent history of long-archived tasks', () => {
     it('deletes the sessions, transcripts, files and ledgers of deleted tasks only', async () => {
       const gone = await session(await task('gone', 'archived', now), 'kettle')
       const kept = await session(await task('kept', 'archived', now), 'teapot')
-      db.insert(schema.agentWebhooks).values({
-        id: 'hook', taskId: 'gone', url: 'https://example.test', eventsJson: '[]', secretEnc: 'x', createdAt: now, updatedAt: now,
-      }).run()
-      db.insert(schema.agentSpawns).values({
-        id: 'spawn', rootTaskId: 'kept', rootSessionId: kept.id, ownerTaskId: 'kept', ownerSessionId: kept.id, childTaskId: 'gone',
-        depth: 1, isolation: 'worktree', provisioningState: 'provisioned', idempotencyKey: 'k', createdAt: now, updatedAt: now,
-      }).run()
+      db.insert(schema.agentWebhooks)
+        .values({
+          id: 'hook',
+          taskId: 'gone',
+          url: 'https://example.test',
+          eventsJson: '[]',
+          secretEnc: 'x',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
+      db.insert(schema.agentSpawns)
+        .values({
+          id: 'spawn',
+          rootTaskId: 'kept',
+          rootSessionId: kept.id,
+          ownerTaskId: 'kept',
+          ownerSessionId: kept.id,
+          childTaskId: 'gone',
+          depth: 1,
+          isolation: 'worktree',
+          provisioningState: 'provisioned',
+          idempotencyKey: 'k',
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run()
 
       expect(await runtime.purgeDeletedTasks(['gone'])).toBeGreaterThan(0)
 
       expect(db.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, gone.id)).get()).toBeUndefined()
-      for (const table of ['agent_events', 'agent_turns', 'agent_requests', 'agent_artifacts'] as const) expect(count(table, gone.id)).toBe(0)
+      for (const table of ['agent_events', 'agent_turns', 'agent_requests', 'agent_artifacts'] as const)
+        expect(count(table, gone.id)).toBe(0)
       expect(indexed(gone.id)).toBe(0)
       expect(existsSync(gone.attachmentPath)).toBe(false)
       expect(existsSync(gone.artifactPath)).toBe(false)
-      expect(db.select().from(schema.agentAttachments).where(eq(schema.agentAttachments.taskId, 'gone')).all()).toEqual([])
+      expect(db.select().from(schema.agentAttachments).where(eq(schema.agentAttachments.taskId, 'gone')).all()).toEqual(
+        [],
+      )
       expect(db.select().from(schema.agentWebhooks).all()).toEqual([])
       expect(db.select().from(schema.agentSpawns).all()).toEqual([])
       expect(await runtime.store.searchTaskSessions('kettle bug', ['gone'], 10)).toEqual([])

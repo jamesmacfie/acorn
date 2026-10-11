@@ -45,10 +45,12 @@ export function installCrashHandlers(options: CrashHandlerOptions = {}): void {
   // The collector hands batches off synchronously; exporters convert and post afterwards.
   // Returning from flushTelemetry is not a delivery acknowledgement. Give those asynchronous
   // sinks the bounded crash window before exiting, even when the collector itself returns at once.
-  const flush = options.flush ?? (() => {
-    flushTelemetry()
-    return new Promise<void>((resolve) => setTimeout(resolve, deadlineMs))
-  })
+  const flush =
+    options.flush ??
+    (() => {
+      flushTelemetry()
+      return new Promise<void>((resolve) => setTimeout(resolve, deadlineMs))
+    })
 
   const die = (kind: 'uncaughtException' | 'unhandledRejection', value: unknown): void => {
     const error = value instanceof Error ? value : new Error(String(value))

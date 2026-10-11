@@ -1,6 +1,13 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { integrationsRoute, projectsRoute, tasksRoute, workspaceExternalProjectsRoute,
-  type IntegrationsResponse, type Project, type ProjectsResponse, type WorkspaceExternalProjectsResponse,
+import {
+  integrationsRoute,
+  projectsRoute,
+  tasksRoute,
+  workspaceExternalProjectsRoute,
+  type IntegrationsResponse,
+  type Project,
+  type ProjectsResponse,
+  type WorkspaceExternalProjectsResponse,
 } from '@acorn/protocol/api.ts'
 import {
   createTask,
@@ -24,14 +31,8 @@ export type PullTaskTarget = PullRef & {
   headRef: string
 }
 
-export const activeTaskForPull = (
-  tasks: readonly Task[],
-  projectId: string,
-  pullNumber: number,
-): Task | undefined => tasks.find((task) =>
-  task.status === 'active'
-  && task.projectId === projectId
-  && task.pullNumber === pullNumber)
+export const activeTaskForPull = (tasks: readonly Task[], projectId: string, pullNumber: number): Task | undefined =>
+  tasks.find((task) => task.status === 'active' && task.projectId === projectId && task.pullNumber === pullNumber)
 
 // Which connected Linear a PR body's `ENG-42` belongs to, or null when that can't be settled.
 //
@@ -48,9 +49,12 @@ export async function linearConnectionForProject(
   projectId: string,
   linears: readonly Integration[],
 ): Promise<string | null> {
-  return connectionForProject(projectId, linears,
+  return connectionForProject(
+    projectId,
+    linears,
     () => queryClient.ensureQueryData(projectsOptions(true)),
-    (workspaceId) => queryClient.ensureQueryData(workspaceExternalProjectsOptions(workspaceId, true)))
+    (workspaceId) => queryClient.ensureQueryData(workspaceExternalProjectsOptions(workspaceId, true)),
+  )
 }
 
 async function connectionForProject(
@@ -103,8 +107,9 @@ async function linksForPull(queryClient: QueryClient, target: PullRef & { projec
     .ensureQueryData(pullDetailOptions(target.owner, target.repo, target.number, true))
     .catch(() => undefined)
   const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
-  const linears = (integrations?.integrations ?? [])
-    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
+  const linears = (integrations?.integrations ?? []).filter(
+    (connection) => connection.providerId === 'linear' && connection.status === 'connected',
+  )
   const linearId = await linearConnectionForProject(queryClient, target.projectId, linears)
   return linksFromBody(detail?.pull?.body, linearId)
 }
@@ -125,11 +130,15 @@ function linksFromBody(body: string | null | undefined, linearId: string | null)
 // connection metadata needed for its references; no second PR read or detached query cache.
 async function linksForResolvedPull(pull: NonNullable<PullDetail['pull']>, projectId: string) {
   const integrations = await readJson<IntegrationsResponse>(integrationsRoute).catch(() => null)
-  const linears = (integrations?.integrations ?? [])
-    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
-  const linearId = await connectionForProject(projectId, linears,
+  const linears = (integrations?.integrations ?? []).filter(
+    (connection) => connection.providerId === 'linear' && connection.status === 'connected',
+  )
+  const linearId = await connectionForProject(
+    projectId,
+    linears,
     async () => (await readJson<ProjectsResponse>(projectsRoute)).projects,
-    (workspaceId) => readJson<WorkspaceExternalProjectsResponse>(workspaceExternalProjectsRoute(workspaceId)))
+    (workspaceId) => readJson<WorkspaceExternalProjectsResponse>(workspaceExternalProjectsRoute(workspaceId)),
+  )
   return linksFromBody(pull.body, linearId)
 }
 
@@ -143,7 +152,13 @@ async function linksForResolvedPull(pull: NonNullable<PullDetail['pull']>, proje
  */
 export const githubPullPromotion: NonNullable<SourceContribution<NonNullable<PullDetail['pull']>>['promotion']> = {
   fromContentLink: async (target) => {
-    if (target.kind !== 'pr' || typeof target.owner !== 'string' || typeof target.repo !== 'string' || typeof target.number !== 'string') return null
+    if (
+      target.kind !== 'pr' ||
+      typeof target.owner !== 'string' ||
+      typeof target.repo !== 'string' ||
+      typeof target.number !== 'string'
+    )
+      return null
     const detail = await readJson<PullDetail>(pullRoute(target.owner, target.repo, target.number))
     return detail.pull
   },
@@ -164,9 +179,9 @@ export const githubPullPromotion: NonNullable<SourceContribution<NonNullable<Pul
   }),
   create: async (seed) => {
     const tasks = await readJson<Task[]>(tasksRoute).catch(() => [] as Task[])
-    const existing = tasks.find((task) => task.status === 'active'
-      && task.projectId === seed.projectId
-      && task.pullNumber === seed.pullNumber)
+    const existing = tasks.find(
+      (task) => task.status === 'active' && task.projectId === seed.projectId && task.pullNumber === seed.pullNumber,
+    )
     return existing ?? createTask(seed)
   },
 }

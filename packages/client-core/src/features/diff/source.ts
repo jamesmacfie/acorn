@@ -1,5 +1,11 @@
 import type { JSX } from 'solid-js'
-import type { DiffDocumentTopology, DiffSearchPage, DiffSearchRequest, DiffSegmentPayload, DiffSegmentRequest } from '@acorn/diff-document/document'
+import type {
+  DiffDocumentTopology,
+  DiffSearchPage,
+  DiffSearchRequest,
+  DiffSegmentPayload,
+  DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import type { CodeRow, DiffThread } from '../../kit/diff/diffModel'
 import type { DiffViewScope } from './viewState'
 

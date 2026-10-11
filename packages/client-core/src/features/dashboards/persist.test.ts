@@ -38,18 +38,22 @@ const panel = (id: string, over: Partial<PanelDefinition> = {}): PanelDefinition
 
 // Most cases below exercise one field inside the current persisted envelope. Version refusal has
 // its own explicit case, so the fixture helper keeps those unrelated cases terse.
-const parseDashboards = (value: unknown) => parsePersistedDashboards(
-  value && typeof value === 'object' && !Array.isArray(value) ? { version: 1, ...value } : value,
-)
+const parseDashboards = (value: unknown) =>
+  parsePersistedDashboards(
+    value && typeof value === 'object' && !Array.isArray(value) ? { version: 1, ...value } : value,
+  )
 
 describe('placement scope keys', () => {
   it('spells home as one segment and keeps a composite owner unambiguous', () => {
     expect(placementScopeKey(HOME_PLACEMENT)).toBe('home')
     expect(placementScopeKey({ surface: 'pane', ownerId: 'pr' })).toBe('pane/pr')
     // `pluginId:regionId` is the owner id placements.md names, and it survives the round trip.
-    expect(placementScopeKey({ surface: 'plugin-region', ownerId: 'github:sidebar', workspaceId: 'w1' }))
-      .toBe('plugin-region/github%3Asidebar/w1')
-    expect(placementScopeKey({ surface: 'pane', ownerId: 'a/b' })).not.toBe(placementScopeKey({ surface: 'pane', ownerId: 'a', workspaceId: 'b' }))
+    expect(placementScopeKey({ surface: 'plugin-region', ownerId: 'github:sidebar', workspaceId: 'w1' })).toBe(
+      'plugin-region/github%3Asidebar/w1',
+    )
+    expect(placementScopeKey({ surface: 'pane', ownerId: 'a/b' })).not.toBe(
+      placementScopeKey({ surface: 'pane', ownerId: 'a', workspaceId: 'b' }),
+    )
   })
 })
 
@@ -78,14 +82,24 @@ describe('codec', () => {
 
   it('retains a typed publication marker and its source metadata', () => {
     const parsed = parseDashboards({
-      panels: { published: panel('published', { publication: {
-        dashboardId: 'published', sources: ['github:pulls'], fieldRoles: ['status'],
-      } }) },
+      panels: {
+        published: panel('published', {
+          publication: {
+            dashboardId: 'published',
+            sources: ['github:pulls'],
+            fieldRoles: ['status'],
+          },
+        }),
+      },
       placements: { home: ['published'] },
     })
-    expect(parsed.panels.published).toMatchObject({ publication: {
-      dashboardId: 'published', sources: ['github:pulls'], fieldRoles: ['status'],
-    } })
+    expect(parsed.panels.published).toMatchObject({
+      publication: {
+        dashboardId: 'published',
+        sources: ['github:pulls'],
+        fieldRoles: ['status'],
+      },
+    })
     expect(parsed.placements.home).toEqual(['published'])
   })
 
@@ -95,7 +109,12 @@ describe('codec', () => {
   })
 
   it('refuses an unversioned flat panel blob instead of reviving legacy collection authority', () => {
-    const legacy = { panels: { p1: { ...panel('p1'), publication: undefined, queries: [{ pluginId: 'github', collectionId: 'pulls' }] } }, placements: { home: ['p1'] } }
+    const legacy = {
+      panels: {
+        p1: { ...panel('p1'), publication: undefined, queries: [{ pluginId: 'github', collectionId: 'pulls' }] },
+      },
+      placements: { home: ['p1'] },
+    }
     expect(parsePersistedDashboards(legacy)).toEqual(emptyDashboards())
     expect(parsePanelDefinition(legacy.panels.p1)).toBeUndefined()
   })
@@ -111,7 +130,14 @@ describe('the geometry codec', () => {
     const parsed = parseDashboards({
       panels: {},
       placements: {},
-      layouts: { home: { ok: { x: 0, y: 0, w: 6, h: 4 }, partial: { x: 0, y: 0, w: 6 }, junk: 'nope', nan: { x: 0, y: 0, w: NaN, h: 2 } } },
+      layouts: {
+        home: {
+          ok: { x: 0, y: 0, w: 6, h: 4 },
+          partial: { x: 0, y: 0, w: 6 },
+          junk: 'nope',
+          nan: { x: 0, y: 0, w: NaN, h: 2 },
+        },
+      },
     })
     expect(parsed.layouts.home).toEqual({ ok: { x: 0, y: 0, w: 6, h: 4 } })
   })
@@ -151,7 +177,8 @@ describe('the geometry codec', () => {
 
 describe('the arranged layout', () => {
   it('auto-places every panel of an old blob, in order', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a'), b: panel('b') },
       placements: { home: ['a', 'b'] },
       layouts: {},
@@ -162,7 +189,8 @@ describe('the arranged layout', () => {
   })
 
   it('sizes a panel by its view kind, so a board arrives wider than a list', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a', { view: { kind: 'board' } }) },
       placements: { home: ['a'] },
       layouts: {},
@@ -171,7 +199,8 @@ describe('the arranged layout', () => {
   })
 
   it('auto-places only the panel that has no rect', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a'), b: panel('b') },
       placements: { home: ['a', 'b'] },
       layouts: { home: { a: { x: 0, y: 0, w: 8, h: 3 } } },
@@ -182,7 +211,8 @@ describe('the arranged layout', () => {
   })
 
   it('ignores a retained rect whose panel is not placed here', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'] },
       layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 }, ghost: { x: 4, y: 0, w: 8, h: 4 } } },
@@ -202,7 +232,8 @@ describe('the arranged layout', () => {
 
 describe('committing a gesture', () => {
   it('writes the rects and rewrites the placement to reading order', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a'), b: panel('b') },
       placements: { home: ['a', 'b'] },
       layouts: {},
@@ -218,7 +249,8 @@ describe('committing a gesture', () => {
   })
 
   it('leaves the geometry of every other scope alone', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'], 'pane/pr': ['a'] },
       layouts: { 'pane/pr': { a: { x: 0, y: 0, w: 4, h: 8 } } },
@@ -228,7 +260,8 @@ describe('committing a gesture', () => {
   })
 
   it('places a wizard commit at its preset size, first-fitted beside what is there', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'] },
       layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 } } },
@@ -251,7 +284,8 @@ describe('committing a gesture', () => {
   })
 
   it('deleting a panel takes its geometry with it', () => {
-    hydrateDashboards({ version: 1,
+    hydrateDashboards({
+      version: 1,
       panels: { a: panel('a') },
       placements: { home: ['a'] },
       layouts: { home: { a: { x: 0, y: 0, w: 6, h: 4 } } },
@@ -316,7 +350,7 @@ describe('home tabs', () => {
     expect(homeTabIdOf('home/t1/w1')).toBeUndefined()
   })
 
-  it('keys a board by workspace, and the unscoped board is nobody\'s', () => {
+  it("keys a board by workspace, and the unscoped board is nobody's", () => {
     expect(placementScopeKey(homeTabScope('', 'w1'))).toBe('home//w1')
     expect(placementScopeKey(homeTabScope('t1', 'w1'))).toBe('home/t1/w1')
     expect(homeTabIdOf('home//w1', 'w1')).toBe('')
@@ -326,10 +360,13 @@ describe('home tabs', () => {
     expect(homeTabIdOf('home/t1', 'w1')).toBeUndefined()
   })
 
-  it('lists only the workspace\'s own tabs, default tab and all', () => {
+  it("lists only the workspace's own tabs, default tab and all", () => {
     const state = parseDashboards({
       placements: { 'home//w1': ['a'], 'home/t2/w1': ['b'], 'home//w2': ['c'] },
-      tabs: [{ id: '', name: 'Home', workspaceId: 'w1' }, { id: '', name: 'Elsewhere', workspaceId: 'w2' }],
+      tabs: [
+        { id: '', name: 'Home', workspaceId: 'w1' },
+        { id: '', name: 'Elsewhere', workspaceId: 'w2' },
+      ],
     })
     // Every workspace's default tab is `''`, so identity is the pair and both survive the codec.
     expect(state.tabs).toHaveLength(2)
@@ -348,9 +385,15 @@ describe('home tabs', () => {
     expect(state.tabs?.filter((tab) => tab.workspaceId === 'w2')).toHaveLength(8)
   })
 
-  it('writing one workspace\'s tabs leaves every other workspace\'s alone', () => {
+  it("writing one workspace's tabs leaves every other workspace's alone", () => {
     hydrateDashboards(parseDashboards({ tabs: [{ id: 't1', name: 'Theirs', workspaceId: 'w2' }] }))
-    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Mine' }], 'w1')
+    setHomeTabs(
+      [
+        { id: '', name: 'Home' },
+        { id: 't1', name: 'Mine' },
+      ],
+      'w1',
+    )
     expect(dashboards().tabs).toEqual([
       { id: 't1', name: 'Theirs', workspaceId: 'w2' },
       { id: '', name: 'Home', workspaceId: 'w1' },
@@ -383,12 +426,12 @@ describe('home tabs', () => {
     expect(state.tabs?.[2].name).toHaveLength(60)
   })
 
-  it('leaves the key off entirely when a blob names no tabs, so today\'s Home is untouched', () => {
+  it("leaves the key off entirely when a blob names no tabs, so today's Home is untouched", () => {
     expect(parseDashboards({ panels: {}, placements: { home: ['a'] } }).tabs).toBeUndefined()
     expect(homeTabs(parseDashboards({ placements: { home: ['a'], 'home/t1': ['b'] } }))).toEqual([])
   })
 
-  it('recovers a home scope that has panels but no name, so an old client\'s write loses only the name', () => {
+  it("recovers a home scope that has panels but no name, so an old client's write loses only the name", () => {
     // Exactly what an old client leaves behind: it serialises what it parsed, so `tabs` is gone and
     // every placement survives.
     const state = parseDashboards({
@@ -408,7 +451,12 @@ describe('home tabs', () => {
   })
 
   it('round-trips through the slice codec unchanged', () => {
-    const state = parseDashboards({ tabs: [{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }] })
+    const state = parseDashboards({
+      tabs: [
+        { id: '', name: 'Home' },
+        { id: 't1', name: 'Reviews' },
+      ],
+    })
     expect(parseDashboards(JSON.stringify(dashboardsSlice.codec.serialize(state))).tabs).toEqual(state.tabs)
   })
 
@@ -418,7 +466,10 @@ describe('home tabs', () => {
     placePanel(HOME_PLACEMENT, 'a')
     placePanel(homeTabScope('t1'), 'a')
     setLayoutAt(homeTabScope('t1'), { order: ['a'], rects: { a: { x: 0, y: 0, w: 4, h: 4 } } })
-    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }])
+    setHomeTabs([
+      { id: '', name: 'Home' },
+      { id: 't1', name: 'Reviews' },
+    ])
 
     removeHomeTab('t1')
     expect(dashboards().tabs).toEqual([{ id: '', name: 'Home' }])
@@ -433,7 +484,10 @@ describe('home tabs', () => {
     hydrateDashboards(emptyDashboards())
     savePanel(panel('a'))
     placePanel(HOME_PLACEMENT, 'a')
-    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }])
+    setHomeTabs([
+      { id: '', name: 'Home' },
+      { id: 't1', name: 'Reviews' },
+    ])
     removeHomeTab('')
     expect(dashboards().tabs).toHaveLength(2)
     expect(panelsAt(HOME_PLACEMENT).map((entry) => entry.id)).toEqual(['a'])
@@ -442,7 +496,10 @@ describe('home tabs', () => {
   it('survives a panel deletion — names are not collateral damage of removing a panel', () => {
     hydrateDashboards(emptyDashboards())
     savePanel(panel('a'))
-    setHomeTabs([{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }])
+    setHomeTabs([
+      { id: '', name: 'Home' },
+      { id: 't1', name: 'Reviews' },
+    ])
     removePanel('a')
     expect(dashboards().tabs).toHaveLength(2)
   })
@@ -468,18 +525,25 @@ describe('home tabs', () => {
 })
 
 describe('adopting the unscoped board', () => {
-  const unscoped = () => parseDashboards({
-    panels: { a: panel('a'), b: panel('b') },
-    placements: { home: ['a'], 'home/t1': ['b'], 'plugin-region/github%3Asidebar': ['a'] },
-    layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 } } },
-    tabs: [{ id: '', name: 'Home' }, { id: 't1', name: 'Reviews' }],
-  })
+  const unscoped = () =>
+    parseDashboards({
+      panels: { a: panel('a'), b: panel('b') },
+      placements: { home: ['a'], 'home/t1': ['b'], 'plugin-region/github%3Asidebar': ['a'] },
+      layouts: { home: { a: { x: 0, y: 0, w: 4, h: 4 } } },
+      tabs: [
+        { id: '', name: 'Home' },
+        { id: 't1', name: 'Reviews' },
+      ],
+    })
 
   it('re-keys the unscoped home scopes into the workspace that opens them next', () => {
     const state = adoptUnscopedHome(unscoped(), 'w1')
     expect(Object.keys(state.placements).sort()).toEqual(['home//w1', 'home/t1/w1', 'plugin-region/github%3Asidebar'])
     expect(state.layouts['home//w1']).toEqual({ a: { x: 0, y: 0, w: 4, h: 4 } })
-    expect(state.tabs).toEqual([{ id: '', name: 'Home', workspaceId: 'w1' }, { id: 't1', name: 'Reviews', workspaceId: 'w1' }])
+    expect(state.tabs).toEqual([
+      { id: '', name: 'Home', workspaceId: 'w1' },
+      { id: 't1', name: 'Reviews', workspaceId: 'w1' },
+    ])
     // The panels the boards point at are untouched: this moves keys, never definitions.
     expect(Object.keys(state.panels).sort()).toEqual(['a', 'b'])
     expect(homeTabs(state, 'w1').map((tab) => tab.name)).toEqual(['Home', 'Reviews'])
@@ -493,10 +557,13 @@ describe('adopting the unscoped board', () => {
   })
 
   it('never overwrites a board the workspace already composed', () => {
-    const state = adoptUnscopedHome(parseDashboards({
-      panels: { a: panel('a'), b: panel('b') },
-      placements: { home: ['a'], 'home//w1': ['b'] },
-    }), 'w1')
+    const state = adoptUnscopedHome(
+      parseDashboards({
+        panels: { a: panel('a'), b: panel('b') },
+        placements: { home: ['a'], 'home//w1': ['b'] },
+      }),
+      'w1',
+    )
     expect(state.placements['home//w1']).toEqual(['b'])
     expect(state.placements.home).toEqual(['a'])
   })

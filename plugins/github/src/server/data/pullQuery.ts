@@ -4,7 +4,8 @@ import { readDataPointer } from '@acorn/protocol/dataValues.ts'
 import { pullSourceDescription } from '../../shared/pullSourceDescription'
 
 export const repositoryName = (value: unknown): string => {
-  if (typeof value !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(value) || value.length > 200) throw new Error('invalid_repository')
+  if (typeof value !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(value) || value.length > 200)
+    throw new Error('invalid_repository')
   return value
 }
 
@@ -18,13 +19,14 @@ function comparisons(predicate?: DataPredicate): Extract<DataPredicate, { kind: 
 /** Qualifiers only narrow candidates. Exact typed predicates are checked after full exhaustion. */
 export function pullSearch(query: DataSourceQuery): string {
   const repositories = query.scope.parameters.repositories
-  if (repositories !== undefined && (!Array.isArray(repositories) || repositories.length > 50)) throw new Error('invalid_repositories')
-  const parts = ['is:pr', ...(repositories ?? []).map(value => `repo:${repositoryName(value)}`)]
+  if (repositories !== undefined && (!Array.isArray(repositories) || repositories.length > 50))
+    throw new Error('invalid_repositories')
+  const parts = ['is:pr', ...(repositories ?? []).map((value) => `repo:${repositoryName(value)}`)]
   for (const filter of comparisons(query.predicate)) {
     const left = filter.left.address
     const right = filter.right?.address
     if (left.from !== 'item' || right?.from !== 'literal') throw new Error('invalid_operand')
-    const field = pullSourceDescription.fields.find(field => field.pointer === left.pointer)
+    const field = pullSourceDescription.fields.find((field) => field.pointer === left.pointer)
     if (!field?.query?.operators.includes(filter.operator)) throw new Error('unsupported_filter')
     const value = right.value
     switch (left.pointer) {
@@ -54,23 +56,33 @@ export function pullSearch(query: DataSourceQuery): string {
     }
   }
   for (const sort of query.sort) {
-    if (!pullSourceDescription.fields.find(field => field.pointer === sort.pointer)?.query?.sortable) throw new Error('unsupported_sort')
+    if (!pullSourceDescription.fields.find((field) => field.pointer === sort.pointer)?.query?.sortable)
+      throw new Error('unsupported_sort')
   }
   return parts.join(' ')
 }
 
 export function selectPulls(records: DataSourcePage['records'], query: DataSourceQuery): DataSourcePage['records'] {
   const filters = comparisons(query.predicate)
-  return records.filter(record => filters.every(filter => {
-    if (filter.left.address.from !== 'item' || filter.right?.address.from !== 'literal') throw new Error('invalid_operand')
-    return compareDataValues(readDataPointer(record.data, filter.left.address.pointer), filter.operator, filter.right.address.value)
-  })).sort((a, b) => {
-    for (const sort of query.sort) {
-      const left = readDataPointer(a.data, sort.pointer)
-      const right = readDataPointer(b.data, sort.pointer)
-      if (typeof left !== 'number' || typeof right !== 'number') throw new Error('invalid_sort_value')
-      if (left !== right) return (left - right) * (sort.direction === 'asc' ? 1 : -1)
-    }
-    return a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0
-  })
+  return records
+    .filter((record) =>
+      filters.every((filter) => {
+        if (filter.left.address.from !== 'item' || filter.right?.address.from !== 'literal')
+          throw new Error('invalid_operand')
+        return compareDataValues(
+          readDataPointer(record.data, filter.left.address.pointer),
+          filter.operator,
+          filter.right.address.value,
+        )
+      }),
+    )
+    .sort((a, b) => {
+      for (const sort of query.sort) {
+        const left = readDataPointer(a.data, sort.pointer)
+        const right = readDataPointer(b.data, sort.pointer)
+        if (typeof left !== 'number' || typeof right !== 'number') throw new Error('invalid_sort_value')
+        if (left !== right) return (left - right) * (sort.direction === 'asc' ? 1 : -1)
+      }
+      return a.recordId < b.recordId ? -1 : a.recordId > b.recordId ? 1 : 0
+    })
 }

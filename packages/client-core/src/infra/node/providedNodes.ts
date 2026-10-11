@@ -1,6 +1,11 @@
 import { coreNodeLifecycleRoute, coreNodeProvidersRoute } from '@acorn/protocol/api.ts'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
-import type { NodeLifecycleVerb, NodeProviderDescriptor, NodeProvidersResponse, ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
+import type {
+  NodeLifecycleVerb,
+  NodeProviderDescriptor,
+  NodeProvidersResponse,
+  ProvidedNode,
+} from '@acorn/protocol/nodeProviders.ts'
 import { readJson, sendJson } from './apiClient'
 import { fleetBridge } from '../platform'
 import { createFleetQuery, type FleetResult } from './fanout'
@@ -59,7 +64,9 @@ export function mergeProvidedNodes(
 ): ProvidedNodeRow[] {
   const merged = new Map<string, ProvidedNodeRow>()
   for (const answer of result.rows) {
-    const byId = new Map<string, NodeProviderDescriptor>(answer.data.providers.map((provider) => [provider.id, provider]))
+    const byId = new Map<string, NodeProviderDescriptor>(
+      answer.data.providers.map((provider) => [provider.id, provider]),
+    )
     for (const node of answer.data.nodes) {
       const key = dedupeKey(node.providerId, node.providerNodeId)
       if (merged.has(key)) continue
@@ -143,7 +150,10 @@ export async function runNodeLifecycle(verb: 'destroy' | 'start' | 'stop', row: 
   })
 }
 
-export async function createProvidedNode(target: { providerId: string; sourceNodeId: string }, label: string): Promise<void> {
+export async function createProvidedNode(
+  target: { providerId: string; sourceNodeId: string },
+  label: string,
+): Promise<void> {
   await sendJson(coreNodeLifecycleRoute('create'), {
     method: 'POST',
     ...jsonBody({ providerId: target.providerId, label, options: {} }),

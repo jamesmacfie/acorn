@@ -56,15 +56,14 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
         measure(element)
         split.attach(element)
       }}
-      onSizeChange={() => { if (box) measure(box) }}
+      onSizeChange={() => {
+        if (box) measure(box)
+      }}
     >
       {/* Two named regions, two frames, no rule between them (../panel.tsx). Only the stacked axis
           can set a row count; across the axis the width is the box's own and the frame takes what it
           is given. */}
-      <box
-        flexDirection="column"
-        {...(axis === 'x' ? { width: split.size() } : {})}
-      >
+      <box flexDirection="column" {...(axis === 'x' ? { width: split.size() } : {})}>
         <Panel
           grow
           scroll
@@ -79,11 +78,7 @@ const documentSplit = (axis: 'x' | 'y') => (props: LayoutProps) => {
         grow
         scroll
         title="Frame"
-        onBox={regionFocus(
-          { paneId: props.stateKey, regionId: 'frame' },
-          1,
-          axis === 'x' ? { x: SECOND_COLUMN } : {},
-        )}
+        onBox={regionFocus({ paneId: props.stateKey, regionId: 'frame' }, 1, axis === 'x' ? { x: SECOND_COLUMN } : {})}
       >
         {props.regions.frame?.()}
       </Panel>

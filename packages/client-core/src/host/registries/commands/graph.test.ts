@@ -9,23 +9,25 @@ import type { CommandContribution, CommandExecutionContext } from './commands'
 // stopped running the plugin behind it. None of them may take the palette down, so each is a dropped
 // node and one diagnostic, and the rest of the tree still draws.
 
-const group = (id: string, over: Partial<CommandContribution> = {}): CommandContribution => ({
-  id,
-  title: id,
-  category: 'pane',
-  palette: true,
-  kind: 'group',
-  ...over,
-} as CommandContribution)
+const group = (id: string, over: Partial<CommandContribution> = {}): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'pane',
+    palette: true,
+    kind: 'group',
+    ...over,
+  }) as CommandContribution
 
-const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution => ({
-  id,
-  title: id,
-  category: 'action',
-  palette: true,
-  run: () => {},
-  ...over,
-} as CommandContribution)
+const leaf = (id: string, over: Partial<CommandContribution> = {}): CommandContribution =>
+  ({
+    id,
+    title: id,
+    category: 'action',
+    palette: true,
+    run: () => {},
+    ...over,
+  }) as CommandContribution
 
 const issues = (graph: { diagnostics: readonly { id: string; issue: CommandGraphIssue }[] }) =>
   graph.diagnostics.map((diagnostic) => `${diagnostic.issue}:${diagnostic.id}`)
@@ -72,7 +74,9 @@ describe('a valid tree', () => {
 
   it('matches a query that spans two keywords', () => {
     // A custom agent's "New Reviewer session" row has neither word of "agent session" in its title.
-    const agent = buildCommandGraph([leaf('agent', { title: 'New Reviewer session', keywords: ['agent', 'new', 'session'] })])
+    const agent = buildCommandGraph([
+      leaf('agent', { title: 'New Reviewer session', keywords: ['agent', 'new', 'session'] }),
+    ])
     expect(agent.search('agent session').map((node) => node.id)).toEqual(['agent'])
   })
 })
@@ -144,11 +148,7 @@ describe('what the graph refuses', () => {
   })
 
   it('drops a cycle instead of walking it', () => {
-    const graph = buildCommandGraph([
-      group('a', { parentId: 'b' }),
-      group('b', { parentId: 'a' }),
-      leaf('safe'),
-    ])
+    const graph = buildCommandGraph([group('a', { parentId: 'b' }), group('b', { parentId: 'a' }), leaf('safe')])
     // Every member of the ring is gone and the rest of the tree is untouched. One diagnostic, not one
     // per member: the walk names where it closed the loop, and repeating it around the ring says
     // nothing more.
@@ -186,10 +186,7 @@ describe('the gates, inherited', () => {
   })
 
   it('hides a hidden ancestor’s children from discovery but keeps them in the tree', () => {
-    const graph = buildCommandGraph([
-      group('panes', { palette: false }),
-      leaf('panes.close', { parentId: 'panes' }),
-    ])
+    const graph = buildCommandGraph([group('panes', { palette: false }), leaf('panes.close', { parentId: 'panes' })])
     // Still available, so a shortcut naming it still works. Just not discoverable, which is what
     // `palette` has always meant.
     expect(graph.nodes.get('panes.close')?.available).toBe(true)
@@ -223,8 +220,13 @@ describe('an empty graph', () => {
 
 describe('scope', () => {
   const WORLD: CommandExecutionContext = {
-    host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
-    paneId: null, surfaceId: null,
+    host: 'desktop',
+    nodeId: 'node-1',
+    workspaceId: 'w-1',
+    projectId: 'p-1',
+    taskId: 't-1',
+    paneId: null,
+    surfaceId: null,
   }
 
   it('is not asked at all without a world to ask it against', () => {
@@ -244,17 +246,23 @@ describe('scope', () => {
     const whole = buildCommandGraph(commands, WORLD)
     expect(whole.top().map((node) => node.id)).toHaveLength(6)
 
-    const bare = buildCommandGraph(commands, { ...WORLD, taskId: null, projectId: null, workspaceId: null, nodeId: null })
+    const bare = buildCommandGraph(commands, {
+      ...WORLD,
+      taskId: null,
+      projectId: null,
+      workspaceId: null,
+      nodeId: null,
+    })
     // The three identity scopes are gone. `node` and the default are not a gate: a client serving its
     // own origin has no node id and would otherwise lose its whole catalogue.
     expect(bare.top().map((node) => node.id)).toEqual(['needs-node', 'needs-nothing', 'says-nothing'])
   })
 
   it('takes a group’s children with it, because a group you cannot reach holds nothing you can', () => {
-    const graph = buildCommandGraph([
-      group('task-things', { scope: 'task' }),
-      leaf('task-things.archive', { parentId: 'task-things' }),
-    ], { ...WORLD, taskId: null })
+    const graph = buildCommandGraph(
+      [group('task-things', { scope: 'task' }), leaf('task-things.archive', { parentId: 'task-things' })],
+      { ...WORLD, taskId: null },
+    )
     expect(graph.nodes.get('task-things.archive')?.available).toBe(false)
     expect(graph.search('archive')).toEqual([])
   })

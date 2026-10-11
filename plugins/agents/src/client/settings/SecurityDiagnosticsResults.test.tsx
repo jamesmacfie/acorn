@@ -5,30 +5,64 @@ import SecurityDiagnosticsResults from './SecurityDiagnosticsResults'
 
 const events = vi.hoisted(() => ({ emit: vi.fn() }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
-  ...(await original<typeof import('@acorn/plugin-api/client')>()), clientEvents: events,
+  ...(await original<typeof import('@acorn/plugin-api/client')>()),
+  clientEvents: events,
 }))
 const cleanup: Array<() => void> = []
-afterEach(() => { for (const dispose of cleanup.splice(0)) dispose(); events.emit.mockReset() })
+afterEach(() => {
+  for (const dispose of cleanup.splice(0)) dispose()
+  events.emit.mockReset()
+})
 const finding = (id: string, patch: Partial<SecurityFinding> = {}): SecurityFinding => ({
-  id, owner: 'agents', nodeId: 'node-1', projectId: null, sessionId: null, checkedAt: 1,
-  state: 'configured_only', severity: 'info', summary: 'Technical evidence: fixture.raw', source: 'internal.fixture',
-  limits: 'Evidence is limited.', repair: 'Review settings.', ...patch,
+  id,
+  owner: 'agents',
+  nodeId: 'node-1',
+  projectId: null,
+  sessionId: null,
+  checkedAt: 1,
+  state: 'configured_only',
+  severity: 'info',
+  summary: 'Technical evidence: fixture.raw',
+  source: 'internal.fixture',
+  limits: 'Evidence is limited.',
+  repair: 'Review settings.',
+  ...patch,
 })
 function mount(findings: SecurityFinding[], patch: Partial<SecurityDiagnostics> = {}) {
-  const host = document.createElement('div'); document.body.append(host)
-  const report: SecurityDiagnostics = { nodeId: 'node-1', projectId: null, sessionId: null, checkedAt: 1, expiresAt: 300_001, findings, ...patch }
+  const host = document.createElement('div')
+  document.body.append(host)
+  const report: SecurityDiagnostics = {
+    nodeId: 'node-1',
+    projectId: null,
+    sessionId: null,
+    checkedAt: 1,
+    expiresAt: 300_001,
+    findings,
+    ...patch,
+  }
   const dispose = render(() => <SecurityDiagnosticsResults report={report} />, host)
-  cleanup.push(() => { dispose(); host.remove() })
+  cleanup.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 
 it('puts actionable warnings first and keeps technical evidence closed until requested', async () => {
   const host = mount([
-    finding('instructions.checks', { description: 'Choose whether agents should wait for your approval.', facts: [{ label: 'Instruction changes', value: 'No approval required' }] }),
-    finding('mcp.managed.example', { severity: 'warning', description: 'This server can download a different version each time it starts.' }),
+    finding('instructions.checks', {
+      description: 'Choose whether agents should wait for your approval.',
+      facts: [{ label: 'Instruction changes', value: 'No approval required' }],
+    }),
+    finding('mcp.managed.example', {
+      severity: 'warning',
+      description: 'This server can download a different version each time it starts.',
+    }),
     finding('plugins.grants', { state: 'unknown', severity: 'attention' }),
   ])
-  expect(host.textContent!.indexOf('This server can download')).toBeLessThan(host.textContent!.indexOf('Choose whether agents'))
+  expect(host.textContent!.indexOf('This server can download')).toBeLessThan(
+    host.textContent!.indexOf('Choose whether agents'),
+  )
   expect(host.textContent).toContain('1 item needs your attention')
   expect(host.textContent).toContain('1 check could not be verified')
   expect(host.textContent).not.toContain('fixture.raw')
@@ -37,8 +71,11 @@ it('puts actionable warnings first and keeps technical evidence closed until req
   const action = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Review MCP servers')!
   action.click()
   expect(events.emit).toHaveBeenCalledWith('presentation:open-settings', { tab: 'agent-mcp-servers' })
-  const details = [...host.querySelectorAll('details')].find((element) => element.querySelector('summary')?.textContent === 'Technical details')!
-  details.open = true; details.dispatchEvent(new Event('toggle'))
+  const details = [...host.querySelectorAll('details')].find(
+    (element) => element.querySelector('summary')?.textContent === 'Technical details',
+  )!
+  details.open = true
+  details.dispatchEvent(new Event('toggle'))
   await Promise.resolve()
   expect(host.textContent).toContain('fixture.raw')
 })

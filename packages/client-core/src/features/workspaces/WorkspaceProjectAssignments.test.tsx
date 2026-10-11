@@ -4,8 +4,17 @@ import type { Project, Workspace } from '@acorn/protocol/api.ts'
 
 const data = vi.hoisted(() => ({ mode: 'off' as 'on' | 'off' }))
 const project = (id: string, workspaceId: string): Project => ({
-  id, name: id, workspaceId, path: `/src/${id}`, sort: 0, hidden: false, color: null,
-  vcs: 'git', defaultBranch: 'main', remoteUrl: null, github: null,
+  id,
+  name: id,
+  workspaceId,
+  path: `/src/${id}`,
+  sort: 0,
+  hidden: false,
+  color: null,
+  vcs: 'git',
+  defaultBranch: 'main',
+  remoteUrl: null,
+  github: null,
 })
 const projects = [project('Alpha', 'a'), project('Beta', 'b')]
 const workspaces: Workspace[] = [
@@ -14,18 +23,25 @@ const workspaces: Workspace[] = [
 ]
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { key: string }) => ({
-    get data() { return options().key === 'projects' ? projects : options().key === 'workspaces' ? workspaces : [] },
+    get data() {
+      return options().key === 'projects' ? projects : options().key === 'workspaces' ? workspaces : []
+    },
     isError: false,
   }),
   useQueryClient: () => ({ invalidateQueries: async () => {} }),
 }))
 vi.mock('../../infra/queries', () => ({
-  projectsKey: ['projects'], workspacesKey: ['workspaces'], tasksKey: ['tasks'],
-  projectsOptions: () => ({ key: 'projects' }), workspacesOptions: () => ({ key: 'workspaces' }), tasksOptions: () => ({ key: 'tasks' }),
+  projectsKey: ['projects'],
+  workspacesKey: ['workspaces'],
+  tasksKey: ['tasks'],
+  projectsOptions: () => ({ key: 'projects' }),
+  workspacesOptions: () => ({ key: 'workspaces' }),
+  tasksOptions: () => ({ key: 'tasks' }),
 }))
 vi.mock('./workspacesMode', () => ({ createWorkspacesMode: () => () => data.mode }))
 vi.mock('../../infra/platform', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../../infra/platform')>(), canPickFolder: () => false,
+  ...(await importOriginal<typeof import('../../infra/platform')>()),
+  canPickFolder: () => false,
 }))
 vi.mock('../../host/registries/sources/projectImporters', () => ({ projectImporterContributions: () => [] }))
 
@@ -33,7 +49,10 @@ import WorkspaceProjectAssignments from './WorkspaceProjectAssignments'
 
 let host: HTMLElement
 let dispose: () => void
-afterEach(() => { dispose?.(); host?.remove() })
+afterEach(() => {
+  dispose?.()
+  host?.remove()
+})
 const mount = (mode: 'on' | 'off') => {
   data.mode = mode
   host = document.createElement('div')

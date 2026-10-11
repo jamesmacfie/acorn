@@ -17,7 +17,7 @@ export default function PaneSwitcher(props: PaneSwitcherProps) {
           data-tip-key={pane.shortcut}
           data-tip-sub={pane.description ? `${pane.description}. ⌘-click to open beside.` : '⌘-click to open beside.'}
           aria-pressed={pane.shown}
-          onClick={(event) => event.metaKey || event.ctrlKey ? props.add(pane.id) : props.show(pane.id)}
+          onClick={(event) => (event.metaKey || event.ctrlKey ? props.add(pane.id) : props.show(pane.id))}
           onContextMenu={(event) => {
             event.preventDefault()
             event.currentTarget.focus()

@@ -17,5 +17,7 @@ export { BEL, notifyMode, type NotifyMode }
 export function initBellNotices(out: NodeJS.WritableStream = process.stdout): () => void {
   const mode = notifyMode()
   if (mode !== 'bell' && mode !== 'both') return () => {}
-  return registerNoticeSink(() => { out.write(BEL) })
+  return registerNoticeSink(() => {
+    out.write(BEL)
+  })
 }

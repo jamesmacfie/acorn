@@ -54,7 +54,9 @@ export function gitWrites(worktree: string): { writable: string[]; writeDenied: 
     writeDenied: [
       join(worktree, '.git'),
       ...['config', 'config.worktree', 'hooks', 'modules'].map((name) => join(shared, name)),
-      ...[...new Set([own, ...worktrees])].flatMap((dir) => ['commondir', 'gitdir', 'config.worktree'].map((name) => join(dir, name))),
+      ...[...new Set([own, ...worktrees])].flatMap((dir) =>
+        ['commondir', 'gitdir', 'config.worktree'].map((name) => join(dir, name)),
+      ),
     ],
   }
 }
@@ -69,15 +71,17 @@ function hiddenBeside(dir: string, kept: readonly string[]): string[] {
   } catch {
     return []
   }
-  return entries.map((entry) => join(dir, entry)).flatMap((path) => {
-    if (!kept.some((keep) => within(keep, path))) return [path]
-    if (kept.includes(path)) return []
-    try {
-      return lstatSync(path).isDirectory() ? hiddenBeside(path, kept) : []
-    } catch {
-      return []
-    }
-  })
+  return entries
+    .map((entry) => join(dir, entry))
+    .flatMap((path) => {
+      if (!kept.some((keep) => within(keep, path))) return [path]
+      if (kept.includes(path)) return []
+      try {
+        return lstatSync(path).isDirectory() ? hiddenBeside(path, kept) : []
+      } catch {
+        return []
+      }
+    })
 }
 
 export function dataRootReadBlock(input: {
@@ -95,8 +99,12 @@ export function dataRootReadBlock(input: {
   const git = linkedGitDirs(worktree)?.shared
   // What the agent works in. Its token file and the Node's certificate are read by the task CLI, never
   // by the model, so they stay out of this list and their folders stay hidden from the file tools.
-  const workspace = [worktree, ...input.skillPaths, input.attachments, ...(git ? [git] : [])].map((path) => resolve(path))
-  const credentials = [input.env.ACORN_API_TOKEN_FILE, input.env.NODE_EXTRA_CA_CERTS].filter((path): path is string => !!path)
+  const workspace = [worktree, ...input.skillPaths, input.attachments, ...(git ? [git] : [])].map((path) =>
+    resolve(path),
+  )
+  const credentials = [input.env.ACORN_API_TOKEN_FILE, input.env.NODE_EXTRA_CA_CERTS].filter(
+    (path): path is string => !!path,
+  )
   let loopback: string | null = null
   try {
     loopback = new URL(input.env.ACORN_API_URL ?? '').host || null

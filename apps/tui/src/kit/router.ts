@@ -29,9 +29,7 @@
 // ../keys/regions.ts keeps when it takes a pane cycler rather than importing the shell.
 
 import { createSignal, type Accessor } from 'solid-js'
-import {
-  CREATE_TASK_ROUTE, PROJECT_ROUTE, TASK_ROUTE,
-} from '@acorn/client-core/host/registries/commands'
+import { CREATE_TASK_ROUTE, PROJECT_ROUTE, TASK_ROUTE } from '@acorn/client-core/host/registries/commands'
 import { matchRoute, sourceRouteContributions } from '@acorn/client-core/host/registries/sources'
 import { projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes'
 
@@ -49,7 +47,11 @@ const [path, setPath] = createSignal('/')
 export const currentPath = path
 
 /** The small location shape used by overlays that must discard callbacks after navigation. */
-export const useLocation = (): { readonly pathname: string } => ({ get pathname() { return path().split('?')[0]! } })
+export const useLocation = (): { readonly pathname: string } => ({
+  get pathname() {
+    return path().split('?')[0]!
+  },
+})
 
 /** Core's patterns ahead of the contributed ones, and the contributed ones in the order they were
  *  declared, which `sourceRouteContributions` already sorts. Order is what puts `/p/:id/pulls/new`
@@ -83,8 +85,9 @@ const params = (): Record<string, string> => {
 
 /** Go somewhere. A number is ignored: there is no history stack here, and a caller asking to go back
  *  is a caller the shell's own overlays and rail already answer. */
-export const useNavigate = (): ((to: string | number, options?: NavigateOptions) => void) =>
-  (to) => { if (typeof to === 'string') setPath(to) }
+export const useNavigate = (): ((to: string | number, options?: NavigateOptions) => void) => (to) => {
+  if (typeof to === 'string') setPath(to)
+}
 
 /**
  * The routed parameters.
@@ -94,12 +97,13 @@ export const useNavigate = (): ((to: string | number, options?: NavigateOptions)
  * derivations — so the reactivity has to be in the property read. An object built at call time would
  * resolve once and never change again, which is the shim's old behaviour wearing a better disguise.
  */
-export const useParams = <T extends Record<string, string>>(): T => new Proxy({} as T, {
-  get: (_target, key) => (typeof key === 'string' ? params()[key] : undefined),
-  has: (_target, key) => typeof key === 'string' && key in params(),
-  ownKeys: () => Object.keys(params()),
-  getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true, value: undefined }),
-}) as T
+export const useParams = <T extends Record<string, string>>(): T =>
+  new Proxy({} as T, {
+    get: (_target, key) => (typeof key === 'string' ? params()[key] : undefined),
+    has: (_target, key) => typeof key === 'string' && key in params(),
+    ownKeys: () => Object.keys(params()),
+    getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true, value: undefined }),
+  }) as T
 
 /**
  * The query string, as the router's read/write pair. Still empty and still inert.
@@ -120,7 +124,8 @@ export function useSearchParams<T extends Record<string, string | string[]>>(): 
 /** "Is the reader on this path", against one pattern rather than the whole table. Truthy when it
  *  matches, because that is all any caller does with it: `useMatch(() => githubCreateRoute)` becomes
  *  `!!newMatch()`. */
-export const useMatch = (pattern: () => string): Accessor<{ path: string; params: Record<string, string> } | undefined> =>
+export const useMatch =
+  (pattern: () => string): Accessor<{ path: string; params: Record<string, string> } | undefined> =>
   () => {
     const here = path()
     const matched = matchRoute(pattern(), here)

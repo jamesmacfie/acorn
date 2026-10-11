@@ -13,5 +13,7 @@ const stableValue = (value: unknown): unknown => {
 
 /** Stable persisted identity for workflow definitions and processing inputs. */
 export function workflowContentFingerprint(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(stableValue(value))).digest('hex')
+  return createHash('sha256')
+    .update(JSON.stringify(stableValue(value)))
+    .digest('hex')
 }

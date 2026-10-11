@@ -1,6 +1,17 @@
-import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
+import {
+  PLUGIN_API_MAJOR,
+  type NodePluginRow,
+  type PluginContributions,
+  type PluginRuntimeIdentity,
+} from '@acorn/protocol/api.ts'
 import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
-import { hasFrameRegion, hasRemoteRegion, isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/plugin/contract.ts'
+import {
+  hasFrameRegion,
+  hasRemoteRegion,
+  isOverlaySurface,
+  isProjectPaneSurface,
+  isTaskPaneSurface,
+} from '@acorn/protocol/plugin/contract.ts'
 import { namespaceContributions } from './contributionIds'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { distribution } from './distribution'
@@ -36,9 +47,12 @@ export function eligiblePlugins(options: { includeInactive?: boolean } = {}): El
     const hash = entry.hash
     const trusted = snapshot.cachedHashes.has(hash) && snapshot.acceptedKeys.has(decisionKey(pluginId, hash))
     eligible.push({
-      pluginId, row: { ...entry.row, installed: runtime },
+      pluginId,
+      row: { ...entry.row, installed: runtime },
       installed: { ...runtime, contributions: namespaceContributions(pluginId, runtime.contributions) },
-      inactive: false, hash, trusted,
+      inactive: false,
+      hash,
+      trusted,
     })
   }
   if (!nodeId) return eligible
@@ -49,12 +63,12 @@ export function eligiblePlugins(options: { includeInactive?: boolean } = {}): El
     const active = runtimeIdentityForRow(row)
     // Chrome keeps command and shortcut metadata for a disabled plugin so saved bindings stay
     // explainable. Every invocation still checks the active runtime on this node.
-    const runtime = active ??
-      (options.includeInactive && row.installed ? { ...row.installed, activation: 'node' as const } : null)
+    const runtime =
+      active ?? (options.includeInactive && row.installed ? { ...row.installed, activation: 'node' as const } : null)
     if (!runtime) continue
     const selection = snapshot.selectionsByNode.get(nodeId)?.get(row.name)
     const hash = speaksApiVersion(runtime.apiVersion, PLUGIN_API_MAJOR)
-      ? selection?.hash ?? runtime.client?.hash ?? ''
+      ? (selection?.hash ?? runtime.client?.hash ?? '')
       : ''
     // The one place a manifest's declared ids are bound to the plugin's own name (./contributionIds.ts).
     // Here rather than at each registration site, so every consumer below reads one spelling: the

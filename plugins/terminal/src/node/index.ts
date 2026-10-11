@@ -1,4 +1,10 @@
-import { type NodePlugin, registerDeletedTaskPurge, RUN_TARGETS, TASK_CREATED, TASK_SESSIONS } from '@acorn/plugin-api/node'
+import {
+  type NodePlugin,
+  registerDeletedTaskPurge,
+  RUN_TARGETS,
+  TASK_CREATED,
+  TASK_SESSIONS,
+} from '@acorn/plugin-api/node'
 import { inArray } from 'drizzle-orm'
 import { terminalSessions } from './schema'
 import { NOTES_SEED_TASK } from '@acorn/plugin-notes/contract/store.ts'
@@ -11,7 +17,14 @@ import { runAgentTools } from '../server/agentTools'
 import { WORKFLOW_STEP_KIND } from '../contract/workflowSteps'
 import { commandStep, runTargetStep } from '../server/workflowSteps'
 import { createRuntimeService } from '../server/runChannel'
-import { disposeTerminal, registerTerminalChannel, sendToAgent, sessionControl, terminalRunGlue, type TerminalChannelDeps } from '../server/terminal'
+import {
+  disposeTerminal,
+  registerTerminalChannel,
+  sendToAgent,
+  sessionControl,
+  terminalRunGlue,
+  type TerminalChannelDeps,
+} from '../server/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
 
 export type TerminalPluginDeps = Pick<TerminalChannelDeps, 'internalEnv' | 'reconciled'>
@@ -38,10 +51,18 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
       const registrations = registerTerminalChannel(db, ctx.core, {
         ...deps,
-        launchContextText: (taskId) => readLaunchContext(taskId, ctx.extensionPoints.handlers(TERMINAL_LAUNCH_CONTEXT), (message) => ctx.log.warn(message)),
+        launchContextText: (taskId) =>
+          readLaunchContext(taskId, ctx.extensionPoints.handlers(TERMINAL_LAUNCH_CONTEXT), (message) =>
+            ctx.log.warn(message),
+          ),
         launchContext: async (taskId, sessionId) => {
-          await deliverLaunchContext(taskId, sessionId, ctx.extensionPoints.handlers(TERMINAL_LAUNCH_CONTEXT),
-            (id, text) => sendToAgent(id, text, 'after-ready'), (message) => ctx.log.warn(message))
+          await deliverLaunchContext(
+            taskId,
+            sessionId,
+            ctx.extensionPoints.handlers(TERMINAL_LAUNCH_CONTEXT),
+            (id, text) => sendToAgent(id, text, 'after-ready'),
+            (message) => ctx.log.warn(message),
+          )
         },
         completed: (event) => ctx.events.send({ channel: 'plugin:terminal:completed', ...event }),
         seedTaskNotes: (task) => ctx.capabilities.get(NOTES_SEED_TASK)?.(task) ?? Promise.resolve(),
@@ -64,8 +85,11 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // observer runs alongside by design. The payload comes back untouched — there is nothing here to
       // change, only work to do before the caller carries on.
       // Archive already stopped and dropped the task's sessions, so only exited rows are left.
-      registerDeletedTaskPurge(ctx, async (taskIds) =>
-        (await db.delete(terminalSessions).where(inArray(terminalSessions.taskId, [...taskIds]))).changes)
+      registerDeletedTaskPurge(
+        ctx,
+        async (taskIds) =>
+          (await db.delete(terminalSessions).where(inArray(terminalSessions.taskId, [...taskIds]))).changes,
+      )
       ctx.hooks.handle('core:worktree-created', {
         id: 'setup-script',
         mode: 'transform',
@@ -82,10 +106,10 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
           const running = registrations.taskSessions.runningCount(task.id)
           return running
             ? {
-              id: 'running',
-              severity: 'warn' as const,
-              message: `${running} terminal${running === 1 ? ' is' : 's are'} still running`,
-            }
+                id: 'running',
+                severity: 'warn' as const,
+                message: `${running} terminal${running === 1 ? ' is' : 's are'} still running`,
+              }
             : null
         },
       })
@@ -113,14 +137,16 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         ctx.hooks,
       )
       runTargets = runTargetService
-      routeDisposables.push(ctx.capabilities.provide(RUN_TARGETS, {
-        targets: (taskId) => runTargetService.targets(taskId),
-        start: (taskId, targetId) => runTargetService.start(taskId, targetId),
-        stop: (taskId, targetId) => runTargetService.stop(taskId, targetId),
-        restart: (taskId, targetId) => runTargetService.restart(taskId, targetId),
-        status: (taskId, targetId) => runTargetService.status(taskId, targetId),
-        defaultUrl: (taskId) => runTargetService.defaultUrl(taskId),
-      }))
+      routeDisposables.push(
+        ctx.capabilities.provide(RUN_TARGETS, {
+          targets: (taskId) => runTargetService.targets(taskId),
+          start: (taskId, targetId) => runTargetService.start(taskId, targetId),
+          stop: (taskId, targetId) => runTargetService.stop(taskId, targetId),
+          restart: (taskId, targetId) => runTargetService.restart(taskId, targetId),
+          status: (taskId, targetId) => runTargetService.status(taskId, targetId),
+          defaultUrl: (taskId) => runTargetService.defaultUrl(taskId),
+        }),
+      )
       routeDisposables.push(ctx.capabilities.provide(TERMINAL_RUN_TARGETS, runTargetService))
       // This plugin's two workflow step kinds (../server/workflowSteps.ts). Contributed rather than
       // granted, like http's: workflows opens the point and any plugin may fill it. Nothing happens on

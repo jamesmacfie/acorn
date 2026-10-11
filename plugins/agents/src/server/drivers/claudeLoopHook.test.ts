@@ -7,11 +7,20 @@ import { CLAUDE_HOOK_INPUT as RECORDED } from './__fixtures__/claudeHookInput'
 describe('Claude Code hook input', () => {
   it('reads the subject a policy reads from a permission request', () => {
     expect(claudeToolSubject(RECORDED.bashPre)).toEqual({
-      toolCallId: 'toolu_01QWwwWDsrhnC1af97vgWNB8', toolName: 'Bash', kind: 'command', title: 'echo hi', command: 'echo hi', paths: [],
+      toolCallId: 'toolu_01QWwwWDsrhnC1af97vgWNB8',
+      toolName: 'Bash',
+      kind: 'command',
+      title: 'echo hi',
+      command: 'echo hi',
+      paths: [],
     })
     expect(claudeToolSubject(RECORDED.writePost)).toEqual({
-      toolCallId: 'toolu_01CFP8EBwYibD1uwk5cUvUoH', toolName: 'Write', kind: 'edit',
-      title: '/private/tmp/p10-probe/claude-cwd/notes.txt', command: '', paths: ['/private/tmp/p10-probe/claude-cwd/notes.txt'],
+      toolCallId: 'toolu_01CFP8EBwYibD1uwk5cUvUoH',
+      toolName: 'Write',
+      kind: 'edit',
+      title: '/private/tmp/p10-probe/claude-cwd/notes.txt',
+      command: '',
+      paths: ['/private/tmp/p10-probe/claude-cwd/notes.txt'],
     })
     expect(claudeToolSubject({ hook_event_name: 'Stop' })).toBeNull()
     expect(claudeToolSubject('nope')).toBeNull()
@@ -19,7 +28,11 @@ describe('Claude Code hook input', () => {
 
   it('answers with a deny, a note, or nothing, and has no way to say allow', () => {
     expect(JSON.parse(claudeHookOutput('PreToolUse', { deny: 'No force-push.' }))).toEqual({
-      hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'No force-push.' },
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'No force-push.',
+      },
     })
     expect(JSON.parse(claudeHookOutput('PostToolUse', { note: 'Tests first.' }))).toEqual({
       hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'Tests first.' },
@@ -42,12 +55,22 @@ describe('installing the bridge in Claude Code', () => {
     expect(settings(claudeHarness.acpSessionMeta!(session, skills, bridge))).toEqual({
       autoContinueAtUsageLimit: false,
       hooks: {
-        PreToolUse: [{
-          matcher: '*',
-          hooks: [{ type: 'command', command: `'/app/node' '/app/helper/it'\\''s/loop-hook.js' 'claude' 'PreToolUse'`, timeout: 600 }],
-        }],
+        PreToolUse: [
+          {
+            matcher: '*',
+            hooks: [
+              {
+                type: 'command',
+                command: `'/app/node' '/app/helper/it'\\''s/loop-hook.js' 'claude' 'PreToolUse'`,
+                timeout: 600,
+              },
+            ],
+          },
+        ],
       },
     })
-    expect(Object.keys(claudeLoopHookSettings({ ...bridge, beforeTool: false, afterTool: true }))).toEqual(['PostToolUse'])
+    expect(Object.keys(claudeLoopHookSettings({ ...bridge, beforeTool: false, afterTool: true }))).toEqual([
+      'PostToolUse',
+    ])
   })
 })

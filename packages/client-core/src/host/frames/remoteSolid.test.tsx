@@ -23,7 +23,11 @@ import { TreeHost, type TreeTransport } from '../tree/TreeHost'
 
 /** A kit node the way the preset reaches it: a component call with a props object. */
 const node = (type: string, props: Record<string, unknown>): RemoteNode =>
-  (KIT_NODE_COMPONENTS[type as keyof typeof KIT_NODE_COMPONENTS] as unknown as (p: Record<string, unknown>) => RemoteNode)(props)
+  (
+    KIT_NODE_COMPONENTS[type as keyof typeof KIT_NODE_COMPONENTS] as unknown as (
+      p: Record<string, unknown>,
+    ) => RemoteNode
+  )(props)
 
 // Through `kitComponent`, because a table entry is a component or a loader for one and the host
 // resolves it in one place (../tree/kitEntry.ts). Every node below is a cheap primitive, so what
@@ -58,7 +62,10 @@ async function draw(build: () => RemoteNode, into: HTMLElement, send?: (handler:
   await new Promise<void>((resolve) => queueMicrotask(resolve))
   let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
   const transport: TreeTransport = {
-    onBatch: (listener) => { deliver = listener; return () => {} },
+    onBatch: (listener) => {
+      deliver = listener
+      return () => {}
+    },
     onFailed: () => () => {},
     send: (handler, _event, payload) => (send ? send(handler, payload) : root.dispatch(handler, payload)),
   }
@@ -76,24 +83,31 @@ describe('the kit as a plugin writes it', () => {
   it('draws the same DOM through the node components as through the components themselves', async () => {
     // A slice of the rollbar pane: a heading with an eyebrow, a status badge, and a fact list, which
     // between them cover a string child, a role prop, and an array-of-objects prop.
-    const build = () => node('Stack', {
-      gap: 'section',
-      children: [
-        node('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
-        node('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
-        node('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
-      ],
-    })
+    const build = () =>
+      node('Stack', {
+        gap: 'section',
+        children: [
+          node('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
+          node('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
+          node('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
+        ],
+      })
     await draw(build, host)
 
-    disposers.push(render(() => direct('Stack', {
-      gap: 'section',
-      children: [
-        direct('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
-        direct('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
-        direct('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
-      ],
-    }), shell))
+    disposers.push(
+      render(
+        () =>
+          direct('Stack', {
+            gap: 'section',
+            children: [
+              direct('Heading', { level: 1, eyebrow: 'Sentry · #14', children: 'Undefined is not a function' }),
+              direct('Badge', { tone: 'danger', size: 'xs', children: 'critical' }),
+              direct('Facts', { items: [{ label: 'Occurrences', value: '412', mono: true }] }),
+            ],
+          }),
+        shell,
+      ),
+    )
 
     expect(host.innerHTML).toBe(shell.innerHTML)
   })
@@ -112,7 +126,7 @@ describe('the kit as a plugin writes it', () => {
     expect(host.querySelector('button')!.textContent).toBe('Open agent run')
   })
 
-  it('draws a number among a Text node\'s children', async () => {
+  it("draws a number among a Text node's children", async () => {
     // What `<Text>{200} OK</Text>` compiles to: the universal renderer passes the 200 through as a
     // number, which the wire used to turn into nothing.
     await draw(() => node('Text', { children: [200, ' OK'] }), host)
@@ -127,14 +141,19 @@ describe('the kit as a plugin writes it', () => {
     await new Promise<void>((resolve) => queueMicrotask(resolve))
     let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
     const transport: TreeTransport = {
-      onBatch: (listener) => { deliver = listener; return () => {} },
+      onBatch: (listener) => {
+        deliver = listener
+        return () => {}
+      },
       onFailed: () => () => {},
       send: () => {},
     }
-    disposers.push(render(
-      () => <TreeHost pluginId="rollbar" transport={transport} onRefused={(reason) => refused.push(reason)} />,
-      host,
-    ))
+    disposers.push(
+      render(
+        () => <TreeHost pluginId="rollbar" transport={transport} onRefused={(reason) => refused.push(reason)} />,
+        host,
+      ),
+    )
     for (const ops of batches) deliver!(ops)
     await frame()
 
@@ -177,10 +196,13 @@ describe('what a Solid tree renderer receives', () => {
 
   // The store proxies `host`, as it does every object in the props, so identity is not the claim. What
   // matters is that the component reaches the two methods and they are the ones the mount supplied.
-  const hostOf = (props: Record<string, unknown> | undefined) => props?.host as {
-    invoke: () => Promise<unknown>
-    openOverlay: () => Promise<unknown>
-  } | undefined
+  const hostOf = (props: Record<string, unknown> | undefined) =>
+    props?.host as
+      | {
+          invoke: () => Promise<unknown>
+          openOverlay: () => Promise<unknown>
+        }
+      | undefined
 
   it('hands over the owner’s props, the bridge, and the host', async () => {
     const { seen, treeHost } = mountWith({ attachment: { id: 'a1' }, taskId: 't1' })

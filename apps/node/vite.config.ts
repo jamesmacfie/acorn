@@ -6,29 +6,40 @@ import { isRuntimeResolved } from './externals'
 import { thirdPartyNotices } from './thirdPartyNotices'
 
 export default defineConfig({
-  plugins: [thirdPartyNotices('THIRD-PARTY-NOTICES.txt'), {
-    name: 'memory-contract',
-    enforce: 'pre',
-    transform(code, id) {
-      if (!id.endsWith('/plugins/memory/src/server/standingContext.ts')) return
-      const contract = readFileSync(resolve(__dirname, '../../plugins/memory/src/server/memoryContract.md'), 'utf8')
-      return code.replace("readFileSync(new URL('./memoryContract.md', import.meta.url), 'utf8')", JSON.stringify(contract))
+  plugins: [
+    thirdPartyNotices('THIRD-PARTY-NOTICES.txt'),
+    {
+      name: 'memory-contract',
+      enforce: 'pre',
+      transform(code, id) {
+        if (!id.endsWith('/plugins/memory/src/server/standingContext.ts')) return
+        const contract = readFileSync(resolve(__dirname, '../../plugins/memory/src/server/memoryContract.md'), 'utf8')
+        return code.replace(
+          "readFileSync(new URL('./memoryContract.md', import.meta.url), 'utf8')",
+          JSON.stringify(contract),
+        )
+      },
     },
-  }, {
-    // Every chunk's edges, external packages, source modules, and emitted size (scripts/chunkGraph.mts),
-    // which the service budget, the size report, and the standalone manifest check all read. The
-    // startup closure is service.js and everything it imports statically; a dynamic import is
-    // post-startup. Staging and the standalone tarball leave this file out.
-    name: 'acorn:service-startup-graph',
-    apply: 'build',
-    generateBundle(_options, bundle) {
-      // A loaded-plugin package build reuses this config (scripts/build-plugin.mjs). It has no service
-      // entry, and its package ships whatever lands in its dist.
-      if (!bundle['service.js']) return
-      const chunks = describeChunks(this, bundle, resolve(__dirname, '../..'))
-      this.emitFile({ type: 'asset', fileName: 'startup-graph.json', source: JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }) })
+    {
+      // Every chunk's edges, external packages, source modules, and emitted size (scripts/chunkGraph.mts),
+      // which the service budget, the size report, and the standalone manifest check all read. The
+      // startup closure is service.js and everything it imports statically; a dynamic import is
+      // post-startup. Staging and the standalone tarball leave this file out.
+      name: 'acorn:service-startup-graph',
+      apply: 'build',
+      generateBundle(_options, bundle) {
+        // A loaded-plugin package build reuses this config (scripts/build-plugin.mjs). It has no service
+        // entry, and its package ships whatever lands in its dist.
+        if (!bundle['service.js']) return
+        const chunks = describeChunks(this, bundle, resolve(__dirname, '../..'))
+        this.emitFile({
+          type: 'asset',
+          fileName: 'startup-graph.json',
+          source: JSON.stringify({ entry: 'service.js', roots: ['service.js'], chunks }),
+        })
+      },
     },
-  }],
+  ],
   // Node resolution, not browser: prefer the `node` condition and never the `browser` field.
   resolve: {
     conditions: ['node'],

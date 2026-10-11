@@ -1,6 +1,11 @@
 import { dehydrate, hydrate, QueryClient } from '@tanstack/solid-query'
 import { describe, expect, it } from 'vitest'
-import { PERSISTED_QUERY_MAX_AGE_MS, PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery, shouldPersistQueryKey } from './queryPersistence'
+import {
+  PERSISTED_QUERY_MAX_AGE_MS,
+  PERSISTED_SNAPSHOT_MAX_AGE_MS,
+  shouldPersistQuery,
+  shouldPersistQueryKey,
+} from './queryPersistence'
 
 describe('query cache persistence policy', () => {
   it('excludes file bodies and every patch-bearing files query', () => {
@@ -14,7 +19,7 @@ describe('query cache persistence policy', () => {
     expect(shouldPersistQueryKey(['tasks'])).toBe(true)
   })
 
-  it('preserves TanStack Query\'s successful-query-only dehydration gate', () => {
+  it("preserves TanStack Query's successful-query-only dehydration gate", () => {
     const client = new QueryClient()
     const tasksKey: readonly unknown[] = ['tasks']
     const pending = client.getQueryCache().build(client, { queryKey: tasksKey })

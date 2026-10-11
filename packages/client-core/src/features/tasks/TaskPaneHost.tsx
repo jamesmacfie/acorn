@@ -1,7 +1,14 @@
 import { createEffect, createSignal, createUniqueId, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
 import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import type { Task } from '../../infra/queries'
-import { paneAvailable, paneContribution, paneContributions, paneRegistry, type PaneContribution, type PaneId } from '../../host/registries/panes/panes'
+import {
+  paneAvailable,
+  paneContribution,
+  paneContributions,
+  paneRegistry,
+  type PaneContribution,
+  type PaneId,
+} from '../../host/registries/panes/panes'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodeState } from '../../infra/node/fleet'
 import { freshnessOf, type Freshness } from '../../infra/node/freshness'
@@ -46,11 +53,13 @@ export default function TaskPaneHost(props: {
   let paneMenuReturnFocus: HTMLElement | undefined
   let openedPane: unknown
   const stored = () => layoutForTask(props.task.id) ?? defaultLayout()
-  const switcherPanes = () => paneContributions().filter((pane) => pane.showInSwitcher !== false && paneAvailable(pane, props.task))
-  const chosenPanes = () => stored().panes.flatMap((id) => {
-    const pane = paneContribution(id)
-    return pane && paneAvailable(pane, props.task) ? [pane] : []
-  })
+  const switcherPanes = () =>
+    paneContributions().filter((pane) => pane.showInSwitcher !== false && paneAvailable(pane, props.task))
+  const chosenPanes = () =>
+    stored().panes.flatMap((id) => {
+      const pane = paneContribution(id)
+      return pane && paneAvailable(pane, props.task) ? [pane] : []
+    })
   // A layout can name only panes this task cannot show: DEFAULT_PANE is the PR pane, and a task on a
   // project with no GitHub remote has no PR. Then the task draws the first pane it does offer, and
   // `layout()` is the layout as drawn, so the switcher marks that pane and add, close, and pin act on
@@ -61,10 +70,11 @@ export default function TaskPaneHost(props: {
     const fallback = fallbackPane()
     return fallback ? { ...stored(), panes: [fallback.id] } : stored()
   }
-  const dispatch = (action: LayoutAction) => dispatchLayout(
-    props.task.id,
-    fallbackPane() ? { type: 'replace', layout: applyLayoutAction(layout(), action) } : action,
-  )
+  const dispatch = (action: LayoutAction) =>
+    dispatchLayout(
+      props.task.id,
+      fallbackPane() ? { type: 'replace', layout: applyLayoutAction(layout(), action) } : action,
+    )
   const registeredLayoutPanes = () => {
     const fallback = fallbackPane()
     return fallback ? [fallback] : chosenPanes()
@@ -80,9 +90,14 @@ export default function TaskPaneHost(props: {
     const nodeId = activeNodeId()
     if (!pane || !nodeId) return null
     return {
-      location: 'rail.pane', id, title: pane.label, nodeId,
-      taskId: props.task.id, projectId: props.task.projectId,
-      pinned: isPinned(id), shown: registeredLayoutPanes().some((entry) => entry.id === id),
+      location: 'rail.pane',
+      id,
+      title: pane.label,
+      nodeId,
+      taskId: props.task.id,
+      projectId: props.task.projectId,
+      pinned: isPinned(id),
+      shown: registeredLayoutPanes().some((entry) => entry.id === id),
     }
   }
   const openPaneMenu = (id: string, at: { x: number; y: number }) => {
@@ -93,28 +108,80 @@ export default function TaskPaneHost(props: {
     setPaneMenu({ at, target })
   }
   const paneAction = registerContextMenuItems<'rail.pane'>([
-    { id: `${menuId}:open`, location: 'rail.pane', label: 'Open', order: 100,
+    {
+      id: `${menuId}:open`,
+      location: 'rail.pane',
+      label: 'Open',
+      order: 100,
       when: (target) => target.taskId === props.task.id,
-      run: (target) => { if (paneMenuTarget(target.id)?.taskId === target.taskId && target.nodeId === activeNodeId()) dispatch({ type: 'show', pane: target.id }) } },
-    { id: `${menuId}:add`, location: 'rail.pane', label: 'Open beside', order: 110,
+      run: (target) => {
+        if (paneMenuTarget(target.id)?.taskId === target.taskId && target.nodeId === activeNodeId())
+          dispatch({ type: 'show', pane: target.id })
+      },
+    },
+    {
+      id: `${menuId}:add`,
+      location: 'rail.pane',
+      label: 'Open beside',
+      order: 110,
       when: (target) => target.taskId === props.task.id,
-      run: (target) => { if (paneMenuTarget(target.id)?.taskId === target.taskId && target.nodeId === activeNodeId()) dispatch({ type: 'add', pane: target.id }) } },
-    { id: `${menuId}:pin`, location: 'rail.pane', label: 'Pin', order: 120,
+      run: (target) => {
+        if (paneMenuTarget(target.id)?.taskId === target.taskId && target.nodeId === activeNodeId())
+          dispatch({ type: 'add', pane: target.id })
+      },
+    },
+    {
+      id: `${menuId}:pin`,
+      location: 'rail.pane',
+      label: 'Pin',
+      order: 120,
       when: (target) => target.taskId === props.task.id && target.shown && !target.pinned,
-      run: (target) => { if (paneMenuTarget(target.id)?.shown && target.nodeId === activeNodeId()) dispatch({ type: 'pin', pane: target.id, pinned: true }) } },
-    { id: `${menuId}:unpin`, location: 'rail.pane', label: 'Unpin', order: 120,
+      run: (target) => {
+        if (paneMenuTarget(target.id)?.shown && target.nodeId === activeNodeId())
+          dispatch({ type: 'pin', pane: target.id, pinned: true })
+      },
+    },
+    {
+      id: `${menuId}:unpin`,
+      location: 'rail.pane',
+      label: 'Unpin',
+      order: 120,
       when: (target) => target.taskId === props.task.id && target.shown && target.pinned,
-      run: (target) => { if (paneMenuTarget(target.id)?.pinned && target.nodeId === activeNodeId()) dispatch({ type: 'pin', pane: target.id, pinned: false }) } },
-    { id: `${menuId}:close`, location: 'rail.pane', label: 'Close', order: 1000, tone: 'danger',
-      when: (target) => target.taskId === props.task.id && target.shown && !target.pinned && registeredLayoutPanes().length > 1,
-      run: (target) => { if (paneMenuTarget(target.id)?.shown && !isPinned(target.id) && registeredLayoutPanes().length > 1 && target.nodeId === activeNodeId()) dispatch({ type: 'close', pane: target.id }) } },
+      run: (target) => {
+        if (paneMenuTarget(target.id)?.pinned && target.nodeId === activeNodeId())
+          dispatch({ type: 'pin', pane: target.id, pinned: false })
+      },
+    },
+    {
+      id: `${menuId}:close`,
+      location: 'rail.pane',
+      label: 'Close',
+      order: 1000,
+      tone: 'danger',
+      when: (target) =>
+        target.taskId === props.task.id && target.shown && !target.pinned && registeredLayoutPanes().length > 1,
+      run: (target) => {
+        if (
+          paneMenuTarget(target.id)?.shown &&
+          !isPinned(target.id) &&
+          registeredLayoutPanes().length > 1 &&
+          target.nodeId === activeNodeId()
+        )
+          dispatch({ type: 'close', pane: target.id })
+      },
+    },
   ])
   onCleanup(() => paneAction.dispose())
   createEffect(() => {
     const target = paneMenu()?.target
-    if (target?.location === 'rail.pane' &&
-      (target.nodeId !== activeNodeId() || target.taskId !== props.task.id || !paneMenuTarget(target.id) ||
-        paneRegistry.get(target.id) !== openedPane)) setPaneMenu(null)
+    if (
+      target?.location === 'rail.pane' &&
+      (target.nodeId !== activeNodeId() ||
+        target.taskId !== props.task.id ||
+        !paneMenuTarget(target.id) ||
+        paneRegistry.get(target.id) !== openedPane)
+    )
+      setPaneMenu(null)
   })
   // `core:pane`, for the buttons this switcher draws (../../host/annotations/statusAnnotations.ts). A
   // task change re-asks with the new task's keys, and a closed task drops its marks on unmount.
@@ -134,7 +201,9 @@ export default function TaskPaneHost(props: {
       pinned: isPinned(pane.id),
       shortcut: props.shortcutFor?.(`pane.show.${pane.id}`)
         ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!)
-        : pane.defaultChord ? formatChord(pane.defaultChord) : undefined,
+        : pane.defaultChord
+          ? formatChord(pane.defaultChord)
+          : undefined,
       markers: markersFor({ kind: 'pane', id: pane.id, taskId: props.task.id }),
     })),
     task: { id: props.task.id, title: props.task.title, projectId: props.task.projectId },
@@ -180,9 +249,14 @@ export default function TaskPaneHost(props: {
         if (!paneWidth) measure()
         if (!paneWidth) return
         dispatch({
-          type: 'resize', pane: pane.id, adjacent: next.id, deltaPx,
-          paneWidth, adjacentWidth,
-          paneMinWidth: minWidthFor(pane), adjacentMinWidth: minWidthFor(next),
+          type: 'resize',
+          pane: pane.id,
+          adjacent: next.id,
+          deltaPx,
+          paneWidth,
+          adjacentWidth,
+          paneMinWidth: minWidthFor(pane),
+          adjacentMinWidth: minWidthFor(next),
         })
       },
       onReset: () => dispatch({ type: 'equalize' }),
@@ -204,65 +278,72 @@ export default function TaskPaneHost(props: {
             // One opening per pane per mount. The host remounts this list for each task, so opening
             // a task opens its panes again. A pane drawn from a layout closes its proxy record when
             // its first region mounts (registries/panes/panes.ts); any other pane closes it here.
-            onCleanup(openFeature(pane.id, paneRegistry.ownerOf(pane.id) ?? 'core', { kind: 'pane', reportsUsable: pane.reportsUsable === true }))
-            onMount(() => { if (!pane.layout) featureMounted(pane.id) })
+            onCleanup(
+              openFeature(pane.id, paneRegistry.ownerOf(pane.id) ?? 'core', {
+                kind: 'pane',
+                reportsUsable: pane.reportsUsable === true,
+              }),
+            )
+            onMount(() => {
+              if (!pane.layout) featureMounted(pane.id)
+            })
             return (
-            <>
-              <div
-                ref={(element) => slotRefs.set(pane.id, element)}
-                use:paneFocus={{ taskId: props.task.id, paneId: pane.id }}
-                class="task-slot"
-                classList={{ 'task-slot-pr': pane.id === 'pr', 'task-slot-pinned': isPinned(pane.id) }}
-                style={{ 'flex-grow': weightFor(pane.id), 'min-width': `${minWidthFor(pane)}px` }}
-                tabindex="0"
-                data-pane-id={pane.id}
-                {...linkPreviews}
-              >
-                <div class="pane-slot-actions">
-                  {/* docs/ui-design/states.md § Connection and staleness vocabulary asks for offline and
+              <>
+                <div
+                  ref={(element) => slotRefs.set(pane.id, element)}
+                  use:paneFocus={{ taskId: props.task.id, paneId: pane.id }}
+                  class="task-slot"
+                  classList={{ 'task-slot-pr': pane.id === 'pr', 'task-slot-pinned': isPinned(pane.id) }}
+                  style={{ 'flex-grow': weightFor(pane.id), 'min-width': `${minWidthFor(pane)}px` }}
+                  tabindex="0"
+                  data-pane-id={pane.id}
+                  {...linkPreviews}
+                >
+                  <div class="pane-slot-actions">
+                    {/* docs/ui-design/states.md § Connection and staleness vocabulary asks for offline and
                       stale rendering on every node-backed surface. `.pane-slot-actions` is the one
                       piece of chrome every pane has, so this is one edit rather than thirteen. It
                       reports the node's state; see registries/panes.ts for why there is no per-pane
                       query hook. */}
-                  <Show when={nodeFreshness() !== 'live'}>
-                    <NodeChip nodeId={activeNodeId() ?? ''} compact />
-                  </Show>
-                  <IconButton
-                    size="xs"
-                    icon={isPinned(pane.id) ? 'pin-off' : 'pin'}
-                    tip={isPinned(pane.id) ? 'Unpin' : 'Keep open'}
-                    tipSub="A pinned pane stays when you switch panes."
-                    label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Pin ${pane.label}`}
-                    pressed={isPinned(pane.id)}
-                    onPress={() => dispatch({ type: 'pin', pane: pane.id })}
-                  />
-                  <Show when={registeredLayoutPanes().length > 1 || isPinned(pane.id)}>
+                    <Show when={nodeFreshness() !== 'live'}>
+                      <NodeChip nodeId={activeNodeId() ?? ''} compact />
+                    </Show>
                     <IconButton
                       size="xs"
-                      icon="x"
-                      tip={isPinned(pane.id) ? 'Unpin to close' : 'Close pane'}
-                      label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Close ${pane.label}`}
-                      onPress={() => dispatch({ type: 'close', pane: pane.id })}
+                      icon={isPinned(pane.id) ? 'pin-off' : 'pin'}
+                      tip={isPinned(pane.id) ? 'Unpin' : 'Keep open'}
+                      tipSub="A pinned pane stays when you switch panes."
+                      label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Pin ${pane.label}`}
+                      pressed={isPinned(pane.id)}
+                      onPress={() => dispatch({ type: 'pin', pane: pane.id })}
                     />
-                  </Show>
+                    <Show when={registeredLayoutPanes().length > 1 || isPinned(pane.id)}>
+                      <IconButton
+                        size="xs"
+                        icon="x"
+                        tip={isPinned(pane.id) ? 'Unpin to close' : 'Close pane'}
+                        label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Close ${pane.label}`}
+                        onPress={() => dispatch({ type: 'close', pane: pane.id })}
+                      />
+                    </Show>
+                  </div>
+                  <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
+                    <pane.component task={props.task} />
+                  </ContributionBoundary>
                 </div>
-                <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
-                  <pane.component task={props.task} />
-                </ContributionBoundary>
-              </div>
-              <Show when={!maximizedPane(props.task.id) && index() < visiblePanes().length - 1}>
-                {(() => {
-                  const adjacent = () => visiblePanes()[index() + 1]
-                  return (
-                    <div
-                      {...paneDrag(pane, adjacent).handleProps}
-                      class="pane-divider ui-split-handle"
-                      data-axis="x"
-                    />
-                  )
-                })()}
-              </Show>
-            </>
+                <Show when={!maximizedPane(props.task.id) && index() < visiblePanes().length - 1}>
+                  {(() => {
+                    const adjacent = () => visiblePanes()[index() + 1]
+                    return (
+                      <div
+                        {...paneDrag(pane, adjacent).handleProps}
+                        class="pane-divider ui-split-handle"
+                        data-axis="x"
+                      />
+                    )
+                  })()}
+                </Show>
+              </>
             )
           }}
         </For>
@@ -293,7 +374,7 @@ export default function TaskPaneHost(props: {
         ariaLabel={paneMenu() ? `Actions for ${paneMenu()!.target.title}` : 'Pane actions'}
         opening={paneMenu}
         onClose={() => setPaneMenu(null)}
-        returnFocus={() => paneMenuReturnFocus?.isConnected ? paneMenuReturnFocus : undefined}
+        returnFocus={() => (paneMenuReturnFocus?.isConnected ? paneMenuReturnFocus : undefined)}
       />
     </>
   )

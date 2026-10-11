@@ -1,7 +1,11 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show } from 'solid-js'
 import { CORE_LINK_PREVIEW_POINT } from '@acorn/protocol/extensionPoints.ts'
-import { closeLinkPreview, linkPreviewProps, type LinkPreviewRequest } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
+import {
+  closeLinkPreview,
+  linkPreviewProps,
+  type LinkPreviewRequest,
+} from '@acorn/client-core/host/linkPreview/linkPreview.ts'
 import { pluginLabel } from '@acorn/client-core/host/plugins'
 import { toast } from '@acorn/client-core/features/notifications'
 import { Line } from '../kit/cells'
@@ -36,8 +40,16 @@ export default function LinkPreviewDialog(props: { request: LinkPreviewRequest; 
             projectId={props.request.scope.projectId ?? null}
             occupied={(occupied, pluginId) => setBy(occupied ? pluginId : undefined)}
           >
-            <Show when={props.request.label}>{(label) => <Line role="strong" wrap>{label()}</Line>}</Show>
-            <Line role="muted" wrap>{props.request.url}</Line>
+            <Show when={props.request.label}>
+              {(label) => (
+                <Line role="strong" wrap>
+                  {label()}
+                </Line>
+              )}
+            </Show>
+            <Line role="muted" wrap>
+              {props.request.url}
+            </Line>
           </Slot>
         </box>
       </ModalBody>

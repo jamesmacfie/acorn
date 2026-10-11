@@ -31,11 +31,9 @@ const mergeEvents = (current: AgentEventRecord[], incoming: AgentEventRecord[]):
 /** HTTP reads and mutation responses can resolve after a newer WebSocket projection. Sequence is the
  * authority; updatedAt breaks ties for writes such as rename that do not append an event. */
 export function newestManagedSession(current: AgentSession, incoming: AgentSession): AgentSession {
-  const currentIsNewer = current.lastEventSeq > incoming.lastEventSeq
-    || (
-      current.lastEventSeq === incoming.lastEventSeq
-      && current.updatedAt > incoming.updatedAt
-    )
+  const currentIsNewer =
+    current.lastEventSeq > incoming.lastEventSeq ||
+    (current.lastEventSeq === incoming.lastEventSeq && current.updatedAt > incoming.updatedAt)
   return currentIsNewer ? current : incoming
 }
 
@@ -47,15 +45,15 @@ export function mergeManagedSnapshot(
   const session = newestManagedSession(current.session, incoming.session)
   return {
     session,
-    turns: mergeById<AgentTurn>(current.turns, incoming.turns)
-      .sort((left, right) => left.ordinal - right.ordinal),
+    turns: mergeById<AgentTurn>(current.turns, incoming.turns).sort((left, right) => left.ordinal - right.ordinal),
     // A read that resumed where the held events end usually brings none, and then the held array
     // passes on as it is: rebuilding and sorting a long session's events to add nothing is the cost
     // resuming exists to avoid, and the store skips re-indexing an array it has already indexed.
     events: incoming.events.length
       ? mergeEvents(current.events, incoming.events).sort((left, right) => left.seq - right.seq)
       : current.events,
-    requests: mergeById<AgentRequest>(current.requests, incoming.requests)
-      .sort((left, right) => left.createdAt - right.createdAt),
+    requests: mergeById<AgentRequest>(current.requests, incoming.requests).sort(
+      (left, right) => left.createdAt - right.createdAt,
+    ),
   }
 }

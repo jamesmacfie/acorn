@@ -8,7 +8,13 @@ import type { SettingsNavigate } from '../../../host/registries/shell/settings'
 import { AddConnection } from './AddConnection'
 import { ConnectionPage } from './ConnectionPage'
 import {
-  connectionPageOf, isModelProvider, needsYouFirst, openConnectionPage, SERVICES_PAGE, takeConnectionRequest, type ConnectionRequest,
+  connectionPageOf,
+  isModelProvider,
+  needsYouFirst,
+  openConnectionPage,
+  SERVICES_PAGE,
+  takeConnectionRequest,
+  type ConnectionRequest,
 } from './connections'
 
 // What Services and AI models share: the node's connections, one connection open as a detail in the
@@ -53,7 +59,8 @@ export function ConnectionsPage(props: {
     return target?.kind === 'connection' ? all().find((connection) => connection.id === target.id) : undefined
   })
   const list: ConnectionsList = {
-    connections: () => needsYouFirst(all().filter((connection) => connectionPageOf(providerOf(connection)) === props.page)),
+    connections: () =>
+      needsYouFirst(all().filter((connection) => connectionPageOf(providerOf(connection)) === props.page)),
     providerOf,
     pending: () => status.isPending,
     failed: () => status.isError,
@@ -72,14 +79,27 @@ export function ConnectionsPage(props: {
           fallback={
             <>
               <Show when={status.isError}>
-                <Alert actions={<Button size="sm" onPress={() => void status.refetch()}>Retry</Button>}>Could not read this node's connections.</Alert>
+                <Alert
+                  actions={
+                    <Button size="sm" onPress={() => void status.refetch()}>
+                      Retry
+                    </Button>
+                  }
+                >
+                  Could not read this node's connections.
+                </Alert>
               </Show>
               {props.children(list)}
             </>
           }
         >
           {(connection) => (
-            <ConnectionPage connection={connection()} provider={providerOf(connection())} listLabel={props.label} onBack={() => setOpen(undefined)} />
+            <ConnectionPage
+              connection={connection()}
+              provider={providerOf(connection())}
+              listLabel={props.label}
+              onBack={() => setOpen(undefined)}
+            />
           )}
         </Show>
       }
@@ -88,7 +108,11 @@ export function ConnectionsPage(props: {
         providers={status.data?.providers ?? []}
         connections={all()}
         offers={props.page === SERVICES_PAGE ? undefined : isModelProvider}
-        listedOn={props.page === SERVICES_PAGE ? (provider) => (isModelProvider(provider) ? 'Listed on AI models' : undefined) : undefined}
+        listedOn={
+          props.page === SERVICES_PAGE
+            ? (provider) => (isModelProvider(provider) ? 'Listed on AI models' : undefined)
+            : undefined
+        }
         openConnection={openConnection}
         listLabel={props.label}
         title={props.page === SERVICES_PAGE ? 'Add connection' : 'Add an API key'}

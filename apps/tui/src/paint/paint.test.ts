@@ -47,11 +47,7 @@ const cursorMoves = (text: string): string[] => text.match(/\x1b\[\d+;\d+H/g) ??
 describe('a box', () => {
   it('draws four edges with corners, and its caption in the top one', () => {
     const box = boxOf(12, 3, { border: true, title: 'Keys' })
-    expect(drawn(box, 12, 3)).toEqual([
-      '┌─Keys─────┐',
-      '│          │',
-      '└──────────┘',
-    ])
+    expect(drawn(box, 12, 3)).toEqual(['┌─Keys─────┐', '│          │', '└──────────┘'])
   })
 
   it('uses an accented left edge for the full height while keeping the other edges neutral', () => {
@@ -60,12 +56,7 @@ describe('a box', () => {
     layoutTree(box, 8, 4)
     paint(box, buffer)
 
-    expect(bufferLines(buffer)).toEqual([
-      '▍──────┐',
-      '▍      │',
-      '▍      │',
-      '▍──────┘',
-    ])
+    expect(bufferLines(buffer)).toEqual(['▍──────┐', '▍      │', '▍      │', '▍──────┘'])
     expect(cellAt(buffer, 0, 0)).toMatchObject({ char: '▍', fg: 2 })
     expect(cellAt(buffer, 0, 3)).toMatchObject({ char: '▍', fg: 2 })
     expect(cellAt(buffer, 7, 0)).toMatchObject({ char: '┐', fg: 8 })
@@ -101,11 +92,7 @@ describe('a box', () => {
     // border. It used to throw from inside whatever signal had just moved, and four crashes in one
     // week were a bare `{count()}` under a `<Stack>` (../tree/renderer.ts).
     const box = boxOf(9, 3, { border: true }, [createTextNode('loose')])
-    expect(drawn(box, 9, 3)).toEqual([
-      '┌───────┐',
-      '│loose  │',
-      '└───────┘',
-    ])
+    expect(drawn(box, 9, 3)).toEqual(['┌───────┐', '│loose  │', '└───────┘'])
   })
 
   it('skips a hidden subtree whole', () => {
@@ -123,12 +110,7 @@ describe('a run of text', () => {
   it('draws the lines its measure produced', () => {
     const text = el('text', { wrapMode: 'word' }, [createTextNode('one two three four')])
     const box = boxOf(9, 4, {}, [text])
-    expect(drawn(box, 9, 4)).toEqual([
-      'one two  ',
-      'three    ',
-      'four     ',
-      '         ',
-    ])
+    expect(drawn(box, 9, 4)).toEqual(['one two  ', 'three    ', 'four     ', '         '])
     // The rectangle and the run are two different widths, and paint needs both: the box is nine cells
     // because a column container stretches its children across, and the run is seven.
     expect(text.rect.w).toBe(9)
@@ -245,7 +227,7 @@ describe('a field', () => {
     expect(drawn(root, 8, 1)).toEqual(['x       '])
   })
 
-  it('writes the terminal\'s caret where the focused field says, and hides it otherwise', () => {
+  it("writes the terminal's caret where the focused field says, and hides it otherwise", () => {
     // The caret is the terminal's own rather than a cell of ours, so paint says where and the flush
     // says whether — and a frame with no field being typed into hides it, because a caret parked in
     // the corner of a list means nothing (./flush.ts § SHOW).
@@ -294,7 +276,7 @@ describe('a pty rectangle', () => {
     return term
   }
 
-  it('copies the emulator\'s cells, colours and attributes into the rectangle', async () => {
+  it("copies the emulator's cells, colours and attributes into the rectangle", async () => {
     // Bold red on the palette's blue, then plain, which is what a shell prompt is made of. The
     // sixteen-slot forms stay slots, because that is what the reader's own theme fills in
     // (../colour.ts).
@@ -336,7 +318,7 @@ describe('a pty rectangle', () => {
     expect(cellAt(buffer, 2, 0)?.char).toBe('x')
   })
 
-  it('follows the emulator\'s own viewport rather than an offset of ours', async () => {
+  it("follows the emulator's own viewport rather than an offset of ours", async () => {
     // A rectangle's viewport is the rectangle, so there is no `scroll` prop here: the program inside
     // scrolls its own region and `viewportY` is where the emulator is showing from (§ drawPty).
     const term = await emulator(6, 2, 'one\r\ntwo\r\nthree\r\nfour')
@@ -348,7 +330,7 @@ describe('a pty rectangle', () => {
     expect(bufferLines(buffer)).toEqual(['three ', 'four  '])
   })
 
-  it('draws the emulator\'s caret only while the rectangle is entered', async () => {
+  it("draws the emulator's caret only while the rectangle is entered", async () => {
     // The second writer of the buffer's one caret, and the rule is the same: paint says where and the
     // flush says whether. At most one thing has the keys, so at most one of the two can be true
     // (§ drawField, ./flush.ts § SHOW).
@@ -422,10 +404,13 @@ describe('the flush', () => {
     try {
       const left = createTextNode('ab')
       const right = createTextNode('yz')
-      insertNode(screen.root, el('box', { flexDirection: 'row', gap: 3 }, [
-        el('text', { flexShrink: 0 }, [left]),
-        el('text', { flexShrink: 0 }, [right]),
-      ]))
+      insertNode(
+        screen.root,
+        el('box', { flexDirection: 'row', gap: 3 }, [
+          el('text', { flexShrink: 0 }, [left]),
+          el('text', { flexShrink: 0 }, [right]),
+        ]),
+      )
       screen.frame()
 
       replaceText(left, 'AB')
@@ -439,7 +424,7 @@ describe('the flush', () => {
     }
   })
 
-  it('names the terminal\'s own colours rather than a white of its own', () => {
+  it("names the terminal's own colours rather than a white of its own", () => {
     // The white-on-white class, fixed where the colour is emitted: `39` and `49` are the foreground
     // and the background the person's terminal already has, and there is no way to say that to
     // OpenTUI at all (../colour.ts).
@@ -475,11 +460,14 @@ describe('the flush', () => {
     // came before ended at the terminal's default.
     const { screen } = screenOf(3, 1)
     try {
-      insertNode(screen.root, el('box', { flexDirection: 'row', gap: 0 }, [
-        el('text', { attributes: ATTRS.bold | ATTRS.underline, flexShrink: 0 }, [createTextNode('a')]),
-        el('text', { attributes: ATTRS.dim, flexShrink: 0 }, [createTextNode('b')]),
-        el('text', { flexShrink: 0 }, [createTextNode('c')]),
-      ]))
+      insertNode(
+        screen.root,
+        el('box', { flexDirection: 'row', gap: 0 }, [
+          el('text', { attributes: ATTRS.bold | ATTRS.underline, flexShrink: 0 }, [createTextNode('a')]),
+          el('text', { attributes: ATTRS.dim, flexShrink: 0 }, [createTextNode('b')]),
+          el('text', { flexShrink: 0 }, [createTextNode('c')]),
+        ]),
+      )
       const written = screen.frame().text
 
       expect(written).toContain('\x1b[1;4m')

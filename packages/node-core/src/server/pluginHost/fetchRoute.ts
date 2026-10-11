@@ -24,9 +24,12 @@ export async function servePluginFetch(
   // its body getter, and undici then demands `duplex` for the stream it finds there. A middleware that
   // already read the body, such as idempotency hashing it, leaves the stream used, so the copy Hono kept
   // goes instead.
-  const body = raw.method === 'GET' || raw.method === 'HEAD' ? {}
-    : raw.bodyUsed ? { body: await c.req.arrayBuffer() }
-    : { body: raw.body, duplex: 'half' }
+  const body =
+    raw.method === 'GET' || raw.method === 'HEAD'
+      ? {}
+      : raw.bodyUsed
+        ? { body: await c.req.arrayBuffer() }
+        : { body: raw.body, duplex: 'half' }
   const forwarded = new Request(url, { method: raw.method, headers, signal: raw.signal, ...body } as RequestInit)
   return args.fetch(forwarded, pluginRequestContext(c, args.pluginId))
 }

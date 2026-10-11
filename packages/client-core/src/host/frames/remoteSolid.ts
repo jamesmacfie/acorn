@@ -23,17 +23,32 @@ import { CHROME_SLOT_NODE, KIT_NODES, type KitNodeName } from '@acorn/protocol/t
 import type { AcornBridge } from './sdk/bridgeTypes'
 import type { TreeMount, TreeRender } from './sdk/treeChannel'
 import {
-  createNode, createText, firstChild, insertNode as attach, isTextNode, nextSibling, parentOf,
-  removeNode, setProperty, setText, type RemoteNode,
+  createNode,
+  createText,
+  firstChild,
+  insertNode as attach,
+  isTextNode,
+  nextSibling,
+  parentOf,
+  removeNode,
+  setProperty,
+  setText,
+  type RemoteNode,
 } from './remoteRoot'
 
 const renderer = createRenderer<RemoteNode>({
   createElement: createNode,
   createTextNode: createText,
   replaceText: setText,
-  setProperty: (node, name, value) => { setProperty(node, name, value) },
-  insertNode: (parent, node, anchor) => { attach(parent, node, anchor) },
-  removeNode: (parent, node) => { removeNode(parent, node) },
+  setProperty: (node, name, value) => {
+    setProperty(node, name, value)
+  },
+  insertNode: (parent, node, anchor) => {
+    attach(parent, node, anchor)
+  },
+  removeNode: (parent, node) => {
+    removeNode(parent, node)
+  },
   isTextNode,
   // Solid's walkers want `undefined` where there is nothing; the root speaks `null`, which is the
   // honest answer for "this node has no parent" and the one the wire uses.
@@ -44,8 +59,18 @@ const renderer = createRenderer<RemoteNode>({
 
 // What the JSX preset compiles against. The names are Solid's, not ours.
 export const {
-  render, effect, memo, createComponent, createElement, createTextNode, insertNode, insert, spread,
-  setProp, mergeProps, use,
+  render,
+  effect,
+  memo,
+  createComponent,
+  createElement,
+  createTextNode,
+  insertNode,
+  insert,
+  spread,
+  setProp,
+  mergeProps,
+  use,
 } = renderer
 
 /**
@@ -83,9 +108,10 @@ const kitNode = (type: KitNodeName | typeof CHROME_SLOT_NODE) => {
 }
 
 /** Every kit node, keyed by name. The named exports below are this object, destructured. */
-export const KIT_NODE_COMPONENTS = Object.fromEntries(
-  KIT_NODES.map((name) => [name, kitNode(name)]),
-) as Record<KitNodeName, (props: KitNodeProps) => JSX.Element>
+export const KIT_NODE_COMPONENTS = Object.fromEntries(KIT_NODES.map((name) => [name, kitNode(name)])) as Record<
+  KitNodeName,
+  (props: KitNodeProps) => JSX.Element
+>
 
 /** Only a rail or topbar replacement receives a host-minted slotRef that this can place. */
 export const Slot = kitNode(CHROME_SLOT_NODE)
@@ -94,14 +120,84 @@ export const Slot = kitNode(CHROME_SLOT_NODE)
 // `KIT_NODES`: a name here that the kit does not have is a type error, and a name the kit has that is
 // missing here is caught by ./remoteSolid.test.ts.
 export const {
-  Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, FilterBar, Modal, ModalBody,
-  ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
-  SectionHeader, TabPanel, ToolbarSpacer, SettingsSection, SettingRow, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
-  ChipRow, StatusDot, Facts, DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
-  DiffLine, FileHead, StackedDiff,
-  NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, IconButton, Input, Textarea,
-  Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
-  KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelBackendPicker, Rectangle, Only,
+  Stack,
+  Inline,
+  Section,
+  Fold,
+  Card,
+  Timeline,
+  Tabs,
+  Toolbar,
+  FilterBar,
+  Modal,
+  ModalBody,
+  ModalActions,
+  Menu,
+  Popover,
+  ListDetail,
+  ListColumn,
+  DetailColumn,
+  SplitHandle,
+  DocumentTabs,
+  SectionHeader,
+  TabPanel,
+  ToolbarSpacer,
+  SettingsSection,
+  SettingRow,
+  Text,
+  Link,
+  Heading,
+  Rows,
+  Row,
+  TreeRow,
+  RowActions,
+  Badge,
+  Chip,
+  ChipRow,
+  StatusDot,
+  Facts,
+  DescriptionList,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  Grid,
+  Meter,
+  CodeBlock,
+  Log,
+  Markdown,
+  DiffPane,
+  DiffLine,
+  FileHead,
+  StackedDiff,
+  NonCodeRow,
+  SplitCell,
+  EmptyState,
+  Alert,
+  Spinner,
+  Kbd,
+  UserAvatar,
+  Icon,
+  Button,
+  IconButton,
+  Input,
+  Textarea,
+  Select,
+  Checkbox,
+  SegmentedControl,
+  ToggleButton,
+  Picker,
+  PickerRow,
+  Composer,
+  MentionTextarea,
+  KeyValueEditor,
+  FindBar,
+  Field,
+  ConfirmButton,
+  CopyButton,
+  ModelBackendPicker,
+  Rectangle,
+  Only,
   Fallback,
 } = KIT_NODE_COMPONENTS
 

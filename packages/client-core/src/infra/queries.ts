@@ -8,10 +8,62 @@ import type { ModelBackendsResponse } from '@acorn/protocol/modelProviders.ts'
 import type { RunTargetInfo } from '@acorn/protocol/runTargets.ts'
 import { readJson } from './node/apiClient'
 import { mergePrefs } from './persistence/devicePrefs'
-import { coreTelemetrySummaryRoute, type TelemetrySummary, integrationMappingsRoute, integrationProjectsRoute, integrationsKey, integrationsRoute, modelBackendsKey, modelBackendsRoute, projectsKey, projectsRoute, workspaceExternalProjectsRoute, type IntegrationMapping, type IntegrationMappingsResponse, type IntegrationProject, type IntegrationProjectsResponse, type Project, type ProjectsResponse, prefsKey, prefsRoute, runTargetsRoute, tasksKey, tasksRoute, archivedTasksRoute, deletedTasksRoute, type ArchivedTask, type Task, workspacesKey, workspacesRoute, type Workspace, type IntegrationsResponse, type WorkspaceExternalProjectsResponse } from '@acorn/protocol/api.ts'
+import {
+  coreTelemetrySummaryRoute,
+  type TelemetrySummary,
+  integrationMappingsRoute,
+  integrationProjectsRoute,
+  integrationsKey,
+  integrationsRoute,
+  modelBackendsKey,
+  modelBackendsRoute,
+  projectsKey,
+  projectsRoute,
+  workspaceExternalProjectsRoute,
+  type IntegrationMapping,
+  type IntegrationMappingsResponse,
+  type IntegrationProject,
+  type IntegrationProjectsResponse,
+  type Project,
+  type ProjectsResponse,
+  prefsKey,
+  prefsRoute,
+  runTargetsRoute,
+  tasksKey,
+  tasksRoute,
+  archivedTasksRoute,
+  deletedTasksRoute,
+  type ArchivedTask,
+  type Task,
+  workspacesKey,
+  workspacesRoute,
+  type Workspace,
+  type IntegrationsResponse,
+  type WorkspaceExternalProjectsResponse,
+} from '@acorn/protocol/api.ts'
 
-export { integrationsKey, modelBackendsKey, prefsKey, projectsKey, tasksKey, workspacesKey } from '@acorn/protocol/api.ts'
-export type { ArchivedTask, Integration, IntegrationMapping, IntegrationProject, IntegrationsResponse, Project, ProjectsResponse, Task, TaskLink, TaskSeed, Workspace, WorkspaceExternalProject } from '@acorn/protocol/api.ts'
+export {
+  integrationsKey,
+  modelBackendsKey,
+  prefsKey,
+  projectsKey,
+  tasksKey,
+  workspacesKey,
+} from '@acorn/protocol/api.ts'
+export type {
+  ArchivedTask,
+  Integration,
+  IntegrationMapping,
+  IntegrationProject,
+  IntegrationsResponse,
+  Project,
+  ProjectsResponse,
+  Task,
+  TaskLink,
+  TaskSeed,
+  Workspace,
+  WorkspaceExternalProject,
+} from '@acorn/protocol/api.ts'
 
 type QueryContext = { signal?: AbortSignal }
 
@@ -29,7 +81,8 @@ export const archivedTasksKey = [...tasksKey, 'archived'] as const
 export const archivedTasksOptions = (enabled: boolean) => ({
   queryKey: archivedTasksKey,
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<ArchivedTask[]> => readJson<ArchivedTask[]>(archivedTasksRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<ArchivedTask[]> =>
+    readJson<ArchivedTask[]>(archivedTasksRoute, { signal }),
 })
 
 // Every deleted task's id (docs/workspaces-and-tasks/archive.md § Deleting a task), so a reference to
@@ -71,7 +124,8 @@ export const workspacesOptions = (enabled: boolean) => ({
 export const projectsOptions = (enabled: boolean) => ({
   queryKey: projectsKey,
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<Project[]> => (await readJson<ProjectsResponse>(projectsRoute, { signal })).projects,
+  queryFn: async ({ signal }: QueryContext): Promise<Project[]> =>
+    (await readJson<ProjectsResponse>(projectsRoute, { signal })).projects,
 })
 
 // External projects linked to a workspace (docs/workspaces-and-tasks.md): (integrationId, externalId) pairs.
@@ -159,7 +213,8 @@ export const integrationsOptions = (enabled: boolean) => ({
   queryKey: integrationsKey,
   enabled,
   staleTime: 5 * 60 * 1000,
-  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> => readJson<IntegrationsResponse>(integrationsRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<IntegrationsResponse> =>
+    readJson<IntegrationsResponse>(integrationsRoute, { signal }),
 })
 
 // Everything a Generate control can spend: every connected model-provider key, plus every agent CLI
@@ -173,5 +228,6 @@ export const modelBackendsOptions = (enabled: boolean) => ({
   queryKey: modelBackendsKey,
   enabled,
   staleTime: 30 * 1000,
-  queryFn: async ({ signal }: QueryContext): Promise<ModelBackendsResponse> => readJson<ModelBackendsResponse>(modelBackendsRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<ModelBackendsResponse> =>
+    readJson<ModelBackendsResponse>(modelBackendsRoute, { signal }),
 })

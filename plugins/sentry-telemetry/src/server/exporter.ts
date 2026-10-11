@@ -64,7 +64,8 @@ export type Exporter = {
 
 export function createExporter(deps: ExporterDeps): Exporter {
   const controller = new AbortController()
-  const sleep = deps.sleep ?? ((ms: number) => delay(ms, undefined, { signal: controller.signal, ref: false }).catch(() => {}))
+  const sleep =
+    deps.sleep ?? ((ms: number) => delay(ms, undefined, { signal: controller.signal, ref: false }).catch(() => {}))
   const queue: Queued[] = []
   const limits: RateLimit[] = []
   let converting: Promise<void> = Promise.resolve()
@@ -98,9 +99,12 @@ export function createExporter(deps: ExporterDeps): Exporter {
       // Keep the longest window when two quotas name the same category, which is what the
       // specification asks for.
       const existing = limits.find((held) =>
-        held.categories === 'all' ? limit.categories === 'all' : limit.categories !== 'all'
-          && held.categories.length === limit.categories.length
-          && held.categories.every((category) => (limit.categories as SentryDataCategory[]).includes(category)))
+        held.categories === 'all'
+          ? limit.categories === 'all'
+          : limit.categories !== 'all' &&
+            held.categories.length === limit.categories.length &&
+            held.categories.every((category) => (limit.categories as SentryDataCategory[]).includes(category)),
+      )
       if (existing) existing.untilMs = Math.max(existing.untilMs, limit.untilMs)
       else limits.push(limit)
     }
@@ -215,7 +219,9 @@ export function createExporter(deps: ExporterDeps): Exporter {
       converting = converting
         .then(() => convert(batch))
         .catch((error: unknown) => deps.log.error('could not build a Sentry envelope', { error: String(error) }))
-        .finally(() => { pendingBatches -= 1 })
+        .finally(() => {
+          pendingBatches -= 1
+        })
         .then(pump)
     },
     async settled() {

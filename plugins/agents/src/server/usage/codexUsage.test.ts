@@ -124,9 +124,12 @@ describe('Codex response and TTY parsing', () => {
   })
 
   it('reads the current app-server window duration field', () => {
-    const provider = parseCodexRpcResponse({
-      result: { rateLimits: { primary: { usedPercent: 100, resetsAt: 2, windowDurationMins: 30 } } },
-    }, 10)
+    const provider = parseCodexRpcResponse(
+      {
+        result: { rateLimits: { primary: { usedPercent: 100, resetsAt: 2, windowDurationMins: 30 } } },
+      },
+      10,
+    )
     expect(provider.quotas[0]).toMatchObject({ resetsAt: 2_000, windowSeconds: 1_800 })
   })
 
@@ -146,8 +149,12 @@ describe('Codex response and TTY parsing', () => {
   })
 
   it('classifies TTY authentication and update errors', () => {
-    expect(() => parseCodexTtyOutput('Please log in')).toThrowError(expect.objectContaining({ code: 'authentication_required' }))
-    expect(() => parseCodexTtyOutput('Codex update available')).toThrowError(expect.objectContaining({ code: 'update_required' }))
+    expect(() => parseCodexTtyOutput('Please log in')).toThrowError(
+      expect.objectContaining({ code: 'authentication_required' }),
+    )
+    expect(() => parseCodexTtyOutput('Codex update available')).toThrowError(
+      expect.objectContaining({ code: 'update_required' }),
+    )
   })
 
   it('blames the flags, not the output, when the CLI rejects an option', () => {

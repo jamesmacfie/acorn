@@ -20,7 +20,10 @@ import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
 // the approval are behind the layout's group switch and a case about them would be a case about the
 // switch (../layouts/ListDetail.tsx).
 
-const posts = () => recordedRequests().filter((request) => request.method === 'POST').map((request) => request.path)
+const posts = () =>
+  recordedRequests()
+    .filter((request) => request.method === 'POST')
+    .map((request) => request.path)
 
 describe('running an agent from a terminal', () => {
   it('can activate the completed Codex plan without treating a planning answer as implementation', async () => {
@@ -57,7 +60,9 @@ describe('running an agent from a terminal', () => {
   it('shows the sessions for the newly opened task', async () => {
     const other = { ...TASK, id: 'task-2', title: 'other-task', branch: 'other-task', sort: 1 }
     const screen = await renderFixture({
-      pane: 'agents', width: 120, height: 40,
+      pane: 'agents',
+      width: 120,
+      height: 40,
       cache: (client) => client.setQueryData(tasksKey, [TASK, other]),
     })
     try {
@@ -205,7 +210,9 @@ describe('running an agent from a terminal', () => {
 describe('other plugins’ rows on a transcript', () => {
   it('files a message from the response’s Copy menu', async () => {
     const fileNote = vi.fn()
-    const rows = registerContextMenuItems([{ id: 'note', location: 'agent.message', label: 'File as note', order: 0, run: fileNote }])
+    const rows = registerContextMenuItems([
+      { id: 'note', location: 'agent.message', label: 'File as note', order: 0, run: fileNote },
+    ])
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
       await openFirstSession(screen)
@@ -215,10 +222,18 @@ describe('other plugins’ rows on a transcript', () => {
       expect(await screen.until('File as note')).toContain('Copy as JSON')
       await stopSaying(screen, 'File as note')
       await screen.press('RETURN')
-      expect(fileNote).toHaveBeenCalledWith(expect.objectContaining({
-        location: 'agent.message', sessionId: 'session-1', taskId: 'task-1', projectId: 'project-1', turnId: 'turn-1',
-        role: 'assistant', status: 'completed', text: 'The reset writes a new hash but `signIn` still checks the one it was passed.',
-      }))
+      expect(fileNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          location: 'agent.message',
+          sessionId: 'session-1',
+          taskId: 'task-1',
+          projectId: 'project-1',
+          turnId: 'turn-1',
+          role: 'assistant',
+          status: 'completed',
+          text: 'The reset writes a new hash but `signIn` still checks the one it was passed.',
+        }),
+      )
       expect(posts()).toEqual([])
     } finally {
       rows.dispose()
@@ -230,7 +245,9 @@ describe('other plugins’ rows on a transcript', () => {
   // explicit menu after it.
   it('offers a message’s whole text to a selection action', async () => {
     const explain = vi.fn()
-    const rows = registerContextMenuItems([{ id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run: explain }])
+    const rows = registerContextMenuItems([
+      { id: 'explain', location: 'content.selection', label: 'Explain', order: 0, run: explain },
+    ])
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
       await openFirstSession(screen)
@@ -240,11 +257,18 @@ describe('other plugins’ rows on a transcript', () => {
       await screen.until('Explain')
       await stopSaying(screen, 'Explain')
       await screen.press('RETURN')
-      expect(explain).toHaveBeenCalledWith(expect.objectContaining({
-        location: 'content.selection', taskId: 'task-1', projectId: 'project-1', ownerId: 'agents', contentKind: 'markdown',
-        readOnly: true, text: 'The reset writes a new hash but signIn still checks the one it was passed.',
-        resource: expect.objectContaining({ kind: 'message', sessionId: 'session-1' }),
-      }))
+      expect(explain).toHaveBeenCalledWith(
+        expect.objectContaining({
+          location: 'content.selection',
+          taskId: 'task-1',
+          projectId: 'project-1',
+          ownerId: 'agents',
+          contentKind: 'markdown',
+          readOnly: true,
+          text: 'The reset writes a new hash but signIn still checks the one it was passed.',
+          resource: expect.objectContaining({ kind: 'message', sessionId: 'session-1' }),
+        }),
+      )
       expect(posts()).toEqual([])
     } finally {
       rows.dispose()
@@ -255,7 +279,9 @@ describe('other plugins’ rows on a transcript', () => {
   it('acts on a finished turn from its closing line', async () => {
     process.env.ACORN_FIXTURE_CODEX_PLAN = '1'
     const review = vi.fn()
-    const rows = registerContextMenuItems([{ id: 'review', location: 'agent.turn', label: 'Review turn', order: 0, run: review }])
+    const rows = registerContextMenuItems([
+      { id: 'review', location: 'agent.turn', label: 'Review turn', order: 0, run: review },
+    ])
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
       await screen.until('Implement plan')
@@ -266,7 +292,9 @@ describe('other plugins’ rows on a transcript', () => {
       await screen.until('Review turn')
       await stopSaying(screen, 'Review turn')
       await screen.press('RETURN')
-      expect(review).toHaveBeenCalledWith(expect.objectContaining({ location: 'agent.turn', turnId: 'turn-1', status: 'completed' }))
+      expect(review).toHaveBeenCalledWith(
+        expect.objectContaining({ location: 'agent.turn', turnId: 'turn-1', status: 'completed' }),
+      )
     } finally {
       rows.dispose()
       screen.done()

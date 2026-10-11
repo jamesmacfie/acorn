@@ -13,7 +13,10 @@ describe('JsonRpcProcess', () => {
     const stdout = new PassThrough()
     const stderr = new PassThrough()
     const child = Object.assign(new EventEmitter(), { stdin, stdout, stderr, killed: false, kill: vi.fn() })
-    child.kill.mockImplementation(() => { child.emit('exit', null, 'SIGTERM'); return true })
+    child.kill.mockImplementation(() => {
+      child.emit('exit', null, 'SIGTERM')
+      return true
+    })
     spawnMock.mockReturnValue(child)
     const serverRequests: unknown[] = []
     const { JsonRpcProcess } = await import('./jsonRpcProcess')
@@ -27,7 +30,9 @@ describe('JsonRpcProcess', () => {
     const request = rpc.request<{ ok: boolean }>('thread/start')
     stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, result: { ok: true } })}\n`)
     expect(await request).toEqual({ ok: true })
-    stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: 'approve-1', method: 'approval', params: { command: 'git status' } })}\n`)
+    stdout.write(
+      `${JSON.stringify({ jsonrpc: '2.0', id: 'approve-1', method: 'approval', params: { command: 'git status' } })}\n`,
+    )
     expect(serverRequests).toEqual([{ id: 'approve-1', method: 'approval', params: { command: 'git status' } }])
     await rpc.stop()
   })
@@ -37,7 +42,10 @@ describe('JsonRpcProcess', () => {
     const stdout = new PassThrough()
     const stderr = new PassThrough()
     const child = Object.assign(new EventEmitter(), { stdin, stdout, stderr, killed: false, kill: vi.fn() })
-    child.kill.mockImplementation(() => { child.emit('exit', null, 'SIGTERM'); return true })
+    child.kill.mockImplementation(() => {
+      child.emit('exit', null, 'SIGTERM')
+      return true
+    })
     spawnMock.mockReturnValue(child)
     const closed: Error[] = []
     const { JsonRpcProcess } = await import('./jsonRpcProcess')
@@ -65,7 +73,10 @@ describe('JsonRpcProcess', () => {
     const stdout = new PassThrough()
     const stderr = new PassThrough()
     const child = Object.assign(new EventEmitter(), { stdin, stdout, stderr, kill: vi.fn() })
-    child.kill.mockImplementation(() => { child.emit('exit', null, 'SIGTERM'); return true })
+    child.kill.mockImplementation(() => {
+      child.emit('exit', null, 'SIGTERM')
+      return true
+    })
     spawnMock.mockReturnValue(child)
     const onClosed = vi.fn()
     const { JsonRpcProcess } = await import('./jsonRpcProcess')
@@ -82,5 +93,4 @@ describe('JsonRpcProcess', () => {
     expect(onClosed).toHaveBeenCalledOnce()
     await expect(rpc.request('after-close')).rejects.toThrow('closed')
   })
-
 })

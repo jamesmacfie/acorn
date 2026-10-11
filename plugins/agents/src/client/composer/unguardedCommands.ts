@@ -15,12 +15,14 @@ export type UnguardedCommandsWarning = { tip: string; detail: string }
 const TIP = 'Commands run without a sandbox or approval'
 const CODEX_FULL_ACCESS = {
   tip: TIP,
-  detail: 'Codex’s full-access profile turns its sandbox off, so its commands can reach everything your account can. Set Permissions to :workspace to sandbox them.',
+  detail:
+    'Codex’s full-access profile turns its sandbox off, so its commands can reach everything your account can. Set Permissions to :workspace to sandbox them.',
 }
 const UNGUARDED: Record<string, UnguardedCommandsWarning> = {
   bypassPermissions: {
     tip: TIP,
-    detail: 'Claude Code is skipping permission checks, and its sandbox is off in Acorn sessions, so its commands can reach everything your account can. Set Mode to Auto or Default.',
+    detail:
+      'Claude Code is skipping permission checks, and its sandbox is off in Acorn sessions, so its commands can reach everything your account can. Set Mode to Auto or Default.',
   },
   ':danger-full-access': CODEX_FULL_ACCESS,
   'danger-full-access': CODEX_FULL_ACCESS,

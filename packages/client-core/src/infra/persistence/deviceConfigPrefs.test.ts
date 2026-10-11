@@ -5,10 +5,13 @@ import { PrefKeys } from './prefKeys'
 describe('device config projection', () => {
   it('round trips covered preferences through the device store representation', () => {
     const config = {
-      theme: 'dark', style: 'modern', themeFollowSystem: false,
+      theme: 'dark',
+      style: 'modern',
+      themeFollowSystem: false,
       keybindings: { 'core.settings.open': 'meta+,' },
       railOrder: { pinned: ['t1'], order: ['t2'] },
-      leftCollapsed: true, workspaceRail: true,
+      leftCollapsed: true,
+      workspaceRail: true,
       exclusiveSlots: { 'pane.switcher': 'board' },
     }
     const prefs = deviceConfigPrefs(config)
@@ -21,10 +24,12 @@ describe('device config projection', () => {
   })
 
   it('treats plugin declarations as offers and leaves trust outside the projection', () => {
-    const config = { plugins: [
-      { id: 'board', source: { github: 'owner/board' } },
-      { id: 'theme', source: { url: 'https://example.com/theme.tgz' } },
-    ] }
+    const config = {
+      plugins: [
+        { id: 'board', source: { github: 'owner/board' } },
+        { id: 'theme', source: { url: 'https://example.com/theme.tgz' } },
+      ],
+    }
     expect(deviceConfigInstallOffers(config, new Set(['board']))).toEqual([config.plugins[1]])
     expect(deviceConfigPrefs(config)).toEqual({})
   })

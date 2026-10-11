@@ -14,7 +14,16 @@
 // and the timestamps are minted here, and every attribute goes through the emitter's own caps.
 import type { PluginBridgeTelemetryAttrs, PluginBridgeTelemetryRecord } from '@acorn/protocol/plugin/bridge.ts'
 import type { TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
-import { currentTrace, emitError, emitEvent, emitLog, emitMetric, emitSpan, newSpanId, newTraceId } from '../../infra/telemetry/emitter'
+import {
+  currentTrace,
+  emitError,
+  emitEvent,
+  emitLog,
+  emitMetric,
+  emitSpan,
+  newSpanId,
+  newTraceId,
+} from '../../infra/telemetry/emitter'
 
 /** A frame's own name for what it did. Long enough for `fetch-issues-for-the-open-project`, short
  *  enough that a name is a name and not a message. */
@@ -35,7 +44,8 @@ function attrs(value: unknown): TelemetryAttrs {
   const out: TelemetryAttrs = {}
   if (!value || typeof value !== 'object' || Array.isArray(value)) return out
   for (const [key, entry] of Object.entries(value as PluginBridgeTelemetryAttrs)) {
-    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean' || entry === null) out[key] = entry
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean' || entry === null)
+      out[key] = entry
   }
   return out
 }
@@ -61,7 +71,8 @@ export function recordFrameTelemetry(pluginId: string, raw: unknown): void {
     case 'gauge': {
       const which = name(record.name)
       const value = finite(record.value)
-      if (which && value !== null) emitMetric(pluginId, { name: which, type: record.type, value, attrs: { ...seam, ...attrs(record.attrs) } })
+      if (which && value !== null)
+        emitMetric(pluginId, { name: which, type: record.type, value, attrs: { ...seam, ...attrs(record.attrs) } })
       return
     }
     case 'span': {
@@ -89,7 +100,13 @@ export function recordFrameTelemetry(pluginId: string, raw: unknown): void {
       if (!body || !LEVELS.has(record.level)) return
       // `logger` is the plugin id and not a tag the frame chose, because a frame's log line has one
       // useful answer to "who wrote this" and it is the plugin the reader can turn off.
-      emitLog(pluginId, { at: Date.now(), level: record.level, logger: pluginId, body, attrs: { ...seam, ...attrs(record.attrs) } })
+      emitLog(pluginId, {
+        at: Date.now(),
+        level: record.level,
+        logger: pluginId,
+        body,
+        attrs: { ...seam, ...attrs(record.attrs) },
+      })
       return
     }
     case 'error': {

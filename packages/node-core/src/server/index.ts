@@ -44,14 +44,16 @@ export function createApp() {
   // Per-instance state (the pairing rate ceiling), so it must be built here rather than imported as a
   // module-level router.
   const pairing = pairingRoutes()
-  const authoring = new Hono<AppEnv>().post('/turn', async c =>
-    (await import('./routes/authoring')).handleAuthoringTurn(c))
-  const queries = new Hono<AppEnv>().use('*', requireProviderAccess).post('/:operation', async c =>
-    (await import('./routes/queries')).handleQuery(c))
+  const authoring = new Hono<AppEnv>().post('/turn', async (c) =>
+    (await import('./routes/authoring')).handleAuthoringTurn(c),
+  )
+  const queries = new Hono<AppEnv>()
+    .use('*', requireProviderAccess)
+    .post('/:operation', async (c) => (await import('./routes/queries')).handleQuery(c))
   const secretPublication = new Hono<AppEnv>()
-    .get('/', async c => (await import('./routes/security/secretPublication')).readSecretPublication(c))
-    .put('/', async c => (await import('./routes/security/secretPublication')).writeSecretPublication(c))
-    .post('/allow', async c => (await import('./routes/security/secretPublication')).allowSecretPublicationOnce(c))
+    .get('/', async (c) => (await import('./routes/security/secretPublication')).readSecretPublication(c))
+    .put('/', async (c) => (await import('./routes/security/secretPublication')).writeSecretPublication(c))
+    .post('/allow', async (c) => (await import('./routes/security/secretPublication')).allowSecretPublicationOnce(c))
 
   const app = new Hono<AppEnv>()
     // First, unconditionally. Every response carries a request id, so a user-reported failure is

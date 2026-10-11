@@ -15,7 +15,9 @@ export async function deleteProject(db: AppDatabase, id: string, ownerId = ''): 
   // Load before the synchronous transaction. Workspace removal itself loads dataset storage only
   // when a project deletion actually needs it, and every row deletion still commits together.
   const removal = removeWorkspace ? await import('./workspaceRemoval') : null
-  const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)
+  const taskIds = (
+    await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))
+  ).map((row) => row.id)
   for (const taskId of taskIds) taskScripts(db).interruptTask(taskId, 'cancelled')
   const removedProviders = db.transaction((tx) => {
     if (taskIds.length) {

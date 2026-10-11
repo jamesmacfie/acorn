@@ -69,9 +69,15 @@ export function FindBar(props: {
       </div>
       {/* Polite, not assertive: the count changes on every keystroke. */}
       <Show when={props.error ?? (props.count && findCountText(props.count))}>
-        {(text) => <span class="ui-findbar-count" data-error={props.error ? '' : undefined} aria-live="polite">{text()}</span>}
+        {(text) => (
+          <span class="ui-findbar-count" data-error={props.error ? '' : undefined} aria-live="polite">
+            {text()}
+          </span>
+        )}
       </Show>
-      <Show when={status()}><span class="ui-findbar-status muted">{status()}</span></Show>
+      <Show when={status()}>
+        <span class="ui-findbar-status muted">{status()}</span>
+      </Show>
       <Toolbar.Group>
         <IconButton
           icon="chevron-up"
@@ -92,7 +98,13 @@ export function FindBar(props: {
       </Toolbar.Group>
       <Show when={toggles()}>{toggles()}</Show>
       <Show when={props.onClose}>
-        <IconButton icon="x" tip="Close find" tipKey={formatChord('escape')} label="Close find" onPress={() => props.onClose?.()} />
+        <IconButton
+          icon="x"
+          tip="Close find"
+          tipKey={formatChord('escape')}
+          label="Close find"
+          onPress={() => props.onClose?.()}
+        />
       </Show>
     </Toolbar>
   )

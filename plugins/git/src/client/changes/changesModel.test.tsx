@@ -10,7 +10,7 @@ const projects = vi.hoisted(() => ({ data: undefined as unknown }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => projects, useQueryClient: () => ({}) }))
 const inline = vi.hoisted(() => ({ capability: undefined as unknown }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
-  ...await original<Record<string, unknown>>(),
+  ...(await original<Record<string, unknown>>()),
   registerKeybindings: () => ({ dispose() {} }),
   clientCapability: () => inline.capability,
   isArchiving: () => false,
@@ -44,9 +44,11 @@ const reads = () => api.document.mock.calls.filter(([, request]) => request.file
 /** The node's document: each read of the stack answers the next digest in `digests`. */
 const answering = (...digests: string[]) => {
   let at = 0
-  api.document.mockImplementation(async (_task: string, request: { files: unknown[] }) => (request.files.length
-    ? { files: [{ path: 'a.txt', patchKey: digests[Math.min(at++, digests.length - 1)], segments: [segment] }] }
-    : { files: [] }))
+  api.document.mockImplementation(async (_task: string, request: { files: unknown[] }) =>
+    request.files.length
+      ? { files: [{ path: 'a.txt', patchKey: digests[Math.min(at++, digests.length - 1)], segments: [segment] }] }
+      : { files: [] },
+  )
 }
 afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose())
@@ -57,14 +59,50 @@ afterEach(() => {
 
 it('refreshes dependency evidence on scope and status edits and ignores an earlier reply', async () => {
   projects.data = [{ id: 'p1', vcs: 'git' }]
-  const change = (staged: boolean, contentKey: string) => ({ path: 'package.json', status: 'modified', staged, additions: 1, deletions: 0, contentKey })
+  const change = (staged: boolean, contentKey: string) => ({
+    path: 'package.json',
+    status: 'modified',
+    staged,
+    additions: 1,
+    deletions: 0,
+    contentKey,
+  })
   let changes = [change(false, 'one'), change(true, 'staged')]
-  api.status.mockImplementation(async () => ({ branch: 'main', upstream: null, ahead: null, behind: null, operation: null, changes }))
+  api.status.mockImplementation(async () => ({
+    branch: 'main',
+    upstream: null,
+    ahead: null,
+    behind: null,
+    operation: null,
+    changes,
+  }))
   api.document.mockResolvedValue({ files: [] })
   let answerFirst!: (value: unknown) => void
-  api.dependencies.mockImplementationOnce(() => new Promise((resolve) => { answerFirst = resolve }))
-    .mockResolvedValueOnce({ scope: 'staged', revision: SECOND, findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
-    .mockResolvedValueOnce({ scope: 'unstaged', revision: 'before-edit', findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
+  api.dependencies
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          answerFirst = resolve
+        }),
+    )
+    .mockResolvedValueOnce({
+      scope: 'staged',
+      revision: SECOND,
+      findings: [],
+      limits: [],
+      packageCount: 0,
+      coverage: 'complete',
+      manager: 'npm',
+    })
+    .mockResolvedValueOnce({
+      scope: 'unstaged',
+      revision: 'before-edit',
+      findings: [],
+      limits: [],
+      packageCount: 0,
+      coverage: 'complete',
+      manager: 'npm',
+    })
   const model = createRoot((dispose) => {
     disposers.push(dispose)
     return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
@@ -72,24 +110,55 @@ it('refreshes dependency evidence on scope and status edits and ignores an earli
   await vi.waitFor(() => expect(api.dependencies).toHaveBeenCalledTimes(1))
   model.select({ path: 'package.json', staged: true })
   await vi.waitFor(() => expect(model.dependencies()?.scope).toBe('staged'))
-  answerFirst({ scope: 'unstaged', revision: FIRST, findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
+  answerFirst({
+    scope: 'unstaged',
+    revision: FIRST,
+    findings: [],
+    limits: [],
+    packageCount: 0,
+    coverage: 'complete',
+    manager: 'npm',
+  })
   await flush()
   expect(model.dependencies()?.scope).toBe('staged')
   model.select({ path: 'package.json', staged: false })
   await vi.waitFor(() => expect(model.dependencies()?.revision).toBe('before-edit'))
   changes = [change(false, 'two')]
-  api.dependencies.mockResolvedValue({ scope: 'unstaged', revision: 'edited', findings: [], limits: [], packageCount: 0, coverage: 'complete', manager: 'npm' })
+  api.dependencies.mockResolvedValue({
+    scope: 'unstaged',
+    revision: 'edited',
+    findings: [],
+    limits: [],
+    packageCount: 0,
+    coverage: 'complete',
+    manager: 'npm',
+  })
   await model.refresh()
   await vi.waitFor(() => expect(model.dependencies()?.revision).toBe('edited'))
 })
 
 it.each(['.pnpmfile.cjs', 'npm.config.js', 'requirements.txt', 'pyproject.toml', 'uv.lock', 'Pipfile.lock'])(
-  'requests an advisory review for %s', async (path) => {
+  'requests an advisory review for %s',
+  async (path) => {
     projects.data = [{ id: 'p1', vcs: 'git' }]
-    api.status.mockResolvedValue({ branch: 'main', upstream: null, ahead: null, behind: null, operation: null,
-      changes: [{ path, status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'new' }] })
+    api.status.mockResolvedValue({
+      branch: 'main',
+      upstream: null,
+      ahead: null,
+      behind: null,
+      operation: null,
+      changes: [{ path, status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'new' }],
+    })
     api.document.mockResolvedValue({ files: [] })
-    api.dependencies.mockResolvedValue({ scope: 'unstaged', revision: FIRST, findings: [], limits: ['Unsupported dependency configuration'], packageCount: 0, coverage: 'partial', manager: 'unsupported' })
+    api.dependencies.mockResolvedValue({
+      scope: 'unstaged',
+      revision: FIRST,
+      findings: [],
+      limits: ['Unsupported dependency configuration'],
+      packageCount: 0,
+      coverage: 'partial',
+      manager: 'unsupported',
+    })
     const model = createRoot((dispose) => {
       disposers.push(dispose)
       return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
@@ -101,7 +170,11 @@ it.each(['.pnpmfile.cjs', 'npm.config.js', 'requirements.txt', 'pyproject.toml',
 
 it('reads the document again after a revision conflict and draws the new revision, once', async () => {
   api.status.mockResolvedValue({
-    branch: 'main', upstream: null, ahead: null, behind: null, operation: null,
+    branch: 'main',
+    upstream: null,
+    ahead: null,
+    behind: null,
+    operation: null,
     changes: [{ path: 'a.txt', status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'k' }],
   })
   answering(FIRST, SECOND)
@@ -112,8 +185,9 @@ it('reads the document again after a revision conflict and draws the new revisio
   })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
 
-  await expect(model.source.loadSegments([{ path: 'a.txt', patchKey: FIRST, ordinal: 0 }], new AbortController().signal))
-    .rejects.toMatchObject({ status: 409 })
+  await expect(
+    model.source.loadSegments([{ path: 'a.txt', patchKey: FIRST, ordinal: 0 }], new AbortController().signal),
+  ).rejects.toMatchObject({ status: 409 })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(SECOND))
   expect(reads()).toBe(2)
   await flush()
@@ -122,7 +196,11 @@ it('reads the document again after a revision conflict and draws the new revisio
 
 it('does not read the document again for any other failure', async () => {
   api.status.mockResolvedValue({
-    branch: 'main', upstream: null, ahead: null, behind: null, operation: null,
+    branch: 'main',
+    upstream: null,
+    ahead: null,
+    behind: null,
+    operation: null,
     changes: [{ path: 'a.txt', status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'k' }],
   })
   answering(FIRST)
@@ -132,15 +210,20 @@ it('does not read the document again for any other failure', async () => {
     return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
   })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
-  await expect(model.source.loadSegments([{ path: 'a.txt', patchKey: FIRST, ordinal: 0 }], new AbortController().signal))
-    .rejects.toMatchObject({ status: 500 })
+  await expect(
+    model.source.loadSegments([{ path: 'a.txt', patchKey: FIRST, ordinal: 0 }], new AbortController().signal),
+  ).rejects.toMatchObject({ status: 500 })
   await flush()
   expect(reads()).toBe(1)
 })
 
 it('keeps the last document when a read of it fails', async () => {
   api.status.mockResolvedValue({
-    branch: 'main', upstream: null, ahead: null, behind: null, operation: null,
+    branch: 'main',
+    upstream: null,
+    ahead: null,
+    behind: null,
+    operation: null,
     changes: [{ path: 'a.txt', status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'k' }],
   })
   answering(FIRST)
@@ -151,7 +234,9 @@ it('keeps the last document when a read of it fails', async () => {
   })
   await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
   api.document.mockRejectedValue(Object.assign(new Error('broken'), { status: 500 }))
-  await expect(model.source.loadSegments([{ path: 'a.txt', patchKey: FIRST, ordinal: 0 }], new AbortController().signal)).rejects.toBeTruthy()
+  await expect(
+    model.source.loadSegments([{ path: 'a.txt', patchKey: FIRST, ordinal: 0 }], new AbortController().signal),
+  ).rejects.toBeTruthy()
   await vi.waitFor(() => expect(reads()).toBe(2))
   await flush()
   expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST)
@@ -159,12 +244,16 @@ it('keeps the last document when a read of it fails', async () => {
 
 // The host draws a line's card inside a tracked expression, and the task's sessions move whenever any
 // of them does. The card has to survive that, or its textarea loses focus mid-sentence.
-it('keeps an open inline card mounted while the task\'s sessions update', async () => {
+it("keeps an open inline card mounted while the task's sessions update", async () => {
   const [sessions, setSessions] = createSignal<unknown[]>([])
   const Card = vi.fn(() => <textarea />)
   inline.capability = { prime() {}, reportPatches() {}, sessionsForTask: () => sessions(), Card }
   api.status.mockResolvedValue({
-    branch: 'main', upstream: null, ahead: null, behind: null, operation: null,
+    branch: 'main',
+    upstream: null,
+    ahead: null,
+    behind: null,
+    operation: null,
     changes: [{ path: 'a.txt', status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'k' }],
   })
   answering(FIRST)

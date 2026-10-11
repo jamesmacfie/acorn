@@ -1,7 +1,14 @@
 import { createSignal } from 'solid-js'
 import {
-  isStandaloneSettingsPage, parseSettingsTarget, PROJECT_SETTINGS_PREFIX, resolveSettingsAlias, settingsCategoryOf,
-  settingsPagesInOrder, WORKSPACE_SETTINGS_PREFIX, type SettingsCategory, type SettingsContribution,
+  isStandaloneSettingsPage,
+  parseSettingsTarget,
+  PROJECT_SETTINGS_PREFIX,
+  resolveSettingsAlias,
+  settingsCategoryOf,
+  settingsPagesInOrder,
+  WORKSPACE_SETTINGS_PREFIX,
+  type SettingsCategory,
+  type SettingsContribution,
 } from '@acorn/client-core/host/registries/shell'
 import { closeOverlay, openOverlay } from './state'
 import { settingsPageForMode } from '@acorn/client-core/features/settings'
@@ -23,7 +30,9 @@ export { place as settingsPlace, setPlace as setSettingsPlace, missing as settin
 /** Every page the route lists, in the rail's order. A workspace's and a project's own pages are drawn
  *  inside the workspace or project on the desktop and have no row of their own there either. */
 export const listedSettingsPages = (mode?: WorkspacesMode): readonly SettingsContribution[] =>
-  settingsPagesInOrder().filter(isStandaloneSettingsPage).map((page) => settingsPageForMode(page, mode))
+  settingsPagesInOrder()
+    .filter(isStandaloneSettingsPage)
+    .map((page) => settingsPageForMode(page, mode))
 
 /** Where a deep link lands: `settings/<pageId>#<sectionId>`, a bare page id, or an old id a page
  *  absorbed. A workspace or project page lands on Overview, which is where this host lists them. The

@@ -10,9 +10,7 @@
 // (docs/ui-design/closed-kit.md § The closed kit, docs/terminal/client.md § Client).
 
 /** What the far end of a PTY says. The same two messages every channel in the app already sends. */
-export type PtyEvent =
-  | { kind: 'out'; data: string }
-  | { kind: 'exit'; code: number | null }
+export type PtyEvent = { kind: 'out'; data: string } | { kind: 'exit'; code: number | null }
 
 /** A PTY, as the plugin that owns it describes it to the host. */
 export type PtyIo = {

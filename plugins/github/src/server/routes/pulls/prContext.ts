@@ -53,13 +53,7 @@ export async function resolvePr(db: PluginDatabase, c: Context<AppEnv>): Promise
       autoMergeEnabled: pullRequests.autoMergeEnabled,
     })
     .from(pullRequests)
-    .where(
-      and(
-        eq(pullRequests.userId, userId),
-        eq(pullRequests.repoId, repoRow.id),
-        eq(pullRequests.number, number),
-      ),
-    )
+    .where(and(eq(pullRequests.userId, userId), eq(pullRequests.repoId, repoRow.id), eq(pullRequests.number, number)))
   return {
     token: await githubToken(c),
     userId,
@@ -77,9 +71,7 @@ export async function resolvePr(db: PluginDatabase, c: Context<AppEnv>): Promise
 }
 
 export const bustPrSync = (db: PluginDatabase, userId: string, repoId: number, number: number) =>
-  db
-    .delete(syncState)
-    .where(and(eq(syncState.userId, userId), eq(syncState.resource, prResource(repoId, number))))
+  db.delete(syncState).where(and(eq(syncState.userId, userId), eq(syncState.resource, prResource(repoId, number))))
 
 export const setPrState = (db: PluginDatabase, userId: string, repoId: number, number: number, state: string) =>
   db

@@ -1,5 +1,10 @@
 import { join } from 'node:path'
-import type { PreviewBrowserRule, ServiceStartConfig, ServiceStartResult, ServiceState } from '@acorn/protocol/serviceProtocol.ts'
+import type {
+  PreviewBrowserRule,
+  ServiceStartConfig,
+  ServiceStartResult,
+  ServiceState,
+} from '@acorn/protocol/serviceProtocol.ts'
 import { helperMark } from './bootMarks'
 import { trustBundledClientPlugins, trustsBundledClientPlugins } from './plugins/bundledPluginTrust'
 import { recordCrash } from './supervision/crashBudget'
@@ -113,19 +118,25 @@ export function createHelper(options: HelperOptions): Helper {
   // Beside the plugin cache in the custody root, because both are this app's disposable copies. The
   // node's data root is the owner's data, and the app bundle is signed and read-only.
   const compileCacheRoot = join(userDataDir, 'compile-cache')
-  const service = new ServiceHost(options.serviceEntry, options.service, options.serviceEnv, {
-    stateChanged: (state: ServiceState, detail?: string) => {
-      log.info(`${state}${detail ? `: ${detail}` : ''}`, { 'service.state': state })
-      if (state === 'failed' && detail) lastFailure = detail
+  const service = new ServiceHost(
+    options.serviceEntry,
+    options.service,
+    options.serviceEnv,
+    {
+      stateChanged: (state: ServiceState, detail?: string) => {
+        log.info(`${state}${detail ? `: ${detail}` : ''}`, { 'service.state': state })
+        if (state === 'failed' && detail) lastFailure = detail
+      },
+      unexpectedExit: (code) => {
+        if (!booted || disposed) return
+        log.error(`service exited unexpectedly with code ${code}`, { 'exit.code': code ?? -1 })
+        // Only if the service did not already say why. Its own message beats an exit code.
+        lastFailure ??= `the background service exited with code ${code}`
+        void recover()
+      },
     },
-    unexpectedExit: (code) => {
-      if (!booted || disposed) return
-      log.error(`service exited unexpectedly with code ${code}`, { 'exit.code': code ?? -1 })
-      // Only if the service did not already say why. Its own message beats an exit code.
-      lastFailure ??= `the background service exited with code ${code}`
-      void recover()
-    },
-  }, compileCacheRoot)
+    compileCacheRoot,
+  )
 
   const broker = new NodeBroker(options.push, { viewerMultiplexing: options.viewerMultiplexing })
   const fleet = new FleetStore(userDataDir, tokens)
@@ -148,14 +159,17 @@ export function createHelper(options: HelperOptions): Helper {
   // before the node so a boot mark taken during `start()` is already recorded when the switch turns
   // out to be on.
   const telemetry = startHelperTelemetry({
-    broker, userDataDir, version,
+    broker,
+    userDataDir,
+    version,
     ...(options.requestFootprint ? { requestFootprint: options.requestFootprint } : {}),
   })
   // These bytes ship with this process. Cache and acknowledge them locally before the renderer asks
   // for plugin state, so a node cannot turn the "bundled" label into auto-trust for arbitrary remote
   // bytes. `trustsBundledClientPlugins` owns the one condition.
   const { bundledPluginsDir } = options.service
-  if (bundledPluginsDir && trustsBundledClientPlugins()) trustBundledClientPlugins(bundledPluginsDir, version, pluginCache, pluginTrust)
+  if (bundledPluginsDir && trustsBundledClientPlugins())
+    trustBundledClientPlugins(bundledPluginsDir, version, pluginCache, pluginTrust)
   helperMark('bundled plugins trusted')
 
   // Record, or re-record after a crash restart, the local node and bring its connection up. The port

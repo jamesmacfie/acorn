@@ -9,7 +9,14 @@ import {
   type TelemetryRecord,
 } from '@acorn/protocol/telemetry.ts'
 import { coreTelemetryRoute, prefsRoute } from '@acorn/protocol/api.ts'
-import { emitMetric, flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry, type Disposable } from '@acorn/node-core/server/telemetry'
+import {
+  emitMetric,
+  flushTelemetry,
+  onTelemetryBatch,
+  setTelemetryPref,
+  startTelemetry,
+  type Disposable,
+} from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 import type { NodeBroker } from './broker/nodeBroker'
 import { helperBootSpans } from './bootMarks'
@@ -91,7 +98,8 @@ export function startHelperTelemetry(options: {
   let finalTimer: ReturnType<typeof setTimeout> | null = null
   let polling: { owner: Adoption; promise: Promise<void> } | null = null
   const adopt = (id: string): Adoption => ({
-    id, enabled: false,
+    id,
+    enabled: false,
     requests: helperTelemetryRequests(options.broker, id, () => `${requestPrefix}-${++counter}`),
   })
   const live = (target: Adoption): boolean => owner === target && !retired
@@ -102,7 +110,11 @@ export function startHelperTelemetry(options: {
   let held: TelemetryRecord[] = []
   let posting: Adoption | null = null
 
-  const post = async (target: Adoption, runtime: PostedTelemetryRuntime, records: readonly TelemetryRecord[]): Promise<void> => {
+  const post = async (
+    target: Adoption,
+    runtime: PostedTelemetryRuntime,
+    records: readonly TelemetryRecord[],
+  ): Promise<void> => {
     for (const body of encodeTelemetryBatches(runtime, records)) {
       if (!canPost(target)) return
       const { status } = await target.requests.ask(coreTelemetryRoute, { method: 'POST', body })
@@ -136,7 +148,9 @@ export function startHelperTelemetry(options: {
       }
     } catch {
       if (live(target) && target.enabled) {
-        const remaining = bodies.slice(next).flatMap(body => (JSON.parse(body) as { records: TelemetryRecord[] }).records)
+        const remaining = bodies
+          .slice(next)
+          .flatMap((body) => (JSON.parse(body) as { records: TelemetryRecord[] }).records)
         held = [...remaining, ...held].slice(-QUEUE_MAX)
       }
     } finally {
@@ -218,10 +232,17 @@ export function startHelperTelemetry(options: {
   const footprint = (sample: FootprintSample): void => {
     const target = owner
     if (retired || !target || !subscription || !target.enabled) return
-    if (sample.helper !== null) emitMetric('core', { name: FOOTPRINT, type: 'gauge', value: sample.helper, unit: 'byte' })
+    if (sample.helper !== null)
+      emitMetric('core', { name: FOOTPRINT, type: 'gauge', value: sample.helper, unit: 'byte' })
     if (sample.renderer === null) return
     const record: TelemetryRecord = {
-      kind: 'metric', at: Date.now(), name: FOOTPRINT, type: 'gauge', value: sample.renderer, unit: 'byte', attrs: { owner: 'core' },
+      kind: 'metric',
+      at: Date.now(),
+      name: FOOTPRINT,
+      type: 'gauge',
+      value: sample.renderer,
+      unit: 'byte',
+      attrs: { owner: 'core' },
     }
     void post(target, 'renderer', [record]).catch(() => {})
   }
@@ -241,7 +262,9 @@ export function startHelperTelemetry(options: {
       try {
         const { status, text } = await target.requests.ask(prefsRoute, { method: 'GET' })
         if (status === 200) value = (JSON.parse(text) as Record<string, string>)[TELEMETRY_PREF_KEY] ?? null
-      } catch { /* An unavailable Node does not authorize collection. */ }
+      } catch {
+        /* An unavailable Node does not authorize collection. */
+      }
       if (live(target)) {
         apply(target, value === '1')
         // The remote consent answer precedes the flush, just as the Node's database read does.
@@ -291,7 +314,10 @@ export function startHelperTelemetry(options: {
       log.warn('the shell left an invalid crash record')
       return
     }
-    const parsed = telemetryRecordSchema.safeParse({ kind: 'error', ...(typeof body === 'object' && body !== null ? body : {}) })
+    const parsed = telemetryRecordSchema.safeParse({
+      kind: 'error',
+      ...(typeof body === 'object' && body !== null ? body : {}),
+    })
     if (!parsed.success) return void log.warn('the shell left a crash record this build cannot read')
     try {
       await post(target, 'shell', [parsed.data])
@@ -306,11 +332,15 @@ export function startHelperTelemetry(options: {
 
   // Both polling paths join the same remote read. Its application and flush stay with that
   // adoption. Retiring the reader lease leaves other subscribers and their preference untouched.
-  const collector = startTelemetry({ node: 'helper', version: options.version, readPref: async () => {
-    const target = owner
-    await poll()
-    return target && live(target) && target.enabled ? '1' : null
-  } })
+  const collector = startTelemetry({
+    node: 'helper',
+    version: options.version,
+    readPref: async () => {
+      const target = owner
+      await poll()
+      return target && live(target) && target.enabled ? '1' : null
+    },
+  })
 
   return {
     setNode: (id) => {
@@ -339,7 +369,10 @@ export function startHelperTelemetry(options: {
       subscription = null
       const target = owner
       if (!target) return
-      if (!target.enabled) { target.requests.close(); return }
+      if (!target.enabled) {
+        target.requests.close()
+        return
+      }
       target.requests.cancelReads()
       polling = null
       // At most five seconds for admitted posts and one final attempt. Failed deliveries cannot

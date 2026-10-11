@@ -54,7 +54,12 @@ function failedProvider(
 ): AgentProviderUsage {
   const normalized = normalizeError(error)
   if (lastSuccess) return { ...lastSuccess, stale: true, error: normalized }
-  return emptyProviderUsage(entry.provider, entry.label, normalized.code === 'cli_missing' ? 'missing' : 'error', normalized)
+  return emptyProviderUsage(
+    entry.provider,
+    entry.label,
+    normalized.code === 'cli_missing' ? 'missing' : 'error',
+    normalized,
+  )
 }
 
 // The collector answers about usage, the registration owns the naming. Stamped here so a collector
@@ -87,22 +92,25 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     }
     await mkdir(options.probeDir, { recursive: true })
     const entries = collectors.entries()
-    const previous = cached?.key === key ? new Map(cached.snapshot.providers.map((item) => [item.provider, item])) : null
+    const previous =
+      cached?.key === key ? new Map(cached.snapshot.providers.map((item) => [item.provider, item])) : null
     // A cold cache or a changed registry needs one complete snapshot before individual rows can be
     // replaced. Otherwise a manual refresh could silently hide a newly registered harness.
-    const partial = providerId !== null && previous?.has(providerId)
-      && entries.every((entry) => previous.has(entry.provider))
+    const partial =
+      providerId !== null && previous?.has(providerId) && entries.every((entry) => previous.has(entry.provider))
     const selected = partial ? entries.filter((entry) => entry.provider === providerId) : entries
     const settled = await Promise.allSettled(selected.map((entry) => entry.collect(pricing)))
-    const updated = new Map(selected.map((entry, index) => {
-      const result = settled[index]
-      if (result.status === 'fulfilled') {
-        const usage = named(entry, result.value)
-        lastSuccess.set(entry.provider, usage)
-        return [entry.provider, usage] as const
-      }
-      return [entry.provider, failedProvider(entry, result.reason, lastSuccess.get(entry.provider))] as const
-    }))
+    const updated = new Map(
+      selected.map((entry, index) => {
+        const result = settled[index]
+        if (result.status === 'fulfilled') {
+          const usage = named(entry, result.value)
+          lastSuccess.set(entry.provider, usage)
+          return [entry.provider, usage] as const
+        }
+        return [entry.provider, failedProvider(entry, result.reason, lastSuccess.get(entry.provider))] as const
+      }),
+    )
     const providers = entries.flatMap((entry) => {
       const item = updated.get(entry.provider) ?? previous?.get(entry.provider)
       return item ? [item] : []
@@ -123,11 +131,7 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
       await inFlight.promise
       return read({ userId, force })
     }
-    if (
-      !force
-      && cached?.key === key
-      && now() - cached.snapshot.refreshedAt < ttlMs
-    ) {
+    if (!force && cached?.key === key && now() - cached.snapshot.refreshedAt < ttlMs) {
       return cached.snapshot
     }
     const promise = refresh(pricing, key).finally(() => {

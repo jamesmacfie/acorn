@@ -33,7 +33,15 @@ export type ChromeActionContext = {
     | { location: 'rail.pane'; paneId: string; taskId: string; projectId: string }
   /** Host-derived identity for a file row or document tab menu. The path is the owner's confined
    *  worktree-relative one; no absolute path and no file bytes ever travel here. */
-  resource?: { kind: 'file'; taskId: string; projectId: string; path: string; directory: boolean; readOnly: boolean; revision?: string }
+  resource?: {
+    kind: 'file'
+    taskId: string
+    projectId: string
+    path: string
+    directory: boolean
+    readOnly: boolean
+    revision?: string
+  }
   /** Host-derived identity for an agent transcript message, with the text its card shows (at most
    *  64 KiB). Never the raw event, hidden reasoning, or the turn's other messages. */
   message?: Omit<AgentMessageTarget, 'location' | 'nodeId'>
@@ -83,7 +91,13 @@ const DONE: ChromeActionResult = { ok: true }
 // and losing an error at an existing click site is exactly what this change is not allowed to do.
 const toast = (pluginId: string, title: string, detail?: string): ChromeActionResult => {
   pushToast(`${pluginId}: ${title}`, { tone: 'danger' })
-  void pushNotice({ taskId: activeTaskId() ?? '', kind: 'plugin', title: `${pluginId}: ${title}`, at: Date.now(), ...(detail ? { detail } : {}) })
+  void pushNotice({
+    taskId: activeTaskId() ?? '',
+    kind: 'plugin',
+    title: `${pluginId}: ${title}`,
+    at: Date.now(),
+    ...(detail ? { detail } : {}),
+  })
   return { ok: false, message: detail ? `${title}: ${detail}` : title }
 }
 
@@ -119,10 +133,14 @@ function goToTask(context: ChromeActionContext): Task | 'unknown-task' | undefin
  * the answer; the palette awaits it so a command that failed keeps its frame open with the reason
  * instead of closing over it.
  */
-export async function runChromeAction(action: PluginChromeAction, context: ChromeActionContext): Promise<ChromeActionResult> {
+export async function runChromeAction(
+  action: PluginChromeAction,
+  context: ChromeActionContext,
+): Promise<ChromeActionResult> {
   switch (action.verb) {
     case 'openPane': {
-      if (context.rail?.location === 'rail.source') return toast(context.pluginId, 'open a task first', 'A source icon does not name a task.')
+      if (context.rail?.location === 'rail.source')
+        return toast(context.pluginId, 'open a task first', 'A source icon does not name a task.')
       // A task-scoped pane lives in a task's layout, so there is nothing to open into outside a task.
       // Saying so is better than a click that appears to do nothing, since the rail is reachable with no
       // task open. This refusal used to fire for every rail row of a plugin whose detail belonged to the
@@ -140,11 +158,16 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       const named = goToTask(context)
       if (named === 'unknown-task') return { ok: false, message: UNKNOWN_TASK }
       const taskId = named?.id ?? activeTaskId()
-      if (!taskId) return toast(context.pluginId, 'open a task first', 'This opens a pane, and a pane belongs to a task.')
+      if (!taskId)
+        return toast(context.pluginId, 'open a task first', 'This opens a pane, and a pane belongs to a task.')
       // The row id travels as a retained pane intent, which is the mechanism that already closed this
       // exact mount-order race for core panes (registries/clientEvents.ts): the intent is held until the
       // pane consumes it, so a pane opening for the first time is not a race against its own mount.
-      openPane(taskId, action.pane, context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item.id })
+      openPane(
+        taskId,
+        action.pane,
+        context.item === undefined ? undefined : { kind: 'plugin:select', item: context.item.id },
+      )
       return DONE
     }
     case 'openTask': {
@@ -152,7 +175,8 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       // reader, and picking a pane for them would be this verb pretending to be `openPane`.
       const named = goToTask(context)
       if (named === 'unknown-task') return { ok: false, message: UNKNOWN_TASK }
-      if (!named) return toast(context.pluginId, 'that row names no task', 'This opens a task, so the row has to say which one.')
+      if (!named)
+        return toast(context.pluginId, 'that row names no task', 'This opens a task, so the row has to say which one.')
       return DONE
     }
     case 'navigate': {
@@ -165,14 +189,19 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       const item = context.item?.id
       const path = context.projectId && item ? projectSurfacePath(action.surface, context.projectId, item) : null
       if (!path || !context.navigate) {
-        return toast(context.pluginId, 'pick a project first', 'This opens beside a project’s list, so it needs one selected.')
+        return toast(
+          context.pluginId,
+          'pick a project first',
+          'This opens beside a project’s list, so it needs one selected.',
+        )
       }
       context.navigate(path)
       return DONE
     }
     case 'runNodeAction': {
       // Repeated on this side for the same reason every read is: the path came off a roster row.
-      if (!ownsRoute(context.pluginId, action.path)) return toast(context.pluginId, 'refused an action outside its own namespace')
+      if (!ownsRoute(context.pluginId, action.path))
+        return toast(context.pluginId, 'refused an action outside its own namespace')
       // Awaited rather than dispatched. The click sites that came before this discard the promise and
       // keep exactly the behaviour they had, because the toast still fires from in here; what the wait
       // buys is a caller that can wait for the answer — the palette closes on success and stays open
@@ -182,11 +211,21 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
           method: 'POST',
           nodeId: context.nodeId,
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(context.resource ? { resource: context.resource }
-            : context.message ? { message: context.message }
-              : context.turn ? { turn: context.turn }
-                : context.selection ? { selection: context.selection }
-                  : context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
+          body: JSON.stringify(
+            context.resource
+              ? { resource: context.resource }
+              : context.message
+                ? { message: context.message }
+                : context.turn
+                  ? { turn: context.turn }
+                  : context.selection
+                    ? { selection: context.selection }
+                    : context.rail
+                      ? { rail: context.rail }
+                      : context.item === undefined
+                        ? {}
+                        : { item: context.item.id },
+          ),
         })
         // Success is silent. The node's status ping is what tells the chrome to re-read. Only a failure
         // needs saying, because nothing else on screen would show it.
@@ -222,8 +261,17 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       // What the frame receives is the command's own id, so there is one id rather than two that can drift.
       // That is also why this verb is only useful on a command: a footer badge's click has no command in
       // scope, and rather than invent a second name for the thing being delivered, the verb refuses there.
-      if (!context.commandId) return toast(context.pluginId, 'surfaceAction needs a command', 'This verb delivers a command id, so it only works from a command.')
-      clientEvents.emit('plugin:surface-action', { pluginId: context.pluginId, surface: action.surface, command: context.commandId })
+      if (!context.commandId)
+        return toast(
+          context.pluginId,
+          'surfaceAction needs a command',
+          'This verb delivers a command id, so it only works from a command.',
+        )
+      clientEvents.emit('plugin:surface-action', {
+        pluginId: context.pluginId,
+        surface: action.surface,
+        command: context.commandId,
+      })
       return DONE
     case 'openUrl':
       // Repeated on this side for the same reason `runNodeAction` re-checks its path: the URL came off a
@@ -241,11 +289,14 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
       // leave from, so it asks for the route; a badge or a command sits beside work in progress and asks
       // for the glance. `refPanel` is the default because that is every caller that has not thought about
       // it, and moving a reader who did not ask to be moved is the worse mistake.
-      if (openInAppUrl(action.url, {
-        taskId: activeTaskId(),
-        prefer: context.prefer ?? 'refPanel',
-        ...(context.navigate ? { navigate: context.navigate } : {}),
-      })) return DONE
+      if (
+        openInAppUrl(action.url, {
+          taskId: activeTaskId(),
+          prefer: context.prefer ?? 'refPanel',
+          ...(context.navigate ? { navigate: context.navigate } : {}),
+        })
+      )
+        return DONE
       window.open(action.url, '_blank', 'noopener,noreferrer')
       return DONE
   }

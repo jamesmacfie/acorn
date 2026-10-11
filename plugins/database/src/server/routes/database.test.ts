@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, makeTestPluginDb, schema, validatePluginConfig, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import {
+  makeTestDb,
+  makeTestPluginDb,
+  schema,
+  validatePluginConfig,
+  type TestDb,
+  type TestPluginDb,
+} from '@acorn/plugin-api/testkit'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createTaskService } from '@acorn/plugin-api/testkit'
@@ -64,13 +71,25 @@ const fixture = (): Fixture => {
       userId: caller.userId,
       principal: caller,
       providers: {
-        connections: () => { throw new Error('database has no provider') },
-        resource: () => { throw new Error('database has no provider') },
-        withConnections: () => { throw new Error('database has no provider') },
-        items: () => { throw new Error('database has no provider') },
+        connections: () => {
+          throw new Error('database has no provider')
+        },
+        resource: () => {
+          throw new Error('database has no provider')
+        },
+        withConnections: () => {
+          throw new Error('database has no provider')
+        },
+        items: () => {
+          throw new Error('database has no provider')
+        },
       },
     }
-    const services = { tasks: createTaskService(core.db), projects: createProjectService(core.db, memoryIdentityStore(caller.userId)), models: { generateText, available } }
+    const services = {
+      tasks: createTaskService(core.db),
+      projects: createProjectService(core.db, memoryIdentityStore(caller.userId)),
+      models: { generateText, available },
+    }
     return createDatabaseFetch(plugin.db, services, bridge)(new Request(`http://acorn.test${path}`, init), context)
   }
   return {
@@ -105,45 +124,98 @@ const task = (id: string, projectName: string) => ({
 
 const seed = async (f: Fixture) => {
   const now = Date.now()
-  await f.core.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+  await f.core.db
+    .insert(schema.workspaces)
+    .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
   await f.core.db.insert(schema.projects).values([
-    { id: 'project-widget', name: 'widget', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: 1, createdAt: now, updatedAt: now },
-    { id: 'project-gadget', name: 'gadget', path: null, workspaceId: 'workspace-1', sort: 1, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'gadget', githubRepoId: 2, createdAt: now, updatedAt: now },
+    {
+      id: 'project-widget',
+      name: 'widget',
+      path: null,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'widget',
+      githubRepoId: 1,
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'project-gadget',
+      name: 'gadget',
+      path: null,
+      workspaceId: 'workspace-1',
+      sort: 1,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'gadget',
+      githubRepoId: 2,
+      createdAt: now,
+      updatedAt: now,
+    },
   ])
   await f.core.db.insert(schema.tasks).values([task('task1', 'widget'), task('other', 'gadget')])
 }
 
 describe('portable database task authorization', () => {
   let f: Fixture
-  beforeEach(async () => { f = fixture(); await seed(f) })
+  beforeEach(async () => {
+    f = fixture()
+    await seed(f)
+  })
   afterEach(() => f.cleanup())
   const caller: Principal = { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' }
   const routes = [
-    { name: 'CLI query', request: (taskId: string): [string, RequestInit?] => ['/cli/query', json({ nodeId: 'node-a', taskId, sql: 'select 1' })] },
-    { name: 'palette queries', request: (taskId: string): [string, RequestInit?] => [`/palette/queries?taskId=${taskId}`] },
-    { name: 'context options', request: (taskId: string): [string, RequestInit?] => [`/context-options?taskId=${taskId}`] },
-    { name: 'context capture', request: (taskId: string): [string, RequestInit?] => ['/context-capture', json({ taskId })] },
+    {
+      name: 'CLI query',
+      request: (taskId: string): [string, RequestInit?] => [
+        '/cli/query',
+        json({ nodeId: 'node-a', taskId, sql: 'select 1' }),
+      ],
+    },
+    {
+      name: 'palette queries',
+      request: (taskId: string): [string, RequestInit?] => [`/palette/queries?taskId=${taskId}`],
+    },
+    {
+      name: 'context options',
+      request: (taskId: string): [string, RequestInit?] => [`/context-options?taskId=${taskId}`],
+    },
+    {
+      name: 'context capture',
+      request: (taskId: string): [string, RequestInit?] => ['/context-capture', json({ taskId })],
+    },
   ]
 
-  it.each(routes)('$name denies foreign and unknown scope before core, saved-query, or connection work', async ({ request }) => {
-    const coreRead = vi.spyOn(f.core.db, 'select')
-    const savedRead = vi.spyOn(f.plugin.db, 'select')
-    const query = vi.fn(async () => ({ error: 'Not connected.' }))
-    const connect = vi.fn(async () => ({ ok: true as const, database: 'dev' }))
-    const bridge = fake({ query, connect })
-    const denied = []
-    for (const taskId of ['other', 'ghost']) {
-      const [path, init] = request(taskId)
-      const response = await f.call(path, init, bridge, caller)
-      expect(response.status).toBe(404)
-      denied.push(await response.json())
-    }
-    expect(denied[0]).toEqual(denied[1])
-    expect(coreRead).not.toHaveBeenCalled()
-    expect(savedRead).not.toHaveBeenCalled()
-    expect(query).not.toHaveBeenCalled()
-    expect(connect).not.toHaveBeenCalled()
-  })
+  it.each(routes)(
+    '$name denies foreign and unknown scope before core, saved-query, or connection work',
+    async ({ request }) => {
+      const coreRead = vi.spyOn(f.core.db, 'select')
+      const savedRead = vi.spyOn(f.plugin.db, 'select')
+      const query = vi.fn(async () => ({ error: 'Not connected.' }))
+      const connect = vi.fn(async () => ({ ok: true as const, database: 'dev' }))
+      const bridge = fake({ query, connect })
+      const denied = []
+      for (const taskId of ['other', 'ghost']) {
+        const [path, init] = request(taskId)
+        const response = await f.call(path, init, bridge, caller)
+        expect(response.status).toBe(404)
+        denied.push(await response.json())
+      }
+      expect(denied[0]).toEqual(denied[1])
+      expect(coreRead).not.toHaveBeenCalled()
+      expect(savedRead).not.toHaveBeenCalled()
+      expect(query).not.toHaveBeenCalled()
+      expect(connect).not.toHaveBeenCalled()
+    },
+  )
 
   it.each(routes)('$name permits the signed task and unconfined device/service readers', async ({ request }) => {
     for (const [principal, taskId] of [
@@ -164,11 +236,21 @@ describe('portable database task authorization', () => {
   })
 
   it('allows auto-connect only after the signed task passes the route check', async () => {
-    const query = vi.fn<DatabaseBridge['query']>()
+    const query = vi
+      .fn<DatabaseBridge['query']>()
       .mockResolvedValueOnce({ error: 'Not connected.' })
       .mockResolvedValueOnce({ columns: ['answer'], rows: [['1']], rowCount: 1, command: 'SELECT', ms: 1 })
     const connect = vi.fn<DatabaseBridge['connect']>().mockResolvedValue({ ok: true, database: 'dev' })
-    expect((await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'select 1' }), fake({ query, connect }), caller)).status).toBe(200)
+    expect(
+      (
+        await f.call(
+          '/cli/query',
+          json({ nodeId: 'node-a', taskId: 'task1', sql: 'select 1' }),
+          fake({ query, connect }),
+          caller,
+        )
+      ).status,
+    ).toBe(200)
     expect(query).toHaveBeenCalledTimes(2)
     expect(connect).toHaveBeenCalledExactlyOnceWith('task1')
   })
@@ -176,7 +258,8 @@ describe('portable database task authorization', () => {
   it('rejects missing query scope and malformed task principals before reads', async () => {
     const coreRead = vi.spyOn(f.core.db, 'select')
     const savedRead = vi.spyOn(f.plugin.db, 'select')
-    for (const path of ['/palette/queries', '/context-options']) expect((await f.call(path, undefined, fake(), caller)).status).toBe(404)
+    for (const path of ['/palette/queries', '/context-options'])
+      expect((await f.call(path, undefined, fake(), caller)).status).toBe(404)
     for (const { request } of routes) {
       const [path, init] = request('task1')
       expect((await f.call(path, init, fake(), { ...caller, taskId: undefined })).status).toBe(404)
@@ -213,18 +296,33 @@ describe('database routes', () => {
     const f = fixture()
     try {
       await seed(f)
-      const query = vi.fn(async () => ({ columns: ['answer'], rows: Array.from({ length: 230 }, (_, i) => [i === 0 ? null : String(i)]), rowCount: 230, command: 'SELECT', ms: 1 }))
+      const query = vi.fn(async () => ({
+        columns: ['answer'],
+        rows: Array.from({ length: 230 }, (_, i) => [i === 0 ? null : String(i)]),
+        rowCount: 230,
+        command: 'SELECT',
+        ms: 1,
+      }))
       const bridge = fake({ query })
-      const response = await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'select answer', maxRows: 200 }), bridge)
+      const response = await f.call(
+        '/cli/query',
+        json({ nodeId: 'node-a', taskId: 'task1', sql: 'select answer', maxRows: 200 }),
+        bridge,
+      )
       expect(response.status).toBe(200)
-      const result = await response.json() as { rows: { value: string; isNull: boolean }[][]; truncated: boolean }
+      const result = (await response.json()) as { rows: { value: string; isNull: boolean }[][]; truncated: boolean }
       expect(result.rows).toHaveLength(200)
       expect(result.rows[0]?.[0]).toEqual({ value: '', isNull: true })
       expect(result.truncated).toBe(true)
       expect(query).toHaveBeenCalledWith('task1', 'select answer', { readOnly: true })
-      expect((await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'delete from users' }), bridge)).status).toBe(400)
+      expect(
+        (await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'delete from users' }), bridge))
+          .status,
+      ).toBe(400)
       expect(query).toHaveBeenCalledTimes(1)
-    } finally { f.cleanup() }
+    } finally {
+      f.cleanup()
+    }
   })
   let f: Fixture
   beforeEach(async () => {
@@ -234,7 +332,10 @@ describe('database routes', () => {
   afterEach(() => f.cleanup())
 
   it('connects and lists tables', async () => {
-    expect(await (await f.call('/tasks/task1/connect', { method: 'POST' })).json()).toEqual({ ok: true, database: 'dev' })
+    expect(await (await f.call('/tasks/task1/connect', { method: 'POST' })).json()).toEqual({
+      ok: true,
+      database: 'dev',
+    })
     expect(await (await f.call('/tasks/task1/tables')).json()).toEqual({ tables: [] })
   })
 
@@ -243,11 +344,18 @@ describe('database routes', () => {
     let upd: unknown = null
     const bridge = fake({
       query: async (_t, s) => ((sql = s), { columns: [], rows: [], rowCount: 0, command: 'UPDATE', ms: 2 }),
-      update: async (_t, schema, name, column, value, pk) => ((upd = { schema, name, column, value, pk }), { ok: true, rowCount: 1 }),
+      update: async (_t, schema, name, column, value, pk) => (
+        (upd = { schema, name, column, value, pk }),
+        { ok: true, rowCount: 1 }
+      ),
     })
     await f.call('/tasks/task1/query', json({ sql: 'select 1' }), bridge)
     expect(sql).toBe('select 1')
-    await f.call('/tasks/task1/update', json({ schema: 'public', name: 't', column: 'c', value: 'v', pk: { id: '1' } }), bridge)
+    await f.call(
+      '/tasks/task1/update',
+      json({ schema: 'public', name: 't', column: 'c', value: 'v', pk: { id: '1' } }),
+      bridge,
+    )
     expect(upd).toEqual({ schema: 'public', name: 't', column: 'c', value: 'v', pk: { id: '1' } })
   })
 
@@ -264,9 +372,16 @@ describe('database routes', () => {
       backendId: 'connection:conn1',
       modelId: 'claude-sonnet-5',
     })
-    const res = await f.call('/tasks/task1/generate', json({ backendId: 'connection:conn1', modelId: 'claude-sonnet-5', prompt: 'all users' }))
+    const res = await f.call(
+      '/tasks/task1/generate',
+      json({ backendId: 'connection:conn1', modelId: 'claude-sonnet-5', prompt: 'all users' }),
+    )
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ sql: 'SELECT * FROM users;', providerId: 'anthropic', modelId: 'claude-sonnet-5' })
+    expect(await res.json()).toEqual({
+      sql: 'SELECT * FROM users;',
+      providerId: 'anthropic',
+      modelId: 'claude-sonnet-5',
+    })
     const args = f.generateText.mock.calls[0][0] as GenerateTextRequest
     expect(args.backendId).toBe('connection:conn1')
     expect(args.userId).toBe('james')
@@ -294,7 +409,9 @@ describe('database routes', () => {
   // loaded bundle does not have, so the rule is read off the request context instead.
   it('refuses generation and the connection list to a task-scoped agent token', async () => {
     const agent = principal('james', 'internal')
-    expect((await f.call('/tasks/task1/generate', json({ backendId: 'connection:c', prompt: 'x' }), fake(), agent)).status).toBe(403)
+    expect(
+      (await f.call('/tasks/task1/generate', json({ backendId: 'connection:c', prompt: 'x' }), fake(), agent)).status,
+    ).toBe(403)
     expect((await f.call('/tasks/task1/model-connections', undefined, fake(), agent)).status).toBe(403)
     expect(f.generateText).not.toHaveBeenCalled()
   })
@@ -312,18 +429,30 @@ describe('the scratch document', () => {
 
   it('reads empty, writes, and reads back', async () => {
     expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text: '' })
-    const put = await f.call('/tasks/task1/scratch', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'SELECT 1;' }) })
+    const put = await f.call('/tasks/task1/scratch', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'SELECT 1;' }),
+    })
     expect(put.status).toBe(200)
     expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text: 'SELECT 1;' })
   })
 
   it('is per task, and 404s a task that does not exist on either verb', async () => {
-    await f.call('/tasks/task1/scratch', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'SELECT 1;' }) })
+    await f.call('/tasks/task1/scratch', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'SELECT 1;' }),
+    })
     expect(await (await f.call('/tasks/other/scratch')).json()).toEqual({ text: '' })
     expect((await f.call('/tasks/ghost/scratch')).status).toBe(404)
     // The write is checked too: an autosave for a task that has gone should not create a row nothing
     // reads.
-    const orphan = await f.call('/tasks/ghost/scratch', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'x' }) })
+    const orphan = await f.call('/tasks/ghost/scratch', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: 'x' }),
+    })
     expect(orphan.status).toBe(404)
   })
 })
@@ -337,10 +466,21 @@ describe('completions', () => {
   afterEach(() => f.cleanup())
 
   const catalog = fake({
-    catalog: async () => ({ tables: [{ schema: 'public', name: 'orders', columns: [{ name: 'id', dataType: 'uuid' }, { name: 'total', dataType: 'numeric' }] }] }),
+    catalog: async () => ({
+      tables: [
+        {
+          schema: 'public',
+          name: 'orders',
+          columns: [
+            { name: 'id', dataType: 'uuid' },
+            { name: 'total', dataType: 'numeric' },
+          ],
+        },
+      ],
+    }),
   })
 
-  it('offers a table after FROM and that table\'s columns after its alias', async () => {
+  it("offers a table after FROM and that table's columns after its alias", async () => {
     const after = async (text: string, column: number): Promise<PluginCompletionResponse> =>
       (await f.call('/tasks/task1/completions', json({ text, position: { line: 1, column } }), catalog)).json()
 
@@ -356,7 +496,11 @@ describe('completions', () => {
   // a red line under the editor for "not connected yet" would be noise on every keystroke.
   it('answers an empty list rather than an error when there is no connection', async () => {
     const offline = fake({ catalog: async () => ({ error: 'Not connected.' }) })
-    const res = await f.call('/tasks/task1/completions', json({ text: 'SELECT ', position: { line: 1, column: 8 } }), offline)
+    const res = await f.call(
+      '/tasks/task1/completions',
+      json({ text: 'SELECT ', position: { line: 1, column: 8 } }),
+      offline,
+    )
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ items: [] })
   })
@@ -371,10 +515,19 @@ describe('hover', () => {
   afterEach(() => f.cleanup())
 
   const catalog = fake({
-    catalog: async () => ({ tables: [
-      { schema: 'public', name: 'orders', columns: [{ name: 'id', dataType: 'uuid' }, { name: 'total', dataType: 'numeric' }] },
-      { schema: 'billing', name: 'invoices', columns: [{ name: 'id', dataType: 'bigint' }] },
-    ] }),
+    catalog: async () => ({
+      tables: [
+        {
+          schema: 'public',
+          name: 'orders',
+          columns: [
+            { name: 'id', dataType: 'uuid' },
+            { name: 'total', dataType: 'numeric' },
+          ],
+        },
+        { schema: 'billing', name: 'invoices', columns: [{ name: 'id', dataType: 'bigint' }] },
+      ],
+    }),
   })
   const hover = async (text: string, line: number, column: number, fakeBridge = catalog) =>
     (await f.call('/tasks/task1/hover', json({ text, position: { line, column }, revision: 7 }), fakeBridge)).json()
@@ -399,7 +552,9 @@ describe('hover', () => {
     expect(await hover('SELECT nothing', 1, 10)).toBeNull()
     expect(await hover('SELECT  ', 1, 8)).toBeNull()
     expect(await hover('SELECT orders', 1, 9, fake({ catalog: async () => ({ error: 'Not connected.' }) }))).toBeNull()
-    expect((await f.call('/tasks/task1/hover', json({ text: 'x', position: { line: 1, column: 1 } }), catalog)).status).toBe(400)
+    expect(
+      (await f.call('/tasks/task1/hover', json({ text: 'x', position: { line: 1, column: 1 } }), catalog)).status,
+    ).toBe(400)
   })
 })
 
@@ -416,7 +571,9 @@ describe('saved queries', () => {
   const save = (body: unknown, taskId = 'task1') => f.call(`/tasks/${taskId}/queries`, json(body))
 
   it('saves, lists and deletes a query', async () => {
-    const saved: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
+    const saved: DbSavedQuery = await (
+      await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })
+    ).json()
     expect(saved).toMatchObject({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })
     expect(await list()).toEqual([saved])
 
@@ -431,7 +588,7 @@ describe('saved queries', () => {
     expect(await list()).toEqual([{ ...second, notes: null, sql: 'SELECT 2;' }])
   })
 
-  it('scopes rows to the task\'s project — a sibling project neither sees nor deletes them', async () => {
+  it("scopes rows to the task's project — a sibling project neither sees nor deletes them", async () => {
     const mine: DbSavedQuery = await (await save({ name: 'mine', notes: '', sql: 'SELECT 1;' })).json()
     expect(await list('other')).toEqual([])
     await f.call(`/tasks/other/queries/${mine.id}`, { method: 'DELETE' })
@@ -445,10 +602,19 @@ describe('saved queries', () => {
   })
 
   it('puts the picked examples in the generate prompt and ignores ids from elsewhere', async () => {
-    const withNotes = fake({ schema: async () => ({ schema: 'SCHEMA', source: 'auto', notes: 'orders.meta holds { coupon }' }) })
-    const picked: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
+    const withNotes = fake({
+      schema: async () => ({ schema: 'SCHEMA', source: 'auto', notes: 'orders.meta holds { coupon }' }),
+    })
+    const picked: DbSavedQuery = await (
+      await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })
+    ).json()
     const foreign: DbSavedQuery = await (await save({ name: 'foreign', notes: '', sql: 'SELECT 99;' }, 'other')).json()
-    f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'anthropic', backendId: 'connection:c', modelId: 'm' })
+    f.generateText.mockResolvedValueOnce({
+      text: 'SELECT 1;',
+      providerId: 'anthropic',
+      backendId: 'connection:c',
+      modelId: 'm',
+    })
 
     const res = await f.call(
       '/tasks/task1/generate',
@@ -465,7 +631,9 @@ describe('saved queries', () => {
   // The agent composer's entry. The scoping is the interesting half: the options a task offers are its
   // project's, not every project's.
   it('serves the composer its options and captures the picked ones', async () => {
-    const mine: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
+    const mine: DbSavedQuery = await (
+      await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })
+    ).json()
     await save({ name: 'foreign', notes: '', sql: 'SELECT 99;' }, 'other')
 
     const options = await (await f.call('/context-options?taskId=task1')).json()
@@ -473,7 +641,11 @@ describe('saved queries', () => {
 
     const captured = await (await f.call('/context-capture', json({ taskId: 'task1', optionIds: [mine.id] }))).json()
     expect(captured).toHaveLength(1)
-    expect(captured[0]).toMatchObject({ contextId: mine.id, label: 'Database · paid orders', deepLink: { pane: 'database' } })
+    expect(captured[0]).toMatchObject({
+      contextId: mine.id,
+      label: 'Database · paid orders',
+      deepLink: { pane: 'database' },
+    })
     expect(captured[0].content).toContain('SELECT 1;')
     // The connection URL is resolved per connect and never persisted, so this asserts the snapshot is
     // only the query and its notes.
@@ -498,16 +670,20 @@ describe('the palette routes', () => {
   const search = async (path: string): Promise<{ items: { id: string; title: string }[] }> =>
     (await f.call(path)).json()
 
-  const connected = [{
-    id: 'connection:conn1',
-    kind: 'connection' as const,
-    label: 'Work key',
-    models: [{ id: 'other', label: 'Other' }],
-    defaultModelId: 'claude-sonnet-5',
-  }] satisfies Awaited<ReturnType<ModelService['available']>>
+  const connected = [
+    {
+      id: 'connection:conn1',
+      kind: 'connection' as const,
+      label: 'Work key',
+      models: [{ id: 'other', label: 'Other' }],
+      defaultModelId: 'claude-sonnet-5',
+    },
+  ] satisfies Awaited<ReturnType<ModelService['available']>>
 
   it('answers this task’s project’s queries and never a sibling project’s', async () => {
-    const mine: DbSavedQuery = await (await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })).json()
+    const mine: DbSavedQuery = await (
+      await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })
+    ).json()
     await save({ name: 'foreign', notes: '', sql: 'SELECT 99;' }, 'other')
 
     expect((await search('/palette/queries?taskId=task1')).items).toEqual([
@@ -531,7 +707,12 @@ describe('the palette routes', () => {
   it('generates with the first backend and that backend’s default model, and no examples', async () => {
     await save({ name: 'paid orders', notes: 'excludes refunds', sql: 'SELECT 1;' })
     f.available.mockResolvedValueOnce(connected)
-    f.generateText.mockResolvedValueOnce({ text: '```sql\nSELECT 2;\n```', providerId: 'anthropic', backendId: 'connection:conn1', modelId: 'claude-sonnet-5' })
+    f.generateText.mockResolvedValueOnce({
+      text: '```sql\nSELECT 2;\n```',
+      providerId: 'anthropic',
+      backendId: 'connection:conn1',
+      modelId: 'claude-sonnet-5',
+    })
 
     const res = await f.call('/palette/generate', json({ input: 'all users', taskId: 'task1' }))
     expect(res.status).toBe(200)
@@ -571,7 +752,10 @@ describe('the palette routes', () => {
     expect((await f.call('/palette/generate', json({ input: 'x'.repeat(4001), taskId: 'task1' }))).status).toBe(400)
     expect((await f.call('/palette/generate', json({ input: '   ', taskId: 'task1' }))).status).toBe(400)
     // A task-scoped agent token: generation spends the owner's provider key.
-    expect((await f.call('/palette/generate', json({ input: 'p', taskId: 'task1' }), fake(), principal('james', 'internal'))).status).toBe(403)
+    expect(
+      (await f.call('/palette/generate', json({ input: 'p', taskId: 'task1' }), fake(), principal('james', 'internal')))
+        .status,
+    ).toBe(403)
     // A task that does not resolve.
     expect((await f.call('/palette/generate', json({ input: 'p', taskId: 'ghost' }))).status).toBe(404)
     // Nothing connected. `available` answers an empty list by default in this fixture.
@@ -580,7 +764,11 @@ describe('the palette routes', () => {
     expect(await none.json()).toMatchObject({ error: { code: 'provider_not_connected' } })
     // A schema that will not load.
     f.available.mockResolvedValueOnce(connected)
-    const noSchema = await f.call('/palette/generate', json({ input: 'p', taskId: 'task1' }), fake({ schema: async () => ({ error: 'Not connected.' }) }))
+    const noSchema = await f.call(
+      '/palette/generate',
+      json({ input: 'p', taskId: 'task1' }),
+      fake({ schema: async () => ({ error: 'Not connected.' }) }),
+    )
     expect(noSchema.status).toBe(422)
     expect(await noSchema.json()).toMatchObject({ error: { code: 'db_schema_unavailable' } })
     // The provider refusing, mapped to its own status.
@@ -592,8 +780,15 @@ describe('the palette routes', () => {
   })
 
   it('omits the model when the backend declares no default, leaving the runtime its own fallback', async () => {
-    f.available.mockResolvedValueOnce([{ id: 'connection:conn2', kind: 'connection', label: 'p', models: [], defaultModelId: '' }] satisfies Awaited<ReturnType<ModelService['available']>>)
-    f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'p', backendId: 'connection:conn2', modelId: 'm' })
+    f.available.mockResolvedValueOnce([
+      { id: 'connection:conn2', kind: 'connection', label: 'p', models: [], defaultModelId: '' },
+    ] satisfies Awaited<ReturnType<ModelService['available']>>)
+    f.generateText.mockResolvedValueOnce({
+      text: 'SELECT 1;',
+      providerId: 'p',
+      backendId: 'connection:conn2',
+      modelId: 'm',
+    })
     expect((await f.call('/palette/generate', json({ input: 'p', taskId: 'task1' }))).status).toBe(200)
     expect((f.generateText.mock.calls[0][0] as GenerateTextRequest).input.modelId).toBeUndefined()
   })
@@ -602,27 +797,47 @@ describe('the palette routes', () => {
 // Byte boundaries use complete documents through the loaded portable carrier and disposable SQLite.
 describe('SQL scratch UTF-8 admission and legacy recovery', () => {
   let f: Fixture
-  beforeEach(async () => { f = fixture(); await seed(f) })
+  beforeEach(async () => {
+    f = fixture()
+    await seed(f)
+  })
   afterEach(() => f.cleanup())
   const put = (f: Fixture, text: string) => f.call('/tasks/task1/scratch', { ...json({ text }), method: 'PUT' })
   const patterns = ['x', 'é', '😀', 'e\u0301']
 
-  it.each(patterns)('admits exact-cap %s text and refuses one extra byte before storage or catalog work', async (pattern) => {
-    const unitBytes = Buffer.byteLength(pattern)
-    const text = pattern.repeat(Math.floor(MAX_DOCUMENT_BYTES / unitBytes)) + 'x'.repeat(MAX_DOCUMENT_BYTES % unitBytes)
-    expect(Buffer.byteLength(text)).toBe(MAX_DOCUMENT_BYTES)
-    expect((await put(f, text)).status).toBe(200)
-    const catalog = vi.fn<DatabaseBridge['catalog']>(async () => ({ tables: [] }))
-    expect((await f.call('/tasks/task1/completions', json({ text, position: { line: 1, column: 1 } }), fake({ catalog }))).status).toBe(200)
-    expect((await put(f, text + 'x')).status).toBe(400)
-    expect((await f.call('/tasks/task1/completions', json({ text: text + 'x', position: { line: 1, column: 1 } }), fake({ catalog }))).status).toBe(400)
-    expect(catalog).toHaveBeenCalledTimes(1)
-    expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text })
-  })
+  it.each(patterns)(
+    'admits exact-cap %s text and refuses one extra byte before storage or catalog work',
+    async (pattern) => {
+      const unitBytes = Buffer.byteLength(pattern)
+      const text =
+        pattern.repeat(Math.floor(MAX_DOCUMENT_BYTES / unitBytes)) + 'x'.repeat(MAX_DOCUMENT_BYTES % unitBytes)
+      expect(Buffer.byteLength(text)).toBe(MAX_DOCUMENT_BYTES)
+      expect((await put(f, text)).status).toBe(200)
+      const catalog = vi.fn<DatabaseBridge['catalog']>(async () => ({ tables: [] }))
+      expect(
+        (await f.call('/tasks/task1/completions', json({ text, position: { line: 1, column: 1 } }), fake({ catalog })))
+          .status,
+      ).toBe(200)
+      expect((await put(f, text + 'x')).status).toBe(400)
+      expect(
+        (
+          await f.call(
+            '/tasks/task1/completions',
+            json({ text: text + 'x', position: { line: 1, column: 1 } }),
+            fake({ catalog }),
+          )
+        ).status,
+      ).toBe(400)
+      expect(catalog).toHaveBeenCalledTimes(1)
+      expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text })
+    },
+  )
 
   it('accepts an empty scratch and empty completion source', async () => {
     expect((await put(f, '')).status).toBe(200)
-    expect((await f.call('/tasks/task1/completions', json({ text: '', position: { line: 1, column: 1 } }))).status).toBe(200)
+    expect(
+      (await f.call('/tasks/task1/completions', json({ text: '', position: { line: 1, column: 1 } }))).status,
+    ).toBe(200)
   })
 
   it('keeps complete legacy oversized SQL readable only within the original task scope until valid replacement', async () => {
@@ -637,23 +852,39 @@ describe('SQL scratch UTF-8 admission and legacy recovery', () => {
     expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text: 'SELECT 1;' })
   })
 
-  it.each(['palette', 'modal'])('%s generation refuses oversized output without a success selection or durable replacement', async (entry) => {
-    await put(f, 'SELECT prior;')
-    f.available.mockResolvedValue([{ id: 'harness:test', kind: 'harness', label: 'Synthetic', models: [], defaultModelId: '' }])
-    const call = () => entry === 'palette'
-      ? f.call('/palette/generate', json({ taskId: 'task1', input: 'synthetic' }))
-      : f.call('/tasks/task1/generate', json({ backendId: 'harness:test', prompt: 'synthetic' }))
-    for (const [text, status] of [['é'.repeat(MAX_DOCUMENT_BYTES / 2), 200], ['é'.repeat(MAX_DOCUMENT_BYTES / 2) + 'x', 400]] as const) {
-      f.generateText.mockResolvedValueOnce({ text, providerId: 'anthropic', backendId: 'harness:test', modelId: 'synthetic' })
-      const response = await call()
-      expect(response.status).toBe(status)
-      const body = await response.json()
-      if (status === 400) {
-        expect(body).not.toHaveProperty('item')
-        expect(body).not.toHaveProperty('sql')
-        expect(body).toHaveProperty('error')
+  it.each(['palette', 'modal'])(
+    '%s generation refuses oversized output without a success selection or durable replacement',
+    async (entry) => {
+      await put(f, 'SELECT prior;')
+      f.available.mockResolvedValue([
+        { id: 'harness:test', kind: 'harness', label: 'Synthetic', models: [], defaultModelId: '' },
+      ])
+      const call = () =>
+        entry === 'palette'
+          ? f.call('/palette/generate', json({ taskId: 'task1', input: 'synthetic' }))
+          : f.call('/tasks/task1/generate', json({ backendId: 'harness:test', prompt: 'synthetic' }))
+      for (const [text, status] of [
+        ['é'.repeat(MAX_DOCUMENT_BYTES / 2), 200],
+        ['é'.repeat(MAX_DOCUMENT_BYTES / 2) + 'x', 400],
+      ] as const) {
+        f.generateText.mockResolvedValueOnce({
+          text,
+          providerId: 'anthropic',
+          backendId: 'harness:test',
+          modelId: 'synthetic',
+        })
+        const response = await call()
+        expect(response.status).toBe(status)
+        const body = await response.json()
+        if (status === 400) {
+          expect(body).not.toHaveProperty('item')
+          expect(body).not.toHaveProperty('sql')
+          expect(body).toHaveProperty('error')
+        }
       }
-    }
-    expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text: entry === 'palette' ? 'é'.repeat(MAX_DOCUMENT_BYTES / 2) : 'SELECT prior;' })
-  })
+      expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({
+        text: entry === 'palette' ? 'é'.repeat(MAX_DOCUMENT_BYTES / 2) : 'SELECT prior;',
+      })
+    },
+  )
 })

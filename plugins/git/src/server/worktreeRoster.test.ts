@@ -10,7 +10,10 @@ import { inventory, parseRoster } from './worktreeRoster'
 import { worktreeRoutes } from './routes/worktrees'
 
 let folder = ''
-afterEach(() => { if (folder) rmSync(folder, { recursive: true, force: true }); folder = '' })
+afterEach(() => {
+  if (folder) rmSync(folder, { recursive: true, force: true })
+  folder = ''
+})
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' })
 
 function fixture() {
@@ -39,16 +42,25 @@ function core(root: string, tasks: TaskRef[] = [], aliasPath = root) {
   return {
     projects: { byId: async (id: string) => projects.find((project) => project.id === id) ?? null },
     tasks: { branchClaims: async () => tasks },
-    git: { git: async (args: readonly string[], opts: { cwd: string }) => {
-      const result = await new Promise<{ code: number; stdout: string; stderr: string }>((done) => {
-        const child = spawn('git', [...args], { cwd: opts.cwd })
-        const stdout: Buffer[] = [], stderr: Buffer[] = []
-        child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
-        child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
-        child.on('close', (code) => done({ code: code ?? 1, stdout: Buffer.concat(stdout).toString(), stderr: Buffer.concat(stderr).toString() }))
-      })
-      return result
-    } },
+    git: {
+      git: async (args: readonly string[], opts: { cwd: string }) => {
+        const result = await new Promise<{ code: number; stdout: string; stderr: string }>((done) => {
+          const child = spawn('git', [...args], { cwd: opts.cwd })
+          const stdout: Buffer[] = [],
+            stderr: Buffer[] = []
+          child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
+          child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
+          child.on('close', (code) =>
+            done({
+              code: code ?? 1,
+              stdout: Buffer.concat(stdout).toString(),
+              stderr: Buffer.concat(stderr).toString(),
+            }),
+          )
+        })
+        return result
+      },
+    },
   } as unknown as Pick<CoreServices, 'git' | 'projects' | 'tasks'>
 }
 
@@ -59,10 +71,30 @@ it('reads NUL-delimited branch, detached, locked, missing, dirty and aliased wor
   const detachedGitPath = realpathSync(detached)
   git(root, 'worktree', 'lock', clean)
   rmSync(detached, { recursive: true })
-  const service = core(root, [
-    { id: 'task', title: 'Owned', projectId: 'project', branch: 'clean', worktreePath: clean, skipSetup: false, pullNumber: null },
-    { id: 'folder-task', title: 'Folder task', projectId: 'project', branch: null, worktreePath: null, skipSetup: false, pullNumber: null },
-  ], clean)
+  const service = core(
+    root,
+    [
+      {
+        id: 'task',
+        title: 'Owned',
+        projectId: 'project',
+        branch: 'clean',
+        worktreePath: clean,
+        skipSetup: false,
+        pullNumber: null,
+      },
+      {
+        id: 'folder-task',
+        title: 'Folder task',
+        projectId: 'project',
+        branch: null,
+        worktreePath: null,
+        skipSetup: false,
+        pullNumber: null,
+      },
+    ],
+    clean,
+  )
   const first = await inventory(service, 'project')
   const alias = await inventory(service, 'alias')
   expect(first.repository).toBe(alias.repository)
@@ -70,11 +102,22 @@ it('reads NUL-delimited branch, detached, locked, missing, dirty and aliased wor
   expect(first.worktrees.map((entry) => entry.observation)).toEqual(alias.worktrees.map((entry) => entry.observation))
   expect(first.worktrees).toHaveLength(4)
   expect(first.worktrees.find((item) => item.main)).toMatchObject({ path: root, owners: [{ id: 'folder-task' }] })
-  expect(first.worktrees.find((item) => item.path === clean)).toMatchObject({ locked: true, dirty: false, owners: [{ id: 'task' }] })
-  expect(first.worktrees.find((item) => item.path === dirty)).toMatchObject({ dirty: true, changedFiles: ['changed\tfile.txt'] })
+  expect(first.worktrees.find((item) => item.path === clean)).toMatchObject({
+    locked: true,
+    dirty: false,
+    owners: [{ id: 'task' }],
+  })
+  expect(first.worktrees.find((item) => item.path === dirty)).toMatchObject({
+    dirty: true,
+    changedFiles: ['changed\tfile.txt'],
+  })
   expect(first.worktrees.find((item) => item.path === detachedGitPath)).toMatchObject({ branch: null, missing: true })
-  expect((await cleanup(service, 'project', first.worktrees.find((item) => item.main)!.observation)).error).toMatch(/main checkout/)
-  expect((await cleanup(service, 'project', first.worktrees.find((item) => item.path === clean)!.observation)).error).toMatch(/locked/)
+  expect((await cleanup(service, 'project', first.worktrees.find((item) => item.main)!.observation)).error).toMatch(
+    /main checkout/,
+  )
+  expect(
+    (await cleanup(service, 'project', first.worktrees.find((item) => item.path === clean)!.observation)).error,
+  ).toMatch(/locked/)
 })
 
 it('removes a clean unowned tree, and refuses ownership that appears after the read', async () => {
@@ -85,7 +128,15 @@ it('removes a clean unowned tree, and refuses ownership that appears after the r
   const dirtyId = original.worktrees.find((item) => item.path === dirty)!.observation
   expect((await cleanup(service, 'project', dirtyId)).ok).toBe(false)
   const cleanId = original.worktrees.find((item) => item.path === clean)!.observation
-  owners.push({ id: 'new', title: 'New owner', projectId: 'project', branch: 'clean', worktreePath: clean, skipSetup: false, pullNumber: null })
+  owners.push({
+    id: 'new',
+    title: 'New owner',
+    projectId: 'project',
+    branch: 'clean',
+    worktreePath: clean,
+    skipSetup: false,
+    pullNumber: null,
+  })
   expect((await cleanup(service, 'project', cleanId)).error).toMatch(/belongs to New owner/)
   expect((await cleanup(service, 'alias', cleanId)).error).toMatch(/belongs to New owner/)
   owners.pop()
@@ -101,7 +152,17 @@ it('blocks repository-wide prune while any missing registration belongs to a tas
   const { root, clean, dirty } = fixture()
   rmSync(clean, { recursive: true })
   rmSync(dirty, { recursive: true })
-  const owners: TaskRef[] = [{ id: 'owned', title: 'Missing owner', projectId: 'project', branch: 'dirty', worktreePath: dirty, skipSetup: false, pullNumber: null }]
+  const owners: TaskRef[] = [
+    {
+      id: 'owned',
+      title: 'Missing owner',
+      projectId: 'project',
+      branch: 'dirty',
+      worktreePath: dirty,
+      skipSetup: false,
+      pullNumber: null,
+    },
+  ]
   const service = core(root, owners)
   const before = await inventory(service, 'project')
   const cleanId = before.worktrees.find((entry) => entry.path === clean)?.observation
@@ -141,10 +202,16 @@ it('gates inventory and cleanup to paired devices and rejects arbitrary observat
   const { root, clean } = fixture()
   const service = core(root)
   const device = new Hono<AppEnv>()
-  device.use('*', async (c, next) => { c.set('principal', { kind: 'device', userId: 'person' }); await next() })
+  device.use('*', async (c, next) => {
+    c.set('principal', { kind: 'device', userId: 'person' })
+    await next()
+  })
   device.route('/api', worktreeRoutes(service))
   const task = new Hono<AppEnv>()
-  task.use('*', async (c, next) => { c.set('principal', { kind: 'internal', userId: 'person', scope: 'task', taskId: 'a' }); await next() })
+  task.use('*', async (c, next) => {
+    c.set('principal', { kind: 'internal', userId: 'person', scope: 'task', taskId: 'a' })
+    await next()
+  })
   task.route('/api', worktreeRoutes(service))
   const path = '/api/projects/project/worktrees'
   expect((await task.request(path)).status).toBe(403)

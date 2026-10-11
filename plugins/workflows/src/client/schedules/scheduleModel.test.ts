@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { cadenceForChoice, formatOccurrence, limitsSummary, nextScheduleOccurrences, scheduleStateLabel } from './scheduleModel'
+import {
+  cadenceForChoice,
+  formatOccurrence,
+  limitsSummary,
+  nextScheduleOccurrences,
+  scheduleStateLabel,
+} from './scheduleModel'
 
 describe('workflow schedule editor model', () => {
   it('shows three concrete timezone occurrences with their UTC offsets', () => {
@@ -17,7 +23,8 @@ describe('workflow schedule editor model', () => {
   it('keeps the UI vocabulary human-facing', () => {
     expect(scheduleStateLabel('needs-review')).toBe('Needs review')
     expect(cadenceForChoice('weekly')).toEqual({ weekly: { day: 1, at: '09:00' } })
-    expect(limitsSummary({ maxDescendants: 80, maxConcurrency: 3, budget: { maxWallTimeMs: 7_200_000 } }))
-      .toBe('Up to 80 tasks, 3 at a time, 120 minutes.')
+    expect(limitsSummary({ maxDescendants: 80, maxConcurrency: 3, budget: { maxWallTimeMs: 7_200_000 } })).toBe(
+      'Up to 80 tasks, 3 at a time, 120 minutes.',
+    )
   })
 })

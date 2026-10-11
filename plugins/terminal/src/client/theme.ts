@@ -49,4 +49,3 @@ export async function xtermTheme(dark: boolean): Promise<ITheme> {
 // Match the app's mono font (falls back to monospace before the token is available). Code surfaces
 // stay monospace in every style pack, so this reads --font-mono rather than --font-ui.
 export const monoFont = (): string => token('--font-mono') || 'monospace'
-

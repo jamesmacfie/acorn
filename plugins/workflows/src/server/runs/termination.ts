@@ -71,11 +71,7 @@ export class WorkflowRunTermination {
     await this.cancelLegacyChildTasks(steps)
   }
 
-  async safetyRail(
-    runId: string,
-    reason: string,
-    trigger?: { runId: string; stepId: string },
-  ): Promise<void> {
+  async safetyRail(runId: string, reason: string, trigger?: { runId: string; stepId: string }): Promise<void> {
     const run = await this.deps.run(runId)
     if (!run || TERMINAL_RUN.has(run.status)) return
     if (run.status !== 'cancelling') await this.deps.setRun(run.id, { status: 'cancelling', error: reason })
@@ -101,7 +97,9 @@ export class WorkflowRunTermination {
   }
 
   private dispatches(parentRunId: string) {
-    return this.db.select().from(schema.workflowDispatches)
+    return this.db
+      .select()
+      .from(schema.workflowDispatches)
       .where(eq(schema.workflowDispatches.parentRunId, parentRunId))
   }
 
@@ -110,11 +108,14 @@ export class WorkflowRunTermination {
     reason: string,
   ): Promise<void> {
     for (const dispatch of dispatches.filter((row) => row.state !== 'terminal')) {
-      await this.db.update(schema.workflowDispatches).set({
-        state: 'cancelling',
-        error: reason,
-        updatedAt: Date.now(),
-      }).where(eq(schema.workflowDispatches.id, dispatch.id))
+      await this.db
+        .update(schema.workflowDispatches)
+        .set({
+          state: 'cancelling',
+          error: reason,
+          updatedAt: Date.now(),
+        })
+        .where(eq(schema.workflowDispatches.id, dispatch.id))
     }
   }
 
@@ -125,19 +126,26 @@ export class WorkflowRunTermination {
   }
 
   private async terminalizeDispatch(dispatchId: string, reason: string): Promise<void> {
-    await this.db.update(schema.workflowDispatches).set({
-      state: 'terminal',
-      error: reason,
-      updatedAt: Date.now(),
-    }).where(eq(schema.workflowDispatches.id, dispatchId))
+    await this.db
+      .update(schema.workflowDispatches)
+      .set({
+        state: 'terminal',
+        error: reason,
+        updatedAt: Date.now(),
+      })
+      .where(eq(schema.workflowDispatches.id, dispatchId))
   }
 
   private async stopActiveWork(run: WorkflowRunRow): Promise<void> {
     this.deps.abortRun(run.id)
     const steps = await this.deps.steps(run.id)
-    await Promise.all(steps.flatMap((step) => step.agentSessionId && this.deps.cancelAgentSession
-      ? [this.deps.cancelAgentSession(run.taskId, step.agentSessionId).catch(() => undefined)]
-      : []))
+    await Promise.all(
+      steps.flatMap((step) =>
+        step.agentSessionId && this.deps.cancelAgentSession
+          ? [this.deps.cancelAgentSession(run.taskId, step.agentSessionId).catch(() => undefined)]
+          : [],
+      ),
+    )
   }
 
   private async cancelLegacyChildTasks(steps: WorkflowStepRow[]): Promise<void> {

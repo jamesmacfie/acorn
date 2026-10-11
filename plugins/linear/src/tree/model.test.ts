@@ -1,16 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
-import { canonicalIdentifier, failureReason, formatDate, linearIdentifierFromHref, relativeTime, taskLinearTargets } from './model'
+import {
+  canonicalIdentifier,
+  failureReason,
+  formatDate,
+  linearIdentifierFromHref,
+  relativeTime,
+  taskLinearTargets,
+} from './model'
 
-const task = (links: Task['links']): Task => ({ id: 't1', links } as Task)
+const task = (links: Task['links']): Task => ({ id: 't1', links }) as Task
 
 describe('linear frame helpers', () => {
   it('reads only this provider’s links off a task, in link order', () => {
-    expect(taskLinearTargets(task([
-      { providerId: 'rollbar', connectionId: 'rb', identifier: '142' },
-      { providerId: 'linear', connectionId: 'linear-b', identifier: 'ENG-2' },
-      { providerId: 'linear', connectionId: 'linear-a', identifier: 'ENG-1' },
-    ] as Task['links']))).toEqual([
+    expect(
+      taskLinearTargets(
+        task([
+          { providerId: 'rollbar', connectionId: 'rb', identifier: '142' },
+          { providerId: 'linear', connectionId: 'linear-b', identifier: 'ENG-2' },
+          { providerId: 'linear', connectionId: 'linear-a', identifier: 'ENG-1' },
+        ] as Task['links']),
+      ),
+    ).toEqual([
       { connectionId: 'linear-b', identifier: 'ENG-2' },
       { connectionId: 'linear-a', identifier: 'ENG-1' },
     ])
@@ -43,7 +54,9 @@ describe('linear frame helpers', () => {
 
   it('turns a route code into a sentence, and keeps prose a route wrote itself', () => {
     const coded = (code: string, message = code) => Object.assign(new Error(message), { code })
-    expect(failureReason(coded('provider_needs_auth'))).toBe("Linear turned down acorn's key. Reconnect Linear in Settings.")
+    expect(failureReason(coded('provider_needs_auth'))).toBe(
+      "Linear turned down acorn's key. Reconnect Linear in Settings.",
+    )
     expect(failureReason(coded('bad_request'))).toBe('Something went wrong. Try again.')
     expect(failureReason(new Error('The issue was archived.'))).toBe('The issue was archived.')
   })

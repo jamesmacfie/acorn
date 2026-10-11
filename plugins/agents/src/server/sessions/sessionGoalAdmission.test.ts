@@ -12,35 +12,61 @@ it('applies admission refusals and prompt changes to goal turns', async () => {
   const registry = new AgentDriverRegistry()
   registry.registerNative('fake', () => new FakeAgentDriver())
   let refuse = true
-  const hook = vi.fn(async (_point: string, payload: Record<string, unknown>) => refuse
-    ? { ok: false, by: 'instruction check', reason: 'Remove the hidden character.' }
-    : { ok: true, payload: { ...payload, text: 'Approved objective' } })
+  const hook = vi.fn(async (_point: string, payload: Record<string, unknown>) =>
+    refuse
+      ? { ok: false, by: 'instruction check', reason: 'Remove the hidden character.' }
+      : { ok: true, payload: { ...payload, text: 'Approved objective' } },
+  )
   const runtime = new ManagedAgentRuntime({
-    db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core, registry,
-    internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => null,
+    db: ctx.storage.open(),
+    dataDir: ctx.dataDir,
+    core: ctx.core,
+    registry,
+    internalEnv: () => ({}),
+    secrets: ctx.env.SECRETS,
+    currentUserId: () => null,
     hooks: { run: hook, handlers: async () => [] } as never,
   })
   try {
-    const session = await runtime.store.createSession({
-      taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {},
-    }, await new FakeAgentDriver().probe())
+    const session = await runtime.store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      await new FakeAgentDriver().probe(),
+    )
     await expect(runtime.setGoal(session.id, 'Finish the work')).rejects.toThrow('Remove the hidden character')
     expect((await runtime.store.snapshot(session.id)).turns).toEqual([])
     expect((await runtime.store.requireSession(session.id)).goal?.status).toBe('blocked')
     expect(hook).toHaveBeenCalledWith('before-send', {
-      sessionId: session.id, taskId: session.taskId, text: 'Finish the work',
+      sessionId: session.id,
+      taskId: session.taskId,
+      text: 'Finish the work',
     })
 
     refuse = false
     let finishAdmission!: () => void
     hook.mockImplementationOnce(async (_point, payload) => {
-      await new Promise<void>((resolve) => { finishAdmission = resolve })
+      await new Promise<void>((resolve) => {
+        finishAdmission = resolve
+      })
       return { ok: true, payload: { ...payload, text: String(payload.text) } }
     })
     const controller = new AbortController()
-    const cancelled = runtime.enqueueTurn(session.id, {
-      source: 'goal', input: [{ type: 'text', text: 'Continue' }], effectivePolicy: {}, idempotencyKey: randomUUID(),
-    }, {}, controller.signal)
+    const cancelled = runtime.enqueueTurn(
+      session.id,
+      {
+        source: 'goal',
+        input: [{ type: 'text', text: 'Continue' }],
+        effectivePolicy: {},
+        idempotencyKey: randomUUID(),
+      },
+      {},
+      controller.signal,
+    )
     const rejection = expect(cancelled).rejects.toThrow('Goal paused')
     await vi.waitFor(() => expect(finishAdmission).toBeTypeOf('function'))
     controller.abort(new Error('Goal paused'))
@@ -50,8 +76,11 @@ it('applies admission refusals and prompt changes to goal turns', async () => {
 
     await runtime.setGoal(session.id, 'Finish the work')
     expect((await runtime.store.snapshot(session.id)).turns).toEqual([
-      expect.objectContaining({ source: 'goal', input: [{ type: 'text', text: 'Approved objective' }],
-        effectivePolicy: expect.objectContaining({ attendance: 'attended' }) }),
+      expect.objectContaining({
+        source: 'goal',
+        input: [{ type: 'text', text: 'Approved objective' }],
+        effectivePolicy: expect.objectContaining({ attendance: 'attended' }),
+      }),
     ])
   } finally {
     await runtime.stop()

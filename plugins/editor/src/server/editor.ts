@@ -20,13 +20,13 @@ import { editorWorktreeChanged } from './worktreeInvalidation'
 const revisionOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex')
 
 async function diskRevision(path: string): Promise<string | null> {
-  try { return revisionOf(await readFile(path)) }
-  catch (error) {
+  try {
+    return revisionOf(await readFile(path))
+  } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw error
   }
 }
-
 
 // The Node runs git in the worktree for every status refresh, so a saved `.git/config` with an
 // `fsmonitor` setting would run a command as the person. A task token reaches this write, and a
@@ -47,7 +47,11 @@ export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs' | 'proc'>
 // Confine relPath to the task's worktree; throw the HTTP-classified error the route surfaces.
 // No worktree yet (unmapped repo) → 404; a path that escapes the root → 403 (never leaks whether
 // the outside target exists).
-async function confinedFile(core: EditorCoreServices, taskId: string, relPath: string): Promise<{ root: string; abs: string }> {
+async function confinedFile(
+  core: EditorCoreServices,
+  taskId: string,
+  relPath: string,
+): Promise<{ root: string; abs: string }> {
   const root = await core.tasks.root(taskId)
   if (!root) throw new BridgeError(404, 'no_worktree', 'No worktree for this task yet.')
   const abs = core.fs.resolveInRoot(root, relPath)
@@ -74,22 +78,35 @@ export const editorBridge = (
 ): EditorBridge => ({
   ...createFileActions(core, changed),
   root: (taskId) => core.tasks.root(taskId),
-  ignored: async (taskId, relPath, names) => (await import('./ignoredEntries')).ignoredEntries(core, taskId, relPath, names),
+  ignored: async (taskId, relPath, names) =>
+    (await import('./ignoredEntries')).ignoredEntries(core, taskId, relPath, names),
 
   list: async (taskId, relPath) => {
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return [] // no worktree / bad path → empty tree, never an error
     const ents = await readdir(abs, { withFileTypes: true })
-    const entries = await Promise.all(ents
-      .filter((e) => e.name !== '.git' && e.name !== 'node_modules')
-      .map(async (e): Promise<EditorEntry | null> => {
-        try {
-          const info = await lstat(join(abs, e.name))
-          return { name: e.name, dir: info.isDirectory(), kind: entryKind(info), identity: entryIdentity(info), entryId: stableEntryId(info), root }
-        } catch { return null } // a disappearing row is absent, not a stale target
-      }))
-    return entries.filter((entry): entry is EditorEntry => entry !== null)
+    const entries = await Promise.all(
+      ents
+        .filter((e) => e.name !== '.git' && e.name !== 'node_modules')
+        .map(async (e): Promise<EditorEntry | null> => {
+          try {
+            const info = await lstat(join(abs, e.name))
+            return {
+              name: e.name,
+              dir: info.isDirectory(),
+              kind: entryKind(info),
+              identity: entryIdentity(info),
+              entryId: stableEntryId(info),
+              root,
+            }
+          } catch {
+            return null
+          } // a disappearing row is absent, not a stale target
+        }),
+    )
+    return entries
+      .filter((entry): entry is EditorEntry => entry !== null)
       .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
   },
 
@@ -147,11 +164,12 @@ export const editorBridge = (
     return readMarkerProviders(markerProviders(), taskId, relPath, root)
   },
 
-  markerSnapshot: (taskId, relPath, revision) => markerSnapshot(
-    () => confinedFile(core, taskId, relPath),
-    revision,
-    (root) => readMarkerProviders(markerProviders(), taskId, relPath, root),
-  ),
+  markerSnapshot: (taskId, relPath, revision) =>
+    markerSnapshot(
+      () => confinedFile(core, taskId, relPath),
+      revision,
+      (root) => readMarkerProviders(markerProviders(), taskId, relPath, root),
+    ),
 
   fileStatus: async (taskId) => {
     const root = await core.tasks.root(taskId)
@@ -159,8 +177,9 @@ export const editorBridge = (
     const provider = fileStatusProviders()[0]
     if (!provider) return { kind: 'unavailable' }
     const result = await provider.read(taskId, { root })
-    return fileStatusProviders()[0] === provider && await core.tasks.root(taskId) === root
-      ? result : { kind: 'unavailable' }
+    return fileStatusProviders()[0] === provider && (await core.tasks.root(taskId)) === root
+      ? result
+      : { kind: 'unavailable' }
   },
 
   // The additive acknowledgement names the exact body written after hooks. Path and filesystem
@@ -169,56 +188,66 @@ export const editorBridge = (
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return { ok: false, kind: 'failure', reason: 'Path is outside the worktree.' }
-    if (await inGitMetadata(root, relPath, abs)) return { ok: false, kind: 'failure', reason: 'Git metadata cannot be changed.' }
+    if (await inGitMetadata(root, relPath, abs))
+      return { ok: false, kind: 'failure', reason: 'Git metadata cannot be changed.' }
     const key = await canonicalCheckoutKey(root).catch(() => null)
     if (!key) return { ok: false, kind: 'failure', reason: 'Cannot resolve the file path.' }
     return withFileWriteLock(key, async () => {
-    // Format on save, as somebody else's plugin (docs/plugins/hooks.md § Hooks). The autosave loop calls this
-    // on every pause, so the chain's timeout is what keeps a slow formatter from stalling typing; a
-    // handler that does not answer leaves the text as the person wrote it.
-    const verdict = await hooks?.run('before-save', { taskId, path: relPath, text: content })
-    if (verdict && !verdict.ok) return { ok: false as const, kind: 'failure' as const, reason: `${verdict.by}: ${verdict.reason}` }
-    try {
-      const text = verdict?.payload.text ?? content
-      // Reconfine after an asynchronous hook. The comparison is immediately before the write;
-      // arbitrary external writers can still race the check and replacement.
-      if (await core.tasks.root(taskId) !== root || core.fs.resolveInRoot(root, relPath) !== abs) {
-        return { ok: false as const, kind: 'failure' as const, reason: 'File path changed during save.' }
+      // Format on save, as somebody else's plugin (docs/plugins/hooks.md § Hooks). The autosave loop calls this
+      // on every pause, so the chain's timeout is what keeps a slow formatter from stalling typing; a
+      // handler that does not answer leaves the text as the person wrote it.
+      const verdict = await hooks?.run('before-save', { taskId, path: relPath, text: content })
+      if (verdict && !verdict.ok)
+        return { ok: false as const, kind: 'failure' as const, reason: `${verdict.by}: ${verdict.reason}` }
+      try {
+        const text = verdict?.payload.text ?? content
+        // Reconfine after an asynchronous hook. The comparison is immediately before the write;
+        // arbitrary external writers can still race the check and replacement.
+        if ((await core.tasks.root(taskId)) !== root || core.fs.resolveInRoot(root, relPath) !== abs) {
+          return { ok: false as const, kind: 'failure' as const, reason: 'File path changed during save.' }
+        }
+        const current = await diskRevision(abs)
+        if (current !== expectedRevision)
+          return {
+            ok: false as const,
+            kind: (current === null ? 'deleted' : 'conflict') as 'deleted' | 'conflict',
+            reason: current === null ? 'Deleted on disk.' : 'Changed on disk.',
+          }
+        if (expectedRevision === null) {
+          await writeFile(abs, text, { encoding: 'utf8', flag: 'wx' })
+        } else {
+          // `r+` refuses deletion after the revision check. Plain `writeFile` would recreate it.
+          const file = await open(abs, 'r+')
+          try {
+            await file.truncate(0)
+            await file.writeFile(text, 'utf8')
+          } finally {
+            await file.close()
+          }
+        }
+        // The coalesced `git status` for this worktree is now a lie, and `changed` below is what makes
+        // every client re-read it (@acorn/plugin-api/node § worktreeStatusText).
+        // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
+        // (docs/plugins/events.md § What is not an event). A save from another client used to move nothing on this one —
+        // its tree, its dirty markers and its git status all went stale until something else pinged
+        // (docs/plugins/events.md § Hearing a core event).
+        await editorWorktreeChanged(core, root, taskId, changed)
+        const revision = revisionOf(Buffer.from(text, 'utf8'))
+        const visible = await diskRevision(abs)
+        if (visible !== revision)
+          return {
+            ok: false as const,
+            kind: (visible === null ? 'deleted' : 'conflict') as 'deleted' | 'conflict',
+            reason: visible === null ? 'Deleted on disk.' : 'Changed on disk.',
+          }
+        return { ok: true as const, text, revision }
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'EEXIST')
+          return { ok: false as const, kind: 'conflict' as const, reason: 'Changed on disk.' }
+        if ((e as NodeJS.ErrnoException).code === 'ENOENT')
+          return { ok: false as const, kind: 'deleted' as const, reason: 'Deleted on disk.' }
+        return { ok: false as const, kind: 'failure' as const, reason: e instanceof Error ? e.message : String(e) }
       }
-      const current = await diskRevision(abs)
-      if (current !== expectedRevision) return {
-        ok: false as const,
-        kind: (current === null ? 'deleted' : 'conflict') as 'deleted' | 'conflict',
-        reason: current === null ? 'Deleted on disk.' : 'Changed on disk.',
-      }
-      if (expectedRevision === null) {
-        await writeFile(abs, text, { encoding: 'utf8', flag: 'wx' })
-      } else {
-        // `r+` refuses deletion after the revision check. Plain `writeFile` would recreate it.
-        const file = await open(abs, 'r+')
-        try { await file.truncate(0); await file.writeFile(text, 'utf8') }
-        finally { await file.close() }
-      }
-      // The coalesced `git status` for this worktree is now a lie, and `changed` below is what makes
-      // every client re-read it (@acorn/plugin-api/node § worktreeStatusText).
-      // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
-      // (docs/plugins/events.md § What is not an event). A save from another client used to move nothing on this one —
-      // its tree, its dirty markers and its git status all went stale until something else pinged
-      // (docs/plugins/events.md § Hearing a core event).
-      await editorWorktreeChanged(core, root, taskId, changed)
-      const revision = revisionOf(Buffer.from(text, 'utf8'))
-      const visible = await diskRevision(abs)
-      if (visible !== revision) return {
-        ok: false as const,
-        kind: (visible === null ? 'deleted' : 'conflict') as 'deleted' | 'conflict',
-        reason: visible === null ? 'Deleted on disk.' : 'Changed on disk.',
-      }
-      return { ok: true as const, text, revision }
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === 'EEXIST') return { ok: false as const, kind: 'conflict' as const, reason: 'Changed on disk.' }
-      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { ok: false as const, kind: 'deleted' as const, reason: 'Deleted on disk.' }
-      return { ok: false as const, kind: 'failure' as const, reason: e instanceof Error ? e.message : String(e) }
-    }
     })
   },
 })

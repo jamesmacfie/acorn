@@ -44,10 +44,23 @@ const assertOwnedCredential = (pluginId: string, providerId: string): void => {
 // `inputs` rides beside the connection: a derived source's handles, built by the source runtime for
 // this one request (../dataSources/inputs.ts). A derived source owns no provider, so its `providers`
 // runtime refuses every call, the same as any connectionless source.
-export type PluginConnectionScope = { providerId?: string; connectionId?: string; inputs?: Readonly<Record<string, DataSourceInputHandle>> }
-export function buildPluginRequestContext(env: Env, principal: Principal, pluginId: string, connectionScope?: PluginConnectionScope): PluginRequestContext {
+export type PluginConnectionScope = {
+  providerId?: string
+  connectionId?: string
+  inputs?: Readonly<Record<string, DataSourceInputHandle>>
+}
+export function buildPluginRequestContext(
+  env: Env,
+  principal: Principal,
+  pluginId: string,
+  connectionScope?: PluginConnectionScope,
+): PluginRequestContext {
   const assertConnectionScope = (providerId: string, connectionId?: string) => {
-    if (connectionScope && (connectionScope.providerId !== providerId || (connectionId !== undefined && connectionScope.connectionId !== connectionId))) {
+    if (
+      connectionScope &&
+      (connectionScope.providerId !== providerId ||
+        (connectionId !== undefined && connectionScope.connectionId !== connectionId))
+    ) {
       throw new Error('Provider request is outside the selected source connection')
     }
   }
@@ -79,8 +92,13 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
       assertConnectionScope(providerId)
       if (connectionScope) {
         const connection = await getConnection(getDb(env), principal.userId, connectionScope.connectionId!)
-        if (!connection || connection.provider !== providerId || ['disabled', 'needs-auth'].includes(connection.status)) return []
-        const value = await env.SECRETS.use(connection.encryptedCredentials, `${providerId}: source connection`, secret => visit(connection, secret))
+        if (!connection || connection.provider !== providerId || ['disabled', 'needs-auth'].includes(connection.status))
+          return []
+        const value = await env.SECRETS.use(
+          connection.encryptedCredentials,
+          `${providerId}: source connection`,
+          (secret) => visit(connection, secret),
+        )
         return value === undefined ? [] : [value]
       }
       return forEachConnection(getDb(env), principal.userId, providerId, env.SECRETS, visit)
@@ -92,12 +110,18 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
       // row the store can reach, not just about the argument.
       assertProviderAccess(principal)
       assertOwnedProvider(pluginId, providerId)
-      if (connectionScope) throw new Error('Source callbacks use connection-scoped resources instead of the cross-connection item store')
+      if (connectionScope)
+        throw new Error('Source callbacks use connection-scoped resources instead of the cross-connection item store')
       return createExternalItemStore(getDb(env), principal.userId, providerId)
     },
   }
 
-  return invocationOwned({ userId: principal.userId, principal, providers, ...(connectionScope?.inputs ? { inputs: connectionScope.inputs } : {}) })
+  return invocationOwned({
+    userId: principal.userId,
+    principal,
+    providers,
+    ...(connectionScope?.inputs ? { inputs: connectionScope.inputs } : {}),
+  })
 }
 
 export function pluginRequestContext(c: Context<AppEnv>, pluginId: string): PluginRequestContext {

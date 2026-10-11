@@ -26,8 +26,16 @@ vi.mock('@tanstack/solid-query', async () => {
   cache.set = (value) => setData(() => value)
   cache.get = data
   return {
-    createQuery: () => ({ get data() { return data() }, isPending: false }),
-    useQueryClient: () => ({ setQueryData: (_key: unknown, value: unknown) => cache.set(value), getQueryData: () => cache.get() }),
+    createQuery: () => ({
+      get data() {
+        return data()
+      },
+      isPending: false,
+    }),
+    useQueryClient: () => ({
+      setQueryData: (_key: unknown, value: unknown) => cache.set(value),
+      getQueryData: () => cache.get(),
+    }),
     reset: () => setData(blank()),
   }
 })
@@ -36,7 +44,7 @@ vi.mock('../usage/usageStore', () => ({
   agentUsageStore: { ensure: async () => {}, refresh: async () => {}, snapshot: () => null },
 }))
 
-const query = await import('@tanstack/solid-query') as unknown as { reset: () => void }
+const query = (await import('@tanstack/solid-query')) as unknown as { reset: () => void }
 const { default: AgentPricingSettings } = await import('./AgentPricingSettings')
 
 const hosts: Array<() => void> = []
@@ -45,7 +53,10 @@ const draw = () => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <AgentPricingSettings />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 
@@ -78,11 +89,20 @@ describe('the agent pricing settings page', () => {
   it('draws the built-in prices as kit rows, one head row per table', () => {
     const host = draw()
     const heads = host.querySelectorAll('thead th[scope="col"]')
-    expect([...heads].map((head) => head.textContent))
-      .toEqual([
-        'Model', 'Input', 'Output', 'Cache write', 'Cache read', '',
-        'Model', 'Input', 'Output', 'Cache write', 'Cache read', '',
-      ])
+    expect([...heads].map((head) => head.textContent)).toEqual([
+      'Model',
+      'Input',
+      'Output',
+      'Cache write',
+      'Cache read',
+      '',
+      'Model',
+      'Input',
+      'Output',
+      'Cache write',
+      'Cache read',
+      '',
+    ])
     // Every model gets a row header and one number field per price.
     const rows = bodyRows(host)
     expect(rows.length).toBeGreaterThan(0)

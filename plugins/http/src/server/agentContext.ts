@@ -65,7 +65,10 @@ export function redactUrl(url: string): string {
  * credential-bearing does not.
  */
 export const requestSnapshot = (request: HttpRequest): PluginAgentContextSnapshotBody => {
-  const headerNames = request.headers.filter((header) => header.enabled).map((header) => header.name).join(', ')
+  const headerNames = request.headers
+    .filter((header) => header.enabled)
+    .map((header) => header.name)
+    .join(', ')
   return {
     // Stable rather than time-stamped: the composer replaces a snapshot by contextId, so re-capturing
     // the same request should update it instead of attaching it twice. The host prefixes the plugin id.

@@ -12,11 +12,21 @@ import { LinearIssuePane } from './app'
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 const issue = (identifier: string) => ({
-  id: `id-${identifier}`, identifier, title: `Title of ${identifier}`, url: '', state: null, assignee: null,
-  description: null, comments: [], activity: [],
+  id: `id-${identifier}`,
+  identifier,
+  title: `Title of ${identifier}`,
+  url: '',
+  state: null,
+  assignee: null,
+  description: null,
+  comments: [],
+  activity: [],
 })
 
-function mount(get: (path: string) => Promise<unknown>, post: (path: string) => Promise<unknown> = () => Promise.resolve({})) {
+function mount(
+  get: (path: string) => Promise<unknown>,
+  post: (path: string) => Promise<unknown> = () => Promise.resolve({}),
+) {
   let select: (item: string) => void = () => {}
   const root = createRemoteRoot(() => {})
   const bridge = {
@@ -59,9 +69,13 @@ function mount(get: (path: string) => Promise<unknown>, post: (path: string) => 
 describe('LinearIssuePane', () => {
   it('clears the issue on screen while the next one loads', async () => {
     let release: (value: unknown) => void = () => {}
-    const pane = mount((path) => path.includes('ACO-2')
-      ? new Promise((resolve) => { release = resolve })
-      : Promise.resolve(issue('ACO-1')))
+    const pane = mount((path) =>
+      path.includes('ACO-2')
+        ? new Promise((resolve) => {
+            release = resolve
+          })
+        : Promise.resolve(issue('ACO-1')),
+    )
     await settle()
     expect(pane.heading()).toBe('Title of ACO-1')
 
@@ -80,7 +94,10 @@ describe('LinearIssuePane', () => {
     let posted: (value: unknown) => void = () => {}
     const pane = mount(
       (path) => Promise.resolve(issue(path.includes('ACO-2') ? 'ACO-2' : 'ACO-1')),
-      () => new Promise((resolve) => { posted = resolve }),
+      () =>
+        new Promise((resolve) => {
+          posted = resolve
+        }),
     )
     await settle()
     const composer = pane.nodes().find((node) => node.type === 'Composer')

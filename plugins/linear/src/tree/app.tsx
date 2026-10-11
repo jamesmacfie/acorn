@@ -148,10 +148,9 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
   // One batch read for every linked issue's title. A failure leaves the keys, which still work.
   const readTitles = async (targets: LinearRailTarget[]): Promise<void> => {
     try {
-      const resolved = await props.bridge.api.post<PluginRefResolutionBody[]>(
-        linearIssuesRoute,
-        { identifiers: targets.map((entry) => entry.identifier) } satisfies LinearIssuesRequest,
-      )
+      const resolved = await props.bridge.api.post<PluginRefResolutionBody[]>(linearIssuesRoute, {
+        identifiers: targets.map((entry) => entry.identifier),
+      } satisfies LinearIssuesRequest)
       setTitles(Object.fromEntries(resolved.map((entry) => [entry.identifier, entry.label])))
     } catch {
       // Keys only.
@@ -261,17 +260,35 @@ function PageStatus(props: { state: Page }) {
   const failure = () => (props.state.kind === 'error' ? props.state : undefined)
   const empty = () => (props.state.kind === 'empty' ? props.state : undefined)
   return (
-    <Show when={failure()} fallback={(
-      <Show when={empty()} fallback={<EmptyState busy align="start" size="sm">Loading issue…</EmptyState>}>
-        {(state) => <EmptyState title={state().title} />}
-      </Show>
-    )}
+    <Show
+      when={failure()}
+      fallback={
+        <Show
+          when={empty()}
+          fallback={
+            <EmptyState busy align="start" size="sm">
+              Loading issue…
+            </EmptyState>
+          }
+        >
+          {(state) => <EmptyState title={state().title} />}
+        </Show>
+      }
     >
       {(error) => (
         <EmptyState title={error().title}>
           {error().detail}
           {/* A child, not `action`: a tree's props are JSON, so an element-valued prop never arrives. */}
-          <Show when={error().retry}>{(retry) => <> <Button size="sm" variant="ghost" onPress={retry()}>Try again</Button></>}</Show>
+          <Show when={error().retry}>
+            {(retry) => (
+              <>
+                {' '}
+                <Button size="sm" variant="ghost" onPress={retry()}>
+                  Try again
+                </Button>
+              </>
+            )}
+          </Show>
         </EmptyState>
       )}
     </Show>

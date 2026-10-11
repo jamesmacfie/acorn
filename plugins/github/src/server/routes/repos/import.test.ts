@@ -8,8 +8,13 @@ import { repos } from '../../../node/schema'
 import { githubImport } from './import'
 
 const principal = { kind: 'device' as const, deviceId: 'device', userId: 'james' }
-const ref = (id: string, path: string | null = null, github: ProjectRef['github'] = null): ProjectRef =>
-  ({ id, name: id, path, workspaceId: 'default', github })
+const ref = (id: string, path: string | null = null, github: ProjectRef['github'] = null): ProjectRef => ({
+  id,
+  name: id,
+  path,
+  workspaceId: 'default',
+  github,
+})
 
 describe('GitHub project importer', () => {
   let plugin: TestPluginDb
@@ -22,9 +27,36 @@ describe('GitHub project importer', () => {
   beforeEach(async () => {
     plugin = makeTestPluginDb('github')
     await plugin.db.insert(repos).values([
-      { userId: 'james', id: 101, owner: 'acme', name: 'map-me', private: false, defaultBranch: 'main', pushedAt: null, fetchedAt: Date.now() },
-      { userId: 'james', id: 102, owner: 'acme', name: 'clone-me', private: false, defaultBranch: 'main', pushedAt: null, fetchedAt: Date.now() },
-      { userId: 'james', id: 103, owner: 'acme', name: 'placeholder-me', private: true, defaultBranch: 'trunk', pushedAt: null, fetchedAt: Date.now() },
+      {
+        userId: 'james',
+        id: 101,
+        owner: 'acme',
+        name: 'map-me',
+        private: false,
+        defaultBranch: 'main',
+        pushedAt: null,
+        fetchedAt: Date.now(),
+      },
+      {
+        userId: 'james',
+        id: 102,
+        owner: 'acme',
+        name: 'clone-me',
+        private: false,
+        defaultBranch: 'main',
+        pushedAt: null,
+        fetchedAt: Date.now(),
+      },
+      {
+        userId: 'james',
+        id: 103,
+        owner: 'acme',
+        name: 'placeholder-me',
+        private: true,
+        defaultBranch: 'trunk',
+        pushedAt: null,
+        fetchedAt: Date.now(),
+      },
     ])
     create.mockReset()
     update.mockReset()
@@ -41,16 +73,24 @@ describe('GitHub project importer', () => {
   afterEach(() => plugin.cleanup())
 
   const env = () => ({ ...testSecretEnv('0'.repeat(64)) }) as unknown as Env
-  const post = (body: unknown) => app.fetch(new Request('http://acorn.test/api/import', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-  }), env())
+  const post = (body: unknown) =>
+    app.fetch(
+      new Request('http://acorn.test/api/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+      env(),
+    )
 
   it('maps a folder through CoreServices with per-repository results', async () => {
     const response = await post({ repositories: [{ repoId: 101, action: 'map', path: '/checkouts/map-me' }] })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ results: [
-      { repoId: 101, owner: 'acme', name: 'map-me', action: 'map', ok: true, projectId: 'map-me-/checkouts/map-me' },
-    ] })
+    expect(await response.json()).toEqual({
+      results: [
+        { repoId: 101, owner: 'acme', name: 'map-me', action: 'map', ok: true, projectId: 'map-me-/checkouts/map-me' },
+      ],
+    })
     expect(create).toHaveBeenCalledWith({ name: 'map-me', path: '/checkouts/map-me' })
     expect(update).toHaveBeenCalledWith('map-me-/checkouts/map-me', { path: '/checkouts/map-me', githubRepoId: 101 })
   })
@@ -59,10 +99,10 @@ describe('GitHub project importer', () => {
     const response = await post({ repositories: [{ repoId: 102, action: 'clone', parentDir: '/checkouts' }] })
     expect(response.status).toBe(200)
     expect((await response.json()).results[0]).toMatchObject({ repoId: 102, action: 'clone', ok: true })
-    expect(gitOrThrow).toHaveBeenCalledWith(
-      ['clone', 'https://github.com/acme/clone-me.git', 'clone-me'],
-      { cwd: '/checkouts', env: { GIT_TERMINAL_PROMPT: '0' } },
-    )
+    expect(gitOrThrow).toHaveBeenCalledWith(['clone', 'https://github.com/acme/clone-me.git', 'clone-me'], {
+      cwd: '/checkouts',
+      env: { GIT_TERMINAL_PROMPT: '0' },
+    })
     expect(create).toHaveBeenCalledWith({ name: 'clone-me', path: '/checkouts/clone-me' })
     expect(update).toHaveBeenCalledWith(expect.any(String), { path: '/checkouts/clone-me', githubRepoId: 102 })
   })
@@ -87,10 +127,12 @@ describe('GitHub project importer', () => {
 
   it('fails a clone without prompting and continues returning a repository result', async () => {
     gitOrThrow.mockRejectedValueOnce(new Error('authentication required'))
-    const response = await post({ repositories: [
-      { repoId: 102, action: 'clone', parentDir: '/checkouts' },
-      { repoId: 101, action: 'map', path: '/checkouts/map-me' },
-    ] })
+    const response = await post({
+      repositories: [
+        { repoId: 102, action: 'clone', parentDir: '/checkouts' },
+        { repoId: 101, action: 'map', path: '/checkouts/map-me' },
+      ],
+    })
     const body = await response.json()
     expect(body.results).toEqual([
       { repoId: 102, owner: 'acme', name: 'clone-me', action: 'clone', ok: false, error: 'authentication required' },
@@ -104,7 +146,18 @@ describe('GitHub project importer', () => {
     expect((await post({ repositories: [{ repoId: 101, action: 'defer' }] })).status).toBe(400)
     const response = await post({ repositories: [{ repoId: 999, action: 'map', path: '/x' }] })
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ results: [{ repoId: 999, owner: '', name: '', action: 'map', ok: false, error: 'Repository is not available in the GitHub mirror.' }] })
+    expect(await response.json()).toEqual({
+      results: [
+        {
+          repoId: 999,
+          owner: '',
+          name: '',
+          action: 'map',
+          ok: false,
+          error: 'Repository is not available in the GitHub mirror.',
+        },
+      ],
+    })
   })
 
   it.each([
@@ -112,9 +165,23 @@ describe('GitHub project importer', () => {
     { kind: 'internal' as const, userId: 'james', scope: 'service' as const },
   ])('refuses $scope import authority before body parsing, mirror reads, or mutations', async (caller) => {
     const select = vi.spyOn(plugin.db, 'select')
-    const denied = new Hono<AppEnv>().use('/api/*', ...testGate(caller)).route('/api', githubImport(plugin.db, { projects: { create, update, byGithub }, git: { gitOrThrow } } as never))
-    for (const body of ['{malformed', JSON.stringify({ repositories: [{ repoId: 101, action: 'map', path: '/checkouts/map-me' }, { repoId: 102, action: 'clone', parentDir: '/checkouts' }] })]) {
-      const request = new Request('http://acorn.test/api/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+    const denied = new Hono<AppEnv>()
+      .use('/api/*', ...testGate(caller))
+      .route('/api', githubImport(plugin.db, { projects: { create, update, byGithub }, git: { gitOrThrow } } as never))
+    for (const body of [
+      '{malformed',
+      JSON.stringify({
+        repositories: [
+          { repoId: 101, action: 'map', path: '/checkouts/map-me' },
+          { repoId: 102, action: 'clone', parentDir: '/checkouts' },
+        ],
+      }),
+    ]) {
+      const request = new Request('http://acorn.test/api/import', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+      })
       const response = await denied.fetch(request, env())
       expect(response.status).toBe(403)
       expect((await response.json()).error.code).toBe('interactive_user_required')

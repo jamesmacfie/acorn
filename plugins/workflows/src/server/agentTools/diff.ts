@@ -13,15 +13,22 @@ export type WorkflowSemanticDiff = {
   steps: { added: string[]; removed: string[]; changed: { step: string; fields: string[] }[] }
 }
 
-const same = (left: unknown, right: unknown): boolean => workflowContentFingerprint(left ?? null) === workflowContentFingerprint(right ?? null)
+const same = (left: unknown, right: unknown): boolean =>
+  workflowContentFingerprint(left ?? null) === workflowContentFingerprint(right ?? null)
 
-function named<T>(before: readonly T[], after: readonly T[], key: (item: T) => string): { added: string[]; removed: string[]; pairs: [string, T, T][] } {
+function named<T>(
+  before: readonly T[],
+  after: readonly T[],
+  key: (item: T) => string,
+): { added: string[]; removed: string[]; pairs: [string, T, T][] } {
   const old = new Map(before.map((item) => [key(item), item]))
   const next = new Map(after.map((item) => [key(item), item]))
   return {
     added: [...next.keys()].filter((name) => !old.has(name)),
     removed: [...old.keys()].filter((name) => !next.has(name)),
-    pairs: [...next.entries()].flatMap(([name, item]) => old.has(name) ? [[name, old.get(name)!, item] as [string, T, T]] : []),
+    pairs: [...next.entries()].flatMap(([name, item]) =>
+      old.has(name) ? [[name, old.get(name)!, item] as [string, T, T]] : [],
+    ),
   }
 }
 
@@ -30,7 +37,11 @@ const changedFields = (before: object, after: object): string[] =>
     .filter((field) => !same((before as Record<string, unknown>)[field], (after as Record<string, unknown>)[field]))
     .sort()
 
-function namedChanges<T>(before: readonly T[] | undefined, after: readonly T[] | undefined, key: (item: T) => string): NamedChanges {
+function namedChanges<T>(
+  before: readonly T[] | undefined,
+  after: readonly T[] | undefined,
+  key: (item: T) => string,
+): NamedChanges {
   const { added, removed, pairs } = named(before ?? [], after ?? [], key)
   return { added, removed, changed: pairs.filter(([, left, right]) => !same(left, right)).map(([name]) => name) }
 }

@@ -27,15 +27,51 @@ type CommandConfig = { command?: unknown; timeoutMs?: unknown; allowFailure?: un
 type RunTargetConfig = { target?: unknown; waitForUrl?: unknown }
 
 const COMMAND_FIELDS: StepField[] = [
-  { id: 'command', label: 'Command', type: 'textarea', required: true, templates: true, placeholder: 'pnpm test', hint: 'Run with /bin/sh -c in the task’s checkout.' },
-  { id: 'timeoutMs', label: 'Timeout', type: 'number', min: MIN_COMMAND_TIMEOUT_MS, max: MAX_COMMAND_TIMEOUT_MS, hint: `Milliseconds. Defaults to ${COMMAND_TIMEOUT_MS}.` },
-  { id: 'allowFailure', label: 'Allow failure', type: 'boolean', hint: 'A non-zero exit becomes an answer the next step can read, not a failed run.' },
-  { id: 'env', label: 'Environment', type: 'textarea', hint: 'One KEY=value per line, added to the allowed environment. Never put a secret here: a workflow file is committed.' },
+  {
+    id: 'command',
+    label: 'Command',
+    type: 'textarea',
+    required: true,
+    templates: true,
+    placeholder: 'pnpm test',
+    hint: 'Run with /bin/sh -c in the task’s checkout.',
+  },
+  {
+    id: 'timeoutMs',
+    label: 'Timeout',
+    type: 'number',
+    min: MIN_COMMAND_TIMEOUT_MS,
+    max: MAX_COMMAND_TIMEOUT_MS,
+    hint: `Milliseconds. Defaults to ${COMMAND_TIMEOUT_MS}.`,
+  },
+  {
+    id: 'allowFailure',
+    label: 'Allow failure',
+    type: 'boolean',
+    hint: 'A non-zero exit becomes an answer the next step can read, not a failed run.',
+  },
+  {
+    id: 'env',
+    label: 'Environment',
+    type: 'textarea',
+    hint: 'One KEY=value per line, added to the allowed environment. Never put a secret here: a workflow file is committed.',
+  },
 ]
 
 const RUN_TARGET_FIELDS: StepField[] = [
-  { id: 'target', label: 'Run target', type: 'select', required: true, optionsRoute: '/v1/p/terminal/tasks/{taskId}/run-targets' },
-  { id: 'waitForUrl', label: 'Wait for a URL', type: 'boolean', hint: `On by default: the step finishes when the target reports a URL, or fails after ${RUN_TARGET_URL_TIMEOUT_MS / 1000} seconds.` },
+  {
+    id: 'target',
+    label: 'Run target',
+    type: 'select',
+    required: true,
+    optionsRoute: '/v1/p/terminal/tasks/{taskId}/run-targets',
+  },
+  {
+    id: 'waitForUrl',
+    label: 'Wait for a URL',
+    type: 'boolean',
+    hint: `On by default: the step finishes when the target reports a URL, or fails after ${RUN_TARGET_URL_TIMEOUT_MS / 1000} seconds.`,
+  },
 ]
 
 /** `KEY=value` per line. A line without an `=` is a mistake worth naming rather than dropping. */
@@ -62,11 +98,19 @@ const validateCommand: TerminalWorkflowStepKind['validate'] = (step, { label }) 
   if (typeof config.command !== 'string' || !config.command.trim()) errors.push(`${label} has no command`)
   if (config.timeoutMs !== undefined) {
     const timeout = config.timeoutMs
-    if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout < MIN_COMMAND_TIMEOUT_MS || timeout > MAX_COMMAND_TIMEOUT_MS) {
-      errors.push(`${label} timeout must be between ${MIN_COMMAND_TIMEOUT_MS} and ${MAX_COMMAND_TIMEOUT_MS} milliseconds`)
+    if (
+      typeof timeout !== 'number' ||
+      !Number.isFinite(timeout) ||
+      timeout < MIN_COMMAND_TIMEOUT_MS ||
+      timeout > MAX_COMMAND_TIMEOUT_MS
+    ) {
+      errors.push(
+        `${label} timeout must be between ${MIN_COMMAND_TIMEOUT_MS} and ${MAX_COMMAND_TIMEOUT_MS} milliseconds`,
+      )
     }
   }
-  if (config.allowFailure !== undefined && typeof config.allowFailure !== 'boolean') errors.push(`${label} allowFailure must be true or false`)
+  if (config.allowFailure !== undefined && typeof config.allowFailure !== 'boolean')
+    errors.push(`${label} allowFailure must be true or false`)
   if (config.env !== undefined) {
     if (typeof config.env !== 'string') errors.push(`${label} env must be KEY=value lines`)
     else for (const problem of parseEnvLines(config.env).problems) errors.push(`${label} env: ${problem}`)
@@ -80,7 +124,8 @@ const validateRunTarget: TerminalWorkflowStepKind['validate'] = (step, { label }
   // Which targets exist is a property of the task's checkout, so it is checked when the step runs and
   // not here: a definition is validated on a node that may not have the repository at all.
   if (typeof config.target !== 'string' || !config.target.trim()) errors.push(`${label} has no run target`)
-  if (config.waitForUrl !== undefined && typeof config.waitForUrl !== 'boolean') errors.push(`${label} waitForUrl must be true or false`)
+  if (config.waitForUrl !== undefined && typeof config.waitForUrl !== 'boolean')
+    errors.push(`${label} waitForUrl must be true or false`)
   return errors
 }
 
@@ -109,7 +154,15 @@ export function commandStep(core: Pick<CoreServices, 'tasks' | 'projects' | 'pro
       const env = buildSessionEnv({
         taskId: task.id,
         cwd,
-        task: project ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title } : null,
+        task: project
+          ? {
+              projectId: project.id,
+              projectName: project.name,
+              github: project.github,
+              branch: task.branch,
+              title: task.title,
+            }
+          : null,
         env: extra,
       })
       const timeoutMs = typeof config.timeoutMs === 'number' ? config.timeoutMs : COMMAND_TIMEOUT_MS
@@ -125,16 +178,27 @@ export function commandStep(core: Pick<CoreServices, 'tasks' | 'projects' | 'pro
         onStderr: (text) => ctx.emit({ at: Date.now(), event: { type: 'stderr', text } }),
       })
       const durationMs = Date.now() - started
-      const structured = { exitCode: result.code, stdout: result.stdout, stderr: result.stderr, truncated: result.truncated }
+      const structured = {
+        exitCode: result.code,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        truncated: result.truncated,
+      }
       const data = { result: { durationMs }, structured }
       if (result.aborted) return { status: 'cancelled', error: 'Step cancelled.' }
-      if (result.spawnError) return { status: 'failed', error: `The command could not start: ${result.spawnError}`, ...data }
-      if (result.timedOut) return { status: 'failed', error: `The command did not finish within ${timeoutMs}ms.`, ...data }
+      if (result.spawnError)
+        return { status: 'failed', error: `The command could not start: ${result.spawnError}`, ...data }
+      if (result.timedOut)
+        return { status: 'failed', error: `The command did not finish within ${timeoutMs}ms.`, ...data }
       // A non-zero exit is a failure unless the step says otherwise. When it says otherwise it becomes
       // an answer, and a later `decide` can branch on the code.
       if (result.code !== 0 && config.allowFailure !== true) {
         const tail = result.stderr.trim().slice(-ERROR_TAIL) || result.stdout.trim().slice(-ERROR_TAIL)
-        return { status: 'failed', error: `The command exited ${result.code ?? result.signal}${tail ? `: ${tail}` : '.'}`, ...data }
+        return {
+          status: 'failed',
+          error: `The command exited ${result.code ?? result.signal}${tail ? `: ${tail}` : '.'}`,
+          ...data,
+        }
       }
       return { status: 'done', ...data, handoff: result.stdout.trim() || undefined }
     },
@@ -166,10 +230,18 @@ export function runTargetStep(runtime: Pick<TerminalRunTargets, 'start' | 'statu
       for (;;) {
         if (ctx.signal.aborted) return { status: 'cancelled', error: 'Step cancelled.' }
         const status = await runtime.status(ctx.run.taskId, targetId)
-        if (status.url) return { status: 'done', structured: { targetId, sessionId, url: status.url }, handoff: status.url }
-        if (!status.running) return { status: 'failed', error: `Run target '${targetId}' stopped with exit code ${status.exitCode ?? 'unknown'}.` }
+        if (status.url)
+          return { status: 'done', structured: { targetId, sessionId, url: status.url }, handoff: status.url }
+        if (!status.running)
+          return {
+            status: 'failed',
+            error: `Run target '${targetId}' stopped with exit code ${status.exitCode ?? 'unknown'}.`,
+          }
         if (Date.now() >= deadline) {
-          return { status: 'failed', error: `Run target '${targetId}' did not report a URL within ${RUN_TARGET_URL_TIMEOUT_MS / 1000} seconds.` }
+          return {
+            status: 'failed',
+            error: `Run target '${targetId}' did not report a URL within ${RUN_TARGET_URL_TIMEOUT_MS / 1000} seconds.`,
+          }
         }
         await new Promise((resolve) => setTimeout(resolve, URL_POLL_MS))
       }

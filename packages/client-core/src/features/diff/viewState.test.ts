@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  diffCollapsed,
-  diffScroll,
-  evictDiffViewStates,
-  rememberDiffCollapsed,
-  rememberDiffScroll,
-} from './viewState'
+import { diffCollapsed, diffScroll, evictDiffViewStates, rememberDiffCollapsed, rememberDiffScroll } from './viewState'
 
 /** A place in the fixed rows of one segment, `fixed` pixels in. */
 const row = (fixed: number) => ({ at: 'row' as const, key: 's:src/a.ts:0', path: 'src/a.ts', index: 1, fixed })

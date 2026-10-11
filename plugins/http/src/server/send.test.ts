@@ -10,7 +10,15 @@ import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices } from '@acorn/plugin-api/testkit'
 import type { HttpSendInput } from '../shared/model'
 import { httpVariables } from '../node/schema'
-import { SendError, buildRequest, describeFetchFailure, referencedVariableNames, resolveVars, send, type SendCoreServices } from './send'
+import {
+  SendError,
+  buildRequest,
+  describeFetchFailure,
+  referencedVariableNames,
+  resolveVars,
+  send,
+  type SendCoreServices,
+} from './send'
 import { readCapped } from './responseBody'
 import { protectHttpValue } from './storage'
 import { SecretService } from '@acorn/plugin-api/testkit'
@@ -36,13 +44,23 @@ const SECRETS = new SecretService(ENC_KEY)
 // Two databases: `http_variables` lives in this plugin's own file, and the task and checkout fixtures
 // the command-variable tests need live in core's. The plugin reads the second only through
 // CoreServices, so the test builds the real thing rather than stubbing the seam it exercises.
-type Fixture = { core: SendCoreServices; db: ReturnType<typeof makeTestPluginDb>['db']; coreDb: ReturnType<typeof makeTestDb>['db']; cleanup: () => void }
+type Fixture = {
+  core: SendCoreServices
+  db: ReturnType<typeof makeTestPluginDb>['db']
+  coreDb: ReturnType<typeof makeTestDb>['db']
+  cleanup: () => void
+}
 
 function fixture(): Fixture {
   const coreDb = makeTestDb()
   const pluginDb = makeTestPluginDb('http')
   return {
-    core: createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
+    core: createCoreServices({
+      secrets: SECRETS,
+      db: coreDb.db,
+      activeIdentity: memoryIdentityStore(),
+      ...testCoreSeams(),
+    }),
     db: pluginDb.db,
     coreDb: coreDb.db,
     cleanup: () => {
@@ -80,7 +98,10 @@ describe('buildRequest — interpolation', () => {
   })
 
   it('fills header names and values', () => {
-    const { headers } = buildRequest(input({ headers: [{ name: 'X-{{H}}', value: '{{V}}', enabled: true }] }), { H: 'Trace', V: 'abc' })
+    const { headers } = buildRequest(input({ headers: [{ name: 'X-{{H}}', value: '{{V}}', enabled: true }] }), {
+      H: 'Trace',
+      V: 'abc',
+    })
     expect(headers.get('x-trace')).toBe('abc')
   })
 
@@ -115,16 +136,18 @@ describe('buildRequest — interpolation', () => {
 
 describe('referencedVariableNames', () => {
   it('finds placeholders in active request fields only', () => {
-    const names = referencedVariableNames(input({
-      url: '{{URL}}',
-      headers: [
-        { name: 'X-{{HEADER_NAME}}', value: '{{HEADER_VALUE}}', enabled: true },
-        { name: 'Ignored', value: '{{DISABLED}}', enabled: false },
-      ],
-      bodyMode: 'json',
-      body: '{"id":"{{BODY}}"}',
-      auth: { mode: 'bearer', token: '{{TOKEN}}' },
-    }))
+    const names = referencedVariableNames(
+      input({
+        url: '{{URL}}',
+        headers: [
+          { name: 'X-{{HEADER_NAME}}', value: '{{HEADER_VALUE}}', enabled: true },
+          { name: 'Ignored', value: '{{DISABLED}}', enabled: false },
+        ],
+        bodyMode: 'json',
+        body: '{"id":"{{BODY}}"}',
+        auth: { mode: 'bearer', token: '{{TOKEN}}' },
+      }),
+    )
 
     expect([...names].sort()).toEqual(['BODY', 'HEADER_NAME', 'HEADER_VALUE', 'TOKEN', 'URL'])
   })
@@ -132,13 +155,26 @@ describe('referencedVariableNames', () => {
 
 describe('buildRequest — content type', () => {
   it('defaults by body mode', () => {
-    expect(buildRequest(input({ bodyMode: 'json', body: '{}' }), {}).headers.get('content-type')).toBe('application/json')
+    expect(buildRequest(input({ bodyMode: 'json', body: '{}' }), {}).headers.get('content-type')).toBe(
+      'application/json',
+    )
     expect(buildRequest(input({ bodyMode: 'text', body: 'hi' }), {}).headers.get('content-type')).toBe('text/plain')
-    expect(buildRequest(input({ bodyMode: 'form', body: '[{"name":"a","value":"1","enabled":true}]' }), {}).headers.get('content-type')).toBe('application/x-www-form-urlencoded')
+    expect(
+      buildRequest(input({ bodyMode: 'form', body: '[{"name":"a","value":"1","enabled":true}]' }), {}).headers.get(
+        'content-type',
+      ),
+    ).toBe('application/x-www-form-urlencoded')
   })
 
   it('never overrides an explicit Content-Type', () => {
-    const { headers } = buildRequest(input({ bodyMode: 'json', body: '{}', headers: [{ name: 'Content-Type', value: 'application/vnd.api+json', enabled: true }] }), {})
+    const { headers } = buildRequest(
+      input({
+        bodyMode: 'json',
+        body: '{}',
+        headers: [{ name: 'Content-Type', value: 'application/vnd.api+json', enabled: true }],
+      }),
+      {},
+    )
     expect(headers.get('content-type')).toBe('application/vnd.api+json')
   })
 
@@ -150,13 +186,19 @@ describe('buildRequest — content type', () => {
 
 describe('buildRequest — api key placement', () => {
   it('adds a header key as a header', () => {
-    const { target, headers } = buildRequest(input({ auth: { mode: 'apikey', key: 'X-Key', value: 'k', placement: 'header' } }), {})
+    const { target, headers } = buildRequest(
+      input({ auth: { mode: 'apikey', key: 'X-Key', value: 'k', placement: 'header' } }),
+      {},
+    )
     expect(headers.get('x-key')).toBe('k')
     expect(target.search).toBe('')
   })
 
   it('merges a query key into the URL alongside existing params', () => {
-    const { target, headers } = buildRequest(input({ url: 'http://x/y?a=1', auth: { mode: 'apikey', key: 'k', value: 'v', placement: 'query' } }), {})
+    const { target, headers } = buildRequest(
+      input({ url: 'http://x/y?a=1', auth: { mode: 'apikey', key: 'k', value: 'v', placement: 'query' } }),
+      {},
+    )
     expect(target.searchParams.get('a')).toBe('1')
     expect(target.searchParams.get('k')).toBe('v')
     expect(headers.has('k')).toBe(false)
@@ -210,74 +252,111 @@ describe('resolveVars — command execution context', () => {
   // Spawns a real subprocess through a bash login shell in a temp git worktree, so it is sensitive to
   // machine load: under load the profile-sourcing shell can exceed send.ts's 15s command timeout.
   // Retry rather than loosening a production timeout to suit CI.
-  it('runs a command in the explicit task worktree and uses its last non-empty output line', { timeout: 30_000, retry: 2 }, async () => {
-    fx = fixture()
-    root = mkdtempSync(join(tmpdir(), 'acorn-http-command-'))
-    const worktree = join(root, 'worktree')
-    const base = join(root, 'base')
-    // A real checkout and a real `git worktree add`, not two bare directories. resolveTaskCwd
-    // verifies a persisted worktree path before handing it back, and its check reads the `gitdir:`
-    // pointer file, so a plain mkdir fails verification and the task falls back to the checkout.
-    const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'ignore' })
-    execFileSync('git', ['init', '-q', '-b', 'main', base], { stdio: 'ignore' })
-    git(base, 'config', 'user.email', 't@t.test')
-    git(base, 'config', 'user.name', 'T')
-    writeFileSync(join(base, 'a.txt'), 'a')
-    git(base, 'add', '.')
-    git(base, 'commit', '-q', '-m', 'init')
-    git(base, 'worktree', 'add', '-q', '-b', 'feature/api-url', worktree)
-    await fx.coreDb.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
-    await fx.coreDb.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: base, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-      createdAt: 0, updatedAt: 0,
-    })
-    await fx.coreDb.insert(schema.projects).values({
-      id: 'project-other', name: 'other', path: null, workspaceId: 'workspace-1', sort: 1, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'other', githubRepoId: null,
-      createdAt: 0, updatedAt: 0,
-    })
-    await fx.coreDb.insert(schema.tasks).values({
-      id: 'task-1',
-      title: 'API task',
-      origin: 'local',
-      projectId: 'project-widget',
-      branch: 'feature/api-url',
-      worktreePath: worktree,
-      pullNumber: null,
-      status: 'active',
-      parentId: null,
-      sort: 0,
-      createdAt: 0,
-      updatedAt: 0,
-      archivedAt: null,
-    })
-    await fx.db.insert(httpVariables).values({
-      id: 'var-1',
-      userId: USER,
-      projectId: 'project-widget',
-      name: 'BASE_URL',
-      kind: 'command',
-      value: await protectHttpValue(`printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`, SECRETS),
-      encrypted: true,
-      enabled: true,
-      createdAt: 0,
-      updatedAt: 0,
-    })
+  it(
+    'runs a command in the explicit task worktree and uses its last non-empty output line',
+    { timeout: 30_000, retry: 2 },
+    async () => {
+      fx = fixture()
+      root = mkdtempSync(join(tmpdir(), 'acorn-http-command-'))
+      const worktree = join(root, 'worktree')
+      const base = join(root, 'base')
+      // A real checkout and a real `git worktree add`, not two bare directories. resolveTaskCwd
+      // verifies a persisted worktree path before handing it back, and its check reads the `gitdir:`
+      // pointer file, so a plain mkdir fails verification and the task falls back to the checkout.
+      const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { stdio: 'ignore' })
+      execFileSync('git', ['init', '-q', '-b', 'main', base], { stdio: 'ignore' })
+      git(base, 'config', 'user.email', 't@t.test')
+      git(base, 'config', 'user.name', 'T')
+      writeFileSync(join(base, 'a.txt'), 'a')
+      git(base, 'add', '.')
+      git(base, 'commit', '-q', '-m', 'init')
+      git(base, 'worktree', 'add', '-q', '-b', 'feature/api-url', worktree)
+      await fx.coreDb
+        .insert(schema.workspaces)
+        .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
+      await fx.coreDb.insert(schema.projects).values({
+        id: 'project-widget',
+        name: 'widget',
+        path: base,
+        workspaceId: 'workspace-1',
+        sort: 0,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: null,
+        githubOwner: 'acme',
+        githubName: 'widget',
+        githubRepoId: null,
+        createdAt: 0,
+        updatedAt: 0,
+      })
+      await fx.coreDb.insert(schema.projects).values({
+        id: 'project-other',
+        name: 'other',
+        path: null,
+        workspaceId: 'workspace-1',
+        sort: 1,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: null,
+        githubOwner: 'acme',
+        githubName: 'other',
+        githubRepoId: null,
+        createdAt: 0,
+        updatedAt: 0,
+      })
+      await fx.coreDb.insert(schema.tasks).values({
+        id: 'task-1',
+        title: 'API task',
+        origin: 'local',
+        projectId: 'project-widget',
+        branch: 'feature/api-url',
+        worktreePath: worktree,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        createdAt: 0,
+        updatedAt: 0,
+        archivedAt: null,
+      })
+      await fx.db.insert(httpVariables).values({
+        id: 'var-1',
+        userId: USER,
+        projectId: 'project-widget',
+        name: 'BASE_URL',
+        kind: 'command',
+        value: await protectHttpValue(
+          `printf 'shell startup noise\\n%s|%s|%s\\n' "$PWD" "$ACORN_TASK_ID" "$ACORN_BRANCH"`,
+          SECRETS,
+        ),
+        encrypted: true,
+        enabled: true,
+        createdAt: 0,
+        updatedAt: 0,
+      })
 
-    const runProcess = vi.spyOn(fx.core.proc, 'runProcess')
-    const vars = await resolveVars(fx.db, fx.core, USER, 'project-widget', input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }))
+      const runProcess = vi.spyOn(fx.core.proc, 'runProcess')
+      const vars = await resolveVars(
+        fx.db,
+        fx.core,
+        USER,
+        'project-widget',
+        input({ url: '{{BASE_URL}}/health', executionTaskId: 'task-1' }),
+      )
 
-    const commandCalls = runProcess.mock.calls.filter(([request]) => request.file === 'bash')
-    expect(commandCalls).toHaveLength(1)
-    expect(commandCalls[0]?.[0]).toEqual(expect.objectContaining({ file: 'bash', cwd: worktree, timeoutMs: 15_000 }))
-    const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
-    expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
-    expect(taskId).toBe('task-1')
-    expect(branch).toBe('feature/api-url')
-    expect(realpathSync(vars.worktree)).toBe(realpathSync(worktree))
-    expect(vars.branch).toBe('feature/api-url')
-  })
+      const commandCalls = runProcess.mock.calls.filter(([request]) => request.file === 'bash')
+      expect(commandCalls).toHaveLength(1)
+      expect(commandCalls[0]?.[0]).toEqual(expect.objectContaining({ file: 'bash', cwd: worktree, timeoutMs: 15_000 }))
+      const [commandCwd, taskId, branch] = vars.BASE_URL.split('|')
+      expect(realpathSync(commandCwd)).toBe(realpathSync(worktree))
+      expect(taskId).toBe('task-1')
+      expect(branch).toBe('feature/api-url')
+      expect(realpathSync(vars.worktree)).toBe(realpathSync(worktree))
+      expect(vars.branch).toBe('feature/api-url')
+    },
+  )
 
   it('rejects an execution task from another project', async () => {
     fx = fixture()
@@ -297,9 +376,9 @@ describe('resolveVars — command execution context', () => {
       archivedAt: null,
     })
 
-    await expect(resolveVars(fx.db, fx.core, USER, 'project-widget', input({ executionTaskId: 'task-2' }))).rejects.toThrow(
-      'The selected task belongs to project-other, not this project',
-    )
+    await expect(
+      resolveVars(fx.db, fx.core, USER, 'project-widget', input({ executionTaskId: 'task-2' })),
+    ).rejects.toThrow('The selected task belongs to project-other, not this project')
   })
 
   it('does not run an unused or request-overridden command variable', async () => {
@@ -319,7 +398,13 @@ describe('resolveVars — command execution context', () => {
 
     await expect(resolveVars(fx.db, fx.core, USER, 'project-widget', input())).resolves.not.toHaveProperty('BASE_URL')
     await expect(
-      resolveVars(fx.db, fx.core, USER, 'project-widget', input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } })),
+      resolveVars(
+        fx.db,
+        fx.core,
+        USER,
+        'project-widget',
+        input({ url: '{{BASE_URL}}/health', vars: { BASE_URL: 'http://override.test' } }),
+      ),
     ).resolves.toMatchObject({ BASE_URL: 'http://override.test' })
   })
 })
@@ -337,12 +422,29 @@ describe('send — transport outcomes', () => {
   it.each([
     { url: 'not a URL {{TOKEN}}/{{TOKEN}}', message: 'Not a valid URL.' },
     { url: '{{TOKEN}}:opaque', message: 'Only http and https URLs are supported.' },
-    { headers: [{ name: 'X-Token', value: '{{TOKEN}}\n{{TOKEN}}', enabled: true }], message: 'Request headers are invalid.' },
-    { headers: [{ name: '{{TOKEN}} invalid', value: 'value', enabled: true }], message: 'Request headers are invalid.' },
+    {
+      headers: [{ name: 'X-Token', value: '{{TOKEN}}\n{{TOKEN}}', enabled: true }],
+      message: 'Request headers are invalid.',
+    },
+    {
+      headers: [{ name: '{{TOKEN}} invalid', value: 'value', enabled: true }],
+      message: 'Request headers are invalid.',
+    },
   ])('returns safe preparation errors before fetch: $message', async ({ message, ...patch }) => {
     fx = fixture()
     const secret = 'SyntheticPrivateValue'
-    await fx.db.insert(httpVariables).values({ id: 'private', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'secret', value: await protectHttpValue(secret, SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
+    await fx.db.insert(httpVariables).values({
+      id: 'private',
+      userId: USER,
+      projectId: 'project-widget',
+      name: 'TOKEN',
+      kind: 'secret',
+      value: await protectHttpValue(secret, SECRETS),
+      encrypted: true,
+      enabled: true,
+      createdAt: 1,
+      updatedAt: 1,
+    })
     const fetcher = vi.fn()
     vi.stubGlobal('fetch', fetcher)
     const attempt = send(fx.db, fx.core, USER, 'project-widget', input(patch))
@@ -355,12 +457,33 @@ describe('send — transport outcomes', () => {
 
   it('redacts URLSearchParams encodings and simulated transport diagnostics while sending the real value', async () => {
     fx = fixture()
-    const secret = "synthetic private value!~"
+    const secret = 'synthetic private value!~'
     const encoded = new URLSearchParams({ value: secret }).toString().slice(6)
-    await fx.db.insert(httpVariables).values({ id: 'private', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'secret', value: await protectHttpValue(secret, SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
-    const fetcher = vi.fn().mockRejectedValue(Object.assign(new Error(`failure ${secret} ${encodeURIComponent(secret)} ${encoded}`), { code: encoded }))
+    await fx.db.insert(httpVariables).values({
+      id: 'private',
+      userId: USER,
+      projectId: 'project-widget',
+      name: 'TOKEN',
+      kind: 'secret',
+      value: await protectHttpValue(secret, SECRETS),
+      encrypted: true,
+      enabled: true,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    const fetcher = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error(`failure ${secret} ${encodeURIComponent(secret)} ${encoded}`), { code: encoded }),
+      )
     vi.stubGlobal('fetch', fetcher)
-    const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'https://api.test/?token={{TOKEN}}' }))
+    const result = await send(
+      fx.db,
+      fx.core,
+      USER,
+      'project-widget',
+      input({ url: 'https://api.test/?token={{TOKEN}}' }),
+    )
     expect(String(fetcher.mock.calls[0]?.[0])).toContain(encodeURIComponent(secret))
     expect(result.ok).toBe(false)
     for (const form of [secret, encodeURIComponent(secret), encoded]) expect(JSON.stringify(result)).not.toContain(form)
@@ -369,26 +492,87 @@ describe('send — transport outcomes', () => {
   it('redacts lowercase URL hosts and header names compiled from private variables', async () => {
     fx = fixture()
     const secret = 'SyntheticPrivateValue'
-    await fx.db.insert(httpVariables).values({ id: 'private', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'secret', value: await protectHttpValue(secret, SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
+    await fx.db.insert(httpVariables).values({
+      id: 'private',
+      userId: USER,
+      projectId: 'project-widget',
+      name: 'TOKEN',
+      kind: 'secret',
+      value: await protectHttpValue(secret, SECRETS),
+      encrypted: true,
+      enabled: true,
+      createdAt: 1,
+      updatedAt: 1,
+    })
     const fetcher = vi.fn().mockResolvedValue(new Response('ok'))
     vi.stubGlobal('fetch', fetcher)
-    const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'https://{{TOKEN}}.test/', headers: [{ name: 'X-{{TOKEN}}', value: 'normal', enabled: true }] }))
+    const result = await send(
+      fx.db,
+      fx.core,
+      USER,
+      'project-widget',
+      input({ url: 'https://{{TOKEN}}.test/', headers: [{ name: 'X-{{TOKEN}}', value: 'normal', enabled: true }] }),
+    )
     expect(String(fetcher.mock.calls[0]?.[0])).toContain(secret.toLowerCase())
     expect(JSON.stringify(result)).not.toContain(secret.toLowerCase())
   })
 
   it.each(['exit', 'spawn', 'throw'])('withholds private command diagnostics on %s failures', async (mode) => {
     fx = fixture()
-    await fx.coreDb.insert(schema.workspaces).values({ id: 'workspace', name: 'Fixture', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
-    await fx.coreDb.insert(schema.projects).values({ id: 'project-widget', name: 'Fixture', path: tmpdir(), workspaceId: 'workspace', sort: 0, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null, createdAt: 0, updatedAt: 0 })
+    await fx.coreDb
+      .insert(schema.workspaces)
+      .values({ id: 'workspace', name: 'Fixture', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
+    await fx.coreDb.insert(schema.projects).values({
+      id: 'project-widget',
+      name: 'Fixture',
+      path: tmpdir(),
+      workspaceId: 'workspace',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: 0,
+      updatedAt: 0,
+    })
     const privateDiagnostic = 'SyntheticPrivateCommandDiagnostic'
-    await fx.db.insert(httpVariables).values({ id: 'command', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'command', value: await protectHttpValue('synthetic-command', SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
+    await fx.db.insert(httpVariables).values({
+      id: 'command',
+      userId: USER,
+      projectId: 'project-widget',
+      name: 'TOKEN',
+      kind: 'command',
+      value: await protectHttpValue('synthetic-command', SECRETS),
+      encrypted: true,
+      enabled: true,
+      createdAt: 1,
+      updatedAt: 1,
+    })
     const process = vi.spyOn(fx.core.proc, 'runProcess')
     if (mode === 'throw') process.mockRejectedValue(new Error(privateDiagnostic))
-    else process.mockResolvedValue({ code: 1, signal: null, stdout: '', stderr: privateDiagnostic, timedOut: false, aborted: false, truncated: false, spawnError: mode === 'spawn' ? privateDiagnostic : null })
+    else
+      process.mockResolvedValue({
+        code: 1,
+        signal: null,
+        stdout: '',
+        stderr: privateDiagnostic,
+        timedOut: false,
+        aborted: false,
+        truncated: false,
+        spawnError: mode === 'spawn' ? privateDiagnostic : null,
+      })
     const fetcher = vi.fn()
     vi.stubGlobal('fetch', fetcher)
-    const error = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'https://api.test/?token={{TOKEN}}' })).catch((error: Error) => error)
+    const error = await send(
+      fx.db,
+      fx.core,
+      USER,
+      'project-widget',
+      input({ url: 'https://api.test/?token={{TOKEN}}' }),
+    ).catch((error: Error) => error)
     expect(error).toBeInstanceOf(SendError)
     expect((error as Error).message).toContain('Variable "TOKEN": command')
     expect(JSON.stringify(error, ['message', 'stack', 'cause'])).not.toContain(privateDiagnostic)
@@ -397,10 +581,14 @@ describe('send — transport outcomes', () => {
 
   it('keeps the system error behind Node’s generic fetch failure', async () => {
     const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:4321'), { code: 'ECONNREFUSED' })
-    const failure = describeFetchFailure(new TypeError('fetch failed', { cause }), new URL('http://127.0.0.1:4321/health'))
+    const failure = describeFetchFailure(
+      new TypeError('fetch failed', { cause }),
+      new URL('http://127.0.0.1:4321/health'),
+    )
 
     expect(failure).toEqual({
-      error: 'Connection refused by 127.0.0.1:4321. The server may not be running or may be listening on a different port.',
+      error:
+        'Connection refused by 127.0.0.1:4321. The server may not be running or may be listening on a different port.',
       code: 'ECONNREFUSED',
       detail: 'connect ECONNREFUSED 127.0.0.1:4321',
     })
@@ -419,28 +607,40 @@ describe('send — transport outcomes', () => {
       url: 'http://missing.test/health',
       error: 'Could not find missing.test. Check the host name or DNS.',
     })
-    expect(result.timeline).toEqual(expect.arrayContaining([
-      { label: 'Request', detail: 'GET http://missing.test/health', group: 'sent' },
-      expect.objectContaining({ label: 'Error', detail: expect.stringContaining('ENOTFOUND') }),
-    ]))
+    expect(result.timeline).toEqual(
+      expect.arrayContaining([
+        { label: 'Request', detail: 'GET http://missing.test/health', group: 'sent' },
+        expect.objectContaining({ label: 'Error', detail: expect.stringContaining('ENOTFOUND') }),
+      ]),
+    )
   })
 
   it('labels each received header by its name, after the status', async () => {
     fx = fixture()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('ok', { status: 200, statusText: 'OK', headers: { 'x-request-id': 'abc' } })))
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(new Response('ok', { status: 200, statusText: 'OK', headers: { 'x-request-id': 'abc' } })),
+    )
 
     const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'http://api.test/ok' }))
 
-    expect(result.timeline).toEqual(expect.arrayContaining([
-      { label: 'Status', detail: '200 OK', group: 'received' },
-      { label: 'x-request-id', detail: 'abc', group: 'received' },
-      expect.objectContaining({ label: 'Size and time', detail: expect.stringMatching(/^2 B in \d+ ms$/) }),
-    ]))
+    expect(result.timeline).toEqual(
+      expect.arrayContaining([
+        { label: 'Status', detail: '200 OK', group: 'received' },
+        { label: 'x-request-id', detail: 'abc', group: 'received' },
+        expect.objectContaining({ label: 'Size and time', detail: expect.stringMatching(/^2 B in \d+ ms$/) }),
+      ]),
+    )
   })
 
   it('keeps an HTTP 500 as a response, including its body', async () => {
     fx = fixture()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('server broke', { status: 500, statusText: 'Internal Server Error' })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('server broke', { status: 500, statusText: 'Internal Server Error' })),
+    )
 
     const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'http://api.test/fail' }))
 
@@ -484,40 +684,70 @@ describe('send — transport outcomes', () => {
   })
 })
 
-
 describe('send caller cancellation', () => {
   it('checks retirement after a held task lookup before admitting more work', async () => {
-    const fx = fixture(), controller = new AbortController()
+    const fx = fixture(),
+      controller = new AbortController()
     let finish!: (value: undefined) => void
     const projects = vi.spyOn(fx.core.projects, 'byId')
-    vi.spyOn(fx.core.tasks, 'load').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
-    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
+    vi.spyOn(fx.core.tasks, 'load').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+    )
+    const fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
     try {
       const call = send(fx.db, fx.core, USER, 'project', input({ executionTaskId: 'task' }), controller.signal)
       const rejected = expect(call).rejects.toMatchObject({ name: 'AbortError' })
-      controller.abort(); finish(undefined); await rejected
+      controller.abort()
+      finish(undefined)
+      await rejected
       expect(projects).not.toHaveBeenCalled()
       expect(fetcher).not.toHaveBeenCalled()
-    } finally { fx.cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() }
+    } finally {
+      fx.cleanup()
+      vi.unstubAllGlobals()
+      vi.restoreAllMocks()
+    }
   })
 
   it.each(['headers', 'body'])('retires a real loopback response during its %s wait', async (phase) => {
-    const fx = fixture(), controller = new AbortController(), sockets = new Set<Socket>()
+    const fx = fixture(),
+      controller = new AbortController(),
+      sockets = new Set<Socket>()
     let reached!: () => void, closed!: () => void
-    const entered = new Promise<void>((resolve) => { reached = resolve })
-    const retired = new Promise<void>((resolve) => { closed = resolve })
+    const entered = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    const retired = new Promise<void>((resolve) => {
+      closed = resolve
+    })
     const server = createServer((_request, response) => {
-      if (phase === 'body') { response.writeHead(200); response.write('partial') }
+      if (phase === 'body') {
+        response.writeHead(200)
+        response.write('partial')
+      }
       reached()
       response.on('close', closed)
     })
-    server.on('connection', (socket) => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
-    await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+    server.on('connection', (socket) => {
+      sockets.add(socket)
+      socket.on('close', () => sockets.delete(socket))
+    })
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
     try {
       const port = (server.address() as { port: number }).port
       const call = send(fx.db, fx.core, USER, 'project', input({ url: `http://127.0.0.1:${port}` }), controller.signal)
       const rejected = expect(call).rejects.toMatchObject({ name: 'AbortError' })
-      await entered; controller.abort(); await rejected; await retired
+      await entered
+      controller.abort()
+      await rejected
+      await retired
     } finally {
       for (const socket of sockets) socket.destroy()
       await new Promise<void>((resolve) => server.close(() => resolve()))
@@ -526,12 +756,14 @@ describe('send caller cancellation', () => {
   })
 
   it('cancels and releases a held reader once, retaining exact-cap completion semantics', async () => {
-    const controller = new AbortController(), cancel = vi.fn(() => new Promise<void>(() => {}))
+    const controller = new AbortController(),
+      cancel = vi.fn(() => new Promise<void>(() => {}))
     const stream = new ReadableStream<Uint8Array>({ cancel })
     const response = new Response(stream)
     const read = readCapped(response, controller.signal)
     const rejected = expect(read).rejects.toMatchObject({ name: 'AbortError' })
-    controller.abort(); await rejected
+    controller.abort()
+    await rejected
     expect(cancel).toHaveBeenCalledOnce()
     expect(stream.locked).toBe(false)
     for (const extra of [0, 1]) {

@@ -15,8 +15,14 @@
 import { createHash } from 'node:crypto'
 import { BridgeError, gitOrThrow } from '@acorn/plugin-api/node'
 import {
-  documentCache, fileDocument, searchDocument,
-  type DiffSearchPage, type DiffSearchRequest, type DiffSegmentDescriptor, type DiffSegmentPayload, type DiffSegmentRequest,
+  documentCache,
+  fileDocument,
+  searchDocument,
+  type DiffSearchPage,
+  type DiffSearchRequest,
+  type DiffSegmentDescriptor,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
   type FileDocument,
 } from '@acorn/diff-document/document'
 import { isValidRelPath, literalPath, localDiff, pathChunks, stripToHunks, type LocalScope } from './localDiff'
@@ -40,9 +46,10 @@ const latestKey = (worktree: string, scope: LocalScope, path: string) => `${work
 
 const digest = (patch: string) => `sha256:${createHash('sha256').update(patch).digest('hex')}`
 const cacheKey = (worktree: string, patchKey: string) => `${worktree}\u0000${patchKey}`
-const statusKey = (worktree: string, scope: LocalScope, file: DocumentFileRequest) => `${worktree}\u0000${scope}\u0000${file.path}\u0000${file.key}`
+const statusKey = (worktree: string, scope: LocalScope, file: DocumentFileRequest) =>
+  `${worktree}\u0000${scope}\u0000${file.path}\u0000${file.key}`
 
-const bounded = <V,>(map: Map<string, V>, key: string, value: V) => {
+const bounded = <V>(map: Map<string, V>, key: string, value: V) => {
   map.delete(key)
   map.set(key, value)
   if (map.size > STATUS_ENTRIES) map.delete(map.keys().next().value!)
@@ -89,14 +96,25 @@ async function patchesFor(worktree: string, scope: LocalScope, paths: readonly s
   // once. Their files are read one at a time instead.
   const alone = new Set<string>()
   for (const chunk of pathChunks(paths)) {
-    const { stdout } = await gitOrThrow(['-c', 'core.quotePath=false', 'ls-files', '-z', '--', ...chunk.map(literalPath)], { cwd: worktree, timeoutMs: 15_000 })
+    const { stdout } = await gitOrThrow(
+      ['-c', 'core.quotePath=false', 'ls-files', '-z', '--', ...chunk.map(literalPath)],
+      { cwd: worktree, timeoutMs: 15_000 },
+    )
     for (const path of stdout.split('\0')) if (path) tracked.add(path)
     // `--no-renames`: a rename whose two names are both in the batch would otherwise come back as one
     // diff under the new name, and the pane stacks each name as its own file. The prefixes are pinned,
     // because a user's `diff.noprefix` or `diff.mnemonicPrefix` would change every header.
     const args = [
-      '-c', 'core.quotePath=false', 'diff', ...(scope === 'staged' ? ['--staged'] : []),
-      '--no-renames', '--no-color', '--src-prefix=a/', '--dst-prefix=b/', '--', ...chunk.map(literalPath),
+      '-c',
+      'core.quotePath=false',
+      'diff',
+      ...(scope === 'staged' ? ['--staged'] : []),
+      '--no-renames',
+      '--no-color',
+      '--src-prefix=a/',
+      '--dst-prefix=b/',
+      '--',
+      ...chunk.map(literalPath),
     ]
     let diffed: Map<string, string>
     try {
@@ -114,14 +132,19 @@ async function patchesFor(worktree: string, scope: LocalScope, paths: readonly s
     if (out.has(path)) continue
     // Untracked, in a failed batch, or a name the batch could not match: read on its own, the way a
     // single file always was. A tracked file the batch printed nothing for has no diff.
-    if (!tracked.has(path) || alone.has(path) || /["\\\u0000-\u001f\u007f]/.test(path)) out.set(path, await aloneOrEmpty(worktree, path, scope))
+    if (!tracked.has(path) || alone.has(path) || /["\\\u0000-\u001f\u007f]/.test(path))
+      out.set(path, await aloneOrEmpty(worktree, path, scope))
     else out.set(path, '')
   }
   return out
 }
 
 /** The document's files, in the order asked. */
-export async function localDocument(worktree: string, scope: LocalScope, files: readonly DocumentFileRequest[]): Promise<LocalDocumentFile[]> {
+export async function localDocument(
+  worktree: string,
+  scope: LocalScope,
+  files: readonly DocumentFileRequest[],
+): Promise<LocalDocumentFile[]> {
   if (!files.every((file) => isValidRelPath(file.path))) throw new BridgeError(400, 'bad_request', 'Invalid path.')
   const known = new Map<string, FileDocument | null>()
   const missing = new Set<string>()
@@ -158,7 +181,7 @@ export async function localDocument(worktree: string, scope: LocalScope, files: 
   }
   return files.map((file) => {
     const doc = known.get(file.path)
-    const patchKey = doc ? keys.get(file.path) ?? null : null
+    const patchKey = doc ? (keys.get(file.path) ?? null) : null
     bounded(latest, latestKey(worktree, scope, file.path), patchKey)
     return { path: file.path, patchKey, segments: doc?.descriptors ?? [] }
   })
@@ -169,17 +192,23 @@ export async function localDocument(worktree: string, scope: LocalScope, files: 
 async function documentAt(worktree: string, scope: LocalScope, path: string, patchKey: string): Promise<FileDocument> {
   if (!isValidRelPath(path)) throw new BridgeError(400, 'bad_request', 'Invalid path.')
   const current = latest.get(latestKey(worktree, scope, path))
-  if (current !== undefined && current !== patchKey) throw new BridgeError(409, 'revision_conflict', 'The file changed since the diff was read.')
+  if (current !== undefined && current !== patchKey)
+    throw new BridgeError(409, 'revision_conflict', 'The file changed since the diff was read.')
   const held = parsed.get(cacheKey(worktree, patchKey))
   if (held) return held
   const { patch } = await localDiff(worktree, path, scope)
-  if (!patch || digest(patch) !== patchKey) throw new BridgeError(409, 'revision_conflict', 'The file changed since the diff was read.')
+  if (!patch || digest(patch) !== patchKey)
+    throw new BridgeError(409, 'revision_conflict', 'The file changed since the diff was read.')
   const doc = fileDocument(path, patch)
   parsed.set(cacheKey(worktree, patchKey), doc)
   return doc
 }
 
-export async function localSegments(worktree: string, scope: LocalScope, requests: readonly DiffSegmentRequest[]): Promise<DiffSegmentPayload[]> {
+export async function localSegments(
+  worktree: string,
+  scope: LocalScope,
+  requests: readonly DiffSegmentRequest[],
+): Promise<DiffSegmentPayload[]> {
   const out: DiffSegmentPayload[] = []
   for (const request of requests) {
     const rows = (await documentAt(worktree, scope, request.path, request.patchKey)).segments[request.ordinal]
@@ -195,7 +224,11 @@ export async function localSearch(
   files: readonly { path: string; patchKey: string }[],
   request: DiffSearchRequest,
 ): Promise<DiffSearchPage> {
-  const page = await searchDocument(files, async (file) => (await documentAt(worktree, scope, file.path, file.patchKey)).segments, request)
+  const page = await searchDocument(
+    files,
+    async (file) => (await documentAt(worktree, scope, file.path, file.patchKey)).segments,
+    request,
+  )
   if (!page) throw new BridgeError(400, 'bad_cursor')
   return page
 }

@@ -41,7 +41,9 @@ describe('the tool cannot install', () => {
       name: 'ToolError',
       kind: 'needs-trust',
     })
-    expect(pendingPluginRequests()).toMatchObject([{ taskId: 'task-1', action: 'install', source: { github: 'acorn/board' }, dev: false }])
+    expect(pendingPluginRequests()).toMatchObject([
+      { taskId: 'task-1', action: 'install', source: { github: 'acorn/board' }, dev: false },
+    ])
     expect(notify).toHaveBeenCalledWith('task-1', 'install')
   })
 
@@ -66,8 +68,18 @@ describe('one ask is one question', () => {
   })
 
   it('does not treat a reordered source as a new question', () => {
-    const first = raisePluginRequest({ taskId: 't', action: 'install', dev: false, source: { github: 'a/b', tag: 'v1' } })
-    const second = raisePluginRequest({ taskId: 't', action: 'install', dev: false, source: { tag: 'v1', github: 'a/b' } as never })
+    const first = raisePluginRequest({
+      taskId: 't',
+      action: 'install',
+      dev: false,
+      source: { github: 'a/b', tag: 'v1' },
+    })
+    const second = raisePluginRequest({
+      taskId: 't',
+      action: 'install',
+      dev: false,
+      source: { tag: 'v1', github: 'a/b' } as never,
+    })
     expect(second.request.requestId).toBe(first.request.requestId)
   })
 
@@ -126,18 +138,29 @@ describe('shape and bounds', () => {
   })
 
   it('refuses a request that names both a source and an id', async () => {
-    await expect(call(tool, { action: 'install', source: { npm: 'x' }, pluginId: 'y' })).rejects.toMatchObject({ kind: 'bad_request' })
-    await expect(call(tool, { action: 'update', pluginId: 'y', source: { npm: 'x' } })).rejects.toMatchObject({ kind: 'bad_request' })
+    await expect(call(tool, { action: 'install', source: { npm: 'x' }, pluginId: 'y' })).rejects.toMatchObject({
+      kind: 'bad_request',
+    })
+    await expect(call(tool, { action: 'update', pluginId: 'y', source: { npm: 'x' } })).rejects.toMatchObject({
+      kind: 'bad_request',
+    })
   })
 
   it('caps the agent’s reason, which is text a model wrote while reading who-knows-what', () => {
-    expect(tool.input.safeParse({ action: 'uninstall', pluginId: 'board', reason: 'x'.repeat(401) }).success).toBe(false)
+    expect(tool.input.safeParse({ action: 'uninstall', pluginId: 'board', reason: 'x'.repeat(401) }).success).toBe(
+      false,
+    )
     expect(tool.input.safeParse({ action: 'uninstall', pluginId: 'board', reason: 'x'.repeat(400) }).success).toBe(true)
   })
 
   it('stops one agent from filling the owner’s queue', async () => {
-    for (let i = 0; i < 20; i++) await expect(call(tool, { action: 'uninstall', pluginId: `p${i}` })).rejects.toMatchObject({ kind: 'needs-trust' })
-    await expect(call(tool, { action: 'uninstall', pluginId: 'one-too-many' })).rejects.toMatchObject({ kind: 'failed' })
+    for (let i = 0; i < 20; i++)
+      await expect(call(tool, { action: 'uninstall', pluginId: `p${i}` })).rejects.toMatchObject({
+        kind: 'needs-trust',
+      })
+    await expect(call(tool, { action: 'uninstall', pluginId: 'one-too-many' })).rejects.toMatchObject({
+      kind: 'failed',
+    })
     expect(pendingPluginRequests()).toHaveLength(20)
   })
 

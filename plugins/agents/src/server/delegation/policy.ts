@@ -22,12 +22,14 @@ export const delegatedToolCeiling = (
 ): ToolCeiling => {
   const left = normalizeToolCeiling(parent)
   const right = normalizeToolCeiling(requested)
-  const allow = left.allow && right.allow
-    ? left.allow.filter((name) => right.allow!.includes(name))
-    : left.allow ?? right.allow
-  const maxRisk = left.maxRisk && right.maxRisk
-    ? RISK_ORDER[left.maxRisk] <= RISK_ORDER[right.maxRisk] ? left.maxRisk : right.maxRisk
-    : left.maxRisk ?? right.maxRisk
+  const allow =
+    left.allow && right.allow ? left.allow.filter((name) => right.allow!.includes(name)) : (left.allow ?? right.allow)
+  const maxRisk =
+    left.maxRisk && right.maxRisk
+      ? RISK_ORDER[left.maxRisk] <= RISK_ORDER[right.maxRisk]
+        ? left.maxRisk
+        : right.maxRisk
+      : (left.maxRisk ?? right.maxRisk)
   return normalizeToolCeiling({ ...(allow ? { allow } : {}), ...(maxRisk ? { maxRisk } : {}) })
 }
 

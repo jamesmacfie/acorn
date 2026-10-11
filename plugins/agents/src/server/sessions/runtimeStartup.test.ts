@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createCoreServices, makeTestDb, makeTestPluginDb, memoryIdentityStore, SecretService, testCoreSeams } from '@acorn/plugin-api/testkit'
+import {
+  createCoreServices,
+  makeTestDb,
+  makeTestPluginDb,
+  memoryIdentityStore,
+  SecretService,
+  testCoreSeams,
+} from '@acorn/plugin-api/testkit'
 import { ManagedAgentRuntime } from './runtime'
 import { ManagedAgentEngine, type AgentRuntimeOptions } from './runtimeEngine'
 import { FakeAgentDriver } from '../drivers/fake'
@@ -10,7 +17,9 @@ import { ProcessRetirementError } from '../processes/ownedProcess'
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -39,7 +48,12 @@ describe('managed startup generations', () => {
   beforeEach(async () => {
     db = makeTestDb()
     plugin = makeTestPluginDb('agents')
-    core = createCoreServices({ db: db.db, secrets: new SecretService('11'.repeat(32)), activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
+    core = createCoreServices({
+      db: db.db,
+      secrets: new SecretService('11'.repeat(32)),
+      activeIdentity: memoryIdentityStore(),
+      ...testCoreSeams(),
+    })
     vi.spyOn(core.tasks, 'requireRoot').mockResolvedValue(plugin.dataDir)
     vi.spyOn(core.tasks, 'workspaceId').mockResolvedValue('workspace')
     starts = []
@@ -52,21 +66,52 @@ describe('managed startup generations', () => {
     launch = (options) => new FakeAgentDriver().start(options)
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => ({
-      providerId: 'fake', profileId: 'fake', probe: () => new FakeAgentDriver().probe(),
+      providerId: 'fake',
+      profileId: 'fake',
+      probe: () => new FakeAgentDriver().probe(),
       async start(options) {
         starts.push(options)
         const handle = await launch(options)
-        return { ...handle, stop: async () => { stops++; await handle.stop() } }
+        return {
+          ...handle,
+          stop: async () => {
+            stops++
+            await handle.stop()
+          },
+        }
       },
     }))
-    build({ db: plugin.db, dataDir: plugin.dataDir, core, registry,
-      internalEnv: () => { tokens++; return {} }, secrets: new SecretService('11'.repeat(32)), currentUserId: () => user,
-      standingContext: async () => { memoryReads++; return memory } })
-    session = await runtime.store.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
+    build({
+      db: plugin.db,
+      dataDir: plugin.dataDir,
+      core,
+      registry,
+      internalEnv: () => {
+        tokens++
+        return {}
+      },
+      secrets: new SecretService('11'.repeat(32)),
+      currentUserId: () => user,
+      standingContext: async () => {
+        memoryReads++
+        return memory
+      },
+    })
+    session = await runtime.store.createSession(
+      { taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} },
+      await new FakeAgentDriver().probe(),
+    )
   })
   afterEach(async () => {
-    try { await runtime.stop() } catch (error) { if (error !== expectedStopError) throw error }
-    finally { plugin.cleanup(); db.cleanup(); vi.restoreAllMocks() }
+    try {
+      await runtime.stop()
+    } catch (error) {
+      if (error !== expectedStopError) throw error
+    } finally {
+      plugin.cleanup()
+      db.cleanup()
+      vi.restoreAllMocks()
+    }
   })
 
   it('joins callers during the first task read and starts one provider', async () => {
@@ -82,7 +127,13 @@ describe('managed startup generations', () => {
 
   it('snapshots memory at admission, preserves it across configuration and resume, and refreshes for a fresh session', async () => {
     memory = 'Memory at creation.'
-    const created = await runtime.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { standingContext: 'Forged context.' } })
+    const created = await runtime.createSession({
+      taskId: 'task',
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { standingContext: 'Forged context.' },
+    })
     expect(created.config.standingContext).toBe('Memory at creation.')
     memory = 'Memory after another agent wrote.'
     await runtime.patchSession(created.id, { config: { standingContext: 'Client replacement.' } })
@@ -90,34 +141,56 @@ describe('managed startup generations', () => {
     await engine.ensureSession(await runtime.store.requireSession(created.id))
     expect(starts.at(-1)?.session.config.standingContext).toBe('Memory at creation.')
     expect(memoryReads).toBe(1)
-    const fresh = await runtime.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+    const fresh = await runtime.createSession({
+      taskId: 'task',
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
     expect(fresh.config.standingContext).toBe('Memory after another agent wrote.')
     expect(memoryReads).toBe(2)
   })
 
-  it.each(['cwd', 'workspace', 'history', 'mcp'])('cancels a held %s read without spawning or using closed storage later', async (stage) => {
-    const held = deferred<never>()
-    if (stage === 'cwd') vi.mocked(core.tasks.requireRoot).mockReturnValue(held.promise)
-    if (stage === 'workspace') vi.mocked(core.tasks.workspaceId).mockReturnValue(held.promise)
-    if (stage === 'history') vi.spyOn(runtime.store, 'hasProviderExecutionHistory').mockReturnValue(held.promise)
-    if (stage === 'mcp') vi.spyOn(runtime.mcpServers, 'resolve').mockReturnValue(held.promise)
-    const starting = engine.ensureSession(session).catch((error: unknown) => error)
-    const dependency = stage === 'cwd' ? core.tasks.requireRoot : stage === 'workspace' ? core.tasks.workspaceId : stage === 'history' ? runtime.store.hasProviderExecutionHistory : runtime.mcpServers.resolve
-    await vi.waitFor(() => expect(dependency).toHaveBeenCalledOnce())
-    const tokensBeforeStop = tokens
-    const first = runtime.stop()
-    expect(runtime.stop()).toBe(first)
-    await first
-    expect(await starting).toBeInstanceOf(Error)
-    plugin.cleanup()
-    held.resolve(undefined as never)
-    await new Promise((resolve) => setImmediate(resolve))
-    expect(starts).toHaveLength(0)
-    expect(tokens).toBe(tokensBeforeStop)
-  })
+  it.each(['cwd', 'workspace', 'history', 'mcp'])(
+    'cancels a held %s read without spawning or using closed storage later',
+    async (stage) => {
+      const held = deferred<never>()
+      if (stage === 'cwd') vi.mocked(core.tasks.requireRoot).mockReturnValue(held.promise)
+      if (stage === 'workspace') vi.mocked(core.tasks.workspaceId).mockReturnValue(held.promise)
+      if (stage === 'history') vi.spyOn(runtime.store, 'hasProviderExecutionHistory').mockReturnValue(held.promise)
+      if (stage === 'mcp') vi.spyOn(runtime.mcpServers, 'resolve').mockReturnValue(held.promise)
+      const starting = engine.ensureSession(session).catch((error: unknown) => error)
+      const dependency =
+        stage === 'cwd'
+          ? core.tasks.requireRoot
+          : stage === 'workspace'
+            ? core.tasks.workspaceId
+            : stage === 'history'
+              ? runtime.store.hasProviderExecutionHistory
+              : runtime.mcpServers.resolve
+      await vi.waitFor(() => expect(dependency).toHaveBeenCalledOnce())
+      const tokensBeforeStop = tokens
+      const first = runtime.stop()
+      expect(runtime.stop()).toBe(first)
+      await first
+      expect(await starting).toBeInstanceOf(Error)
+      plugin.cleanup()
+      held.resolve(undefined as never)
+      await new Promise((resolve) => setImmediate(resolve))
+      expect(starts).toHaveLength(0)
+      expect(tokens).toBe(tokensBeforeStop)
+    },
+  )
 
   it('joins a held startup warning before closing storage', async () => {
-    vi.spyOn(runtime.mcpServers, 'resolve').mockResolvedValue({ servers: [], secrets: [], unavailable: ['missing-server'], managedRoots: [], revisions: {} })
+    vi.spyOn(runtime.mcpServers, 'resolve').mockResolvedValue({
+      servers: [],
+      secrets: [],
+      unavailable: ['missing-server'],
+      managedRoots: [],
+      revisions: {},
+    })
     const held = deferred<void>()
     const record = runtime.store.recordEvent.bind(runtime.store)
     const writing = vi.spyOn(runtime.store, 'recordEvent').mockImplementation(async (sessionId, turnId, event) => {
@@ -125,10 +198,17 @@ describe('managed startup generations', () => {
       return record(sessionId, turnId, event)
     })
     const starting = engine.ensureSession(session).catch((error: unknown) => error)
-    await vi.waitFor(() => expect(writing).toHaveBeenCalledWith(session.id, null,
-      expect.objectContaining({ type: 'diagnostic', message: expect.stringContaining('missing-server') })))
+    await vi.waitFor(() =>
+      expect(writing).toHaveBeenCalledWith(
+        session.id,
+        null,
+        expect.objectContaining({ type: 'diagnostic', message: expect.stringContaining('missing-server') }),
+      ),
+    )
     let finished = false
-    const stopping = runtime.stop().then(() => { finished = true })
+    const stopping = runtime.stop().then(() => {
+      finished = true
+    })
     await new Promise<void>((resolve) => setImmediate(resolve))
     expect(finished).toBe(false)
     held.resolve()
@@ -139,11 +219,16 @@ describe('managed startup generations', () => {
 
   it('joins and retires a late handle from a native driver that ignores cancellation', async () => {
     const held = deferred<void>()
-    launch = async (options) => { await held.promise; return new FakeAgentDriver().start(options) }
+    launch = async (options) => {
+      await held.promise
+      return new FakeAgentDriver().start(options)
+    }
     const starting = engine.ensureSession(session).catch((error: unknown) => error)
     await vi.waitFor(() => expect(starts).toHaveLength(1))
     let stopped = false
-    const stopping = runtime.stop().then(() => { stopped = true })
+    const stopping = runtime.stop().then(() => {
+      stopped = true
+    })
     await new Promise((resolve) => setImmediate(resolve))
     expect(stopped).toBe(false)
     held.resolve()
@@ -161,9 +246,13 @@ describe('managed startup generations', () => {
       return record(sessionId, turnId, event)
     })
     const emitted = starts[0].onEvent({ type: 'assistant_message', text: 'committed before close' })
-    await vi.waitFor(() => expect(writing).toHaveBeenCalledWith(session.id, null, expect.objectContaining({ type: 'assistant_message' })))
+    await vi.waitFor(() =>
+      expect(writing).toHaveBeenCalledWith(session.id, null, expect.objectContaining({ type: 'assistant_message' })),
+    )
     let finished = false
-    const stopping = runtime.stop().then(() => { finished = true })
+    const stopping = runtime.stop().then(() => {
+      finished = true
+    })
     await vi.waitFor(() => expect(stops).toBe(1))
     expect(finished).toBe(false)
     held.resolve()
@@ -172,15 +261,29 @@ describe('managed startup generations', () => {
     plugin.db.close()
     const reopened = plugin.openConnection()
     try {
-      build({ db: reopened, dataDir: plugin.dataDir, core, registry: new AgentDriverRegistry(),
-        internalEnv: () => ({}), secrets: new SecretService('11'.repeat(32)), currentUserId: () => null })
+      build({
+        db: reopened,
+        dataDir: plugin.dataDir,
+        core,
+        registry: new AgentDriverRegistry(),
+        internalEnv: () => ({}),
+        secrets: new SecretService('11'.repeat(32)),
+        currentUserId: () => null,
+      })
       await runtime.reconcile()
-      expect((await runtime.store.eventPage(session.id)).events).toEqual(expect.arrayContaining([
-        expect.objectContaining({ event: expect.objectContaining({ type: 'assistant_message', text: 'committed before close' }) }),
-      ]))
+      expect((await runtime.store.eventPage(session.id)).events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            event: expect.objectContaining({ type: 'assistant_message', text: 'committed before close' }),
+          }),
+        ]),
+      )
       await starts[0].onEvent({ type: 'assistant_message', text: 'after close' })
-      expect((await runtime.store.eventPage(session.id)).events.some((entry) =>
-        entry.event.type === 'assistant_message' && entry.event.text === 'after close')).toBe(false)
+      expect(
+        (await runtime.store.eventPage(session.id)).events.some(
+          (entry) => entry.event.type === 'assistant_message' && entry.event.text === 'after close',
+        ),
+      ).toBe(false)
     } finally {
       await runtime.stop()
       reopened.close()
@@ -190,13 +293,17 @@ describe('managed startup generations', () => {
   it('joins an in-flight webhook queue write before shutdown returns', async () => {
     await engine.ensureSession(session)
     const held = deferred<void>()
-    const accepting = vi.spyOn(engine.webhooks, 'accept').mockImplementation(async () => { await held.promise })
+    const accepting = vi.spyOn(engine.webhooks, 'accept').mockImplementation(async () => {
+      await held.promise
+    })
     let stopping: Promise<void> | null = null
     try {
       await starts[0].onEvent({ type: 'assistant_message', text: 'published event' })
       await vi.waitFor(() => expect(accepting).toHaveBeenCalled())
       let finished = false
-      stopping = runtime.stop().then(() => { finished = true })
+      stopping = runtime.stop().then(() => {
+        finished = true
+      })
       await vi.waitFor(() => expect(stops).toBe(1))
       await new Promise<void>((resolve) => setImmediate(resolve))
       expect(finished).toBe(false)
@@ -208,7 +315,9 @@ describe('managed startup generations', () => {
 
   it('refuses replacement startup after process retirement failed', async () => {
     const failure = new ProcessRetirementError('synthetic exit was not acknowledged')
-    launch = async () => { throw failure }
+    launch = async () => {
+      throw failure
+    }
     expectedStopError = failure
     await expect(engine.ensureSession(session)).rejects.toBe(failure)
     await expect(engine.ensureSession(session)).rejects.toBe(failure)
@@ -220,7 +329,12 @@ describe('managed startup generations', () => {
     const failure = new ProcessRetirementError('disconnected child did not exit')
     launch = async (options) => {
       const handle = await new FakeAgentDriver().start(options)
-      return { ...handle, stop: async () => { throw failure } }
+      return {
+        ...handle,
+        stop: async () => {
+          throw failure
+        },
+      }
     }
     expectedStopError = failure
     await engine.ensureSession(session)
@@ -248,7 +362,9 @@ describe('managed startup generations', () => {
     const held = deferred<string>()
     vi.mocked(core.tasks.requireRoot).mockReturnValue(held.promise)
     const create = vi.spyOn(runtime.store, 'createSession')
-    const starting = runtime.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }).catch((error: unknown) => error)
+    const starting = runtime
+      .createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+      .catch((error: unknown) => error)
     await vi.waitFor(() => expect(core.tasks.requireRoot).toHaveBeenCalledOnce())
     await runtime.stop()
     expect(await starting).toBeInstanceOf(Error)
@@ -263,8 +379,14 @@ describe('managed startup generations', () => {
     user = 'owner'
     const held = deferred<string | null>()
     const actualRead = core.prefs.read.bind(core.prefs)
-    const read = vi.spyOn(core.prefs, 'read').mockImplementation((userId, key) => key === 'agents:session-defaults:v1' ? held.promise : actualRead(userId, key))
-    const starting = runtime.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }).catch((error: unknown) => error)
+    const read = vi
+      .spyOn(core.prefs, 'read')
+      .mockImplementation((userId, key) =>
+        key === 'agents:session-defaults:v1' ? held.promise : actualRead(userId, key),
+      )
+    const starting = runtime
+      .createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+      .catch((error: unknown) => error)
     await vi.waitFor(() => expect(read).toHaveBeenCalledWith('owner', 'agents:session-defaults:v1'))
     await runtime.stop()
     expect(await starting).toBeInstanceOf(Error)
@@ -280,7 +402,9 @@ describe('managed startup generations', () => {
     user = 'owner'
     const held = deferred<string | null>()
     const actualRead = core.prefs.read.bind(core.prefs)
-    const read = vi.spyOn(core.prefs, 'read').mockImplementation((userId, key) => key === 'agents:concurrency:v1' ? held.promise : actualRead(userId, key))
+    const read = vi
+      .spyOn(core.prefs, 'read')
+      .mockImplementation((userId, key) => (key === 'agents:concurrency:v1' ? held.promise : actualRead(userId, key)))
     await engine.ensureSession(session)
     await vi.waitFor(() => expect(read).toHaveBeenCalledWith('owner', 'agents:concurrency:v1'))
     await runtime.stop()
@@ -290,5 +414,4 @@ describe('managed startup generations', () => {
     expect(starts).toHaveLength(1)
     expect(stops).toBe(1)
   })
-
 })

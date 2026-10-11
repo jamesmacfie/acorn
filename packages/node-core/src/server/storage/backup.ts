@@ -1,4 +1,14 @@
-import { chmodSync, closeSync, mkdtempSync, openSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  closeSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'

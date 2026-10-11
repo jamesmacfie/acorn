@@ -5,11 +5,24 @@ import type { MemoryScope, MemoryType } from '../contract/library'
 
 export type { MemoryScope, MemoryType } from '../contract/library'
 export const DIRECT_MEMORY_TYPES = ['user', 'feedback', 'project', 'reference'] as const
-export const normalizeMemoryType = (type: string): typeof DIRECT_MEMORY_TYPES[number] =>
-  ['convention', 'architecture', 'decision', 'fix', 'task'].includes(type) ? 'project'
-    : DIRECT_MEMORY_TYPES.includes(type as typeof DIRECT_MEMORY_TYPES[number]) ? type as typeof DIRECT_MEMORY_TYPES[number] : 'reference'
+export const normalizeMemoryType = (type: string): (typeof DIRECT_MEMORY_TYPES)[number] =>
+  ['convention', 'architecture', 'decision', 'fix', 'task'].includes(type)
+    ? 'project'
+    : DIRECT_MEMORY_TYPES.includes(type as (typeof DIRECT_MEMORY_TYPES)[number])
+      ? (type as (typeof DIRECT_MEMORY_TYPES)[number])
+      : 'reference'
 
-export const MEMORY_TYPES: readonly MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user', 'project']
+export const MEMORY_TYPES: readonly MemoryType[] = [
+  'convention',
+  'architecture',
+  'decision',
+  'fix',
+  'reference',
+  'feedback',
+  'task',
+  'user',
+  'project',
+]
 
 export type MemoryFile = {
   name: string
@@ -33,9 +46,8 @@ export const isValidMemoryName = (s: string): boolean => /^[a-z0-9][a-z0-9._-]*$
 // them. Scope is about reach, not storage: a `projects/<projectId>` directory holds the memories
 // that apply to one project, and through that project to its workspace, while the root holds the
 // ones that apply wherever the owner is working.
-export const privateMemoryRoot = (homeDir: string): string => process.env.ACORN_DATA_DIR
-  ? join(process.env.ACORN_DATA_DIR, 'memory')
-  : join(homeDir, '.acorn', 'memory')
+export const privateMemoryRoot = (homeDir: string): string =>
+  process.env.ACORN_DATA_DIR ? join(process.env.ACORN_DATA_DIR, 'memory') : join(homeDir, '.acorn', 'memory')
 
 // The project id is a path segment here, so it goes through the same name check a memory file does.
 export function projectMemoryDir(homeDir: string, projectId: string): string {
@@ -76,16 +88,32 @@ export function parseMemory(text: string, fallbackName: string): MemoryFile {
       const m = line.match(/^(\s*)([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/)
       if (m) {
         const value = m[3].trim()
-        fields[m[2]] = value.startsWith('"') && value.endsWith('"')
-          ? (() => { try { return JSON.parse(value) as string } catch { return value.slice(1, -1) } })()
-          : value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1).replaceAll("''", "'") : value
+        fields[m[2]] =
+          value.startsWith('"') && value.endsWith('"')
+            ? (() => {
+                try {
+                  return JSON.parse(value) as string
+                } catch {
+                  return value.slice(1, -1)
+                }
+              })()
+            : value.startsWith("'") && value.endsWith("'")
+              ? value.slice(1, -1).replaceAll("''", "'")
+              : value
       } // flat + metadata-nested keys share one namespace (unique here)
     }
     body = text.slice(frontmatter[0].length)
   }
   return {
     name: fields.name && isValidMemoryName(fields.name) ? fields.name : fallbackName,
-    description: fields.description || body.split('\n').find((l) => l.trim() && !l.startsWith('#'))?.trim().slice(0, 200) || fallbackName,
+    description:
+      fields.description ||
+      body
+        .split('\n')
+        .find((l) => l.trim() && !l.startsWith('#'))
+        ?.trim()
+        .slice(0, 200) ||
+      fallbackName,
     type: normalizeMemoryType(fields.type),
     originSessionId: fields.originSessionId || null,
     commitSha: fields.commitSha || null,
@@ -115,7 +143,14 @@ export async function scanMemoryDir(source: MemorySource): Promise<ScannedMemory
       const info = await lstat(file)
       if (!info.isFile() || info.isSymbolicLink()) continue
       const [text, st] = await Promise.all([readFile(file, 'utf8'), stat(file)])
-      out.push({ ...parseMemory(text, name), name, path: file, updatedAt: st.mtimeMs, scope: source.scope, projectId: source.projectId })
+      out.push({
+        ...parseMemory(text, name),
+        name,
+        path: file,
+        updatedAt: st.mtimeMs,
+        scope: source.scope,
+        projectId: source.projectId,
+      })
     } catch {
       // unreadable file → skipped
     }
@@ -124,12 +159,15 @@ export async function scanMemoryDir(source: MemorySource): Promise<ScannedMemory
 }
 
 // MEMORY.md: one line per memory, the index injected at agent launch.
-export const renderMemoryIndex = (entries: (Pick<MemoryFile, 'name' | 'description'> & { updatedAt?: number | string })[]): string =>
+export const renderMemoryIndex = (
+  entries: (Pick<MemoryFile, 'name' | 'description'> & { updatedAt?: number | string })[],
+): string =>
   entries.length
     ? entries
         .slice()
         .sort((a, b) => {
-          const updated = (value: number | string | undefined) => typeof value === 'number' ? value : value ? Date.parse(value) || 0 : 0
+          const updated = (value: number | string | undefined) =>
+            typeof value === 'number' ? value : value ? Date.parse(value) || 0 : 0
           return updated(b.updatedAt) - updated(a.updatedAt) || a.name.localeCompare(b.name)
         })
         .map((m) => `- [${m.name}](${m.name}.md) — ${m.description}`)

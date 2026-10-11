@@ -2,7 +2,17 @@
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */
-export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane', 'file.row', 'document.tab', 'agent.message', 'agent.turn', 'content.selection'] as const
+export const CONTEXT_MENU_LOCATIONS = [
+  'task.row',
+  'item.row',
+  'rail.source',
+  'rail.pane',
+  'file.row',
+  'document.tab',
+  'agent.message',
+  'agent.turn',
+  'content.selection',
+] as const
 
 export type ContextMenuLocation = (typeof CONTEXT_MENU_LOCATIONS)[number]
 

@@ -4,7 +4,8 @@ import Ajv from 'ajv'
 import { describe, expect, it } from 'vitest'
 import { nodeResource, pluginResources, projectResource, taskResource, workspaceResource } from './projection'
 
-const read = (name: string): unknown => JSON.parse(readFileSync(resolve(import.meta.dirname, '../schemas', name), 'utf8'))
+const read = (name: string): unknown =>
+  JSON.parse(readFileSync(resolve(import.meta.dirname, '../schemas', name), 'utf8'))
 const schema = read('resources-v1.schema.json') as object
 const examples = read('resources-v1.examples.json') as Record<string, unknown>[]
 const validate = new Ajv({ strict: false }).compile(schema)
@@ -21,10 +22,54 @@ describe('versioned resource contract', () => {
     const [node, workspace, project, task, plugin] = examples
     const projected = [
       nodeResource('node-one', { protocolVersion: 1, baseline: 'acorn-1', endpoint: 'https://node-one.test' }),
-      workspaceResource('node-one', { id: 'workspace-one', name: 'Default', isDefault: true, sort: 0, projects: [{ id: 'project-one', name: 'App', sort: 0 }] }),
-      projectResource('node-one', { id: 'project-one', name: 'App', workspaceId: 'workspace-one', path: '/srv/app', hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, sort: 0, color: null, github: null }),
-      taskResource('node-one', { id: 'task-one', projectId: 'project-one', title: 'Investigate timeout', status: 'active', branch: null, worktreePath: null, parentId: null, icon: null, origin: 'manual', github: null, pullNumber: null, sort: 0, links: [] }),
-      pluginResources('node-one', { plugins: [{ name: 'agents', state: 'active', running: true, disabled: false, required: true, active: { version: '1.0.0' } as never }], restartRequired: false })[0],
+      workspaceResource('node-one', {
+        id: 'workspace-one',
+        name: 'Default',
+        isDefault: true,
+        sort: 0,
+        projects: [{ id: 'project-one', name: 'App', sort: 0 }],
+      }),
+      projectResource('node-one', {
+        id: 'project-one',
+        name: 'App',
+        workspaceId: 'workspace-one',
+        path: '/srv/app',
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: null,
+        sort: 0,
+        color: null,
+        github: null,
+      }),
+      taskResource('node-one', {
+        id: 'task-one',
+        projectId: 'project-one',
+        title: 'Investigate timeout',
+        status: 'active',
+        branch: null,
+        worktreePath: null,
+        parentId: null,
+        icon: null,
+        origin: 'manual',
+        github: null,
+        pullNumber: null,
+        sort: 0,
+        links: [],
+      }),
+      pluginResources('node-one', {
+        plugins: [
+          {
+            name: 'agents',
+            state: 'active',
+            running: true,
+            disabled: false,
+            required: true,
+            active: { version: '1.0.0' } as never,
+          },
+        ],
+        restartRequired: false,
+      })[0],
     ]
     expect(projected).toEqual([node, workspace, project, task, plugin])
     for (const resource of projected) expect(validate(resource), JSON.stringify(validate.errors)).toBe(true)

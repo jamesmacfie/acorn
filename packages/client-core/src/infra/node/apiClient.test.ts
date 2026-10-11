@@ -28,11 +28,18 @@ function installBroker(state: NodeConnectionState): void {
       desktop: true,
       fleetList: () => Promise.resolve({ nodes: [node], statuses: [{ nodeId: 'n1', state }] }),
       onNodeStatus: () => () => {},
-      nodeFetch: (_nodeId: string, request: { path: string; method: string; headers: Record<string, string>; timeoutMs?: number }) => {
+      nodeFetch: (
+        _nodeId: string,
+        request: { path: string; method: string; headers: Record<string, string>; timeoutMs?: number },
+      ) => {
         headers.push(request.headers)
         // Recorded only when it is there, so the requests that ask for nothing keep the shape the
         // assertions below already spell out.
-        attempted.push({ path: request.path, method: request.method, ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }) })
+        attempted.push({
+          path: request.path,
+          method: request.method,
+          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+        })
         return Promise.resolve({ status: 200, headers: {}, body: new TextEncoder().encode('{"ok":true}') })
       },
       nodeAbort: () => {},
@@ -61,7 +68,9 @@ describe('request cancellation and encoding', () => {
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     const controller = new AbortController()
     controller.abort()
-    await expect(writeJson('/v1/core/workspaces', { method: 'POST', body: '{}', signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(
+      writeJson('/v1/core/workspaces', { method: 'POST', body: '{}', signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' })
     expect(attempted).toEqual([])
     expect(encode).not.toHaveBeenCalled()
   })
@@ -72,10 +81,14 @@ describe('request cancellation and encoding', () => {
     const controller = new AbortController()
     const abort = vi.fn()
     window.acorn!.nodeAbort = abort
-    window.acorn!.nodeFetch = (_id, request) => new Promise((_resolve, reject) => {
-      expect(request.body?.kind).toBe('bytes')
-      abort.mockImplementation((requestId: string) => { expect(requestId).toBe(request.requestId); reject(Object.assign(new Error('cancelled'), { name: 'AbortError' })) })
-    })
+    window.acorn!.nodeFetch = (_id, request) =>
+      new Promise((_resolve, reject) => {
+        expect(request.body?.kind).toBe('bytes')
+        abort.mockImplementation((requestId: string) => {
+          expect(requestId).toBe(request.requestId)
+          reject(Object.assign(new Error('cancelled'), { name: 'AbortError' }))
+        })
+      })
     const request = writeJson('/v1/core/workspaces', { method: 'POST', body: '{}', signal: controller.signal })
     controller.abort()
     await expect(request).rejects.toMatchObject({ name: 'AbortError' })

@@ -2,7 +2,15 @@ import { createSignal, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { integrationsKey, modelBackendsKey, prefsKey, projectsKey, workspacesKey, type Project, type Workspace } from '@acorn/protocol/api.ts'
+import {
+  integrationsKey,
+  modelBackendsKey,
+  prefsKey,
+  projectsKey,
+  workspacesKey,
+  type Project,
+  type Workspace,
+} from '@acorn/protocol/api.ts'
 import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { activeNodeId, setActiveNode } from '@acorn/plugin-api/client'
 
@@ -14,11 +22,11 @@ const platform = vi.hoisted(() => ({
 }))
 const navigation = vi.hoisted(() => ({ navigate: vi.fn() }))
 vi.mock('@solidjs/router', async (original) => ({
-  ...await original<typeof import('@solidjs/router')>(),
+  ...(await original<typeof import('@solidjs/router')>()),
   useNavigate: () => navigation.navigate,
 }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
-  ...await original<typeof import('@acorn/plugin-api/client')>(),
+  ...(await original<typeof import('@acorn/plugin-api/client')>()),
   canAddProjectFromFolder: () => true,
   pickFolder: platform.pickFolder,
   createProject: platform.createProject,
@@ -29,11 +37,24 @@ vi.mock('@acorn/plugin-api/client', async (original) => ({
 import OnboardingWizard from './OnboardingWizard'
 
 const project = (id: string, workspaceId: string): Project => ({
-  id, name: id, workspaceId, path: `/tmp/${id}`, sort: 0, hidden: false, color: null,
-  vcs: null, defaultBranch: null, remoteUrl: null, github: null,
+  id,
+  name: id,
+  workspaceId,
+  path: `/tmp/${id}`,
+  sort: 0,
+  hidden: false,
+  color: null,
+  vcs: null,
+  defaultBranch: null,
+  remoteUrl: null,
+  github: null,
 })
 const workspace = (id: string): Workspace => ({
-  id, name: id, isDefault: false, sort: 0, projects: [{ id, name: id, sort: 0 }],
+  id,
+  name: id,
+  isDefault: false,
+  sort: 0,
+  projects: [{ id, name: id, sort: 0 }],
 })
 
 let host: HTMLDivElement
@@ -48,8 +69,8 @@ let originalNodeId: string | null
 const writes: { key: string; value: string }[] = []
 
 const view = () => document.body
-const button = (label: string) => [...view().querySelectorAll<HTMLButtonElement>('button')]
-  .find((element) => element.textContent?.trim() === label)
+const button = (label: string) =>
+  [...view().querySelectorAll<HTMLButtonElement>('button')].find((element) => element.textContent?.trim() === label)
 const click = (label: string) => {
   const element = button(label)
   expect(element, `button ${label}`).toBeTruthy()
@@ -57,8 +78,10 @@ const click = (label: string) => {
 }
 const waitForText = async (value: string) => vi.waitFor(() => expect(view().textContent).toContain(value))
 // A layout option's button also holds its picture, so it is found by its radio role and label.
-const radio = (label: string) => [...view().querySelectorAll<HTMLButtonElement>('[role="radio"]')]
-  .find((element) => element.textContent?.startsWith(label))
+const radio = (label: string) =>
+  [...view().querySelectorAll<HTMLButtonElement>('[role="radio"]')].find((element) =>
+    element.textContent?.startsWith(label),
+  )
 const toLayout = async () => {
   click('Get started')
   await waitForText('Choose a layout')
@@ -76,22 +99,28 @@ function mount(mode?: WorkspacesMode, options: { unmountOnClose?: boolean } = {}
   document.body.append(host)
   const [open, setOpen] = createSignal(true)
   const [preference, setPreference] = createSignal(mode)
-  const onClose = vi.fn(() => { if (options.unmountOnClose) setOpen(false) })
-  dispose = render(() => (
-    <QueryClientProvider client={client}>
-      <Show when={open()}>
-        <OnboardingWizard workspacesPreference={preference()} onClose={onClose} />
-      </Show>
-    </QueryClientProvider>
-  ), host)
+  const onClose = vi.fn(() => {
+    if (options.unmountOnClose) setOpen(false)
+  })
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Show when={open()}>
+          <OnboardingWizard workspacesPreference={preference()} onClose={onClose} />
+        </Show>
+      </QueryClientProvider>
+    ),
+    host,
+  )
   return { onClose, setPreference }
 }
 
 async function advanceToDone() {
   click('Get started')
   await waitForText('Add your first project')
-  const folder = [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')]
-    .find((element) => element.textContent?.includes('Open a folder'))!
+  const folder = [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')].find((element) =>
+    element.textContent?.includes('Open a folder'),
+  )!
   folder.click()
   await vi.waitFor(() => expect(view().querySelector('h2')?.textContent).toBe('Name your project'))
   click('Continue')
@@ -118,17 +147,20 @@ beforeEach(() => {
   })
   platform.patchProject.mockResolvedValue(undefined)
   platform.createWorkspace.mockResolvedValue(workspace('New'))
-  vi.stubGlobal('fetch', vi.fn(async (_path: string, options: RequestInit) => {
-    const raw = ArrayBuffer.isView(options.body)
-      ? new TextDecoder().decode(options.body as Uint8Array)
-      : String(options.body)
-    const body = JSON.parse(raw) as { key: string; value: string }
-    writes.push(body)
-    if (pendingWrite) await pendingWrite
-    if (saveError) throw saveError
-    stored[body.key] = body.value
-    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
-  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_path: string, options: RequestInit) => {
+      const raw = ArrayBuffer.isView(options.body)
+        ? new TextDecoder().decode(options.body as Uint8Array)
+        : String(options.body)
+      const body = JSON.parse(raw) as { key: string; value: string }
+      writes.push(body)
+      if (pendingWrite) await pendingWrite
+      if (saveError) throw saveError
+      stored[body.key] = body.value
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }),
+  )
 })
 
 afterEach(() => {
@@ -146,7 +178,9 @@ describe('first-run workspace choice', () => {
   ] as const)('saves %s before entering Add a project', async (mode, label) => {
     mount()
     await toLayout()
-    expect(view().textContent).toContain("You can group projects into workspaces later, but you can't separate them again.")
+    expect(view().textContent).toContain(
+      "You can group projects into workspaces later, but you can't separate them again.",
+    )
     radio(label)!.click()
     expect(radio(label)?.getAttribute('aria-checked')).toBe('true')
     click('Continue')
@@ -158,7 +192,9 @@ describe('first-run workspace choice', () => {
   it('waits for a save and leaves an error visible for retry', async () => {
     mount()
     await toLayout()
-    pendingWrite = new Promise<void>((resolve) => { releaseWrite = resolve })
+    pendingWrite = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
     click('Continue')
     await vi.waitFor(() => expect(writes).toHaveLength(1))
     expect(view().textContent).not.toContain('Add your first project')
@@ -203,8 +239,9 @@ describe('first-run workspace choice', () => {
     mount(mode)
     click('Get started')
     await waitForText('Add your first project')
-    const folder = [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')]
-      .find((element) => element.textContent?.includes('Open a folder'))!
+    const folder = [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')].find((element) =>
+      element.textContent?.includes('Open a folder'),
+    )!
     folder.click()
     await waitForText('Name your project')
     const name = view().querySelector<HTMLInputElement>('input')!
@@ -220,8 +257,9 @@ describe('first-run workspace choice', () => {
     mount('on')
     click('Get started')
     await waitForText('Add your first project')
-    const folder = [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')]
-      .find((element) => element.textContent?.includes('Open a folder'))!
+    const folder = [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')].find((element) =>
+      element.textContent?.includes('Open a folder'),
+    )!
     folder.click()
     await waitForText('Name your project')
     view().querySelector<HTMLButtonElement>('.ui-select')?.click()
@@ -235,25 +273,30 @@ describe('first-run workspace choice', () => {
     await vi.waitFor(() => expect(platform.createWorkspace).toHaveBeenCalledWith('Team'))
   })
 
-  it.each(['off', 'on'] as const)('shows the saved %s answer and its one-way rule after navigating back', async (mode) => {
-    const { setPreference } = mount()
-    await toLayout()
-    radio(mode === 'off' ? 'Keep each project separate' : 'Group projects into workspaces')!.click()
-    click('Continue')
-    await waitForText('Add your first project')
-    click('Back')
-    await waitForText(mode === 'off'
-      ? 'Your projects stay separate. You can group them into workspaces later in Settings.'
-      : "Your projects are grouped into workspaces. You can't switch back to separate projects.")
-    expect(view().querySelectorAll('[role="radio"]')).toHaveLength(0)
-    if (mode === 'off') {
-      setPreference('on')
-      await waitForText("Your projects are grouped into workspaces. You can't switch back to separate projects.")
-    }
-    click('Continue')
-    await waitForText('Add your first project')
-    expect(writes).toHaveLength(1)
-  })
+  it.each(['off', 'on'] as const)(
+    'shows the saved %s answer and its one-way rule after navigating back',
+    async (mode) => {
+      const { setPreference } = mount()
+      await toLayout()
+      radio(mode === 'off' ? 'Keep each project separate' : 'Group projects into workspaces')!.click()
+      click('Continue')
+      await waitForText('Add your first project')
+      click('Back')
+      await waitForText(
+        mode === 'off'
+          ? 'Your projects stay separate. You can group them into workspaces later in Settings.'
+          : "Your projects are grouped into workspaces. You can't switch back to separate projects.",
+      )
+      expect(view().querySelectorAll('[role="radio"]')).toHaveLength(0)
+      if (mode === 'off') {
+        setPreference('on')
+        await waitForText("Your projects are grouped into workspaces. You can't switch back to separate projects.")
+      }
+      click('Continue')
+      await waitForText('Add your first project')
+      expect(writes).toHaveLength(1)
+    },
+  )
 
   it('opens the first project after Finish closes and unmounts the wizard', async () => {
     const { onClose } = mount('off', { unmountOnClose: true })
@@ -280,7 +323,9 @@ describe('first-run workspace choice', () => {
   it.each(['node switch', 'disposal'] as const)('ignores a pending Finish after external %s', async (interruption) => {
     const { onClose } = mount('off', { unmountOnClose: true })
     await advanceToDone()
-    pendingWrite = new Promise<void>((resolve) => { releaseWrite = resolve })
+    pendingWrite = new Promise<void>((resolve) => {
+      releaseWrite = resolve
+    })
     click('Open acorn')
     await vi.waitFor(() => expect(writes).toHaveLength(1))
     if (interruption === 'node switch') setActiveNode('another-node')

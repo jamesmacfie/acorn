@@ -1,5 +1,12 @@
 import type { RollbarItemMetadata, RollbarOccurrenceDetail, RollbarOccurrencesResponse } from '../shared/api'
-import { isRecord, type MirroredResourceContribution, parseJson, type ProviderResourceContext, type ProviderResourceRefreshContext, type RouteFailure } from '@acorn/plugin-api/node'
+import {
+  isRecord,
+  type MirroredResourceContribution,
+  parseJson,
+  type ProviderResourceContext,
+  type ProviderResourceRefreshContext,
+  type RouteFailure,
+} from '@acorn/plugin-api/node'
 import {
   instancePath,
   itemByCounterPath,
@@ -29,12 +36,8 @@ type Dependencies = {
   failFor(response: Response): RouteFailure | null
 }
 
-const resourceKey = (
-  connectionId: string,
-  issueIdentifier: string,
-  resource: ChildResource,
-  identifier: string,
-) => `provider:rollbar:${connectionId}:${resource}:${issueIdentifier}:${identifier}`
+const resourceKey = (connectionId: string, issueIdentifier: string, resource: ChildResource, identifier: string) =>
+  `provider:rollbar:${connectionId}:${resource}:${issueIdentifier}:${identifier}`
 
 // The store types `resource` as a bare string, so `ChildResource` stops an occurrence list and an
 // occurrence detail from landing under each other's key. The wrappers also hold the two constants
@@ -71,13 +74,22 @@ async function writeResource(
 }
 
 const isOccurrence = (value: unknown): value is RollbarOccurrenceDetail =>
-  isRecord(value) && typeof value.id === 'string' && (typeof value.url === 'string' || value.url === null) &&
-  Array.isArray(value.frames) && typeof value.truncated === 'boolean'
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  (typeof value.url === 'string' || value.url === null) &&
+  Array.isArray(value.frames) &&
+  typeof value.truncated === 'boolean'
 
 const isOccurrences = (value: unknown): value is RollbarOccurrencesResponse =>
-  isRecord(value) && Array.isArray(value.occurrences) && typeof value.capped === 'boolean' &&
-  value.occurrences.every((occurrence) => isRecord(occurrence) && typeof occurrence.id === 'string' &&
-    (typeof occurrence.url === 'string' || occurrence.url === null))
+  isRecord(value) &&
+  Array.isArray(value.occurrences) &&
+  typeof value.capped === 'boolean' &&
+  value.occurrences.every(
+    (occurrence) =>
+      isRecord(occurrence) &&
+      typeof occurrence.id === 'string' &&
+      (typeof occurrence.url === 'string' || occurrence.url === null),
+  )
 
 const readVersioned = (raw: string): unknown => {
   const envelope = parseJson(raw)
@@ -113,10 +125,13 @@ export function createRollbarOccurrenceResources(dependencies: Dependencies) {
         if (failure) return { ok: false, failure }
         const instances = (await rollbarData<RollbarApiInstancesPage>(response)).instances ?? []
         const value: RollbarOccurrencesResponse = {
-          occurrences: instances.map(normalizeOccurrence).map(occurrenceSummary).filter((item) => item.id !== ''),
+          occurrences: instances
+            .map(normalizeOccurrence)
+            .map(occurrenceSummary)
+            .filter((item) => item.id !== ''),
           capped: instances.length >= OCCURRENCE_PAGE_SIZE,
         }
-        return await writeResource(context, input.identifier, 'occurrence-list', 'list', value)
+        return (await writeResource(context, input.identifier, 'occurrence-list', 'list', value))
           ? { ok: true }
           : { ok: false, failure: { error: 'provider_response_too_large', status: 502 } }
       } catch {
@@ -143,7 +158,7 @@ export function createRollbarOccurrenceResources(dependencies: Dependencies) {
         if (failure) return { ok: false, failure }
         const value = normalizeOccurrence(await rollbarData<RollbarApiInstance>(response))
         if (!value.id) value.id = input.occurrenceId
-        return await writeResource(context, input.identifier, 'occurrence', input.occurrenceId, value)
+        return (await writeResource(context, input.identifier, 'occurrence', input.occurrenceId, value))
           ? { ok: true }
           : { ok: false, failure: { error: 'provider_response_too_large', status: 502 } }
       } catch {

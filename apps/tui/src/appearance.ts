@@ -62,7 +62,13 @@ const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
  *  is what CSS means by it. */
 const fromHex = (hex: string): Color => {
   const body = hex.slice(1)
-  const full = body.length === 3 ? body.split('').map((part) => part + part).join('') : body
+  const full =
+    body.length === 3
+      ? body
+          .split('')
+          .map((part) => part + part)
+          .join('')
+      : body
   return [0, 2, 4].map((at) => Number.parseInt(full.slice(at, at + 2), 16)) as unknown as Color
 }
 
@@ -87,11 +93,15 @@ let palette: Palette = TERMINAL_PALETTE
 export const slotColor = (slot: Slot | undefined): Color => palette[slot ?? 'default']
 
 /** Swap the palette when the device configuration changes. */
-export const setPalette = (next: Palette): void => { palette = next }
+export const setPalette = (next: Palette): void => {
+  palette = next
+}
 
 // Density is the one style axis a terminal keeps (docs/ui-design/appearance.md § Roles, and what each host makes
 // of them). It decides whether a Section or a Card spends a blank line; shape, type and space have no
 // answer here.
 let density: 'compact' | 'default' = 'default'
 export const isCompact = (): boolean => density === 'compact'
-export const setDensity = (next: 'compact' | 'default'): void => { density = next }
+export const setDensity = (next: 'compact' | 'default'): void => {
+  density = next
+}

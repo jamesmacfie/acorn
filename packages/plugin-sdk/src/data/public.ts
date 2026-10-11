@@ -2,8 +2,20 @@
 // docs/plugin-authoring/derived-sources.md for the walkthrough. The implementation in ./derived.ts
 // imports its types from here, and contract.test.ts holds the two together.
 import type {
-  DataField, DataPrimitive, DataRecordAction, DataRecordRef, DataSchema, DataSourceDescription, DataSourceInput,
-  DataSourceInputHandle, DataSourceQuery, DataSourceRegistration, DataSourceRequest, DataSourceResult, DataValue, PluginFetchHandler,
+  DataField,
+  DataPrimitive,
+  DataRecordAction,
+  DataRecordRef,
+  DataSchema,
+  DataSourceDescription,
+  DataSourceInput,
+  DataSourceInputHandle,
+  DataSourceQuery,
+  DataSourceRegistration,
+  DataSourceRequest,
+  DataSourceResult,
+  DataValue,
+  PluginFetchHandler,
 } from 'acorn-plugin-types'
 
 // ── Fields ────────────────────────────────────────────────────────────────────────────────────────
@@ -20,14 +32,25 @@ export type FieldOptions = {
   /** The value may be null, for a row that has none. */
   nullable?: boolean
 }
-export type FieldChoice = { id: string; label: string; tone?: 'ok' | 'warn' | 'bad' | 'muted' | 'accent'; rank?: number }
+export type FieldChoice = {
+  id: string
+  label: string
+  tone?: 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
+  rank?: number
+}
 
 /** The value a record carries for a field with these options. */
-export type FieldValue<T, O extends FieldOptions> = (O['list'] extends true ? readonly T[] : T) | (O['nullable'] extends true ? null : never)
+export type FieldValue<T, O extends FieldOptions> =
+  | (O['list'] extends true ? readonly T[] : T)
+  | (O['nullable'] extends true ? null : never)
 
 /** One declared field. The metadata and the JSON schema are built together, so they can't disagree.
  *  `value` exists only for the compiler: it's how a record's type follows from its fields. */
-export type FieldSpec<T> = { readonly field: Omit<DataField, 'pointer'>; readonly schema: DataSchema; readonly value?: T }
+export type FieldSpec<T> = {
+  readonly field: Omit<DataField, 'pointer'>
+  readonly schema: DataSchema
+  readonly value?: T
+}
 export type FieldSpecs = Record<string, FieldSpec<unknown>>
 export type FieldValues<F extends FieldSpecs> = { [K in keyof F]: F[K] extends FieldSpec<infer T> ? T : never }
 
@@ -37,7 +60,9 @@ export declare const field: {
   number<const O extends FieldOptions>(options: O): FieldSpec<FieldValue<number, O>>
   boolean<const O extends FieldOptions>(options: O): FieldSpec<FieldValue<boolean, O>>
   datetime<const O extends FieldOptions>(options: O): FieldSpec<FieldValue<number, O>>
-  choice<const O extends FieldOptions & { choices: readonly FieldChoice[] }>(options: O): FieldSpec<FieldValue<O['choices'][number]['id'], O>>
+  choice<const O extends FieldOptions & { choices: readonly FieldChoice[] }>(
+    options: O,
+  ): FieldSpec<FieldValue<O['choices'][number]['id'], O>>
   person<const O extends FieldOptions>(options: O): FieldSpec<FieldValue<string, O>>
   link<const O extends FieldOptions>(options: O): FieldSpec<FieldValue<string, O>>
 }
@@ -72,7 +97,9 @@ export type InputHandle = {
   all(query?: InputQuery): Promise<InputRead>
 }
 /** An optional input the person skipped is `undefined`, so the compiler makes you handle it. */
-export type InputHandles<I extends InputSpecs> = { [K in keyof I]: I[K]['optional'] extends true ? InputHandle | undefined : InputHandle }
+export type InputHandles<I extends InputSpecs> = {
+  [K in keyof I]: I[K]['optional'] extends true ? InputHandle | undefined : InputHandle
+}
 
 // ── The source ────────────────────────────────────────────────────────────────────────────────────
 
@@ -116,9 +143,13 @@ export type DerivedSource<I extends InputSpecs, F extends FieldSpecs, P extends 
 
 /** Answers every source operation from the declared fields, checks every record, and calls `query`
  *  for your logic. */
-export declare function defineDerivedSource<const I extends InputSpecs, const F extends FieldSpecs, const P extends FieldSpecs = {}>(
-  definition: DerivedSourceDefinition<I, F, P>,
-): DerivedSource<I, F, P>
+export declare function defineDerivedSource<
+  const I extends InputSpecs,
+  const F extends FieldSpecs,
+  const P extends FieldSpecs = {},
+>(definition: DerivedSourceDefinition<I, F, P>): DerivedSource<I, F, P>
 
 /** The `contributions.dataSources` entry for the manifest, inputs included, so the two can't disagree. */
-export declare function derivedSourceManifest(source: DerivedSource<InputSpecs, FieldSpecs, FieldSpecs>): DataSourceRegistration
+export declare function derivedSourceManifest(
+  source: DerivedSource<InputSpecs, FieldSpecs, FieldSpecs>,
+): DataSourceRegistration

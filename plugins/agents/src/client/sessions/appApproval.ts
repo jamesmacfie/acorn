@@ -10,7 +10,7 @@ const SCOPES: readonly AgentApprovalScope[] = ['session', 'always']
 export function appApprovalOf(value: unknown): AgentAppApproval | null {
   if (typeof value !== 'object' || value == null) return null
   const row = value as Record<string, unknown>
-  const app = typeof row.app === 'object' && row.app != null ? row.app as Record<string, unknown> : null
+  const app = typeof row.app === 'object' && row.app != null ? (row.app as Record<string, unknown>) : null
   if (typeof row.connector !== 'string' || typeof app?.id !== 'string' || typeof app.name !== 'string') return null
   const scopes = Array.isArray(row.scopes) ? SCOPES.filter((scope) => (row.scopes as unknown[]).includes(scope)) : []
   if (!scopes.length) return null
@@ -30,8 +30,10 @@ export const approvalTarget = (approval: AgentAppApproval): string =>
 export function approvalScopeNote(approval: AgentAppApproval): string {
   const session = 'Allow for this session lasts for this agent session only.'
   if (!approval.scopes.includes('always')) return session
-  return `${session} Always allow lets ${approval.connector} use any app with this identifier in future sessions, `
-    + `including rebuilds, until you revoke it in ${approval.connector}'s settings.`
+  return (
+    `${session} Always allow lets ${approval.connector} use any app with this identifier in future sessions, ` +
+    `including rebuilds, until you revoke it in ${approval.connector}'s settings.`
+  )
 }
 
 /** The button a settled request was answered with, if it was answered with one. */

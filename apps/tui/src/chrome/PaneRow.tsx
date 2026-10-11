@@ -12,7 +12,10 @@ import { openActionPicker } from '@acorn/client-core/host/registries/commands'
 import { linkLabel, openLinkPreview } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
 import { markersFor } from '@acorn/client-core/host/registries/rail'
 import { resolveRailMarkers } from '@acorn/client-core/features/tabs'
-import { releasePaneAnnotations, requestPaneAnnotations } from '@acorn/client-core/host/annotations/statusAnnotations.ts'
+import {
+  releasePaneAnnotations,
+  requestPaneAnnotations,
+} from '@acorn/client-core/host/annotations/statusAnnotations.ts'
 
 // The pane row: one line of pane labels, and the pane under it.
 //
@@ -31,7 +34,8 @@ import { releasePaneAnnotations, requestPaneAnnotations } from '@acorn/client-co
 export function PaneStrip(props: { task: Task; focused: boolean }) {
   const scripts = createTaskScripts(() => props.task.id)
   const panes = () => panesFor(props.task)
-  const legendFor = (paneId: string) => resolveRailMarkers(markersFor({ kind: 'pane', id: paneId, taskId: props.task.id })).legend
+  const legendFor = (paneId: string) =>
+    resolveRailMarkers(markersFor({ kind: 'pane', id: paneId, taskId: props.task.id })).legend
   const shownLegend = () => {
     const shown = shownPane(props.task)
     return shown ? legendFor(shown.id).map((marker) => marker.l) : []
@@ -45,23 +49,32 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
   return (
     <box flexDirection="column" flexShrink={0}>
       <box flexDirection="row" gap={1}>
-      {/* The caret every collection draws, because the strip is a place the keys can be and nothing
+        {/* The caret every collection draws, because the strip is a place the keys can be and nothing
           else on this line would say so: the current pane is already marked, and a mark that means
           two things means neither. */}
-      <Line tone="accent">{props.focused ? '\u203a' : ' '}</Line>
-      <Tabs
-        idPrefix="chrome.panes"
-        ariaLabel="Task panes"
-        tabs={panes().map((pane) => {
-          const count = legendFor(pane.id).length
-          return { id: pane.id, label: count ? `${pane.label} +${count}` : pane.label }
-        })}
-        active={shownPane(props.task)?.id ?? ''}
-        onChange={(id) => showPane(props.task, id)}
-      />
+        <Line tone="accent">{props.focused ? '\u203a' : ' '}</Line>
+        <Tabs
+          idPrefix="chrome.panes"
+          ariaLabel="Task panes"
+          tabs={panes().map((pane) => {
+            const count = legendFor(pane.id).length
+            return { id: pane.id, label: count ? `${pane.label} +${count}` : pane.label }
+          })}
+          active={shownPane(props.task)?.id ?? ''}
+          onChange={(id) => showPane(props.task, id)}
+        />
       </box>
-      <Show when={shownLegend().length}><Line role="muted">{shownLegend().join(' · ')}</Line></Show>
-      <Show when={scripts.query.data}>{snapshot => <Line>{scriptLabel(snapshot().setup)} · {scriptLabel(snapshot().teardown)}{scripts.freshness() === 'live' ? '' : ` · ${scripts.freshness()} snapshot`}</Line>}</Show>
+      <Show when={shownLegend().length}>
+        <Line role="muted">{shownLegend().join(' · ')}</Line>
+      </Show>
+      <Show when={scripts.query.data}>
+        {(snapshot) => (
+          <Line>
+            {scriptLabel(snapshot().setup)} · {scriptLabel(snapshot().teardown)}
+            {scripts.freshness() === 'live' ? '' : ` · ${scripts.freshness()} snapshot`}
+          </Line>
+        )}
+      </Show>
     </box>
   )
 }
@@ -80,10 +93,17 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
       title: label ?? 'Link',
       detail: link.url,
       actions: [
-        { id: 'preview', label: 'Preview', run: () => openLinkPreview({
-          url: link.url, ...(label ? { label } : {}), focus: true,
-          scope: { taskId: props.task.id, projectId: props.task.projectId },
-        }) },
+        {
+          id: 'preview',
+          label: 'Preview',
+          run: () =>
+            openLinkPreview({
+              url: link.url,
+              ...(label ? { label } : {}),
+              focus: true,
+              scope: { taskId: props.task.id, projectId: props.task.projectId },
+            }),
+        },
         { id: 'address', label: 'Show address', run: link.showAddress },
       ],
     })
@@ -97,7 +117,11 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
         <Show
           when={shown()}
           keyed
-          fallback={<EmptyState title="No panes available here">Nothing this build can draw is available on this task.</EmptyState>}
+          fallback={
+            <EmptyState title="No panes available here">
+              Nothing this build can draw is available on this task.
+            </EmptyState>
+          }
         >
           {/* Clipped, not shrunk. A pane taller than the screen is the normal case at 24 rows, and yoga
               answers a height deficit by shrinking every child that will give — so a one-line row shrunk to
@@ -110,15 +134,17 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
               draws at all. */}
           {(pane) => (
             <box flexDirection="column" flexGrow={1} overflow="hidden">
-              <ErrorBoundary fallback={(error, reset) => (
-                <PaneFailure
-                  error={error}
-                  nodeId={props.nodeId}
-                  reset={reset}
-                  name={pane.id}
-                  region={{ paneId: pane.id, regionId: 'failure' }}
-                />
-              )}>
+              <ErrorBoundary
+                fallback={(error, reset) => (
+                  <PaneFailure
+                    error={error}
+                    nodeId={props.nodeId}
+                    reset={reset}
+                    name={pane.id}
+                    region={{ paneId: pane.id, regionId: 'failure' }}
+                  />
+                )}
+              >
                 {/* Under a `Suspense`, because a pane whose contribution is a bare component rather than a
                     set of regions is a `lazy()` this host mounts itself, and a pending `lazy()` resolves to
                     an empty string — which a cell host refuses outright where the DOM would have drawn a
@@ -127,7 +153,11 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
                 <PaneIdContext.Provider value={pane.id}>
                   <LinkMenuContext.Provider value={linkMenu}>
                     <Suspense fallback={null}>
-                      {createComponent(pane.component, { get task() { return props.task } })}
+                      {createComponent(pane.component, {
+                        get task() {
+                          return props.task
+                        },
+                      })}
                     </Suspense>
                   </LinkMenuContext.Provider>
                 </PaneIdContext.Provider>

@@ -45,8 +45,11 @@ const SECRET_SHAPED = /_(KEY|SECRET|TOKEN)$/
 // environment already held is visible on every ancestor process anyway, and a harness may pass it on
 // to its agent (`envPassthrough`), so it stays in.
 export function serviceEnvironment(env: NodeJS.ProcessEnv, fromEnvFiles: ReadonlySet<string>): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(env).filter(([name]) =>
-    !SECRET_NAMES.has(name) && !(fromEnvFiles.has(name) && SECRET_SHAPED.test(name))))
+  return Object.fromEntries(
+    Object.entries(env).filter(
+      ([name]) => !SECRET_NAMES.has(name) && !(fromEnvFiles.has(name) && SECRET_SHAPED.test(name)),
+    ),
+  )
 }
 
 export class ServiceHost {
@@ -131,7 +134,11 @@ export class ServiceHost {
     })
     child.on('exit', (code) => this.handleExit(child, code ?? 0))
     await spawned
-    const result = await peer.request('service.start', { ...this.config, deviceToken: rememberedDeviceToken, keys }, 60_000)
+    const result = await peer.request(
+      'service.start',
+      { ...this.config, deviceToken: rememberedDeviceToken, keys },
+      60_000,
+    )
     // Parsed, not cast. A malformed handoff would otherwise surface much later as an unreachable node
     // with no explanation.
     return serviceStartResultSchema.parse(result)

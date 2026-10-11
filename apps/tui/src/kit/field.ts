@@ -50,8 +50,12 @@ export type Press = {
 
 const clamp = (value: number, limit: number): number => Math.min(Math.max(value, 0), limit)
 
-export const create = (text: string, cursor = text.length): Field =>
-  ({ text, cursor: clamp(cursor, text.length), assoc: 0, goal: undefined })
+export const create = (text: string, cursor = text.length): Field => ({
+  text,
+  cursor: clamp(cursor, text.length),
+  assoc: 0,
+  goal: undefined,
+})
 
 /** A value written in from outside, keeping the caret where it was.
  *
@@ -71,8 +75,12 @@ const change = (field: Field, from: number, to: number, insert: string): Field =
   goal: undefined,
 })
 
-const move = (field: Field, cursor: number, assoc = 0, goal?: number): Field =>
-  ({ text: field.text, cursor: clamp(cursor, field.text.length), assoc, goal })
+const move = (field: Field, cursor: number, assoc = 0, goal?: number): Field => ({
+  text: field.text,
+  cursor: clamp(cursor, field.text.length),
+  assoc,
+  goal,
+})
 
 /** Where the logical line the caret is on starts and ends. Not the visual row: `Ctrl+K` and `Ctrl+U`
  *  delete to the ends of the line the text has, which is what they do in a shell. */
@@ -237,9 +245,7 @@ function typedBy(key: Press): string {
  * `newline` is the whole of the difference between the two fields. An `Input` says no, and Return
  * then falls through to its component, which submits (./asking/fields.tsx § Input).
  */
-export function edit(
-  field: Field, key: Press, rows: readonly Row[], newline: boolean,
-): Field | false {
+export function edit(field: Field, key: Press, rows: readonly Row[], newline: boolean): Field | false {
   // A key carrying the platform's own modifier is refused outright, because that modifier is not in
   // the chord spelling below and without this it would match its Ctrl twin. A terminal emulator on
   // macOS keeps that key for itself and never delivers it; where the kitty protocol does deliver it,

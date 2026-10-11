@@ -8,9 +8,7 @@
 //   command - a stored shell command run in the task worktree, or the project checkout, when a
 //             request references it. Its output is never stored.
 import { Index, Show } from 'solid-js'
-import {
-  Button, Checkbox, ConfirmButton, Icon, Inline, Input, Select, Stack, Text,
-} from '@acorn/plugin-api/ui/tree'
+import { Button, Checkbox, ConfirmButton, Icon, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui/tree'
 import { variableKinds, type VariableKind } from '../shared/model'
 import type { HttpClient } from './httpClient'
 import { createVariableModel } from './variableModel'
@@ -32,7 +30,10 @@ const PLACEHOLDER: Record<VariableKind, string> = {
 
 // Headed by its host: the panel's Variables bar, or the settings page's Variables section.
 export default function HttpVariables(props: { client: HttpClient; projectId: string }) {
-  const { rows, error, busy, editRow, save, remove, add } = createVariableModel(() => props.client, () => props.projectId)
+  const { rows, error, busy, editRow, save, remove, add } = createVariableModel(
+    () => props.client,
+    () => props.projectId,
+  )
 
   return (
     <Stack gap="section">
@@ -45,7 +46,9 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
       </Stack>
 
       <Show when={error()}>
-        <Text tone="danger" wrap>{error()}</Text>
+        <Text tone="danger" wrap>
+          {error()}
+        </Text>
       </Show>
 
       {/* One row per variable, as an Inline of controls. It was a five-column CSS grid this plugin
@@ -56,8 +59,18 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
         {(row, index) => (
           <Stack gap="none">
             <Inline wrap>
-              <Checkbox checked={row().enabled} ariaLabel="Enabled" onChange={(checked: boolean) => editRow(index, { enabled: checked })} />
-              <Input size="sm" label="Name" value={row().name} placeholder="BASE_URL" onChange={(value: string) => editRow(index, { name: value })} />
+              <Checkbox
+                checked={row().enabled}
+                ariaLabel="Enabled"
+                onChange={(checked: boolean) => editRow(index, { enabled: checked })}
+              />
+              <Input
+                size="sm"
+                label="Name"
+                value={row().name}
+                placeholder="BASE_URL"
+                onChange={(value: string) => editRow(index, { name: value })}
+              />
               <Select
                 size="sm"
                 value={row().kind}
@@ -70,7 +83,11 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
                 label="Value"
                 type={row().kind === 'secret' ? 'password' : 'text'}
                 value={row().value}
-                placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'Saved. Leave blank to keep it.' : PLACEHOLDER[row().kind]}
+                placeholder={
+                  row().kind === 'secret' && row().hasStoredSecret
+                    ? 'Saved. Leave blank to keep it.'
+                    : PLACEHOLDER[row().kind]
+                }
                 onChange={(value: string) => editRow(index, { value })}
               />
               <Button size="sm" busy={busy().includes(row().key)} onPress={() => void save(index)}>
@@ -88,7 +105,9 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
                   confirmLabel="Delete variable?"
                   skipConfirm={!row().id}
                   onConfirm={() => void remove(index)}
-                ><Icon name="trash-2" /></ConfirmButton>
+                >
+                  <Icon name="trash-2" />
+                </ConfirmButton>
               </Show>
             </Inline>
             <Text tone="muted">{KIND_HINT[row().kind]}</Text>

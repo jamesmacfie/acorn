@@ -40,8 +40,10 @@ export const closeWorkflowStart = (): void => {
  * frame rather than in a toast, so that row throws (../commands.ts). One rule, two readers.
  */
 export const needsStartDialog = (next: Pick<StartRequest, 'inputs' | 'prefill' | 'taskId'>): boolean =>
-  !next.taskId
-  || (next.inputs ?? []).some((input) => input.required && input.default === undefined && next.prefill?.[input.name] === undefined)
+  !next.taskId ||
+  (next.inputs ?? []).some(
+    (input) => input.required && input.default === undefined && next.prefill?.[input.name] === undefined,
+  )
 
 /**
  * Ask for the dialog.

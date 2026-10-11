@@ -3,10 +3,7 @@
  * app-server process exits during that window, thread/resume reports this exact condition. Acorn
  * may replace only that empty thread; the runtime separately proves no turn may have executed.
  */
-export const canReplaceMissingCodexSession = (
-  error: unknown,
-  noProviderExecutionHistory: boolean,
-): boolean =>
-  noProviderExecutionHistory
-  && error instanceof Error
-  && /^no rollout found for thread id(?:\s|$)/i.test(error.message.trim())
+export const canReplaceMissingCodexSession = (error: unknown, noProviderExecutionHistory: boolean): boolean =>
+  noProviderExecutionHistory &&
+  error instanceof Error &&
+  /^no rollout found for thread id(?:\s|$)/i.test(error.message.trim())

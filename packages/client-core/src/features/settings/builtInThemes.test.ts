@@ -20,7 +20,11 @@ import { THEMES } from './builtInThemes'
 // by plugins/chrome/themes.test.ts, which asserts a registration produces a block whose selector is
 // exactly the registered id.
 describe('THEMES ↔ stylesheets', () => {
-  const css = stripComments(readStyleSheets().map((f) => f.text).join('\n'))
+  const css = stripComments(
+    readStyleSheets()
+      .map((f) => f.text)
+      .join('\n'),
+  )
   const inCss = new Set([
     // 'light' is the :root default (no data-theme block); every other theme has an attribute block.
     'light',

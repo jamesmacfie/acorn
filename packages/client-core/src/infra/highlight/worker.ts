@@ -41,15 +41,18 @@ async function onMainThread(path: string, code: string): Promise<HighlightLines>
   if (lang === 'text') return plain(code)
   try {
     const hl = await getHighlighter(lang)
-    return code
-      .split('\n')
-      .map((line) =>
-        (hl.codeToTokensWithThemes(line, { lang: lang as never, themes: { light: 'github-light', dark: 'github-dark' } })[0] ?? []).map((t) => ({
-          content: t.content,
-          light: t.variants.light.color ?? '',
-          dark: t.variants.dark.color ?? '',
-        })),
-      )
+    return code.split('\n').map((line) =>
+      (
+        hl.codeToTokensWithThemes(line, {
+          lang: lang as never,
+          themes: { light: 'github-light', dark: 'github-dark' },
+        })[0] ?? []
+      ).map((t) => ({
+        content: t.content,
+        light: t.variants.light.color ?? '',
+        dark: t.variants.dark.color ?? '',
+      })),
+    )
   } catch {
     return plain(code)
   }
@@ -72,7 +75,10 @@ export async function highlightDocument(path: string, code: string): Promise<Hig
     return { lines, timedOut: reason === 'timeout' }
   }
   const result = await owner.request((id) => ({
-    id, lang, code, ...(telemetryEnabled() ? { sentAt: performance.timeOrigin + performance.now() } : {}),
+    id,
+    lang,
+    code,
+    ...(telemetryEnabled() ? { sentAt: performance.timeOrigin + performance.now() } : {}),
   }))
   if (result.kind === 'degraded') {
     recordSample('core', 'highlight.fallback', 1, '1', { reason: 'retired' })

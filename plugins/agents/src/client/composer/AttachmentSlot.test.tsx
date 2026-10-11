@@ -32,35 +32,41 @@ const Contributor = () => <span>drawn by images</span>
 const registered: Disposable[] = []
 
 const attachment = (filename: string, mediaType: string): AgentAttachment =>
-  ({ id: 'a1', filename, mediaType, byteSize: 2048 } as AgentAttachment)
+  ({ id: 'a1', filename, mediaType, byteSize: 2048 }) as AgentAttachment
 
 const point = () =>
-  registered.push(extensionPointRegistry.register({
-    id: AGENT_ATTACHMENT_POINT,
-    ownerId: 'agents',
-    label: 'Attachment',
-    kind: 'remote',
-    mode: 'replace',
-    max: 4,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: AGENT_ATTACHMENT_POINT,
+      ownerId: 'agents',
+      label: 'Attachment',
+      kind: 'remote',
+      mode: 'replace',
+      max: 4,
+    }),
+  )
 
 const contributor = (pluginId: string, matches: string[]) =>
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:attachment`,
-    pluginId,
-    point: AGENT_ATTACHMENT_POINT,
-    label: `${pluginId} viewer`,
-    order: 500,
-    carrier: 'component',
-    component: Contributor,
-    matches,
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:attachment`,
+      pluginId,
+      point: AGENT_ATTACHMENT_POINT,
+      label: `${pluginId} viewer`,
+      order: 500,
+      carrier: 'component',
+      component: Contributor,
+      matches,
+    } as ExtensionContribution),
+  )
 
 const draw = (file: AgentAttachment): string => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(
-    () => <AttachmentSlot attachment={file} taskId="t1" sessionId="s1" onRemove={() => {}} onReplace={async () => {}} />,
+    () => (
+      <AttachmentSlot attachment={file} taskId="t1" sessionId="s1" onRemove={() => {}} onReplace={async () => {}} />
+    ),
     host,
   )
   // Each remove control reads as one ✕, whether it is the chip's own or the one outside the slot:

@@ -6,7 +6,6 @@ import { prefsOptions, projectsOptions } from '../../infra/queries'
 export function createWorkspacesMode(): () => WorkspacesMode | undefined {
   const prefs = createQuery(() => prefsOptions(true))
   const projects = createQuery(() => projectsOptions(true))
-  return () => prefs.data && projects.data
-    ? workspacesMode(prefs.data[WORKSPACES_PREF_KEY], projects.data.length)
-    : undefined
+  return () =>
+    prefs.data && projects.data ? workspacesMode(prefs.data[WORKSPACES_PREF_KEY], projects.data.length) : undefined
 }

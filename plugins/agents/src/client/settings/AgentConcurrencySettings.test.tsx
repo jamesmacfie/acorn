@@ -26,7 +26,10 @@ const draw = () => {
   const host = document.createElement('div')
   document.body.append(host)
   const dispose = render(() => <AgentConcurrencySettings />, host)
-  hosts.push(() => { dispose(); host.remove() })
+  hosts.push(() => {
+    dispose()
+    host.remove()
+  })
   return host
 }
 

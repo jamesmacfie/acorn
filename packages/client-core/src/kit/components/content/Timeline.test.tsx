@@ -57,7 +57,9 @@ const layout = () => {
     Object.defineProperty(box, 'scrollTop', {
       configurable: true,
       get: () => scrollTop,
-      set: (to: number) => { scrollTop = Math.max(0, Math.min(Math.round(to), maxScroll())) },
+      set: (to: number) => {
+        scrollTop = Math.max(0, Math.min(Math.round(to), maxScroll()))
+      },
     })
     box.getBoundingClientRect = () => ({ top: 0, bottom: viewport, height: viewport }) as DOMRect
   }
@@ -134,13 +136,27 @@ function mount(turns: () => readonly string[], height = 100) {
   const [place, setPlace] = createSignal<ReadingPlace>(LIVE)
   const draw = () => {
     for (const key of turns()) if (!heights.has(key)) heights.set(key, height)
-    dispose = render(() => (
-      <Timeline follow place={place} onChange={(next) => { held = next; setPlace(next) }}>
-        <For each={turns()}>
-          {(key) => <Timeline.Turn key={key}><Card>{key}</Card></Timeline.Turn>}
-        </For>
-      </Timeline>
-    ), host)
+    dispose = render(
+      () => (
+        <Timeline
+          follow
+          place={place}
+          onChange={(next) => {
+            held = next
+            setPlace(next)
+          }}
+        >
+          <For each={turns()}>
+            {(key) => (
+              <Timeline.Turn key={key}>
+                <Card>{key}</Card>
+              </Timeline.Turn>
+            )}
+          </For>
+        </Timeline>
+      ),
+      host,
+    )
     settle()
   }
   draw()
@@ -163,7 +179,16 @@ function mount(turns: () => readonly string[], height = 100) {
 
 describe('Timeline', () => {
   it('is a plain list until it is told to follow', () => {
-    dispose = render(() => <Timeline><Timeline.Turn><Card>one</Card></Timeline.Turn></Timeline>, host)
+    dispose = render(
+      () => (
+        <Timeline>
+          <Timeline.Turn>
+            <Card>one</Card>
+          </Timeline.Turn>
+        </Timeline>
+      ),
+      host,
+    )
     expect(scroller()).toBeNull()
     expect(host.querySelector('.ui-timeline')).not.toBeNull()
   })
@@ -482,13 +507,20 @@ describe('Timeline health', () => {
   it('reports projected and mounted turns apart, and returns its observers and frames on teardown', () => {
     const [turns, setTurns] = createSignal(['a', 'b', 'c'])
     for (const key of ['a', 'b', 'c', 'd']) heights.set(key, 100)
-    dispose = render(() => (
-      <Timeline follow total={40}>
-        <For each={turns()}>
-          {(key) => <Timeline.Turn key={key}><Card>{key}</Card></Timeline.Turn>}
-        </For>
-      </Timeline>
-    ), host)
+    dispose = render(
+      () => (
+        <Timeline follow total={40}>
+          <For each={turns()}>
+            {(key) => (
+              <Timeline.Turn key={key}>
+                <Card>{key}</Card>
+              </Timeline.Turn>
+            )}
+          </For>
+        </Timeline>
+      ),
+      host,
+    )
     settle()
 
     let [entry] = surfaceHealthSnapshot().surfaces
@@ -517,7 +549,16 @@ describe('Timeline health', () => {
   })
 
   it('counts a plain run of cards, which has no observers of its own', () => {
-    dispose = render(() => <Timeline><Timeline.Turn><Card>one</Card></Timeline.Turn></Timeline>, host)
+    dispose = render(
+      () => (
+        <Timeline>
+          <Timeline.Turn>
+            <Card>one</Card>
+          </Timeline.Turn>
+        </Timeline>
+      ),
+      host,
+    )
     const [entry] = surfaceHealthSnapshot().surfaces
     expect(entry?.mounted.dynamicBlocks).toBe(1)
     expect(entry?.topology.dynamicBlocks).toBe(1)
@@ -549,7 +590,9 @@ describe('Timeline window', () => {
     }
     Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
       configurable: true,
-      get(this: HTMLElement) { return this.classList.contains('ui-timeline-turn') ? size(this) : 0 },
+      get(this: HTMLElement) {
+        return this.classList.contains('ui-timeline-turn') ? size(this) : 0
+      },
     })
   })
   afterEach(() => {
@@ -566,7 +609,9 @@ describe('Timeline window', () => {
     Object.defineProperty(element, 'scrollTop', {
       configurable: true,
       get: () => scrollTop,
-      set: (to: number) => { scrollTop = Math.max(0, Math.min(Math.round(to), Math.max(0, total() - viewport))) },
+      set: (to: number) => {
+        scrollTop = Math.max(0, Math.min(Math.round(to), Math.max(0, total() - viewport)))
+      },
     })
     element.getBoundingClientRect = () => ({ top: 0, bottom: viewport, height: viewport }) as DOMRect
     return element
@@ -594,7 +639,10 @@ describe('Timeline window', () => {
         <Timeline
           follow
           place={place}
-          onChange={(next) => { held = next; setPlace(next) }}
+          onChange={(next) => {
+            held = next
+            setPlace(next)
+          }}
           total={keys().length}
           hidden={window.start()}
           onShowEarlier={window.showEarlier}
@@ -604,7 +652,10 @@ describe('Timeline window', () => {
           <For each={window.keys()}>
             {(key, index) => (
               <Timeline.Turn key={key} position={window.start() + index() + 1} setSize={keys().length}>
-                <Card><span>{key}</span><button type="button">{`act ${key}`}</button></Card>
+                <Card>
+                  <span>{key}</span>
+                  <button type="button">{`act ${key}`}</button>
+                </Card>
               </Timeline.Turn>
             )}
           </For>
@@ -616,7 +667,8 @@ describe('Timeline window', () => {
     return { keys, setKeys, place: () => held }
   }
 
-  const earlier = () => [...host.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show earlier'))
+  const earlier = () =>
+    [...host.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show earlier'))
 
   it('draws the newest page, says how many turns it hides, and numbers each in the whole list', () => {
     mountWindowed(keysOf(1000))
@@ -718,10 +770,18 @@ describe('Timeline deferred bodies', () => {
   let watched: Element[] = []
   let notify: ((entries: { target: Element; isIntersecting: boolean }[]) => void) | undefined
   class TestIntersectionObserver {
-    constructor(run: (entries: { target: Element; isIntersecting: boolean }[]) => void) { notify = run }
-    observe(element: Element) { watched.push(element) }
-    unobserve(element: Element) { watched = watched.filter((item) => item !== element) }
-    disconnect() { watched = [] }
+    constructor(run: (entries: { target: Element; isIntersecting: boolean }[]) => void) {
+      notify = run
+    }
+    observe(element: Element) {
+      watched.push(element)
+    }
+    unobserve(element: Element) {
+      watched = watched.filter((item) => item !== element)
+    }
+    disconnect() {
+      watched = []
+    }
   }
   beforeEach(() => {
     watched = []
@@ -734,23 +794,29 @@ describe('Timeline deferred bodies', () => {
 
   it('builds a body when its turn comes near, in the same list item, and counts it', () => {
     let built = 0
-    dispose = render(() => (
-      <Timeline>
-        <For each={['a', 'b', 'c']}>
-          {(key) => (
-            <Timeline.Turn key={key}>
-              {(near) => (
-                <Card>
-                  <Show when={near()} fallback={<span>summary {key}</span>}>
-                    {(() => { built += 1; return <span>body {key}</span> })()}
-                  </Show>
-                </Card>
-              )}
-            </Timeline.Turn>
-          )}
-        </For>
-      </Timeline>
-    ), host)
+    dispose = render(
+      () => (
+        <Timeline>
+          <For each={['a', 'b', 'c']}>
+            {(key) => (
+              <Timeline.Turn key={key}>
+                {(near) => (
+                  <Card>
+                    <Show when={near()} fallback={<span>summary {key}</span>}>
+                      {(() => {
+                        built += 1
+                        return <span>body {key}</span>
+                      })()}
+                    </Show>
+                  </Card>
+                )}
+              </Timeline.Turn>
+            )}
+          </For>
+        </Timeline>
+      ),
+      host,
+    )
     const item = host.querySelector('[data-turn="b"]')!
     expect(watched).toHaveLength(3)
     expect(item.textContent).toBe('summary b')
@@ -776,11 +842,14 @@ describe('Timeline deferred bodies', () => {
 
   it('builds every body at once where nothing can say what is near', () => {
     delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver
-    dispose = render(() => (
-      <Timeline>
-        <Timeline.Turn key="a">{(near) => <Card>{near() ? 'body' : 'summary'}</Card>}</Timeline.Turn>
-      </Timeline>
-    ), host)
+    dispose = render(
+      () => (
+        <Timeline>
+          <Timeline.Turn key="a">{(near) => <Card>{near() ? 'body' : 'summary'}</Card>}</Timeline.Turn>
+        </Timeline>
+      ),
+      host,
+    )
     expect(host.textContent).toBe('body')
   })
 })

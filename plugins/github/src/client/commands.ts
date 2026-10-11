@@ -109,21 +109,36 @@ export function githubCommands(deps: GithubCommandDeps): ContributedCommand[] {
         const list = deps.files()
         const query = text.trim()
         if (!query) return Promise.resolve(list.map((file) => fileItem(file.path)))
-        return Promise.resolve(list
-          .map((file, at) => ({ file, at, score: fuzzyScore(query, file.path) }))
-          .filter((row): row is { file: PullFile; at: number; score: number } => row.score !== null)
-          .sort((a, b) => b.score - a.score || a.at - b.at)
-          .map((row) => fileItem(row.file.path)))
+        return Promise.resolve(
+          list
+            .map((file, at) => ({ file, at, score: fuzzyScore(query, file.path) }))
+            .filter((row): row is { file: PullFile; at: number; score: number } => row.score !== null)
+            .sort((a, b) => b.score - a.score || a.at - b.at)
+            .map((row) => fileItem(row.file.path)),
+        )
       },
       select: (item): CommandOutcome => {
         if (!item.ref) return COMMAND_CLOSED
-        if (!deps.files().some((file) => file.path === item.ref)) throw new Error('that file is no longer in this pull request')
+        if (!deps.files().some((file) => file.path === item.ref))
+          throw new Error('that file is no longer in this pull request')
         deps.selectFile(item.ref)
         return COMMAND_CLOSED
       },
     },
-    { id: 'github.files.next', title: 'Next changed file', category: 'navigation', when: () => !!deps.route(), run: () => deps.cycleFile(1) },
-    { id: 'github.files.previous', title: 'Previous changed file', category: 'navigation', when: () => !!deps.route(), run: () => deps.cycleFile(-1) },
+    {
+      id: 'github.files.next',
+      title: 'Next changed file',
+      category: 'navigation',
+      when: () => !!deps.route(),
+      run: () => deps.cycleFile(1),
+    },
+    {
+      id: 'github.files.previous',
+      title: 'Previous changed file',
+      category: 'navigation',
+      when: () => !!deps.route(),
+      run: () => deps.cycleFile(-1),
+    },
     {
       id: 'github.pull.find',
       kind: 'search',
@@ -143,13 +158,15 @@ export function githubCommands(deps: GithubCommandDeps): ContributedCommand[] {
         const list = await openPulls(context)
         // The browse list's own matcher, so the palette finds a pull request by the same words the
         // filter box does: its number, its title, its author and its branch.
-        return filterPulls(list, text).slice(0, MAX_PULL_ROWS).map((pull): CommandSearchItem => ({
-          id: String(pull.number),
-          title: pull.title,
-          subtitle: `#${pull.number}${pull.author ? ` · ${pull.author}` : ''}`,
-          ...(pull.draft ? { badge: 'draft' } : {}),
-          ref: String(pull.number),
-        }))
+        return filterPulls(list, text)
+          .slice(0, MAX_PULL_ROWS)
+          .map((pull): CommandSearchItem => ({
+            id: String(pull.number),
+            title: pull.title,
+            subtitle: `#${pull.number}${pull.author ? ` · ${pull.author}` : ''}`,
+            ...(pull.draft ? { badge: 'draft' } : {}),
+            ref: String(pull.number),
+          }))
       },
       select: (item, context): CommandOutcome => {
         const projectId = context.projectId ?? deps.projectId()

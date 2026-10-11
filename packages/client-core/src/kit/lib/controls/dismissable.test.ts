@@ -107,7 +107,11 @@ describe('createDismissable', () => {
     const press = fakeDocument()
     const onDismiss = vi.fn()
     createRoot((dispose) => {
-      createDismissable({ onDismiss, container: () => ({ isConnected: false }) as unknown as HTMLElement, trapFocus: false })
+      createDismissable({
+        onDismiss,
+        container: () => ({ isConnected: false }) as unknown as HTMLElement,
+        trapFocus: false,
+      })
       press(keyEvent('Escape').event)
       expect(onDismiss).not.toHaveBeenCalled()
       dispose()

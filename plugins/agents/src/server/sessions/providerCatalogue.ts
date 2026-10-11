@@ -27,10 +27,14 @@ export class ProviderCatalogue {
     // The runtime's shutdown. Once it aborts, every probe is refused and nothing is cached.
     private readonly shutdown: AbortSignal,
   ) {
-    shutdown.addEventListener('abort', () => {
-      this.cache = null
-      this.probe = null
-    }, { once: true })
+    shutdown.addEventListener(
+      'abort',
+      () => {
+        this.cache = null
+        this.probe = null
+      },
+      { once: true },
+    )
   }
 
   async list(force = false): Promise<AgentProviderDescriptor[]> {
@@ -57,7 +61,8 @@ export class ProviderCatalogue {
   /** The last answer already observed. Diagnostics must never start a probe. */
   observed(id: string): AgentProviderDescriptor | null {
     return this.cache?.generation === this.registry.generation
-      ? this.cache.descriptors.find((provider) => provider.id === id) ?? null : null
+      ? (this.cache.descriptors.find((provider) => provider.id === id) ?? null)
+      : null
   }
 
   /** Harnesses that turn the person's read block into their own sandbox (../drivers/readBlock.ts). */
@@ -77,7 +82,10 @@ export class ProviderCatalogue {
       }
     }
     if (!advertised.size) return descriptors
-    return descriptors.map(provider => ({ ...provider, configOptions: advertised.get(provider.id) ?? provider.configOptions }))
+    return descriptors.map((provider) => ({
+      ...provider,
+      configOptions: advertised.get(provider.id) ?? provider.configOptions,
+    }))
   }
 
   // A forced read starts its own probe, because one already running may have started before the
@@ -89,37 +97,41 @@ export class ProviderCatalogue {
     const probedAt = Date.now()
     const driverIds = this.registry.providers()
     const wave = { generation, promise: null as unknown as Promise<AgentProviderDescriptor[]> }
-    const probe = Promise.all(driverIds.map(async (providerId) => {
-      const driver = this.registry.create(providerId)
-      if (!driver) throw new Error(`Agent driver disappeared during discovery: ${providerId}`)
-      try {
-        return await driver.probe()
-      } catch (error) {
-        return {
-          id: providerId,
-          profileId: driver.profileId,
-          label: providerId,
-          driverKind: 'terminal' as const,
-          driverVersion: 'unavailable',
-          installed: false,
-          authenticated: null,
-          statusAuthority: 'process' as const,
-          capabilities: [],
-          configOptions: [],
-          commands: [],
-          skills: [],
-          diagnostics: [error instanceof Error ? error.message : 'Provider discovery failed.'],
+    const probe = Promise.all(
+      driverIds.map(async (providerId) => {
+        const driver = this.registry.create(providerId)
+        if (!driver) throw new Error(`Agent driver disappeared during discovery: ${providerId}`)
+        try {
+          return await driver.probe()
+        } catch (error) {
+          return {
+            id: providerId,
+            profileId: driver.profileId,
+            label: providerId,
+            driverKind: 'terminal' as const,
+            driverVersion: 'unavailable',
+            installed: false,
+            authenticated: null,
+            statusAuthority: 'process' as const,
+            capabilities: [],
+            configOptions: [],
+            commands: [],
+            skills: [],
+            diagnostics: [error instanceof Error ? error.message : 'Provider discovery failed.'],
+          }
         }
-      }
-    })).then((descriptors) => {
-      // An older probe that finishes last must not replace a newer answer.
-      if (!this.shutdown.aborted && (this.probe === wave && this.registry.generation === generation)) {
-        this.cache = { probedAt, generation, descriptors }
-      }
-      return descriptors
-    }).finally(() => {
-      if (this.probe === wave) this.probe = null
-    })
+      }),
+    )
+      .then((descriptors) => {
+        // An older probe that finishes last must not replace a newer answer.
+        if (!this.shutdown.aborted && this.probe === wave && this.registry.generation === generation) {
+          this.cache = { probedAt, generation, descriptors }
+        }
+        return descriptors
+      })
+      .finally(() => {
+        if (this.probe === wave) this.probe = null
+      })
     wave.promise = probe
     this.probe = wave
     return probe

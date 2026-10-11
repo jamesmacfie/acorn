@@ -3,26 +3,32 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setRouteTestCapability, type AppEnv } from '@acorn/plugin-api/node'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes, type WorkflowSchedulesBridge } from './schedules'
 
-const post = (path: string, body: unknown) => new Request(`http://acorn.test${path}`, {
-  method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-})
+const post = (path: string, body: unknown) =>
+  new Request(`http://acorn.test${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
 
 const appFor = (principal: unknown) => {
   const app = new Hono<AppEnv>()
-  app.use('/schedules/*', async (c, next) => { c.set('principal', principal as never); await next() })
+  app.use('/schedules/*', async (c, next) => {
+    c.set('principal', principal as never)
+    await next()
+  })
   return app.route('/schedules', workflowScheduleRoutes)
 }
 
 const bridge = (overrides: Partial<WorkflowSchedulesBridge> = {}): WorkflowSchedulesBridge => ({
   list: async () => [],
-  get: async id => ({ id }),
+  get: async (id) => ({ id }),
   defaults: async () => ({ timezone: 'UTC' }),
-  prepare: async input => input,
-  save: async input => input,
+  prepare: async (input) => input,
+  save: async (input) => input,
   approve: async (id, firstCheck, freshEpoch) => ({ id, firstCheck, freshEpoch }),
   pause: async (id, paused) => ({ id, paused }),
-  runNow: async id => ({ id }),
-  remove: async id => ({ id }),
+  runNow: async (id) => ({ id }),
+  remove: async (id) => ({ id }),
   ...overrides,
 })
 
@@ -32,8 +38,9 @@ describe('workflow schedule routes', () => {
   it('keeps schedule bindings behind the device gate', async () => {
     const save = vi.fn(bridge().save)
     setRouteTestCapability(WORKFLOW_SCHEDULES_ROUTE, bridge({ save }))
-    const response = await appFor({ kind: 'internal', scope: 'task', userId: 'owner', taskId: 'task' })
-      .fetch(post('/schedules', { projectId: 'p', workflowId: 'w', timezone: 'UTC' }))
+    const response = await appFor({ kind: 'internal', scope: 'task', userId: 'owner', taskId: 'task' }).fetch(
+      post('/schedules', { projectId: 'p', workflowId: 'w', timezone: 'UTC' }),
+    )
     expect(response.status).toBe(403)
     expect(save).not.toHaveBeenCalled()
   })
@@ -56,7 +63,9 @@ describe('workflow schedule routes', () => {
     const app = appFor({ kind: 'device', userId: 'owner', deviceId: 'device' })
     const draft = { projectId: 'p', workflowId: 'w', timezone: 'Pacific/Auckland', inputs: { count: 2 } }
     expect((await app.fetch(post('/schedules', draft))).status).toBe(200)
-    expect((await app.fetch(post('/schedules/id/approve', { firstCheck: 'track-now', freshEpoch: true }))).status).toBe(200)
+    expect((await app.fetch(post('/schedules/id/approve', { firstCheck: 'track-now', freshEpoch: true }))).status).toBe(
+      200,
+    )
     expect(save).toHaveBeenCalledWith(draft)
     expect(approve).toHaveBeenCalledWith('id', 'track-now', true)
   })

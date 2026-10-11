@@ -26,7 +26,11 @@ import {
 import type { CommandInputResult } from '@acorn/protocol/commands.ts'
 import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
-import type { PluginCompletionResponse, PluginDocumentBody, PluginHoverResponse } from '@acorn/protocol/documentSurface.ts'
+import type {
+  PluginCompletionResponse,
+  PluginDocumentBody,
+  PluginHoverResponse,
+} from '@acorn/protocol/documentSurface.ts'
 import { defaultModelIdFor } from '@acorn/protocol/modelProviders.ts'
 import { GENERATE_MAX_PROMPT_CHARS, SCRATCH_SELECT_ID } from '../../shared/database'
 import type { DbGenerateResult, DbSavedQuery } from '../../shared/database'
@@ -57,7 +61,13 @@ const isInteractiveOwner = (c: Context<AppEnv>): boolean => {
 // on the wire.
 const cell = z.union([z.string(), z.null()])
 const queryBody = z.object({ sql: z.string().min(1) })
-const updateBody = z.object({ schema: z.string(), name: z.string(), column: z.string(), value: cell, pk: z.record(z.string(), cell) })
+const updateBody = z.object({
+  schema: z.string(),
+  name: z.string(),
+  column: z.string(),
+  value: cell,
+  pk: z.record(z.string(), cell),
+})
 const insertBody = z.object({ schema: z.string(), name: z.string(), values: z.record(z.string(), cell) })
 const deleteBody = z.object({ schema: z.string(), name: z.string(), pk: z.record(z.string(), cell) })
 const generateBody = z.object({
@@ -73,8 +83,12 @@ const savedQueryBody = z.object({
 })
 // The document surface's write body. The host defines this shape, and the cap matches the one it
 // enforces on the way in and the bridge enforces on the way back.
-const documentText = z.string().refine((text) => Buffer.byteLength(text, 'utf8') <= MAX_DOCUMENT_BYTES,
-  `SQL scratch is capped at ${MAX_DOCUMENT_BYTES} UTF-8 bytes. The previous document is unchanged.`)
+const documentText = z
+  .string()
+  .refine(
+    (text) => Buffer.byteLength(text, 'utf8') <= MAX_DOCUMENT_BYTES,
+    `SQL scratch is capped at ${MAX_DOCUMENT_BYTES} UTF-8 bytes. The previous document is unchanged.`,
+  )
 const scratchBody = z.object({ text: documentText })
 const completionsBody = z.object({
   text: documentText,
@@ -95,13 +109,24 @@ const paletteGenerateBody = z.object({
 const id = (c: { req: { param(k: string): string } }) => c.req.param('taskId')
 
 type SavedRow = typeof dbSavedQueries.$inferSelect
-const rowToQuery = (r: SavedRow): DbSavedQuery => ({ id: r.id, name: r.name, notes: r.notes, sql: r.sql, updatedAt: r.updatedAt })
+const rowToQuery = (r: SavedRow): DbSavedQuery => ({
+  id: r.id,
+  name: r.name,
+  notes: r.notes,
+  sql: r.sql,
+  updatedAt: r.updatedAt,
+})
 
 export type DatabaseRouteServices = Pick<CoreServices, 'tasks' | 'models' | 'projects'>
 
 type Emit = (frame: { channel: string } & Record<string, unknown>) => void
 
-export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge, emit: Emit = () => {}) => {
+export const databaseRoutes = (
+  db: PluginDatabase,
+  core: DatabaseRouteServices,
+  bridge: DatabaseBridge,
+  emit: Emit = () => {},
+) => {
   // Saved queries are project-scoped but addressed through the task, like everything else in this
   // pane. The frame holds the task and core resolves its project without a cross-file join.
   const taskOf = (taskId: string) => core.tasks.load(taskId)
@@ -145,306 +170,380 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       .onConflictDoUpdate({ target: dbScratch.taskId, set: { sql, updatedAt: at } })
   }
 
-  return new Hono<AppEnv>()
-    .post('/cli/query', async (c) => {
-      const input = z.strictObject({ nodeId: z.string(), taskId: z.string().min(1), sql: z.string().min(1).max(20_000), maxRows: z.number().int().min(1).max(200).optional() })
-        .safeParse(await c.req.json().catch(() => null))
-      if (!input.success) return respondError(c, 400, 'bad_request')
-      if (!principalMayActOnTask(requestContext(c).principal, input.data.taskId)) return respondError(c, 404, 'not_found')
-      if (!await taskOf(input.data.taskId)) return respondError(c, 404, 'not_found')
-      try {
-        const result = await databaseQuery(bridge).query(input.data.taskId, input.data.sql, { maxRows: input.data.maxRows })
-        return c.json({ ...result, rows: result.rows.map((row) => row.map((cell) => ({ value: cell ?? '', isNull: cell === null }))) })
-      } catch (error) {
-        return respondError(c, 400, 'bad_request', [error instanceof Error ? error.message : 'Query refused.'])
-      }
-    })
-    // The manifest's `availability` route: the pane is hidden on a task with no database source.
-    // It lists every active task on the node, so a task-scoped caller may not read it.
-    .get('/available', async (c) => {
-      const { principal } = requestContext(c)
-      if (principal.kind !== 'device' && principal.scope !== 'service') return respondError(c, 403, 'forbidden')
-      const tasks = await core.tasks.active()
-      return c.json(Object.fromEntries(await Promise.all(tasks.map(async (t) => [t.id, await bridge.configured(t.id)] as const))))
-    })
-    .post('/tasks/:taskId/connect', async (c) => c.json(await bridge.connect(id(c))))
-    .post('/tasks/:taskId/disconnect', async (c) => c.json(await bridge.disconnect(id(c))))
-    .get('/tasks/:taskId/tables', async (c) => c.json(await bridge.tables(id(c))))
-    .get('/tasks/:taskId/columns', async (c) => {
-      const schema = c.req.query('schema')
-      const name = c.req.query('name')
-      if (!schema || !name) return respondError(c, 400, 'bad_request')
-      return c.json(await bridge.columns(id(c), schema, name))
-    })
-    .get('/tasks/:taskId/rows', async (c) => {
-      const schema = c.req.query('schema')
-      const name = c.req.query('name')
-      if (!schema || !name) return respondError(c, 400, 'bad_request')
-      const offsetRaw = c.req.query('offset')
-      const offset = offsetRaw ? Number(offsetRaw) : undefined
-      return c.json(await bridge.rows(id(c), schema, name, offset))
-    })
-    .post('/tasks/:taskId/query', async (c) => {
-      const p = queryBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      return c.json(await bridge.query(id(c), p.data.sql))
-    })
-    .post('/tasks/:taskId/update', async (c) => {
-      const p = updateBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      return c.json(await bridge.update(id(c), p.data.schema, p.data.name, p.data.column, p.data.value, p.data.pk))
-    })
-    .post('/tasks/:taskId/insert', async (c) => {
-      const p = insertBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      return c.json(await bridge.insert(id(c), p.data.schema, p.data.name, p.data.values))
-    })
-    .post('/tasks/:taskId/delete', async (c) => {
-      const p = deleteBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      return c.json(await bridge.remove(id(c), p.data.schema, p.data.name, p.data.pk))
-    })
+  return (
+    new Hono<AppEnv>()
+      .post('/cli/query', async (c) => {
+        const input = z
+          .strictObject({
+            nodeId: z.string(),
+            taskId: z.string().min(1),
+            sql: z.string().min(1).max(20_000),
+            maxRows: z.number().int().min(1).max(200).optional(),
+          })
+          .safeParse(await c.req.json().catch(() => null))
+        if (!input.success) return respondError(c, 400, 'bad_request')
+        if (!principalMayActOnTask(requestContext(c).principal, input.data.taskId))
+          return respondError(c, 404, 'not_found')
+        if (!(await taskOf(input.data.taskId))) return respondError(c, 404, 'not_found')
+        try {
+          const result = await databaseQuery(bridge).query(input.data.taskId, input.data.sql, {
+            maxRows: input.data.maxRows,
+          })
+          return c.json({
+            ...result,
+            rows: result.rows.map((row) => row.map((cell) => ({ value: cell ?? '', isNull: cell === null }))),
+          })
+        } catch (error) {
+          return respondError(c, 400, 'bad_request', [error instanceof Error ? error.message : 'Query refused.'])
+        }
+      })
+      // The manifest's `availability` route: the pane is hidden on a task with no database source.
+      // It lists every active task on the node, so a task-scoped caller may not read it.
+      .get('/available', async (c) => {
+        const { principal } = requestContext(c)
+        if (principal.kind !== 'device' && principal.scope !== 'service') return respondError(c, 403, 'forbidden')
+        const tasks = await core.tasks.active()
+        return c.json(
+          Object.fromEntries(await Promise.all(tasks.map(async (t) => [t.id, await bridge.configured(t.id)] as const))),
+        )
+      })
+      .post('/tasks/:taskId/connect', async (c) => c.json(await bridge.connect(id(c))))
+      .post('/tasks/:taskId/disconnect', async (c) => c.json(await bridge.disconnect(id(c))))
+      .get('/tasks/:taskId/tables', async (c) => c.json(await bridge.tables(id(c))))
+      .get('/tasks/:taskId/columns', async (c) => {
+        const schema = c.req.query('schema')
+        const name = c.req.query('name')
+        if (!schema || !name) return respondError(c, 400, 'bad_request')
+        return c.json(await bridge.columns(id(c), schema, name))
+      })
+      .get('/tasks/:taskId/rows', async (c) => {
+        const schema = c.req.query('schema')
+        const name = c.req.query('name')
+        if (!schema || !name) return respondError(c, 400, 'bad_request')
+        const offsetRaw = c.req.query('offset')
+        const offset = offsetRaw ? Number(offsetRaw) : undefined
+        return c.json(await bridge.rows(id(c), schema, name, offset))
+      })
+      .post('/tasks/:taskId/query', async (c) => {
+        const p = queryBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        return c.json(await bridge.query(id(c), p.data.sql))
+      })
+      .post('/tasks/:taskId/update', async (c) => {
+        const p = updateBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        return c.json(await bridge.update(id(c), p.data.schema, p.data.name, p.data.column, p.data.value, p.data.pk))
+      })
+      .post('/tasks/:taskId/insert', async (c) => {
+        const p = insertBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        return c.json(await bridge.insert(id(c), p.data.schema, p.data.name, p.data.values))
+      })
+      .post('/tasks/:taskId/delete', async (c) => {
+        const p = deleteBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        return c.json(await bridge.remove(id(c), p.data.schema, p.data.name, p.data.pk))
+      })
 
-    // The document surface: docs/editor.md. This plugin owns a column of text; the host
-    // owns the editor, its theme, workers, autosave, and the flush before unmount.
-    .get('/tasks/:taskId/scratch', async (c) => {
-      const taskId = id(c)
-      if (!principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
-      if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
-      const [row] = await db.select().from(dbScratch).where(eq(dbScratch.taskId, taskId)).limit(1)
-      return c.json({ text: row?.sql ?? '' } satisfies PluginDocumentBody)
-    })
-    .put('/tasks/:taskId/scratch', async (c) => {
-      const p = scratchBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request', p.error.issues.map((issue) => issue.message))
-      const taskId = id(c)
-      if (!principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
-      // The taskId is a plain ID into core's tables, so core validates it. Checked on the write as
-      // well as the read: an autosave for an archived task should not create a row nothing reads.
-      if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
-      await writeScratch(taskId, p.data.text)
-      return c.json({ ok: true })
-    })
+      // The document surface: docs/editor.md. This plugin owns a column of text; the host
+      // owns the editor, its theme, workers, autosave, and the flush before unmount.
+      .get('/tasks/:taskId/scratch', async (c) => {
+        const taskId = id(c)
+        if (!principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
+        if (!(await taskOf(taskId))) return respondError(c, 404, 'not_found')
+        const [row] = await db.select().from(dbScratch).where(eq(dbScratch.taskId, taskId)).limit(1)
+        return c.json({ text: row?.sql ?? '' } satisfies PluginDocumentBody)
+      })
+      .put('/tasks/:taskId/scratch', async (c) => {
+        const p = scratchBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success)
+          return respondError(
+            c,
+            400,
+            'bad_request',
+            p.error.issues.map((issue) => issue.message),
+          )
+        const taskId = id(c)
+        if (!principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
+        // The taskId is a plain ID into core's tables, so core validates it. Checked on the write as
+        // well as the read: an autosave for an archived task should not create a row nothing reads.
+        if (!(await taskOf(taskId))) return respondError(c, 404, 'not_found')
+        await writeScratch(taskId, p.data.text)
+        return c.json({ ok: true })
+      })
 
-    // Table and column completions. The host POSTs a position and maps what comes back onto its
-    // editor. Every judgement about SQL is in ../completions.ts, on this side.
-    .post('/tasks/:taskId/completions', async (c) => {
-      const p = completionsBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      const catalog = await bridge.catalog(id(c))
-      // Not connected is not an error here. A reader typing in the editor before the pane has reached
-      // the database wants an empty popup, not a red line.
-      if ('error' in catalog) return c.json({ items: [] } satisfies PluginCompletionResponse)
-      const items = completeSql(p.data.text, p.data.position, catalog.tables)
-      return c.json({ items: items.slice(0, MAX_COMPLETION_ITEMS) } satisfies PluginCompletionResponse)
-    })
-    // Schema hover, from the same catalog the completions read. `null` when the position is on no
-    // known name, or before the pane has connected, so the host draws nothing.
-    .post('/tasks/:taskId/hover', async (c) => {
-      const p = hoverBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      const catalog = await bridge.catalog(id(c))
-      const hover = 'error' in catalog ? null : hoverSql(p.data.text, p.data.position, catalog.tables)
-      return c.json(hover && ({ revision: p.data.revision, ...hover } satisfies PluginHoverResponse))
-    })
+      // Table and column completions. The host POSTs a position and maps what comes back onto its
+      // editor. Every judgement about SQL is in ../completions.ts, on this side.
+      .post('/tasks/:taskId/completions', async (c) => {
+        const p = completionsBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        const catalog = await bridge.catalog(id(c))
+        // Not connected is not an error here. A reader typing in the editor before the pane has reached
+        // the database wants an empty popup, not a red line.
+        if ('error' in catalog) return c.json({ items: [] } satisfies PluginCompletionResponse)
+        const items = completeSql(p.data.text, p.data.position, catalog.tables)
+        return c.json({ items: items.slice(0, MAX_COMPLETION_ITEMS) } satisfies PluginCompletionResponse)
+      })
+      // Schema hover, from the same catalog the completions read. `null` when the position is on no
+      // known name, or before the pane has connected, so the host draws nothing.
+      .post('/tasks/:taskId/hover', async (c) => {
+        const p = hoverBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        const catalog = await bridge.catalog(id(c))
+        const hover = 'error' in catalog ? null : hoverSql(p.data.text, p.data.position, catalog.tables)
+        return c.json(hover && ({ revision: p.data.revision, ...hover } satisfies PluginHoverResponse))
+      })
 
-    // --- saved queries (project-scoped, this plugin's own table, no database connection needed) ---
-    .get('/tasks/:taskId/queries', async (c) => {
-      const saved = await savedFor(id(c))
-      if (!saved) return respondError(c, 404, 'not_found')
-      return c.json(saved)
-    })
-    .post('/tasks/:taskId/queries', async (c) => {
-      const p = savedQueryBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      const t = await taskOf(id(c))
-      if (!t) return respondError(c, 404, 'not_found')
-      const project = t.projectId ? await projectOf(t) : null
-      if (!project) return respondError(c, 400, 'project_not_found')
-      const now = Date.now()
-      const row: typeof dbSavedQueries.$inferInsert = {
-        id: randomUUID(),
-        projectId: project.id,
-        name: p.data.name.trim(),
-        notes: p.data.notes.trim() || null,
-        sql: p.data.sql.trim(),
-        createdAt: now,
-        updatedAt: now,
-      }
-      const [saved] = await db
-        .insert(dbSavedQueries)
-        .values(row)
-        .onConflictDoUpdate({
-          target: [dbSavedQueries.projectId, dbSavedQueries.name],
-          set: { notes: row.notes, sql: row.sql, updatedAt: now },
-        })
-        .returning()
-      emit({ channel: pluginChannel('database', 'saved-queries-changed'), projectId: project.id })
-      return c.json(rowToQuery(saved))
-    })
-    .delete('/tasks/:taskId/queries/:queryId', async (c) => {
-      const t = await taskOf(id(c))
-      if (!t) return respondError(c, 404, 'not_found')
-      const project = t.projectId ? await projectOf(t) : null
-      if (!project) return c.json({ ok: true })
-      await db.delete(dbSavedQueries).where(and(eq(dbSavedQueries.id, c.req.param('queryId')), projectScope(project.id)))
-      emit({ channel: pluginChannel('database', 'saved-queries-changed'), projectId: project.id })
-      return c.json({ ok: true })
-    })
+      // --- saved queries (project-scoped, this plugin's own table, no database connection needed) ---
+      .get('/tasks/:taskId/queries', async (c) => {
+        const saved = await savedFor(id(c))
+        if (!saved) return respondError(c, 404, 'not_found')
+        return c.json(saved)
+      })
+      .post('/tasks/:taskId/queries', async (c) => {
+        const p = savedQueryBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        const t = await taskOf(id(c))
+        if (!t) return respondError(c, 404, 'not_found')
+        const project = t.projectId ? await projectOf(t) : null
+        if (!project) return respondError(c, 400, 'project_not_found')
+        const now = Date.now()
+        const row: typeof dbSavedQueries.$inferInsert = {
+          id: randomUUID(),
+          projectId: project.id,
+          name: p.data.name.trim(),
+          notes: p.data.notes.trim() || null,
+          sql: p.data.sql.trim(),
+          createdAt: now,
+          updatedAt: now,
+        }
+        const [saved] = await db
+          .insert(dbSavedQueries)
+          .values(row)
+          .onConflictDoUpdate({
+            target: [dbSavedQueries.projectId, dbSavedQueries.name],
+            set: { notes: row.notes, sql: row.sql, updatedAt: now },
+          })
+          .returning()
+        emit({ channel: pluginChannel('database', 'saved-queries-changed'), projectId: project.id })
+        return c.json(rowToQuery(saved))
+      })
+      .delete('/tasks/:taskId/queries/:queryId', async (c) => {
+        const t = await taskOf(id(c))
+        if (!t) return respondError(c, 404, 'not_found')
+        const project = t.projectId ? await projectOf(t) : null
+        if (!project) return c.json({ ok: true })
+        await db
+          .delete(dbSavedQueries)
+          .where(and(eq(dbSavedQueries.id, c.req.param('queryId')), projectScope(project.id)))
+        emit({ channel: pluginChannel('database', 'saved-queries-changed'), projectId: project.id })
+        return c.json({ ok: true })
+      })
 
-    // The project's saved queries as field options, for the `database:query` workflow step's picker
-    // (../workflowSteps.ts). Project-scoped rather than task-scoped, unlike every route above, because
-    // the workflow editor is a project surface and has no task to address one through.
-    .get('/projects/:projectId/saved-queries', async (c) => {
-      // No task in the path means no scope gate, so the check is here: a project id is guessable and a
-      // task-confined agent has no business enumerating another repository's saved queries.
-      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
-      const rows = await db.select().from(dbSavedQueries).where(projectScope(c.req.param('projectId'))).orderBy(dbSavedQueries.name)
-      return c.json({ options: rows.map((row) => ({ value: row.id, label: row.name, ...(row.notes ? { description: row.notes } : {}) })) })
-    })
-
-    // --- the command palette's two rows (docs/plugins/commands.md § Command kinds) ---
-    //
-    // Task-scoped, both of them, and that is the boundary rather than a convenience. Saved queries are
-    // project-owned, but every route in this file addresses them through a task, because the task is
-    // what core can resolve a project from and the palette is the only caller that could otherwise have
-    // named a project of its own. `taskId` is the identity the HOST derived from the session it
-    // captured; a manifest names the scope and never the value.
-    //
-    // Everything reachable from here is reachable from the pane already, through the same
-    // `savedFor`/`taskOf` pair: a task that does not resolve is a 404, a task whose project has no rows
-    // gets an empty list, and rows are filtered to that one project in SQL rather than after the fact.
-
-    // The `Find a saved query` command's rows. Display facts and the saved query's own id, in the
-    // order the pane's picker lists them, narrowed by what somebody typed (../paletteSearch.ts).
-    //
-    // No credential is in reach: a saved query is a name, a note and SQL somebody wrote down, and the
-    // connection URL is resolved per connect and never persisted (../database.ts).
-    .get('/palette/queries', async (c) => {
-      const taskId = c.req.query('taskId')
-      if (!taskId || !principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
-      const saved = await savedFor(taskId)
-      if (!saved) return respondError(c, 404, 'not_found')
-      return c.json({ items: savedQuerySearchItems(saved, c.req.query('q') ?? '') })
-    })
-
-    // The `Generate SQL` fast path: the modal's six steps with every choice already made
-    // (docs/database/palette-and-workflows.md § From the command palette).
-    //
-    // The choices it does not offer are the point. One text field cannot carry a backend, a model and
-    // a set of worked examples, so this takes the first available backend and that backend's own
-    // default model — the selection the modal opens on — and generates with no examples. Backends
-    // arrive connections-first, so this keeps spending the key the owner configured and reaches for an
-    // installed CLI only when there is no key at all. Choosing any of the three remains the modal's
-    // job, unchanged.
-    //
-    // The write comes before the answer, and that ordering is the contract: the success action opens
-    // the Database pane, whose editor GETs the scratch route on mount, so answering first would race
-    // the reader to their own result. Every failure below returns before the write, which is what keeps
-    // the prompt in the palette field with the reason under it.
-    .post('/palette/generate', async (c) => {
-      const p = paletteGenerateBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request', p.error.issues.map((i) => i.message))
-      // Generation spends the owner's provider key, so a task-scoped agent credential must not reach
-      // it — the same gate the modal's route applies.
-      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
-      const { input, taskId } = p.data
-      if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
-      const backend = (await core.models.available(owner(c)))[0]
-      if (!backend) return respondError(c, 404, 'provider_not_connected')
-      const modelId = defaultModelIdFor(backend)
-      const schemaRes = await bridge.schema(taskId)
-      if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
-      try {
-        const result = await core.models.generateText({
-          userId: owner(c),
-          backendId: backend.id,
-          input: {
-            system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples: [] }),
-            prompt: input,
-            ...(modelId ? { modelId } : {}),
-            maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
-          },
-        })
-        const sql = documentText.safeParse(stripSqlFences(result.text))
-        if (!sql.success) return respondError(c, 400, 'bad_request', sql.error.issues.map((issue) => issue.message))
-        await writeScratch(taskId, sql.data)
-        // The row the success action carries. Its id is the sentinel the pane reads as "re-read the
-        // scratch document", not a saved query's id, so a pane that is already open shows the new SQL
-        // instead of quietly keeping what was in the editor (../../shared/database.ts).
+      // The project's saved queries as field options, for the `database:query` workflow step's picker
+      // (../workflowSteps.ts). Project-scoped rather than task-scoped, unlike every route above, because
+      // the workflow editor is a project surface and has no task to address one through.
+      .get('/projects/:projectId/saved-queries', async (c) => {
+        // No task in the path means no scope gate, so the check is here: a project id is guessable and a
+        // task-confined agent has no business enumerating another repository's saved queries.
+        if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
+        const rows = await db
+          .select()
+          .from(dbSavedQueries)
+          .where(projectScope(c.req.param('projectId')))
+          .orderBy(dbSavedQueries.name)
         return c.json({
-          ok: true,
-          item: { id: SCRATCH_SELECT_ID, title: 'Generated SQL' },
-        } satisfies CommandInputResult)
-      } catch (error) {
-        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
-        return respondError(c, 502, 'provider_unavailable')
-      }
-    })
-
-    // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
-    // machine. The frame cannot ask core directly: `/v1/core/integrations` has no bridge scope, and
-    // minting one would hand every installed plugin the whole roster to serve one dropdown. This
-    // answers ids and labels. The key stays on the node and is resolved inside `models.generateText`.
-    .get('/tasks/:taskId/model-connections', async (c) => {
-      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
-      const backends = await core.models.available(owner(c))
-      // `options` beside `backends`, not instead of it: the pane's dropdown reads the rows and the
-      // workflow editor reads the field-option shape every `optionsRoute` answers
-      // (docs/workflows/step-kinds.md § Contributed step kinds).
-      return c.json({ backends, options: backends.map((backend) => ({ value: backend.id, label: backend.label })) })
-    })
-
-    // Generate a PostgreSQL query from a natural-language description through a connected model
-    // provider. The plugin owns the route and the prompt; core owns provider access.
-    .post('/tasks/:taskId/generate', async (c) => {
-      const p = generateBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
-      if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
-      const schemaRes = await bridge.schema(id(c))
-      if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
-      // Unknown/foreign ids just do not resolve; a stale pick should not fail the whole generate.
-      const examples = await loadExamples(id(c), p.data.queryIds ?? [])
-      try {
-        const result = await core.models.generateText({
-          userId: owner(c),
-          backendId: p.data.backendId,
-          input: {
-            system: buildSystemPrompt(schemaRes.schema, { ...(schemaRes.notes ? { notes: schemaRes.notes } : {}), examples }),
-            prompt: p.data.prompt,
-            ...(p.data.modelId ? { modelId: p.data.modelId } : {}),
-            maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
-          },
+          options: rows.map((row) => ({
+            value: row.id,
+            label: row.name,
+            ...(row.notes ? { description: row.notes } : {}),
+          })),
         })
-        const sql = documentText.safeParse(stripSqlFences(result.text))
-        if (!sql.success) return respondError(c, 400, 'bad_request', sql.error.issues.map((issue) => issue.message))
-        return c.json({ sql: sql.data, providerId: result.providerId, modelId: result.modelId } satisfies DbGenerateResult)
-      } catch (error) {
-        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
-        return respondError(c, 502, 'provider_unavailable')
-      }
-    })
+      })
 
-    // --- the agent composer's "Saved database queries" entry (../agentContext.ts) ---
-    .get('/context-options', async (c) => {
-      const taskId = c.req.query('taskId')
-      if (!taskId || !principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
-      const saved = await savedFor(taskId, MAX_CONTEXT_QUERIES)
-      if (!saved) return respondError(c, 404, 'not_found')
-      return c.json(saved.map(savedQueryOption))
-    })
-    .post('/context-capture', async (c) => {
-      const p = contextCaptureBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request', p.error.issues.map((i) => i.message))
-      if (!principalMayActOnTask(requestContext(c).principal, p.data.taskId)) return respondError(c, 404, 'not_found')
-      const saved = await savedFor(p.data.taskId, MAX_CONTEXT_QUERIES)
-      if (!saved) return respondError(c, 404, 'not_found')
-      const chosen = p.data.optionIds ? saved.filter((query) => p.data.optionIds?.includes(query.id)) : saved
-      return c.json(chosen.map(savedQuerySnapshot))
-    })
+      // --- the command palette's two rows (docs/plugins/commands.md § Command kinds) ---
+      //
+      // Task-scoped, both of them, and that is the boundary rather than a convenience. Saved queries are
+      // project-owned, but every route in this file addresses them through a task, because the task is
+      // what core can resolve a project from and the palette is the only caller that could otherwise have
+      // named a project of its own. `taskId` is the identity the HOST derived from the session it
+      // captured; a manifest names the scope and never the value.
+      //
+      // Everything reachable from here is reachable from the pane already, through the same
+      // `savedFor`/`taskOf` pair: a task that does not resolve is a 404, a task whose project has no rows
+      // gets an empty list, and rows are filtered to that one project in SQL rather than after the fact.
+
+      // The `Find a saved query` command's rows. Display facts and the saved query's own id, in the
+      // order the pane's picker lists them, narrowed by what somebody typed (../paletteSearch.ts).
+      //
+      // No credential is in reach: a saved query is a name, a note and SQL somebody wrote down, and the
+      // connection URL is resolved per connect and never persisted (../database.ts).
+      .get('/palette/queries', async (c) => {
+        const taskId = c.req.query('taskId')
+        if (!taskId || !principalMayActOnTask(requestContext(c).principal, taskId))
+          return respondError(c, 404, 'not_found')
+        const saved = await savedFor(taskId)
+        if (!saved) return respondError(c, 404, 'not_found')
+        return c.json({ items: savedQuerySearchItems(saved, c.req.query('q') ?? '') })
+      })
+
+      // The `Generate SQL` fast path: the modal's six steps with every choice already made
+      // (docs/database/palette-and-workflows.md § From the command palette).
+      //
+      // The choices it does not offer are the point. One text field cannot carry a backend, a model and
+      // a set of worked examples, so this takes the first available backend and that backend's own
+      // default model — the selection the modal opens on — and generates with no examples. Backends
+      // arrive connections-first, so this keeps spending the key the owner configured and reaches for an
+      // installed CLI only when there is no key at all. Choosing any of the three remains the modal's
+      // job, unchanged.
+      //
+      // The write comes before the answer, and that ordering is the contract: the success action opens
+      // the Database pane, whose editor GETs the scratch route on mount, so answering first would race
+      // the reader to their own result. Every failure below returns before the write, which is what keeps
+      // the prompt in the palette field with the reason under it.
+      .post('/palette/generate', async (c) => {
+        const p = paletteGenerateBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success)
+          return respondError(
+            c,
+            400,
+            'bad_request',
+            p.error.issues.map((i) => i.message),
+          )
+        // Generation spends the owner's provider key, so a task-scoped agent credential must not reach
+        // it — the same gate the modal's route applies.
+        if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
+        const { input, taskId } = p.data
+        if (!(await taskOf(taskId))) return respondError(c, 404, 'not_found')
+        const backend = (await core.models.available(owner(c)))[0]
+        if (!backend) return respondError(c, 404, 'provider_not_connected')
+        const modelId = defaultModelIdFor(backend)
+        const schemaRes = await bridge.schema(taskId)
+        if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
+        try {
+          const result = await core.models.generateText({
+            userId: owner(c),
+            backendId: backend.id,
+            input: {
+              system: buildSystemPrompt(schemaRes.schema, {
+                ...(schemaRes.notes ? { notes: schemaRes.notes } : {}),
+                examples: [],
+              }),
+              prompt: input,
+              ...(modelId ? { modelId } : {}),
+              maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
+            },
+          })
+          const sql = documentText.safeParse(stripSqlFences(result.text))
+          if (!sql.success)
+            return respondError(
+              c,
+              400,
+              'bad_request',
+              sql.error.issues.map((issue) => issue.message),
+            )
+          await writeScratch(taskId, sql.data)
+          // The row the success action carries. Its id is the sentinel the pane reads as "re-read the
+          // scratch document", not a saved query's id, so a pane that is already open shows the new SQL
+          // instead of quietly keeping what was in the editor (../../shared/database.ts).
+          return c.json({
+            ok: true,
+            item: { id: SCRATCH_SELECT_ID, title: 'Generated SQL' },
+          } satisfies CommandInputResult)
+        } catch (error) {
+          if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
+          return respondError(c, 502, 'provider_unavailable')
+        }
+      })
+
+      // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
+      // machine. The frame cannot ask core directly: `/v1/core/integrations` has no bridge scope, and
+      // minting one would hand every installed plugin the whole roster to serve one dropdown. This
+      // answers ids and labels. The key stays on the node and is resolved inside `models.generateText`.
+      .get('/tasks/:taskId/model-connections', async (c) => {
+        if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
+        const backends = await core.models.available(owner(c))
+        // `options` beside `backends`, not instead of it: the pane's dropdown reads the rows and the
+        // workflow editor reads the field-option shape every `optionsRoute` answers
+        // (docs/workflows/step-kinds.md § Contributed step kinds).
+        return c.json({ backends, options: backends.map((backend) => ({ value: backend.id, label: backend.label })) })
+      })
+
+      // Generate a PostgreSQL query from a natural-language description through a connected model
+      // provider. The plugin owns the route and the prompt; core owns provider access.
+      .post('/tasks/:taskId/generate', async (c) => {
+        const p = generateBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success) return respondError(c, 400, 'bad_request')
+        if (!isInteractiveOwner(c)) return respondError(c, 403, 'interactive_user_required')
+        const schemaRes = await bridge.schema(id(c))
+        if ('error' in schemaRes) return respondError(c, 422, 'db_schema_unavailable', [schemaRes.error])
+        // Unknown/foreign ids just do not resolve; a stale pick should not fail the whole generate.
+        const examples = await loadExamples(id(c), p.data.queryIds ?? [])
+        try {
+          const result = await core.models.generateText({
+            userId: owner(c),
+            backendId: p.data.backendId,
+            input: {
+              system: buildSystemPrompt(schemaRes.schema, {
+                ...(schemaRes.notes ? { notes: schemaRes.notes } : {}),
+                examples,
+              }),
+              prompt: p.data.prompt,
+              ...(p.data.modelId ? { modelId: p.data.modelId } : {}),
+              maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
+            },
+          })
+          const sql = documentText.safeParse(stripSqlFences(result.text))
+          if (!sql.success)
+            return respondError(
+              c,
+              400,
+              'bad_request',
+              sql.error.issues.map((issue) => issue.message),
+            )
+          return c.json({
+            sql: sql.data,
+            providerId: result.providerId,
+            modelId: result.modelId,
+          } satisfies DbGenerateResult)
+        } catch (error) {
+          if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
+          return respondError(c, 502, 'provider_unavailable')
+        }
+      })
+
+      // --- the agent composer's "Saved database queries" entry (../agentContext.ts) ---
+      .get('/context-options', async (c) => {
+        const taskId = c.req.query('taskId')
+        if (!taskId || !principalMayActOnTask(requestContext(c).principal, taskId))
+          return respondError(c, 404, 'not_found')
+        const saved = await savedFor(taskId, MAX_CONTEXT_QUERIES)
+        if (!saved) return respondError(c, 404, 'not_found')
+        return c.json(saved.map(savedQueryOption))
+      })
+      .post('/context-capture', async (c) => {
+        const p = contextCaptureBody.safeParse(await c.req.json().catch(() => null))
+        if (!p.success)
+          return respondError(
+            c,
+            400,
+            'bad_request',
+            p.error.issues.map((i) => i.message),
+          )
+        if (!principalMayActOnTask(requestContext(c).principal, p.data.taskId)) return respondError(c, 404, 'not_found')
+        const saved = await savedFor(p.data.taskId, MAX_CONTEXT_QUERIES)
+        if (!saved) return respondError(c, 404, 'not_found')
+        const chosen = p.data.optionIds ? saved.filter((query) => p.data.optionIds?.includes(query.id)) : saved
+        return c.json(chosen.map(savedQuerySnapshot))
+      })
+  )
 }
 
 /** The portable carrier. A Hono instance cannot cross a process boundary and a (Request) → Response
  * function can, so this is what `ctx.routes.fetch` is handed. */
-export const createDatabaseFetch = (db: PluginDatabase, core: DatabaseRouteServices, bridge: DatabaseBridge, emit?: Emit): PluginFetchHandler =>
-  portableFetch(databaseRoutes(db, core, bridge, emit))
+export const createDatabaseFetch = (
+  db: PluginDatabase,
+  core: DatabaseRouteServices,
+  bridge: DatabaseBridge,
+  emit?: Emit,
+): PluginFetchHandler => portableFetch(databaseRoutes(db, core, bridge, emit))

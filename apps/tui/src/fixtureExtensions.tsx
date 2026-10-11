@@ -36,9 +36,12 @@ function installBadge(shape: string): Disposable {
     label: 'Fixture badge',
     order: 10,
     carrier: 'component',
-    component: () => (shape === 'text'
-      ? <Text>fixture says staging</Text>
-      : <Button onPress={() => fixtureBadgePresses.push('deploy')}>Deploy fixture</Button>),
+    component: () =>
+      shape === 'text' ? (
+        <Text>fixture says staging</Text>
+      ) : (
+        <Button onPress={() => fixtureBadgePresses.push('deploy')}>Deploy fixture</Button>
+      ),
   })
 }
 
@@ -53,9 +56,7 @@ function installDiffMark(): Disposable {
     order: 10,
     carrier: 'items',
     fetch: async () => [],
-    marks: async () => [
-      { key: { file: 'src/login.ts', line: 2, side: 'new' }, text: 'uncovered', severity: 'warn' },
-    ],
+    marks: async () => [{ key: { file: 'src/login.ts', line: 2, side: 'new' }, text: 'uncovered', severity: 'warn' }],
   })
 }
 
@@ -66,18 +67,23 @@ function installDiffMark(): Disposable {
  *  for itself. `meta+ctrl+…` therefore arrives at the engine carrying `ctrl` twice, which its parser
  *  reads as one flag (../keys/commandLayer.ts). */
 function installChord(): Disposable[] {
-  return [commandRegistry.register({
-    id: 'plugin.fixture.mark',
-    title: 'Fixture: mark it',
-    category: 'action',
-    run: () => { fixtureBadgePresses.push('chord') },
-  }), keybindingRegistry.register({
-    id: 'plugin.fixture.mark',
-    command: 'plugin.fixture.mark',
-    description: 'Fixture: mark it',
-    category: 'fixture',
-    defaultChord: 'meta+ctrl+alt+shift+d',
-  })]
+  return [
+    commandRegistry.register({
+      id: 'plugin.fixture.mark',
+      title: 'Fixture: mark it',
+      category: 'action',
+      run: () => {
+        fixtureBadgePresses.push('chord')
+      },
+    }),
+    keybindingRegistry.register({
+      id: 'plugin.fixture.mark',
+      command: 'plugin.fixture.mark',
+      description: 'Fixture: mark it',
+      category: 'fixture',
+      defaultChord: 'meta+ctrl+alt+shift+d',
+    }),
+  ]
 }
 
 let installed: Disposable[] = []

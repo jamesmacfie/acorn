@@ -10,7 +10,12 @@ vi.mock('@acorn/plugin-api/client', () => ({
   registerWsChannel: (_prefix: string, handler: (frame: unknown) => void) => {
     if (transport.handler) throw new Error('ws channel already registered: agent')
     transport.handler = handler
-    return { dispose: () => { transport.handler = null; transport.dispose() } }
+    return {
+      dispose: () => {
+        transport.handler = null
+        transport.dispose()
+      },
+    }
   },
 }))
 

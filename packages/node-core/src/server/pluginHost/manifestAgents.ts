@@ -23,7 +23,9 @@ export function registerManifestHarnesses(
     } else {
       const resolved = binding?.dir ? resolveInRoot(binding.dir, descriptor.spawn.entry!) : null
       if (!resolved) {
-        createLogger(`plugin:${name}`, name).warn(`harness '${descriptor.id}' declares an entry outside its package; skipped`)
+        createLogger(`plugin:${name}`, name).warn(
+          `harness '${descriptor.id}' declares an entry outside its package; skipped`,
+        )
         continue
       }
       spawn = {
@@ -33,14 +35,16 @@ export function registerManifestHarnesses(
       }
     }
     // A harness without a probe can register without host bindings. Resolve those only on a probe.
-    const probe = (path: string) => async (signal: AbortSignal): Promise<unknown> => {
-      const response = await dispatchPluginRoute(requireEnv(name), name, path, { method: 'GET' }, signal)
-      if (!response.ok) {
-        harnessLog.warn(`${name}:${descriptor.id} answered ${response.status} from ${path}`)
-        return null
+    const probe =
+      (path: string) =>
+      async (signal: AbortSignal): Promise<unknown> => {
+        const response = await dispatchPluginRoute(requireEnv(name), name, path, { method: 'GET' }, signal)
+        if (!response.ok) {
+          harnessLog.warn(`${name}:${descriptor.id} answered ${response.status} from ${path}`)
+          return null
+        }
+        return await response.json().catch(() => null)
       }
-      return await response.json().catch(() => null)
-    }
     ctx.harnesses.register({
       id: descriptor.id,
       label: descriptor.label,

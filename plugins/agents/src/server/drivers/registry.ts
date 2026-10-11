@@ -11,7 +11,9 @@ import type { AgentDriver, AgentDriverFactory } from './types'
 export class AgentDriverRegistry {
   private revision = 0
 
-  get generation(): number { return this.revision }
+  get generation(): number {
+    return this.revision
+  }
 
   readonly #factories = new Map<string, AgentDriverFactory>()
 

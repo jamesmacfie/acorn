@@ -4,7 +4,33 @@ import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import { acornMcp, buildSessionEnv, childEnv, type CompiledCoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, interactiveProfile, invalidateWorktreeStatus, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
+import {
+  acornMcp,
+  buildSessionEnv,
+  childEnv,
+  type CompiledCoreServices,
+  createLogger,
+  describeError,
+  getProfile,
+  type InternalEnvFactory,
+  interactiveProfile,
+  invalidateWorktreeStatus,
+  launcherSpec,
+  listProfileDefs,
+  listProfiles,
+  type CompiledPluginBroadcast,
+  type PluginDatabase,
+  rendererBaseCheckout,
+  resolveCommand,
+  resolveMcpEntry,
+  serverName,
+  taskContext,
+  type TaskCreatedHook,
+  type TaskRef,
+  type TaskSessionsBridge,
+  TEARDOWN_TIMEOUT_MS,
+  tmuxAvailable,
+} from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from './routes/terminal'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
@@ -104,7 +130,13 @@ const agentSender = new AgentSender((id) => {
   let facade = sendableSessions.get(s)
   if (!facade) {
     const live = () => !s.retired && s.admitted && sessions.get(id) === s && s.meta.status === 'running'
-    facade = { write: data => { if (live()) s.pty.write(data) }, running: live, idle: () => s.meta.idle }
+    facade = {
+      write: (data) => {
+        if (live()) s.pty.write(data)
+      },
+      running: live,
+      idle: () => s.meta.idle,
+    }
     sendableSessions.set(s, facade)
   }
   return facade
@@ -126,7 +158,8 @@ export function sendToAgent(sessionId: string, text: string, submit: SendSubmit)
 // this module imports, and shadowing it would silently rebind every query below.
 export const sessionControl = {
   create: (opts: CreateOpts): Promise<TerminalSession> => create(opts),
-  list: async (): Promise<TerminalSession[]> => [...sessions.values()].filter(s => s.admitted && !s.retired).map((s) => s.meta),
+  list: async (): Promise<TerminalSession[]> =>
+    [...sessions.values()].filter((s) => s.admitted && !s.retired).map((s) => s.meta),
 }
 
 let launchContextText: ((taskId: string) => Promise<string | null>) | null = null
@@ -153,41 +186,66 @@ type EngineOwner = {
 let engineToken: object | null = null
 function owner(): EngineOwner {
   if (!engineToken || !store) throw new Error('The terminal engine has not been initialized.')
-  return { token: engineToken, db: store, core: services(), env: internalEnv,
-    status: statusBroadcast, worktree: worktreeBroadcast, launch: launchContext, launchText: launchContextText, complete: completed, seed: seedNotes }
+  return {
+    token: engineToken,
+    db: store,
+    core: services(),
+    env: internalEnv,
+    status: statusBroadcast,
+    worktree: worktreeBroadcast,
+    launch: launchContext,
+    launchText: launchContextText,
+    complete: completed,
+    seed: seedNotes,
+  }
 }
 function assertOwner(engine: EngineOwner): void {
   if (engine.token !== engineToken) throw new Error('The terminal engine has been disposed.')
 }
 function drain(actions: (() => void)[]): void {
   for (const action of actions) {
-    try { action() } catch (error) {
-      try { log.warn(`terminal cleanup failed: ${describeError(error).message}`) } catch { /* Continue releasing owned resources. */ }
+    try {
+      action()
+    } catch (error) {
+      try {
+        log.warn(`terminal cleanup failed: ${describeError(error).message}`)
+      } catch {
+        /* Continue releasing owned resources. */
+      }
     }
   }
 }
 function releaseCallbacks(s: Session): void {
   if (s.flushTimer) clearTimeout(s.flushTimer)
   s.flushTimer = null
-  drain(s.callbacks.splice(0).map(callback => () => callback.dispose()))
+  drain(s.callbacks.splice(0).map((callback) => () => callback.dispose()))
 }
 function settleSession(s: Session, exitCode: number | null): void {
   const settlers = [...s.settlers]
   s.settlers.clear()
-  drain(settlers.map(settle => () => settle(exitCode)))
+  drain(settlers.map((settle) => () => settle(exitCode)))
 }
 // Retirement closes this Node's attachment. Explicit Stop/remove separately destroys tmux state.
 function retireSession(s: Session, reason: 'terminal_removed' | 'shutdown' = 'terminal_removed'): void {
   if (s.retired) return
-  if (s.script && s.meta.status === 'running' && !(reason === 'shutdown' && s.meta.backend === 'tmux')) s.evidence.report(s.script, { type: 'interrupted', reason })
+  if (s.script && s.meta.status === 'running' && !(reason === 'shutdown' && s.meta.backend === 'tmux'))
+    s.evidence.report(s.script, { type: 'interrupted', reason })
   s.retired = true
   releaseCallbacks(s)
   s.pendingOut = ''
-  drain([() => settleSession(s, null), () => s.display.dispose(), () => agentSender.clear(s.meta.id),
-    () => { if (s.meta.status === 'running') s.pty.kill() },
+  drain([
+    () => settleSession(s, null),
+    () => s.display.dispose(),
+    () => agentSender.clear(s.meta.id),
+    () => {
+      if (s.meta.status === 'running') s.pty.kill()
+    },
     // A removed terminal's token stops working now, not when it expires. A shutdown keeps it, because
     // a tmux shell outlives this Node (docs/security/credentials.md § Revoking a credential).
-    () => { if (reason === 'terminal_removed') revokeCredential(s.meta) }])
+    () => {
+      if (reason === 'terminal_removed') revokeCredential(s.meta)
+    },
+  ])
 }
 
 function revokeCredential(meta: { taskId: string; id: string }): void {
@@ -206,7 +264,11 @@ function worktreeSettled(s: Session): void {
 
 // PTY-tier AgentState (docs/terminal/activity.md § Activity and status): shells stay 'unknown'; agents flip between working
 // and idle with the silence detector, and 'blocked' lands with the prompt-pattern scan.
-const ptyState = (kind: 'shell' | 'agent', status: 'running' | 'exited', idle: boolean): TerminalSession['agentState'] =>
+const ptyState = (
+  kind: 'shell' | 'agent',
+  status: 'running' | 'exited',
+  idle: boolean,
+): TerminalSession['agentState'] =>
   kind !== 'agent' ? 'unknown' : status !== 'running' ? 'done' : idle ? 'idle' : 'working'
 
 // Flush any coalesced PTY output as one 'output' frame. Called on the ~16ms tick, and eagerly before any
@@ -336,7 +398,11 @@ const deleteRow = async (id: string, db: PluginDatabase): Promise<void> => {
   await db.delete(terminalSessions).where(eq(terminalSessions.id, id))
 }
 
-function rowToMeta(row: typeof terminalSessions.$inferSelect, ctx: Pick<TerminalSession, 'repo' | 'pull'>, isWorktree: boolean): TerminalSession {
+function rowToMeta(
+  row: typeof terminalSessions.$inferSelect,
+  ctx: Pick<TerminalSession, 'repo' | 'pull'>,
+  isWorktree: boolean,
+): TerminalSession {
   return {
     id: row.id,
     title: row.title,
@@ -366,7 +432,9 @@ function rowToMeta(row: typeof terminalSessions.$inferSelect, ctx: Pick<Terminal
 function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, script?: Session['script']): Session {
   assertOwner(engine)
   const s: Session = {
-    meta, script, evidence: engine.core.taskScripts,
+    meta,
+    script,
+    evidence: engine.core.taskScripts,
     pty,
     ring: new OutputRing(),
     display: new TerminalDisplay(meta.cols, meta.rows),
@@ -374,51 +442,70 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, scri
     sawIdle: false,
     pendingOut: '',
     flushTimer: null,
-    callbacks: [], settlers: new Set(), retired: false, admitted: false, persisted: false, discardRow: false,
+    callbacks: [],
+    settlers: new Set(),
+    retired: false,
+    admitted: false,
+    persisted: false,
+    discardRow: false,
   }
   sessions.set(meta.id, s)
   if (script) engine.core.taskScripts.report(script, { type: 'started', terminalSessionId: meta.id })
   try {
-    s.callbacks.push(pty.onData((data) => {
-      if (s.retired || engine.token !== engineToken || sessions.get(meta.id) !== s) return
-      s.lastActivityAt = Date.now()
-      if (s.meta.idle) {
-        s.meta.idle = false // output resumed → no longer waiting
-        s.meta.agentState = ptyState(s.meta.kind, s.meta.status, false)
-        if (s.admitted) drain([() => engine.status()])
-      }
-      if (s.script) s.evidence.report(s.script, { type: 'output', data })
-      queueOutput(s, data) // append to ring now; coalesce the wire frame onto the ~16ms tick
-    }))
-    s.callbacks.push(pty.onExit(({ exitCode, signal }) => {
-      // A PTY from a disposed engine may exit after the next boot has installed a new store.
-      if (s.retired || engine.token !== engineToken || sessions.get(s.meta.id) !== s) return
-      if (s.script) s.evidence.report(s.script, s.meta.backend === 'tmux'
-        ? { type: 'interrupted', reason: 'process_lost' } // attach-client exit is not command exit evidence
-        : { type: 'exit', exitCode, signal })
-      s.meta.status = 'exited'
-      s.meta.idle = false
-      s.meta.agentState = ptyState(s.meta.kind, 'exited', false)
-      s.meta.exitCode = exitCode
-      drain([
-        () => agentSender.clear(s.meta.id),
-        () => emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null }),
-        () => { if (s.persisted && s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode, engine.db) },
-        () => worktreeSettled(s),
-        ...[...runSessionExitListeners].map(listener => () => listener(s.meta.id, exitCode)),
-        () => {
-          if (s.meta.kind !== 'agent' || s.meta.title === 'Teardown') return
-          const event = { taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, completedAt: Date.now() }
-          engine.complete?.(event)
-        },
-        () => settleSession(s, s.script && s.meta.backend === 'tmux' ? null : exitCode),
-        // A plain shell that exited is gone for good. A tmux attach client exiting says nothing
-        // about the shell, which removal or the next reconcile revokes.
-        () => { if (s.meta.backend !== 'tmux') revokeCredential(s.meta) },
-        () => releaseCallbacks(s),
-        () => { if (s.admitted) engine.status() },
-      ])
-    }))
+    s.callbacks.push(
+      pty.onData((data) => {
+        if (s.retired || engine.token !== engineToken || sessions.get(meta.id) !== s) return
+        s.lastActivityAt = Date.now()
+        if (s.meta.idle) {
+          s.meta.idle = false // output resumed → no longer waiting
+          s.meta.agentState = ptyState(s.meta.kind, s.meta.status, false)
+          if (s.admitted) drain([() => engine.status()])
+        }
+        if (s.script) s.evidence.report(s.script, { type: 'output', data })
+        queueOutput(s, data) // append to ring now; coalesce the wire frame onto the ~16ms tick
+      }),
+    )
+    s.callbacks.push(
+      pty.onExit(({ exitCode, signal }) => {
+        // A PTY from a disposed engine may exit after the next boot has installed a new store.
+        if (s.retired || engine.token !== engineToken || sessions.get(s.meta.id) !== s) return
+        if (s.script)
+          s.evidence.report(
+            s.script,
+            s.meta.backend === 'tmux'
+              ? { type: 'interrupted', reason: 'process_lost' } // attach-client exit is not command exit evidence
+              : { type: 'exit', exitCode, signal },
+          )
+        s.meta.status = 'exited'
+        s.meta.idle = false
+        s.meta.agentState = ptyState(s.meta.kind, 'exited', false)
+        s.meta.exitCode = exitCode
+        drain([
+          () => agentSender.clear(s.meta.id),
+          () => emit(s, { type: 'exit', exitCode, signal: signal != null ? String(signal) : null }),
+          () => {
+            if (s.persisted && s.meta.backend === 'tmux') void markExited(s.meta.id, exitCode, engine.db)
+          },
+          () => worktreeSettled(s),
+          ...[...runSessionExitListeners].map((listener) => () => listener(s.meta.id, exitCode)),
+          () => {
+            if (s.meta.kind !== 'agent' || s.meta.title === 'Teardown') return
+            const event = { taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, completedAt: Date.now() }
+            engine.complete?.(event)
+          },
+          () => settleSession(s, s.script && s.meta.backend === 'tmux' ? null : exitCode),
+          // A plain shell that exited is gone for good. A tmux attach client exiting says nothing
+          // about the shell, which removal or the next reconcile revokes.
+          () => {
+            if (s.meta.backend !== 'tmux') revokeCredential(s.meta)
+          },
+          () => releaseCallbacks(s),
+          () => {
+            if (s.admitted) engine.status()
+          },
+        ])
+      }),
+    )
   } catch (error) {
     if (sessions.get(meta.id) === s) sessions.delete(meta.id)
     s.retired = true
@@ -436,7 +523,10 @@ function startIdleWatch() {
     const now = Date.now()
     for (const s of sessions.values()) {
       if (!s.admitted || s.retired) continue
-      if (computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now, s.sawIdle ? IDLE_MS : FIRST_IDLE_MS) && !s.meta.idle) {
+      if (
+        computeIdle(s.meta.kind, s.meta.status, s.lastActivityAt, now, s.sawIdle ? IDLE_MS : FIRST_IDLE_MS) &&
+        !s.meta.idle
+      ) {
         s.meta.idle = true
         s.sawIdle = true
         // An idle session showing an input prompt in its tail is blocked, not done.
@@ -465,7 +555,15 @@ async function maybeRunSetup(t: TaskRef, cwd: string, engine: EngineOwner): Prom
   if (!setup) return null
   let session: TerminalSession
   try {
-    session = await spawnOne({ taskId: t.id, command: setup.script, title: 'Setup' }, cwd, true, taskContext(t), t, engine, setup.identity)
+    session = await spawnOne(
+      { taskId: t.id, command: setup.script, title: 'Setup' },
+      cwd,
+      true,
+      taskContext(t),
+      t,
+      engine,
+      setup.identity,
+    )
   } catch (error) {
     engine.core.taskScripts.report(setup.identity, { type: 'failed', reason: 'spawn_failed' })
     throw error
@@ -495,7 +593,10 @@ async function runSetup(taskId: string, engine: EngineOwner): Promise<{ sessionI
   } catch (error) {
     // Anything between admission and the spawn would otherwise leave the attempt `starting` for good.
     // A no-op when the spawn already reported, or a new worktree generation has replaced this attempt.
-    engine.core.taskScripts.report({ attemptId: admitted.attemptId!, generation: admitted.generation }, { type: 'failed', reason: 'spawn_failed' })
+    engine.core.taskScripts.report(
+      { attemptId: admitted.attemptId!, generation: admitted.generation },
+      { type: 'failed', reason: 'spawn_failed' },
+    )
     throw error
   }
 }
@@ -542,9 +643,16 @@ async function spawnOne(
   const env = buildSessionEnv({
     taskId: opts.taskId,
     cwd,
-    task: task && project
-      ? { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
-      : null,
+    task:
+      task && project
+        ? {
+            projectId: project.id,
+            projectName: project.name,
+            github: project.github,
+            branch: task.branch,
+            title: task.title,
+          }
+        : null,
     env: { ...engine.env({ scope: 'task', taskId: opts.taskId, sessionId: id }), ACORN_SESSION_ID: id, ...opts.env },
   })
   const backend = resolveBackend(profile.backendPreference, tmuxAvailable())
@@ -575,14 +683,23 @@ async function spawnOne(
   }
 
   if (profile.mcpRegistration && mcpRegistrationAllowed() && !mcpRegistered.has(profile.id)) {
-    void profile.mcpRegistration(mcpName(), mcpLauncher()).then((res) => { if (res?.ok) mcpRegistered.add(profile.id) }).catch(() => undefined)
+    void profile
+      .mcpRegistration(mcpName(), mcpLauncher())
+      .then((res) => {
+        if (res?.ok) mcpRegistered.add(profile.id)
+      })
+      .catch(() => undefined)
   }
 
   // Profile launchArgs apply only to the profile's own binary; a command override is a different
   // program. meta.command stays the bare line the UI shows, and the args are launch-only.
-  const context = !opts.command && profile.launchContextArgs ? await engine.launchText?.(opts.taskId) ?? null : null
+  const context = !opts.command && profile.launchContextArgs ? ((await engine.launchText?.(opts.taskId)) ?? null) : null
   assertOwner(engine)
-  const launchArgs = opts.command ? [] : profile.launchContextArgs ? profile.launchContextArgs(context) : (profile.launchArgs ?? [])
+  const launchArgs = opts.command
+    ? []
+    : profile.launchContextArgs
+      ? profile.launchContextArgs(context)
+      : (profile.launchArgs ?? [])
 
   let pty: IPty | undefined
   let session: Session | undefined
@@ -627,7 +744,9 @@ async function spawnOne(
         try {
           const rows = await engine.db.select().from(terminalSessions).where(eq(terminalSessions.id, meta.id)).limit(1)
           absent = rows.length === 0
-        } catch { /* A closed database cannot establish whether the insert committed. */ }
+        } catch {
+          /* A closed database cannot establish whether the insert committed. */
+        }
       }
       if (absent) drain([() => killTmuxSession(meta.tmuxSession!)])
       else drain([() => log.warn(`preserved tmux session ${meta.tmuxSession} after unconfirmed metadata admission`)])
@@ -637,8 +756,9 @@ async function spawnOne(
   // Profiles without a system-prompt seam receive launch context on their idle edge.
   // An explicit command or profile launch instruction owns its delivery instead.
   if (profile.kind === 'agent' && !opts.command && !profile.launchContextArgs && !launchArgs.length) {
-    void engine.launch?.(opts.taskId, id).catch((error: unknown) =>
-      log.warn(`launch context for session ${id} failed: ${describeError(error).message}`))
+    void engine
+      .launch?.(opts.taskId, id)
+      .catch((error: unknown) => log.warn(`launch context for session ${id} failed: ${describeError(error).message}`))
   }
   return meta
 }
@@ -651,7 +771,9 @@ const mcpRegistered = new Set<string>()
 // The fallback name is the packaged one: a plain Node process has no build flavour of its own, and the
 // composition root sets the real one through configureAcornMcp before any session spawns.
 const mcpName = () => acornMcp()?.name ?? serverName(true)
-const mcpLauncher = () => acornMcp()?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
+const mcpLauncher = () =>
+  acornMcp()?.launcher ??
+  launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
 // The registration lives in the person's own Claude and Codex config, which every checkout shares. An
 // isolated `dev:agent` session sets this so its throwaway build doesn't take the `acorn-dev` entry
 // over and leave it pointing at a worktree that is later removed.
@@ -697,7 +819,10 @@ export async function reconcileTmux() {
   } catch {
     return
   }
-  if (!rows.length) { engine.core.taskScripts.reconcile([]); return }
+  if (!rows.length) {
+    engine.core.taskScripts.reconcile([])
+    return
+  }
   const alive = tmuxAvailable() ? listTmuxSessions() : new Set<string>()
   let reattached = 0
   for (const row of rows) {
@@ -714,8 +839,17 @@ export async function reconcileTmux() {
         const isWorktree = !!task?.worktreePath && resolve(row.cwd) === resolve(task.worktreePath)
         const pty = attachTmuxPty(row.tmuxSession, row.cols, row.rows)
         let session: Session
-        try { session = wireSession(rowToMeta(row, taskContext(task), isWorktree), pty, engine, engine.core.taskScripts.forSession(row.id) ?? undefined) }
-        catch (error) { drain([() => pty.kill()]); throw error }
+        try {
+          session = wireSession(
+            rowToMeta(row, taskContext(task), isWorktree),
+            pty,
+            engine,
+            engine.core.taskScripts.forSession(row.id) ?? undefined,
+          )
+        } catch (error) {
+          drain([() => pty.kill()])
+          throw error
+        }
         session.admitted = true
         session.persisted = true
         reattached++
@@ -727,7 +861,9 @@ export async function reconcileTmux() {
       drain([() => log.warn(`tmux reconcile failed for session ${row.id}: ${describeError(e).message}`)])
     }
   }
-  engine.core.taskScripts.reconcile([...sessions.values()].filter(s => s.admitted && !s.retired && s.meta.status === 'running').map(s => s.meta.id))
+  engine.core.taskScripts.reconcile(
+    [...sessions.values()].filter((s) => s.admitted && !s.retired && s.meta.status === 'running').map((s) => s.meta.id),
+  )
   // This runs after the window, so the client's initial term:list has already fired. Ping it to
   // re-list, or resurrected sessions stay invisible until some unrelated broadcast.
   if (reattached && engine.token === engineToken) engine.status()
@@ -743,10 +879,21 @@ export function terminalRunGlue(): RunSessionGlue {
       assertOwner(engine)
       const t = await engine.core.tasks.load(taskId)
       assertOwner(engine)
-      const meta = await spawnOne({ taskId, command: target.command, title: `▶ ${target.id}` }, cwd, true, taskContext(t), t, engine)
+      const meta = await spawnOne(
+        { taskId, command: target.command, title: `▶ ${target.id}` },
+        cwd,
+        true,
+        taskContext(t),
+        t,
+        engine,
+      )
       return meta.id
     },
-    isRunning: (sessionId: string) => engine.token === engineToken && sessions.get(sessionId)?.admitted === true && !sessions.get(sessionId)!.retired && sessions.get(sessionId)?.meta.status === 'running',
+    isRunning: (sessionId: string) =>
+      engine.token === engineToken &&
+      sessions.get(sessionId)?.admitted === true &&
+      !sessions.get(sessionId)!.retired &&
+      sessions.get(sessionId)?.meta.status === 'running',
     onExit: (listener) => {
       assertOwner(engine)
       runSessionExitListeners.add(listener)
@@ -761,7 +908,8 @@ export function terminalRunGlue(): RunSessionGlue {
         drain([() => engine.status()])
       }
     },
-    exitCode: (sessionId: string) => engine.token === engineToken ? sessions.get(sessionId)?.meta.exitCode : undefined,
+    exitCode: (sessionId: string) =>
+      engine.token === engineToken ? sessions.get(sessionId)?.meta.exitCode : undefined,
     killSession: (sessionId: string) => {
       assertOwner(engine)
       const s = sessions.get(sessionId)
@@ -828,7 +976,11 @@ export type TerminalChannelRegistrations = {
   worktreeCreated: (taskId: string, cwd: string) => Promise<void>
 }
 
-export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: TerminalCoreServices, deps: TerminalChannelDeps): TerminalChannelRegistrations {
+export function registerTerminalChannel(
+  pluginDb: PluginDatabase,
+  coreServices: TerminalCoreServices,
+  deps: TerminalChannelDeps,
+): TerminalChannelRegistrations {
   if (engineToken) disposeTerminal()
   engineToken = {}
   store = pluginDb
@@ -861,8 +1013,14 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   // The bridge closes over the engine internals.
   const terminal: TerminalBridge = {
     // Same lookup the WS hub gets as `streamTaskId` below, off the same map.
-    taskIdFor: (id) => engine.token === engineToken && sessions.get(id)?.admitted && !sessions.get(id)!.retired ? sessions.get(id)!.meta.taskId : null,
-    list: async () => { assertOwner(engine); return [...sessions.values()].filter(s => s.admitted && !s.retired).map((s) => s.meta) },
+    taskIdFor: (id) =>
+      engine.token === engineToken && sessions.get(id)?.admitted && !sessions.get(id)!.retired
+        ? sessions.get(id)!.meta.taskId
+        : null,
+    list: async () => {
+      assertOwner(engine)
+      return [...sessions.values()].filter((s) => s.admitted && !s.retired).map((s) => s.meta)
+    },
     profiles: async () => listProfiles(),
     create: (opts) => create(opts ?? ({} as CreateOpts), engine),
     runSetup: (taskId) => runSetup(taskId, engine),
@@ -894,11 +1052,17 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
       const s = sessions.get(id)
       if (!s?.admitted || s.retired) return false
       sessions.delete(id)
-      drain([() => { if (s.meta.backend === 'tmux' && s.meta.tmuxSession) killTmuxSession(s.meta.tmuxSession) },
-        () => retireSession(s)])
+      drain([
+        () => {
+          if (s.meta.backend === 'tmux' && s.meta.tmuxSession) killTmuxSession(s.meta.tmuxSession)
+        },
+        () => retireSession(s),
+      ])
       try {
         if (s.meta.backend === 'tmux') await deleteRow(id, engine.db)
-      } finally { if (engine.token === engineToken) drain([() => engine.status()]) }
+      } finally {
+        if (engine.token === engineToken) drain([() => engine.status()])
+      }
       return true
     },
     resize: async (id, cols, rows) => {
@@ -917,7 +1081,12 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   const taskSessions: TaskSessionsBridge = {
     // The reconcile gate the route awaits before the running-session guard.
     ready: () => deps.reconciled,
-    runningCount: (taskId) => { assertOwner(engine); return [...sessions.values()].filter((s) => s.admitted && !s.retired && s.meta.taskId === taskId && s.meta.status === 'running').length },
+    runningCount: (taskId) => {
+      assertOwner(engine)
+      return [...sessions.values()].filter(
+        (s) => s.admitted && !s.retired && s.meta.taskId === taskId && s.meta.status === 'running',
+      ).length
+    },
     killRunning: (taskId) => {
       assertOwner(engine)
       for (const s of sessions.values()) if (s.meta.taskId === taskId && s.meta.status === 'running') killSession(s)
@@ -925,15 +1094,17 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     // Drop any lingering exited sessions for this task so their rows don't outlive it.
     dropTaskSessions: async (taskId) => {
       assertOwner(engine)
-      const dropped = [...sessions.values()].filter(s => s.meta.taskId === taskId)
+      const dropped = [...sessions.values()].filter((s) => s.meta.taskId === taskId)
       for (const s of dropped) {
         sessions.delete(s.meta.id)
         s.discardRow = true
         retireSession(s)
       }
       try {
-        await Promise.all(dropped.filter(s => s.meta.backend === 'tmux').map(s => deleteRow(s.meta.id, engine.db)))
-      } finally { if (dropped.some(s => s.admitted) && engine.token === engineToken) drain([() => engine.status()]) }
+        await Promise.all(dropped.filter((s) => s.meta.backend === 'tmux').map((s) => deleteRow(s.meta.id, engine.db)))
+      } finally {
+        if (dropped.some((s) => s.admitted) && engine.token === engineToken) drain([() => engine.status()])
+      }
     },
     // Teardown streams to the task drawer as a "Teardown" tab, and its exit code plus ring buffer are the
     // result. A ~2 min timeout kills it, surfacing exitCode null as a timeout.
@@ -941,16 +1112,29 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
       assertOwner(engine)
       const t = await engine.core.tasks.load(taskId)
       assertOwner(engine)
-      const meta = await spawnOne({ taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t, engine, attempt)
+      const meta = await spawnOne(
+        { taskId, command: script, title: 'Teardown', env },
+        cwd,
+        true,
+        taskContext(t),
+        t,
+        engine,
+        attempt,
+      )
       assertOwner(engine)
       const s = sessions.get(meta.id)
       if (!s) return { exitCode: null, output: 'Could not start the teardown session.' }
-      if (s.meta.status === 'exited') return { exitCode: s.script && s.meta.backend === 'tmux' ? null : s.meta.exitCode, output: s.ring.tail() }
+      if (s.meta.status === 'exited')
+        return { exitCode: s.script && s.meta.backend === 'tmux' ? null : s.meta.exitCode, output: s.ring.tail() }
       return new Promise((resolveTeardown) => {
         const finish = (exitCode: number | null, reason?: 'timeout') => {
           clearTimeout(timer)
           s.settlers.delete(finish)
-          resolveTeardown({ exitCode, output: s.ring.tail(), ...(exitCode === null ? { reason: reason ?? 'cancelled' as const } : {}) })
+          resolveTeardown({
+            exitCode,
+            output: s.ring.tail(),
+            ...(exitCode === null ? { reason: reason ?? ('cancelled' as const) } : {}),
+          })
         }
         const timer = setTimeout(() => {
           // Deadline is an honest timeout result, even if the PTY never emits an exit.
@@ -964,7 +1148,9 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
           s.meta.agentState = ptyState(s.meta.kind, 'exited', false)
           drain([
             () => emit(s, { type: 'exit', exitCode: null, signal: null }),
-            () => { if (s.persisted) void markExited(s.meta.id, null, engine.db) },
+            () => {
+              if (s.persisted) void markExited(s.meta.id, null, engine.db)
+            },
             () => worktreeSettled(s),
             () => engine.status(),
             () => finish(null, 'timeout'),
@@ -990,7 +1176,10 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   deps.streams?.({
     // Which task owns a session, so the WS hub can refuse a task-scoped internal credential that tries to
     // attach to or type into another task's pseudo-terminal (server/transport/wsHub.ts § mayDriveStream).
-    streamTaskId: (id) => engine.token === engineToken && sessions.get(id)?.admitted && !sessions.get(id)!.retired ? sessions.get(id)!.meta.taskId : null,
+    streamTaskId: (id) =>
+      engine.token === engineToken && sessions.get(id)?.admitted && !sessions.get(id)!.retired
+        ? sessions.get(id)!.meta.taskId
+        : null,
     input: (id, data) => {
       if (engine.token !== engineToken) return
       const s = sessions.get(id)

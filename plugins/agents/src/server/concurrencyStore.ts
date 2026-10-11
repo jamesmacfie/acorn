@@ -5,10 +5,7 @@ import {
   type AgentConcurrencyLimits,
 } from '../shared/concurrency'
 
-export async function readAgentConcurrency(
-  prefs: PrefService,
-  userId: string,
-): Promise<AgentConcurrencyLimits> {
+export async function readAgentConcurrency(prefs: PrefService, userId: string): Promise<AgentConcurrencyLimits> {
   return parseAgentConcurrency(await prefs.read(userId, agentConcurrencyPreferenceKey))
 }
 

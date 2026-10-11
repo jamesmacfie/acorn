@@ -34,7 +34,8 @@ export async function dataCatalog(entry: DataPoolEntry): Promise<DataTable[]> {
   if (entry.catalogWave) return entry.catalogWave
   const version = entry.schemaVersion
   const wave = entry.pool.query<CatalogRow>(CATALOG_SQL).then(({ rows }) => {
-    if (entry.retired || entry.schemaVersion !== version) throw new Error('Database catalog retired. Retry the schema read.')
+    if (entry.retired || entry.schemaVersion !== version)
+      throw new Error('Database catalog retired. Retry the schema read.')
     const tables: DataTable[] = []
     for (const row of rows) {
       let table = tables[tables.length - 1]
@@ -42,14 +43,21 @@ export async function dataCatalog(entry: DataPoolEntry): Promise<DataTable[]> {
         table = { schema: row.table_schema, name: row.table_name, columns: [] }
         tables.push(table)
       }
-      if (row.column_name !== null) table.columns.push({
-        name: row.column_name, dataType: row.data_type, nullable: row.is_nullable === 'YES', isPk: row.is_pk,
-      })
+      if (row.column_name !== null)
+        table.columns.push({
+          name: row.column_name,
+          dataType: row.data_type,
+          nullable: row.is_nullable === 'YES',
+          isPk: row.is_pk,
+        })
     }
     entry.catalog = tables
     return tables
   })
   entry.catalogWave = wave
-  try { return await wave }
-  finally { if (entry.catalogWave === wave) entry.catalogWave = undefined }
+  try {
+    return await wave
+  } finally {
+    if (entry.catalogWave === wave) entry.catalogWave = undefined
+  }
 }

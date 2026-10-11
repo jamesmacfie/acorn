@@ -7,8 +7,7 @@ export type ChordModifier = (typeof CHORD_MODIFIERS)[number]
 
 export type ParsedChord = { modifiers: ChordModifier[]; key: string }
 
-const singleKey = (value: string): boolean =>
-  value !== '+' && value.trim() === value && Array.from(value).length === 1
+const singleKey = (value: string): boolean => value !== '+' && value.trim() === value && Array.from(value).length === 1
 
 export function parseChord(value: string): ParsedChord | null {
   if (!value || value !== value.toLowerCase() || value.trim() !== value) return null
@@ -31,8 +30,7 @@ export const hasCommandModifier = (chord: string): boolean => {
   return !!parsed?.modifiers.some((modifier) => modifier === 'meta' || modifier === 'ctrl' || modifier === 'alt')
 }
 
-export const isPluginShortcutChord = (chord: string): boolean =>
-  isNormalizedChord(chord) && hasCommandModifier(chord)
+export const isPluginShortcutChord = (chord: string): boolean => isNormalizedChord(chord) && hasCommandModifier(chord)
 
 // Clipboard, undo and select-all are implemented by the browser (on macOS, by the Edit menu's roles)
 // against whatever is selected or focused. They carry a command modifier, so anything that cancels
@@ -98,14 +96,17 @@ export function isTypingTarget(target: unknown): boolean {
     isContentEditable?: unknown
     editContext?: unknown
   }
-  const name = typeof element.nodeName === 'string'
-    ? element.nodeName.toUpperCase()
-    : typeof element.tagName === 'string'
-      ? element.tagName.toUpperCase()
-      : ''
-  return name === 'INPUT'
-    || name === 'TEXTAREA'
-    || name === 'SELECT'
-    || element.isContentEditable === true
-    || element.editContext != null
+  const name =
+    typeof element.nodeName === 'string'
+      ? element.nodeName.toUpperCase()
+      : typeof element.tagName === 'string'
+        ? element.tagName.toUpperCase()
+        : ''
+  return (
+    name === 'INPUT' ||
+    name === 'TEXTAREA' ||
+    name === 'SELECT' ||
+    element.isContentEditable === true ||
+    element.editContext != null
+  )
 }

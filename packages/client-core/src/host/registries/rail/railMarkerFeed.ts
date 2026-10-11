@@ -58,7 +58,11 @@ export function markersFor(target: RailMarkerTarget): RailMarker[] {
       for (const marker of contribution.markers(target)) {
         // Qualified by contributor, so two plugins can both call a marker `running` and the
         // allocator's id tiebreak stays stable.
-        markers.push({ ...marker, id: `${contribution.id}:${marker.id}`, priority: clampMarkerPriority(marker.priority) })
+        markers.push({
+          ...marker,
+          id: `${contribution.id}:${marker.id}`,
+          priority: clampMarkerPriority(marker.priority),
+        })
       }
     } catch (error) {
       log.warn(`contribution '${contribution.id}' failed`, error, { 'contribution.id': contribution.id })

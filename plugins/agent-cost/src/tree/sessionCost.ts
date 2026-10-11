@@ -1,8 +1,4 @@
-import type {
-  SessionHeaderProps,
-  SessionHeaderTokenPrice,
-  SessionHeaderUsage,
-} from './sessionHeaderContract'
+import type { SessionHeaderProps, SessionHeaderTokenPrice, SessionHeaderUsage } from './sessionHeaderContract'
 import { estimateUsageEventCost } from '@acorn/protocol/usageCost.ts'
 
 export type SessionCostEstimate = {
@@ -41,10 +37,19 @@ export function estimateSessionCost(props: SessionHeaderProps): SessionCostEstim
   for (const turn of props.turns) {
     const raw = turn.usage.cost
     const amount = raw?.currency.toUpperCase() === 'USD' ? finiteCount(raw.amount) : null
-    const reported = amount === null ? null : props.costAccounting === 'cumulative'
-      ? previousReported === null || amount < previousReported ? amount : amount - previousReported : amount
-    const cost = reported ?? (turn.price ? tokenCost(turn.usage,
-      props.tokenAccounting === 'cumulative' ? previousUsage : {}, turn.price) : null)
+    const reported =
+      amount === null
+        ? null
+        : props.costAccounting === 'cumulative'
+          ? previousReported === null || amount < previousReported
+            ? amount
+            : amount - previousReported
+          : amount
+    const cost =
+      reported ??
+      (turn.price
+        ? tokenCost(turn.usage, props.tokenAccounting === 'cumulative' ? previousUsage : {}, turn.price)
+        : null)
     if (cost === null) return null
     amountUsd += cost
     estimated ||= reported === null

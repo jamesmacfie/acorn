@@ -46,7 +46,19 @@ describe('plugin-api entrypoints load in a node environment', () => {
     // node-safe now and a plugin test that wants an editor theme can have one. It stays a separate
     // entrypoint for the other reason its header gives — keeping the grammars out of every pane's boot
     // graph — which is a bundling concern, not a realm one.
-    expect(nodeSafe.sort()).toEqual(['./client', './node', './testkit', './testkit/client', './testkit/ws-client', './ui/diff', './ui/editor', './ui/model-provider-failure', './ui/sdk', './ui/tokens', './ui/tree'])
+    expect(nodeSafe.sort()).toEqual([
+      './client',
+      './node',
+      './testkit',
+      './testkit/client',
+      './testkit/ws-client',
+      './ui/diff',
+      './ui/editor',
+      './ui/model-provider-failure',
+      './ui/sdk',
+      './ui/tokens',
+      './ui/tree',
+    ])
     expect([...BROWSER_REALM].every((entry) => entry in PKG.exports)).toBe(true)
   })
 

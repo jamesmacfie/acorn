@@ -41,16 +41,18 @@ export type CardKeyFields = {
  */
 export function cardKeyOf(fields: CardKeyFields): string | null {
   if (fields.type === 'tool' && fields.toolId != null) return `tool\n${fields.toolId}`
-  if (fields.type === 'file_change' && fields.changeId != null) return `change\n${fields.changeId}\n${fields.path ?? ''}`
+  if (fields.type === 'file_change' && fields.changeId != null)
+    return `change\n${fields.changeId}\n${fields.path ?? ''}`
   return null
 }
 
-export const eventCardKey = (event: AgentNormalizedEvent): string | null => cardKeyOf({
-  type: event.type,
-  toolId: event.type === 'tool' ? event.tool.id : null,
-  changeId: event.type === 'file_change' ? event.changeId ?? null : null,
-  path: event.type === 'file_change' ? event.path ?? null : null,
-})
+export const eventCardKey = (event: AgentNormalizedEvent): string | null =>
+  cardKeyOf({
+    type: event.type,
+    toolId: event.type === 'tool' ? event.tool.id : null,
+    changeId: event.type === 'file_change' ? (event.changeId ?? null) : null,
+    path: event.type === 'file_change' ? (event.path ?? null) : null,
+  })
 
 /** The SQL that reads a row's card fields. Kept beside `cardKeyOf` so the two cannot drift. */
 export const cardKeyColumns = sql`
@@ -67,9 +69,9 @@ export const cardKeyColumns = sql`
  * report each time, so the last one is the state.
  */
 export function foldCard(events: readonly AgentNormalizedEvent[]): AgentNormalizedEvent {
-  return events.reduce((card, next) => card.type === 'tool' && next.type === 'tool'
-    ? { type: 'tool', tool: mergeToolCall(card.tool, next.tool) }
-    : next)
+  return events.reduce((card, next) =>
+    card.type === 'tool' && next.type === 'tool' ? { type: 'tool', tool: mergeToolCall(card.tool, next.tool) } : next,
+  )
 }
 
 export const parseStoredEvent = (json: string): AgentNormalizedEvent | null => {
@@ -133,9 +135,8 @@ export class LedgerFold {
     // The opener has the lowest sequence, so it comes first if it is still there. It goes only with its
     // session, and then this event has no session to land in either.
     if (rows[0]?.id !== card.head) return open()
-    const stored = event.type === 'tool'
-      ? foldCard([...rows.flatMap((row) => parseStoredEvent(row.eventJson) ?? []), event])
-      : event
+    const stored =
+      event.type === 'tool' ? foldCard([...rows.flatMap((row) => parseStoredEvent(row.eventJson) ?? []), event]) : event
     return {
       head: card.head,
       stored,

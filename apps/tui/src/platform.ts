@@ -44,11 +44,15 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
   const statuses = new Map<string, NodeStatus>()
 
   const broker = new NodeBroker({
-    frame: (nodeId, frame) => { for (const handler of frameHandlers) handler(nodeId, frame) },
+    frame: (nodeId, frame) => {
+      for (const handler of frameHandlers) handler(nodeId, frame)
+    },
     // Terminal output, as the one binary frame (@acorn/protocol/ws.ts § The one binary frame). The
     // desktop tags the node id around this because it has a process boundary to cross; here the
     // broker is in this process, so the frame the node sent is handed over as it stands.
-    bytes: (nodeId, frame) => { for (const handler of byteHandlers) handler(nodeId, frame) },
+    bytes: (nodeId, frame) => {
+      for (const handler of byteHandlers) handler(nodeId, frame)
+    },
     status: (status) => {
       statuses.set(status.nodeId, status)
       for (const handler of statusHandlers) handler(status)
@@ -68,9 +72,13 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
   // Without a broker record, selecting a saved node fails as "Unknown node".
   for (const node of fleet.list()) connect(node.nodeId)
   // Connect the local node again when this run's child announces its current endpoint.
-  if (opened.starting) void opened.starting.then((handshake) => connect(handshake.nodeId), () => {})
+  if (opened.starting)
+    void opened.starting.then(
+      (handshake) => connect(handshake.nodeId),
+      () => {},
+    )
 
-  const subscribe = <T,>(list: T[], handler: T): (() => void) => {
+  const subscribe = <T>(list: T[], handler: T): (() => void) => {
     list.push(handler)
     return () => {
       const at = list.indexOf(handler)
@@ -88,7 +96,8 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     platform: process.platform,
     nodeFetch: (nodeId: string, request: Parameters<NodeBroker['fetch']>[1]) => broker.fetch(nodeId, request),
     nodeAbort: (requestId: string) => broker.abort(requestId),
-    nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1], options?: Parameters<NodeBroker['send']>[2]) => broker.send(nodeId, frame, options),
+    nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1], options?: Parameters<NodeBroker['send']>[2]) =>
+      broker.send(nodeId, frame, options),
     nodeInterest: (_nodeId: string | null) => {},
     onNodeTransportError: (_cb: unknown) => () => {},
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameHandlers, cb),
@@ -117,7 +126,15 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       const result = await pairWithNode(probe, { code: request.code, deviceName: request.deviceName })
       pending = null
       const node = fleet.remember(
-        { nodeId: result.nodeId, label: request.label, endpoint: probe.endpoint, fingerprint: probe.fingerprint, certPem: probe.certPem, deviceId: result.device.id, local: false },
+        {
+          nodeId: result.nodeId,
+          label: request.label,
+          endpoint: probe.endpoint,
+          fingerprint: probe.fingerprint,
+          certPem: probe.certPem,
+          deviceId: result.device.id,
+          local: false,
+        },
         result.deviceToken,
       )
       connect(node.nodeId)
@@ -137,8 +154,15 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
         // The last request that will ever authenticate, and it closes our own socket. A failure must
         // not abort the local forget: the usual reason revoke fails is that the node is offline.
         await broker
-          .fetch(nodeId, { requestId: `forget-${nodeId}`, path: `/v1/core/devices/${node.deviceId}`, method: 'DELETE', headers: {} })
-          .catch((error: unknown) => log.warn(`could not revoke this device on ${nodeId}`, error, { 'node.id': nodeId }))
+          .fetch(nodeId, {
+            requestId: `forget-${nodeId}`,
+            path: `/v1/core/devices/${node.deviceId}`,
+            method: 'DELETE',
+            headers: {},
+          })
+          .catch((error: unknown) =>
+            log.warn(`could not revoke this device on ${nodeId}`, error, { 'node.id': nodeId }),
+          )
       }
       broker.remove(nodeId)
       fleet.forget(nodeId)
@@ -146,7 +170,8 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     },
     nodeReconnect: (nodeId: string) => connect(nodeId),
     nodeRestartLocal: async (): Promise<void> => {
-      if (!supervised) throw new Error('acorn attached to this node rather than starting it, so it is not ours to restart.')
+      if (!supervised)
+        throw new Error('acorn attached to this node rather than starting it, so it is not ours to restart.')
       await stop()
       // A restarted node binds a fresh port and may mint a fresh token, so the fleet row is rewritten
       // from the new handshake rather than reused. What is not here is the desktop's `onNodeReplaced`

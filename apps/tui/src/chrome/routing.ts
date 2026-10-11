@@ -80,10 +80,12 @@ export function installRouting(model: ShellModel): void {
   // Tracked, it also ran on every Menu choice — and since choosing a source does not rewrite the
   // path, the path's owner was still the old source, and the choice was snapped straight back: once
   // a reader had browsed into any source-claimed path, the Menu stopped working.
-  createEffect(on(currentPath, (path) => {
-    const owner = untrack(() => sourceIdForPath(path))
-    if (owner && owner !== untrack(selectedSource)) setSelectedSource(owner)
-  }))
+  createEffect(
+    on(currentPath, (path) => {
+      const owner = untrack(() => sourceIdForPath(path))
+      if (owner && owner !== untrack(selectedSource)) setSelectedSource(owner)
+    }),
+  )
 
   // Keep the path on a project this workspace has. Two cases, and they are the same check: nothing is
   // chosen yet, or the reader switched workspace and the path still names the old one's project.

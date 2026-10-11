@@ -28,17 +28,23 @@ describe('what the owner is shown', () => {
 
   it('leads with the action, and says when data is going with it', () => {
     expect(describePluginRequest(request())).toBe('Install github:acorn/board')
-    expect(describePluginRequest(request({ action: 'update', source: undefined, pluginId: 'board' }))).toBe('Update board')
-    expect(describePluginRequest(request({ action: 'uninstall', source: undefined, pluginId: 'board' }))).toBe('Remove board')
-    expect(describePluginRequest(request({ action: 'uninstall', source: undefined, pluginId: 'board', purgeData: true }))).toBe(
-      'Remove board and delete its data',
+    expect(describePluginRequest(request({ action: 'update', source: undefined, pluginId: 'board' }))).toBe(
+      'Update board',
     )
+    expect(describePluginRequest(request({ action: 'uninstall', source: undefined, pluginId: 'board' }))).toBe(
+      'Remove board',
+    )
+    expect(
+      describePluginRequest(request({ action: 'uninstall', source: undefined, pluginId: 'board', purgeData: true })),
+    ).toBe('Remove board and delete its data')
   })
 })
 
 describe('what the agent is told', () => {
   it('refuses without explaining how to get a different answer', () => {
-    expect(pluginRequestOutcomeMessage(request(), { decision: 'denied' })).toBe('The owner declined this install. Do not retry it.')
+    expect(pluginRequestOutcomeMessage(request(), { decision: 'denied' })).toBe(
+      'The owner declined this install. Do not retry it.',
+    )
     expect(pluginRequestOutcomeMessage(request(), { decision: 'denied', removed: true })).toContain('Do not ask again')
   })
 
@@ -54,8 +60,10 @@ describe('what the agent is told', () => {
   })
 
   it('says what happened for an uninstall', () => {
-    expect(pluginRequestOutcomeMessage(request({ action: 'uninstall', source: undefined, pluginId: 'board' }), { decision: 'approved' })).toBe(
-      'board was removed from this node.',
-    )
+    expect(
+      pluginRequestOutcomeMessage(request({ action: 'uninstall', source: undefined, pluginId: 'board' }), {
+        decision: 'approved',
+      }),
+    ).toBe('board was removed from this node.')
   })
 })

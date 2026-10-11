@@ -16,10 +16,18 @@ export default function DockerExecTerminal(props: { containerRef: string; label:
   const ref = props.containerRef
   const execId = crypto.randomUUID()
   const io: PtyIo = {
-    open: ({ cols, rows }, onEvent) => wsDockerExecOpen(execId, ref, cols, rows, (event) => {
-      if (event.kind === 'out') onEvent({ kind: 'out', data: event.data })
-      else onEvent({ kind: 'exit', code: null })
-    }, owner),
+    open: ({ cols, rows }, onEvent) =>
+      wsDockerExecOpen(
+        execId,
+        ref,
+        cols,
+        rows,
+        (event) => {
+          if (event.kind === 'out') onEvent({ kind: 'out', data: event.data })
+          else onEvent({ kind: 'exit', code: null })
+        },
+        owner,
+      ),
     input: (data) => wsDockerExecInput(execId, data, owner),
     resize: ({ cols, rows }) => wsDockerExecResize(execId, cols, rows, owner),
     farewell: '[session ended]',

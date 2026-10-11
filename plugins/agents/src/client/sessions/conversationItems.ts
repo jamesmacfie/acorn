@@ -1,9 +1,4 @@
-import type {
-  AgentEventRecord,
-  AgentNormalizedEvent,
-  AgentRequest,
-  AgentSubagentUpdate,
-} from '../../contract/wire.ts'
+import type { AgentEventRecord, AgentNormalizedEvent, AgentRequest, AgentSubagentUpdate } from '../../contract/wire.ts'
 // The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
 // both sources hand the transcript one usage record a turn already, and it still runs so that a
 // replayed page, an older node, or a subagent's roster usage folds the way it always did.
@@ -64,10 +59,7 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
 // So this needs the request row and not only the event, since only the row knows whether anybody has
 // answered yet. A caller with no rows to hand is drawing a subagent's own stream, which never contains
 // one (`subagentIdOf` below), so the lookup is optional.
-const belongsInThread = (
-  event: AgentNormalizedEvent,
-  requestFor: RequestLookup | undefined,
-): boolean => {
+const belongsInThread = (event: AgentNormalizedEvent, requestFor: RequestLookup | undefined): boolean => {
   if (event.type !== 'request') return true
   if (event.kind !== 'permission') return true
   // A refusal by a policy plugin is the only record that the agent asked, so it stays.
@@ -82,7 +74,10 @@ export const visibleConversationItems = (
   items: AgentConversationItem[],
   requestFor?: RequestLookup,
 ): AgentConversationItem[] =>
-  items.filter((item) => !item.fileChangeAttached && VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor))
+  items.filter(
+    (item) =>
+      !item.fileChangeAttached && VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor),
+  )
 
 /** A card that is somebody talking — the reader or the agent — as opposed to a tool call, reasoning,
  *  or a note. What the "show chats only" toggle above the composer keeps.
@@ -93,10 +88,10 @@ export const visibleConversationItems = (
  *  above has already dropped the resolved permissions, so what is left is the questions and whatever
  *  is still blocking. */
 export const isChatItem = (item: AgentConversationItem): boolean =>
-  item.event.type === 'user_message'
-  || item.event.type === 'assistant_message'
-  || item.event.type === 'request'
-  || item.event.type === 'plan_proposal'
+  item.event.type === 'user_message' ||
+  item.event.type === 'assistant_message' ||
+  item.event.type === 'request' ||
+  item.event.type === 'plan_proposal'
 
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
@@ -119,9 +114,7 @@ const mergeSubagent = (previous: AgentSubagentUpdate, next: AgentSubagentUpdate)
   role: next.role ?? previous.role,
   model: next.model ?? previous.model,
   providerAgentRef: next.providerAgentRef ?? previous.providerAgentRef,
-  usage: next.usage && previous.usage
-    ? mergeUsage(previous.usage, next.usage)
-    : next.usage ?? previous.usage,
+  usage: next.usage && previous.usage ? mergeUsage(previous.usage, next.usage) : (next.usage ?? previous.usage),
   toolUseCount: next.toolUseCount ?? previous.toolUseCount,
   durationMs: next.durationMs ?? previous.durationMs,
 })
@@ -130,8 +123,10 @@ const mergeSubagent = (previous: AgentSubagentUpdate, next: AgentSubagentUpdate)
 const subagentIdOf = (event: AgentNormalizedEvent): string | undefined => {
   if (event.type === 'tool') return event.tool.subagentId
   if (
-    event.type === 'user_message' || event.type === 'assistant_message'
-    || event.type === 'reasoning' || event.type === 'file_change'
+    event.type === 'user_message' ||
+    event.type === 'assistant_message' ||
+    event.type === 'reasoning' ||
+    event.type === 'file_change'
   ) {
     return event.subagentId
   }
@@ -150,7 +145,12 @@ type Stream = {
   cardAt?: number
 }
 
-const newStream = (cardAt?: number): Stream => ({ items: [], usageCardAt: undefined, planCardAtByTurn: new Map(), cardAt })
+const newStream = (cardAt?: number): Stream => ({
+  items: [],
+  usageCardAt: undefined,
+  planCardAtByTurn: new Map(),
+  cardAt,
+})
 
 // A record the node already folded (`foldedThroughSeq`) stands in for every update of its card up to
 // that seq, so the card's `lastSeq` jumps there, and a row at or below it is one that record already
@@ -181,8 +181,11 @@ const folded = (card: AgentNormalizedEvent, update: AgentNormalizedEvent): Agent
 }
 
 // Spread, so a subagent card keeps the `children` it was last handed.
-const foldInto = (card: AgentConversationItem, record: AgentEventRecord): AgentConversationItem =>
-  ({ ...card, lastSeq: reach(record), event: folded(card.event, record.event) })
+const foldInto = (card: AgentConversationItem, record: AgentEventRecord): AgentConversationItem => ({
+  ...card,
+  lastSeq: reach(record),
+  event: folded(card.event, record.event),
+})
 
 type Fold = {
   /** Take the next record. Records must come in seq order. */
@@ -256,7 +259,12 @@ function openFold(): Fold {
     for (const file of files) {
       const item = file.stream.items[file.at]
       if (item.event.type !== 'file_change' || item.event.path === undefined) continue
-      changes.push({ path: item.event.path, patch: item.event.patch, snippet: item.event.snippet, patchArtifactId: item.event.patchArtifactId })
+      changes.push({
+        path: item.event.path,
+        patch: item.event.patch,
+        snippet: item.event.snippet,
+        patchArtifactId: item.event.patchArtifactId,
+      })
       if (!item.fileChangeAttached) write(file.stream, file.at, { ...item, fileChangeAttached: true })
     }
     write(tool.stream, tool.at, { ...tool.stream.items[tool.at], fileChanges: changes })
@@ -299,10 +307,7 @@ function openFold(): Fold {
   // like a tool call, by id, so a completion summary lands on the card the spawn opened.
   //
   // Which existing card this record updates, and in which stream. `undefined` means it opens a new one.
-  const foldTarget = (
-    record: AgentEventRecord,
-    stream: Stream,
-  ): { stream: Stream; at: number } | undefined => {
+  const foldTarget = (record: AgentEventRecord, stream: Stream): { stream: Stream; at: number } | undefined => {
     if (record.event.type === 'tool') return toolCards.get(toolCardKey(record.turnId, record.event.tool.id))
     if (record.event.type === 'file_change') {
       const key = fileChangeKey(record)
@@ -354,13 +359,13 @@ function openFold(): Fold {
     const last = stream.items.length - 1
     const previous = stream.items[last]
     if (
-      previous
-      && previous.turnId === record.turnId
-      && isAppendable(previous.event)
-      && isAppendable(record.event)
-      && previous.event.type === record.event.type
-      && record.event.append
-      && previous.event.messageId === record.event.messageId
+      previous &&
+      previous.turnId === record.turnId &&
+      isAppendable(previous.event) &&
+      isAppendable(record.event) &&
+      previous.event.type === record.event.type &&
+      record.event.append &&
+      previous.event.messageId === record.event.messageId
     ) {
       write(stream, last, {
         ...previous,
@@ -508,5 +513,8 @@ export function createConversationProjection(): (events: AgentEventRecord[]) => 
 // The store's merge keeps the row's id, seq and turn (managedStore.ts § foldUsage). The turn decides
 // which card a usage row folds into, so a row that moved turns is not the same row.
 const sameUsageRow = (held: AgentEventRecord, now: AgentEventRecord): boolean =>
-  now.event.type === 'usage' && held.event.type === 'usage'
-  && now.id === held.id && now.seq === held.seq && now.turnId === held.turnId
+  now.event.type === 'usage' &&
+  held.event.type === 'usage' &&
+  now.id === held.id &&
+  now.seq === held.seq &&
+  now.turnId === held.turnId

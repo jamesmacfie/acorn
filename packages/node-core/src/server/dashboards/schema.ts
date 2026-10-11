@@ -12,12 +12,16 @@ export const dashboardDrafts = sqliteTable('dashboard_drafts', {
   updatedAt: integer('updated_at').notNull(),
 })
 
-export const dashboardRevisions = sqliteTable('dashboard_revisions', {
-  dashboardId: text('dashboard_id').notNull(),
-  revision: integer('revision').notNull(),
-  workspaceId: text('workspace_id').notNull(),
-  projectId: text('project_id'),
-  content: text('content').notNull(),
-  digest: text('digest').notNull(),
-  createdAt: integer('created_at').notNull(),
-}, table => [primaryKey({ columns: [table.dashboardId, table.revision] })])
+export const dashboardRevisions = sqliteTable(
+  'dashboard_revisions',
+  {
+    dashboardId: text('dashboard_id').notNull(),
+    revision: integer('revision').notNull(),
+    workspaceId: text('workspace_id').notNull(),
+    projectId: text('project_id'),
+    content: text('content').notNull(),
+    digest: text('digest').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.dashboardId, table.revision] })],
+)

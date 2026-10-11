@@ -27,13 +27,14 @@ import { httpPanelModel } from './panelModel'
 // A selection into an already-mounted project pane arrives as `onSelect`, which the model subscribes
 // to once, because remounting per click would throw away the draft the panel is holding.
 
-
 /** What the host mounts a pane region with: the surface's subject, minted by the shell per slot. */
 export type HttpPaneProps = { taskId?: string; projectId?: string; item?: string }
 
 /** The project a region was opened for, and the states in which there is nothing to draw. Both regions
  *  ask this, so both answer a missing or unloadable project the same way. */
-function WithProject(props: HttpPaneProps & { bridge: AcornBridge; children: (model: ReturnType<typeof httpPanelModel>) => JSX.Element }) {
+function WithProject(
+  props: HttpPaneProps & { bridge: AcornBridge; children: (model: ReturnType<typeof httpPanelModel>) => JSX.Element },
+) {
   // The project is read from core rather than carried in the mount props, which hold an id and not a
   // name. One read, no refetch: a region is remounted when its subject changes.
   const [project, { refetch }] = createResource(
@@ -49,19 +50,28 @@ function WithProject(props: HttpPaneProps & { bridge: AcornBridge; children: (mo
         <EmptyState title="No project">Open this from a task or a project.</EmptyState>
       </Match>
       <Match when={project.loading}>
-        <EmptyState align="start" busy>Loading project…</EmptyState>
+        <EmptyState align="start" busy>
+          Loading project…
+        </EmptyState>
       </Match>
       <Match when={project.error}>
-        <EmptyState title="Couldn't load this project" action={<Button onPress={() => void refetch()}>Try again</Button>} />
+        <EmptyState
+          title="Couldn't load this project"
+          action={<Button onPress={() => void refetch()}>Try again</Button>}
+        />
       </Match>
       <Match when={project()}>
-        {(row) => props.children(httpPanelModel({
-          bridge: props.bridge,
-          projectId: row().id,
-          projectName: row().name,
-          ...(props.taskId ? { taskId: props.taskId } : {}),
-          ...(props.item ? { initialRequestId: props.item } : {}),
-        }))}
+        {(row) =>
+          props.children(
+            httpPanelModel({
+              bridge: props.bridge,
+              projectId: row().id,
+              projectName: row().name,
+              ...(props.taskId ? { taskId: props.taskId } : {}),
+              ...(props.item ? { initialRequestId: props.item } : {}),
+            }),
+          )
+        }
       </Match>
     </Switch>
   )
@@ -78,7 +88,13 @@ export function HttpDetailApp(props: HttpPaneProps & { bridge: AcornBridge }) {
 // The variables settings surface. A picker rather than an inferred project: variables belong to a
 // project and a settings page is workspace-shaped at most.
 export function HttpSettingsApp(props: { bridge: AcornBridge }) {
-  const client = createHttpClient(props.bridge.api, props.bridge.context.authority ? JSON.stringify([props.bridge.context.nodeId, props.bridge.context.authority]) : undefined, props.bridge.context.nodeId)
+  const client = createHttpClient(
+    props.bridge.api,
+    props.bridge.context.authority
+      ? JSON.stringify([props.bridge.context.nodeId, props.bridge.context.authority])
+      : undefined,
+    props.bridge.context.nodeId,
+  )
   const [projects] = createResource(() => props.bridge.api.get<ProjectsResponse>(projectsRoute))
   const [selected, setSelected] = createSignal('')
   const visible = () => (projects()?.projects ?? []).filter((candidate) => !candidate.hidden)
@@ -89,18 +105,23 @@ export function HttpSettingsApp(props: { bridge: AcornBridge }) {
   // with the panel's Variables view, and each variable in it is a small form with its own Save: a
   // variable's name, kind and value only make sense together, and changing the kind clears the value.
   return (
-    <SettingsSection id="variables" label="Variables" description="Variables for the API panel, saved per project. Pick a project to edit its variables.">
+    <SettingsSection
+      id="variables"
+      label="Variables"
+      description="Variables for the API panel, saved per project. Pick a project to edit its variables."
+    >
       <SettingRow label="Project">
         <Select
           label="Project"
           value={selected()}
           onChange={(value: string) => setSelected(value)}
-          options={[{ value: '', label: 'Choose a project…' }, ...visible().map((candidate) => ({ value: candidate.id, label: candidate.name }))]}
+          options={[
+            { value: '', label: 'Choose a project…' },
+            ...visible().map((candidate) => ({ value: candidate.id, label: candidate.name })),
+          ]}
         />
       </SettingRow>
-      <Show when={chosen()}>
-        {(candidate) => <HttpVariables client={client} projectId={candidate().id} />}
-      </Show>
+      <Show when={chosen()}>{(candidate) => <HttpVariables client={client} projectId={candidate().id} />}</Show>
     </SettingsSection>
   )
 }

@@ -27,15 +27,20 @@ vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 const remote = vi.fn()
 const [observedStatus, setObservedStatus] = createSignal<Partial<LocalStatus>>({})
 
-const model = (status: Partial<LocalStatus>, busy = false): ChangesModel => ({
-  task: { id: 't1', projectId: 'p1' },
-  isGit: () => true,
-  status: () => ({ ...emptyLocalStatus(), ...status, ...observedStatus() }),
-  project: () => ({ name: 'widget', path: '/src/widget' }),
-  remoteBusy: () => busy,
-  forceObservation: () => ({ nodeId: 'node-a', branch: status.branch ?? null, upstreamId: observedStatus().upstreamId ?? status.upstreamId ?? null }),
-  remote,
-} as unknown as ChangesModel)
+const model = (status: Partial<LocalStatus>, busy = false): ChangesModel =>
+  ({
+    task: { id: 't1', projectId: 'p1' },
+    isGit: () => true,
+    status: () => ({ ...emptyLocalStatus(), ...status, ...observedStatus() }),
+    project: () => ({ name: 'widget', path: '/src/widget' }),
+    remoteBusy: () => busy,
+    forceObservation: () => ({
+      nodeId: 'node-a',
+      branch: status.branch ?? null,
+      upstreamId: observedStatus().upstreamId ?? status.upstreamId ?? null,
+    }),
+    remote,
+  }) as unknown as ChangesModel
 
 let host: HTMLElement
 const disposers: (() => void)[] = []
@@ -68,7 +73,10 @@ const buttons = () => [...host.querySelectorAll<HTMLButtonElement>('button')]
 const byText = (label: string) => buttons().find((button) => button.textContent?.trim() === label)
 /** The bar's primary button: the one that is neither the menu trigger nor a copy button. */
 const primary = (): HTMLButtonElement =>
-  buttons().find((button) => button.classList.contains('ui-btn') && !button.getAttribute('aria-haspopup') && !button.closest('.ui-alert'))!
+  buttons().find(
+    (button) =>
+      button.classList.contains('ui-btn') && !button.getAttribute('aria-haspopup') && !button.closest('.ui-alert'),
+  )!
 const menuTrigger = () => host.querySelector<HTMLButtonElement>('button[aria-label="Remote actions"]')!
 const openMenu = () => {
   menuTrigger().click()
@@ -132,8 +140,13 @@ describe('the bar itself', () => {
 describe('the remote menu', () => {
   it('offers fetch, both pulls and both pushes', () => {
     draw({ upstream: 'origin/main', ahead: 0, behind: 0 })
-    expect(openMenu().map((item) => item.textContent?.trim()))
-      .toEqual(['Fetch', 'Pull fast-forward only', 'Pull with rebase', 'Push', 'Force push'])
+    expect(openMenu().map((item) => item.textContent?.trim())).toEqual([
+      'Fetch',
+      'Pull fast-forward only',
+      'Pull with rebase',
+      'Push',
+      'Force push',
+    ])
   })
 
   it('is shut while a verb is already running, and so is the primary button', () => {
@@ -144,7 +157,9 @@ describe('the remote menu', () => {
 
   it('sends the rebase form of a pull from its own item', () => {
     draw({ upstream: 'origin/main', ahead: 1, behind: 1 })
-    openMenu().find((item) => item.textContent?.trim() === 'Pull with rebase')!.click()
+    openMenu()
+      .find((item) => item.textContent?.trim() === 'Pull with rebase')!
+      .click()
     expect(remote).toHaveBeenCalledWith('rebase')
   })
 
@@ -163,7 +178,9 @@ describe('the remote menu', () => {
 
   it('retains the upstream observed when force push was armed after a status refresh', () => {
     draw({ branch: 'main', upstream: 'origin/main', upstreamId: 'a'.repeat(40) })
-    openMenu().find((item) => item.textContent?.trim() === 'Force push')!.click()
+    openMenu()
+      .find((item) => item.textContent?.trim() === 'Force push')!
+      .click()
     setObservedStatus({ upstreamId: 'b'.repeat(40) })
     document.querySelector<HTMLButtonElement>('.ui-menu .ui-menu-item[data-armed]')!.click()
     expect(remote).toHaveBeenCalledWith('force', { nodeId: 'node-a', branch: 'main', upstreamId: 'a'.repeat(40) })
@@ -216,25 +233,29 @@ const Contributor = (props: PushActionsProps) => {
 }
 
 const point = () =>
-  registered.push(extensionPointRegistry.register({
-    id: PUSH_ACTIONS_POINT,
-    ownerId: 'changes',
-    label: 'After a push',
-    kind: 'remote',
-    mode: 'stack',
-    max: PUSH_ACTIONS_MAX,
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: PUSH_ACTIONS_POINT,
+      ownerId: 'changes',
+      label: 'After a push',
+      kind: 'remote',
+      mode: 'stack',
+      max: PUSH_ACTIONS_MAX,
+    }),
+  )
 
 const contributor = () =>
-  registered.push(extensionRegistry.register({
-    id: 'other.push-actions',
-    pluginId: 'other',
-    point: PUSH_ACTIONS_POINT,
-    label: 'Open pull request',
-    order: 10,
-    carrier: 'component',
-    component: Contributor,
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: 'other.push-actions',
+      pluginId: 'other',
+      point: PUSH_ACTIONS_POINT,
+      label: 'Open pull request',
+      order: 10,
+      carrier: 'component',
+      component: Contributor,
+    } as ExtensionContribution),
+  )
 
 describe('the push-actions slot', () => {
   it('draws nothing and takes no space when nobody fills it', () => {

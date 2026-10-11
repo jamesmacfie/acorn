@@ -44,10 +44,7 @@ export const foldStartsOpen = (prefs: AgentToolFoldPrefs): boolean =>
  * `sticky` learns: under the other two modes a toggle is this card's own business, and writing it
  * would quietly rewrite the setting the reader chose.
  */
-export const foldPrefsAfterToggle = (
-  prefs: AgentToolFoldPrefs,
-  open: boolean,
-): AgentToolFoldPrefs | null => {
+export const foldPrefsAfterToggle = (prefs: AgentToolFoldPrefs, open: boolean): AgentToolFoldPrefs | null => {
   if (prefs.mode !== 'sticky') return null
   const last = open ? 'expanded' : 'collapsed'
   return last === prefs.last ? null : { ...prefs, last }
@@ -122,8 +119,8 @@ export const agentToolFoldSlice: PersistedStateSlice<Record<string, unknown>> = 
   codec: {
     parse: (raw) => {
       try {
-        const value = typeof raw === 'string' ? JSON.parse(raw) as unknown : raw
-        return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+        const value = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw
+        return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
       } catch {
         return {}
       }

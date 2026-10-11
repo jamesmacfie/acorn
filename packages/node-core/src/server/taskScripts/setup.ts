@@ -10,9 +10,21 @@ export async function recordSetupDecision(db: AppDatabase, taskId: string, publi
   if (!task.scriptHistoryKnown || task.worktreePath || scripts.select(taskId, 'setup').attemptId) return
   const project = await getProject(db, task.projectId)
   const config = project ? await getProjectConfig(db, project.id) : null
-  const skip = !task.branch || project?.vcs !== 'git' ? 'not_applicable'
-    : task.skipSetup ? 'user_skipped' : config?.config.setupScriptTrigger === 'off' ? 'disabled'
-    : !config?.config.setupScript?.trim() ? 'not_configured' : undefined
+  const skip =
+    !task.branch || project?.vcs !== 'git'
+      ? 'not_applicable'
+      : task.skipSetup
+        ? 'user_skipped'
+        : config?.config.setupScriptTrigger === 'off'
+          ? 'disabled'
+          : !config?.config.setupScript?.trim()
+            ? 'not_configured'
+            : undefined
   // Config reads yield. A creator may have admitted setup or advanced the cycle meanwhile.
-  if (skip && scripts.store.task(taskId).scriptGeneration === task.scriptGeneration && !scripts.select(taskId, 'setup').attemptId) scripts.admit(taskId, 'setup', skip, publish)
+  if (
+    skip &&
+    scripts.store.task(taskId).scriptGeneration === task.scriptGeneration &&
+    !scripts.select(taskId, 'setup').attemptId
+  )
+    scripts.admit(taskId, 'setup', skip, publish)
 }

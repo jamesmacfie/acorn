@@ -1,12 +1,35 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import type { AgentAttachment, AgentConfigOption, AgentSession } from '../../contract/wire.ts'
-import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import {
+  agentContextBudget,
+  type AgentContextContribution,
+  type AgentContextSnapshot,
+} from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
 import { activeNodeId, agentContextContributions, formatChord } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Only, Picker,
-  Popover, SectionHeader, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
+  Alert,
+  Button,
+  Chip,
+  ChipRow,
+  CodeBlock,
+  Field,
+  Icon,
+  IconButton,
+  Inline,
+  Kbd,
+  MentionTextarea,
+  Only,
+  Picker,
+  Popover,
+  SectionHeader,
+  Select,
+  Stack,
+  Text,
+  Toolbar,
+  type MentionSegment,
+  type MentionSource,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { consumeComposerFocus } from '../sessions/managedSelection'
@@ -21,7 +44,12 @@ import { useWorktreeFiles } from './worktreeFiles'
 import AgentContextPickerModal from './AgentContextPickerModal'
 import { AttachmentSlot } from './AttachmentSlot'
 import TerminalComposerShortcut from './TerminalComposerShortcut'
-import { addDraftFiles, pickDraftAttachments, removeDraftAttachment, replaceDraftAttachment } from './attachmentOperations'
+import {
+  addDraftFiles,
+  pickDraftAttachments,
+  removeDraftAttachment,
+  replaceDraftAttachment,
+} from './attachmentOperations'
 import { captureContext, contextBelongsTo, refreshAutomaticContext } from './contextOperations'
 import { submitTurn } from './submitOperation'
 import { unguardedCommandsWarning } from './unguardedCommands'
@@ -80,8 +108,7 @@ export default function AgentComposer(props: {
   const capture = () => {
     const state = shared()
     const session = props.session
-    return { state, session, nodeId: state.nodeId,
-      visible: () => state.valid() && shared() === state }
+    return { state, session, nodeId: state.nodeId, visible: () => state.valid() && shared() === state }
   }
   createEffect(() => onCleanup(shared().hold()))
   const attachments = () => shared().attachments()
@@ -103,7 +130,7 @@ export default function AgentComposer(props: {
   const configOptions = createMemo<AgentConfigOption[]>(
     () => {
       const value = props.session.config.configOptions
-      return Array.isArray(value) ? value as AgentConfigOption[] : []
+      return Array.isArray(value) ? (value as AgentConfigOption[]) : []
     },
     [],
     { equals: sameAgentConfigOptions },
@@ -112,17 +139,20 @@ export default function AgentComposer(props: {
   const unguardedWarning = createMemo(() => unguardedCommandsWarning(configOptions()))
   const commands = createMemo(() => {
     const value = props.session.config.commands
-    const advertised = Array.isArray(value) ? value as Array<{ name: string; description?: string }> : []
+    const advertised = Array.isArray(value) ? (value as Array<{ name: string; description?: string }>) : []
     // acorn answers `/mcp` itself (../sessions/AgentMcpPanel.tsx), so it is offered to every harness and
     // described as what it does here. Claude Code advertises its own, which in a session like this
     // only prints a one-line count.
     return props.onMcp
-      ? [{ name: 'mcp', description: 'Manage this session’s MCP servers' }, ...advertised.filter((command) => command.name !== 'mcp')]
+      ? [
+          { name: 'mcp', description: 'Manage this session’s MCP servers' },
+          ...advertised.filter((command) => command.name !== 'mcp'),
+        ]
       : advertised
   })
   const skills = createMemo(() => {
     const value = props.session.config.skills
-    return Array.isArray(value) ? value as Array<{ name: string; description?: string }> : []
+    return Array.isArray(value) ? (value as Array<{ name: string; description?: string }>) : []
   })
   const insertChoices = createMemo<InsertChoice[]>(() => [
     ...commands().map((command) => ({
@@ -141,12 +171,13 @@ export default function AgentComposer(props: {
   const contextBudget = createMemo(() => agentContextBudget(contexts()))
   const disabledMessage = createMemo(() => agentComposerDisabledMessage(props.session, props.disabled))
   const contextPicker = createMemo(() =>
-    agentContextContributions().find((contribution) => contribution.id === contextPickerId()))
-  const taskContextAdded = createMemo(() => contexts().some((context) =>
-    context.source === AUTOMATIC_TASK_CONTEXT_SOURCE || context.source === 'context.task'))
+    agentContextContributions().find((contribution) => contribution.id === contextPickerId()),
+  )
+  const taskContextAdded = createMemo(() =>
+    contexts().some((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE || context.source === 'context.task'),
+  )
   const automaticContextKey = createMemo(() => {
-    const contribution = agentContextContributions()
-      .find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
+    const contribution = agentContextContributions().find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
     const revision = contribution?.revision?.({ taskId: props.session.taskId }) ?? 0
     return [
       props.session.id,
@@ -163,7 +194,10 @@ export default function AgentComposer(props: {
   let field: HTMLTextAreaElement | undefined
   let focusedSessionId: string | undefined
   createEffect(() => {
-    if (!props.autoFocus) { focusedSessionId = undefined; return }
+    if (!props.autoFocus) {
+      focusedSessionId = undefined
+      return
+    }
     const id = composerSessionId()
     const requested = consumeComposerFocus(id)
     if (focusedSessionId === id && !requested) return
@@ -179,44 +213,64 @@ export default function AgentComposer(props: {
   // many composers are mounted, since it fetches attachment metadata.
   let pickerTimer: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => clearTimeout(pickerTimer))
-  createEffect(on(shared, (state) => {
-    clearTimeout(pickerTimer)
-    const owner = capture()
-    setContextPickerId('')
-    setDismissedAutomaticPayload(undefined)
-    hydrateComposerDraft(state.sessionId, async () => {
-      const revision = state.revisions()[1]
-      const fork = owner.session.config.pendingForkContext
-      if (fork && typeof fork === 'object' && (fork as { type?: unknown }).type === 'context') {
-        state.preserveForkHydration()
-        if (!state.contexts().length) state.setContexts([fork as AgentContextSnapshot])
-      }
-      if (state.attachmentIds().length === state.attachments().length
-        && state.attachmentIds().every((id, index) => state.attachments()[index]?.id === id)) return
-      const items = await Promise.all(state.attachmentIds().map((id) =>
-        managedAgentApi.attachment(id, owner)))
-      if (state.valid() && state.revisions()[1] === revision) {
-        state.setAttachments(items.filter((item): item is AgentAttachment => item != null))
-      }
-    }, state)
-  }))
+  createEffect(
+    on(shared, (state) => {
+      clearTimeout(pickerTimer)
+      const owner = capture()
+      setContextPickerId('')
+      setDismissedAutomaticPayload(undefined)
+      hydrateComposerDraft(
+        state.sessionId,
+        async () => {
+          const revision = state.revisions()[1]
+          const fork = owner.session.config.pendingForkContext
+          if (fork && typeof fork === 'object' && (fork as { type?: unknown }).type === 'context') {
+            state.preserveForkHydration()
+            if (!state.contexts().length) state.setContexts([fork as AgentContextSnapshot])
+          }
+          if (
+            state.attachmentIds().length === state.attachments().length &&
+            state.attachmentIds().every((id, index) => state.attachments()[index]?.id === id)
+          )
+            return
+          const items = await Promise.all(state.attachmentIds().map((id) => managedAgentApi.attachment(id, owner)))
+          if (state.valid() && state.revisions()[1] === revision) {
+            state.setAttachments(items.filter((item): item is AgentAttachment => item != null))
+          }
+        },
+        state,
+      )
+    }),
+  )
 
-  createEffect(on(() => [shared(), automaticContextKey()], () => {
-    const owner = capture()
-    if (owner.session.kind !== 'interactive') return
-    void refreshAutomaticContext(owner, automaticContextKey(),
-      props.previousAutomaticContext, dismissedAutomaticPayload()).catch((caught) => {
-      owner.state.setError(caught instanceof Error ? caught.message : 'Unable to attach task context.')
-    })
-  }))
+  createEffect(
+    on(
+      () => [shared(), automaticContextKey()],
+      () => {
+        const owner = capture()
+        if (owner.session.kind !== 'interactive') return
+        void refreshAutomaticContext(
+          owner,
+          automaticContextKey(),
+          props.previousAutomaticContext,
+          dismissedAutomaticPayload(),
+        ).catch((caught) => {
+          owner.state.setError(caught instanceof Error ? caught.message : 'Unable to attach task context.')
+        })
+      },
+    ),
+  )
   const draft = () => shared().text()
   const setDraft = (value: string | ((current: string) => string)) => {
     shared().setText(typeof value === 'function' ? value(draft()) : value)
   }
 
   const effectivePolicy = (): Record<string, unknown> =>
-    Object.fromEntries(configOptions().flatMap((option) =>
-      option.currentValue == null ? [] : [[option.id === 'reasoning' ? 'effort' : option.id, option.currentValue]]))
+    Object.fromEntries(
+      configOptions().flatMap((option) =>
+        option.currentValue == null ? [] : [[option.id === 'reasoning' ? 'effort' : option.id, option.currentValue]],
+      ),
+    )
 
   const nothingToSend = () => !draft().trim() && !attachments().length && !contexts().length
 
@@ -228,8 +282,17 @@ export default function AgentComposer(props: {
       owner.state.setText('')
       return
     }
-    if (nothingToSend() || !owner.state.hydrated() || owner.state.sending() || owner.state.uploading()
-      || owner.state.capturing() || owner.state.replacing() || props.disabled || props.submitDisabled) return
+    if (
+      nothingToSend() ||
+      !owner.state.hydrated() ||
+      owner.state.sending() ||
+      owner.state.uploading() ||
+      owner.state.capturing() ||
+      owner.state.replacing() ||
+      props.disabled ||
+      props.submitDisabled
+    )
+      return
     const automaticKey = automaticContextKey()
     const previousAutomaticContext = props.previousAutomaticContext
     const dismissedPayload = dismissedAutomaticPayload()
@@ -237,8 +300,7 @@ export default function AgentComposer(props: {
       origin: owner,
       paths: files.paths(),
       policy: effectivePolicy(),
-      refreshContext: () => refreshAutomaticContext(owner, automaticKey,
-        previousAutomaticContext, dismissedPayload),
+      refreshContext: () => refreshAutomaticContext(owner, automaticKey, previousAutomaticContext, dismissedPayload),
       onSent: props.onSent,
     })
   }
@@ -259,12 +321,15 @@ export default function AgentComposer(props: {
 
   async function updateOption(option: AgentConfigOption, value: string) {
     const owner = capture()
-    const nextOptions = configOptions().map((item) =>
-      item.id === option.id ? { ...item, currentValue: value } : item)
+    const nextOptions = configOptions().map((item) => (item.id === option.id ? { ...item, currentValue: value } : item))
     try {
-      const updated = await managedAgentApi.patch(owner.session.id, {
-        config: { ...owner.session.config, configOptions: nextOptions },
-      }, owner)
+      const updated = await managedAgentApi.patch(
+        owner.session.id,
+        {
+          config: { ...owner.session.config, configOptions: nextOptions },
+        },
+        owner,
+      )
       if (owner.visible()) props.onSessionUpdated(updated)
     } catch (caught) {
       owner.state.setError(caught instanceof Error ? caught.message : 'Unable to update agent configuration.')
@@ -290,7 +355,8 @@ export default function AgentComposer(props: {
 
   const selectedContextOptionIds = (contribution: AgentContextContribution): string[] =>
     contexts().flatMap((context) =>
-      context.source === contribution.source && context.resourceId ? [context.resourceId] : [])
+      context.source === contribution.source && context.resourceId ? [context.resourceId] : [],
+    )
 
   const captureSelectedContext = (contributionId: string, optionIds: readonly string[]) =>
     captureContext(capture(), contributionId, optionIds, () => setContextPickerId(''))
@@ -311,14 +377,15 @@ export default function AgentComposer(props: {
       emptyText: 'No matching files.',
       loading: files.loading(),
       error: files.error() ? 'Unable to load worktree files.' : undefined,
-      suggest: (query) => fileMentionSuggestions(files.paths(), query).map((path) => {
-        const slash = path.lastIndexOf('/')
-        return {
-          value: formatFileMention(path),
-          label: slash < 0 ? path : path.slice(slash + 1),
-          detail: slash < 0 ? undefined : path.slice(0, slash),
-        }
-      }),
+      suggest: (query) =>
+        fileMentionSuggestions(files.paths(), query).map((path) => {
+          const slash = path.lastIndexOf('/')
+          return {
+            value: formatFileMention(path),
+            label: slash < 0 ? path : path.slice(slash + 1),
+            detail: slash < 0 ? undefined : path.slice(0, slash),
+          }
+        }),
     },
     {
       sigil: '/',
@@ -344,14 +411,16 @@ export default function AgentComposer(props: {
   const segments = (value: string): MentionSegment[] | null =>
     value.length > MAX_HIGHLIGHT_LENGTH
       ? null
-      : composerSegments(value, advertisedNames(), files.paths()).map((segment) => segment.token
-        ? {
-          text: segment.text,
-          tone: TOKEN_TONE[segment.token.kind],
-          tip: segment.token.kind === 'file' ? undefined : describe(segment.token.kind, segment.token.name),
-          caret: segment.token.end,
-        }
-        : { text: segment.text })
+      : composerSegments(value, advertisedNames(), files.paths()).map((segment) =>
+          segment.token
+            ? {
+                text: segment.text,
+                tone: TOKEN_TONE[segment.token.kind],
+                tip: segment.token.kind === 'file' ? undefined : describe(segment.token.kind, segment.token.name),
+                caret: segment.token.end,
+              }
+            : { text: segment.text },
+        )
 
   return (
     <Stack gap="row">
@@ -371,7 +440,11 @@ export default function AgentComposer(props: {
                     value={option.currentValue ?? ''}
                     disabled={props.disabled || props.submitDisabled}
                     onChange={(value) => void updateOption(option, value)}
-                    options={option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))}
+                    options={option.values.map((value) => ({
+                      value: value.value,
+                      label: value.label,
+                      title: value.description,
+                    }))}
                   />
                 </Field>
               )}
@@ -398,7 +471,11 @@ export default function AgentComposer(props: {
                     value={option.currentValue ?? ''}
                     disabled={props.disabled || props.submitDisabled}
                     onChange={(value) => void updateOption(option, value)}
-                    options={option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))}
+                    options={option.values.map((value) => ({
+                      value: value.value,
+                      label: value.label,
+                      title: value.description,
+                    }))}
                   />
                 </Inline>
               )}
@@ -432,7 +509,11 @@ export default function AgentComposer(props: {
                 leading={<Icon name="diamond" />}
                 onRemove={() => removeContext(context)}
               >
-                {context.label} · ~{(context.estimatedTokens ?? Math.ceil((context.byteSize ?? context.content.length) / 4)).toLocaleString()} tok
+                {context.label} · ~
+                {(
+                  context.estimatedTokens ?? Math.ceil((context.byteSize ?? context.content.length) / 4)
+                ).toLocaleString()}{' '}
+                tok
               </Chip>
             )}
           </For>
@@ -450,11 +531,17 @@ export default function AgentComposer(props: {
 
       <Only hosts={['tui']}>
         <Show when={unguardedWarning()}>
-          {(warning) => <Text tone="danger" wrap>{warning().tip}. {warning().detail}</Text>}
+          {(warning) => (
+            <Text tone="danger" wrap>
+              {warning().tip}. {warning().detail}
+            </Text>
+          )}
         </Show>
       </Only>
       <MentionTextarea
-        ref={(element) => { field = element }}
+        ref={(element) => {
+          field = element
+        }}
         label="Message agent"
         tone={unguardedWarning() ? 'danger' : undefined}
         value={draft()}
@@ -496,7 +583,9 @@ export default function AgentComposer(props: {
 
       <Toolbar variant="actions" size="sm">
         <Show when={props.onGoal && props.session.kind === 'interactive'}>
-          <Button size="sm" title="Set session goal" disabled={props.disabled} onPress={props.onGoal}>Goal</Button>
+          <Button size="sm" title="Set session goal" disabled={props.disabled} onPress={props.onGoal}>
+            Goal
+          </Button>
         </Show>
         <Button
           size="sm"
@@ -513,14 +602,17 @@ export default function AgentComposer(props: {
           size="sm"
           placeholder="Filter context sources…"
           emptyText="No context sources available."
-          results={(query) => agentContextContributions().filter((contribution) =>
-            contribution.label.toLowerCase().includes(query.trim().toLowerCase()))}
+          results={(query) =>
+            agentContextContributions().filter((contribution) =>
+              contribution.label.toLowerCase().includes(query.trim().toLowerCase()),
+            )
+          }
           rowLabel={(contribution) => contribution.label}
           rowDescription={(contribution) => contribution.description}
           isActive={(contribution) => contexts().some((context) => contextBelongsTo(context, contribution))}
           isDisabled={(contribution) =>
-            !!capturingContext()
-              || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID && taskContextAdded())}
+            !!capturingContext() || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID && taskContextAdded())
+          }
           onSelect={(contribution) => {
             // Solid delegates click handlers at the document. Mounting a backdrop synchronously
             // lets the selecting click reach the new backdrop and dismiss the modal immediately.
@@ -532,7 +624,9 @@ export default function AgentComposer(props: {
             // the same function on both hosts, and only the DOM has the delegation this defers past.
             clearTimeout(pickerTimer)
             const owner = capture()
-            pickerTimer = setTimeout(() => { if (owner.visible()) setContextPickerId(contribution.id) }, 0)
+            pickerTimer = setTimeout(() => {
+              if (owner.visible()) setContextPickerId(contribution.id)
+            }, 0)
           }}
           disabled={props.disabled}
           placement="top-start"
@@ -543,8 +637,11 @@ export default function AgentComposer(props: {
           size="sm"
           placeholder="Filter commands and skills…"
           emptyText="No commands or skills advertised."
-          results={(query) => insertChoices().filter((choice) =>
-            `${choice.label} ${choice.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()))}
+          results={(query) =>
+            insertChoices().filter((choice) =>
+              `${choice.label} ${choice.description ?? ''}`.toLowerCase().includes(query.trim().toLowerCase()),
+            )
+          }
           rowLabel={(choice) => choice.label}
           rowDescription={(choice) => choice.description}
           isActive={() => false}
@@ -561,14 +658,17 @@ export default function AgentComposer(props: {
             role="dialog"
             trigger={({ toggle, open }) => (
               <Button variant="bare" size="sm" expanded={open()} onPress={toggle}>
-                Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens · {(contextBudget().bytes / 1024).toFixed(1)} KiB
+                Preview sent context · ~{contextBudget().estimatedTokens.toLocaleString()} tokens ·{' '}
+                {(contextBudget().bytes / 1024).toFixed(1)} KiB
               </Button>
             )}
           >
             <Stack gap="row">
               <SectionHeader level="group">Sent context</SectionHeader>
               <CodeBlock wrap maxHeight="block">
-                {contexts().map((context) => `## ${context.label}\n${context.content}`).join('\n\n')}
+                {contexts()
+                  .map((context) => `## ${context.label}\n${context.content}`)
+                  .join('\n\n')}
               </CodeBlock>
             </Stack>
           </Popover>
@@ -582,14 +682,25 @@ export default function AgentComposer(props: {
           props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })}
         />
         <Toolbar.Spacer />
-        <Text emphasis="muted"><Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline</Text>
+        <Text emphasis="muted">
+          <Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline
+        </Text>
         <Button
           variant="solid"
           tone="accent"
           size="sm"
           busy={sending()}
           title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
-          disabled={nothingToSend() || !shared().hydrated() || uploading() || !!capturingContext() || !!replacing() || contextBudget().overLimit || props.disabled || props.submitDisabled}
+          disabled={
+            nothingToSend() ||
+            !shared().hydrated() ||
+            uploading() ||
+            !!capturingContext() ||
+            !!replacing() ||
+            contextBudget().overLimit ||
+            props.disabled ||
+            props.submitDisabled
+          }
           onPress={() => void send()}
         >
           Send

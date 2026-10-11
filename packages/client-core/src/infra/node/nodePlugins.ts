@@ -142,13 +142,21 @@ export const reviewNodePlugin = async (
 export const readPluginInputGrant = async (id: string, nodeId?: string): Promise<PluginInputGrantState> =>
   await readJson<PluginInputGrantState>(corePluginInputGrantRoute(id), nodeId ? { nodeId } : {})
 
-export const grantPluginInputs = async (id: string, sources: PluginInputGrant['sources'], nodeId?: string): Promise<void> => {
+export const grantPluginInputs = async (
+  id: string,
+  sources: PluginInputGrant['sources'],
+  nodeId?: string,
+): Promise<void> => {
   await mutate(corePluginInputGrantRoute(id), 'POST', { sources }, nodeId)
 }
 
 // The owner's approval of a plugin's skills at the digests the trust prompt showed, and the switch for
 // one (docs/managed-agents/skills.md § Skills). Read and written on the plugin's own Node.
-export const grantPluginSkills = async (id: string, digests: Record<string, string>, nodeId?: string): Promise<void> => {
+export const grantPluginSkills = async (
+  id: string,
+  digests: Record<string, string>,
+  nodeId?: string,
+): Promise<void> => {
   await mutate(corePluginSkillGrantRoute(id), 'POST', { digests }, nodeId)
 }
 
@@ -167,8 +175,10 @@ export const revokePluginInputs = async (id: string, nodeId?: string): Promise<v
 export const readPluginModelGrant = async (id: string, signal?: AbortSignal): Promise<PluginModelGrantState> =>
   await readJson<PluginModelGrantState>(corePluginModelGrantRoute(id), signal ? { signal } : {})
 
-export const savePluginModelGrant = async (id: string, grant: NonNullable<PluginModelGrantState['grant']>): Promise<PluginModelGrantState> =>
-  await mutate<PluginModelGrantState>(corePluginModelGrantRoute(id), 'PUT', grant)
+export const savePluginModelGrant = async (
+  id: string,
+  grant: NonNullable<PluginModelGrantState['grant']>,
+): Promise<PluginModelGrantState> => await mutate<PluginModelGrantState>(corePluginModelGrantRoute(id), 'PUT', grant)
 
 export const removePluginModelGrant = async (id: string): Promise<void> => {
   await mutate(corePluginModelGrantRoute(id), 'DELETE', {})
@@ -192,8 +202,8 @@ export function clearNodePlugins(): void {
   setNodePlugins(null)
 }
 
-  // Registered here rather than in the shell's evictor file, so this signal and the thing that clears
-  // it are one edit apart (registries/scopeEviction.ts has the argument).
+// Registered here rather than in the shell's evictor file, so this signal and the thing that clears
+// it are one edit apart (registries/scopeEviction.ts has the argument).
 onScopeEvicted((e) => {
   if (e.scope === 'node-switched') clearNodePlugins()
 })

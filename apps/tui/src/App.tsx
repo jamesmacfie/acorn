@@ -1,7 +1,14 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, lazy, Show, type Accessor, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
-import { prefsOptions, projectsKey, tasksKey, tasksOptions, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
+import {
+  prefsOptions,
+  projectsKey,
+  tasksKey,
+  tasksOptions,
+  type Project,
+  type Task,
+} from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -55,7 +62,9 @@ setRegionPlaceholder((props) => <Line role="muted">Loading {props.label}…</Lin
 setRemoteTree(RemoteTree)
 // The document region is host-owned too. Keep its editor and route reader behind a loader so opening
 // an ordinary task does not add them to the first frame's startup graph.
-setDocumentSurface(lazy(() => import('./plugins/DocumentSurface').then((module) => ({ default: module.DocumentSurface }))))
+setDocumentSurface(
+  lazy(() => import('./plugins/DocumentSurface').then((module) => ({ default: module.DocumentSurface }))),
+)
 
 // …and the third seam of the same shape. A plugin that contributes a rail source by descriptor rather
 // than by code gets `ChromeSourcePanel` on the desktop, which is `<main class="panes">` and DOM kit
@@ -143,7 +152,11 @@ export function App(props: {
   setProjectsLookup(() => clientFor(activeNodeId() ?? props.nodeId).client.getQueryData<Project[]>(projectsKey) ?? [])
   // The same for one task by id: a plugin's menu row on a file checks its task is still on this Node.
   // From the tasks barrel, which the first frame already loads through chrome/Rail.tsx.
-  setTaskLookup((taskId) => clientFor(activeNodeId() ?? props.nodeId).client.getQueryData<Task[]>(tasksKey)?.find((task) => task.id === taskId))
+  setTaskLookup((taskId) =>
+    clientFor(activeNodeId() ?? props.nodeId)
+      .client.getQueryData<Task[]>(tasksKey)
+      ?.find((task) => task.id === taskId),
+  )
   let shownNode: string | undefined
   const forNode = (nodeId: string) => {
     if (shownNode && shownNode !== nodeId) {
@@ -164,13 +177,20 @@ export function App(props: {
       <QueryClientProvider client={client}>
         <Telemetry />
         <TaskArg id={nodeId === props.nodeId ? props.task : undefined} onMissing={props.onNoTask}>
-          <Shell nodeId={nodeId} supervised={props.supervised && nodeId === props.nodeId} onQuit={props.onQuit}
-            link={nodeId === props.nodeId ? props.link : undefined} linkReady={props.linkReady} />
+          <Shell
+            nodeId={nodeId}
+            supervised={props.supervised && nodeId === props.nodeId}
+            onQuit={props.onQuit}
+            link={nodeId === props.nodeId ? props.link : undefined}
+            linkReady={props.linkReady}
+          />
         </TaskArg>
       </QueryClientProvider>
     )
   }
   return (
-    <Show when={activeNodeId() ?? props.nodeId} keyed>{forNode}</Show>
+    <Show when={activeNodeId() ?? props.nodeId} keyed>
+      {forNode}
+    </Show>
   )
 }

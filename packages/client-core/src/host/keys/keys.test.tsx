@@ -61,11 +61,18 @@ const PULLS = [
 ]
 
 function mountRows(items = PULLS) {
-  dispose = render(() => (
-    <Rows id="pulls" ariaLabel="Pull requests" items={items}>
-      {(item, itemProps, selected) => <Row item={itemProps} selected={selected()}>{item.label}</Row>}
-    </Rows>
-  ), host)
+  dispose = render(
+    () => (
+      <Rows id="pulls" ariaLabel="Pull requests" items={items}>
+        {(item, itemProps, selected) => (
+          <Row item={itemProps} selected={selected()}>
+            {item.label}
+          </Row>
+        )}
+      </Rows>
+    ),
+    host,
+  )
   return host.querySelector<HTMLElement>('.ui-rows')!
 }
 
@@ -98,11 +105,18 @@ describe('a run of rows is a collection', () => {
   })
 
   it('renders a tree, with the same collection behind it, when the rows are nested', () => {
-    dispose = render(() => (
-      <Rows tree id="files" ariaLabel="Files" items={PULLS}>
-        {(item, itemProps, selected) => <Row item={itemProps} selected={selected()}>{item.label}</Row>}
-      </Rows>
-    ), host)
+    dispose = render(
+      () => (
+        <Rows tree id="files" ariaLabel="Files" items={PULLS}>
+          {(item, itemProps, selected) => (
+            <Row item={itemProps} selected={selected()}>
+              {item.label}
+            </Row>
+          )}
+        </Rows>
+      ),
+      host,
+    )
     const list = host.querySelector<HTMLElement>('.ui-rows')!
     // `tree` is what a file tree and a request tree are; the roles differ because a screen reader
     // announces "expandable" for one and not the other, and nothing else about the collection does.
@@ -159,13 +173,18 @@ describe('a virtualised run of rows is the same collection', () => {
   // the whole list's, not the drawn window's. jsdom measures nothing, so the window here is empty,
   // which is exactly the case that has to keep working.
   it('keeps the whole list in the collection while its own scroller draws the window', () => {
-    dispose = render(() => (
-      <Rows virtual id="virtual-pulls" ariaLabel="Pull requests" items={PULLS}>
-        {(item, itemProps, selected, place) => (
-          <Row item={itemProps} selected={selected()} offset={place.offset} height={place.height}>{item.label}</Row>
-        )}
-      </Rows>
-    ), host)
+    dispose = render(
+      () => (
+        <Rows virtual id="virtual-pulls" ariaLabel="Pull requests" items={PULLS}>
+          {(item, itemProps, selected, place) => (
+            <Row item={itemProps} selected={selected()} offset={place.offset} height={place.height}>
+              {item.label}
+            </Row>
+          )}
+        </Rows>
+      ),
+      host,
+    )
     const list = host.querySelector<HTMLElement>('.ui-rows')!
     expect(host.querySelector('.ui-rows-scroll')).not.toBeNull()
     expect(list.getAttribute('role')).toBe('listbox')
@@ -201,15 +220,23 @@ describe('something outside a collection can put an item in view', () => {
 describe('a tab strip is a collection', () => {
   it('is a tablist whose arrows move the selection', () => {
     let active = 'one'
-    dispose = render(() => (
-      <Tabs
-        tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }]}
-        active={active}
-        onChange={(id) => { active = id }}
-        idPrefix="panel"
-        ariaLabel="Sections"
-      />
-    ), host)
+    dispose = render(
+      () => (
+        <Tabs
+          tabs={[
+            { id: 'one', label: 'One' },
+            { id: 'two', label: 'Two' },
+          ]}
+          active={active}
+          onChange={(id) => {
+            active = id
+          }}
+          idPrefix="panel"
+          ariaLabel="Sections"
+        />
+      ),
+      host,
+    )
     const strip = host.querySelector<HTMLElement>('.ui-tabs .ui-tab-scroll')!
     expect(strip.getAttribute('role')).toBe('tablist')
     // The tab keeps the id the panel points back at.
@@ -222,15 +249,21 @@ describe('a tab strip is a collection', () => {
   // A strip whose labels are all the same shape — github's pull strip labels every tab `#1234` —
   // needs a mark and a tooltip to tell them apart, and neither may cost the tab its role.
   it('draws a mark and a title on a tab that asks for one', () => {
-    dispose = render(() => (
-      <Tabs
-        tabs={[{ id: 'one', label: '#1', icon: 'link-2', title: 'Mentioned in #2' }, { id: 'two', label: '#2' }]}
-        active="one"
-        onChange={() => {}}
-        idPrefix="marked"
-        ariaLabel="Pulls"
-      />
-    ), host)
+    dispose = render(
+      () => (
+        <Tabs
+          tabs={[
+            { id: 'one', label: '#1', icon: 'link-2', title: 'Mentioned in #2' },
+            { id: 'two', label: '#2' },
+          ]}
+          active="one"
+          onChange={() => {}}
+          idPrefix="marked"
+          ariaLabel="Pulls"
+        />
+      ),
+      host,
+    )
     const [first, second] = host.querySelectorAll<HTMLElement>('.ui-tab')
     expect(first.querySelector('.ui-icon')).not.toBeNull()
     expect(first.dataset.tip).toBe('Mentioned in #2')
@@ -247,7 +280,14 @@ describe('a modal is a trap', () => {
     const opener = document.createElement('button')
     document.body.append(opener)
     opener.focus()
-    dispose = render(() => <Modal title="Archive task" onDismiss={() => {}}><span>body</span></Modal>, host)
+    dispose = render(
+      () => (
+        <Modal title="Archive task" onDismiss={() => {}}>
+          <span>body</span>
+        </Modal>
+      ),
+      host,
+    )
     // On the document, not in `host`: the modal portals its backdrop to the body.
     const dialog = document.querySelector('[role="dialog"]')!
     expect(dialog.getAttribute('aria-modal')).toBe('true')
@@ -259,7 +299,9 @@ describe('a modal is a trap', () => {
 })
 
 describe('layout regions are focus groups', () => {
-  const text = (name: string): Region => () => <button data-region={name}>{name}</button>
+  const text =
+    (name: string): Region =>
+    () => <button data-region={name}>{name}</button>
   const mount = (layout: keyof typeof LAYOUTS, props: Partial<LayoutProps>) => {
     dispose = render(() => LAYOUTS[layout]({ stateKey: 'pane', label: 'Pane', regions: {}, ...props }), host)
   }
@@ -328,8 +370,13 @@ describe('layout regions are focus groups', () => {
 
 describe('the command layer still is the keybinding table', () => {
   const binding = (over: Partial<ResolvedKeybinding> = {}): ResolvedKeybinding => ({
-    id: 'core.test', command: 'core.test', description: 'Test', category: 'Global',
-    defaultChord: 'meta+k', chord: 'meta+k', ...over,
+    id: 'core.test',
+    command: 'core.test',
+    description: 'Test',
+    category: 'Global',
+    defaultChord: 'meta+k',
+    chord: 'meta+k',
+    ...over,
   })
 
   let ran: string[]
@@ -346,8 +393,22 @@ describe('the command layer still is the keybinding table', () => {
   beforeEach(() => {
     ran = []
     commands = registerCommands([
-      { id: 'core.test', title: 'Test', category: 'action', run: () => { ran.push('core.test') } },
-      { id: 'core.bare', title: 'Bare', category: 'action', run: () => { ran.push('core.bare') } },
+      {
+        id: 'core.test',
+        title: 'Test',
+        category: 'action',
+        run: () => {
+          ran.push('core.test')
+        },
+      },
+      {
+        id: 'core.bare',
+        title: 'Bare',
+        category: 'action',
+        run: () => {
+          ran.push('core.bare')
+        },
+      },
     ])
   })
   afterEach(() => commands.dispose())

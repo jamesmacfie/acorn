@@ -118,15 +118,17 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
         ...(body === undefined
           ? {}
           : {
-            headers: {
-              'content-type': body.type,
-              ...(body.filename ? { 'content-disposition': `attachment; filename="${body.filename.replace(/["\\]/g, '')}"` } : {}),
-            },
-            // The one cast in this file. `NodeFetchBody` narrows its view to an `ArrayBuffer`-backed one
-            // and a value that crossed a MessagePort is typed as backed by either; both work here,
-            // because everything downstream only ever reads the view.
-            body: { kind: 'bytes' as const, bytes: body.bytes as Uint8Array<ArrayBuffer> },
-          }),
+              headers: {
+                'content-type': body.type,
+                ...(body.filename
+                  ? { 'content-disposition': `attachment; filename="${body.filename.replace(/["\\]/g, '')}"` }
+                  : {}),
+              },
+              // The one cast in this file. `NodeFetchBody` narrows its view to an `ArrayBuffer`-backed one
+              // and a value that crossed a MessagePort is typed as backed by either; both work here,
+              // because everything downstream only ever reads the view.
+              body: { kind: 'bytes' as const, bytes: body.bytes as Uint8Array<ArrayBuffer> },
+            }),
       })
       return result
     },
@@ -194,11 +196,14 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // too. It is the last one tried for a frame: the surfaces below either asked for the panel or said
       // nothing, which is what makes a github link clicked inside a Linear issue open github's panel
       // beside it rather than replacing the issue the reader is in the middle of.
-      if (openInAppUrl(url, {
-        taskId: props.binding.taskId,
-        navigate: host.navigate,
-        ...(props.binding.target === 'refPanel' ? { prefer: 'refPanel' as const } : {}),
-      })) return
+      if (
+        openInAppUrl(url, {
+          taskId: props.binding.taskId,
+          navigate: host.navigate,
+          ...(props.binding.target === 'refPanel' ? { prefer: 'refPanel' as const } : {}),
+        })
+      )
+        return
       // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
       // the URL to `shell.openExternal` behind the scheme allowlist, so this opens in the owner's
       // browser and never in-app, with no second policy to keep in step

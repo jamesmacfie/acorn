@@ -21,7 +21,9 @@ import {
 
 const NOTHING = (() => null) as unknown as Component
 let core: { dispose(): void }
-beforeEach(() => { core = registerCoreExclusiveSlot('rail.taskList', NOTHING) })
+beforeEach(() => {
+  core = registerCoreExclusiveSlot('rail.taskList', NOTHING)
+})
 
 const offer = (pluginId: string, over: { when?: () => boolean } = {}) =>
   exclusiveSlotRegistry.register({
@@ -35,25 +37,35 @@ const offer = (pluginId: string, over: { when?: () => boolean } = {}) =>
 
 // Each test disposes what it registered; the failure set is module state and has no owner, so it is
 // cleared here.
-afterEach(() => { core.dispose(); clearExclusiveSlotFailures() })
+afterEach(() => {
+  core.dispose()
+  clearExclusiveSlotFailures()
+})
 
 describe('resolveExclusiveSlot', () => {
-  it.each(['pane.switcher', 'rail', 'topbar'] as const)('%s keeps core after a provider disappears or fails', (slot) => {
-    const coreSlot = registerCoreExclusiveSlot(slot, NOTHING)
-    const offered = exclusiveSlotRegistry.register({
-      id: `plugin:chrome:${slot}`, pluginId: 'chrome', slot, label: 'Chrome', component: NOTHING,
-    })
-    expect(resolveExclusiveSlot(slot, undefined).pluginId).toBe('core')
-    expect(resolveExclusiveSlot(slot, 'chrome').pluginId).toBe('chrome')
-    noteExclusiveSlotFailure(slot, 'chrome')
-    noteExclusiveSlotFailure(slot, 'chrome')
-    noteExclusiveSlotFailure(slot, 'chrome')
-    expect(resolveExclusiveSlot(slot, 'chrome').pluginId).toBe('core')
-    offered.dispose()
-    clearExclusiveSlotFailures()
-    expect(resolveExclusiveSlot(slot, 'chrome').pluginId).toBe('core')
-    coreSlot.dispose()
-  })
+  it.each(['pane.switcher', 'rail', 'topbar'] as const)(
+    '%s keeps core after a provider disappears or fails',
+    (slot) => {
+      const coreSlot = registerCoreExclusiveSlot(slot, NOTHING)
+      const offered = exclusiveSlotRegistry.register({
+        id: `plugin:chrome:${slot}`,
+        pluginId: 'chrome',
+        slot,
+        label: 'Chrome',
+        component: NOTHING,
+      })
+      expect(resolveExclusiveSlot(slot, undefined).pluginId).toBe('core')
+      expect(resolveExclusiveSlot(slot, 'chrome').pluginId).toBe('chrome')
+      noteExclusiveSlotFailure(slot, 'chrome')
+      noteExclusiveSlotFailure(slot, 'chrome')
+      noteExclusiveSlotFailure(slot, 'chrome')
+      expect(resolveExclusiveSlot(slot, 'chrome').pluginId).toBe('core')
+      offered.dispose()
+      clearExclusiveSlotFailures()
+      expect(resolveExclusiveSlot(slot, 'chrome').pluginId).toBe('core')
+      coreSlot.dispose()
+    },
+  )
   it('answers core when nobody has offered', () => {
     expect(resolveExclusiveSlot('rail.taskList', undefined).pluginId).toBe('core')
     expect(resolveExclusiveSlot('rail.taskList', 'board').pluginId).toBe('core')
@@ -132,6 +144,8 @@ describe('the stored arbitration', () => {
   it('drops a choice for a slot this shell does not have', () => {
     // Version skew in the other direction: a preference written by a newer build naming a designated
     // surface this one has no host for. Dropped, because there is nothing here to honour it with.
-    expect(exclusiveSlotChoices('{"rail.taskList":"board","sidebar.future":"board"}')).toEqual({ 'rail.taskList': 'board' })
+    expect(exclusiveSlotChoices('{"rail.taskList":"board","sidebar.future":"board"}')).toEqual({
+      'rail.taskList': 'board',
+    })
   })
 })

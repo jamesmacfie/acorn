@@ -5,7 +5,13 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { pluginManifestSchema } from './manifest'
 import { readPackageSkill, SKILL_LIMITS } from './skills'
 import { skillStateStore } from './skillState'
-import { catalogueSkills, deliverableSkills, recordSkillDelivery, registerSkill, skillDeliveries } from '../pluginHost/skills'
+import {
+  catalogueSkills,
+  deliverableSkills,
+  recordSkillDelivery,
+  registerSkill,
+  skillDeliveries,
+} from '../pluginHost/skills'
 
 // A package as the loader sees it: a folder with skills under it. Every case reads through
 // readPackageSkill, the one function the installer, the loader and each session start share.
@@ -34,8 +40,17 @@ describe('reading a skill out of a package', () => {
     write(root, 'skills/review/SKILL.md', skillFile())
     write(root, 'skills/review/checklist.md', '1. Tests pass.\n')
     const first = read(root)
-    expect(first.ok && { name: first.skill.name, description: first.skill.description, file: first.skill.file.endsWith('/SKILL.md') })
-      .toEqual({ name: 'review-checklist', description: 'Check a diff before review. Use when asked to review.', file: true })
+    expect(
+      first.ok && {
+        name: first.skill.name,
+        description: first.skill.description,
+        file: first.skill.file.endsWith('/SKILL.md'),
+      },
+    ).toEqual({
+      name: 'review-checklist',
+      description: 'Check a diff before review. Use when asked to review.',
+      file: true,
+    })
     write(root, 'skills/review/checklist.md', '1. Tests pass.\n2. Docs updated.\n')
     const second = read(root)
     expect(first.ok && second.ok && first.skill.digest !== second.skill.digest).toBe(true)
@@ -43,8 +58,14 @@ describe('reading a skill out of a package', () => {
 
   it('reads quoted and block descriptions', () => {
     const root = pkg()
-    write(root, 'skills/review/SKILL.md', `---\nname: review\ndescription: >\n  Check a diff.\n  Use when asked.\n---\nBody`)
-    expect(read(root).ok && (read(root) as { skill: { description: string } }).skill.description).toBe('Check a diff. Use when asked.')
+    write(
+      root,
+      'skills/review/SKILL.md',
+      `---\nname: review\ndescription: >\n  Check a diff.\n  Use when asked.\n---\nBody`,
+    )
+    expect(read(root).ok && (read(root) as { skill: { description: string } }).skill.description).toBe(
+      'Check a diff. Use when asked.',
+    )
     write(root, 'skills/review/SKILL.md', `---\nname: "review"\ndescription: 'It''s a check.'\n---\nBody`)
     expect(read(root).ok && (read(root) as { skill: { description: string } }).skill.description).toBe("It's a check.")
   })
@@ -91,22 +112,39 @@ describe('reading a skill out of a package', () => {
     expect(read(root).ok).toBe(true)
     write(root, 'skills/review/SKILL.md', skillFile('é'.repeat(SKILL_LIMITS.descriptionChars + 1)))
     expect(reason(read(root))).toContain('longer than 1,024 characters')
-    write(root, 'skills/review/SKILL.md', `---\nname: review\ndescription: x\n---\n${'a'.repeat(SKILL_LIMITS.bodyBytes + 1)}`)
+    write(
+      root,
+      'skills/review/SKILL.md',
+      `---\nname: review\ndescription: x\n---\n${'a'.repeat(SKILL_LIMITS.bodyBytes + 1)}`,
+    )
     expect(reason(read(root))).toContain('body is larger than 64 KiB')
   })
 
   it('refuses two skills with one id in a manifest', () => {
     const parsed = pluginManifestSchema.safeParse({
-      id: 'acme', name: 'Acme', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1',
-      contributions: { skills: [{ id: 'review', path: 'a' }, { id: 'review', path: 'b' }] },
+      id: 'acme',
+      name: 'Acme',
+      version: '1.0.0',
+      baseline: 'acorn-1',
+      apiVersion: '1',
+      contributions: {
+        skills: [
+          { id: 'review', path: 'a' },
+          { id: 'review', path: 'b' },
+        ],
+      },
     })
-    expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.message)).toContain("duplicate skill id 'review'")
+    expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.message)).toContain(
+      "duplicate skill id 'review'",
+    )
   })
 })
 
 describe('what a starting provider may receive', () => {
   const owned: Array<() => void> = []
-  afterEach(() => { for (const undo of owned.splice(0)) undo() })
+  afterEach(() => {
+    for (const undo of owned.splice(0)) undo()
+  })
 
   it('only approved, switched-on skills whose folder still holds the approved bytes', async () => {
     const root = pkg()
@@ -135,7 +173,9 @@ describe('what a starting provider may receive', () => {
     if (!first.ok) throw new Error(first.reason)
     const dispose = registerSkill('acme', first.skill).dispose
     recordSkillDelivery('Claude Code', { delivered: ['acme:review'], omitted: [] })
-    expect(skillDeliveries(catalogueSkills('acme')[0]!).map((entry) => [entry.harness, entry.outcome])).toEqual([['Claude Code', 'delivered']])
+    expect(skillDeliveries(catalogueSkills('acme')[0]!).map((entry) => [entry.harness, entry.outcome])).toEqual([
+      ['Claude Code', 'delivered'],
+    ])
     // A reload with changed bytes is a new entry with no claims yet.
     dispose()
     write(root, 'skills/review/SKILL.md', skillFile('Changed.'))

@@ -190,7 +190,10 @@ describe('scope decides who may spend the owner provider credential', () => {
   it('allows a paired device, which is the owner', async () => {
     const app = await probe()
     const { token } = await devices.issue('laptop')
-    const owner = await app.fetch(new Request('http://127.0.0.1/v1/probe', { headers: { authorization: `Bearer ${token}` } }), env)
+    const owner = await app.fetch(
+      new Request('http://127.0.0.1/v1/probe', { headers: { authorization: `Bearer ${token}` } }),
+      env,
+    )
     expect((await owner.json()) as { token: string }).toEqual({ token: 'gho_OWNER_SECRET' })
   })
 })

@@ -9,14 +9,39 @@ vi.mock('./memorySelection', () => ({ openMemory: mocks.openMemory }))
 import { MemoryToolCard } from './MemoryToolCard'
 
 let host: HTMLDivElement, dispose: () => void
-const settle = () => new Promise(resolve => setTimeout(resolve, 0))
-afterEach(() => { dispose?.(); host?.remove(); vi.resetAllMocks() })
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+afterEach(() => {
+  dispose?.()
+  host?.remove()
+  vi.resetAllMocks()
+})
 function draw(tool: AgentToolCardProps['tool']) {
-  host = document.createElement('div'); document.body.append(host)
+  host = document.createElement('div')
+  document.body.append(host)
   dispose = render(() => <MemoryToolCard tool={tool} taskId="task" defaultOpen />, host)
 }
-const saved: AgentToolCardProps['tool'] = { id: 'tool', name: 'memory_write', title: 'Memory', status: 'completed', input: '{"name":"testing","scope":"project"}', output: JSON.stringify({ content: [{ type: 'text', text: JSON.stringify({ projectId: 'project-1', changeId: 'change-1', name: 'testing', scope: 'project', description: 'Use the isolated profile.' }) }] }) }
-const button = (text: string) => [...host.querySelectorAll('button')].find(button => button.textContent === text)!
+const saved: AgentToolCardProps['tool'] = {
+  id: 'tool',
+  name: 'memory_write',
+  title: 'Memory',
+  status: 'completed',
+  input: '{"name":"testing","scope":"project"}',
+  output: JSON.stringify({
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({
+          projectId: 'project-1',
+          changeId: 'change-1',
+          name: 'testing',
+          scope: 'project',
+          description: 'Use the isolated profile.',
+        }),
+      },
+    ],
+  }),
+}
+const button = (text: string) => [...host.querySelectorAll('button')].find((button) => button.textContent === text)!
 
 describe('memory transcript actions', () => {
   it('opens the exact scope and undoes a successful MCP write once', async () => {
@@ -26,7 +51,8 @@ describe('memory transcript actions', () => {
     expect(host.textContent).toContain('Use the isolated profile.')
     button('Open').click()
     expect(mocks.openMemory).toHaveBeenCalledWith('testing', 'project', 'project-1', mocks.navigate)
-    button('Undo').click(); await settle()
+    button('Undo').click()
+    await settle()
     expect(mocks.undo).toHaveBeenCalledWith('change-1')
     expect(button('Undone').disabled).toBe(true)
     expect(host.textContent).toContain('Undid project memory testing')
@@ -36,7 +62,8 @@ describe('memory transcript actions', () => {
     mocks.undo.mockRejectedValue(new Error('A later change exists.'))
     draw({ ...saved, name: 'memory_delete' })
     expect(host.textContent).toContain('Deleted project memory testing')
-    button('Undo').click(); await settle()
+    button('Undo').click()
+    await settle()
     expect(host.textContent).toContain('A later change exists.')
     expect(button('Undo').disabled).toBe(false)
     expect(button('Open')).toBeDefined()

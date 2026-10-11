@@ -17,7 +17,11 @@ import { nodeWorkspacesMode, WORKSPACES_OFF_MESSAGE } from '../../workspacesMode
  * Whether this project is one of the workspace's own. A link scoped to a project in some other
  * workspace would never match anything, so it is a bad request rather than a row worth storing.
  */
-export async function projectInWorkspace(db: ReturnType<typeof getDb>, projectId: string, workspaceId: string): Promise<boolean> {
+export async function projectInWorkspace(
+  db: ReturnType<typeof getDb>,
+  projectId: string,
+  workspaceId: string,
+): Promise<boolean> {
   const [row] = await db
     .select({ id: schema.projects.id })
     .from(schema.projects)
@@ -26,17 +30,23 @@ export async function projectInWorkspace(db: ReturnType<typeof getDb>, projectId
   return !!row
 }
 
-const workspacePatchBody = z.object({
-  name: z.string().trim().min(1).optional(),
-  appearance: z.unknown().optional(),
-}).strict().refine((body) => Object.keys(body).length > 0)
+const workspacePatchBody = z
+  .object({
+    name: z.string().trim().min(1).optional(),
+    appearance: z.unknown().optional(),
+  })
+  .strict()
+  .refine((body) => Object.keys(body).length > 0)
 
 async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]> {
   const { resolveWorkspaceAppearance } = await import('@acorn/protocol/workspaceAppearance.ts')
   const rows = await db.select().from(schema.workspaces).orderBy(schema.workspaces.sort)
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
-  const projectRows = await db.select().from(schema.projects).where(inArray(schema.projects.workspaceId, ids))
+  const projectRows = await db
+    .select()
+    .from(schema.projects)
+    .where(inArray(schema.projects.workspaceId, ids))
     .orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt), asc(schema.projects.id))
   const projectsByWs = new Map<string, WorkspaceProjectRef[]>()
   for (const project of projectRows) {
@@ -59,7 +69,9 @@ async function ensureDefault(db: ReturnType<typeof getDb>): Promise<{ id: string
   if (existing[0]) return { id: existing[0].id, created: false }
   const now = Date.now()
   const id = randomUUID()
-  await db.insert(schema.workspaces).values({ id, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+  await db
+    .insert(schema.workspaces)
+    .values({ id, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
   return { id, created: true }
 }
 
@@ -79,37 +91,60 @@ export const workspaces = new Hono<AppEnv>()
   })
   .post('/', async (c) => {
     const db = getDb(c.env)
-    if (nodeWorkspacesMode(db, ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
+    if (nodeWorkspacesMode(db, ownerId(c)) === 'off')
+      return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const body = (await c.req.json().catch(() => ({}))) as Partial<WorkspaceSeed>
     if (!body.name?.trim()) return respondError(c, 400, 'bad_request')
     const [{ value }] = await db.select({ value: max(schema.workspaces.sort) }).from(schema.workspaces)
     const now = Date.now()
     const id = randomUUID()
-    await db.insert(schema.workspaces).values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
+    await db
+      .insert(schema.workspaces)
+      .values({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, createdAt: now, updatedAt: now })
     broadcastWorkspaceChanged({ workspaceId: id })
-    return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, projects: [] } satisfies Workspace)
+    return c.json({
+      id,
+      name: body.name.trim(),
+      isDefault: false,
+      sort: (value ?? -1) + 1,
+      projects: [],
+    } satisfies Workspace)
   })
   // Workspace appearance is core-owned. Project colour belongs to project routes.
   .patch('/:id', async (c) => {
     const parsed = workspacePatchBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
-    if (parsed.data.name !== undefined && nodeWorkspacesMode(db, ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
+    if (parsed.data.name !== undefined && nodeWorkspacesMode(db, ownerId(c)) === 'off')
+      return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const id = c.req.param('id')
-    const [existing] = await db.select({ id: schema.workspaces.id, name: schema.workspaces.name }).from(schema.workspaces).where(eq(schema.workspaces.id, id))
+    const [existing] = await db
+      .select({ id: schema.workspaces.id, name: schema.workspaces.name })
+      .from(schema.workspaces)
+      .where(eq(schema.workspaces.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
     if (parsed.data.appearance !== undefined) {
       const { workspaceAppearanceSchema, isWorkspaceIconName } = await import('@acorn/protocol/workspaceAppearance.ts')
       const appearance = workspaceAppearanceSchema.nullable().safeParse(parsed.data.appearance)
-      if (!appearance.success) return respondError(c, 400, 'bad_request', ['Choose a valid workspace icon and background.'])
-      if (appearance.data?.kind === 'icon' && !(await isWorkspaceIconName(appearance.data.icon))) return respondError(c, 400, 'bad_request', ['Choose an icon from the catalogue.'])
+      if (!appearance.success)
+        return respondError(c, 400, 'bad_request', ['Choose a valid workspace icon and background.'])
+      if (appearance.data?.kind === 'icon' && !(await isWorkspaceIconName(appearance.data.icon)))
+        return respondError(c, 400, 'bad_request', ['Choose an icon from the catalogue.'])
       const { saveWorkspaceAppearance } = await import('../../workspaceImages')
-      try { if (!saveWorkspaceAppearance(db, id, appearance.data)) return respondError(c, 404, 'not_found') }
-      catch (error) { return respondError(c, 400, 'bad_request', [error instanceof Error ? error.message : 'Could not save the workspace icon.']) }
+      try {
+        if (!saveWorkspaceAppearance(db, id, appearance.data)) return respondError(c, 404, 'not_found')
+      } catch (error) {
+        return respondError(c, 400, 'bad_request', [
+          error instanceof Error ? error.message : 'Could not save the workspace icon.',
+        ])
+      }
       broadcastWorkspaceChanged({ workspaceId: id })
     }
     if (parsed.data.name !== undefined && existing.name !== parsed.data.name) {
-      await db.update(schema.workspaces).set({ name: parsed.data.name, updatedAt: Date.now() }).where(eq(schema.workspaces.id, id))
+      await db
+        .update(schema.workspaces)
+        .set({ name: parsed.data.name, updatedAt: Date.now() })
+        .where(eq(schema.workspaces.id, id))
       broadcastWorkspaceChanged({ workspaceId: id })
     }
     return c.json({ ok: true })
@@ -123,22 +158,30 @@ export const workspaces = new Hono<AppEnv>()
     const { reorderWorkspaceProjects } = await import('../../workspaceProjectOrder')
     const result = reorderWorkspaceProjects(getDb(c.env), c.req.param('id'), parsed.data.projectIds)
     if (result === 'not_found') return respondError(c, 404, 'not_found')
-    if (result === 'membership_changed') return respondError(c, 409, 'conflict', ['The workspace projects changed. Refresh and try again.'])
+    if (result === 'membership_changed')
+      return respondError(c, 409, 'conflict', ['The workspace projects changed. Refresh and try again.'])
     return c.json({ ok: true })
   })
   .delete('/:id', async (c) => {
     const id = c.req.param('id')
     const db = getDb(c.env)
-    if (nodeWorkspacesMode(db, ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
+    if (nodeWorkspacesMode(db, ownerId(c)) === 'off')
+      return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const row = (await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, id)).limit(1))[0]
     if (!row) return respondError(c, 404, 'not_found')
     if (row.isDefault) return respondError(c, 400, 'cannot_delete_default')
-    const reassignedProjects = await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.workspaceId, id))
+    const reassignedProjects = await db
+      .select({ id: schema.projects.id })
+      .from(schema.projects)
+      .where(eq(schema.projects.workspaceId, id))
     const defaultWorkspace = await ensureDefault(db)
     const { removeWorkspaceRows, notifyWorkspaceRemoved } = await import('../../workspaceRemoval')
     // Reassign this workspace's projects back to Default rather than orphaning them.
     const removedProviders = db.transaction((tx) => {
-      tx.update(schema.projects).set({ workspaceId: defaultWorkspace.id, updatedAt: Date.now() }).where(eq(schema.projects.workspaceId, id)).run()
+      tx.update(schema.projects)
+        .set({ workspaceId: defaultWorkspace.id, updatedAt: Date.now() })
+        .where(eq(schema.projects.workspaceId, id))
+        .run()
       return removeWorkspaceRows(tx, db, id, ownerId(c))
     })
     if (defaultWorkspace.created) broadcastWorkspaceChanged({ workspaceId: defaultWorkspace.id })
@@ -147,7 +190,9 @@ export const workspaces = new Hono<AppEnv>()
     return c.json({ ok: true })
   })
   // External projects (Linear/Rollbar/…) linked to this workspace: (integrationId, externalId) pairs.
-  .get('/:id/external-projects', async (c) => (await import('./workspaceExternalProjects')).readWorkspaceExternalProjects(c))
+  .get('/:id/external-projects', async (c) =>
+    (await import('./workspaceExternalProjects')).readWorkspaceExternalProjects(c),
+  )
   .put('/:id/external-projects', async (c) => {
     return (await import('./workspaceExternalProjects')).writeWorkspaceExternalProjects(c, projectInWorkspace)
   })

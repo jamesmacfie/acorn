@@ -28,7 +28,13 @@ export type WorkflowFileOperation = {
 export type WorkflowFileRequest =
   | { action: 'open'; target: WorkflowFileTarget }
   | { action: 'save'; target: WorkflowFileTarget; revision: number; def: WorkflowDef }
-  | { action: 'review'; target: WorkflowFileTarget; revision: number; externalHash?: string; choices?: Record<string, 'local' | 'external'> }
+  | {
+      action: 'review'
+      target: WorkflowFileTarget
+      revision: number
+      externalHash?: string
+      choices?: Record<string, 'local' | 'external'>
+    }
   | { action: 'export'; projectId: string; id: string }
   | { action: 'publish'; id: string }
   | { action: 'discard'; id: string }

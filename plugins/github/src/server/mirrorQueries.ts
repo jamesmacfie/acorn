@@ -8,7 +8,12 @@ import { repoMatches } from './repoMatch'
 // GitHub repo id everywhere below, and nothing outside this plugin can resolve owner/name to that
 // id. That is why the GitHub plugin owns mirror-related repository state, pinned repositories and
 // viewed files included.
-async function mirroredRepoId(db: PluginDatabase, userId: string, repoOwner: string, repoName: string): Promise<number | null> {
+async function mirroredRepoId(
+  db: PluginDatabase,
+  userId: string,
+  repoOwner: string,
+  repoName: string,
+): Promise<number | null> {
   const [row] = await db
     .select({ id: repos.id })
     .from(repos)
@@ -76,11 +81,13 @@ export async function taskPullComparison(
   const [row] = await db
     .select({ baseRef: pullRequests.baseRef, headSha: pullRequests.headSha })
     .from(pullRequests)
-    .where(and(
-      eq(pullRequests.userId, pull.userId),
-      eq(pullRequests.repoId, pull.repoId),
-      eq(pullRequests.number, pull.number),
-    ))
+    .where(
+      and(
+        eq(pullRequests.userId, pull.userId),
+        eq(pullRequests.repoId, pull.repoId),
+        eq(pullRequests.number, pull.number),
+      ),
+    )
   return row ? { ...pull, ...row } : null
 }
 
@@ -98,7 +105,10 @@ export async function taskChecks(
   core: Pick<CoreServices, 'tasks' | 'projects'>,
   userId: string | null,
   taskId: string,
-): Promise<{ number: number; checks: { name: string; status: string | null; url: string | null; runId: number | null }[] } | null> {
+): Promise<{
+  number: number
+  checks: { name: string; status: string | null; url: string | null; runId: number | null }[]
+} | null> {
   const pull = await mirroredTaskPull(db, core, userId, taskId)
   if (!pull) return null
   const rows = await db
@@ -154,11 +164,23 @@ export async function taskReviewFeedback(
   // the same but their Drizzle types are not, and the helper only typechecked with a cast that threw
   // away the column check it was there to keep.
   const [reviewRows, threadRows, commentRows] = await Promise.all([
-    db.select().from(reviews)
+    db
+      .select()
+      .from(reviews)
       .where(and(eq(reviews.userId, pull.userId), eq(reviews.repoId, pull.repoId), eq(reviews.number, pull.number))),
-    db.select().from(reviewThreads)
-      .where(and(eq(reviewThreads.userId, pull.userId), eq(reviewThreads.repoId, pull.repoId), eq(reviewThreads.number, pull.number))),
-    db.select().from(comments)
+    db
+      .select()
+      .from(reviewThreads)
+      .where(
+        and(
+          eq(reviewThreads.userId, pull.userId),
+          eq(reviewThreads.repoId, pull.repoId),
+          eq(reviewThreads.number, pull.number),
+        ),
+      ),
+    db
+      .select()
+      .from(comments)
       .where(and(eq(comments.userId, pull.userId), eq(comments.repoId, pull.repoId), eq(comments.number, pull.number))),
   ])
 
@@ -166,7 +188,14 @@ export async function taskReviewFeedback(
   for (const row of [...threadRows].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))) {
     if (row.resolved && !options.includeResolved) continue
     const thread = byThread.get(row.threadId) ?? {
-      threadId: row.threadId, path: row.path, line: row.outdated == null ? null : row.line, originalLine: row.originalLine, outdated: row.outdated, side: row.side, resolved: row.resolved, comments: [],
+      threadId: row.threadId,
+      path: row.path,
+      line: row.outdated == null ? null : row.line,
+      originalLine: row.originalLine,
+      outdated: row.outdated,
+      side: row.side,
+      resolved: row.resolved,
+      comments: [],
     }
     thread.comments.push({ author: row.author, body: row.body, createdAt: row.createdAt })
     byThread.set(row.threadId, thread)

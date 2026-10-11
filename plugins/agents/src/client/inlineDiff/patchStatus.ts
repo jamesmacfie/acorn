@@ -2,7 +2,8 @@ import { createSignal } from 'solid-js'
 import type { InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 
 type Scope = Pick<InlineDiffOrigin, 'taskId' | 'source' | 'scope' | 'pull'>
-const keyFor = (scope: Scope) => JSON.stringify([scope.taskId, scope.source, scope.scope, scope.pull?.owner, scope.pull?.repo, scope.pull?.number])
+const keyFor = (scope: Scope) =>
+  JSON.stringify([scope.taskId, scope.source, scope.scope, scope.pull?.owner, scope.pull?.repo, scope.pull?.number])
 const [documents, setDocuments] = createSignal(new Map<string, Record<string, string | null>>())
 
 export const reportPatches = (scope: Scope, patches: Record<string, string | null>): void => {

@@ -9,5 +9,8 @@ export function utf8Tail(value: string, maxBytes: number): string {
 }
 export function appendOutput(previous: string, data: string): { output: string; truncated: boolean } {
   const joined = (previous + data).replace(/acorn_(?:it|dt)_[A-Za-z0-9_.-]+/g, '[redacted acorn credential]')
-  return { output: utf8Tail(joined, TASK_SCRIPT_OUTPUT_BYTES), truncated: Buffer.byteLength(joined) > TASK_SCRIPT_OUTPUT_BYTES }
+  return {
+    output: utf8Tail(joined, TASK_SCRIPT_OUTPUT_BYTES),
+    truncated: Buffer.byteLength(joined) > TASK_SCRIPT_OUTPUT_BYTES,
+  }
 }

@@ -17,8 +17,11 @@ import { nodeWorkspacesMode, settleWorkspacesMode, WORKSPACES_OFF_MESSAGE } from
 export type ProjectRow = typeof schema.projects.$inferSelect
 
 function nextProjectSort(db: AppDatabase, workspaceId: string): number {
-  const row = db.select({ value: max(schema.projects.sort) }).from(schema.projects)
-    .where(eq(schema.projects.workspaceId, workspaceId)).get()
+  const row = db
+    .select({ value: max(schema.projects.sort) })
+    .from(schema.projects)
+    .where(eq(schema.projects.workspaceId, workspaceId))
+    .get()
   return (row?.value ?? -1) + 1
 }
 
@@ -28,8 +31,11 @@ async function projectAtPath(db: AppDatabase, path: string, exceptId?: string): 
   return registered.find((row) => {
     if (!row.path || row.id === exceptId) return false
     if (row.path === path) return true
-    try { return realpathSync(row.path) === canonicalPath }
-    catch { return false }
+    try {
+      return realpathSync(row.path) === canonicalPath
+    } catch {
+      return false
+    }
   })
 }
 
@@ -62,9 +68,10 @@ export function toProjectRef(row: ProjectRow): ProjectRef {
     name: row.name,
     path: row.path,
     workspaceId: row.workspaceId,
-    github: row.githubOwner && row.githubName
-      ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId }
-      : null,
+    github:
+      row.githubOwner && row.githubName
+        ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId }
+        : null,
   }
 }
 
@@ -84,7 +91,10 @@ export const normalizeGithubPart = (value: string): string => value.trim().toLow
 // (GitHub owners and repos are case-insensitive). The host is anchored so a URL such as
 // https://example.com/github.com/acme/web cannot become a GitHub facet.
 export function parseGithubRemote(url: string): { owner: string; name: string } | null {
-  const match = /^(?:(?:https?|ssh):\/\/(?:[^@/\s]+@)?github\.com\/|git@github\.com:\/?)([^/\s?#]+)\/([^/\s?#]+?)(?:\.git)?$/i.exec(url.trim())
+  const match =
+    /^(?:(?:https?|ssh):\/\/(?:[^@/\s]+@)?github\.com\/|git@github\.com:\/?)([^/\s?#]+)\/([^/\s?#]+?)(?:\.git)?$/i.exec(
+      url.trim(),
+    )
   return match ? { owner: match[1]!, name: match[2]! } : null
 }
 
@@ -112,7 +122,9 @@ export async function detectFacets(path: string): Promise<ProjectFacets> {
   }
 }
 
-export type CreateProjectResult = { ok: true; project: ProjectRow } | { ok: false; reason: string; code?: 'workspaces_off' }
+export type CreateProjectResult =
+  | { ok: true; project: ProjectRow }
+  | { ok: false; reason: string; code?: 'workspaces_off' }
 
 const isDir = (p: string): boolean => {
   try {
@@ -124,7 +136,12 @@ const isDir = (p: string): boolean => {
 
 type NewProject = Omit<typeof schema.projects.$inferInsert, 'id' | 'workspaceId' | 'sort' | 'createdAt' | 'updatedAt'>
 
-function insertProject(db: AppDatabase, ownerId: string, input: NewProject, requestedWorkspaceId?: string): CreateProjectResult {
+function insertProject(
+  db: AppDatabase,
+  ownerId: string,
+  input: NewProject,
+  requestedWorkspaceId?: string,
+): CreateProjectResult {
   const result = db.transaction((tx) => {
     const mode = settleWorkspacesMode(tx, ownerId)
     if (mode === 'off' && requestedWorkspaceId !== undefined) {
@@ -135,26 +152,51 @@ function insertProject(db: AppDatabase, ownerId: string, input: NewProject, requ
     let workspaceId = requestedWorkspaceId
     let createdWorkspace = false
     if (workspaceId) {
-      if (!tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, workspaceId)).get()) {
+      if (
+        !tx
+          .select({ id: schema.workspaces.id })
+          .from(schema.workspaces)
+          .where(eq(schema.workspaces.id, workspaceId))
+          .get()
+      ) {
         throw new Error('No such workspace.')
       }
     } else if (mode === 'off') {
       workspaceId = randomUUID()
-      const sort = tx.select({ value: max(schema.workspaces.sort) }).from(schema.workspaces).get()?.value ?? -1
-      tx.insert(schema.workspaces).values({ id: workspaceId, name: input.name, isDefault: false, sort: sort + 1, createdAt: now, updatedAt: now }).run()
+      const sort =
+        tx
+          .select({ value: max(schema.workspaces.sort) })
+          .from(schema.workspaces)
+          .get()?.value ?? -1
+      tx.insert(schema.workspaces)
+        .values({ id: workspaceId, name: input.name, isDefault: false, sort: sort + 1, createdAt: now, updatedAt: now })
+        .run()
       createdWorkspace = true
     } else {
-      const existing = tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.isDefault, true)).get()
+      const existing = tx
+        .select({ id: schema.workspaces.id })
+        .from(schema.workspaces)
+        .where(eq(schema.workspaces.isDefault, true))
+        .get()
       if (existing) workspaceId = existing.id
       else {
         workspaceId = randomUUID()
-        tx.insert(schema.workspaces).values({ id: workspaceId, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now }).run()
+        tx.insert(schema.workspaces)
+          .values({ id: workspaceId, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+          .run()
         createdWorkspace = true
       }
     }
     const id = randomUUID()
-    const sort = tx.select({ value: max(schema.projects.sort) }).from(schema.projects).where(eq(schema.projects.workspaceId, workspaceId)).get()?.value ?? -1
-    tx.insert(schema.projects).values({ ...input, id, workspaceId, sort: sort + 1, createdAt: now, updatedAt: now }).run()
+    const sort =
+      tx
+        .select({ value: max(schema.projects.sort) })
+        .from(schema.projects)
+        .where(eq(schema.projects.workspaceId, workspaceId))
+        .get()?.value ?? -1
+    tx.insert(schema.projects)
+      .values({ ...input, id, workspaceId, sort: sort + 1, createdAt: now, updatedAt: now })
+      .run()
     return { project: tx.select().from(schema.projects).where(eq(schema.projects.id, id)).get()!, createdWorkspace }
   })
   if (result.createdWorkspace) broadcastWorkspaceChanged({ workspaceId: result.project.workspaceId })
@@ -164,7 +206,9 @@ function insertProject(db: AppDatabase, ownerId: string, input: NewProject, requ
 
 export class WorkspacesOffError extends Error {
   readonly code = 'workspaces_off'
-  constructor() { super(WORKSPACES_OFF_MESSAGE) }
+  constructor() {
+    super(WORKSPACES_OFF_MESSAGE)
+  }
 }
 
 export async function createProject(
@@ -189,8 +233,9 @@ export async function createProject(
     path: input.path,
     ...facets,
   }
-  try { return insertProject(db, ownerId, project, input.workspaceId) }
-  catch (error) {
+  try {
+    return insertProject(db, ownerId, project, input.workspaceId)
+  } catch (error) {
     if (error instanceof WorkspacesOffError) return { ok: false, code: 'workspaces_off', reason: error.message }
     if (error instanceof Error && error.message === 'No such workspace.') return { ok: false, reason: error.message }
     throw error
@@ -203,7 +248,10 @@ export async function getProject(db: AppDatabase, id: string): Promise<ProjectRo
 }
 
 export async function listProjects(db: AppDatabase): Promise<ProjectRow[]> {
-  return db.select().from(schema.projects).orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt), asc(schema.projects.id))
+  return db
+    .select()
+    .from(schema.projects)
+    .orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt), asc(schema.projects.id))
 }
 
 // Find a project by GitHub owner and repo, ignoring case. When several local projects point at the
@@ -215,10 +263,12 @@ export async function projectByGithub(db: AppDatabase, owner: string, name: stri
   const [row] = await db
     .select()
     .from(schema.projects)
-    .where(and(
-      sql`lower(${schema.projects.githubOwner}) = ${normalizedOwner}`,
-      sql`lower(${schema.projects.githubName}) = ${normalizedName}`,
-    ))
+    .where(
+      and(
+        sql`lower(${schema.projects.githubOwner}) = ${normalizedOwner}`,
+        sql`lower(${schema.projects.githubName}) = ${normalizedName}`,
+      ),
+    )
     .orderBy(asc(schema.projects.createdAt), asc(schema.projects.id))
     .limit(1)
   return row ?? null
@@ -247,9 +297,21 @@ export async function detectProject(db: AppDatabase, id: string): Promise<Projec
   return getProject(db, id)
 }
 
-export type PatchProjectInput = Partial<{ name: string; workspaceId: string; hidden: boolean; color: string | null; sort: number; path: string }>
+export type PatchProjectInput = Partial<{
+  name: string
+  workspaceId: string
+  hidden: boolean
+  color: string | null
+  sort: number
+  path: string
+}>
 
-export async function patchProject(db: AppDatabase, id: string, patch: PatchProjectInput, ownerId = ''): Promise<CreateProjectResult> {
+export async function patchProject(
+  db: AppDatabase,
+  id: string,
+  patch: PatchProjectInput,
+  ownerId = '',
+): Promise<CreateProjectResult> {
   const project = await getProject(db, id)
   if (!project) return { ok: false, reason: 'No such project.' }
   const mode = nodeWorkspacesMode(db, ownerId)
@@ -263,7 +325,10 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
     set.name = name
   }
   if (patch.workspaceId !== undefined) {
-    const [workspace] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, patch.workspaceId))
+    const [workspace] = await db
+      .select({ id: schema.workspaces.id })
+      .from(schema.workspaces)
+      .where(eq(schema.workspaces.id, patch.workspaceId))
     if (!workspace) return { ok: false, reason: 'No such workspace.' }
     set.workspaceId = patch.workspaceId
     if (patch.workspaceId !== project.workspaceId) set.sort = nextProjectSort(db, patch.workspaceId)
@@ -282,10 +347,15 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
   }
   if (Object.keys(set).length === 0) return { ok: true, project }
   db.transaction((tx) => {
-    tx.update(schema.projects).set({ ...set, updatedAt: Date.now() }).where(eq(schema.projects.id, id)).run()
+    tx.update(schema.projects)
+      .set({ ...set, updatedAt: Date.now() })
+      .where(eq(schema.projects.id, id))
+      .run()
     if (mode === 'off' && set.name !== undefined) {
-      tx.update(schema.workspaces).set({ name: set.name as string, updatedAt: Date.now() })
-        .where(eq(schema.workspaces.id, project.workspaceId)).run()
+      tx.update(schema.workspaces)
+        .set({ name: set.name as string, updatedAt: Date.now() })
+        .where(eq(schema.workspaces.id, project.workspaceId))
+        .run()
     }
   })
   if (mode === 'off' && set.name !== undefined) broadcastWorkspaceChanged({ workspaceId: project.workspaceId })
@@ -297,38 +367,56 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
 // Core-only write seam for importer plugins. The public project routes remain the richer UI/config
 // surface; this pair covers only the fields a later importer needs to create a deferred remote
 // project and map it to a folder, not a general-purpose project mutation API.
-export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefInput, ownerId = ''): Promise<ProjectRef> {
+export async function createProjectRef(
+  db: AppDatabase,
+  input: ProjectCreateRefInput,
+  ownerId = '',
+): Promise<ProjectRef> {
   const name = input.name.trim()
   if (!name) throw new Error('Project name cannot be blank.')
-  if (input.github && (!input.github.owner.trim() || !input.github.name.trim())) throw new Error('GitHub owner and name cannot be blank.')
+  if (input.github && (!input.github.owner.trim() || !input.github.name.trim()))
+    throw new Error('GitHub owner and name cannot be blank.')
   if (input.path !== undefined && input.path !== null) {
     const result = await createProject(db, { path: input.path, workspaceId: input.workspaceId, name }, ownerId)
     if (!result.ok) throw result.code === 'workspaces_off' ? new WorkspacesOffError() : new Error(result.reason)
     if (input.github) {
-      await db.update(schema.projects).set({
-        githubOwner: normalizeGithubPart(input.github.owner),
-        githubName: normalizeGithubPart(input.github.name),
-        githubRepoId: input.github.repoId ?? null,
-        updatedAt: Date.now(),
-      }).where(eq(schema.projects.id, result.project.id))
+      await db
+        .update(schema.projects)
+        .set({
+          githubOwner: normalizeGithubPart(input.github.owner),
+          githubName: normalizeGithubPart(input.github.name),
+          githubRepoId: input.github.repoId ?? null,
+          updatedAt: Date.now(),
+        })
+        .where(eq(schema.projects.id, result.project.id))
       broadcastProjectChanged({ projectId: result.project.id })
     }
     return toProjectRef((await getProject(db, result.project.id))!)
   }
 
-  if (!input.github?.owner.trim() || !input.github.name.trim()) throw new Error('Deferred projects need a GitHub facet.')
-  const result = insertProject(db, ownerId, {
-    name,
-    path: null,
-    githubOwner: normalizeGithubPart(input.github.owner),
-    githubName: normalizeGithubPart(input.github.name),
-    githubRepoId: input.github.repoId ?? null,
-  }, input.workspaceId)
+  if (!input.github?.owner.trim() || !input.github.name.trim())
+    throw new Error('Deferred projects need a GitHub facet.')
+  const result = insertProject(
+    db,
+    ownerId,
+    {
+      name,
+      path: null,
+      githubOwner: normalizeGithubPart(input.github.owner),
+      githubName: normalizeGithubPart(input.github.name),
+      githubRepoId: input.github.repoId ?? null,
+    },
+    input.workspaceId,
+  )
   if (!result.ok) throw new Error(result.reason)
   return toProjectRef(result.project)
 }
 
-export async function updateProjectRef(db: AppDatabase, id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null> {
+export async function updateProjectRef(
+  db: AppDatabase,
+  id: string,
+  patch: ProjectUpdateRefInput,
+): Promise<ProjectRef | null> {
   const current = await getProject(db, id)
   if (!current) return null
   if (patch.path !== undefined) {
@@ -341,12 +429,23 @@ export async function updateProjectRef(db: AppDatabase, id: string, patch: Proje
       // available. `detectProject` clears disk-derived facets for that folder; preserve the explicit
       // importer facet until a later Git-backed probe can replace it.
       if (current.githubOwner && current.githubName && !result.project.githubOwner) {
-        await db.update(schema.projects).set({ githubOwner: current.githubOwner, githubName: current.githubName, githubRepoId: current.githubRepoId, updatedAt: Date.now() }).where(eq(schema.projects.id, id))
+        await db
+          .update(schema.projects)
+          .set({
+            githubOwner: current.githubOwner,
+            githubName: current.githubName,
+            githubRepoId: current.githubRepoId,
+            updatedAt: Date.now(),
+          })
+          .where(eq(schema.projects.id, id))
       }
     }
   }
   if (patch.githubRepoId !== undefined) {
-    await db.update(schema.projects).set({ githubRepoId: patch.githubRepoId, updatedAt: Date.now() }).where(eq(schema.projects.id, id))
+    await db
+      .update(schema.projects)
+      .set({ githubRepoId: patch.githubRepoId, updatedAt: Date.now() })
+      .where(eq(schema.projects.id, id))
   }
   const updated = await getProject(db, id)
   if (updated) broadcastProjectChanged({ projectId: id })

@@ -59,28 +59,51 @@ export function ListDetail(props: LayoutProps) {
   const drag = createSplitDrag({
     axis: 'x',
     label: `Resize ${props.label} list`,
-    onStart: () => { dragStart = width() || (list?.offsetWidth ?? MIN_LIST_WIDTH) },
+    onStart: () => {
+      dragStart = width() || (list?.offsetWidth ?? MIN_LIST_WIDTH)
+    },
     onDelta: (deltaPx) => {
       const from = dragStart ?? (width() || (list?.offsetWidth ?? MIN_LIST_WIDTH))
       setWidth(Math.min(Math.max(from + deltaPx, MIN_LIST_WIDTH), ceiling()))
     },
-    onCommit: () => { dragStart = null },
+    onCommit: () => {
+      dragStart = null
+    },
   })
 
   return (
-    <div ref={root} class="pane layout-list-detail" style={width() && !collapsed() ? { '--listdetail-w': `${width()}px` } : undefined}>
+    <div
+      ref={root}
+      class="pane layout-list-detail"
+      style={width() && !collapsed() ? { '--listdetail-w': `${width()}px` } : undefined}
+    >
       <Show when={!props.hidden?.includes('list')}>
         {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
             screen reader tells two same-shaped columns apart. */}
-        <aside ref={list} class="layout-region-list" data-collapsed={collapsed() ? '' : undefined} aria-label={`${props.label} list`} use:regionFocus={{ paneId: props.stateKey, regionId: 'list' }}>
-          <Show when={collapsed()}><div class="layout-collapsed-header" aria-hidden="true" /></Show>
+        <aside
+          ref={list}
+          class="layout-region-list"
+          data-collapsed={collapsed() ? '' : undefined}
+          aria-label={`${props.label} list`}
+          use:regionFocus={{ paneId: props.stateKey, regionId: 'list' }}
+        >
+          <Show when={collapsed()}>
+            <div class="layout-collapsed-header" aria-hidden="true" />
+          </Show>
           <Show when={!collapsed() || props.collapseContent !== 'empty'}>
             {props.regions['list-header']?.()}
-            <div class="layout-list-scroll" ref={(element) => retainScroll(element, {
-              key: () => props.scrollScope ?? '',
-              read: (scope) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[0](),
-              write: (scope, offset) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[1](offset),
-            })}>{props.regions.list?.()}</div>
+            <div
+              class="layout-list-scroll"
+              ref={(element) =>
+                retainScroll(element, {
+                  key: () => props.scrollScope ?? '',
+                  read: (scope) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[0](),
+                  write: (scope, offset) => layoutState(props.stateKey, `list-scroll:${scope}`, 0)[1](offset),
+                })
+              }
+            >
+              {props.regions.list?.()}
+            </div>
             <Show when={props.regions['list-footer']}>
               <div class="layout-list-footer">{props.regions['list-footer']?.()}</div>
             </Show>
@@ -98,7 +121,9 @@ export function ListDetail(props: LayoutProps) {
           />
         </Show>
       </Show>
-      <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>{props.regions.detail?.()}</div>
+      <div class="layout-region-detail" use:regionFocus={{ paneId: props.stateKey, regionId: 'detail' }}>
+        {props.regions.detail?.()}
+      </div>
     </div>
   )
 }

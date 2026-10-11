@@ -65,7 +65,8 @@ export function enrichmentWeight(rows: readonly DiffRow[]): number {
  * Nothing else goes in. Rows are a pure function of these, so the same key on any source of the node
  * is the same rows; review threads and theme are not inputs (tokens carry both themes' colours).
  */
-export const residentKey = (contentKey: string, path: string, sha: string | null): string => `${contentKey}\u0000${path}\u0000${sha ?? ''}`
+export const residentKey = (contentKey: string, path: string, sha: string | null): string =>
+  `${contentKey}\u0000${path}\u0000${sha ?? ''}`
 
 /** `provisional` colour is a fallback after the highlight worker timed out: drawn, but a later pane
  *  colours the segment again rather than take it as final. */
@@ -100,7 +101,9 @@ export type SegmentHolder = {
   supersede: (path: string, patchKey: string) => void
 }
 
-export function createSegmentCache(limits: { rows: number; bytes: number } = { rows: SEGMENT_CACHE_ROWS, bytes: SEGMENT_CACHE_BYTES }) {
+export function createSegmentCache(
+  limits: { rows: number; bytes: number } = { rows: SEGMENT_CACHE_ROWS, bytes: SEGMENT_CACHE_BYTES },
+) {
   // Oldest first: a Map iterates in insertion order, and a touch re-inserts.
   const entries = new Map<string, Entry>()
   const holders = new Set<Holder>()

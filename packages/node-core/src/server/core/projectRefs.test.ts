@@ -17,32 +17,68 @@ describe('CoreServices.projects', () => {
     testDb = makeTestDb()
     dir = mkdtempSync(join(tmpdir(), 'acorn-project-service-'))
     const now = Date.now()
-    await testDb.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await testDb.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await testDb.db.insert(schema.projects).values([
       {
-        id: 'project-old', name: 'widget', path: join(dir, 'old'), workspaceId: 'workspace-1', githubOwner: 'acme', githubName: 'widget', githubRepoId: 7,
-        createdAt: 10, updatedAt: 10,
+        id: 'project-old',
+        name: 'widget',
+        path: join(dir, 'old'),
+        workspaceId: 'workspace-1',
+        githubOwner: 'acme',
+        githubName: 'widget',
+        githubRepoId: 7,
+        createdAt: 10,
+        updatedAt: 10,
       },
       {
-        id: 'project-new', name: 'widget clone', path: join(dir, 'new'), workspaceId: 'workspace-1', githubOwner: 'acme', githubName: 'widget', githubRepoId: 7,
-        createdAt: 20, updatedAt: 20,
+        id: 'project-new',
+        name: 'widget clone',
+        path: join(dir, 'new'),
+        workspaceId: 'workspace-1',
+        githubOwner: 'acme',
+        githubName: 'widget',
+        githubRepoId: 7,
+        createdAt: 20,
+        updatedAt: 20,
       },
       {
-        id: 'project-plain', name: 'plain', path: join(dir, 'plain'), workspaceId: 'workspace-1', createdAt: 5, updatedAt: 5,
+        id: 'project-plain',
+        name: 'plain',
+        path: join(dir, 'plain'),
+        workspaceId: 'workspace-1',
+        createdAt: 5,
+        updatedAt: 5,
       },
     ])
     await testDb.db.insert(schema.integrations).values([
       {
-        id: 'rollbar-a', userId: 'owner', provider: 'rollbar', label: 'Rollbar A', encryptedCredentials: 'secret',
-        createdAt: now, updatedAt: now,
+        id: 'rollbar-a',
+        userId: 'owner',
+        provider: 'rollbar',
+        label: 'Rollbar A',
+        encryptedCredentials: 'secret',
+        createdAt: now,
+        updatedAt: now,
       },
       {
-        id: 'rollbar-b', userId: 'owner', provider: 'rollbar', label: 'Rollbar B', encryptedCredentials: 'secret',
-        createdAt: now, updatedAt: now,
+        id: 'rollbar-b',
+        userId: 'owner',
+        provider: 'rollbar',
+        label: 'Rollbar B',
+        encryptedCredentials: 'secret',
+        createdAt: now,
+        updatedAt: now,
       },
       {
-        id: 'linear-a', userId: 'owner', provider: 'linear', label: 'Linear A', encryptedCredentials: 'secret',
-        createdAt: now, updatedAt: now,
+        id: 'linear-a',
+        userId: 'owner',
+        provider: 'linear',
+        label: 'Linear A',
+        encryptedCredentials: 'secret',
+        createdAt: now,
+        updatedAt: now,
       },
     ])
     await testDb.db.insert(schema.workspaceExternalProjects).values([
@@ -50,7 +86,13 @@ describe('CoreServices.projects', () => {
       { workspaceId: 'workspace-1', integrationId: 'rollbar-a', externalId: 'project-a', createdAt: now },
       { workspaceId: 'workspace-1', integrationId: 'linear-a', externalId: 'team-a', createdAt: now },
       // The narrow form: this one follows a single project rather than the whole workspace.
-      { workspaceId: 'workspace-1', integrationId: 'linear-a', externalId: 'team-b', projectId: 'project-plain', createdAt: now },
+      {
+        workspaceId: 'workspace-1',
+        integrationId: 'linear-a',
+        externalId: 'team-b',
+        projectId: 'project-plain',
+        createdAt: now,
+      },
     ])
   })
 
@@ -62,7 +104,13 @@ describe('CoreServices.projects', () => {
   it('exposes a narrow projection and oldest GitHub clone lookup', async () => {
     const projects = projectService(testDb.db)
     const ref = await projects.byId('project-old')
-    expect(ref).toEqual({ id: 'project-old', name: 'widget', path: join(dir, 'old'), workspaceId: 'workspace-1', github: { owner: 'acme', name: 'widget', repoId: 7 } })
+    expect(ref).toEqual({
+      id: 'project-old',
+      name: 'widget',
+      path: join(dir, 'old'),
+      workspaceId: 'workspace-1',
+      github: { owner: 'acme', name: 'widget', repoId: 7 },
+    })
     expect(ref).not.toHaveProperty('setupScript')
     expect(ref).not.toHaveProperty('vcs')
     expect(await projects.byGithub('acme', 'widget')).toMatchObject({ id: 'project-old' })
@@ -104,12 +152,24 @@ describe('CoreServices.projects', () => {
 
   it('supports controlled deferred creation and mapping updates', async () => {
     const projects = projectService(testDb.db)
-    const deferred = await projects.create({ name: 'remote widget', path: null, github: { owner: 'acme', name: 'remote', repoId: 99 } })
-    expect(deferred).toMatchObject({ name: 'remote widget', path: null, github: { owner: 'acme', name: 'remote', repoId: 99 } })
+    const deferred = await projects.create({
+      name: 'remote widget',
+      path: null,
+      github: { owner: 'acme', name: 'remote', repoId: 99 },
+    })
+    expect(deferred).toMatchObject({
+      name: 'remote widget',
+      path: null,
+      github: { owner: 'acme', name: 'remote', repoId: 99 },
+    })
 
     const folder = join(dir, 'remote')
     mkdirSync(folder)
     const mapped = await projects.update(deferred.id, { path: folder })
-    expect(mapped).toMatchObject({ id: deferred.id, path: folder, github: { owner: 'acme', name: 'remote', repoId: 99 } })
+    expect(mapped).toMatchObject({
+      id: deferred.id,
+      path: folder,
+      github: { owner: 'acme', name: 'remote', repoId: 99 },
+    })
   })
 })

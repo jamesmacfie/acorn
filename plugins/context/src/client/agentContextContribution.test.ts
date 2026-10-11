@@ -13,15 +13,17 @@ const context: TaskContext = {
     worktreePath: '/worktree',
     pullNumber: null,
   },
-  sections: [{
-    id: 'issues',
-    label: 'Linked issues',
-    defaultIncluded: true,
-    budget: { overflow: 'omit-with-marker' },
-    items: [{ id: 'linear:ENG-1', kind: 'linear', label: 'ENG-1 Fix it' }],
-    compact: '## Linked issues\n- ENG-1 Fix it',
-    omitted: 0,
-  }],
+  sections: [
+    {
+      id: 'issues',
+      label: 'Linked issues',
+      defaultIncluded: true,
+      budget: { overflow: 'omit-with-marker' },
+      items: [{ id: 'linear:ENG-1', kind: 'linear', label: 'ENG-1 Fix it' }],
+      compact: '## Linked issues\n- ENG-1 Fix it',
+      omitted: 0,
+    },
+  ],
 }
 
 afterEach(() => {
@@ -31,10 +33,13 @@ afterEach(() => {
 
 describe('task agent context contribution', () => {
   it('uses server defaults for untouched tasks and returns one explicit snapshot', async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify(context), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify(context), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
     vi.stubGlobal('fetch', fetch)
 
     const snapshots = await taskContextAgentContribution.capture({ taskId: 'task-1' })
@@ -51,33 +56,52 @@ describe('task agent context contribution', () => {
 
   it('requests only the sections selected in the Context pane', async () => {
     setSectionSelection('task-1', { issues: true, notes: false, memory: false })
-    const fetch = vi.fn(async () => new Response(JSON.stringify(context), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify(context), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
     vi.stubGlobal('fetch', fetch)
 
     await taskContextAgentContribution.capture({ taskId: 'task-1' })
 
-    expect(fetch).toHaveBeenCalledWith('/v1/core/tasks/task-1/context?include=issues', expect.objectContaining({ signal: undefined }))
+    expect(fetch).toHaveBeenCalledWith(
+      '/v1/core/tasks/task-1/context?include=issues',
+      expect.objectContaining({ signal: undefined }),
+    )
   })
 
   it('lists selectable sections and captures the modal selection', async () => {
-    const fetch = vi.fn(async () => new Response(JSON.stringify(context), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    }))
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify(context), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
     vi.stubGlobal('fetch', fetch)
 
-    await expect(taskContextAgentContribution.options({ taskId: 'task-1' })).resolves.toEqual([{
-      id: 'issues',
-      label: 'Linked issues',
-      description: '1 item',
-      defaultSelected: true,
-    }])
+    await expect(taskContextAgentContribution.options({ taskId: 'task-1' })).resolves.toEqual([
+      {
+        id: 'issues',
+        label: 'Linked issues',
+        description: '1 item',
+        defaultSelected: true,
+      },
+    ])
     await taskContextAgentContribution.capture({ taskId: 'task-1' }, ['issues'])
 
-    expect(fetch).toHaveBeenNthCalledWith(1, '/v1/core/tasks/task-1/context?include=*', expect.objectContaining({ signal: undefined }))
-    expect(fetch).toHaveBeenNthCalledWith(2, '/v1/core/tasks/task-1/context?include=issues', expect.objectContaining({ signal: undefined }))
+    expect(fetch).toHaveBeenNthCalledWith(
+      1,
+      '/v1/core/tasks/task-1/context?include=*',
+      expect.objectContaining({ signal: undefined }),
+    )
+    expect(fetch).toHaveBeenNthCalledWith(
+      2,
+      '/v1/core/tasks/task-1/context?include=issues',
+      expect.objectContaining({ signal: undefined }),
+    )
   })
 })

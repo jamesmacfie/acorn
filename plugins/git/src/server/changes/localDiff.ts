@@ -6,12 +6,19 @@
 
 import { lstat, readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
-import { git, gitOrThrow, gitText, invalidateWorktreeStatus, resolveInRoot, worktreeGitText, worktreeStatusText } from '@acorn/plugin-api/node'
+import {
+  git,
+  gitOrThrow,
+  gitText,
+  invalidateWorktreeStatus,
+  resolveInRoot,
+  worktreeGitText,
+  worktreeStatusText,
+} from '@acorn/plugin-api/node'
 import { decodeGitPath, parseNumstat } from './gitPaths'
 import { stampLocalChanges } from './localStamps'
 import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { CommitOptions, HeadCommit, PullOptions, PushOptions } from '../../shared/changes/api'
-
 
 export type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 type LocalChangeStatus = LocalChange['status']
@@ -21,7 +28,12 @@ export type LocalScope = 'unstaged' | 'staged'
 // Repo-relative only: rejects absolute paths, `..` segments, and a leading dash, which argv could
 // mistake for a flag.
 export const isValidRelPath = (p: string): boolean =>
-  typeof p === 'string' && !!p && !p.startsWith('/') && !p.startsWith('-') && !p.split('/').includes('..') && !p.includes('\0')
+  typeof p === 'string' &&
+  !!p &&
+  !p.startsWith('/') &&
+  !p.startsWith('-') &&
+  !p.split('/').includes('..') &&
+  !p.includes('\0')
 
 const statusFor = (xy: string, index: boolean): LocalChangeStatus => {
   const c = index ? xy[0] : xy[1]
@@ -46,7 +58,10 @@ export type ParsedPorcelain = Omit<LocalStatus, 'operation'>
 export function parsePorcelainV2(stdout: string): ParsedPorcelain {
   const lines = stdout.split('\n')
   const header = (key: string): string | null =>
-    lines.find((line) => line.startsWith(`# ${key} `))?.slice(key.length + 3).trim() ?? null
+    lines
+      .find((line) => line.startsWith(`# ${key} `))
+      ?.slice(key.length + 3)
+      .trim() ?? null
   const head = header('branch.head')
   // `+A -B`, in that order and always both.
   const ab = header('branch.ab')?.match(/^\+(\d+) -(\d+)$/)
@@ -55,7 +70,14 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
     if (!line) continue
     const kind = line[0]
     if (kind === '?') {
-      out.push({ path: decodeGitPath(line.slice(2)), status: 'untracked', staged: false, additions: null, deletions: null, contentKey: '' })
+      out.push({
+        path: decodeGitPath(line.slice(2)),
+        status: 'untracked',
+        staged: false,
+        additions: null,
+        deletions: null,
+        contentKey: '',
+      })
       continue
     }
     if (kind !== '1' && kind !== '2' && kind !== 'u') continue
@@ -70,8 +92,24 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
     const [mH, mI, mW, hH, hI] = parts.slice(3, 8)
     if (kind === '1') {
       const path = decodeGitPath(parts.slice(8).join(' '))
-      if (xy[0] !== '.') out.push({ path, status: statusFor(xy, true), staged: true, additions: null, deletions: null, contentKey: key(`${mH} ${mI} ${hH} ${hI}`) })
-      if (xy[1] !== '.') out.push({ path, status: statusFor(xy, false), staged: false, additions: null, deletions: null, contentKey: key(`${mI} ${mW} ${hI}`) })
+      if (xy[0] !== '.')
+        out.push({
+          path,
+          status: statusFor(xy, true),
+          staged: true,
+          additions: null,
+          deletions: null,
+          contentKey: key(`${mH} ${mI} ${hH} ${hI}`),
+        })
+      if (xy[1] !== '.')
+        out.push({
+          path,
+          status: statusFor(xy, false),
+          staged: false,
+          additions: null,
+          deletions: null,
+          contentKey: key(`${mI} ${mW} ${hI}`),
+        })
     } else if (kind === '2') {
       // `2 XY sub mH mI mW hH hI Xscore path\torigPath`
       const pathField = parts.slice(9).join(' ')
@@ -79,14 +117,39 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
       if (fields.length !== 2) throw new Error('Malformed Git rename record.')
       const path = decodeGitPath(fields[0]!)
       const origPath = decodeGitPath(fields[1]!)
-      if (xy[0] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, true), staged: true, additions: null, deletions: null, contentKey: key(`${mH} ${mI} ${hH} ${hI} ${origPath}`) })
-      if (xy[1] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, false), staged: false, additions: null, deletions: null, contentKey: key(`${mI} ${mW} ${hI}`) })
+      if (xy[0] !== '.')
+        out.push({
+          path,
+          oldPath: origPath,
+          status: statusFor(xy, true),
+          staged: true,
+          additions: null,
+          deletions: null,
+          contentKey: key(`${mH} ${mI} ${hH} ${hI} ${origPath}`),
+        })
+      if (xy[1] !== '.')
+        out.push({
+          path,
+          oldPath: origPath,
+          status: statusFor(xy, false),
+          staged: false,
+          additions: null,
+          deletions: null,
+          contentKey: key(`${mI} ${mW} ${hI}`),
+        })
     } else {
       // Unmerged. Its own status, not a modification: git's answer to "stage it" is "mark it
       // resolved", and there is no half of it that can be in the index while the rest is not.
       // `u XY sub m1 m2 m3 mW h1 h2 h3 path`: three stages and the disk, which the stat finishes.
       const path = decodeGitPath(parts.slice(10).join(' '))
-      out.push({ path, status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: key(parts.slice(3, 10).join(' ')) })
+      out.push({
+        path,
+        status: 'conflicted',
+        staged: false,
+        additions: null,
+        deletions: null,
+        contentKey: key(parts.slice(3, 10).join(' ')),
+      })
     }
   }
   return {
@@ -100,7 +163,9 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
 
 // Pure: merge numstat (adds/dels per path) into changes for one scope.
 export function mergeNumstat(changes: LocalChange[], numstat: string, staged: boolean): LocalChange[] {
-  const stats = new Map(parseNumstat(numstat).map((record) => [JSON.stringify([record.oldPath ?? null, record.path]), record.counts]))
+  const stats = new Map(
+    parseNumstat(numstat).map((record) => [JSON.stringify([record.oldPath ?? null, record.path]), record.counts]),
+  )
   return changes.map((c) => {
     if (c.staged !== staged) return c
     // A conflicted file is in neither diff, and `git diff --numstat` reports the merge markers as
@@ -117,11 +182,18 @@ export function mergeNumstat(changes: LocalChange[], numstat: string, staged: bo
 // is the only way to find them. The lookup shares the status read's two-second window; the three
 // stats never do. `fresh` is for the abort verb, which refuses on this answer
 // (@acorn/plugin-api/node § worktreeStatusText: the cache serves reads, never a refusal).
-export async function gitOperation(worktree: string, opts: { fresh?: boolean } = {}): Promise<LocalStatus['operation']> {
+export async function gitOperation(
+  worktree: string,
+  opts: { fresh?: boolean } = {},
+): Promise<LocalStatus['operation']> {
   const dir = (await worktreeGitText(worktree, ['rev-parse', '--git-dir'], { fresh: opts.fresh }))?.trim()
   if (!dir) return null
   const gitDir = isAbsolute(dir) ? dir : join(worktree, dir)
-  const present = async (name: string) => await lstat(join(gitDir, name)).then(() => true, () => false)
+  const present = async (name: string) =>
+    await lstat(join(gitDir, name)).then(
+      () => true,
+      () => false,
+    )
   if (await present('MERGE_HEAD')) return 'merge'
   // Two names, one operation: `rebase-merge` is the interactive and merge-based rebase, `rebase-apply`
   // the am-based one.
@@ -142,7 +214,9 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
   // reads four, which is why the two callers can share one command.
   const stdout = (await worktreeStatusText(worktree)) ?? ''
   const parsed = parsePorcelainV2(stdout)
-  const upstreamId = parsed.upstream ? await worktreeGitText(worktree, ['rev-parse', '--verify', '@{upstream}'], { timeoutMs: 10_000 }) : null
+  const upstreamId = parsed.upstream
+    ? await worktreeGitText(worktree, ['rev-parse', '--verify', '@{upstream}'], { timeoutMs: 10_000 })
+    : null
   // The line counts share that window too, and are dropped with it when the node writes under the
   // path. Not skipped when the status text is unchanged: a second edit to a file that is already
   // modified moves its counts and leaves its porcelain line alone. A null is git failing, and stats
@@ -178,11 +252,17 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
   // files, must also reject symlinks in intermediate directories that leave the task root.
   if (scope === 'unstaged' && !resolveInRoot(worktree, path)) throw new Error('Invalid path.')
   // Untracked files aren't in the index, so this renders an all-additions patch via --no-index.
-  const tracked = (await git(['ls-files', '--error-unmatch', '--', literalPath(path)], { cwd: worktree, timeoutMs: 10_000 })).code === 0
+  const tracked =
+    (await git(['ls-files', '--error-unmatch', '--', literalPath(path)], { cwd: worktree, timeoutMs: 10_000 })).code ===
+    0
   if (!tracked && scope === 'unstaged') {
     // --no-index exits 1 on "differences found". Accept that complete answer through the process
     // seam, which still refuses truncation, timeout, cancellation, and spawn failure.
-    const result = await gitOrThrow(['diff', '--no-index', '--no-color', '--', '/dev/null', path], { cwd: worktree, timeoutMs: 15_000, allowedExitCodes: [0, 1] })
+    const result = await gitOrThrow(['diff', '--no-index', '--no-color', '--', '/dev/null', path], {
+      cwd: worktree,
+      timeoutMs: 15_000,
+      allowedExitCodes: [0, 1],
+    })
     return { patch: stripToHunks(result.stdout) }
   }
   // `--no-color`, because `color.ui=always` would hide the hunk headers from stripToHunks.
@@ -203,7 +283,12 @@ export type GitActionResult = { ok: true } | { ok: false; reason: string }
  *  rather than a blocked prompt (`packages/node-core/src/server/core/git.ts`). */
 export const NETWORK_TIMEOUT_MS = 120_000
 
-const run = async (worktree: string, args: string[], timeoutMs = 30_000, env?: Record<string, string>): Promise<GitActionResult> => {
+const run = async (
+  worktree: string,
+  args: string[],
+  timeoutMs = 30_000,
+  env?: Record<string, string>,
+): Promise<GitActionResult> => {
   // Every mutation this file makes goes through here, which makes it the one place that has to drop the
   // coalesced `git status` for the path. Before the command, not after: a status read that starts while
   // `git add` is running must not be able to store its pre-stage answer under the new timestamp
@@ -233,7 +318,12 @@ export function pathChunks(paths: readonly string[], size = STAGE_CHUNK): string
 }
 
 // One call per batch, stopping at the first failure so the reason the pane shows is the one git gave.
-const runChunked = async (worktree: string, paths: readonly string[], args: string[], size: number): Promise<GitActionResult> => {
+const runChunked = async (
+  worktree: string,
+  paths: readonly string[],
+  args: string[],
+  size: number,
+): Promise<GitActionResult> => {
   if (!paths.length) return { ok: false, reason: 'No paths.' }
   if (!paths.every(isValidRelPath)) return { ok: false, reason: 'Invalid path.' }
   for (const chunk of pathChunks(paths, size)) {
@@ -266,7 +356,12 @@ export function unstageFiles(worktree: string, paths: readonly string[], size = 
 //
 // Untracked files are in neither HEAD nor the index, so there is nothing to restore them from and
 // `git clean` deletes them instead, scoped to the one path.
-export async function discardFile(worktree: string, path: string, untracked: boolean, oldPath?: string): Promise<GitActionResult> {
+export async function discardFile(
+  worktree: string,
+  path: string,
+  untracked: boolean,
+  oldPath?: string,
+): Promise<GitActionResult> {
   const paths = oldPath ? [path, oldPath] : [path]
   if (!paths.every(isValidRelPath)) return { ok: false, reason: 'Invalid path.' }
   return untracked
@@ -301,7 +396,11 @@ export function commitArgs(message: string, options: CommitOptions = {}): string
 
 // Commit what the options name: the index, or every tracked change when `all` is set. `--` never
 // applies, because -m is fixed and the message is a value argv.
-export async function commitStaged(worktree: string, message: string, options: CommitOptions = {}): Promise<GitActionResult> {
+export async function commitStaged(
+  worktree: string,
+  message: string,
+  options: CommitOptions = {},
+): Promise<GitActionResult> {
   const msg = message.trim()
   // Refused here rather than by git, which would answer with its own commit-template help text. An
   // amend with no message is still a message: the client fills the field from HEAD before it asks.
@@ -314,7 +413,9 @@ export async function commitStaged(worktree: string, message: string, options: C
 export async function headCommit(worktree: string): Promise<HeadCommit | null> {
   // gitOrThrow, not gitText: a commit message is content, and its body's blank lines are part of it.
   // The unit separator keeps the split honest for a subject that contains one of anything else.
-  const { stdout } = await gitOrThrow(['log', '-1', '--pretty=%H%x1f%B'], { cwd: worktree, timeoutMs: 15_000 }).catch(() => ({ stdout: '' }))
+  const { stdout } = await gitOrThrow(['log', '-1', '--pretty=%H%x1f%B'], { cwd: worktree, timeoutMs: 15_000 }).catch(
+    () => ({ stdout: '' }),
+  )
   const [sha, message] = stdout.split('\x1f')
   if (!sha?.trim()) return null
   // Trailing newlines only: git ends the body with one, and leading whitespace in a message is the
@@ -325,7 +426,9 @@ export async function headCommit(worktree: string): Promise<HeadCommit | null> {
 /** The branch a hook payload names. Empty on a detached head, which is a real answer: a handler
  *  keyed on branch names has nothing to say about one that has none. */
 export async function branchOf(worktree: string): Promise<string> {
-  const branch = await gitText(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: worktree, timeoutMs: 15_000 }).catch(() => '')
+  const branch = await gitText(['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: worktree, timeoutMs: 15_000 }).catch(
+    () => '',
+  )
   return branch === 'HEAD' ? '' : branch
 }
 
@@ -347,8 +450,13 @@ export function pushArgs(options: PushOptions = {}): string[] {
   // `--set-upstream` on every push, not only the first: it is harmless where the upstream is already
   // set, and it means a branch whose upstream was deleted republishes without a second verb. That is
   // also why Publish and Push are one call with two labels.
-  return ['push', ...(options.force ? [`--force-with-lease=refs/heads/${options.expectedBranch}:${options.expectedRemoteId}`] : []),
-    '--set-upstream', 'origin', ...(options.force ? [`HEAD:refs/heads/${options.expectedBranch}`] : ['HEAD'])]
+  return [
+    'push',
+    ...(options.force ? [`--force-with-lease=refs/heads/${options.expectedBranch}:${options.expectedRemoteId}`] : []),
+    '--set-upstream',
+    'origin',
+    ...(options.force ? [`HEAD:refs/heads/${options.expectedBranch}`] : ['HEAD']),
+  ]
 }
 
 /** Undo whichever operation is mid-flight. The operation is read off the tree rather than taken
@@ -357,15 +465,23 @@ export function pushArgs(options: PushOptions = {}): string[] {
 export const abortArgs = (operation: NonNullable<LocalStatus['operation']>): string[] => [operation, '--abort']
 
 const networkArgs = (args: string[]): string[] => [
-  '-c', 'protocol.allow=never', '-c', 'protocol.file.allow=always', '-c', 'protocol.ssh.allow=always',
-  '-c', 'protocol.https.allow=always', '-c', 'protocol.git.allow=always', ...args,
+  '-c',
+  'protocol.allow=never',
+  '-c',
+  'protocol.file.allow=always',
+  '-c',
+  'protocol.ssh.allow=always',
+  '-c',
+  'protocol.https.allow=always',
+  '-c',
+  'protocol.git.allow=always',
+  ...args,
 ]
 
 const runNetwork = (worktree: string, args: string[]): Promise<GitActionResult> =>
   run(worktree, networkArgs(args), NETWORK_TIMEOUT_MS, { GIT_SSH_COMMAND: 'ssh' })
 
-export const fetchRemote = (worktree: string): Promise<GitActionResult> =>
-  runNetwork(worktree, ['fetch'])
+export const fetchRemote = (worktree: string): Promise<GitActionResult> => runNetwork(worktree, ['fetch'])
 
 export const pullRemote = (worktree: string, options: PullOptions = {}): Promise<GitActionResult> =>
   runNetwork(worktree, pullArgs(options))
@@ -378,8 +494,10 @@ export async function pushBranch(worktree: string, options: PushOptions = {}): P
   return runNetwork(worktree, pushArgs(options))
 }
 
-export const abortOperation = (worktree: string, operation: NonNullable<LocalStatus['operation']>): Promise<GitActionResult> =>
-  run(worktree, abortArgs(operation))
+export const abortOperation = (
+  worktree: string,
+  operation: NonNullable<LocalStatus['operation']>,
+): Promise<GitActionResult> => run(worktree, abortArgs(operation))
 
 /** The diff a commit would take, over the paths named, as one patch.
  *
@@ -416,7 +534,10 @@ export function parseGitLog(stdout: string): GitLogEntry[] {
 
 export async function gitLog(worktree: string, n = 10): Promise<GitLogEntry[]> {
   const count = Number.isInteger(n) && n > 0 && n <= 100 ? n : 10
-  const stdout = await gitText(['log', `-n${count}`, '--pretty=format:%h\x1f%s\x1f%an\x1f%ct'], { cwd: worktree, timeoutMs: 15_000 })
+  const stdout = await gitText(['log', `-n${count}`, '--pretty=format:%h\x1f%s\x1f%an\x1f%ct'], {
+    cwd: worktree,
+    timeoutMs: 15_000,
+  })
   return parseGitLog(stdout)
 }
 

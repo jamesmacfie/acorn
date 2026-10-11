@@ -87,7 +87,9 @@ const call = async (helper: Helper, method: HelperMethod, params: unknown): Prom
       socket.once('open', () => resolve())
       socket.once('error', reject)
     })
-    const reply = new Promise<HelperReply>((resolve) => socket.once('message', (data) => resolve(JSON.parse(String(data)) as HelperReply)))
+    const reply = new Promise<HelperReply>((resolve) =>
+      socket.once('message', (data) => resolve(JSON.parse(String(data)) as HelperReply)),
+    )
     socket.send(JSON.stringify({ id: 1, method, params }))
     return await reply
   } finally {
@@ -112,7 +114,13 @@ it('accepts a device configuration patch over the helper socket', async () => {
 
 describe('node-adopt checks the vouched fingerprint against the certificate', () => {
   it('refuses a node presenting an identity the provider did not vouch for', async () => {
-    probeNode.mockResolvedValue({ endpoint: ADOPT_RESULT.endpoint, fingerprint: SUBSTITUTED, protocolVersion: 1, compatible: true, certPem: 'cert' })
+    probeNode.mockResolvedValue({
+      endpoint: ADOPT_RESULT.endpoint,
+      fingerprint: SUBSTITUTED,
+      protocolVersion: 1,
+      compatible: true,
+      certPem: 'cert',
+    })
     const { helper, remembered, upserted } = stubHelper()
 
     const reply = await call(helper, 'node-adopt', REQUEST)
@@ -126,13 +134,23 @@ describe('node-adopt checks the vouched fingerprint against the certificate', ()
   })
 
   it('pairs a matching node and keeps the device token out of the reply', async () => {
-    probeNode.mockResolvedValue({ endpoint: ADOPT_RESULT.endpoint, fingerprint: VOUCHED, protocolVersion: 1, compatible: true, certPem: 'cert-pem' })
+    probeNode.mockResolvedValue({
+      endpoint: ADOPT_RESULT.endpoint,
+      fingerprint: VOUCHED,
+      protocolVersion: 1,
+      compatible: true,
+      certPem: 'cert-pem',
+    })
     const { helper, remembered, upserted } = stubHelper()
 
     const reply = await call(helper, 'node-adopt', REQUEST)
 
     expect(reply.ok).toBe(true)
-    expect(reply.timing).toMatchObject({ receivedAt: expect.any(Number), repliedAt: expect.any(Number), handlerMs: expect.any(Number) })
+    expect(reply.timing).toMatchObject({
+      receivedAt: expect.any(Number),
+      repliedAt: expect.any(Number),
+      handlerMs: expect.any(Number),
+    })
     expect(reply.ok === true && reply.value).toEqual({
       nodeId: 'node-1',
       label: 'Big box',
@@ -154,18 +172,35 @@ it('refuses a multibyte secret safely and then accepts the valid secret and orig
   const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost' })
   servers.push(server)
   const refused = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${encodeURIComponent('é'.repeat(64))}`)
-  await new Promise<void>((resolve) => { refused.on('error', () => {}); refused.once('close', () => resolve()) })
-  const foreign = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, { origin: 'http://foreign.invalid' })
-  await new Promise<void>((resolve) => { foreign.on('error', () => {}); foreign.once('close', () => resolve()) })
-  const valid = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, { origin: 'http://acorn.localhost' })
-  await new Promise<void>((resolve, reject) => { valid.once('open', resolve); valid.on('error', reject) })
+  await new Promise<void>((resolve) => {
+    refused.on('error', () => {})
+    refused.once('close', () => resolve())
+  })
+  const foreign = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, {
+    origin: 'http://foreign.invalid',
+  })
+  await new Promise<void>((resolve) => {
+    foreign.on('error', () => {})
+    foreign.once('close', () => resolve())
+  })
+  const valid = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, {
+    origin: 'http://acorn.localhost',
+  })
+  await new Promise<void>((resolve, reject) => {
+    valid.once('open', resolve)
+    valid.on('error', reject)
+  })
   valid.close()
 })
 
 it('closes an oversized request with 1009 before dispatch, then shuts down promptly', async () => {
   const { helper } = stubHelper()
   const write = vi.spyOn(helper.config, 'write')
-  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  const server = await startHelperServer(helper, {
+    secret: 'a'.repeat(64),
+    appOrigin: 'http://acorn.localhost',
+    maxRequestBytes: 64,
+  })
   servers.push(server)
   const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
   ws.on('error', () => {})
@@ -178,8 +213,14 @@ it('closes an oversized request with 1009 before dispatch, then shuts down promp
 
 it('does not apply the incoming carrier limit to a larger helper reply', async () => {
   const { helper } = stubHelper()
-  vi.spyOn(helper.config, 'read').mockReturnValue({ config: { testValue: 'x'.repeat(1000) } } as ReturnType<Helper['config']['read']>)
-  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  vi.spyOn(helper.config, 'read').mockReturnValue({ config: { testValue: 'x'.repeat(1000) } } as ReturnType<
+    Helper['config']['read']
+  >)
+  const server = await startHelperServer(helper, {
+    secret: 'a'.repeat(64),
+    appOrigin: 'http://acorn.localhost',
+    maxRequestBytes: 64,
+  })
   servers.push(server)
   const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
   ws.on('error', () => {})
@@ -192,7 +233,11 @@ it('does not apply the incoming carrier limit to a larger helper reply', async (
 
 it('terminates an oversized peer still waiting in its closing handshake during helper disposal', async () => {
   const { helper } = stubHelper()
-  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  const server = await startHelperServer(helper, {
+    secret: 'a'.repeat(64),
+    appOrigin: 'http://acorn.localhost',
+    maxRequestBytes: 64,
+  })
   servers.push(server)
   const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
   ws.on('error', () => {})
@@ -209,7 +254,6 @@ it('terminates an oversized peer still waiting in its closing handshake during h
     ws.terminate()
   }
 }, 2_000)
-
 
 // The helper forwards the active node's frames and nobody else's.
 //
@@ -250,7 +294,7 @@ describe('the helper forwards only the active node', () => {
     return { socket, settled, server }
   }
 
-  it('drops a frame from a node the renderer is not addressing, and keeps every node\'s status', async () => {
+  it("drops a frame from a node the renderer is not addressing, and keeps every node's status", async () => {
     const { socket, settled, server } = await connect()
     try {
       socket.send(JSON.stringify({ id: 1, method: 'node-interest', params: { nodeId: 'node-a' } }))

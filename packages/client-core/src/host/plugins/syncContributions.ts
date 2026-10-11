@@ -10,17 +10,22 @@ let loading: Promise<Passes> | undefined
 // The frame and chrome hosts are only needed once a loaded plugin is accepted, so they load on the first
 // pass rather than at startup. This module owns the one loader promise. A failed import is forgotten so
 // the next pass, after a commit or a node change, imports again.
-const loadPasses = (): Promise<Passes> => loading ??= Promise.all([import('../frames/register'), import('../chrome/chromeRegister')])
-  .then(([frames, chrome]) => passes = { frames: frames.syncFrameContributions, chrome: chrome.syncChromeContributions })
-  .catch((error: unknown) => {
-    loading = undefined
-    throw error
-  })
+const loadPasses = (): Promise<Passes> =>
+  (loading ??= Promise.all([import('../frames/register'), import('../chrome/chromeRegister')])
+    .then(
+      ([frames, chrome]) =>
+        (passes = { frames: frames.syncFrameContributions, chrome: chrome.syncChromeContributions }),
+    )
+    .catch((error: unknown) => {
+      loading = undefined
+      throw error
+    }))
 
-const run = ({ frames, chrome }: Passes): void => batch(() => {
-  frames()
-  chrome()
-})
+const run = ({ frames, chrome }: Passes): void =>
+  batch(() => {
+    frames()
+    chrome()
+  })
 
 /**
  * Both registration passes, in order. They must always run as a pair, since the frames pass draws the

@@ -170,7 +170,7 @@ export const SECTION_CONCEPTS = [
   'A `gate-human` step may carry a `form` when a person should check and correct a value before the',
   'run uses it. `form.fields` declares each value the way `inputs` does, with `name` and `schema`,',
   'and `form.values` binds a field to where its proposal comes from, the way child inputs bind.',
-  'The approved values are the gate\'s output under `/values`, so a later step binds to those, never',
+  "The approved values are the gate's output under `/values`, so a later step binds to those, never",
   'to the draft. For example, an agent step `draft` with a `schema` holding `title`, then:',
   '`{ "id": "approve", "name": "Approve the note", "kind": "gate-human", "after": ["draft"], "form": {',
   '"fields": [{ "name": "title", "schema": { "type": "string" }, "required": true }], "values": {',

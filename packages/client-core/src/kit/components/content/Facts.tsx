@@ -22,7 +22,9 @@ export function Facts(props: {
     <DescriptionList layout={props.grouping === 'rows' ? 'columns' : 'facts'} size={props.size}>
       <For each={props.items}>
         {(item) => (
-          <DescriptionList.Item label={item.label} mono={item.mono} wide={item.wide}>{item.value}</DescriptionList.Item>
+          <DescriptionList.Item label={item.label} mono={item.mono} wide={item.wide}>
+            {item.value}
+          </DescriptionList.Item>
         )}
       </For>
     </DescriptionList>

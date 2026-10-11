@@ -5,10 +5,20 @@ export type FolderMark = { count: number; conflicts: number; label: string; tone
 export type FileStatusProjection = { files: ReadonlyMap<string, FileMark>; folders: ReadonlyMap<string, FolderMark> }
 
 const rank: Record<EditorFileChange['status'], number> = {
-  deleted: 0, modified: 1, untracked: 2, added: 3, renamed: 4, conflicted: 5,
+  deleted: 0,
+  modified: 1,
+  untracked: 2,
+  added: 3,
+  renamed: 4,
+  conflicted: 5,
 }
 const letter: Record<EditorFileChange['status'], string> = {
-  deleted: 'D', modified: 'M', untracked: '?', added: 'A', renamed: 'R', conflicted: '!',
+  deleted: 'D',
+  modified: 'M',
+  untracked: '?',
+  added: 'A',
+  renamed: 'R',
+  conflicted: '!',
 }
 
 /** One path has one mark even when Git reports index and worktree entries separately. */
@@ -25,15 +35,21 @@ export function projectFileStatus(snapshot: EditorFileStatusSnapshot | null): Fi
   }
   const folderPaths = new Map<string, { count: number; conflicts: number }>()
   for (const [path, entries] of byPath) {
-    const primary = entries.reduce((best, entry) => rank[entry.status] > rank[best.status] ? entry : best)
+    const primary = entries.reduce((best, entry) => (rank[entry.status] > rank[best.status] ? entry : best))
     const staged = entries.some((entry) => entry.staged)
     const unstaged = entries.some((entry) => !entry.staged)
     const scope = staged && unstaged ? 'Staged and unstaged' : staged ? 'Staged' : 'Unstaged'
     const name = primary.status[0]!.toUpperCase() + primary.status.slice(1)
     files.set(path, {
       letter: letter[primary.status],
-      tone: primary.status === 'conflicted' ? 'danger' : primary.status === 'renamed' ? 'accent'
-        : primary.status === 'added' || primary.status === 'untracked' ? 'ok' : 'muted',
+      tone:
+        primary.status === 'conflicted'
+          ? 'danger'
+          : primary.status === 'renamed'
+            ? 'accent'
+            : primary.status === 'added' || primary.status === 'untracked'
+              ? 'ok'
+              : 'muted',
       label: `${name} — ${scope}${primary.oldPath ? `; renamed from ${primary.oldPath}` : ''}`,
     })
     const parts = path.split('/')
@@ -45,10 +61,11 @@ export function projectFileStatus(snapshot: EditorFileStatusSnapshot | null): Fi
       folderPaths.set(folder, totals)
     }
   }
-  for (const [path, totals] of folderPaths) folders.set(path, {
-    ...totals,
-    label: `${totals.count} changed ${totals.count === 1 ? 'path' : 'paths'}, ${totals.conflicts} ${totals.conflicts === 1 ? 'conflict' : 'conflicts'}`,
-    tone: totals.conflicts ? 'danger' : 'muted',
-  })
+  for (const [path, totals] of folderPaths)
+    folders.set(path, {
+      ...totals,
+      label: `${totals.count} changed ${totals.count === 1 ? 'path' : 'paths'}, ${totals.conflicts} ${totals.conflicts === 1 ? 'conflict' : 'conflicts'}`,
+      tone: totals.conflicts ? 'danger' : 'muted',
+    })
   return { files, folders }
 }

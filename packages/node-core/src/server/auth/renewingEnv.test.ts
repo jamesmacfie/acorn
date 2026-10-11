@@ -21,8 +21,18 @@ describe('internal credential renewal', () => {
     vi.setSystemTime(new Date('2026-10-09T00:00:00Z'))
     const root = mkdtempSync(join(tmpdir(), 'acorn-credentials-'))
     roots.push(root)
-    const first = renewingInternalEnv(KEY, root, () => ({ ACORN_API_URL: 'https://127.0.0.1:1' }), new ActiveCredentials())
-    const launched = first.internalEnv({ scope: 'task', taskId: 'task-1', sessionId: 'session-1', toolCeiling: { allow: ['task_current'], maxRisk: 'read' } })
+    const first = renewingInternalEnv(
+      KEY,
+      root,
+      () => ({ ACORN_API_URL: 'https://127.0.0.1:1' }),
+      new ActiveCredentials(),
+    )
+    const launched = first.internalEnv({
+      scope: 'task',
+      taskId: 'task-1',
+      sessionId: 'session-1',
+      toolCeiling: { allow: ['task_current'], maxRisk: 'read' },
+    })
     const path = launched.ACORN_API_TOKEN_FILE
     expect(path).toBeTruthy()
     expect(statSync(path).mode & 0o777).toBe(0o600)
@@ -34,13 +44,17 @@ describe('internal credential renewal', () => {
     const renewed = readFileSync(path, 'utf8')
     expect(renewed).not.toBe(launched.ACORN_API_TOKEN)
     expect(verifyInternalToken(KEY, renewed)).toEqual({
-      scope: 'task', taskId: 'task-1', sessionId: 'session-1',
+      scope: 'task',
+      taskId: 'task-1',
+      sessionId: 'session-1',
       toolCeiling: { allow: ['task_current'], maxRisk: 'read' },
       credentialId: verifyInternalToken(KEY, renewed)?.credentialId,
     })
     // Renewal keeps the credential, so a copy of the launch token and the renewed file share one id.
-    expect(JSON.parse(Buffer.from(launched.ACORN_API_TOKEN.slice('acorn_it_'.length).split('.')[0]!, 'base64url').toString()).i)
-      .toBe(verifyInternalToken(KEY, renewed)?.credentialId)
+    expect(
+      JSON.parse(Buffer.from(launched.ACORN_API_TOKEN.slice('acorn_it_'.length).split('.')[0]!, 'base64url').toString())
+        .i,
+    ).toBe(verifyInternalToken(KEY, renewed)?.credentialId)
     second.dispose()
   })
 
@@ -50,11 +64,17 @@ describe('internal credential renewal', () => {
     const root = mkdtempSync(join(tmpdir(), 'acorn-credentials-'))
     roots.push(root)
     const credentials = renewingInternalEnv(KEY, root, () => ({}), new ActiveCredentials())
-    const child = credentials.internalEnv({ scope: 'task', taskId: 'task-1', toolCeiling: { allow: ['task_current'], maxRisk: 'read' } })
+    const child = credentials.internalEnv({
+      scope: 'task',
+      taskId: 'task-1',
+      toolCeiling: { allow: ['task_current'], maxRisk: 'read' },
+    })
     vi.advanceTimersByTime(3 * 24 * 60 * 60 * 1000)
     expect(verifyInternalToken(KEY, child.ACORN_API_TOKEN)).toBeNull()
     expect(verifyInternalToken(KEY, readFileSync(child.ACORN_API_TOKEN_FILE, 'utf8'))).toEqual({
-      scope: 'task', taskId: 'task-1', sessionId: undefined,
+      scope: 'task',
+      taskId: 'task-1',
+      sessionId: undefined,
       toolCeiling: { allow: ['task_current'], maxRisk: 'read' },
       credentialId: expect.any(String),
     })
@@ -138,7 +158,9 @@ describe('internal credential renewal', () => {
     first.dispose()
     const active = new ActiveCredentials()
     const second = renewingInternalEnv(KEY, root, () => ({}), active)
-    expect(authenticateInternalToken(KEY, active, readFileSync(session.ACORN_API_TOKEN_FILE, 'utf8'))).toMatchObject({ sessionId: 'session-1' })
+    expect(authenticateInternalToken(KEY, active, readFileSync(session.ACORN_API_TOKEN_FILE, 'utf8'))).toMatchObject({
+      sessionId: 'session-1',
+    })
     expect(authenticateInternalToken(KEY, active, child.ACORN_API_TOKEN)).toBeNull()
     second.dispose()
   })
@@ -146,7 +168,9 @@ describe('internal credential renewal', () => {
   it('gives a session file from before credential ids a live token at start, and refuses the old one', () => {
     const root = mkdtempSync(join(tmpdir(), 'acorn-credentials-'))
     roots.push(root)
-    const payload = Buffer.from(JSON.stringify({ s: 'task', t: 'task-1', n: 'session-1', e: Date.now() + 60_000 })).toString('base64url')
+    const payload = Buffer.from(
+      JSON.stringify({ s: 'task', t: 'task-1', n: 'session-1', e: Date.now() + 60_000 }),
+    ).toString('base64url')
     const legacy = `acorn_it_${payload}.${createHmac('sha256', KEY).update(payload).digest('base64url')}`
     const path = sessionCredentialPath(root, 'task-1', 'session-1')
     mkdirSync(dirname(path), { recursive: true })

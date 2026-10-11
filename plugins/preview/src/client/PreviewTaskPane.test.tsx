@@ -17,11 +17,17 @@ vi.mock('@acorn/plugin-api/client', () => ({
   remotePreviewBlocked: () => false,
 }))
 // The page itself is a native view the shell positions, and is not what this file is about.
-vi.mock('./PreviewPane', () => ({ default: (props: { taskId: string; url: string | null }) => <span class="page" data-url={props.url ?? ""}>{props.taskId}</span> }))
+vi.mock('./PreviewPane', () => ({
+  default: (props: { taskId: string; url: string | null }) => (
+    <span class="page" data-url={props.url ?? ''}>
+      {props.taskId}
+    </span>
+  ),
+}))
 
 const { previewPaneContribution } = await import('./paneContribution')
 
-const task = (id: string): Task => ({ id, status: 'active' } as Task)
+const task = (id: string): Task => ({ id, status: 'active' }) as Task
 
 let host: HTMLElement
 let registration: Disposable
@@ -51,7 +57,12 @@ const drawn = (taskId: string) =>
 
 it('binds same-ID task reads to the originating Node and rejects late URLs', async () => {
   let complete!: (value: unknown) => void
-  read.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve }))
+  read.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve
+      }),
+  )
   const Pane = pane()
   disposers.push(render(() => <Pane task={task('same')} />, host))
   await vi.waitFor(() => expect(read).toHaveBeenCalledOnce())

@@ -21,27 +21,46 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
   const disposables: { dispose(): void }[] = []
   beforeAll(() => {
     for (const id of ['linear', 'rollbar']) {
-      disposables.push(sourceRegistry.register({
-        id, order: id === 'linear' ? 20 : 30, providerId: id, glyph: id === 'linear' ? '◷' : '◍', label: id === 'linear' ? 'Linear' : 'Rollbar',
-        promotion: {
-          canPromote: () => true,
-          prepare: async () => ({ origin: id, projectId: 'project-1', branch: 'main' }),
-          create: async (seed) => ({
-            ...seed,
-            id: 'task', title: seed.title ?? 'Task', icon: seed.icon ?? null, worktreePath: null, pullNumber: seed.pullNumber ?? null,
-            status: 'active', parentId: null, sort: 0, links: [],
-            github: { owner: 'acme', name: 'widget' }, branch: seed.branch ?? null,
-          }),
-        },
-      }))
+      disposables.push(
+        sourceRegistry.register({
+          id,
+          order: id === 'linear' ? 20 : 30,
+          providerId: id,
+          glyph: id === 'linear' ? '◷' : '◍',
+          label: id === 'linear' ? 'Linear' : 'Rollbar',
+          promotion: {
+            canPromote: () => true,
+            prepare: async () => ({ origin: id, projectId: 'project-1', branch: 'main' }),
+            create: async (seed) => ({
+              ...seed,
+              id: 'task',
+              title: seed.title ?? 'Task',
+              icon: seed.icon ?? null,
+              worktreePath: null,
+              pullNumber: seed.pullNumber ?? null,
+              status: 'active',
+              parentId: null,
+              sort: 0,
+              links: [],
+              github: { owner: 'acme', name: 'widget' },
+              branch: seed.branch ?? null,
+            }),
+          },
+        }),
+      )
     }
-    disposables.push(sourceRegistry.register({ id: 'github', order: 10, glyph: '◇', label: 'GitHub', providerId: 'github' }))
+    disposables.push(
+      sourceRegistry.register({ id: 'github', order: 10, glyph: '◇', label: 'GitHub', providerId: 'github' }),
+    )
   })
   afterAll(() => disposables.forEach((disposable) => disposable.dispose()))
 
   it('local sources (no providerId) are always shown', () => {
     const local = sourceRegistry.register({
-      id: 'docker-test', order: 40, glyph: '◧', label: 'Docker',
+      id: 'docker-test',
+      order: 40,
+      glyph: '◧',
+      label: 'Docker',
     })
     try {
       expect(availableSources(undefined).map((s) => s.id)).toContain('docker-test')
@@ -52,9 +71,16 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
   })
 
   it('a git-only source hides only once the workspace is known to hold no git project', () => {
-    const worktrees = sourceRegistry.register({ id: 'worktrees-test', order: 50, glyph: 'folder-git-2', label: 'Worktrees', requiresGitProject: true })
+    const worktrees = sourceRegistry.register({
+      id: 'worktrees-test',
+      order: 50,
+      glyph: 'folder-git-2',
+      label: 'Worktrees',
+      requiresGitProject: true,
+    })
     try {
-      const ids = (gitProject?: boolean) => availableSources([], gitProject === undefined ? {} : { gitProject }).map((s) => s.id)
+      const ids = (gitProject?: boolean) =>
+        availableSources([], gitProject === undefined ? {} : { gitProject }).map((s) => s.id)
       expect(ids(true)).toContain('worktrees-test')
       expect(ids(false)).not.toContain('worktrees-test')
       // Projects still loading: no answer yet, so no flicker.
@@ -68,7 +94,9 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     expect(availableSources(undefined).map((s) => s.id)).toEqual([])
     expect(availableSources([integration('github')]).map((s) => s.id)).toEqual(['github'])
     expect(availableSources([integration('linear')]).map((s) => s.id)).toEqual(['linear'])
-    expect(availableSources([integration('github'), integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['github', 'linear', 'rollbar'])
+    expect(
+      availableSources([integration('github'), integration('linear'), integration('rollbar')]).map((s) => s.id),
+    ).toEqual(['github', 'linear', 'rollbar'])
     expect(availableSources([integration('github', false)]).map((s) => s.id)).toEqual([])
   })
 
@@ -84,7 +112,9 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
       // trails. Under registration order this would read aardvark, linear, rollbar, github,
       // zebra, and alphabetically it would read aardvark first too, so neither fallback can
       // produce this answer.
-      expect(availableSources([integration('github'), integration('linear'), integration('rollbar')]).map((s) => s.id)).toEqual(['zebra', 'github', 'linear', 'rollbar', 'aardvark'])
+      expect(
+        availableSources([integration('github'), integration('linear'), integration('rollbar')]).map((s) => s.id),
+      ).toEqual(['zebra', 'github', 'linear', 'rollbar', 'aardvark'])
     } finally {
       late.dispose()
       early.dispose()
@@ -110,7 +140,12 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     // A source with both must satisfy both, otherwise adding `when` would have quietly opened a
     // hole in the integration gate for any contribution that declared one.
     const both = sourceRegistry.register({
-      id: 'both-test', order: 0, glyph: 'b', label: 'Both', providerId: 'linear', when: () => false,
+      id: 'both-test',
+      order: 0,
+      glyph: 'b',
+      label: 'Both',
+      providerId: 'linear',
+      when: () => false,
     })
     try {
       expect(availableSources([integration('linear')]).map((s) => s.id)).not.toContain('both-test')
@@ -162,7 +197,11 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
       const two = [...connected, { ...integration('rollbar'), id: 'rollbar-b' }]
       const linked = [{ integrationId: 'rollbar-b', externalId: 'project-b' }]
       expect(availableSources(two, { providers, linked }).map((s) => s.id)).toContain('rollbar')
-      expect(availableSources(two, { providers, linked: [{ integrationId: 'someone-else', externalId: 'x' }] }).map((s) => s.id)).not.toContain('rollbar')
+      expect(
+        availableSources(two, { providers, linked: [{ integrationId: 'someone-else', externalId: 'x' }] }).map(
+          (s) => s.id,
+        ),
+      ).not.toContain('rollbar')
     })
 
     it('does not gate while either half is still loading', () => {

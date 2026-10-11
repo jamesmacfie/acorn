@@ -20,13 +20,22 @@ import { onCleanup } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import { _resetCollectionState, registerCollectionReveal } from '@acorn/client-core/kit/keys'
 import {
-  COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions, type CollectionItem,
+  COLLECTION_INTENTS,
+  createCollectionIntents,
+  type CollectionIntentOptions,
+  type CollectionItem,
 } from '@acorn/client-core/kit/keys'
 import { registerIntentLayer } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { bindKeys } from './install'
 import {
-  activationEntersMain, focusedRenderable, focusRenderable, markCollection, markItem, moveColumn,
-  scheduleSettle, walkStops,
+  activationEntersMain,
+  focusedRenderable,
+  focusRenderable,
+  markCollection,
+  markItem,
+  moveColumn,
+  scheduleSettle,
+  walkStops,
 } from './regions'
 import { STOP } from './tiers'
 
@@ -104,11 +113,15 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
         // renderer's focus goes with the one it destroyed. The landing rule re-lands on the same
         // logical row, because the identity registry now points at this box.
         if (previous && previous !== box) scheduleSettle()
-        onCleanup(() => { if (boxes.get(key) === box) boxes.delete(key) })
+        onCleanup(() => {
+          if (boxes.get(key) === box) boxes.delete(key)
+        })
       },
       press: (run) => {
         presses.set(key, run)
-        onCleanup(() => { if (presses.get(key) === run) presses.delete(key) })
+        onCleanup(() => {
+          if (presses.get(key) === run) presses.delete(key)
+        })
       },
     }),
     focusActive: () => {
@@ -123,9 +136,11 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       // the region-wide Shift+Tab skips those controls and traps keyboard readers in
       // the collection once its active row has been remembered.
       bindKeys(box, [{ key: 'shift+tab', cmd: () => walkStops(focusedRenderable(), -1) }], STOP)
-      onCleanup(registerCollectionReveal(options.id(), (key) => {
-        if (options.items().some((item) => item.key === key && !item.disabled)) keys.goTo(key)
-      }))
+      onCleanup(
+        registerCollectionReveal(options.id(), (key) => {
+          if (options.items().some((item) => item.key === key && !item.disabled)) keys.goTo(key)
+        }),
+      )
       // The collection tier, focus-within on the collection, exactly as on the desktop (client-core
       // host/keys/install.ts § the four tiers). Priority decides, not locality. The number comes from
       // `registerIntentLayer`'s own default, which both hosts read, so it is the one tier this
@@ -138,7 +153,10 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       // (./regions.ts § focusedExpands, ../chrome/bindings.ts).
       markCollection(
         box,
-        () => { const key = keys.active(); return key ? boxes.get(key) : undefined },
+        () => {
+          const key = keys.active()
+          return key ? boxes.get(key) : undefined
+        },
         () => !!options.onExpand,
       )
     },

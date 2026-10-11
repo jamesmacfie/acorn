@@ -14,7 +14,15 @@ import type { Duplex } from 'node:stream'
 // forbids (server/plugins/nodePluginWorker.ts), taking the whole plugin down with it.
 import type { WebSocket, WebSocketServer } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
-import { MAX_NODE_WS_MESSAGE_BYTES, encodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import {
+  MAX_NODE_WS_MESSAGE_BYTES,
+  encodeIdFrame,
+  WS_PATH,
+  WS_VIEWERS_HEADER,
+  type WsClientFrame,
+  type WsServerFrame,
+  type WsServerWireFrame,
+} from '@acorn/protocol/ws.ts'
 import { WsViewers, type EventViewer } from './wsViewers'
 import { createWsViewerDispatch, isTaskConfinedWs } from './wsViewerDispatch'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
@@ -26,8 +34,15 @@ const log = createLogger('ws')
 // Owners may implement a void hook with an async function. Observe both synchronous throws and
 // returned rejections; cleanup invokes each owner independently so a failure cannot strand peers.
 function invokeOwner(action: () => unknown, failed: () => void = () => {}): void {
-  const reject = (): void => { failed(); log.warn('WebSocket owner handler failed.') }
-  try { void Promise.resolve(action()).catch(reject) } catch { reject() }
+  const reject = (): void => {
+    failed()
+    log.warn('WebSocket owner handler failed.')
+  }
+  try {
+    void Promise.resolve(action()).catch(reject)
+  } catch {
+    reject()
+  }
 }
 
 // A sink is one connection's outlet for stream frames. The owner defines the rest of each payload.
@@ -207,17 +222,29 @@ function sendFrame(conn: Conn, frame: WsServerFrame, viewerId?: string | null): 
         // One event per congested window, not per shed frame, because the socket falls silent after
         // this until it drains and one "you are behind" is the whole message.
         emitEvent(frameOwner(frame.channel), 'ws.shed', { seam: 'ws.frame', channel: channelPrefix(frame.channel) })
-        conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() })
+        conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame), (error) => {
+          if (error) conn.ws.terminate()
+        })
         return
       }
     }
     conn.seq += 1
     const seq = conn.seq
     const routed = viewerId ? { channel: 'ws:viewer', viewerId, frame } : frame
-    measure(frameOwner(frame.channel), 'ws.frame', () => conn.ws.send(JSON.stringify({ ...routed, seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() }), {
-      channel: channelPrefix(frame.channel),
-    })
-  } catch { conn.ws.terminate() }
+    measure(
+      frameOwner(frame.channel),
+      'ws.frame',
+      () =>
+        conn.ws.send(JSON.stringify({ ...routed, seq } satisfies WsServerWireFrame), (error) => {
+          if (error) conn.ws.terminate()
+        }),
+      {
+        channel: channelPrefix(frame.channel),
+      },
+    )
+  } catch {
+    conn.ws.terminate()
+  }
 }
 
 // Terminal output, as one binary frame instead of an escaped JSON string.
@@ -262,8 +289,12 @@ function sendStreamFrame(conn: Conn, owner: EventViewer, id: string, msg: Stream
       watchDrain(conn)
       // and fall through, for the reason sendFrame gives: there is no cursor to replay a hole from.
     }
-    conn.ws.send(owner.id ? encodeIdFrame(owner.id, frame)! : frame, { binary: true }, (error) => { if (error) conn.ws.terminate() })
-  } catch { conn.ws.terminate() }
+    conn.ws.send(owner.id ? encodeIdFrame(owner.id, frame)! : frame, { binary: true }, (error) => {
+      if (error) conn.ws.terminate()
+    })
+  } catch {
+    conn.ws.terminate()
+  }
 }
 
 // Is this connection confined to a single task? The socket-level twin of requireUser.ts's
@@ -352,7 +383,19 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
 }
 
 function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiplexed: boolean): void {
-  const conn: Conn = { ws, viewers: new WsViewers(), multiplexed, deviceId: authorized.deviceId, seq: 0, internal: authorized.internal, missedPongs: 0, held: new Set(), shedding: false, drainTimer: null, mark }
+  const conn: Conn = {
+    ws,
+    viewers: new WsViewers(),
+    multiplexed,
+    deviceId: authorized.deviceId,
+    seq: 0,
+    internal: authorized.internal,
+    missedPongs: 0,
+    held: new Set(),
+    shedding: false,
+    drainTimer: null,
+    mark,
+  }
   conns.add(conn)
   ws.on('pong', () => {
     conn.missedPongs = 0
@@ -363,7 +406,12 @@ function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiple
     release: (id) => releaseStream(conn, id),
     invoke: (action) => invokeOwner(action),
   })
-  ws.on('message', (raw) => invokeOwner(() => dispatch.receive(raw.toString()), () => ws.terminate()))
+  ws.on('message', (raw) =>
+    invokeOwner(
+      () => dispatch.receive(raw.toString()),
+      () => ws.terminate(),
+    ),
+  )
   const cleanup = () => {
     if (!conns.delete(conn)) return // 'error' and 'close' can both fire, run once
     // Before the detaches: a socket that died while it was behind must not leave the PTY it was
@@ -394,7 +442,11 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   const ready = (socket: Duplex): boolean => !disposed && !socket.destroyed && socket.writable
   const refuse = (socket: Duplex): void => {
     if (ready(socket)) {
-      try { socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n', () => socket.destroy()) } catch { socket.destroy() }
+      try {
+        socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n', () => socket.destroy())
+      } catch {
+        socket.destroy()
+      }
     } else socket.destroy()
   }
   // Immediate path: the revoke that happened in this process tells us directly.
@@ -447,7 +499,9 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
       return
     }
     pending.add(socket)
-    const onPeerError = (): void => { socket.destroy() }
+    const onPeerError = (): void => {
+      socket.destroy()
+    }
     socket.on('error', onPeerError)
     socket.once('close', () => pending.delete(socket))
     void (async () => {
@@ -456,13 +510,20 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
       // Cache the import-and-construction promise, so concurrent first upgrades share one server.
       loading ??= import('ws').then(({ WebSocketServer }) => {
         if (disposed) throw new Error('WebSocket hub disposed')
-        return (wss = new WebSocketServer({ noServer: true, maxPayload: Math.min(deps.maxMessageBytes ?? MAX_NODE_WS_MESSAGE_BYTES, MAX_NODE_WS_MESSAGE_BYTES) }))
+        return (wss = new WebSocketServer({
+          noServer: true,
+          maxPayload: Math.min(deps.maxMessageBytes ?? MAX_NODE_WS_MESSAGE_BYTES, MAX_NODE_WS_MESSAGE_BYTES),
+        }))
       })
       const loaded = await loading
       if (!ready(socket)) return refuse(socket)
       loaded.handleUpgrade(req, socket, head, (ws) => {
         pending.delete(socket)
-        if (disposed) { ws.on('error', () => {}); ws.terminate(); return }
+        if (disposed) {
+          ws.on('error', () => {})
+          ws.terminate()
+          return
+        }
         onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES, req.headers[WS_VIEWERS_HEADER] === '1')
         socket.off('error', onPeerError)
       })

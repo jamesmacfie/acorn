@@ -21,7 +21,10 @@ export type NotificationSettings = {
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
-  sound: true, system: true, badge: true, events: { blocked: true, finished: true, error: true },
+  sound: true,
+  system: true,
+  badge: true,
+  events: { blocked: true, finished: true, error: true },
 }
 
 // Absent, malformed, and "some other writer put a string here" all mean on. Only an explicit `false`
@@ -29,7 +32,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 const on = (value: unknown): boolean => value !== false
 
 const object = (value: unknown): Record<string, unknown> =>
-  value !== null && typeof value === 'object' ? value as Record<string, unknown> : {}
+  value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 
 export function parseNotificationSettings(json: string | undefined): NotificationSettings {
   let raw: Record<string, unknown> = {}

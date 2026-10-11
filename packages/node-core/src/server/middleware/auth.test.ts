@@ -7,9 +7,7 @@ import type { Env } from '../bindings'
 
 const ENC_KEY = '0'.repeat(64)
 
-const app = new Hono<AppEnv>()
-  .use('*', authMiddleware)
-  .get('/', (c) => c.json({ principal: c.get('principal') }))
+const app = new Hono<AppEnv>().use('*', authMiddleware).get('/', (c) => c.json({ principal: c.get('principal') }))
 
 describe('machine identity binding', () => {
   it('accepts only the socket peer, regardless of forwarded headers, and fails closed without one', async () => {
@@ -20,7 +18,12 @@ describe('machine identity binding', () => {
       ...testSecretEnv(ENC_KEY),
     } as unknown as Env
     const request = new Request('http://acorn.test/', {
-      headers: { 'x-acorn-internal': token, host: '127.0.0.1', forwarded: 'for=127.0.0.1', 'x-forwarded-for': '127.0.0.1' },
+      headers: {
+        'x-acorn-internal': token,
+        host: '127.0.0.1',
+        forwarded: 'for=127.0.0.1',
+        'x-forwarded-for': '127.0.0.1',
+      },
     })
     for (const address of ['192.0.2.12', undefined]) {
       const incoming = address ? { socket: { remoteAddress: address } } : undefined
@@ -43,14 +46,21 @@ describe('machine identity binding', () => {
         ...testSecretEnv(ENC_KEY),
       } as unknown as Env
       for (const presented of [token, `${token}x`]) {
-        const response = await app.fetch(new Request('http://acorn.test/', { headers: { 'x-acorn-internal': presented } }), env)
+        const response = await app.fetch(
+          new Request('http://acorn.test/', { headers: { 'x-acorn-internal': presented } }),
+          env,
+        )
         expect(await response.json()).toEqual({ principal: null })
       }
-    } finally { vi.useRealTimers() }
+    } finally {
+      vi.useRealTimers()
+    }
   })
   it('maps the internal token to the explicit active identity without querying cached rows', async () => {
     const response = await app.fetch(
-      new Request('http://acorn.test/', { headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) } }),
+      new Request('http://acorn.test/', {
+        headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) },
+      }),
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
@@ -95,7 +105,9 @@ describe('machine identity binding', () => {
 
   it('fails closed for internal traffic when no identity is bound', async () => {
     const response = await app.fetch(
-      new Request('http://acorn.test/', { headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) } }),
+      new Request('http://acorn.test/', {
+        headers: { 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) },
+      }),
       {
         INTERNAL_TOKEN: 'internal',
         ACTIVE_IDENTITY: { get: () => null, set: vi.fn(), clear: vi.fn() },
@@ -110,11 +122,14 @@ describe('machine identity binding', () => {
   // 'internal' and matching it is correct.
   it('rejects an internal token that differs only in length or content', async () => {
     for (const presented of ['interna', 'internalx', 'INTERNAL', '']) {
-      const response = await app.fetch(new Request('http://acorn.test/', { headers: { 'x-acorn-internal': presented } }), {
-        INTERNAL_TOKEN: 'internal',
-        ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
-        ...testSecretEnv(ENC_KEY),
-      } as unknown as Env)
+      const response = await app.fetch(
+        new Request('http://acorn.test/', { headers: { 'x-acorn-internal': presented } }),
+        {
+          INTERNAL_TOKEN: 'internal',
+          ACTIVE_IDENTITY: { get: () => 'bob', set: vi.fn(), clear: vi.fn() },
+          ...testSecretEnv(ENC_KEY),
+        } as unknown as Env,
+      )
       expect(await response.json()).toEqual({ principal: null })
     }
   })
@@ -167,7 +182,10 @@ describe('device bearer', () => {
   })
 
   it('resolves no principal when the device is unknown or revoked', async () => {
-    const response = await withBearer('Bearer acorn_dt_token', envWith({ authenticate: vi.fn().mockResolvedValue(null) }))
+    const response = await withBearer(
+      'Bearer acorn_dt_token',
+      envWith({ authenticate: vi.fn().mockResolvedValue(null) }),
+    )
     expect(await response.json()).toEqual({ principal: null })
   })
 
@@ -192,7 +210,10 @@ describe('device bearer', () => {
   it('does not fall back to the internal token when a presented bearer fails', async () => {
     const response = await app.fetch(
       new Request('http://acorn.test/', {
-        headers: { authorization: 'Bearer revoked', 'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }) },
+        headers: {
+          authorization: 'Bearer revoked',
+          'x-acorn-internal': mintInternalToken('internal', { scope: 'service' }),
+        },
       }),
       envWith({ authenticate: vi.fn().mockResolvedValue(null) }),
     )

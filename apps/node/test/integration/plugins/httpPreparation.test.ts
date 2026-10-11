@@ -14,28 +14,81 @@ describe('HTTP preparation errors in durable workflows', () => {
     const http = makeTestNodeContext({ plugin: { name: 'http' }, userId: 'alice' })
     const workflows = makeTestNodeContext({ plugin: { name: 'workflows' } })
     const db = makeTestPluginDb('workflows')
-    const runner = new WorkflowRunner(db.db, {
-      runStep: async () => { throw new Error('No agent step expected') },
-      writeHandoff: async () => {}, assembleContext: async () => '',
-      evaluatePolicy: async () => ({ pass: true }), failingChecks: async () => null, notify: vi.fn(),
-    }, { handlers: (point) => workflows.extensionPoints.handlers(point) })
+    const runner = new WorkflowRunner(
+      db.db,
+      {
+        runStep: async () => {
+          throw new Error('No agent step expected')
+        },
+        writeHandoff: async () => {},
+        assembleContext: async () => '',
+        evaluatePolicy: async () => ({ pass: true }),
+        failingChecks: async () => null,
+        notify: vi.fn(),
+      },
+      { handlers: (point) => workflows.extensionPoints.handlers(point) },
+    )
     try {
       workflows.extensionPoints.declare(WORKFLOW_STEP_KIND, 'Workflow steps')
-      await http.db.insert(schema.workspaces).values({ id: 'workspace', name: 'Fixture', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
-      await http.db.insert(schema.projects).values({ id: 'project', workspaceId: 'workspace', name: 'Fixture', path: null, sort: 0, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null, createdAt: 0, updatedAt: 0 })
-      await http.db.insert(schema.tasks).values({ id: 'task', title: 'Fixture', origin: 'local', projectId: 'project', branch: 'main', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: 0, updatedAt: 0, archivedAt: null })
+      await http.db
+        .insert(schema.workspaces)
+        .values({ id: 'workspace', name: 'Fixture', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
+      await http.db.insert(schema.projects).values({
+        id: 'project',
+        workspaceId: 'workspace',
+        name: 'Fixture',
+        path: null,
+        sort: 0,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: null,
+        githubOwner: null,
+        githubName: null,
+        githubRepoId: null,
+        createdAt: 0,
+        updatedAt: 0,
+      })
+      await http.db.insert(schema.tasks).values({
+        id: 'task',
+        title: 'Fixture',
+        origin: 'local',
+        projectId: 'project',
+        branch: 'main',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        createdAt: 0,
+        updatedAt: 0,
+        archivedAt: null,
+      })
       await httpPlugin().init(http)
       const route = pluginRouteContributions().find((route) => route.plugin === 'http')!
-      const context = await makeTestRequestContext({ plugin: 'http', principal: { kind: 'device', userId: 'alice' }, env: http.env })
+      const context = await makeTestRequestContext({
+        plugin: 'http',
+        principal: { kind: 'device', userId: 'alice' },
+        env: http.env,
+      })
       const secret = 'SyntheticPrivatePreparationValue'
-      const created = await route.fetch!(new Request('http://acorn.test/projects/project/vars', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: 'TOKEN', kind: 'secret', value: secret, enabled: true }),
-      }), context)
+      const created = await route.fetch!(
+        new Request('http://acorn.test/projects/project/vars', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: 'TOKEN', kind: 'secret', value: secret, enabled: true }),
+        }),
+        context,
+      )
       expect(created.status).toBe(201)
       const fetcher = vi.fn()
       vi.stubGlobal('fetch', fetcher)
-      const runId = await runner.start('task', { baseline: 'acorn-1', formatVersion: 1, name: 'Private preparation failure', steps: [{ id: 'call', name: 'Call', kind: 'http:request', with: { method: 'GET', ...config } }] })
+      const runId = await runner.start('task', {
+        baseline: 'acorn-1',
+        formatVersion: 1,
+        name: 'Private preparation failure',
+        steps: [{ id: 'call', name: 'Call', kind: 'http:request', with: { method: 'GET', ...config } }],
+      })
       await vi.waitFor(async () => expect((await runner.run(runId))?.status).toBe('failed'))
       const run = await runner.run(runId)
       const steps = await runner.steps(runId)

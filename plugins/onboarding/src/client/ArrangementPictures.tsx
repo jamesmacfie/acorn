@@ -10,7 +10,9 @@ const WORKSPACES = [
 ]
 
 const ProjectBox = (props: { name: string }) => (
-  <Card pad="sm"><Text>{props.name}</Text></Card>
+  <Card pad="sm">
+    <Text>{props.name}</Text>
+  </Card>
 )
 
 export function SeparateProjects() {

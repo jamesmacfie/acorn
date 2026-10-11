@@ -1,19 +1,48 @@
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { NodePluginRow, NodePluginState, PluginInputLine } from '@acorn/protocol/api.ts'
-import { readNodePluginLogs, readPluginInputGrant, revokePluginInputs, reviewNodePlugin, setNodePluginDevelopment, uninstallNodePlugin, updateNodePlugin } from '../../../infra/node/nodePlugins'
+import {
+  readNodePluginLogs,
+  readPluginInputGrant,
+  revokePluginInputs,
+  reviewNodePlugin,
+  setNodePluginDevelopment,
+  uninstallNodePlugin,
+  updateNodePlugin,
+} from '../../../infra/node/nodePlugins'
 import { integrationsOptions } from '../../../infra/queries'
 import type { PluginHostState } from '../../../infra/platform'
 import { forgetPluginTrust, installPluginOnDevice, setPluginDevGrant } from '../../../host/plugins/host'
-import { distribution, refreshPluginTrust, resolvePendingTrust, reviewPendingTrust } from '../../../host/plugins/distribution'
+import {
+  distribution,
+  refreshPluginTrust,
+  resolvePendingTrust,
+  reviewPendingTrust,
+} from '../../../host/plugins/distribution'
 import { awaitingInputApproval } from '../../../host/plugins/distributionModel'
 import {
-  agentToolGrants, agentToolPermissionLines, extensionGrants, extensionPermissionLines, navigationDestinationGrants,
-  navigationDestinationPermissionLines, nodePermissionLines,
-  scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines,
+  agentToolGrants,
+  agentToolPermissionLines,
+  extensionGrants,
+  extensionPermissionLines,
+  navigationDestinationGrants,
+  navigationDestinationPermissionLines,
+  nodePermissionLines,
+  scheduleGrants,
+  schedulePermissionLines,
+  uiPermissionLines,
+  webviewGrants,
+  webviewPermissionLines,
 } from '../../../host/trust/permissions'
 import { confirmAction } from '../../../host/registries/shell/willPhase'
-import { isStandaloneSettingsPage, settingsCategoryOf, settingsRegistry, settingsScopeOf, SETTINGS_CATEGORY_LABELS, type SettingsNavigate } from '../../../host/registries/shell/settings'
+import {
+  isStandaloneSettingsPage,
+  settingsCategoryOf,
+  settingsRegistry,
+  settingsScopeOf,
+  SETTINGS_CATEGORY_LABELS,
+  type SettingsNavigate,
+} from '../../../host/registries/shell/settings'
 import { activeNodeId } from '../../../infra/node/activeNode'
 import { commandRegistry } from '../../../host/registries/commands/commands'
 import { keybindingRegistry } from '../../../host/registries/commands/keybindings'
@@ -109,21 +138,26 @@ export function PluginPage(props: PluginPageProps) {
 
   // Development mode is this device's answer and names one node, because the same plugin may be a plain
   // install on the owner's other laptop (docs/security/plugin-install.md § The dev grant).
-  const devGrant = () => (props.custody?.devGrants ?? []).find((grant) => grant.pluginId === props.plugin.id
-    && (props.plugin.kind === 'device' ? grant.source?.kind === 'device' : grant.nodeId === props.nodeId))
+  const devGrant = () =>
+    (props.custody?.devGrants ?? []).find(
+      (grant) =>
+        grant.pluginId === props.plugin.id &&
+        (props.plugin.kind === 'device' ? grant.source?.kind === 'device' : grant.nodeId === props.nodeId),
+    )
   const status = createMemo(() => statusOf(distribution(), props.nodeId, props.plugin, !!devGrant()))
 
   const enableSave = createSettingSave()
   const togglable = () => props.plugin.kind === 'device' || !row().required
-  const setEnabled = (on: boolean) => enableSave.run(async () => {
-    if (props.plugin.kind === 'device') {
-      await setDevicePluginEnabled(qc, props.plugin.id, on)
-      await props.settleDevice()
-      return
-    }
-    const nodeId = props.nodeId ?? ''
-    props.onNodeState(await setNodePluginEnabled(props.rows, props.plugin.id, on, nodeId || undefined), nodeId)
-  })
+  const setEnabled = (on: boolean) =>
+    enableSave.run(async () => {
+      if (props.plugin.kind === 'device') {
+        await setDevicePluginEnabled(qc, props.plugin.id, on)
+        await props.settleDevice()
+        return
+      }
+      const nodeId = props.nodeId ?? ''
+      props.onNodeState(await setNodePluginEnabled(props.rows, props.plugin.id, on, nodeId || undefined), nodeId)
+    })
 
   // Overview and Settings read what the plugin registered in this window, which runs on the active node.
   // With the header on another node they say so, rather than passing that node's plugin off as this one.
@@ -134,31 +168,67 @@ export function PluginPage(props: PluginPageProps) {
   return (
     <>
       <Show when={!hostDrawsBack}>
-        <Inline><Button variant="bare" size="sm" onPress={props.onBack}>‹ Installed</Button></Inline>
+        <Inline>
+          <Button variant="bare" size="sm" onPress={props.onBack}>
+            ‹ Installed
+          </Button>
+        </Inline>
       </Show>
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
 
-      <Tabs tabs={tabs()} active={tab()} onChange={(id) => setTab(id as Tab)} idPrefix={ID_PREFIX} ariaLabel={`About ${pluginName(props.plugin)}`} />
+      <Tabs
+        tabs={tabs()}
+        active={tab()}
+        onChange={(id) => setTab(id as Tab)}
+        idPrefix={ID_PREFIX}
+        ariaLabel={`About ${pluginName(props.plugin)}`}
+      />
       <TabPanel idPrefix={ID_PREFIX} id="overview" active={tab()}>
         <Stack gap="section">
           <SettingsSection id="plugin" label="Status">
-            <SettingRow label="Enabled" description={props.plugin.kind === 'node' ? 'Takes effect when the node next starts.' : 'Applies right away on this computer.'} error={enableSave.error()}>
+            <SettingRow
+              label="Enabled"
+              description={
+                props.plugin.kind === 'node'
+                  ? 'Takes effect when the node next starts.'
+                  : 'Applies right away on this computer.'
+              }
+              error={enableSave.error()}
+            >
               <Show when={togglable()} fallback={<Text emphasis="muted">Required. acorn needs it to run.</Text>}>
-                <Checkbox switch ariaLabel={`Enable ${pluginName(props.plugin)}`} checked={!row().disabled} disabled={busy()} onChange={setEnabled} />
+                <Checkbox
+                  switch
+                  ariaLabel={`Enable ${pluginName(props.plugin)}`}
+                  checked={!row().disabled}
+                  disabled={busy()}
+                  onChange={setEnabled}
+                />
               </Show>
             </SettingRow>
             <Show when={status().tone !== 'ok'}>
               <Alert
                 tone={status().tone === 'danger' ? 'danger' : status().needsYou ? 'warn' : 'muted'}
                 variant="banner"
-                actions={status().line === 'waiting' ? <Button size="sm" onPress={() => setTab('permissions')}>Review…</Button> : undefined}
+                actions={
+                  status().line === 'waiting' ? (
+                    <Button size="sm" onPress={() => setTab('permissions')}>
+                      Review…
+                    </Button>
+                  ) : undefined
+                }
               >
                 {status().text}
               </Alert>
             </Show>
           </SettingsSection>
-          <Show when={holdsModels() && !elsewhere()}><ModelGrantSection pluginId={props.plugin.id} /></Show>
-          <Show when={nodeRow()?.skills && !elsewhere()}><SkillsSection pluginId={props.plugin.id} /></Show>
+          <Show when={holdsModels() && !elsewhere()}>
+            <ModelGrantSection pluginId={props.plugin.id} />
+          </Show>
+          <Show when={nodeRow()?.skills && !elsewhere()}>
+            <SkillsSection pluginId={props.plugin.id} />
+          </Show>
           <Overview plugin={props.plugin} navigate={props.navigate} elsewhere={elsewhere()} />
         </Stack>
       </TabPanel>
@@ -168,7 +238,9 @@ export function PluginPage(props: PluginPageProps) {
         </Stack>
       </TabPanel>
       <TabPanel idPrefix={ID_PREFIX} id="versions" active={tab()}>
-        <Stack gap="section"><Versions {...props} busy={busy()} run={run} /></Stack>
+        <Stack gap="section">
+          <Versions {...props} busy={busy()} run={run} />
+        </Stack>
       </TabPanel>
       <Show when={developing()}>
         <TabPanel idPrefix={ID_PREFIX} id="logs" active={tab()}>
@@ -183,7 +255,8 @@ export function PluginPage(props: PluginPageProps) {
 
 type Actions = { busy: boolean; run: (work: () => Promise<void>) => Promise<void> }
 
-const ELSEWHERE = 'This shows what the plugin adds on the node this window uses, not the one in the header. To see the other, switch the window to that node.'
+const ELSEWHERE =
+  'This shows what the plugin adds on the node this window uses, not the one in the header. To see the other, switch the window to that node.'
 
 // What the plugin put into acorn, each linking to where it is changed: rail sources, its settings pages,
 // surfaces it offers to draw, commands, agent tools, and events. Read from the registries the plugin
@@ -194,13 +267,16 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
   const railSaves = new Map<string, ReturnType<typeof createSettingSave>>()
   const railSave = (id: string) => {
     let save = railSaves.get(id)
-    if (!save) railSaves.set(id, save = createSettingSave())
+    if (!save) railSaves.set(id, (save = createSettingSave()))
     return save
   }
   const sources = () => pluginSources(props.plugin.id).map(({ pluginId, source }) => ({ pluginId, ...source }))
-  const commands = () => commandRegistry.entries().filter((command) => command.ownerId === props.plugin.id && command.palette)
-  const shortcuts = () => keybindingRegistry.entries().filter((binding) => keybindingRegistry.ownerOf(binding.id) === props.plugin.id)
-  const contributions = () => pluginRow(props.plugin).active?.contributions ?? pluginRow(props.plugin).installed?.contributions
+  const commands = () =>
+    commandRegistry.entries().filter((command) => command.ownerId === props.plugin.id && command.palette)
+  const shortcuts = () =>
+    keybindingRegistry.entries().filter((binding) => keybindingRegistry.ownerOf(binding.id) === props.plugin.id)
+  const contributions = () =>
+    pluginRow(props.plugin).active?.contributions ?? pluginRow(props.plugin).installed?.contributions
   const tools = () => {
     const declared = contributions()
     return declared ? agentToolGrants(declared).length : 0
@@ -211,7 +287,10 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
   // What the running version supplies, from the node's roster row. The Skills section above holds the switches.
   const skills = () => pluginRow(props.plugin).skills?.skills ?? []
   const pages = () => settingsRegistry.entries().filter((page) => settingsRegistry.ownerOf(page.id) === props.plugin.id)
-  const surfaces = () => CORE_EXCLUSIVE_SLOTS.flatMap((slot) => exclusiveSlotOffers(slot).filter((offer) => offer.pluginId === props.plugin.id))
+  const surfaces = () =>
+    CORE_EXCLUSIVE_SLOTS.flatMap((slot) =>
+      exclusiveSlotOffers(slot).filter((offer) => offer.pluginId === props.plugin.id),
+    )
   const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
   return (
@@ -220,14 +299,22 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
         {(source) => (
           <SettingRow
             label={`Rail source: ${source.label}`}
-            description={source.showInRailByDefault === false && !visibility.shown(source.id) ? 'Hidden until you show it.' : undefined}
+            description={
+              source.showInRailByDefault === false && !visibility.shown(source.id)
+                ? 'Hidden until you show it.'
+                : undefined
+            }
             error={railSave(source.id).error()}
           >
             <Checkbox
               switch
               ariaLabel={`Show ${source.label} in left rail`}
               checked={visibility.shown(source.id)}
-              onChange={(on) => railSave(source.id).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))}
+              onChange={(on) =>
+                railSave(source.id).run(() =>
+                  visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }),
+                )
+              }
             />
           </SettingRow>
         )}
@@ -238,44 +325,97 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
         {(page) => (
           <Show
             when={isStandaloneSettingsPage(page)}
-            fallback={<SettingRow label={page.title ?? page.label} description={`A tab on each ${settingsScopeOf(page)}'s settings page.`} />}
+            fallback={
+              <SettingRow
+                label={page.title ?? page.label}
+                description={`A tab on each ${settingsScopeOf(page)}'s settings page.`}
+              />
+            }
           >
-            <SettingRow label={page.title ?? page.label} description={`Settings page in ${SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)]}.`}>
-              <Button size="sm" variant="ghost" onPress={() => props.navigate(page.id)}>Open</Button>
+            <SettingRow
+              label={page.title ?? page.label}
+              description={`Settings page in ${SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)]}.`}
+            >
+              <Button size="sm" variant="ghost" onPress={() => props.navigate(page.id)}>
+                Open
+              </Button>
             </SettingRow>
           </Show>
         )}
       </For>
       <Show when={surfaces().length}>
-        <SettingRow label="Replaced surfaces" description={`Can replace acorn's ${surfaces().map((offer) => offer.label).join(', ')}.`}>
-          <Button size="sm" variant="ghost" onPress={() => props.navigate('rail-surfaces#surfaces')}>Rail and surfaces</Button>
+        <SettingRow
+          label="Replaced surfaces"
+          description={`Can replace acorn's ${surfaces()
+            .map((offer) => offer.label)
+            .join(', ')}.`}
+        >
+          <Button size="sm" variant="ghost" onPress={() => props.navigate('rail-surfaces#surfaces')}>
+            Rail and surfaces
+          </Button>
         </SettingRow>
       </Show>
       <Show when={commands().length || shortcuts().length}>
-        <SettingRow label="Commands and shortcuts" description={`${plural(commands().length, 'command')}, ${plural(shortcuts().length, 'shortcut')}.`}>
-          <Button variant="ghost" size="sm" onPress={() => props.navigate('shortcuts')}>Keyboard shortcuts</Button>
+        <SettingRow
+          label="Commands and shortcuts"
+          description={`${plural(commands().length, 'command')}, ${plural(shortcuts().length, 'shortcut')}.`}
+        >
+          <Button variant="ghost" size="sm" onPress={() => props.navigate('shortcuts')}>
+            Keyboard shortcuts
+          </Button>
         </SettingRow>
       </Show>
       <Show when={tools()}>
         <SettingRow label="Agent tools" description={plural(tools(), 'agent tool')}>
-          <Button variant="ghost" size="sm" onPress={() => props.navigate('agent-tools')}>Tools and permissions</Button>
+          <Button variant="ghost" size="sm" onPress={() => props.navigate('agent-tools')}>
+            Tools and permissions
+          </Button>
         </SettingRow>
       </Show>
       <Show when={dataSources().length}>
-        <SettingRow label="Data sources" description={`${dataSources().map((source) => source.name).join(', ')}. You can use them in panels, workflows, and datasets.`} />
+        <SettingRow
+          label="Data sources"
+          description={`${dataSources()
+            .map((source) => source.name)
+            .join(', ')}. You can use them in panels, workflows, and datasets.`}
+        />
       </Show>
       <Show when={skills().length}>
-        <SettingRow label="Skills" description={`${plural(skills().length, 'procedure')} your agents can load. Switch each one in Skills above.`} />
+        <SettingRow
+          label="Skills"
+          description={`${plural(skills().length, 'procedure')} your agents can load. Switch each one in Skills above.`}
+        />
       </Show>
       <Show when={emits().length}>
         <SettingRow label="Events it announces" help="Other plugins can react to these." layout="stacked">
           <ul class="plugin-emits">
-            <For each={emits()}>{(event) => <li><code>{event.verb}</code><span>{event.description}</span></li>}</For>
+            <For each={emits()}>
+              {(event) => (
+                <li>
+                  <code>{event.verb}</code>
+                  <span>{event.description}</span>
+                </li>
+              )}
+            </For>
           </ul>
         </SettingRow>
       </Show>
-      <Show when={!sources().length && !pages().length && !surfaces().length && !commands().length && !shortcuts().length && !tools() && !emits().length && !dataSources().length && !skills().length}>
-        <Text emphasis="muted" wrap>It isn't adding anything right now. A plugin that's off or waiting for approval adds nothing.</Text>
+      <Show
+        when={
+          !sources().length &&
+          !pages().length &&
+          !surfaces().length &&
+          !commands().length &&
+          !shortcuts().length &&
+          !tools() &&
+          !emits().length &&
+          !dataSources().length &&
+          !skills().length
+        }
+      >
+        <Text emphasis="muted" wrap>
+          It isn't adding anything right now. A plugin that's off or waiting for approval adds nothing.
+        </Text>
       </Show>
     </SettingsSection>
   )
@@ -283,7 +423,9 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
 
 // What the plugin may do, and every answer this device gave about it. The controls docs/security.md asks
 // the owner to be able to see and end, so they get a tab rather than a line of small buttons.
-function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostState['devGrants'][number] | undefined; active: boolean }) {
+function Permissions(
+  props: PluginPageProps & Actions & { devGrant: PluginHostState['devGrants'][number] | undefined; active: boolean },
+) {
   const row = () => pluginRow(props.plugin)
   const pending = () => (props.plugin.kind === 'node' ? props.plugin.row.pendingReview : undefined)
   const lines = () => {
@@ -305,53 +447,77 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
   // the app and asks nobody.
   const decisions = () => {
     const plugin = props.plugin
-    if (plugin.kind === 'device') return (props.custody?.acks ?? []).filter((ack) => ack.pluginId === row().name && ack.hash === plugin.entry.hash)
-    const hashes = new Set([row().active?.client?.hash, row().installed?.client?.hash].filter((hash): hash is string => !!hash))
-    return row().installed?.bundled ? [] : (props.custody?.acks ?? []).filter((ack) => ack.pluginId === row().name && hashes.has(ack.hash))
+    if (plugin.kind === 'device')
+      return (props.custody?.acks ?? []).filter((ack) => ack.pluginId === row().name && ack.hash === plugin.entry.hash)
+    const hashes = new Set(
+      [row().active?.client?.hash, row().installed?.client?.hash].filter((hash): hash is string => !!hash),
+    )
+    return row().installed?.bundled
+      ? []
+      : (props.custody?.acks ?? []).filter((ack) => ack.pluginId === row().name && hashes.has(ack.hash))
   }
-  const forget = (hash: string, deferred: boolean) => props.run(async () => {
-    await forgetPluginTrust({ pluginId: row().name, hash })
-    if (deferred) resolvePendingTrust(row().name, hash)
-    await refreshPluginTrust()
-    await props.settleDevice()
-  })
+  const forget = (hash: string, deferred: boolean) =>
+    props.run(async () => {
+      await forgetPluginTrust({ pluginId: row().name, hash })
+      if (deferred) resolvePendingTrust(row().name, hash)
+      await refreshPluginTrust()
+      await props.settleDevice()
+    })
   // Ending development mode drops the grant and every approval it wrote, so the plugin goes back to
   // being asked about each bundle, starting with the current one. A node plugin from a folder also has
   // the node's half: the watch, the logs, and the development grant for what it reads.
   const folder = () => (props.plugin.kind === 'node' ? props.plugin.row.development : undefined)
   const developing = () => !!props.devGrant || !!folder()?.on
-  const setDevMode = (grant: boolean) => props.run(async () => {
-    if (folder()) {
-      const nodeId = props.nodeId ?? ''
-      props.onNodeState(await setNodePluginDevelopment(row().name, grant, nodeId || undefined), nodeId)
-    }
-    await setPluginDevGrant(props.plugin.kind === 'device'
-      ? { pluginId: row().name, nodeId: '', source: { kind: 'device' }, grant }
-      : { pluginId: row().name, nodeId: props.nodeId ?? '', grant })
-    await refreshPluginTrust()
-    await props.settleDevice()
-  })
-  const decideStaged = (decision: 'approved' | 'denied') => props.run(async () => {
-    const review = pending()
-    if (!review || !('reviewId' in review)) throw new Error('This review record is unreadable. Remove the package to clear it.')
-    if (decision === 'approved' && !row().installed) throw new Error('The staged package is missing. Remove this interrupted review.')
-    await reviewNodePlugin(row().name, review, decision, props.nodeId ?? undefined)
-    await props.settleNode()
-  })
+  const setDevMode = (grant: boolean) =>
+    props.run(async () => {
+      if (folder()) {
+        const nodeId = props.nodeId ?? ''
+        props.onNodeState(await setNodePluginDevelopment(row().name, grant, nodeId || undefined), nodeId)
+      }
+      await setPluginDevGrant(
+        props.plugin.kind === 'device'
+          ? { pluginId: row().name, nodeId: '', source: { kind: 'device' }, grant }
+          : { pluginId: row().name, nodeId: props.nodeId ?? '', grant },
+      )
+      await refreshPluginTrust()
+      await props.settleDevice()
+    })
+  const decideStaged = (decision: 'approved' | 'denied') =>
+    props.run(async () => {
+      const review = pending()
+      if (!review || !('reviewId' in review))
+        throw new Error('This review record is unreadable. Remove the package to clear it.')
+      if (decision === 'approved' && !row().installed)
+        throw new Error('The staged package is missing. Remove this interrupted review.')
+      await reviewNodePlugin(row().name, review, decision, props.nodeId ?? undefined)
+      await props.settleNode()
+    })
 
   return (
     <>
       <Show when={pending()}>
         {(review) => (
           <SettingsSection id="review" label="Waiting for your review">
-            <Show when={!('corrupt' in review())} fallback={<Alert>Review record is unreadable. Remove this package to recover.</Alert>}>
+            <Show
+              when={!('corrupt' in review())}
+              fallback={<Alert>Review record is unreadable. Remove this package to recover.</Alert>}
+            >
               <Text>
-                An agent asked for {row().name} {row().installed?.version}, and it is held from running. Its node code cannot start
-                until you approve it. If the install was interrupted, remove it and ask the agent to try again.
+                An agent asked for {row().name} {row().installed?.version}, and it is held from running. Its node code
+                cannot start until you approve it. If the install was interrupted, remove it and ask the agent to try
+                again.
               </Text>
               <Inline>
-                <Button size="sm" disabled={props.busy || !row().installed} onPress={() => void decideStaged('approved')}>Approve this package</Button>
-                <Button size="sm" tone="danger" disabled={props.busy} onPress={() => void decideStaged('denied')}>Remove staged package</Button>
+                <Button
+                  size="sm"
+                  disabled={props.busy || !row().installed}
+                  onPress={() => void decideStaged('approved')}
+                >
+                  Approve this package
+                </Button>
+                <Button size="sm" tone="danger" disabled={props.busy} onPress={() => void decideStaged('denied')}>
+                  Remove staged package
+                </Button>
               </Inline>
             </Show>
           </SettingsSection>
@@ -361,17 +527,50 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
         {(inputs) => <Reads {...props} inputs={inputs()} />}
       </Show>
       <SettingsSection id="grants" label="What it may do">
-        <For each={lines()} fallback={<Text emphasis="muted">{row().installed ? "It doesn't ask for any permissions." : 'A built-in plugin ships with acorn and runs with acorn\'s own access.'}</Text>}>
-          {(line) => <SettingRow label={line.text}><Show when={line.high}><Badge tone="warn">Broad access</Badge></Show></SettingRow>}
+        <For
+          each={lines()}
+          fallback={
+            <Text emphasis="muted">
+              {row().installed
+                ? "It doesn't ask for any permissions."
+                : "A built-in plugin ships with acorn and runs with acorn's own access."}
+            </Text>
+          }
+        >
+          {(line) => (
+            <SettingRow label={line.text}>
+              <Show when={line.high}>
+                <Badge tone="warn">Broad access</Badge>
+              </Show>
+            </SettingRow>
+          )}
         </For>
       </SettingsSection>
       {/* What another plugin says this one's grants reach, such as the agent harnesses its tool hooks cover. */}
       <Slot point={CORE_PLUGIN_PAGE_POINT} props={() => ({ pluginId: row().name, nodeId: props.nodeId ?? null })} />
-      <SettingsSection id="approvals" label="Approvals on this computer" help="You approve each version of a plugin before this computer runs it.">
-        <For each={decisions()} fallback={<Text emphasis="muted">{row().installed?.bundled || (props.plugin.kind === 'node' && !row().installed) ? "Built in, so there's nothing to approve." : 'No approvals.'}</Text>}>
+      <SettingsSection
+        id="approvals"
+        label="Approvals on this computer"
+        help="You approve each version of a plugin before this computer runs it."
+      >
+        <For
+          each={decisions()}
+          fallback={
+            <Text emphasis="muted">
+              {row().installed?.bundled || (props.plugin.kind === 'node' && !row().installed)
+                ? "Built in, so there's nothing to approve."
+                : 'No approvals.'}
+            </Text>
+          }
+        >
           {(ack) => (
             <SettingRow label={`${ack.version}: ${ack.decision === 'accepted' ? 'approved' : 'rejected'}`}>
-              <Button size="sm" variant="ghost" disabled={props.busy || !!props.devGrant} onPress={() => void forget(ack.hash, ack.decision === 'accepted')}>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={props.busy || !!props.devGrant}
+                onPress={() => void forget(ack.hash, ack.decision === 'accepted')}
+              >
                 {ack.decision === 'accepted' ? 'Revoke approval' : 'Review again'}
               </Button>
             </SettingRow>
@@ -382,21 +581,31 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
         <SettingsSection id="dev" label="Development mode">
           <SettingRow
             label={developing() ? 'In development' : 'Off'}
-            description={developing()
-              ? folder()?.on
-                ? 'The node reloads this plugin when its built files change, keeps its logs, and lets it read its sources without asking. This computer runs each new version without asking. Turn it off when you finish working on the plugin.'
-                : 'This computer runs each new version of this plugin without asking. Turn it off when you finish working on the plugin.'
-              : folder()
-                ? "For a plugin you're writing: reloads it when its built files change, keeps its logs, and runs each new version without asking."
-                : props.plugin.kind === 'device'
-                  ? "For a plugin you're writing: runs each new version without asking."
-                  : "Runs each new version without asking. It turns on when you let an agent install a plugin it's writing."}
+            description={
+              developing()
+                ? folder()?.on
+                  ? 'The node reloads this plugin when its built files change, keeps its logs, and lets it read its sources without asking. This computer runs each new version without asking. Turn it off when you finish working on the plugin.'
+                  : 'This computer runs each new version of this plugin without asking. Turn it off when you finish working on the plugin.'
+                : folder()
+                  ? "For a plugin you're writing: reloads it when its built files change, keeps its logs, and runs each new version without asking."
+                  : props.plugin.kind === 'device'
+                    ? "For a plugin you're writing: runs each new version without asking."
+                    : "Runs each new version without asking. It turns on when you let an agent install a plugin it's writing."
+            }
           >
             <Show
               when={developing()}
-              fallback={<Show when={props.plugin.kind === 'device' || folder()}><Button size="sm" variant="ghost" disabled={props.busy} onPress={() => void setDevMode(true)}>Turn on</Button></Show>}
+              fallback={
+                <Show when={props.plugin.kind === 'device' || folder()}>
+                  <Button size="sm" variant="ghost" disabled={props.busy} onPress={() => void setDevMode(true)}>
+                    Turn on
+                  </Button>
+                </Show>
+              }
             >
-              <Button size="sm" disabled={props.busy} onPress={() => void setDevMode(false)}>Turn off</Button>
+              <Button size="sm" disabled={props.busy} onPress={() => void setDevMode(false)}>
+                Turn off
+              </Button>
             </Show>
           </SettingRow>
         </SettingsSection>
@@ -417,7 +626,7 @@ function Reads(props: PluginPageProps & Actions & { active: boolean; inputs: Non
   const integrations = createQuery(() => integrationsOptions(props.active))
   const account = (connectionId: string) => {
     const connection = integrations.data?.integrations.find((candidate) => candidate.id === connectionId)
-    return connection ? connection.name ?? connection.label : undefined
+    return connection ? (connection.name ?? connection.label) : undefined
   }
   const used = (input: PluginInputLine): string | undefined => {
     const loaded = state()
@@ -430,35 +639,47 @@ function Reads(props: PluginPageProps & Actions & { active: boolean; inputs: Non
   }
   const describe = (input: PluginInputLine) =>
     [input.plural ?? input.source, input.provider, used(input), input.approved ? undefined : 'not approved yet']
-      .filter((part): part is string => !!part).join(' · ')
-  const revoke = () => props.run(async () => {
-    const name = pluginName(props.plugin)
-    const confirmed = await confirmAction({
-      title: `Revoke what ${name} reads`,
-      actionLabel: 'Revoke',
-      goes: `${name}'s data sources stop reading other sources on their next request.`,
-      stays: 'Its panels stay, and show as unavailable until you approve again.',
-      danger: true,
+      .filter((part): part is string => !!part)
+      .join(' · ')
+  const revoke = () =>
+    props.run(async () => {
+      const name = pluginName(props.plugin)
+      const confirmed = await confirmAction({
+        title: `Revoke what ${name} reads`,
+        actionLabel: 'Revoke',
+        goes: `${name}'s data sources stop reading other sources on their next request.`,
+        stays: 'Its panels stay, and show as unavailable until you approve again.',
+        danger: true,
+      })
+      if (!confirmed) return
+      await revokePluginInputs(id(), props.nodeId ?? undefined)
+      await props.settleNode()
     })
-    if (!confirmed) return
-    await revokePluginInputs(id(), props.nodeId ?? undefined)
-    await props.settleNode()
-  })
   return (
-    <SettingsSection id="reads" label="Reads" help="Sources its data sources read, only with the account you choose for each panel.">
+    <SettingsSection
+      id="reads"
+      label="Reads"
+      help="Sources its data sources read, only with the account you choose for each panel."
+    >
       <For each={props.inputs.inputs}>
         {(input) => <SettingRow label={input.label} description={describe(input)} />}
       </For>
       <SettingRow
         label={awaitingInputApproval(pluginRow(props.plugin)) ? 'Waiting for your approval' : 'Approved'}
-        description={props.inputs.granted ? 'One approval covers this list. Panels still pick each account.' : undefined}
+        description={
+          props.inputs.granted ? 'One approval covers this list. Panels still pick each account.' : undefined
+        }
       >
         <Inline>
           <Show when={awaitingInputApproval(pluginRow(props.plugin))}>
-            <Button size="sm" disabled={props.busy} onPress={() => reviewPendingTrust(id())}>Review…</Button>
+            <Button size="sm" disabled={props.busy} onPress={() => reviewPendingTrust(id())}>
+              Review…
+            </Button>
           </Show>
           <Show when={props.inputs.granted}>
-            <Button size="sm" variant="ghost" tone="danger" disabled={props.busy} onPress={() => void revoke()}>Revoke</Button>
+            <Button size="sm" variant="ghost" tone="danger" disabled={props.busy} onPress={() => void revoke()}>
+              Revoke
+            </Button>
           </Show>
         </Inline>
       </SettingRow>
@@ -473,14 +694,30 @@ function Logs(props: { pluginId: string; nodeId: string | null; active: boolean 
     () => (props.active ? { id: props.pluginId, nodeId: props.nodeId } : false),
     async ({ id, nodeId }) => (await readNodePluginLogs(id, nodeId ?? undefined)).lines,
   )
-  const timer = setInterval(() => { if (props.active) void refetch() }, 3_000)
+  const timer = setInterval(() => {
+    if (props.active) void refetch()
+  }, 3_000)
   onCleanup(() => clearInterval(timer))
-  const text = () => (lines.latest ?? []).map((line) =>
-    `${new Date(line.at).toLocaleTimeString()}  ${line.level.toUpperCase().padEnd(5)}  ${line.message}`).join('\n')
+  const text = () =>
+    (lines.latest ?? [])
+      .map(
+        (line) => `${new Date(line.at).toLocaleTimeString()}  ${line.level.toUpperCase().padEnd(5)}  ${line.message}`,
+      )
+      .join('\n')
   return (
-    <SettingsSection id="logs" label="Logs" help="What the plugin wrote with ctx.log since development mode came on. The last 500 lines are kept until you turn it off.">
-      <Show when={!lines.error} fallback={<Alert>{lines.error instanceof Error ? lines.error.message : 'Couldn\'t read the logs.'}</Alert>}>
-        <Show when={text()} fallback={<Text emphasis="muted">{lines.loading ? 'Reading…' : 'Nothing logged yet.'}</Text>}>
+    <SettingsSection
+      id="logs"
+      label="Logs"
+      help="What the plugin wrote with ctx.log since development mode came on. The last 500 lines are kept until you turn it off."
+    >
+      <Show
+        when={!lines.error}
+        fallback={<Alert>{lines.error instanceof Error ? lines.error.message : "Couldn't read the logs."}</Alert>}
+      >
+        <Show
+          when={text()}
+          fallback={<Text emphasis="muted">{lines.loading ? 'Reading…' : 'Nothing logged yet.'}</Text>}
+        >
           {(value) => <CodeBlock copy>{value()}</CodeBlock>}
         </Show>
       </Show>
@@ -494,23 +731,26 @@ function Logs(props: { pluginId: string; nodeId: string | null; active: boolean 
 function Versions(props: PluginPageProps & Actions) {
   const row = () => pluginRow(props.plugin)
   const installed = () => row().installed
-  const updatable = () => (props.plugin.kind === 'device' ? !!props.plugin.entry.installSource : !!installed() && !installed()?.bundled)
-  const update = () => props.run(async () => {
-    if (props.plugin.kind === 'device') {
-      const source = props.plugin.entry.installSource
-      if (!source) throw new Error('This plugin has no recorded source to update from.')
-      await installPluginOnDevice(source, props.plugin.id)
-      await props.settleDevice()
-      return
-    }
-    const result = await updateNodePlugin(props.plugin.id, {}, props.nodeId ?? undefined)
-    await props.settleNode()
-    if (result.fromVersion === result.toVersion) throw new Error(`${pluginName(props.plugin)} is already at ${result.toVersion}.`)
-  })
+  const updatable = () =>
+    props.plugin.kind === 'device' ? !!props.plugin.entry.installSource : !!installed() && !installed()?.bundled
+  const update = () =>
+    props.run(async () => {
+      if (props.plugin.kind === 'device') {
+        const source = props.plugin.entry.installSource
+        if (!source) throw new Error('This plugin has no recorded source to update from.')
+        await installPluginOnDevice(source, props.plugin.id)
+        await props.settleDevice()
+        return
+      }
+      const result = await updateNodePlugin(props.plugin.id, {}, props.nodeId ?? undefined)
+      await props.settleNode()
+      if (result.fromVersion === result.toVersion)
+        throw new Error(`${pluginName(props.plugin)} is already at ${result.toVersion}.`)
+    })
   const source = () => (props.plugin.kind === 'device' ? props.plugin.entry.sourceLabel : installed()?.source)
   const offeredBy = () => (props.plugin.kind === 'device' ? props.plugin.entry.nodeIds : [])
   // A built-in's source is the app itself, which the node words for a log rather than for a person.
-  const sourceText = () => (props.plugin.kind === 'node' && installed()?.bundled ? 'Built in' : source() ?? '')
+  const sourceText = () => (props.plugin.kind === 'node' && installed()?.bundled ? 'Built in' : (source() ?? ''))
   return (
     <SettingsSection
       id="versions"
@@ -526,13 +766,25 @@ function Versions(props: PluginPageProps & Actions) {
             ? [{ label: 'Running', value: `${row().active?.version}, until the node restarts` }]
             : []),
           ...(source() ? [{ label: 'Source', value: sourceText() }] : []),
-          ...(installed()?.installedAt ? [{ label: 'Installed on', value: new Date(installed()!.installedAt!).toLocaleString() }] : []),
+          ...(installed()?.installedAt
+            ? [{ label: 'Installed on', value: new Date(installed()!.installedAt!).toLocaleString() }]
+            : []),
           ...(offeredBy().length ? [{ label: 'Also offered by', value: offeredBy().join(', ') }] : []),
         ]}
       />
       <Show when={updatable()}>
-        <SettingRow label="Update" description="Gets the newest version from where it was installed. You approve it before it runs.">
-          <Button size="sm" variant="ghost" disabled={props.busy || !!(props.plugin.kind === 'node' && props.plugin.row.pendingReview)} onPress={() => void update()}>Update</Button>
+        <SettingRow
+          label="Update"
+          description="Gets the newest version from where it was installed. You approve it before it runs."
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={props.busy || !!(props.plugin.kind === 'node' && props.plugin.row.pendingReview)}
+            onPress={() => void update()}
+          >
+            Update
+          </Button>
         </SettingRow>
       </Show>
     </SettingsSection>
@@ -543,39 +795,47 @@ function Versions(props: PluginPageProps & Actions) {
 // checkbox inside a confirmation, which is how someone deletes a year of notes by reflex.
 function DangerZone(props: PluginPageProps & Actions & { nodeRow: NodePluginRow | undefined }) {
   const qc = useQueryClient()
-  const removable = () => (props.plugin.kind === 'device' ? true : !!props.nodeRow && ((!!props.nodeRow.installed && !props.nodeRow.installed.bundled) || !!props.nodeRow.pendingReview))
-  const uninstall = (purgeData: boolean) => props.run(async () => {
-    const id = props.plugin.id
-    const name = pluginName(props.plugin)
-    const confirmed = await confirmAction({
-      title: `Uninstall ${name}`,
-      actionLabel: purgeData ? 'Uninstall and delete its data' : 'Uninstall',
-      goes: purgeData
-        ? `${name} is removed from this node, with everything it stored there.`
-        : `${name} is removed from this node. It stops when the node next restarts.`,
-      stays: purgeData ? 'Other plugins and their data stay as they are.' : 'Its data stays on the node, so installing it again picks up where it left off.',
-      danger: true,
+  const removable = () =>
+    props.plugin.kind === 'device'
+      ? true
+      : !!props.nodeRow &&
+        ((!!props.nodeRow.installed && !props.nodeRow.installed.bundled) || !!props.nodeRow.pendingReview)
+  const uninstall = (purgeData: boolean) =>
+    props.run(async () => {
+      const id = props.plugin.id
+      const name = pluginName(props.plugin)
+      const confirmed = await confirmAction({
+        title: `Uninstall ${name}`,
+        actionLabel: purgeData ? 'Uninstall and delete its data' : 'Uninstall',
+        goes: purgeData
+          ? `${name} is removed from this node, with everything it stored there.`
+          : `${name} is removed from this node. It stops when the node next restarts.`,
+        stays: purgeData
+          ? 'Other plugins and their data stay as they are.'
+          : 'Its data stays on the node, so installing it again picks up where it left off.',
+        danger: true,
+      })
+      if (!confirmed) return
+      await uninstallNodePlugin(id, { purgeData }, props.nodeId ?? undefined)
+      props.onBack()
+      await props.settleNode()
     })
-    if (!confirmed) return
-    await uninstallNodePlugin(id, { purgeData }, props.nodeId ?? undefined)
-    props.onBack()
-    await props.settleNode()
-  })
-  const remove = () => props.run(async () => {
-    const id = props.plugin.id
-    const name = pluginName(props.plugin)
-    const confirmed = await confirmAction({
-      title: `Remove ${name} from this device`,
-      actionLabel: 'Remove',
-      goes: `${name} and every preference this device kept for it are removed.`,
-      stays: 'Nothing on any node changes.',
-      danger: true,
+  const remove = () =>
+    props.run(async () => {
+      const id = props.plugin.id
+      const name = pluginName(props.plugin)
+      const confirmed = await confirmAction({
+        title: `Remove ${name} from this device`,
+        actionLabel: 'Remove',
+        goes: `${name} and every preference this device kept for it are removed.`,
+        stays: 'Nothing on any node changes.',
+        danger: true,
+      })
+      if (!confirmed) return
+      await removeDevicePlugin(qc, id)
+      props.onBack()
+      await props.settleDevice()
     })
-    if (!confirmed) return
-    await removeDevicePlugin(qc, id)
-    props.onBack()
-    await props.settleDevice()
-  })
   return (
     <Show when={removable()}>
       <SettingsSection id="danger" label="Danger zone" tone="danger">
@@ -583,15 +843,27 @@ function DangerZone(props: PluginPageProps & Actions & { nodeRow: NodePluginRow 
           when={props.plugin.kind === 'node'}
           fallback={
             <SettingRow label="Remove from this device" description="It stops at once.">
-              <Button size="sm" tone="danger" disabled={props.busy} onPress={() => void remove()}>Remove</Button>
+              <Button size="sm" tone="danger" disabled={props.busy} onPress={() => void remove()}>
+                Remove
+              </Button>
             </SettingRow>
           }
         >
-          <SettingRow label="Uninstall, keep its data" description="Its data stays, so a reinstall picks up where it left off.">
-            <Button size="sm" disabled={props.busy} onPress={() => void uninstall(false)}>Keep its data</Button>
+          <SettingRow
+            label="Uninstall, keep its data"
+            description="Its data stays, so a reinstall picks up where it left off."
+          >
+            <Button size="sm" disabled={props.busy} onPress={() => void uninstall(false)}>
+              Keep its data
+            </Button>
           </SettingRow>
-          <SettingRow label="Uninstall and delete its data" description="Everything it stored on this node goes too. This cannot be undone.">
-            <Button size="sm" tone="danger" disabled={props.busy} onPress={() => void uninstall(true)}>Delete its data</Button>
+          <SettingRow
+            label="Uninstall and delete its data"
+            description="Everything it stored on this node goes too. This cannot be undone."
+          >
+            <Button size="sm" tone="danger" disabled={props.busy} onPress={() => void uninstall(true)}>
+              Delete its data
+            </Button>
           </SettingRow>
         </Show>
       </SettingsSection>

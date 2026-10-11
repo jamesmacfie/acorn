@@ -34,23 +34,27 @@ const selectedRunnTask = task('selected-runn-task', 'project-runn', 'runn')
 const tasks = [acornTask, oldRunnTask, selectedRunnTask]
 
 describe('workspace view transitions', () => {
-  it.each([
-    '/p/project-runn',
-    '/p/project-runn/pulls/42',
-    '/p/project-runn/x/plugin/item',
-  ])('keeps an explicit project path %s over a remembered task or source', (path) => {
-    for (const rememberedView of [{ taskId: oldRunnTask.id }, { source: 'github', path: '/p/project-runn/pulls/old' }]) {
-      expect(planWorkspaceViewTransition({
-        workspace: runn,
-        selectedSource: 'plugin-source',
-        activeTaskId: acornTask.id,
-        tasks,
-        defaultSource: 'home',
-        rememberedView,
-        explicitProjectPath: path,
-      })).toEqual({ kind: 'keep-project' })
-    }
-  })
+  it.each(['/p/project-runn', '/p/project-runn/pulls/42', '/p/project-runn/x/plugin/item'])(
+    'keeps an explicit project path %s over a remembered task or source',
+    (path) => {
+      for (const rememberedView of [
+        { taskId: oldRunnTask.id },
+        { source: 'github', path: '/p/project-runn/pulls/old' },
+      ]) {
+        expect(
+          planWorkspaceViewTransition({
+            workspace: runn,
+            selectedSource: 'plugin-source',
+            activeTaskId: acornTask.id,
+            tasks,
+            defaultSource: 'home',
+            rememberedView,
+            explicitProjectPath: path,
+          }),
+        ).toEqual({ kind: 'keep-project' })
+      }
+    },
+  )
 
   it('keeps an explicit cross-workspace task jump instead of restoring an older task', () => {
     const transition = planWorkspaceViewTransition({
@@ -105,24 +109,31 @@ describe('workspace view transitions', () => {
   })
 
   it('restores the page a source was on, unless its project has left the workspace', () => {
-    const plan = (path: string) => planWorkspaceViewTransition({
-      workspace: acorn,
-      selectedSource: null,
-      activeTaskId: null,
-      tasks,
-      defaultSource: 'home',
-      rememberedView: { source: 'github', path },
-    })
+    const plan = (path: string) =>
+      planWorkspaceViewTransition({
+        workspace: acorn,
+        selectedSource: null,
+        activeTaskId: null,
+        tasks,
+        defaultSource: 'home',
+        rememberedView: { source: 'github', path },
+      })
 
-    expect(plan('/p/project-acorn/pulls/12')).toEqual({ kind: 'restore-source', source: 'github', path: '/p/project-acorn/pulls/12' })
+    expect(plan('/p/project-acorn/pulls/12')).toEqual({
+      kind: 'restore-source',
+      source: 'github',
+      path: '/p/project-acorn/pulls/12',
+    })
     expect(plan('/p/project-runn/pulls/12')).toEqual({ kind: 'restore-source', source: 'github' })
   })
 })
 
 describe('what a workspace remembers', () => {
   it('records a source with the page it is on', () => {
-    expect(viewToRemember(acorn, 'github', null, '/p/project-acorn/pulls/12'))
-      .toEqual({ source: 'github', path: '/p/project-acorn/pulls/12' })
+    expect(viewToRemember(acorn, 'github', null, '/p/project-acorn/pulls/12')).toEqual({
+      source: 'github',
+      path: '/p/project-acorn/pulls/12',
+    })
     expect(viewToRemember(acorn, 'home', null, '/')).toEqual({ source: 'home' })
   })
 

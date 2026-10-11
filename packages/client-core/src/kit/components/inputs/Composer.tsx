@@ -38,7 +38,12 @@ export function Composer(props: {
   // Seeded from the prop and re-seeded whenever it changes, so a caller that does hold the value stays
   // the source of truth and a caller that does not still has a working field.
   const [live, setLive] = createSignal(props.value)
-  createEffect(on(() => props.value, (value) => setLive(value)))
+  createEffect(
+    on(
+      () => props.value,
+      (value) => setLive(value),
+    ),
+  )
   const type = (value: string): void => {
     setLive(value)
     props.onInput?.(value)
@@ -62,10 +67,7 @@ export function Composer(props: {
   return (
     // The composer owns its keys while focused, except for `commit`: Cmd+Enter on macOS and
     // Ctrl+Enter elsewhere, which is one row of ../keys/keymap.ts rather than a chord spelled here.
-    <div
-      class="ui-composer"
-      ref={(el) => bindIntents(el, ['commit'], () => submit() === true)}
-    >
+    <div class="ui-composer" ref={(el) => bindIntents(el, ['commit'], () => submit() === true)}>
       <Show
         when={props.mentions}
         fallback={
@@ -88,9 +90,13 @@ export function Composer(props: {
           />
         )}
       </Show>
-      <Show when={props.error}><Alert>{props.error}</Alert></Show>
+      <Show when={props.error}>
+        <Alert>{props.error}</Alert>
+      </Show>
       <Toolbar variant="actions">
-        <Show when={hint()}><span class="ui-composer-hint muted">{hint()}</span></Show>
+        <Show when={hint()}>
+          <span class="ui-composer-hint muted">{hint()}</span>
+        </Show>
         <Toolbar.Spacer />
         <Show when={secondary()}>{secondary()}</Show>
         <Button

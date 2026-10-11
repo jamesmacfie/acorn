@@ -7,7 +7,13 @@ import {
   type PluginRailSearchResult,
   type PluginSlotBadge,
 } from '@acorn/protocol/api.ts'
-import { isAnnotationSeverity, MAX_RAW_ANNOTATION_ROWS, type PluginAnnotationKey, type PluginAnnotationMark, type PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
+import {
+  isAnnotationSeverity,
+  MAX_RAW_ANNOTATION_ROWS,
+  type PluginAnnotationKey,
+  type PluginAnnotationMark,
+  type PluginExtensionItem,
+} from '@acorn/protocol/extensionPoints.ts'
 import {
   agentContextBudget,
   MAX_AGENT_CONTEXT_BYTES,
@@ -160,8 +166,11 @@ async function read<T>(pluginId: string, path: string, nodeId: string, signal?: 
 
 const str = (value: unknown): value is string => typeof value === 'string' && value.length > 0
 const opt = (value: unknown): boolean => value === undefined || str(value)
-const stringRecord = (value: unknown): boolean => !!value && typeof value === 'object' && !Array.isArray(value)
-  && Object.values(value).every((entry) => typeof entry === 'string')
+const stringRecord = (value: unknown): boolean =>
+  !!value &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  Object.values(value).every((entry) => typeof entry === 'string')
 
 // The row goes to the console and never into the record: it is a plugin's own data, and an
 // attribute is a scalar (docs/telemetry/model.md § The attribute vocabulary). The logger drops a
@@ -174,21 +183,27 @@ const railLink = (value: unknown): NonNullable<NonNullable<PluginRailItem['task'
   const link = value as NonNullable<NonNullable<PluginRailItem['task']>['link']>
   const ref = link.ref
   if (!str(link.connectionId) || !str(link.identifier)) return undefined
-  if (ref !== undefined && (!ref || typeof ref !== 'object' || !str(ref.displayId)
-    || !opt(ref.externalId) || !opt(ref.url)
-    || (ref.locator !== undefined && !stringRecord(ref.locator)))) return undefined
+  if (
+    ref !== undefined &&
+    (!ref ||
+      typeof ref !== 'object' ||
+      !str(ref.displayId) ||
+      !opt(ref.externalId) ||
+      !opt(ref.url) ||
+      (ref.locator !== undefined && !stringRecord(ref.locator)))
+  )
+    return undefined
   return link
 }
 
 // Empty strings stay: `fields` is positional (protocol/api.ts § PluginRailItem), so an empty cell
 // holds its column.
 const fieldList = (value: unknown): string[] | undefined =>
-  Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string')
-    ? value : undefined
+  Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string') ? value : undefined
 
 const RAIL_SEVERITIES = new Set(['info', 'warn', 'danger'])
 const railSeverity = (value: unknown): PluginRailItem['severity'] =>
-  typeof value === 'string' && RAIL_SEVERITIES.has(value) ? value as PluginRailItem['severity'] : undefined
+  typeof value === 'string' && RAIL_SEVERITIES.has(value) ? (value as PluginRailItem['severity']) : undefined
 
 /** Parse plugin row data field by field. A malformed optional task claim loses that claim; it does
  * not get to erase an otherwise useful row from the host-owned source list.
@@ -198,17 +213,30 @@ const railSeverity = (value: unknown): PluginRailItem['severity'] =>
  * error, no warning, and a list that still renders. Check both when adding one. */
 export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem | null => {
   const item = row as PluginRailItem
-  if (!item || typeof item !== 'object' || !str(item.id) || !str(item.title)
-    || !opt(item.subtitle) || !opt(item.icon) || !opt(item.badge) || !opt(item.short)) return null
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    !str(item.id) ||
+    !str(item.title) ||
+    !opt(item.subtitle) ||
+    !opt(item.icon) ||
+    !opt(item.badge) ||
+    !opt(item.short)
+  )
+    return null
   const fields = fieldList(item.fields)
   if (!item.task || typeof item.task !== 'object') {
-    return { id: item.id, title: item.title, ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
+    return {
+      id: item.id,
+      title: item.title,
+      ...(str(item.subtitle) ? { subtitle: item.subtitle } : {}),
       ...(fields ? { fields } : {}),
       ...(item.fieldsFirst === true ? { fieldsFirst: true } : {}),
       ...(str(item.icon) ? { icon: item.icon } : {}),
       ...(railSeverity(item.severity) ? { severity: railSeverity(item.severity) } : {}),
       ...(str(item.badge) ? { badge: item.badge } : {}),
-      ...(str(item.short) ? { short: item.short } : {}) }
+      ...(str(item.short) ? { short: item.short } : {}),
+    }
   }
   const task = item.task
   const link = railLink(task.link)
@@ -232,7 +260,12 @@ export const sanitizeRailItem = (pluginId: string, row: unknown): PluginRailItem
   }
 }
 
-export async function readRailItems(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<PluginRailItem[]> {
+export async function readRailItems(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  signal: AbortSignal,
+): Promise<PluginRailItem[]> {
   const body = await read<{ items?: unknown }>(pluginId, path, nodeId, signal)
   const rows = Array.isArray(body?.items) ? body.items : []
   return rows.flatMap((row) => {
@@ -245,8 +278,12 @@ export async function readRailItems(pluginId: string, path: string, nodeId: stri
 
 /** A source search's cache key. Its own prefix, so a search answer never stands in for the list and a
  *  chrome refresh never touches a search. The node partition is the cache's, as with `chromeKey`. */
-export const chromeSearchKey = (pluginId: string, sourceId: string, projectId: string | undefined, query: string): readonly unknown[] =>
-  ['plugin-chrome-search', pluginId, sourceId, projectId ?? '', query]
+export const chromeSearchKey = (
+  pluginId: string,
+  sourceId: string,
+  projectId: string | undefined,
+  query: string,
+): readonly unknown[] => ['plugin-chrome-search', pluginId, sourceId, projectId ?? '', query]
 
 /**
  * One source search, from the plugin's own `search` route (docs/plugins/descriptors.md § Searching a
@@ -305,9 +342,16 @@ export async function readCommandSearch(
   scope: CommandRouteScope,
   signal: AbortSignal,
 ): Promise<CommandSearchItem[]> {
-  const body = await read<unknown>(pluginId, withQuery(path, { q: query.slice(0, MAX_COMMAND_SEARCH_QUERY), ...scope }), nodeId, signal)
+  const body = await read<unknown>(
+    pluginId,
+    withQuery(path, { q: query.slice(0, MAX_COMMAND_SEARCH_QUERY), ...scope }),
+    nodeId,
+    signal,
+  )
   const items = acceptCommandSearchItems(body)
-  const sent = Array.isArray((body as { items?: unknown[] } | null)?.items) ? (body as { items: unknown[] }).items.length : 0
+  const sent = Array.isArray((body as { items?: unknown[] } | null)?.items)
+    ? (body as { items: unknown[] }).items.length
+    : 0
   if (sent > items.length) drop(pluginId, `search response (${sent - items.length} of ${sent} rows)`, body)
   return items
 }
@@ -395,7 +439,12 @@ const acceptSettingValue = (pluginId: string, body: unknown): string => {
 
 const TONES = new Set(['neutral', 'accent', 'warn'])
 
-export async function readBadge(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<PluginSlotBadge> {
+export async function readBadge(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  signal: AbortSignal,
+): Promise<PluginSlotBadge> {
   const body = await read<unknown>(pluginId, path, nodeId, signal)
   // `null` is the documented "nothing to say" answer, not a failure.
   if (body === null || body === undefined) return null
@@ -411,15 +460,29 @@ const SEVERITIES = new Set(['info', 'warn', 'danger'])
 
 const isAttentionItem = (row: unknown): row is PluginAttentionWireItem => {
   const item = row as PluginAttentionWireItem
-  return !!item && typeof item === 'object'
-    && str(item.id) && str(item.title) && opt(item.detail) && opt(item.taskId)
-    && SEVERITIES.has(item.severity) && Number.isFinite(item.at)
+  return (
+    !!item &&
+    typeof item === 'object' &&
+    str(item.id) &&
+    str(item.title) &&
+    opt(item.detail) &&
+    opt(item.taskId) &&
+    SEVERITIES.has(item.severity) &&
+    Number.isFinite(item.at)
+  )
 }
 
-export async function readAttention(pluginId: string, path: string, nodeId: string, signal: AbortSignal): Promise<PluginAttentionWireItem[]> {
+export async function readAttention(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  signal: AbortSignal,
+): Promise<PluginAttentionWireItem[]> {
   const body = await read<{ items?: unknown }>(pluginId, path, nodeId, signal)
   const rows = Array.isArray(body?.items) ? body.items : []
-  return rows.filter((row) => isAttentionItem(row) || (drop(pluginId, 'attention item', row), false)) as PluginAttentionWireItem[]
+  return rows.filter(
+    (row) => isAttentionItem(row) || (drop(pluginId, 'attention item', row), false),
+  ) as PluginAttentionWireItem[]
 }
 
 // One row a cooperative extension point delivers. Display strings only. There is no `action` on the
@@ -427,8 +490,16 @@ export async function readAttention(pluginId: string, path: string, nodeId: stri
 // manifest.
 export const sanitizeExtensionItem = (row: unknown): PluginExtensionItem | null => {
   const item = row as PluginExtensionItem
-  if (!item || typeof item !== 'object' || !str(item.id) || !str(item.title)
-    || !opt(item.subtitle) || !opt(item.icon) || !opt(item.badge)) return null
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    !str(item.id) ||
+    !str(item.title) ||
+    !opt(item.subtitle) ||
+    !opt(item.icon) ||
+    !opt(item.badge)
+  )
+    return null
   return {
     id: item.id,
     title: item.title,
@@ -486,11 +557,15 @@ export async function readAnnotationMarks(
   })
   const rows = Array.isArray(body?.items) ? body.items : []
   if (rows.length > MAX_RAW_ANNOTATION_ROWS) {
-    log.warn(`${pluginId} returned too many annotation marks; ignored ${rows.length - MAX_RAW_ANNOTATION_ROWS}`, undefined, {
-      'plugin.id': pluginId,
-      'annotation.rows': rows.length,
-      'annotation.limit': MAX_RAW_ANNOTATION_ROWS,
-    })
+    log.warn(
+      `${pluginId} returned too many annotation marks; ignored ${rows.length - MAX_RAW_ANNOTATION_ROWS}`,
+      undefined,
+      {
+        'plugin.id': pluginId,
+        'annotation.rows': rows.length,
+        'annotation.limit': MAX_RAW_ANNOTATION_ROWS,
+      },
+    )
   }
   return rows.slice(0, MAX_RAW_ANNOTATION_ROWS).flatMap((row) => {
     const mark = sanitizeAnnotationMark(row)
@@ -615,7 +690,9 @@ export async function captureAgentContext(
   // is not. This one is worth telling the person about, so it throws into the composer's error line
   // rather than a console warning.
   if (agentContextBudget(snapshots).overLimit) {
-    throw new Error(`${pluginId} returned more than ${MAX_AGENT_CONTEXT_BYTES / 1024} KiB of context; nothing was attached.`)
+    throw new Error(
+      `${pluginId} returned more than ${MAX_AGENT_CONTEXT_BYTES / 1024} KiB of context; nothing was attached.`,
+    )
   }
   return snapshots
 }

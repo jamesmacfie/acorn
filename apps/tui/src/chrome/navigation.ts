@@ -11,7 +11,11 @@ import type { ShellModel } from './model'
 
 export function shellNavigation(model: ShellModel, words: () => WorkspaceWords): NavigationHost {
   // A task's project by name, never its id, from the workspaces that list it.
-  const projectName = (id: string) => model.workspaces().flatMap((workspace) => workspace.projects).find((project) => project.id === id)?.name
+  const projectName = (id: string) =>
+    model
+      .workspaces()
+      .flatMap((workspace) => workspace.projects)
+      .find((project) => project.id === id)?.name
   const onActiveNode = <T>(row: T) => ({ ...row, nodeId: activeNodeId() ?? '' })
   return {
     words,
@@ -20,7 +24,10 @@ export function shellNavigation(model: ShellModel, words: () => WorkspaceWords):
     workspaces: () => model.workspaces().map((workspace) => onActiveNode({ workspace })),
     // The open workspace's projects, the same list the shell's own project overlay draws: a project
     // outside it belongs to a workspace this shell is not showing.
-    projects: () => (words().singular === 'project' ? model.workspaces().flatMap((workspace) => workspace.projects) : model.workspace()?.projects ?? []),
+    projects: () =>
+      words().singular === 'project'
+        ? model.workspaces().flatMap((workspace) => workspace.projects)
+        : (model.workspace()?.projects ?? []),
     openTask: (row) => activateTaskSignals(row.task),
     // `chooseWorkspace` clears the open task and source, then restores whatever the destination was
     // left on, so there is nothing to do to the rail here.

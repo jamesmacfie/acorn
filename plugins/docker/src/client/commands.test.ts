@@ -11,10 +11,12 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('./dockerStore', () => ({ containers: mocks.containers, refreshDocker: mocks.refreshDocker }))
 vi.mock('./dockerClient', () => ({
-  fetchImages: mocks.fetchImages, fetchVolumes: mocks.fetchVolumes, fetchNetworks: mocks.fetchNetworks,
+  fetchImages: mocks.fetchImages,
+  fetchVolumes: mocks.fetchVolumes,
+  fetchNetworks: mocks.fetchNetworks,
 }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   setSelectedSource: mocks.setSelectedSource,
 }))
 
@@ -27,7 +29,13 @@ import { consumeDockerReveal } from './dockerViewStore'
 // — and that a pick names the rail source rather than the task pane, which only ever draws containers.
 
 const context = (): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: null, taskId: null, paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: null,
+  taskId: null,
+  paneId: null,
+  surfaceId: null,
 })
 const signal = (): AbortSignal => new AbortController().signal
 
@@ -94,7 +102,11 @@ describe('the docker plugin catalogue', () => {
   })
   it('drops a held lookup and an earlier selection after switching Nodes', async () => {
     let resolve!: (rows: unknown[]) => void
-    mocks.fetchImages.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    mocks.fetchImages.mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
     const held = find().query('', context(), signal())
     await vi.waitFor(() => expect(mocks.fetchImages).toHaveBeenCalledTimes(1))
     setActiveNode('node-2')
@@ -107,5 +119,4 @@ describe('the docker plugin catalogue', () => {
     expect(consumeDockerReveal()).toBeNull()
     expect(mocks.setSelectedSource).not.toHaveBeenCalled()
   })
-
 })

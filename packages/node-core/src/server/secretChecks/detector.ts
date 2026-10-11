@@ -6,7 +6,12 @@
 // our fixtures, has no confidence tiers, and puts the matched value into every message it returns.
 // Each rule below is a documented provider prefix with a fixture in detector.test.ts. Raise
 // SECRET_DETECTOR_VERSION whenever a rule changes, because allowances and caches bind to it.
-import type { SecretCheckReport, SecretConfidence, SecretFinding, SecretUnscanned } from '@acorn/protocol/secretChecks.ts'
+import type {
+  SecretCheckReport,
+  SecretConfidence,
+  SecretFinding,
+  SecretUnscanned,
+} from '@acorn/protocol/secretChecks.ts'
 
 export const SECRET_DETECTOR_VERSION = 'acorn-secrets/1'
 
@@ -20,22 +25,44 @@ type Rule = { id: string; confidence: SecretConfidence; pattern: RegExp; value?:
 const RULES: readonly Rule[] = [
   { id: 'private-key', confidence: 'high', pattern: /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----/g },
   { id: 'aws-access-key-id', confidence: 'high', pattern: /\b(?:AKIA|ASIA|ABIA|ACCA)[A-Z2-7]{16}\b/g },
-  { id: 'github-token', confidence: 'high', pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59})\b/g },
+  {
+    id: 'github-token',
+    confidence: 'high',
+    pattern: /\b(?:gh[pousr]_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9]{22}_[A-Za-z0-9]{59})\b/g,
+  },
   { id: 'gitlab-token', confidence: 'high', pattern: /\bglpat-[A-Za-z0-9_-]{20}\b/g },
   { id: 'slack-token', confidence: 'high', pattern: /\bxox[abposr]-[0-9]{8,13}-[A-Za-z0-9-]{8,}\b/g },
-  { id: 'slack-webhook', confidence: 'high', pattern: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]{8,}\/B[A-Z0-9]{8,}\/[A-Za-z0-9]{24}/g },
+  {
+    id: 'slack-webhook',
+    confidence: 'high',
+    pattern: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]{8,}\/B[A-Z0-9]{8,}\/[A-Za-z0-9]{24}/g,
+  },
   { id: 'stripe-secret-key', confidence: 'high', pattern: /\b[sr]k_live_[A-Za-z0-9]{24,}\b/g },
   { id: 'anthropic-api-key', confidence: 'high', pattern: /\bsk-ant-(?:api|admin)\d{2}-[A-Za-z0-9_-]{80,}/g },
-  { id: 'openai-api-key', confidence: 'high', pattern: /\bsk-(?:(?:proj|svcacct|admin)-[A-Za-z0-9_-]{40,}|[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20})/g },
+  {
+    id: 'openai-api-key',
+    confidence: 'high',
+    pattern: /\bsk-(?:(?:proj|svcacct|admin)-[A-Za-z0-9_-]{40,}|[A-Za-z0-9]{20}T3BlbkFJ[A-Za-z0-9]{20})/g,
+  },
   { id: 'google-api-key', confidence: 'high', pattern: /\bAIza[0-9A-Za-z_-]{35}\b/g },
   { id: 'npm-token', confidence: 'high', pattern: /\bnpm_[A-Za-z0-9]{36}\b/g },
   // Heuristics: they warn and never block on their own.
-  { id: 'jwt', confidence: 'heuristic', pattern: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g },
-  { id: 'url-password', confidence: 'heuristic', pattern: /\b[a-z][a-z0-9+.-]{1,20}:\/\/[^\s/:@'"]{1,64}:([^\s/@'"]{6,128})@/g, value: 1 },
+  {
+    id: 'jwt',
+    confidence: 'heuristic',
+    pattern: /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g,
+  },
+  {
+    id: 'url-password',
+    confidence: 'heuristic',
+    pattern: /\b[a-z][a-z0-9+.-]{1,20}:\/\/[^\s/:@'"]{1,64}:([^\s/@'"]{6,128})@/g,
+    value: 1,
+  },
   {
     id: 'credential-assignment',
     confidence: 'heuristic',
-    pattern: /\b[A-Za-z0-9_.-]{0,40}(?:api[_-]?key|secret|token|passw(?:or)?d|credential|auth)[A-Za-z0-9_.-]{0,40}['"]?\s{0,4}[:=]\s{0,4}['"]([^'"\s]{12,200})['"]/gi,
+    pattern:
+      /\b[A-Za-z0-9_.-]{0,40}(?:api[_-]?key|secret|token|passw(?:or)?d|credential|auth)[A-Za-z0-9_.-]{0,40}['"]?\s{0,4}[:=]\s{0,4}['"]([^'"\s]{12,200})['"]/gi,
     value: 1,
   },
 ]
@@ -128,12 +155,17 @@ export function secretReport(input: {
 }): SecretCheckReport {
   const unscanned = [...(input.unscanned ?? [])]
   // High-confidence findings first, so a truncated report still names what blocks.
-  const ordered = [...input.findings].sort((a, b) => (a.confidence === b.confidence ? 0 : a.confidence === 'high' ? -1 : 1))
+  const ordered = [...input.findings].sort((a, b) =>
+    a.confidence === b.confidence ? 0 : a.confidence === 'high' ? -1 : 1,
+  )
   return {
     detectorVersion: SECRET_DETECTOR_VERSION,
     digest: input.digest,
     findings: ordered.slice(0, MAX_SECRET_FINDINGS),
-    counts: { high: ordered.filter((finding) => finding.confidence === 'high').length, heuristic: ordered.filter((finding) => finding.confidence === 'heuristic').length },
+    counts: {
+      high: ordered.filter((finding) => finding.confidence === 'high').length,
+      heuristic: ordered.filter((finding) => finding.confidence === 'heuristic').length,
+    },
     truncated: ordered.length > MAX_SECRET_FINDINGS,
     unscanned: unscanned.slice(0, MAX_SECRET_FINDINGS),
     complete: !unscanned.length && !input.stopped,

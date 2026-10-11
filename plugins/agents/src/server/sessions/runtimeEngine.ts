@@ -2,14 +2,26 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
 import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION } from '../../contract/loopHook.ts'
-import type { CompiledCoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
-import { acornFileGuard, acornLoopHook, agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
 import type {
-  AgentEventRecord,
-  AgentNormalizedEvent,
-  AgentSession,
-  AgentTurn,
-} from '../../contract/wire.ts'
+  CompiledCoreServices,
+  InternalEnvFactory,
+  Launcher,
+  PluginDatabase,
+  PluginHookRegistry,
+  PluginTelemetry,
+  SecretService,
+  SpanHandle,
+} from '@acorn/plugin-api/node'
+import {
+  acornFileGuard,
+  acornLoopHook,
+  agentProfileRegistry,
+  createLogger,
+  deliverableSkills,
+  describeError,
+  recordSkillDelivery,
+} from '@acorn/plugin-api/node'
+import type { AgentEventRecord, AgentNormalizedEvent, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { EnqueueAgentTurnInput } from '../../shared/schemas'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { SkillReport } from '../drivers/skillIndex'
@@ -34,12 +46,7 @@ import { AgentStore, type EnqueueTurnOutcome } from './store'
 import { QueueCoordinator } from './queueCoordinator'
 import { ProviderSessionLifecycle, type ProviderGeneration } from './providerSessionLifecycle'
 import type { AgentDriverSession } from '../drivers/types'
-import {
-  eventSubagentId,
-  isActiveSubagent,
-  quietedSubagents,
-  SUBAGENT_QUIET_MS,
-} from './stateMachine'
+import { eventSubagentId, isActiveSubagent, quietedSubagents, SUBAGENT_QUIET_MS } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import type { RepeatedToolCallWarnings } from './repeatedToolCalls'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
@@ -84,13 +91,15 @@ export function acornMcpServers(
   if (!mcp) return []
   const profile = agentProfileRegistry.get(session.profileId)
   if (!profile || (profile.mcpRegistration && session.driverKind !== 'codex-app-server')) return []
-  return [{
-    transport: 'stdio',
-    name: mcp.name,
-    command: mcp.launcher.command,
-    args: mcp.launcher.args,
-    env: { ...mcp.launcher.env, ...sessionEnv },
-  }]
+  return [
+    {
+      transport: 'stdio',
+      name: mcp.name,
+      command: mcp.launcher.command,
+      args: mcp.launcher.args,
+      env: { ...mcp.launcher.env, ...sessionEnv },
+    },
+  ]
 }
 
 // The tag is what the reader greps for and the owner is what a sink files it under.
@@ -152,7 +161,8 @@ const FOOTPRINT_SAMPLE_MS = 60_000
 
 const secretEnvironmentValues = (env: Record<string, string>): string[] =>
   Object.entries(env).flatMap(([key, value]) =>
-    /(?:TOKEN|SECRET|PASSWORD|AUTH|COOKIE|KEY)/i.test(key) && value ? [value] : [])
+    /(?:TOKEN|SECRET|PASSWORD|AUTH|COOKIE|KEY)/i.test(key) && value ? [value] : [],
+  )
 
 /** A `before-send` handler refused the turn. Its own class, so a caller can answer a refusal rather than fail. */
 export class TurnVetoedError extends Error {}
@@ -251,66 +261,94 @@ export class ManagedAgentEngine {
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.skillFolders = join(options.dataDir, 'agent-skills')
     const publish = options.publish
-    this.store = new AgentStore(options.db, options.core, (frame) => { if (!this.stopped) publish?.(frame) })
-    this.processes = new ProviderSessionLifecycle({
-      registry: options.registry ?? agentDriverRegistry,
-      taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
-      workspaceId: (taskId) => this.core.tasks.workspaceId(taskId),
-      hasProviderExecutionHistory: (sessionId) => this.store.hasProviderExecutionHistory(sessionId),
-      scopedEnvironment: (session, sandboxed) => this.scopedProviderEnvironment(session, sandboxed),
-      mcpServers: (session, env, signal) => this.providerMcpServers(session, env, signal),
-      // Loaded on the first start rather than at boot, like the rest of a start's preparation. A driver
-      // with its own skill support gets a folder per start, which the lifecycle removes when it's done.
-      skills: async (session, generation, native) => (await import('../drivers/skillIndex')).prepareSkillStart(await deliverableSkills(options.dataDir), {
-        folder: native ? join(this.skillFolders, session.id, String(generation.number)) : null,
-        lastTold: session.config.skillIndex,
-      }),
-      skillsDelivered: (sessionId, report) => this.skillsDelivered(sessionId, report),
-      // Only the points somebody handles, read at every start and resume like the skills.
-      loopHooks: async () => {
-        const bridge = acornLoopHook()
-        if (!bridge || !this.hooks) return null
-        const [before, after] = await Promise.all([BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map((id) => this.hooks!.handlers(id)))
-        if (!before!.length && !after!.length) return null
-        return { command: bridge.command, args: [...bridge.args, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION], beforeTool: before!.length > 0, afterTool: after!.length > 0 }
+    this.store = new AgentStore(options.db, options.core, (frame) => {
+      if (!this.stopped) publish?.(frame)
+    })
+    this.processes = new ProviderSessionLifecycle(
+      {
+        registry: options.registry ?? agentDriverRegistry,
+        taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+        workspaceId: (taskId) => this.core.tasks.workspaceId(taskId),
+        hasProviderExecutionHistory: (sessionId) => this.store.hasProviderExecutionHistory(sessionId),
+        scopedEnvironment: (session, sandboxed) => this.scopedProviderEnvironment(session, sandboxed),
+        mcpServers: (session, env, signal) => this.providerMcpServers(session, env, signal),
+        // Loaded on the first start rather than at boot, like the rest of a start's preparation. A driver
+        // with its own skill support gets a folder per start, which the lifecycle removes when it's done.
+        skills: async (session, generation, native) =>
+          (await import('../drivers/skillIndex')).prepareSkillStart(await deliverableSkills(options.dataDir), {
+            folder: native ? join(this.skillFolders, session.id, String(generation.number)) : null,
+            lastTold: session.config.skillIndex,
+          }),
+        skillsDelivered: (sessionId, report) => this.skillsDelivered(sessionId, report),
+        // Only the points somebody handles, read at every start and resume like the skills.
+        loopHooks: async () => {
+          const bridge = acornLoopHook()
+          if (!bridge || !this.hooks) return null
+          const [before, after] = await Promise.all(
+            [BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map((id) => this.hooks!.handlers(id)),
+          )
+          if (!before!.length && !after!.length) return null
+          return {
+            command: bridge.command,
+            args: [...bridge.args, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION],
+            beforeTool: before!.length > 0,
+            afterTool: after!.length > 0,
+          }
+        },
+        // The person's switch on Settings > Security and backup (docs/managed-agents/read-block.md).
+        readBlockOn: async () => {
+          const userId = this.currentUserId()
+          return !!userId && (await readAgentSessionDefaults(this.core.prefs, userId)).blockDataRootReads
+        },
+        readBlock: async (input) => {
+          // Claude's own file tools run outside its sandbox, so a blocked session doesn't start without
+          // the guard that checks them.
+          const fileGuard = acornFileGuard()
+          if (!fileGuard)
+            throw new Error(
+              "This Node can't keep an agent's file tools out of Acorn's data folder, because it has no file guard program.",
+            )
+          const { sessionId, ...start } = input
+          // Made now so the block keeps it open. A file copied in later is readable through the folder.
+          const attachments = this.attachments.sessionFolder(sessionId)
+          await mkdir(attachments, { recursive: true })
+          return (await import('../drivers/readBlock')).dataRootReadBlock({
+            dataDir: options.dataDir,
+            fileGuard,
+            attachments,
+            ...start,
+          })
+        },
+        mcpUnavailable: (sessionId, names) =>
+          this.record(sessionId, null, {
+            type: 'diagnostic',
+            level: 'warning',
+            message: `This session runs without ${names.join(', ')}. Check consent, stored credentials, and review availability in Settings → MCP servers.`,
+          }).then(() => undefined),
+        event: (sessionId, generation, event) => this.onProviderEvent(sessionId, generation, event),
+        closed: (sessionId, generation, attempt, error) => this.onProviderClosed(sessionId, generation, attempt, error),
+        closeMessage: (error) => safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets),
+        startFailed: (sessionId, turnId, error) => this.onProviderStartFailed(sessionId, turnId, error),
+        retirementFlush: async (sessionId) => {
+          await this.providerEvents.flush(sessionId)
+          await this.store.flushSearch(sessionId)
+        },
+        session: (sessionId) => this.store.requireSession(sessionId),
+        idleSweep: async () => {
+          await this.upkeep.stopIdleSessions()
+        },
+        quietSweep: (sessionId) => this.quietSubagents(sessionId),
+        footprintSample: () => this.upkeep.sampleProcessFootprint(),
+        callbackError: (kind, error) => log.warn(`${kind} sweep failed: ${describeError(error).message}`),
+        telemetry: this.telemetry,
+        pump: () => {
+          void this.pump()
+        },
+        shuttingDown: () => this.stopped,
       },
-      // The person's switch on Settings > Security and backup (docs/managed-agents/read-block.md).
-      readBlockOn: async () => {
-        const userId = this.currentUserId()
-        return !!userId && (await readAgentSessionDefaults(this.core.prefs, userId)).blockDataRootReads
-      },
-      readBlock: async (input) => {
-        // Claude's own file tools run outside its sandbox, so a blocked session doesn't start without
-        // the guard that checks them.
-        const fileGuard = acornFileGuard()
-        if (!fileGuard) throw new Error("This Node can't keep an agent's file tools out of Acorn's data folder, because it has no file guard program.")
-        const { sessionId, ...start } = input
-        // Made now so the block keeps it open. A file copied in later is readable through the folder.
-        const attachments = this.attachments.sessionFolder(sessionId)
-        await mkdir(attachments, { recursive: true })
-        return (await import('../drivers/readBlock')).dataRootReadBlock({ dataDir: options.dataDir, fileGuard, attachments, ...start })
-      },
-      mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
-        type: 'diagnostic', level: 'warning',
-        message: `This session runs without ${names.join(', ')}. Check consent, stored credentials, and review availability in Settings → MCP servers.`,
-      }).then(() => undefined),
-      event: (sessionId, generation, event) => this.onProviderEvent(sessionId, generation, event),
-      closed: (sessionId, generation, attempt, error) => this.onProviderClosed(sessionId, generation, attempt, error),
-      closeMessage: (error) => safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets),
-      startFailed: (sessionId, turnId, error) => this.onProviderStartFailed(sessionId, turnId, error),
-      retirementFlush: async (sessionId) => {
-        await this.providerEvents.flush(sessionId)
-        await this.store.flushSearch(sessionId)
-      },
-      session: (sessionId) => this.store.requireSession(sessionId),
-      idleSweep: async () => { await this.upkeep.stopIdleSessions() },
-      quietSweep: (sessionId) => this.quietSubagents(sessionId),
-      footprintSample: () => this.upkeep.sampleProcessFootprint(),
-      callbackError: (kind, error) => log.warn(`${kind} sweep failed: ${describeError(error).message}`),
-      telemetry: this.telemetry,
-      pump: () => { void this.pump() },
-      shuttingDown: () => this.stopped,
-    }, options.idleSweepMs ?? IDLE_SWEEP_MS, this.subagentQuietMs)
+      options.idleSweepMs ?? IDLE_SWEEP_MS,
+      this.subagentQuietMs,
+    )
     this.queue = new QueueCoordinator({
       queuedHeads: () => this.store.queuedHeads(),
       getSession: (id) => this.store.getSession(id),
@@ -320,9 +358,9 @@ export class ManagedAgentEngine {
         const userId = this.currentUserId()
         return userId
           ? this.readWhileRunning(() => readAgentConcurrency(this.core.prefs, userId)).catch((error: unknown) => {
-            if (this.stopped) return defaultAgentConcurrency()
-            throw error
-          })
+              if (this.stopped) return defaultAgentConcurrency()
+              throw error
+            })
           : defaultAgentConcurrency()
       },
       occupancy: () => this.processes.occupancy(),
@@ -345,28 +383,49 @@ export class ManagedAgentEngine {
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
     this.mcpServers = new AgentMcpServerStore(options.db, options.secrets, join(options.dataDir, 'managed-mcp'))
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
-    this.frames = new SessionFrames({ publish, webhooks: this.webhooks, store: this.store, shutdown: this.shutdown.signal })
+    this.frames = new SessionFrames({
+      publish,
+      webhooks: this.webhooks,
+      store: this.store,
+      shutdown: this.shutdown.signal,
+    })
     this.instructionAdmission = new LazyService(async () => {
       const [{ InstructionAdmission }, { InstructionReviewStore }] = await Promise.all([
-        import('./instructionAdmission'), import('./instructionReviewStore'),
+        import('./instructionAdmission'),
+        import('./instructionReviewStore'),
       ])
       return new InstructionAdmission(this.core, options.dataDir, new InstructionReviewStore(this.db, options.secrets))
     })
-    this.mcpReviews = new LazyService(() => import('../mcpReviewManager').then(({ McpReviewManager }) =>
-      new McpReviewManager(this.mcpServers, () => this.mintedSecrets)))
-    this.goals = new LazyService(() => import('./sessionGoalGeneration').then(({ SessionGoalGeneration }) =>
-      new SessionGoalGeneration({
-        db: this.db,
-        store: this.store,
-        models: this.core.models,
-        currentUserId: this.currentUserId,
-        publish: (session) => this.frames.emit({ channel: 'agent:session', session }),
-        enqueue: async (sessionId, prompt, key, signal) => {
-          await this.acceptTurn(sessionId, {
-            source: 'goal', input: [{ type: 'text', text: prompt }], effectivePolicy: {}, idempotencyKey: key,
-          }, {}, signal)
-        },
-      })))
+    this.mcpReviews = new LazyService(() =>
+      import('../mcpReviewManager').then(
+        ({ McpReviewManager }) => new McpReviewManager(this.mcpServers, () => this.mintedSecrets),
+      ),
+    )
+    this.goals = new LazyService(() =>
+      import('./sessionGoalGeneration').then(
+        ({ SessionGoalGeneration }) =>
+          new SessionGoalGeneration({
+            db: this.db,
+            store: this.store,
+            models: this.core.models,
+            currentUserId: this.currentUserId,
+            publish: (session) => this.frames.emit({ channel: 'agent:session', session }),
+            enqueue: async (sessionId, prompt, key, signal) => {
+              await this.acceptTurn(
+                sessionId,
+                {
+                  source: 'goal',
+                  input: [{ type: 'text', text: prompt }],
+                  effectivePolicy: {},
+                  idempotencyKey: key,
+                },
+                {},
+                signal,
+              )
+            },
+          }),
+      ),
+    )
     this.upkeep = new ProcessUpkeep({
       processes: this.processes,
       store: this.store,
@@ -378,7 +437,9 @@ export class ManagedAgentEngine {
       record: (sessionId, turnId, event) => this.record(sessionId, turnId, event),
       endTurnSpan: (turnId, outcome) => this.endTurnSpan(turnId, outcome),
       pauseGoal: (sessionId) => this.pauseGoal(sessionId),
-      pump: () => { void this.pump() },
+      pump: () => {
+        void this.pump()
+      },
     })
     // Armed at construction when there is a host to report to, and cleared by stop().
     if (this.telemetry) this.processes.armFootprintSample(options.footprintSampleMs ?? FOOTPRINT_SAMPLE_MS)
@@ -412,12 +473,14 @@ export class ManagedAgentEngine {
       text: input.input.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n'),
     })
     if (prompt && !prompt.ok) throw new TurnVetoedError(`${prompt.by}: ${prompt.reason}`)
-    const enqueued = prompt && prompt.payload.text !== undefined
-      ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
-      : input
+    const enqueued =
+      prompt && prompt.payload.text !== undefined
+        ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
+        : input
     signal?.throwIfAborted()
-    const outcome = await this.core.checkoutAdmission.admitWork(session.taskId,
-      () => this.store.enqueueTurn(sessionId, enqueued, context))
+    const outcome = await this.core.checkoutAdmission.admitWork(session.taskId, () =>
+      this.store.enqueueTurn(sessionId, enqueued, context),
+    )
     // An idle session behind the concurrency limit emits no provider event, so publish its queue count.
     this.frames.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
     // The pump owns startup and admission after the durable acceptance boundary.
@@ -434,19 +497,25 @@ export class ManagedAgentEngine {
     const controller = new AbortController()
     const done = compactLedgers(this.db, {
       signal: controller.signal,
-      onError: (sessionId, error) => log.warn(`could not compact session ${sessionId}: ${describeError(error).message}`),
-    }).then((totals) => {
-      if (totals.deleted || totals.rewritten) {
-        log.info(`compacted ${totals.sessions} sessions: removed ${totals.deleted} superseded rows, rewrote ${totals.rewritten}`)
-      }
-    }, (error: unknown) => log.warn(`ledger compaction stopped: ${describeError(error).message}`))
+      onError: (sessionId, error) =>
+        log.warn(`could not compact session ${sessionId}: ${describeError(error).message}`),
+    }).then(
+      (totals) => {
+        if (totals.deleted || totals.rewritten) {
+          log.info(
+            `compacted ${totals.sessions} sessions: removed ${totals.deleted} superseded rows, rewrote ${totals.rewritten}`,
+          )
+        }
+      },
+      (error: unknown) => log.warn(`ledger compaction stopped: ${describeError(error).message}`),
+    )
     this.ledgerCompaction = { controller, done }
   }
 
   // Releases what this engine holds, in the order docs/managed-agents/operations.md § Operations and failure
   // describes. Called from the plugin's dispose (node/index.ts) before the database closes.
   stop(): Promise<void> {
-    return this.stopPromise ??= this.stopEngine()
+    return (this.stopPromise ??= this.stopEngine())
   }
 
   private async stopEngine(): Promise<void> {
@@ -497,13 +566,22 @@ export class ManagedAgentEngine {
     return awaitWithSignal(query(), this.shutdown.signal)
   }
 
-  ensureSession(session: AgentSession, admission?: { turnId: string; workspaceId: string }): Promise<ProviderGeneration> {
+  ensureSession(
+    session: AgentSession,
+    admission?: { turnId: string; workspaceId: string },
+  ): Promise<ProviderGeneration> {
     return this.processes.ensure(session, admission)
   }
 
-  get shutdownSignal(): AbortSignal { return this.shutdown.signal }
-  get isStopped(): boolean { return this.stopped }
-  currentSession(sessionId: string) { return this.processes.current(sessionId) }
+  get shutdownSignal(): AbortSignal {
+    return this.shutdown.signal
+  }
+  get isStopped(): boolean {
+    return this.stopped
+  }
+  currentSession(sessionId: string) {
+    return this.processes.current(sessionId)
+  }
 
   /** A provider event in the shape the ledger stores, for a caller outside the provider's own stream
    *  (./loopHooks.ts). */
@@ -516,19 +594,36 @@ export class ManagedAgentEngine {
     return this.providerEvents.accept(pending)
   }
 
-  sessionSignal(generation: ProviderGeneration): AbortSignal { return this.processes.signal(generation) }
-  hasLiveSession(sessionId: string): boolean { return this.processes.has(sessionId) }
-  liveSessionIds(): string[] { return this.processes.ids() }
-  withSessionHandle<T>(generation: ProviderGeneration, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T> {
+  sessionSignal(generation: ProviderGeneration): AbortSignal {
+    return this.processes.signal(generation)
+  }
+  hasLiveSession(sessionId: string): boolean {
+    return this.processes.has(sessionId)
+  }
+  liveSessionIds(): string[] {
+    return this.processes.ids()
+  }
+  withSessionHandle<T>(
+    generation: ProviderGeneration,
+    operation: (handle: AgentDriverSession) => Promise<T>,
+  ): Promise<T> {
     return this.processes.withHandle(generation, operation)
   }
-  withCurrentSessionHandle<T>(generation: ProviderGeneration, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T | null> {
+  withCurrentSessionHandle<T>(
+    generation: ProviderGeneration,
+    operation: (handle: AgentDriverSession) => Promise<T>,
+  ): Promise<T | null> {
     return this.processes.withCurrentHandle(generation, operation)
   }
-  sessionHandleIfPresent<T>(sessionId: string, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T | null> {
+  sessionHandleIfPresent<T>(
+    sessionId: string,
+    operation: (handle: AgentDriverSession) => Promise<T>,
+  ): Promise<T | null> {
     return this.processes.handleIfPresent(sessionId, operation)
   }
-  flushProviderEvents(sessionId: string): Promise<void> { return this.providerEvents.flush(sessionId) }
+  flushProviderEvents(sessionId: string): Promise<void> {
+    return this.providerEvents.flush(sessionId)
+  }
 
   /** Revokes a deleted session's task token, so a copy of it stops working at once
    *  (docs/security/credentials.md § Revoking a credential). */
@@ -543,13 +638,16 @@ export class ManagedAgentEngine {
     const persisted = persistedToolCeiling(session.config)
     const env = {
       ...this.internalEnv({
-        scope: 'task', taskId: session.taskId, sessionId: session.id,
+        scope: 'task',
+        taskId: session.taskId,
+        sessionId: session.id,
         toolCeiling: sandboxed ? delegatedToolCeiling(persisted, { maxRisk: 'write' }) : persisted,
       }),
       ACORN_TASK_ID: session.taskId,
       ACORN_SESSION_ID: session.id,
     }
-    for (const secret of secretEnvironmentValues(env)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    for (const secret of secretEnvironmentValues(env))
+      if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
     return env
   }
 
@@ -569,13 +667,16 @@ export class ManagedAgentEngine {
     })
   }
 
-
   private async providerMcpServers(
     session: AgentSession,
     env: Record<string, string>,
     signal: AbortSignal,
   ): Promise<{ servers: AgentDriverMcpServer[]; unavailable: string[]; retire?: () => Promise<void> }> {
-    const userMcp = await this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session', signal)
+    const userMcp = await this.mcpServers.resolve(
+      sessionMcpSelection(session.config),
+      'agent MCP server: start a session',
+      signal,
+    )
     signal.throwIfAborted()
     const releaseManagedRoots = this.mcpServers.holdManagedRoots(userMcp.managedRoots)
     for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
@@ -585,7 +686,10 @@ export class ManagedAgentEngine {
       for (const server of userMcp.servers) {
         signal.throwIfAborted()
         const identity = userMcp.revisions[server.name]
-        if (!identity?.reviewTools) { servers.push(server); continue }
+        if (!identity?.reviewTools) {
+          servers.push(server)
+          continue
+        }
         try {
           const reviewed = await (await this.mcpReviews.get()).prepare(server, session.id, identity.revision)
           if (reviewed.transport === 'http') {
@@ -607,21 +711,29 @@ export class ManagedAgentEngine {
       servers: [...acornMcpServers(this.mcp(), session, env), ...servers],
       unavailable,
       retire: async () => {
-        try { await (await this.mcpReviews.built())?.closeSession(session.id) }
-        finally { releaseManagedRoots() }
+        try {
+          await (await this.mcpReviews.built())?.closeSession(session.id)
+        } finally {
+          releaseManagedRoots()
+        }
       },
     }
   }
 
   private async onProviderStartFailed(sessionId: string, turnId: string | null, error: unknown): Promise<void> {
     await this.record(sessionId, turnId, {
-      type: 'error', code: 'provider_start_failed',
+      type: 'error',
+      code: 'provider_start_failed',
       message: safeProviderMessage(error, 'Provider session failed to start.', this.mintedSecrets),
       retryable: false,
     })
   }
 
-  private async onProviderEvent(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void> {
+  private async onProviderEvent(
+    sessionId: string,
+    generation: ProviderGeneration,
+    event: AgentDriverEvent,
+  ): Promise<void> {
     if (event.type === 'session_state' && event.state === 'ready' && this.processes.isReadinessHeld(sessionId)) return
     const live = this.processes.current(sessionId)
     if (!live || live.closing || !this.processes.owns(generation)) return
@@ -631,31 +743,42 @@ export class ManagedAgentEngine {
       const session = await this.store.requireSession(sessionId)
       const turn = turnId ? await this.store.turn(turnId) : null
       const attendance = turn
-        ? persistedAttendance(turn.effectivePolicy, { session, source: turn.source }) : sessionAttendance(session)
+        ? persistedAttendance(turn.effectivePolicy, { session, source: turn.source })
+        : sessionAttendance(session)
       const { settleAutonomousRequest } = await import('./requestPolicy')
-      if (await settleAutonomousRequest({
-        attendance,
-        owned: () => this.processes.owns(generation),
-        materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
-        accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
-        respond: (requestId, resolution) => this.withSessionHandle(generation, (handle) => handle.resolveRequest(requestId, resolution)),
-      }, event)) return
+      if (
+        await settleAutonomousRequest(
+          {
+            attendance,
+            owned: () => this.processes.owns(generation),
+            materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
+            accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
+            respond: (requestId, resolution) =>
+              this.withSessionHandle(generation, (handle) => handle.resolveRequest(requestId, resolution)),
+          },
+          event,
+        )
+      )
+        return
       if (event.type === 'permission_request') {
         const { settlePermissionRequest } = await import('./permissionPolicy')
-        return settlePermissionRequest({
-          attendance,
-          hooks: this.hooks,
-          session: () => this.store.requireSession(sessionId),
-          taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
-          materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
-          owned: () => this.processes.owns(generation),
-          accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
-        }, event)
+        return settlePermissionRequest(
+          {
+            attendance,
+            hooks: this.hooks,
+            session: () => this.store.requireSession(sessionId),
+            taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+            materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
+            owned: () => this.processes.owns(generation),
+            accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
+          },
+          event,
+        )
       }
     }
     for (const normalized of await this.eventMaterializer.map(sessionId, turnId, event)) {
       if (!this.processes.owns(generation)) return
-      if (turnId && await this.deferForUsageLimit(sessionId, turnId, generation, normalized)) continue
+      if (turnId && (await this.deferForUsageLimit(sessionId, turnId, generation, normalized))) continue
       if (!this.processes.owns(generation)) return
       await this.providerEvents.accept({ sessionId, turnId, event: normalized, generation })
     }
@@ -670,7 +793,10 @@ export class ManagedAgentEngine {
     if (!this.usageLimitResetAt || !mayBeUsageLimit(event)) return false
     const providerId = this.processes.current(sessionId)?.providerId
     if (!providerId) return false
-    const resetAt = await awaitWithSignal(this.usageLimitResetAt(providerId).catch(() => null), this.processes.signal(generation))
+    const resetAt = await awaitWithSignal(
+      this.usageLimitResetAt(providerId).catch(() => null),
+      this.processes.signal(generation),
+    )
     if (resetAt == null || !this.processes.owns(generation)) return false
     const resumeAt = Math.max(Date.now(), resetAt + this.usageContinuationGraceMs)
     // Any streamed answer fragments must precede the scheduler's diagnostic in the durable ledger.
@@ -700,7 +826,8 @@ export class ManagedAgentEngine {
     const live = this.processes.current(sessionId)
     const settlesTurn = event.type === 'turn_completed' || event.type === 'error'
     if (settlesTurn) {
-      if (live && (!generation || live.generation === generation)) this.processes.clearActive(live.generation, turnId ?? undefined)
+      if (live && (!generation || live.generation === generation))
+        this.processes.clearActive(live.generation, turnId ?? undefined)
       if (turnId && (!live || !generation || live.generation === generation)) {
         this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
       }
@@ -725,17 +852,22 @@ export class ManagedAgentEngine {
   }
 
   private repeatedToolCallWarnings(): Promise<RepeatedToolCallWarnings> {
-    return this.repeatedToolCalls ??= import('./repeatedToolCalls').then(({ RepeatedToolCallWarnings }) =>
-      new RepeatedToolCallWarnings({
-        limit: async () => {
-          const userId = this.currentUserId()
-          return (userId ? await readAgentSessionDefaults(this.core.prefs, userId) : defaultAgentSessionDefaults())
-            .warnRepeatedToolCallsAfter
-        },
-        record: (sessionId, turnId, event) => this.stopped ? Promise.resolve() : this.record(sessionId, turnId, event),
-        session: (sessionId) => this.store.requireSession(sessionId),
-        notice: (notice) => { if (!this.stopped) this.notice?.(notice) },
-      }))
+    return (this.repeatedToolCalls ??= import('./repeatedToolCalls').then(
+      ({ RepeatedToolCallWarnings }) =>
+        new RepeatedToolCallWarnings({
+          limit: async () => {
+            const userId = this.currentUserId()
+            return (userId ? await readAgentSessionDefaults(this.core.prefs, userId) : defaultAgentSessionDefaults())
+              .warnRepeatedToolCallsAfter
+          },
+          record: (sessionId, turnId, event) =>
+            this.stopped ? Promise.resolve() : this.record(sessionId, turnId, event),
+          session: (sessionId) => this.store.requireSession(sessionId),
+          notice: (notice) => {
+            if (!this.stopped) this.notice?.(notice)
+          },
+        }),
+    ))
   }
 
   // A backgrounded child never reports that it finished. Its spawning `Agent` call returns a launch
@@ -756,12 +888,18 @@ export class ManagedAgentEngine {
     }
     // A child that fell silent after this timer was armed is not stale yet, and nothing of its own is
     // coming to arm the next sweep, so do it here. A child still streaming re-arms with its traffic.
-    const waiting = session.subagents.some((entry) =>
-      entry.background && isActiveSubagent(entry) && !quieted.includes(entry.id))
+    const waiting = session.subagents.some(
+      (entry) => entry.background && isActiveSubagent(entry) && !quieted.includes(entry.id),
+    )
     if (waiting) this.processes.armQuiet(sessionId)
   }
 
-  private async onProviderClosed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void> {
+  private async onProviderClosed(
+    sessionId: string,
+    generation: ProviderGeneration,
+    attempt: number,
+    error?: Error,
+  ): Promise<void> {
     if (!this.processes.owns(generation)) return
     const message = safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets)
     const interruptedTurnId = this.processes.current(sessionId)?.activeTurnId
@@ -787,35 +925,48 @@ export class ManagedAgentEngine {
     this.instructionScans.get(turnId)?.abort(new Error('Turn cancelled.'))
   }
 
-  private async dispatchQueuedTurn(session: AgentSession, turn: AgentTurn, generation: ProviderGeneration): Promise<boolean> {
+  private async dispatchQueuedTurn(
+    session: AgentSession,
+    turn: AgentTurn,
+    generation: ProviderGeneration,
+  ): Promise<boolean> {
     this.processes.beginDispatch(generation)
     await this.store.dispatchTurn(turn.id)
     try {
       turn = await this.store.restoreTurnAttendance(turn.id)
       const input = turn.continuationInput ?? turn.input
       const { attendanceInstructions } = await import('./attendanceInstructions')
-      const instructions = attendanceInstructions(persistedAttendance(turn.effectivePolicy, { session, source: turn.source }))
+      const instructions = attendanceInstructions(
+        persistedAttendance(turn.effectivePolicy, { session, source: turn.source }),
+      )
       const driverInput = instructions ? [{ type: 'text' as const, text: instructions }, ...input] : input
       await this.record(session.id, turn.id, {
         type: 'user_message',
         text: agentTurnInputText({ ...turn, input }),
         ...(turn.continuationInput || turn.source === 'goal' ? { automatic: true } : {}),
       })
-      const attachments = Object.fromEntries((await Promise.all(
-        [...new Set(input.flatMap((part) =>
-          part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : []))]
-          .map(async (attachmentId) => {
+      const attachments = Object.fromEntries(
+        await Promise.all(
+          [
+            ...new Set(
+              input.flatMap((part) => (part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : [])),
+            ),
+          ].map(async (attachmentId) => {
             const attachment = await this.attachments.resolve(attachmentId)
             if (!attachment) throw new Error(`Attachment is unavailable: ${attachmentId}`)
-            return [attachmentId, {
-              id: attachment.id,
-              filename: attachment.filename,
-              mediaType: attachment.mediaType,
-              byteSize: attachment.byteSize,
-              localPath: attachment.localPath,
-            }] as const
+            return [
+              attachmentId,
+              {
+                id: attachment.id,
+                filename: attachment.filename,
+                mediaType: attachment.mediaType,
+                byteSize: attachment.byteSize,
+                localPath: attachment.localPath,
+              },
+            ] as const
           }),
-      )))
+        ),
+      )
       if (!this.processes.owns(generation)) return false
       // The queue is shared by interactive, resumed, workflow, operation and delegated turns.
       // Admission belongs immediately before the driver, including retries of a durable turn.
@@ -824,8 +975,9 @@ export class ManagedAgentEngine {
       const stopScan = () => scan.abort(this.shutdown.signal.reason)
       if (this.shutdown.signal.aborted) stopScan()
       else this.shutdown.signal.addEventListener('abort', stopScan, { once: true })
-      try { await (await this.instructionAdmission.get()).admit(session.taskId, scan.signal) }
-      finally {
+      try {
+        await (await this.instructionAdmission.get()).admit(session.taskId, scan.signal)
+      } finally {
         this.instructionScans.delete(turn.id)
         this.shutdown.signal.removeEventListener('abort', stopScan)
       }
@@ -834,35 +986,40 @@ export class ManagedAgentEngine {
       // secret gate here, on every turn source, including a retry (./secretPublication.ts).
       if (Object.keys(attachments).length && this.core.secretPublication) {
         const { admitAttachments } = await import('./secretPublication')
-        await admitAttachments(this.core.secretPublication, { sessionId: session.id, providerId: session.providerId, attachments: Object.values(attachments) })
+        await admitAttachments(this.core.secretPublication, {
+          sessionId: session.id,
+          providerId: session.providerId,
+          attachments: Object.values(attachments),
+        })
         if (!this.processes.owns(generation)) return false
       }
       // Copied only once admitted, because the session can read its folder: under the read block,
       // the store itself is out of its reach (./attachmentStore.ts).
-      const sent = Object.fromEntries(await Promise.all(Object.entries(attachments).map(async ([id, attachment]) =>
-        [id, { ...attachment, localPath: await this.attachments.copyToSession(session.id, attachment) }] as const)))
+      const sent = Object.fromEntries(
+        await Promise.all(
+          Object.entries(attachments).map(
+            async ([id, attachment]) =>
+              [id, { ...attachment, localPath: await this.attachments.copyToSession(session.id, attachment) }] as const,
+          ),
+        ),
+      )
       if (!this.processes.owns(generation)) return false
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
-      this.processes.sendTurn(generation, { turn, input: driverInput, attachments: sent },
+      this.processes.sendTurn(
+        generation,
+        { turn, input: driverInput, attachments: sent },
         async (result) => {
           if (!this.processes.owns(generation)) return
           if (result.providerTurnRef) await this.store.setTurnProviderRef(turn.id, result.providerTurnRef)
-        }, async (error) => {
+        },
+        async (error) => {
           if (!this.processes.owns(generation) || this.processes.current(session.id)?.activeTurnId !== turn.id) return
           this.processes.clearActive(generation, turn.id)
           const failure = this.processes.driverFailure(generation, error)
-          if (
-            failure === 'safe_transient'
-            && !this.processes.accepted(generation)
-            && turn.attempt < 3
-          ) {
-            const message = safeProviderMessage(
-              error,
-              'Safe transient provider failure.',
-              this.mintedSecrets,
-            )
+          if (failure === 'safe_transient' && !this.processes.accepted(generation) && turn.attempt < 3) {
+            const message = safeProviderMessage(error, 'Safe transient provider failure.', this.mintedSecrets)
             // The same turn id starts again, so its first attempt's span has to close here or
             // the next attempt would replace an open handle in the map.
             this.endTurnSpan(turn.id, 'requeued')
@@ -887,16 +1044,13 @@ export class ManagedAgentEngine {
             event: {
               type: 'error',
               code: 'turn_dispatch_failed',
-              message: safeProviderMessage(
-                error,
-                'Provider turn failed.',
-                this.mintedSecrets,
-              ),
+              message: safeProviderMessage(error, 'Provider turn failed.', this.mintedSecrets),
               retryable: false,
             },
           })
           void this.pump()
-        })
+        },
+      )
     } catch (error) {
       this.processes.clearActive(generation, turn.id)
       await this.providerEvents.accept({
@@ -914,20 +1068,27 @@ export class ManagedAgentEngine {
     return true
   }
 
-  async record(
-    sessionId: string,
-    turnId: string | null,
-    event: AgentNormalizedEvent,
-  ): Promise<AgentEventRecord> {
+  async record(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
     const record = await this.store.recordEvent(sessionId, turnId, event)
     const session = await this.store.requireSession(sessionId)
     let clientRecord = record
-    if (record.event.type === 'tool' && record.event.tool.kind === 'execute' && record.event.tool.status !== undefined) {
+    if (
+      record.event.type === 'tool' &&
+      record.event.tool.kind === 'execute' &&
+      record.event.tool.status !== undefined
+    ) {
       const { commandStatus } = await import('./commandLifecycle')
       const turn = record.turnId ? await this.store.turn(record.turnId) : null
-      clientRecord = { ...record, event: { type: 'tool', tool: {
-        ...record.event.tool, status: commandStatus(record.event.tool, turn ?? undefined, session),
-      } } }
+      clientRecord = {
+        ...record,
+        event: {
+          type: 'tool',
+          tool: {
+            ...record.event.tool,
+            status: commandStatus(record.event.tool, turn ?? undefined, session),
+          },
+        },
+      }
     }
     this.frames.emit({ channel: 'agent:event', event: clientRecord })
     await this.emitProjection(sessionId, record.turnId, event)
@@ -939,9 +1100,12 @@ export class ManagedAgentEngine {
     if (event.type === 'session_metadata' || this.frames.rowChanged(session)) {
       this.frames.emit({ channel: 'agent:session', session })
     }
-    if (event.type === 'turn_completed' || event.type === 'error'
-      || (event.type === 'session_state' && ['ready', 'stopped', 'failed', 'archived'].includes(event.state))
-      || (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))) {
+    if (
+      event.type === 'turn_completed' ||
+      event.type === 'error' ||
+      (event.type === 'session_state' && ['ready', 'stopped', 'failed', 'archived'].includes(event.state)) ||
+      (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))
+    ) {
       await this.settleCommands(sessionId)
     }
     return record
@@ -956,10 +1120,16 @@ export class ManagedAgentEngine {
       const turn = record.turnId ? await this.store.turn(record.turnId) : null
       const status = commandStatus(record.event.tool, turn ?? undefined, session)
       if (status === record.event.tool.status) continue
-      await this.record(record.sessionId, record.turnId, { type: 'tool', tool: {
-        id: record.event.tool.id, title: '', kind: 'execute', status,
-        subagentId: record.event.tool.subagentId,
-      } })
+      await this.record(record.sessionId, record.turnId, {
+        type: 'tool',
+        tool: {
+          id: record.event.tool.id,
+          title: '',
+          kind: 'execute',
+          status,
+          subagentId: record.event.tool.subagentId,
+        },
+      })
     }
   }
 
@@ -973,11 +1143,7 @@ export class ManagedAgentEngine {
   //
   // `error` is deliberately not here: it also expires this session's pending requests, which is a set
   // this projection cannot name, so the client still refetches for that one.
-  private async emitProjection(
-    sessionId: string,
-    turnId: string | null,
-    event: AgentNormalizedEvent,
-  ): Promise<void> {
+  private async emitProjection(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<void> {
     if (event.type === 'request' || event.type === 'request_resolved') {
       const request = await this.store.request(sessionId, event.requestId)
       if (request) this.frames.emit({ channel: 'agent:request', request })

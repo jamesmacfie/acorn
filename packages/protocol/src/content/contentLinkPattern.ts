@@ -27,7 +27,8 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
     throw new Error(`content-link pattern must be 1-${CONTENT_LINK_PATTERN_MAX_LENGTH} characters`)
   }
   if (!pattern.startsWith('https://')) throw new Error('content-link pattern must use https://')
-  if (pattern.includes('?') || pattern.includes('#')) throw new Error('content-link pattern cannot contain a query or fragment')
+  if (pattern.includes('?') || pattern.includes('#'))
+    throw new Error('content-link pattern cannot contain a query or fragment')
 
   const rest = pattern.slice('https://'.length)
   const slash = rest.indexOf('/')
@@ -45,7 +46,8 @@ export function compileContentLinkPattern(pattern: string): CompiledContentLinkP
 
   const rawPath = rest.slice(slash)
   const rawSegments = rawPath === '/' ? [] : rawPath.slice(1).split('/')
-  if (rawSegments.some((segment) => !segment)) throw new Error('content-link pattern path cannot contain empty segments')
+  if (rawSegments.some((segment) => !segment))
+    throw new Error('content-link pattern path cannot contain empty segments')
   const captures: string[] = []
   const segments: Segment[] = rawSegments.map((segment) => {
     const capture = /^\{([^{}]+)\}$/.exec(segment)?.[1]

@@ -26,14 +26,21 @@ export function SourceSurface(props: { source: SourceContribution }) {
   // because switching sources hands this same component a new source. The render effect opens the
   // record before the surface draws, and the effect closes it once the surface has mounted.
   const sourceId = () => props.source.id
-  createRenderEffect(on(sourceId, (id) => onCleanup(openFeature(id, sourceRegistry.ownerOf(id) ?? 'core', { kind: 'source', reportsUsable: false }))))
+  createRenderEffect(
+    on(sourceId, (id) =>
+      onCleanup(openFeature(id, sourceRegistry.ownerOf(id) ?? 'core', { kind: 'source', reportsUsable: false })),
+    ),
+  )
   createEffect(on(sourceId, featureMounted))
   return (
-    <Show when={props.source.regions} fallback={
-      <Show when={props.source.component}>
-        {(component) => <SourceRegion source={props.source} component={component()} />}
-      </Show>
-    }>
+    <Show
+      when={props.source.regions}
+      fallback={
+        <Show when={props.source.component}>
+          {(component) => <SourceRegion source={props.source} component={component()} />}
+        </Show>
+      }
+    >
       {(regions) => (
         // Keyed by the source, so collapsing GitHub's list leaves Linear's alone and each comes back
         // where it was left (kit/lib/layout/collapseState.ts). Every source that hands over two halves is a

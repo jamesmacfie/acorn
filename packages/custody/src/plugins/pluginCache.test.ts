@@ -1,6 +1,16 @@
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,10 +41,15 @@ const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text)).
 let dir = ''
 let served: { status: number; body: string | Uint8Array<ArrayBuffer> } | Error = { status: 200, body: BUNDLE }
 let legacyServed: typeof served | null = null
-let requests: Array<{ nodeId: string; request: NodeFetchRequest; limits: { maxResponseBytes?: number } | undefined }> = []
+let requests: Array<{ nodeId: string; request: NodeFetchRequest; limits: { maxResponseBytes?: number } | undefined }> =
+  []
 
 const broker = {
-  fetch: async (nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse> => {
+  fetch: async (
+    nodeId: string,
+    request: NodeFetchRequest,
+    limits?: { maxResponseBytes?: number },
+  ): Promise<NodeFetchResponse> => {
     requests.push({ nodeId, request, limits })
     const answer = request.path.endsWith('/client.js') && legacyServed ? legacyServed : served
     if (answer instanceof Error) throw answer
@@ -71,7 +86,12 @@ describe('fetching a bundle from a node', () => {
     expect(requests[0].limits).toEqual({ maxResponseBytes: MAX_BUNDLE_BYTES })
     expect(store.has(sha256(BUNDLE))).toBe(true)
     expect(readFileSync(join(cacheDir(), `${sha256(BUNDLE)}.js`), 'utf8')).toBe(BUNDLE)
-    expect(store.list()[sha256(BUNDLE)]).toMatchObject({ pluginId: 'sparkline', version: '1.2.0', bytes: BUNDLE.length, nodeIds: ['node-a'] })
+    expect(store.list()[sha256(BUNDLE)]).toMatchObject({
+      pluginId: 'sparkline',
+      version: '1.2.0',
+      bytes: BUNDLE.length,
+      nodeIds: ['node-a'],
+    })
   })
 
   it('survives the process: a second store reads the index off disk', async () => {
@@ -94,7 +114,9 @@ describe('fetching a bundle from a node', () => {
       { maxResponseBytes: MAX_BUNDLE_BYTES },
     ])
     legacyServed = { status: 200, body: 'other bytes' }
-    expect(await cache().putFromNode('old-node', 'changed', claim(sha256('different')))).toEqual({ error: 'hash-mismatch' })
+    expect(await cache().putFromNode('old-node', 'changed', claim(sha256('different')))).toEqual({
+      error: 'hash-mismatch',
+    })
   })
 
   it('does not re-fetch a bundle it already holds', async () => {
@@ -121,17 +143,28 @@ describe('installing a device bundle', () => {
     const folder = join(dir, 'package')
     mkdirSync(folder)
     writeFileSync(join(folder, 'client.js'), BUNDLE)
-    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify({
-      id: 'sparkline', name: 'Sparkline', version: '1.2.0', baseline: ACORN_BASELINE,
-      apiVersion: PLUGIN_API_MAJOR, client: 'client.js',
-    }))
+    writeFileSync(
+      join(folder, 'acorn-plugin.json'),
+      JSON.stringify({
+        id: 'sparkline',
+        name: 'Sparkline',
+        version: '1.2.0',
+        baseline: ACORN_BASELINE,
+        apiVersion: PLUGIN_API_MAJOR,
+        client: 'client.js',
+      }),
+    )
     return folder
   }
 
   it('hashes a folder bundle and re-reads it on update', async () => {
     const folder = packageFolder()
     const store = cache()
-    expect(await store.putFromSource({ path: folder })).toEqual({ hash: sha256(BUNDLE), pluginId: 'sparkline', version: '1.2.0' })
+    expect(await store.putFromSource({ path: folder })).toEqual({
+      hash: sha256(BUNDLE),
+      pluginId: 'sparkline',
+      version: '1.2.0',
+    })
     expect(store.list()[sha256(BUNDLE)]).toMatchObject({ source: { kind: 'device' }, installSource: { path: folder } })
     writeFileSync(join(folder, 'client.js'), 'export default 2')
     const updated = await store.putFromSource({ path: folder })
@@ -171,11 +204,15 @@ describe('installing a device bundle', () => {
     const folder = packageFolder()
     const file = join(folder, 'acorn-plugin.json')
     const manifest = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
-    manifest.contributions = { sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, tree: { list: 'list', detail: 'detail' } }] }
+    manifest.contributions = {
+      sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, tree: { list: 'list', detail: 'detail' } }],
+    }
     writeFileSync(file, JSON.stringify(manifest))
     const store = cache()
     expect(await store.putFromSource({ path: folder })).toMatchObject({ pluginId: 'sparkline' })
-    manifest.contributions = { sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, items: '/v1/p/sparkline/items' }] }
+    manifest.contributions = {
+      sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, items: '/v1/p/sparkline/items' }],
+    }
     writeFileSync(file, JSON.stringify(manifest))
     expect(await store.putFromSource({ path: folder })).toEqual({ error: 'has-node-half' })
   })
@@ -192,13 +229,18 @@ describe('installing a device bundle', () => {
     execFileSync('/usr/bin/mkfifo', [join(folder, 'pipe')], { timeout: 2000 })
     const archive = join(folder, '..', 'special.tgz')
     execFileSync('/usr/bin/tar', ['-czf', archive, '-C', folder, '.'], { timeout: 2000 })
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(readFileSync(archive)))))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Uint8Array(readFileSync(archive)))),
+    )
     const store = cache()
     try {
       await expect(store.putFromSource({ url: 'https://example.test/special.tgz' })).rejects.toThrow(/unsupported/)
       expect(store.list()).toEqual({})
       expect(readdirSync(dir).filter((name) => name.startsWith('.staging-'))).toEqual([])
-    } finally { vi.unstubAllGlobals() }
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('rejects an oversized local manifest before caching', async () => {
@@ -231,14 +273,18 @@ describe('trust binds to bytes, not to the listing', () => {
   })
 
   it('refuses a claim that is not a sha256 at all, without asking the node for anything', async () => {
-    expect(await cache().putFromNode('node-a', 'sparkline', { hash: '../../etc/passwd', version: '1.0.0' })).toEqual({ error: 'hash-mismatch' })
+    expect(await cache().putFromNode('node-a', 'sparkline', { hash: '../../etc/passwd', version: '1.0.0' })).toEqual({
+      error: 'hash-mismatch',
+    })
     expect(requests).toEqual([])
   })
 
   it('refuses a bundle over the size ceiling', async () => {
     const huge = new Uint8Array(MAX_BUNDLE_BYTES + 1)
     served = { status: 200, body: huge }
-    expect(await cache().putFromNode('node-a', 'sparkline', claim(createHash('sha256').update(huge).digest('hex')))).toEqual({ error: 'too-large' })
+    expect(
+      await cache().putFromNode('node-a', 'sparkline', claim(createHash('sha256').update(huge).digest('hex'))),
+    ).toEqual({ error: 'too-large' })
   })
 
   it('reports a transport refusal as too large rather than unreachable', async () => {
@@ -254,7 +300,10 @@ describe('eviction', () => {
     store.forgetNode('node-a')
     // Rewrite the index with an old lastSeen: the alternative is a test that waits a month.
     const path = join(cacheDir(), 'index.json')
-    const index = JSON.parse(readFileSync(path, 'utf8')) as { version: 1; entries: Record<string, { lastSeen: number }> }
+    const index = JSON.parse(readFileSync(path, 'utf8')) as {
+      version: 1
+      entries: Record<string, { lastSeen: number }>
+    }
     index.entries[sha256(BUNDLE)].lastSeen = Date.now() - 40 * 24 * 60 * 60 * 1000
     writeFileSync(path, JSON.stringify(index))
 
@@ -268,7 +317,10 @@ describe('eviction', () => {
     const store = cache()
     await store.putFromNode('node-a', 'sparkline', claim())
     const path = join(cacheDir(), 'index.json')
-    const index = JSON.parse(readFileSync(path, 'utf8')) as { version: 1; entries: Record<string, { lastSeen: number }> }
+    const index = JSON.parse(readFileSync(path, 'utf8')) as {
+      version: 1
+      entries: Record<string, { lastSeen: number }>
+    }
     index.entries[sha256(BUNDLE)].lastSeen = Date.now() - 40 * 24 * 60 * 60 * 1000
     writeFileSync(path, JSON.stringify(index))
 
@@ -298,7 +350,13 @@ describe('caching the application own bundles', () => {
     const store = cache()
     const results = store.putBundledBatch([
       { pluginId: 'first', version: '1', read: () => new TextEncoder().encode('first') },
-      { pluginId: 'missing', version: '1', read: () => { throw new Error('missing resource') } },
+      {
+        pluginId: 'missing',
+        version: '1',
+        read: () => {
+          throw new Error('missing resource')
+        },
+      },
       { pluginId: 'large', version: '1', read: () => new Uint8Array(MAX_BUNDLE_BYTES + 1) },
       { pluginId: 'last', version: '1', read: () => new TextEncoder().encode('last') },
     ])
@@ -317,7 +375,9 @@ describe('caching the application own bundles', () => {
   it('does not publish failed index writes and retries their unindexed bodies', () => {
     const store = cache()
     const bytes = new TextEncoder().encode(BUNDLE)
-    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => { throw new Error('disk unavailable') })
+    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => {
+      throw new Error('disk unavailable')
+    })
 
     expect(() => store.putBundled('sparkline', '1', bytes)).toThrow('disk unavailable')
     expect(store.list()).toEqual({})
@@ -333,7 +393,9 @@ describe('caching the application own bundles', () => {
     const before = readFileSync(path, 'utf8')
     const second = new TextEncoder().encode('second bundle')
     vi.mocked(renameSync).mockImplementationOnce(vi.mocked(renameSync).getMockImplementation()!)
-    vi.mocked(renameSync).mockImplementationOnce(() => { throw new Error('replacement unavailable') })
+    vi.mocked(renameSync).mockImplementationOnce(() => {
+      throw new Error('replacement unavailable')
+    })
 
     expect(() => store.putBundled('second', '1', second)).toThrow('replacement unavailable')
     expect(readFileSync(path, 'utf8')).toBe(before)
@@ -350,7 +412,11 @@ describe('caching the application own bundles', () => {
     rmSync(store.path(sha256(BUNDLE))!)
     store.putBundledBatch([{ pluginId: 'sparkline', version: '2', read: () => new TextEncoder().encode(BUNDLE) }])
 
-    expect(cache().list()[sha256(BUNDLE)]).toMatchObject({ nodeIds: ['node-a'], firstSeen: before.firstSeen, version: '2' })
+    expect(cache().list()[sha256(BUNDLE)]).toMatchObject({
+      nodeIds: ['node-a'],
+      firstSeen: before.firstSeen,
+      version: '2',
+    })
     expect(readFileSync(cache().path(sha256(BUNDLE))!, 'utf8')).toBe(BUNDLE)
   })
 

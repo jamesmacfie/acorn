@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionUpdate } from '@agentclientprotocol/sdk'
-import { acpElicitationResponse, acpPermissionSubject, normalizeAcpElicitation, normalizeAcpUpdate } from './acpNormalizer'
+import {
+  acpElicitationResponse,
+  acpPermissionSubject,
+  normalizeAcpElicitation,
+  normalizeAcpUpdate,
+} from './acpNormalizer'
 import { foldSubagentRoster } from '../sessions/stateMachine'
 import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 import capture from './__fixtures__/claudeSubagentWire.json' with { type: 'json' }
@@ -16,72 +21,90 @@ const toolEvent = (update: SessionUpdate) => {
 
 describe('ACP tool call normalization', () => {
   it('keeps the MCP tool identity separate from its provider title', () => {
-    expect(toolEvent({ sessionUpdate: 'tool_call', toolCallId: 'memory', title: 'Save a memory',
-      _meta: { claudeCode: { toolName: 'mcp__acorn__memory_write' } },
-    })).toMatchObject({ name: 'memory_write', title: 'Save a memory' })
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'memory',
+        title: 'Save a memory',
+        _meta: { claudeCode: { toolName: 'mcp__acorn__memory_write' } },
+      }),
+    ).toMatchObject({ name: 'memory_write', title: 'Save a memory' })
   })
 
   it('carries inline text content through as the call output', () => {
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'bash-1',
-      status: 'completed',
-      content: [
-        { type: 'content', content: { type: 'text', text: 'first' } },
-        { type: 'content', content: { type: 'text', text: 'second' } },
-      ],
-    })).toMatchObject({ id: 'bash-1', status: 'completed', output: 'first\nsecond' })
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'bash-1',
+        status: 'completed',
+        content: [
+          { type: 'content', content: { type: 'text', text: 'first' } },
+          { type: 'content', content: { type: 'text', text: 'second' } },
+        ],
+      }),
+    ).toMatchObject({ id: 'bash-1', status: 'completed', output: 'first\nsecond' })
   })
 
   it('unwraps the markdown fence a command\u2019s output arrives in', () => {
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'bash-1',
-      status: 'completed',
-      content: [{ type: 'content', content: { type: 'text', text: '```console\nline one\nline two\n```' } }],
-    }).output).toBe('line one\nline two')
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'bash-1',
+        status: 'completed',
+        content: [{ type: 'content', content: { type: 'text', text: '```console\nline one\nline two\n```' } }],
+      }).output,
+    ).toBe('line one\nline two')
   })
 
   it('leaves text that is not a whole fence alone', () => {
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'bash-1',
-      content: [{ type: 'content', content: { type: 'text', text: 'plain output' } }],
-    }).output).toBe('plain output')
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'bash-1',
+        content: [{ type: 'content', content: { type: 'text', text: 'plain output' } }],
+      }).output,
+    ).toBe('plain output')
   })
 
   it('leaves the status absent when the update does not report one', () => {
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'bash-1',
-      content: [{ type: 'content', content: { type: 'text', text: 'more output' } }],
-    }).status).toBeUndefined()
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'bash-1',
+        content: [{ type: 'content', content: { type: 'text', text: 'more output' } }],
+      }).status,
+    ).toBeUndefined()
   })
 
   it('defaults a new call to pending and maps in_progress to running', () => {
     expect(toolEvent({ sessionUpdate: 'tool_call', toolCallId: 'bash-1', title: 'Bash' }).status).toBe('pending')
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'bash-1',
-      status: 'in_progress',
-    }).status).toBe('running')
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'bash-1',
+        status: 'in_progress',
+      }).status,
+    ).toBe('running')
   })
 
   // Without this a running call has nothing to disclose, because output only lands on the completion
   // update, so its card cannot honour the reader's fold setting until the call is over.
   it('carries a call’s parameters through as its input', () => {
-    expect(toolEvent({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'bash-1',
-      title: 'ls -la /tmp',
-      rawInput: { command: 'ls -la /tmp', description: 'List files' },
-    }).input).toBe('{\n  "command": "ls -la /tmp",\n  "description": "List files"\n}')
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'bash-1',
+        title: 'ls -la /tmp',
+        rawInput: { command: 'ls -la /tmp', description: 'List files' },
+      }).input,
+    ).toBe('{\n  "command": "ls -la /tmp",\n  "description": "List files"\n}')
   })
 
   it('sends no input for parameters there is nothing to show for', () => {
     for (const rawInput of [undefined, null, {}, 'a string', ['an', 'array'], 42]) {
-      expect(toolEvent({ sessionUpdate: 'tool_call', toolCallId: 'bash-1', title: 'Bash', rawInput }).input)
-        .toBeUndefined()
+      expect(
+        toolEvent({ sessionUpdate: 'tool_call', toolCallId: 'bash-1', title: 'Bash', rawInput }).input,
+      ).toBeUndefined()
     }
   })
 })
@@ -94,21 +117,25 @@ describe('an ACP diff becomes a patch', () => {
     normalizeAcpUpdate(update, 'Claude Code').filter((event) => event.type === 'file_change')
 
   it('marks an edit’s excerpt, whose line numbers are not the file’s', () => {
-    expect(changes({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'toolu_1',
-      title: 'Edit a.ts',
-      content: [{ type: 'diff', path: '/w/a.ts', oldText: 'keep\nold', newText: 'keep\nnew' }],
-      locations: [{ path: '/w/a.ts' }],
-    })).toEqual([{
-      type: 'file_change',
-      path: '/w/a.ts',
-      patch: '@@ -1,2 +1,2 @@\n keep\n-old\n+new',
-      changeId: 'toolu_1',
-      snippet: true,
-      summary: 'Claude Code updated a file.',
-      subagentId: undefined,
-    }])
+    expect(
+      changes({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'toolu_1',
+        title: 'Edit a.ts',
+        content: [{ type: 'diff', path: '/w/a.ts', oldText: 'keep\nold', newText: 'keep\nnew' }],
+        locations: [{ path: '/w/a.ts' }],
+      }),
+    ).toEqual([
+      {
+        type: 'file_change',
+        path: '/w/a.ts',
+        patch: '@@ -1,2 +1,2 @@\n keep\n-old\n+new',
+        changeId: 'toolu_1',
+        snippet: true,
+        summary: 'Claude Code updated a file.',
+        subagentId: undefined,
+      },
+    ])
   })
 
   it('reads a missing old text as a new file, numbered from its first line', () => {
@@ -131,7 +158,10 @@ describe('an ACP diff becomes a patch', () => {
         { type: 'diff', path: '/w/a.ts', oldText: 'k1\nold', newText: 'k1\nnew\nextra' },
         { type: 'diff', path: '/w/a.ts', oldText: 'k2\nq', newText: 'k2\nr' },
       ],
-      locations: [{ path: '/w/a.ts', line: 10 }, { path: '/w/a.ts', line: 40 }],
+      locations: [
+        { path: '/w/a.ts', line: 10 },
+        { path: '/w/a.ts', line: 40 },
+      ],
     })
     expect(rest).toEqual([])
     // The second hunk's old side starts a line earlier, because the first one added a line.
@@ -149,8 +179,8 @@ describe('an ACP diff becomes a patch', () => {
 // with adapter 0.54.1 actually sent for a two-subagent fan-out.
 const captured = capture.updates as SessionUpdate[]
 const normalizedCapture = captured.flatMap((update) => normalizeAcpUpdate(update, 'Claude Code'))
-const subagents = normalizedCapture.flatMap((event) => event.type === 'subagent' ? [event.subagent] : [])
-const tools = normalizedCapture.flatMap((event) => event.type === 'tool' ? [event.tool] : [])
+const subagents = normalizedCapture.flatMap((event) => (event.type === 'subagent' ? [event.subagent] : []))
+const tools = normalizedCapture.flatMap((event) => (event.type === 'tool' ? [event.tool] : []))
 
 describe('Claude subagent attribution, against the captured wire', () => {
   it('finds both subagents and never emits one as a plain tool call', () => {
@@ -185,8 +215,10 @@ describe('Claude subagent attribution, against the captured wire', () => {
   })
 
   it('titles each row from the spawning call\u2019s description', () => {
-    expect(subagents.flatMap((subagent) => subagent.title ? [subagent.title] : []))
-      .toEqual(['Read alpha.txt first line', 'Read beta.txt first line'])
+    expect(subagents.flatMap((subagent) => (subagent.title ? [subagent.title] : []))).toEqual([
+      'Read alpha.txt first line',
+      'Read beta.txt first line',
+    ])
   })
 
   it('never seeds a row with the bare tool name', () => {
@@ -204,8 +236,7 @@ describe('Claude subagent attribution, against the captured wire', () => {
     expect(briefs.length).toBe(2)
     for (const brief of briefs) {
       expect(ids.has((brief as Extract<AgentNormalizedEvent, { type: 'user_message' }>).subagentId!)).toBe(true)
-      expect((brief as Extract<AgentNormalizedEvent, { type: 'user_message' }>).text)
-        .toContain('Working directory')
+      expect((brief as Extract<AgentNormalizedEvent, { type: 'user_message' }>).text).toContain('Working directory')
     }
     // And the call it came out of has nothing left to disclose.
     for (const id of ids) {
@@ -216,8 +247,10 @@ describe('Claude subagent attribution, against the captured wire', () => {
   it('leaves the parent\u2019s own prose unattributed', () => {
     // This CLI never forwards a subagent's own text, so anything tagged here would be a bug in the
     // reader rather than a feature of the wire.
-    const prose = normalizedCapture.filter((event): event is Extract<AgentNormalizedEvent, { type: 'assistant_message' }> =>
-      event.type === 'assistant_message')
+    const prose = normalizedCapture.filter(
+      (event): event is Extract<AgentNormalizedEvent, { type: 'assistant_message' }> =>
+        event.type === 'assistant_message',
+    )
     expect(prose.length).toBeGreaterThan(0)
     expect(prose.every((event) => event.subagentId === undefined)).toBe(true)
   })
@@ -231,16 +264,22 @@ describe('a backgrounded subagent, as the wire reports it', () => {
   const meta = (extra: Record<string, unknown>) => ({ _meta: { claudeCode: extra } })
 
   const launchInput = {
-    sessionUpdate: 'tool_call_update', toolCallId: agentId, title: 'Recon the sessions folder',
+    sessionUpdate: 'tool_call_update',
+    toolCallId: agentId,
+    title: 'Recon the sessions folder',
     rawInput: { subagent_type: 'general-purpose', run_in_background: true },
     ...meta({ toolName: 'Agent' }),
   } as unknown as SessionUpdate
   const launchSummary = {
-    sessionUpdate: 'tool_call_update', toolCallId: agentId,
+    sessionUpdate: 'tool_call_update',
+    toolCallId: agentId,
     ...meta({ toolResponse: { agentId: 'a97', agentType: 'general-purpose', status: 'async_launched' } }),
   } as unknown as SessionUpdate
   const spawnCompleted = {
-    sessionUpdate: 'tool_call_update', toolCallId: agentId, status: 'completed', ...meta({ toolName: 'Agent' }),
+    sessionUpdate: 'tool_call_update',
+    toolCallId: agentId,
+    status: 'completed',
+    ...meta({ toolName: 'Agent' }),
   } as unknown as SessionUpdate
 
   const rosterFrom = (updates: SessionUpdate[]) => {
@@ -267,7 +306,8 @@ describe('a backgrounded subagent, as the wire reports it', () => {
 
   it('still settles when a real completion summary arrives', () => {
     const done = {
-      sessionUpdate: 'tool_call_update', toolCallId: agentId,
+      sessionUpdate: 'tool_call_update',
+      toolCallId: agentId,
       ...meta({ toolResponse: { agentId: 'a97', status: 'completed', totalDurationMs: 51000, totalToolUseCount: 22 } }),
     } as unknown as SessionUpdate
     const roster = rosterFrom([launchInput, launchSummary, spawnCompleted, done])
@@ -277,11 +317,17 @@ describe('a backgrounded subagent, as the wire reports it', () => {
   it('leaves a foreground subagent settling on its own completion, as before', () => {
     // Same shape without the background flag: the spawning call’s completion is the child’s finish.
     const fgSpawn = {
-      sessionUpdate: 'tool_call_update', toolCallId: 'toolu_fg', title: 'Read one file',
-      rawInput: { subagent_type: 'general-purpose', run_in_background: false }, ...meta({ toolName: 'Agent' }),
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'toolu_fg',
+      title: 'Read one file',
+      rawInput: { subagent_type: 'general-purpose', run_in_background: false },
+      ...meta({ toolName: 'Agent' }),
     } as unknown as SessionUpdate
     const fgDone = {
-      sessionUpdate: 'tool_call_update', toolCallId: 'toolu_fg', status: 'completed', ...meta({ toolName: 'Agent' }),
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'toolu_fg',
+      status: 'completed',
+      ...meta({ toolName: 'Agent' }),
     } as unknown as SessionUpdate
     const roster = rosterFrom([fgSpawn, fgDone])
     expect(roster[0]).toMatchObject({ status: 'completed' })
@@ -290,13 +336,17 @@ describe('a backgrounded subagent, as the wire reports it', () => {
 })
 
 describe('Claude subagent attribution, unit cases', () => {
-  const spawn = (toolName: string): AgentNormalizedEvent[] => normalizeAcpUpdate({
-    sessionUpdate: 'tool_call',
-    toolCallId: 'agent-1',
-    title: 'Task',
-    kind: 'think',
-    _meta: { claudeCode: { toolName } },
-  } as SessionUpdate, 'Claude Code')
+  const spawn = (toolName: string): AgentNormalizedEvent[] =>
+    normalizeAcpUpdate(
+      {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'agent-1',
+        title: 'Task',
+        kind: 'think',
+        _meta: { claudeCode: { toolName } },
+      } as SessionUpdate,
+      'Claude Code',
+    )
 
   it('treats the older Task name as the same tool', () => {
     for (const toolName of ['Agent', 'Task']) {
@@ -305,23 +355,29 @@ describe('Claude subagent attribution, unit cases', () => {
   })
 
   it('leaves an unrelated tool alone', () => {
-    const events = normalizeAcpUpdate({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'bash-9',
-      title: 'ls',
-      _meta: { claudeCode: { toolName: 'Bash' } },
-    } as SessionUpdate, 'Claude Code')
+    const events = normalizeAcpUpdate(
+      {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'bash-9',
+        title: 'ls',
+        _meta: { claudeCode: { toolName: 'Bash' } },
+      } as SessionUpdate,
+      'Claude Code',
+    )
     expect(events.some((event) => event.type === 'subagent')).toBe(false)
     expect(events[0]).toMatchObject({ type: 'tool', tool: { id: 'bash-9', subagentId: undefined } })
   })
 
   it('ignores a foreign harness\u2019s own metadata namespace', () => {
-    const events = normalizeAcpUpdate({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'tool-1',
-      title: 'Something',
-      _meta: { someOtherHarness: { toolName: 'Agent', parentToolUseId: 'x' } },
-    } as SessionUpdate, 'Other')
+    const events = normalizeAcpUpdate(
+      {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'tool-1',
+        title: 'Something',
+        _meta: { someOtherHarness: { toolName: 'Agent', parentToolUseId: 'x' } },
+      } as SessionUpdate,
+      'Other',
+    )
     expect(events.some((event) => event.type === 'subagent')).toBe(false)
     expect(events[0]).toMatchObject({ type: 'tool', tool: { subagentId: undefined } })
   })
@@ -331,12 +387,16 @@ describe('Claude subagent attribution, unit cases', () => {
   // This is what @agentclientprotocol/claude-agent-acp 0.54.1 sends for a `tool_progress` message,
   // transcribed from its `case "tool_progress"` in dist/acp-agent.js. The id is the CLI's own,
   // `${toolUseID}-heartbeat-${n}` from the 30-second interval in the 2.1.269 binary.
-  const heartbeat = (toolName: string): AgentNormalizedEvent[] => normalizeAcpUpdate({
-    sessionUpdate: 'tool_call_update',
-    toolCallId: 'agent-1-heartbeat-0',
-    status: 'in_progress',
-    _meta: { claudeCode: { toolName, toolResponse: { elapsedTimeSeconds: 30 } } },
-  } as SessionUpdate, 'Claude Code')
+  const heartbeat = (toolName: string): AgentNormalizedEvent[] =>
+    normalizeAcpUpdate(
+      {
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'agent-1-heartbeat-0',
+        status: 'in_progress',
+        _meta: { claudeCode: { toolName, toolResponse: { elapsedTimeSeconds: 30 } } },
+      } as SessionUpdate,
+      'Claude Code',
+    )
 
   it('drops a progress heartbeat instead of inventing a call for it', () => {
     // `Agent` is the one that hurt: every ping minted a subagent row that never settled.
@@ -345,11 +405,14 @@ describe('Claude subagent attribution, unit cases', () => {
   })
 
   it('reads a failed subagent out of the summary rather than the status', () => {
-    const [event] = normalizeAcpUpdate({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'agent-1',
-      _meta: { claudeCode: { toolResponse: { agentId: 'a1', status: 'error' } } },
-    } as SessionUpdate, 'Claude Code')
+    const [event] = normalizeAcpUpdate(
+      {
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'agent-1',
+        _meta: { claudeCode: { toolResponse: { agentId: 'a1', status: 'error' } } },
+      } as SessionUpdate,
+      'Claude Code',
+    )
     expect(event).toMatchObject({ type: 'subagent', subagent: { status: 'failed', providerAgentRef: 'a1' } })
   })
 })
@@ -376,8 +439,9 @@ describe('the captured fan-out as a transcript', () => {
   it('leaves no orphan tool card at the top level', () => {
     // The bug: the adapter leaves a subagent's mid-call update untagged, and a per-stream fold could not
     // place it, so seven cards appeared at the top titled with a raw tool id.
-    const orphans = projected().filter((item) =>
-      item.event.type === 'tool' && item.event.tool.title.startsWith('toolu_'))
+    const orphans = projected().filter(
+      (item) => item.event.type === 'tool' && item.event.tool.title.startsWith('toolu_'),
+    )
     expect(orphans).toEqual([])
   })
 
@@ -432,7 +496,7 @@ describe('an ACP form elicitation becomes a question', () => {
       title: 'Which package manager should I use?',
       options: [{ id: 'decline', label: 'Skip' }],
     })
-    const questions = event.type === 'request' ? event.questions ?? [] : []
+    const questions = event.type === 'request' ? (event.questions ?? []) : []
     expect(questions).toHaveLength(2)
     // One question and no description, so the header would only repeat the prompt.
     expect(questions[0]).toEqual({
@@ -464,12 +528,15 @@ describe('an ACP form elicitation becomes a question', () => {
         },
       },
     })
-    const [question] = event.type === 'request' ? event.questions ?? [] : []
+    const [question] = event.type === 'request' ? (event.questions ?? []) : []
     expect(question).toEqual({
       id: 'question_0',
       header: 'Auth',
       prompt: 'Which sign-in method do you want?',
-      options: [{ id: 'OAuth', label: 'OAuth' }, { id: 'Magic link', label: 'Magic link' }],
+      options: [
+        { id: 'OAuth', label: 'OAuth' },
+        { id: 'Magic link', label: 'Magic link' },
+      ],
     })
   })
 
@@ -483,23 +550,33 @@ describe('an ACP form elicitation becomes a question', () => {
         properties: {
           question_0: {
             type: 'array',
-            items: { anyOf: [{ const: 'lint', title: 'Lint' }, { const: 'test', title: 'Test' }] },
+            items: {
+              anyOf: [
+                { const: 'lint', title: 'Lint' },
+                { const: 'test', title: 'Test' },
+              ],
+            },
           },
         },
       },
     })
-    const [question] = event.type === 'request' ? event.questions ?? [] : []
+    const [question] = event.type === 'request' ? (event.questions ?? []) : []
     expect(question.multiple).toBe(true)
-    expect(question.options).toEqual([{ id: 'lint', label: 'Lint' }, { id: 'test', label: 'Test' }])
+    expect(question.options).toEqual([
+      { id: 'lint', label: 'Lint' },
+      { id: 'test', label: 'Test' },
+    ])
   })
 })
 
 describe('an answer goes back in the shape the agent asked for', () => {
   it('sends the option value behind the label a person picked', () => {
     // The card answers with labels, and this label is the flattened "value — description" one.
-    expect(acpElicitationResponse(askUserQuestion, {
-      answers: { question_0: 'pnpm — what the repo already uses', question_0_custom: '' },
-    })).toEqual({ action: 'accept', content: { question_0: 'pnpm' } })
+    expect(
+      acpElicitationResponse(askUserQuestion, {
+        answers: { question_0: 'pnpm — what the repo already uses', question_0_custom: '' },
+      }),
+    ).toEqual({ action: 'accept', content: { question_0: 'pnpm' } })
   })
 
   it('keeps a multi-select an array and a free-text answer a string', () => {
@@ -517,9 +594,11 @@ describe('an answer goes back in the shape the agent asked for', () => {
         },
       },
     }
-    expect(acpElicitationResponse(request, {
-      answers: { checks: ['lint', 'test'], why: 'the build is red', count: '3', rerun: 'Yes' },
-    })).toEqual({
+    expect(
+      acpElicitationResponse(request, {
+        answers: { checks: ['lint', 'test'], why: 'the build is red', count: '3', rerun: 'Yes' },
+      }),
+    ).toEqual({
       action: 'accept',
       content: { checks: ['lint', 'test'], why: 'the build is red', count: 3, rerun: true },
     })
@@ -536,15 +615,19 @@ describe('an answer goes back in the shape the agent asked for', () => {
 })
 
 describe('Claude’s plan-mode handover', () => {
-  const exitPlanMode = (update: Partial<SessionUpdate> = {}): AgentNormalizedEvent[] => normalizeAcpUpdate({
-    sessionUpdate: 'tool_call',
-    toolCallId: 'plan-1',
-    title: 'Ready to code?',
-    kind: 'other',
-    rawInput: { plan: '# The plan\n\n- step one\n- step two' },
-    _meta: { claudeCode: { toolName: 'ExitPlanMode' } },
-    ...update,
-  } as SessionUpdate, 'Claude Code')
+  const exitPlanMode = (update: Partial<SessionUpdate> = {}): AgentNormalizedEvent[] =>
+    normalizeAcpUpdate(
+      {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'plan-1',
+        title: 'Ready to code?',
+        kind: 'other',
+        rawInput: { plan: '# The plan\n\n- step one\n- step two' },
+        _meta: { claudeCode: { toolName: 'ExitPlanMode' } },
+        ...update,
+      } as SessionUpdate,
+      'Claude Code',
+    )
 
   it('posts the plan as the agent talking, in the markdown it was written in', () => {
     expect(exitPlanMode()[0]).toEqual({
@@ -574,25 +657,30 @@ describe('Claude’s plan-mode handover', () => {
   // The other end of a subagent's run, and it arrived the same way: the whole report riding in a call's
   // parameters. `SubagentHandback` is the child's call, so the report lands in the child's stream.
   it('posts a subagent’s report back as that subagent talking', () => {
-    const events = normalizeAcpUpdate({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'handback-1',
-      title: 'SubagentHandback',
-      rawInput: { message: '# Report\n\nfindings' },
-      _meta: { claudeCode: { toolName: 'SubagentHandback', parentToolUseId: 'agent-1' } },
-    } as SessionUpdate, 'Claude Code')
+    const events = normalizeAcpUpdate(
+      {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'handback-1',
+        title: 'SubagentHandback',
+        rawInput: { message: '# Report\n\nfindings' },
+        _meta: { claudeCode: { toolName: 'SubagentHandback', parentToolUseId: 'agent-1' } },
+      } as SessionUpdate,
+      'Claude Code',
+    )
     expect(events[0]).toEqual({ type: 'assistant_message', text: '# Report\n\nfindings', subagentId: 'agent-1' })
     expect(events.find((event) => event.type === 'tool')).toMatchObject({ tool: { input: undefined } })
   })
 
   it('leaves every other tool’s parameters alone', () => {
-    expect(toolEvent({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'bash-1',
-      title: 'Bash',
-      rawInput: { plan: 'not a plan' },
-      _meta: { claudeCode: { toolName: 'Bash' } },
-    }).input).toBe('{\n  "plan": "not a plan"\n}')
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'bash-1',
+        title: 'Bash',
+        rawInput: { plan: 'not a plan' },
+        _meta: { claudeCode: { toolName: 'Bash' } },
+      }).input,
+    ).toBe('{\n  "plan": "not a plan"\n}')
   })
 })
 
@@ -606,20 +694,46 @@ describe('Claude’s plan-mode handover', () => {
 // on the others rather than say "empty".
 describe('Claude web activity, against the captured wire', () => {
   const tools = webCapture.updates.map((update) => toolEvent(update as unknown as SessionUpdate))
-  const folded = (id: string) => tools.filter((tool) => tool.id === id)
-    .reduce((card, update) => {
-      const [item] = buildConversationItems([
-        { id: 'a', sessionId: 's', turnId: 't', seq: 1, event: { type: 'tool', tool: card }, searchText: null, createdAt: 0 },
-        { id: 'b', sessionId: 's', turnId: 't', seq: 2, event: { type: 'tool', tool: update }, searchText: null, createdAt: 0 },
-      ] as AgentEventRecord[])
-      if (item.event.type !== 'tool') throw new Error('expected a tool card')
-      return item.event.tool
-    })
+  const folded = (id: string) =>
+    tools
+      .filter((tool) => tool.id === id)
+      .reduce((card, update) => {
+        const [item] = buildConversationItems([
+          {
+            id: 'a',
+            sessionId: 's',
+            turnId: 't',
+            seq: 1,
+            event: { type: 'tool', tool: card },
+            searchText: null,
+            createdAt: 0,
+          },
+          {
+            id: 'b',
+            sessionId: 's',
+            turnId: 't',
+            seq: 2,
+            event: { type: 'tool', tool: update },
+            searchText: null,
+            createdAt: 0,
+          },
+        ] as AgentEventRecord[])
+        if (item.event.type !== 'tool') throw new Error('expected a tool card')
+        return item.event.tool
+      })
 
   it('names the row after what the call did, not after the adapter’s quoted title', () => {
     // The adapter titles this one `"Agent Client Protocol specification" (allowed: …)`.
-    expect(tools.map((tool) => tool.title))
-      .toEqual(['Search web', 'Search web', 'Fetch page', 'Fetch page', 'Fetch page', 'Fetch page', 'Search web', 'Search web'])
+    expect(tools.map((tool) => tool.title)).toEqual([
+      'Search web',
+      'Search web',
+      'Fetch page',
+      'Fetch page',
+      'Fetch page',
+      'Fetch page',
+      'Search web',
+      'Search web',
+    ])
   })
 
   it('keeps the query and the domain filter of a search', () => {
@@ -634,14 +748,21 @@ describe('Claude web activity, against the captured wire', () => {
 
   it('keeps the URL and the page prompt of a fetch', () => {
     expect(tools[3].web).toEqual({
-      action: { type: 'fetch_page', url: 'https://agentclientprotocol.com/protocol/overview', prompt: 'what is a session' },
+      action: {
+        type: 'fetch_page',
+        url: 'https://agentclientprotocol.com/protocol/overview',
+        prompt: 'what is a session',
+      },
     })
   })
 
   it('reads the sources out of the structured tool response rather than out of its prose', () => {
     expect(tools[6].web?.action).toBeUndefined()
     expect(tools[6].web?.results?.slice(0, 2)).toEqual([
-      { url: 'https://agentclientprotocol.com/get-started/introduction', title: 'Introduction - Agent Client Protocol' },
+      {
+        url: 'https://agentclientprotocol.com/get-started/introduction',
+        title: 'Introduction - Agent Client Protocol',
+      },
       { url: 'https://agentclientprotocol.com/protocol/v1/overview', title: 'Overview - Agent Client Protocol' },
     ])
   })
@@ -681,21 +802,25 @@ describe('Claude web activity, unit cases', () => {
   it('leaves an ACP call that is not Claude’s generic, however it spells its kind', () => {
     // `fetch` is the kind Claude's own web tools use, and `search` is what another harness may well
     // call a repository grep. Neither is evidence about the web on its own.
-    expect(toolEvent({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'other-1',
-      title: 'Search the repository',
-      kind: 'search',
-      rawInput: { query: 'signIn' },
-    }).web).toBeUndefined()
-    expect(toolEvent({
-      sessionUpdate: 'tool_call',
-      toolCallId: 'other-2',
-      title: 'Fetch',
-      kind: 'fetch',
-      _meta: { someOtherHarness: { toolName: 'WebSearch' } },
-      rawInput: { query: 'signIn' },
-    }).web).toBeUndefined()
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'other-1',
+        title: 'Search the repository',
+        kind: 'search',
+        rawInput: { query: 'signIn' },
+      }).web,
+    ).toBeUndefined()
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'other-2',
+        title: 'Fetch',
+        kind: 'fetch',
+        _meta: { someOtherHarness: { toolName: 'WebSearch' } },
+        rawInput: { query: 'signIn' },
+      }).web,
+    ).toBeUndefined()
   })
 
   it('settles a search that never carried a usable query', () => {
@@ -717,57 +842,79 @@ describe('Claude web activity, unit cases', () => {
 
   it('says nothing about the web on an update that reported neither request nor sources', () => {
     // Otherwise the completion update, which carries only a status, would blank the query above it.
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'web-1',
-      status: 'completed',
-      _meta: { claudeCode: { toolName: 'WebSearch' } },
-    }).web).toBeUndefined()
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'web-1',
+        status: 'completed',
+        _meta: { claudeCode: { toolName: 'WebSearch' } },
+      }).web,
+    ).toBeUndefined()
   })
 
   it('reads past result entries that are prose rather than sources', () => {
     // `toolResponse.results` mixes the source objects with the model's own text.
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'web-1',
-      _meta: {
-        claudeCode: {
-          toolName: 'WebSearch',
-          toolResponse: {
-            query: 'q',
-            results: ['prose', { content: [{ title: 'One', url: 'https://example.com/one' }, { title: 'no url' }] }],
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'web-1',
+        _meta: {
+          claudeCode: {
+            toolName: 'WebSearch',
+            toolResponse: {
+              query: 'q',
+              results: ['prose', { content: [{ title: 'One', url: 'https://example.com/one' }, { title: 'no url' }] }],
+            },
           },
         },
-      },
-    }).web?.results).toEqual([{ url: 'https://example.com/one', title: 'One' }])
+      }).web?.results,
+    ).toEqual([{ url: 'https://example.com/one', title: 'One' }])
   })
 
   it('reads a 404 off a fetch that the CLI reports as finished', () => {
     // The shape Claude Code returned for https://httpbin.org/status/404 on 2026-09-28: not an error,
     // no page, and the status only in the structured response.
-    expect(toolEvent({
-      sessionUpdate: 'tool_call_update',
-      toolCallId: 'fetch-1',
-      _meta: {
-        claudeCode: {
-          toolName: 'WebFetch',
-          toolResponse: { bytes: 0, code: 404, codeText: 'Not Found', result: 'The server returned HTTP 404 Not Found.', durationMs: 1168, url: 'https://httpbin.org/status/404' },
+    expect(
+      toolEvent({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'fetch-1',
+        _meta: {
+          claudeCode: {
+            toolName: 'WebFetch',
+            toolResponse: {
+              bytes: 0,
+              code: 404,
+              codeText: 'Not Found',
+              result: 'The server returned HTTP 404 Not Found.',
+              durationMs: 1168,
+              url: 'https://httpbin.org/status/404',
+            },
+          },
         },
-      },
-    }).web).toEqual({ status: { code: 404, text: 'Not Found' } })
+      }).web,
+    ).toEqual({ status: { code: 404, text: 'Not Found' } })
   })
 })
 
 describe('Claude tool loading', () => {
-  const load = (update: Partial<SessionUpdate> & Record<string, unknown>) => toolEvent({
-    toolCallId: 'load-1',
-    ...update,
-    _meta: { claudeCode: { toolName: 'ToolSearch', ...(update._meta as object | undefined) } },
-  } as unknown as SessionUpdate)
+  const load = (update: Partial<SessionUpdate> & Record<string, unknown>) =>
+    toolEvent({
+      toolCallId: 'load-1',
+      ...update,
+      _meta: { claudeCode: { toolName: 'ToolSearch', ...(update._meta as object | undefined) } },
+    } as unknown as SessionUpdate)
   const fold = (...updates: ReturnType<typeof load>[]) => {
-    const [item] = buildConversationItems(updates.map((tool, at) => ({
-      id: `e${at}`, sessionId: 's', turnId: 't', seq: at + 1, event: { type: 'tool', tool }, searchText: null, createdAt: 0,
-    })) as AgentEventRecord[])
+    const [item] = buildConversationItems(
+      updates.map((tool, at) => ({
+        id: `e${at}`,
+        sessionId: 's',
+        turnId: 't',
+        seq: at + 1,
+        event: { type: 'tool', tool },
+        searchText: null,
+        createdAt: 0,
+      })) as AgentEventRecord[],
+    )
     if (item.event.type !== 'tool') throw new Error('expected a tool card')
     return item.event.tool
   }
@@ -775,9 +922,20 @@ describe('Claude tool loading', () => {
   it('names the row after the tools it loaded and has nothing to open onto', () => {
     const card = fold(
       load({ sessionUpdate: 'tool_call', title: 'ToolSearch', rawInput: {} }),
-      load({ sessionUpdate: 'tool_call_update', title: 'ToolSearch', rawInput: { query: 'select:WebFetch', max_results: 1 } }),
-      load({ sessionUpdate: 'tool_call_update', _meta: { toolResponse: { matches: ['WebFetch'], query: 'select:WebFetch', total_deferred_tools: 47 } } }),
-      load({ sessionUpdate: 'tool_call_update', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'Tool: WebFetch' } }] }),
+      load({
+        sessionUpdate: 'tool_call_update',
+        title: 'ToolSearch',
+        rawInput: { query: 'select:WebFetch', max_results: 1 },
+      }),
+      load({
+        sessionUpdate: 'tool_call_update',
+        _meta: { toolResponse: { matches: ['WebFetch'], query: 'select:WebFetch', total_deferred_tools: 47 } },
+      }),
+      load({
+        sessionUpdate: 'tool_call_update',
+        status: 'completed',
+        content: [{ type: 'content', content: { type: 'text', text: 'Tool: WebFetch' } }],
+      }),
     )
     expect(card).toMatchObject({ title: 'Load tools: WebFetch', status: 'completed' })
     expect(card.input).toBeUndefined()
@@ -785,31 +943,47 @@ describe('Claude tool loading', () => {
   })
 
   it('says when nothing matched, and keeps the error of a load that failed', () => {
-    expect(load({ sessionUpdate: 'tool_call_update', _meta: { toolResponse: { matches: [], query: 'jupyter' } } }).title)
-      .toBe('Load tools: none found')
-    expect(load({
-      sessionUpdate: 'tool_call_update',
-      status: 'failed',
-      content: [{ type: 'content', content: { type: 'text', text: 'Tool search unavailable' } }],
-    }).output).toBe('Tool search unavailable')
+    expect(
+      load({ sessionUpdate: 'tool_call_update', _meta: { toolResponse: { matches: [], query: 'jupyter' } } }).title,
+    ).toBe('Load tools: none found')
+    expect(
+      load({
+        sessionUpdate: 'tool_call_update',
+        status: 'failed',
+        content: [{ type: 'content', content: { type: 'text', text: 'Tool search unavailable' } }],
+      }).output,
+    ).toBe('Tool search unavailable')
   })
 })
 
 describe('ACP permission subjects', () => {
   it('maps the kinds a policy reads and takes paths from locations', () => {
-    expect(acpPermissionSubject({
-      toolCallId: 'bash-1', kind: 'execute', rawInput: { command: 'rm -rf build', description: 'Clean' },
-      locations: [{ path: '/work/task/build' }],
-    })).toEqual({ toolCallId: 'bash-1', kind: 'command', command: 'rm -rf build', paths: ['/work/task/build'] })
-    expect(['edit', 'delete', 'move', 'read', 'search', 'fetch', 'think', 'switch_mode', 'other']
-      .map((kind) => acpPermissionSubject({ toolCallId: 'x', kind: kind as 'other' }).kind))
-      .toEqual(['edit', 'edit', 'edit', 'read', 'read', 'fetch', 'other', 'other', 'other'])
+    expect(
+      acpPermissionSubject({
+        toolCallId: 'bash-1',
+        kind: 'execute',
+        rawInput: { command: 'rm -rf build', description: 'Clean' },
+        locations: [{ path: '/work/task/build' }],
+      }),
+    ).toEqual({ toolCallId: 'bash-1', kind: 'command', command: 'rm -rf build', paths: ['/work/task/build'] })
+    expect(
+      ['edit', 'delete', 'move', 'read', 'search', 'fetch', 'think', 'switch_mode', 'other'].map(
+        (kind) => acpPermissionSubject({ toolCallId: 'x', kind: kind as 'other' }).kind,
+      ),
+    ).toEqual(['edit', 'edit', 'edit', 'read', 'read', 'fetch', 'other', 'other', 'other'])
   })
 
   it('leaves what the agent did not send empty rather than inventing it', () => {
-    expect(acpPermissionSubject({ toolCallId: 'x' })).toEqual({ toolCallId: 'x', kind: 'other', command: '', paths: [] })
+    expect(acpPermissionSubject({ toolCallId: 'x' })).toEqual({
+      toolCallId: 'x',
+      kind: 'other',
+      command: '',
+      paths: [],
+    })
     // An argv array or a non-object input is not a command line, so it is not rebuilt into one.
-    expect(acpPermissionSubject({ toolCallId: 'x', kind: 'execute', rawInput: { command: ['git', 'push'] } }).command).toBe('')
+    expect(
+      acpPermissionSubject({ toolCallId: 'x', kind: 'execute', rawInput: { command: ['git', 'push'] } }).command,
+    ).toBe('')
     expect(acpPermissionSubject({ toolCallId: 'x', kind: 'execute', rawInput: 'git push' }).command).toBe('')
   })
 })

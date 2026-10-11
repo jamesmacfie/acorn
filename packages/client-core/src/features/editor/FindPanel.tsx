@@ -29,7 +29,13 @@ export type FindPanelProps = {
   /** The find input, for the engine to focus and select. */
   field: (element: HTMLInputElement) => void
   replaceField: (element: HTMLInputElement) => void
-  change: (patch: { search?: string; replace?: string; caseSensitive?: boolean; wholeWord?: boolean; regexp?: boolean }) => void
+  change: (patch: {
+    search?: string
+    replace?: string
+    caseSensitive?: boolean
+    wholeWord?: boolean
+    regexp?: boolean
+  }) => void
   next: () => void
   previous: () => void
   selectAll: () => void
@@ -42,7 +48,15 @@ function FindPanel(props: FindPanelProps) {
   const query = () => props.snapshot().query
   const noMatches = () => !props.snapshot().count?.total
   const option = (o: { label: string; icon: string; key: 'caseSensitive' | 'wholeWord' | 'regexp' }) => (
-    <ToggleButton variant="bare" size="sm" iconOnly label={o.label} tip={o.label} pressed={query()[o.key]} onPressedChange={(on) => props.change({ [o.key]: on })}>
+    <ToggleButton
+      variant="bare"
+      size="sm"
+      iconOnly
+      label={o.label}
+      tip={o.label}
+      pressed={query()[o.key]}
+      onPressedChange={(on) => props.change({ [o.key]: on })}
+    >
       <Icon name={o.icon} />
     </ToggleButton>
   )
@@ -68,9 +82,19 @@ function FindPanel(props: FindPanelProps) {
               {option({ label: 'Whole word', icon: 'whole-word', key: 'wholeWord' })}
               {option({ label: 'Regular expression', icon: 'regex', key: 'regexp' })}
             </Toolbar.Group>
-            <IconButton icon="text-cursor-input" label="Select all matches" disabled={noMatches()} onPress={props.selectAll} />
+            <IconButton
+              icon="text-cursor-input"
+              label="Select all matches"
+              disabled={noMatches()}
+              onPress={props.selectAll}
+            />
             <Show when={!props.snapshot().readOnly}>
-              <IconButton icon="replace" label="Replace" expanded={props.replacing()} onPress={() => props.setReplacing(!props.replacing())} />
+              <IconButton
+                icon="replace"
+                label="Replace"
+                expanded={props.replacing()}
+                onPress={() => props.setReplacing(!props.replacing())}
+              />
             </Show>
           </>
         }
@@ -87,8 +111,12 @@ function FindPanel(props: FindPanelProps) {
             onInput={(replace) => props.change({ replace })}
             onSubmit={props.replaceNext}
           />
-          <Button size="sm" disabled={noMatches()} onPress={props.replaceNext}>Replace next</Button>
-          <Button size="sm" disabled={noMatches()} onPress={props.replaceAll}>Replace all</Button>
+          <Button size="sm" disabled={noMatches()} onPress={props.replaceNext}>
+            Replace next
+          </Button>
+          <Button size="sm" disabled={noMatches()} onPress={props.replaceAll}>
+            Replace all
+          </Button>
         </Toolbar>
       </Show>
     </>

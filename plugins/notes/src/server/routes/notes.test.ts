@@ -53,19 +53,27 @@ describe('notes-owned routes', () => {
 
   it('serves task and workspace CRUD under the notes namespace', async () => {
     const calls: string[] = []
-    setRouteTestCapability(NOTES_STORE, fakeStore({
-      create: async (location, title, options) => {
-        calls.push(`create:${location.scope}:${title}:${options?.kind ?? ''}`)
-        return { slug: 'plan' }
-      },
-      setTitle: async (location, slug, title) => {
-        calls.push(`title:${location.scope}:${slug}:${title}`)
-      },
-    }))
+    setRouteTestCapability(
+      NOTES_STORE,
+      fakeStore({
+        create: async (location, title, options) => {
+          calls.push(`create:${location.scope}:${title}:${options?.kind ?? ''}`)
+          return { slug: 'plan' }
+        },
+        setTitle: async (location, slug, title) => {
+          calls.push(`title:${location.scope}:${slug}:${title}`)
+        },
+      }),
+    )
     const app = appFor({ kind: 'device', userId: 'james' })
 
-    expect((await app.fetch(request('/api/tasks/task1/notes', 'POST', { title: 'Plan', kind: 'plan' }), {} as Env)).status).toBe(200)
-    const renamed = await app.fetch(request('/api/workspaces/ws1/notes/plan/title', 'POST', { title: 'Renamed' }), {} as Env)
+    expect(
+      (await app.fetch(request('/api/tasks/task1/notes', 'POST', { title: 'Plan', kind: 'plan' }), {} as Env)).status,
+    ).toBe(200)
+    const renamed = await app.fetch(
+      request('/api/workspaces/ws1/notes/plan/title', 'POST', { title: 'Renamed' }),
+      {} as Env,
+    )
     expect(renamed.status).toBe(200)
     expect(await renamed.json()).toEqual({ ok: true })
     expect(calls).toEqual(['create:task:Plan:plan', 'title:workspace:plan:Renamed'])
@@ -83,7 +91,9 @@ describe('notes-owned routes', () => {
   it('requires a device principal for workspace routes and reports an unavailable store', async () => {
     const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api', notes)
     expect((await gated.fetch(request('/api/workspaces/ws1/notes'), {} as Env)).status).toBe(401)
-    expect((await appFor({ kind: 'device', userId: 'james' }).fetch(request('/api/tasks/task1/notes'), {} as Env)).status).toBe(503)
+    expect(
+      (await appFor({ kind: 'device', userId: 'james' }).fetch(request('/api/tasks/task1/notes'), {} as Env)).status,
+    ).toBe(503)
   })
 
   // The list and the create carry no trailing segment, so the original `/workspaces/:wsId/notes/*`

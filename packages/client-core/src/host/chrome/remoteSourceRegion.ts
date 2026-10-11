@@ -6,9 +6,15 @@ import { sidebarCollapsed } from '../../kit/lib/layout/collapseState'
 
 // Resolve the host's renderer when a source is drawn. The terminal supplies its cell renderer before
 // plugin registration; the desktop uses the DOM renderer. Neither runs plugin code in the shell.
-const RemoteTree = lazy(async () => ({ default: suppliedRemoteTree() ?? (await import('../tree/RemoteTree')).RemoteTree }))
+const RemoteTree = lazy(async () => ({
+  default: suppliedRemoteTree() ?? (await import('../tree/RemoteTree')).RemoteTree,
+}))
 
-export default function SourceRegion(props: { contribution: RemoteContribution; sourceId: string; region: 'list' | 'detail' }) {
+export default function SourceRegion(props: {
+  contribution: RemoteContribution
+  sourceId: string
+  region: 'list' | 'detail'
+}) {
   const params = useParams<{ projectId?: string }>()
   const scope = () => ({ ...(params.projectId ? { projectId: params.projectId } : {}) })
   // The worker cannot read the host's collapse signal, so the list is told in its props and draws its

@@ -26,7 +26,16 @@ const asTask1 = () => as({ kind: 'internal', userId: 'james', scope: 'task', tas
 // The node calling its own loopback surface. Unconfined by construction.
 const asService = () => as({ kind: 'internal', userId: 'james', scope: 'service' })
 
-const session = { id: 's1', taskId: 'task1', title: 'sh', kind: 'shell', status: 'running', backend: 'pty', cols: 80, rows: 24 }
+const session = {
+  id: 's1',
+  taskId: 'task1',
+  title: 'sh',
+  kind: 'shell',
+  status: 'running',
+  backend: 'pty',
+  cols: 80,
+  rows: 24,
+}
 // A second task's session, for the ownership tests below. Same engine, different owner.
 const otherSession = { ...session, id: 's2', taskId: 'task2', title: 'other' }
 const fake = (over: Partial<TerminalBridge> = {}): TerminalBridge => ({
@@ -56,11 +65,13 @@ describe('terminal control routes', () => {
 
   it('creates a session, lists, and resizes via the bridge', async () => {
     const seen: string[] = []
-    setTerminalBridge(fake({
-      create: async (opts) => (seen.push(`create:${opts.taskId}`), session as never),
-      resize: async (id, cols, rows) => (seen.push(`resize:${id}:${cols}x${rows}`), true),
-      kill: async (id) => (seen.push(`kill:${id}`), true),
-    }))
+    setTerminalBridge(
+      fake({
+        create: async (opts) => (seen.push(`create:${opts.taskId}`), session as never),
+        resize: async (id, cols, rows) => (seen.push(`resize:${id}:${cols}x${rows}`), true),
+        kill: async (id) => (seen.push(`kill:${id}`), true),
+      }),
+    )
     const app = authed()
     // De-doubled paths: /sessions, not /terminal/sessions. Under the plugin namespace this is
     // /v1/p/terminal/sessions (docs/api-reference/plugin-routes.md § Plugin routes).
@@ -111,28 +122,39 @@ describe('a task-scoped credential is confined to its own task PTYs', () => {
     setTerminalBridge(fake({ sendToAgent: async (id, text) => (typed.push(`${id}:${text}`), { ok: true }) }))
     const app = asTask1()
     // The original probe, verbatim: type a shell command into another task's shell.
-    const foreign = await app.fetch(req('/api/sessions/s2/send', 'POST', { text: 'rm -rf ~', submit: 'now' }), {} as Env)
+    const foreign = await app.fetch(
+      req('/api/sessions/s2/send', 'POST', { text: 'rm -rf ~', submit: 'now' }),
+      {} as Env,
+    )
     expect(foreign.status).toBe(404)
     // An id that exists nowhere gets the same answer, so the surface is not a session-id oracle.
-    expect((await app.fetch(req('/api/sessions/nope/send', 'POST', { text: 'x', submit: 'now' }), {} as Env)).status).toBe(404)
+    expect(
+      (await app.fetch(req('/api/sessions/nope/send', 'POST', { text: 'x', submit: 'now' }), {} as Env)).status,
+    ).toBe(404)
     // Nothing reached the engine.
     expect(typed).toEqual([])
     // Its own session is refused too. Typing into a shell runs a command outside the agent's sandbox
     // and tool permissions, so sending is the person's.
-    expect((await app.fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status).toBe(403)
+    expect(
+      (await app.fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status,
+    ).toBe(403)
     expect(typed).toEqual([])
-    expect((await authed().fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status).toBe(200)
+    expect(
+      (await authed().fetch(req('/api/sessions/s1/send', 'POST', { text: 'ls', submit: 'now' }), {} as Env)).status,
+    ).toBe(200)
     expect(typed).toEqual(['s1:ls'])
   })
 
   it('cannot kill, interrupt, remove or resize another task session', async () => {
     const touched: string[] = []
-    setTerminalBridge(fake({
-      kill: async (id) => (touched.push(`kill:${id}`), true),
-      interrupt: async (id) => (touched.push(`interrupt:${id}`), true),
-      remove: async (id) => (touched.push(`remove:${id}`), true),
-      resize: async (id) => (touched.push(`resize:${id}`), true),
-    }))
+    setTerminalBridge(
+      fake({
+        kill: async (id) => (touched.push(`kill:${id}`), true),
+        interrupt: async (id) => (touched.push(`interrupt:${id}`), true),
+        remove: async (id) => (touched.push(`remove:${id}`), true),
+        resize: async (id) => (touched.push(`resize:${id}`), true),
+      }),
+    )
     const app = asTask1()
     for (const verb of ['kill', 'interrupt', 'remove'] as const) {
       expect((await app.fetch(req(`/api/sessions/s2/${verb}`, 'POST'), {} as Env)).status).toBe(404)
@@ -143,15 +165,19 @@ describe('a task-scoped credential is confined to its own task PTYs', () => {
 
   it('cannot open a terminal or run the setup script, even in its own task', async () => {
     const spawned: string[] = []
-    setTerminalBridge(fake({
-      create: async (opts) => (spawned.push(opts.taskId), session as never),
-      runSetup: async (taskId) => (spawned.push(`setup:${taskId}`), { sessionId: 's1' }),
-    }))
+    setTerminalBridge(
+      fake({
+        create: async (opts) => (spawned.push(opts.taskId), session as never),
+        runSetup: async (taskId) => (spawned.push(`setup:${taskId}`), { sessionId: 's1' }),
+      }),
+    )
     const app = asTask1()
     // A task token with a read-only ceiling opened a terminal running any command here. Opening one
     // is the person's, like typing into one.
     for (const taskId of ['task1', 'task2']) {
-      expect((await app.fetch(req('/api/sessions', 'POST', { taskId, command: 'printf probe' }), {} as Env)).status).toBe(403)
+      expect(
+        (await app.fetch(req('/api/sessions', 'POST', { taskId, command: 'printf probe' }), {} as Env)).status,
+      ).toBe(403)
     }
     expect((await app.fetch(req('/api/tasks/task1/setup', 'POST'), {} as Env)).status).toBe(403)
     expect(spawned).toEqual([])

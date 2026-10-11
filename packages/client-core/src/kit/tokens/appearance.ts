@@ -6,8 +6,7 @@
 // plugin-to-plugin coupling as a shrinking baseline).
 
 /** Resolved value of a custom property on `<html>`, trimmed. */
-export const token = (name: string): string =>
-  getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+export const token = (name: string): string => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 
 /** Perceived-luminance dark check on a 6-digit hex colour. Pure; exported for tests. */
 export const isDarkColor = (hex: string): boolean => {

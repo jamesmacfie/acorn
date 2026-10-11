@@ -17,17 +17,31 @@ it('keeps an older installed version for a live provider until its retirement', 
       const lockDigest = 'a'.repeat(64)
       const root = join(data, `${lockDigest}-${installationId}`)
       return {
-        coordinate: { name: 'fixture', version }, graph: [], bins: ['fixture'], bin: 'fixture',
-        lockDigest, treeDigest: 'b'.repeat(64), registry: 'https://registry.npmjs.org/',
-        runtime: process.version, policyVersion: 1, installer: process.execPath, exceptions: [],
-        root, installationId, entry: join(root, 'fixture.mjs'), entryDigest: 'c'.repeat(64),
+        coordinate: { name: 'fixture', version },
+        graph: [],
+        bins: ['fixture'],
+        bin: 'fixture',
+        lockDigest,
+        treeDigest: 'b'.repeat(64),
+        registry: 'https://registry.npmjs.org/',
+        runtime: process.version,
+        policyVersion: 1,
+        installer: process.execPath,
+        exceptions: [],
+        root,
+        installationId,
+        entry: join(root, 'fixture.mjs'),
+        entryDigest: 'c'.repeat(64),
       }
     }
     const old = installed('1.0.0', '11111111-1111-4111-8111-111111111111')
     const next = installed('2.0.0', '22222222-2222-4222-8222-222222222222')
-    await mkdir(old.root); await mkdir(next.root)
+    await mkdir(old.root)
+    await mkdir(next.root)
     const saved = await store.saveManaged('fixture', old, [], true, null)
-    await expect(store.saveManaged('fixture', next, [], true, 'wrong revision')).rejects.toThrow('changed before activation')
+    await expect(store.saveManaged('fixture', next, [], true, 'wrong revision')).rejects.toThrow(
+      'changed before activation',
+    )
     expect((await store.get('fixture'))?.managed?.version).toBe('1.0.0')
     const retire = store.holdManagedRoots([old.root])
     await store.saveManaged('fixture', next, [], true, saved.revision)

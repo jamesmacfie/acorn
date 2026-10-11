@@ -19,14 +19,18 @@ import { recordedRequests } from './fixture'
  *
  *  Accent is the palette's own sixth slot and the default foreground is white, so a red channel below
  *  the green is "this is the accent slot" without naming a colour (./appearance.ts). */
-const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: number; g: number; b: number }; attributes: number }[][]> }): Promise<string[]> =>
-  (await screen.spans()).flat()
+const litRuns = async (screen: {
+  spans: () => Promise<{ text: string; fg: { r: number; g: number; b: number }; attributes: number }[][]>
+}): Promise<string[]> =>
+  (await screen.spans())
+    .flat()
     .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
     .map((run) => run.text)
 
 /** What the pane asked the node to do, as distinct from what it read. The diff reads its segments
  *  with a POST, because a batch of them is a body, so method alone no longer says "a write". */
-const posted = () => recordedRequests().filter((request) => request.method === 'POST' && !request.path.endsWith('/diff/segments'))
+const posted = () =>
+  recordedRequests().filter((request) => request.method === 'POST' && !request.path.endsWith('/diff/segments'))
 
 describe('the pull request from the keyboard', () => {
   it('lands the keys on a control in the Details panel, and says which one has them', async () => {
@@ -118,9 +122,7 @@ describe('the pull request from the keyboard', () => {
       // Ctrl+Return is a chord only because the app asks the terminal for the kitty keyboard
       // protocol; without it a terminal sends one byte for Return either way (./main.tsx).
       await screen.press('RETURN', { ctrl: true })
-      expect(posted()).toEqual([
-        { path: '/v1/p/github/repos/runn-fast/acorn/pulls/42/comments', method: 'POST' },
-      ])
+      expect(posted()).toEqual([{ path: '/v1/p/github/repos/runn-fast/acorn/pulls/42/comments', method: 'POST' }])
     } finally {
       screen.done()
     }

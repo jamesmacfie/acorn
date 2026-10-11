@@ -45,7 +45,8 @@ export function decideReplacement(input: {
   // delete it.
   if (input.replacement.id === input.expectedId) return { kind: 'noop' }
   if (input.replacement.taskId !== input.taskId) return refuse('That attachment belongs to another task.')
-  if (!input.replacement.mediaType.startsWith('image/')) return refuse('An attachment can only be replaced by an image.')
+  if (!input.replacement.mediaType.startsWith('image/'))
+    return refuse('An attachment can only be replaced by an image.')
 
   const at = input.current.findIndex((item) => item.id === input.expectedId)
   // The reader removed it, sent the turn, or switched sessions while an editor was open.

@@ -16,13 +16,37 @@ export const gitClientPlugin: ClientPlugin = {
   init(ctx) {
     ctx.sources.register(gitSourceContribution)
     ctx.panes.register(gitPaneContribution)
-    ctx.settingsPages.register({ id: 'git', label: 'Git', category: 'features', scope: 'node', icon: 'git-branch', order: 42,
-      requires: { plugin: 'git' }, keywords: ['author', 'email', 'pull', 'rebase', 'fetch', 'identity'],
-      sections: [{ id: 'identity', label: 'Git identity', rows: ['Repository', 'Write scope', 'Effective author', 'Effective email', 'Author name', 'Author email'] },
-        { id: 'behavior', label: 'Git behavior', rows: ['Pull strategy', 'Auto-fetch'] }], component: GitSettings })
-    ctx.settingsPages.register({ id: 'git-display', label: 'Git display', category: 'features', scope: 'device', icon: 'git-branch', order: 43,
-      requires: { plugin: 'git' }, keywords: ['graph', 'diff', 'unified', 'split'],
-      sections: [{ id: 'display', label: 'Git display', rows: ['History graph', 'Diff presentation'] }], component: GitAppearance })
+    ctx.settingsPages.register({
+      id: 'git',
+      label: 'Git',
+      category: 'features',
+      scope: 'node',
+      icon: 'git-branch',
+      order: 42,
+      requires: { plugin: 'git' },
+      keywords: ['author', 'email', 'pull', 'rebase', 'fetch', 'identity'],
+      sections: [
+        {
+          id: 'identity',
+          label: 'Git identity',
+          rows: ['Repository', 'Write scope', 'Effective author', 'Effective email', 'Author name', 'Author email'],
+        },
+        { id: 'behavior', label: 'Git behavior', rows: ['Pull strategy', 'Auto-fetch'] },
+      ],
+      component: GitSettings,
+    })
+    ctx.settingsPages.register({
+      id: 'git-display',
+      label: 'Git display',
+      category: 'features',
+      scope: 'device',
+      icon: 'git-branch',
+      order: 43,
+      requires: { plugin: 'git' },
+      keywords: ['graph', 'diff', 'unified', 'split'],
+      sections: [{ id: 'display', label: 'Git display', rows: ['History graph', 'Diff presentation'] }],
+      component: GitAppearance,
+    })
     registerChanges(ctx)
   },
 }
@@ -59,7 +83,11 @@ function registerChanges(ctx: Parameters<ClientPlugin['init']>[0]) {
   // (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The node-side
   // `git:before-commit` and `git:before-push` hooks are declared in ../server/changes/registerChanges.ts.
   ctx.extensionPoints.register({
-    id: 'diff-line', label: 'Changes diff line', kind: 'annotation', key: [...DIFF_LINE_KEY], max: 4,
+    id: 'diff-line',
+    label: 'Changes diff line',
+    kind: 'annotation',
+    key: [...DIFF_LINE_KEY],
+    max: 4,
   })
   // What somebody else may do once this branch is on its remote, drawn under the branch bar
   // (./changes/RemoteBar.tsx). The GitHub plugin's "Open pull request" is the first filler, and this
@@ -70,7 +98,11 @@ function registerChanges(ctx: Parameters<ClientPlugin['init']>[0]) {
   // parameter from the props", which is code, and a kit tree is the cheapest code that runs in
   // another plugin's surface (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
   ctx.extensionPoints.register({
-    id: 'push-actions', label: 'After a push', kind: 'remote', mode: 'stack', max: PUSH_ACTIONS_MAX,
+    id: 'push-actions',
+    label: 'After a push',
+    kind: 'remote',
+    mode: 'stack',
+    max: PUSH_ACTIONS_MAX,
   })
   // Renders the file tool calls in an agent transcript. It lives here rather than in agents: the plugin
   // that owns a tool owns how its result reads.

@@ -71,19 +71,35 @@ const PAGE_KEYS: Partial<Record<Intent, (box: Viewport) => void>> = {
  *  painter. The keymap is acorn's, so the keyboard goes through the shared dispatcher rather than
  *  round it with an `onKeyDown`. */
 function bindViewportKeys(box: Renderable, view: Viewport, scrolled: () => void): void {
-  bindKeys(box, KEY_SCROLLS.map(({ key, move }) => ({
-    key,
-    cmd: () => { move(view); scrolled(); return true },
-  // Both layers on the pane's own tier, below the collection: a list inside a viewport answers Home
-  // and the arrows first, which is what a reader in a list means by them (../keys/tiers.ts).
-  })), PANE, { mode: 'focus' })
-  onCleanup(registerIntentLayer(box, Object.keys(PAGE_KEYS) as Intent[], (intent) => {
-    const move = PAGE_KEYS[intent]
-    if (!move) return false
-    move(view)
-    scrolled()
-    return true
-  }, { priority: PANE, mode: 'focus-within' }))
+  bindKeys(
+    box,
+    KEY_SCROLLS.map(({ key, move }) => ({
+      key,
+      cmd: () => {
+        move(view)
+        scrolled()
+        return true
+      },
+      // Both layers on the pane's own tier, below the collection: a list inside a viewport answers Home
+      // and the arrows first, which is what a reader in a list means by them (../keys/tiers.ts).
+    })),
+    PANE,
+    { mode: 'focus' },
+  )
+  onCleanup(
+    registerIntentLayer(
+      box,
+      Object.keys(PAGE_KEYS) as Intent[],
+      (intent) => {
+        const move = PAGE_KEYS[intent]
+        if (!move) return false
+        move(view)
+        scrolled()
+        return true
+      },
+      { priority: PANE, mode: 'focus-within' },
+    ),
+  )
 }
 
 type ViewportProps = {
@@ -174,19 +190,32 @@ function viewportBox(props: ViewportProps): JSX.Element {
     restored = true
     place(props.scrollOffset)
   }
-  createEffect(on(() => [props.visible, props.scrollOffset] as const, ([visible, offset], previous) => {
-    if (previous && visible === previous[0] && offset === previous[1]) return
-    if (visible === false) return
-    restored = false
-    restoreIfReady()
-  }))
+  createEffect(
+    on(
+      () => [props.visible, props.scrollOffset] as const,
+      ([visible, offset], previous) => {
+        if (previous && visible === previous[0] && offset === previous[1]) return
+        if (visible === false) return
+        restored = false
+        restoreIfReady()
+      },
+    ),
+  )
   // Geometry changes must not reinterpret a previously bottom-following reader as having
   // scrolled away: a growing transcript still follows, while a shrinking menu clamps its offset.
-  const clampCurrent = (): void => { setOffset(clamp(offset())); restoreIfReady() }
-  const move = (rows: number): void => { place(offset() + rows) }
+  const clampCurrent = (): void => {
+    setOffset(clamp(offset()))
+    restoreIfReady()
+  }
+  const move = (rows: number): void => {
+    place(offset() + rows)
+  }
 
   const scrollBy = (delta: number, unit?: 'viewport'): void => {
-    if (unit !== 'viewport') { move(Math.round(delta)); return }
+    if (unit !== 'viewport') {
+      move(Math.round(delta))
+      return
+    }
     // A fraction of the viewport, and never nought: a three-row panel would otherwise refuse a fifth
     // of itself and read as a dead key.
     const step = delta * fits()
@@ -212,15 +241,25 @@ function viewportBox(props: ViewportProps): JSX.Element {
 
   const api = {
     scrollBy,
-    scrollTo: (to: number) => { place(to) },
+    scrollTo: (to: number) => {
+      place(to)
+    },
     scrollChildIntoView,
-    get scrollTop() { return offset() },
-    get scrollHeight() { return total() },
-    get viewport() { return { height: fits() } },
+    get scrollTop() {
+      return offset()
+    },
+    get scrollHeight() {
+      return total()
+    },
+    get viewport() {
+      return { height: fits() }
+    },
     /** Put the offset back on the last line, unless the reader has scrolled away from it. Called from
      *  a follower's own `onSizeChange`, which the layout raises after the read-back — so the height
      *  the clamp reads is this frame's rather than last frame's (../layout/pass.ts § readBack). */
-    stickToBottom: () => { if (stuck) place(Number.MAX_SAFE_INTEGER) },
+    stickToBottom: () => {
+      if (stuck) place(Number.MAX_SAFE_INTEGER)
+    },
   }
 
   // The offset into the node's props, where paint reads it, and a frame to draw the move.
@@ -266,7 +305,9 @@ function viewportBox(props: ViewportProps): JSX.Element {
         maxWidth="100%"
         paddingRight={1}
         onSizeChange={clampCurrent}
-        ref={(element: Renderable) => { content = element as unknown as Node }}
+        ref={(element: Renderable) => {
+          content = element as unknown as Node
+        }}
       >
         {props.children}
       </box>

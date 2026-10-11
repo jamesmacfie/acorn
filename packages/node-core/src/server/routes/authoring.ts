@@ -27,7 +27,8 @@ import { schema } from '../db'
 const log = createLogger('authoring')
 
 const TARGET_PROMPTS = {
-  query: 'The candidate must be one QueryContent object. Keep typed predicates and exact source option ids. Ask for metadata before naming a source, field, operator, connection, or option.',
+  query:
+    'The candidate must be one QueryContent object. Keep typed predicates and exact source option ids. Ask for metadata before naming a source, field, operator, connection, or option.',
   dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. A source whose catalog entry lists inputs is a derived source: give it no connectionId, bind every required input in scope.inputs by name with { connectionId, parameters }, and choose each input's account under the same rule. When more than one of the person's accounts fits an input, ask with a clarification whose choices are those accounts. Board writes need a source-declared writable bound field and an exact writeValues entry per choice and source; list them as requirements with paths into columns, choices, and writeValues. A missing mapping is unavailable, never guessed. A field the panel only sorts, groups, or filters by still needs a column; mark it hidden when the person doesn't ask to see it or asks to hide it (capabilities.hiddenColumns). Propose a dataset only when the request needs history that live sources cannot provide; say which mode and coverage are needed. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. An instruction that starts with [Focus: <paths> "<title>"] is about those plan paths; change other parts only when the request needs it. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
 } as const
 
@@ -44,30 +45,92 @@ export async function handleAuthoringTurn(c: Context<AppEnv>) {
   const principal = c.get('principal')!
   if (principal.kind !== 'device') return respondError(c, 403, 'interactive_user_required')
   const invocation = { principal, signal: c.req.raw.signal }
-  const accounts = request.target === 'dashboard' ? (await listConnections(getDb(c.env), principal.userId))
-    .filter(account => !['disabled', 'needs-auth'].includes(account.status)) : []
-  const sourceCatalog = request.target === 'dashboard' ? await listDataSources(c.env, { ...request.scope, parameters: {} }, invocation) : undefined
+  const accounts =
+    request.target === 'dashboard'
+      ? (await listConnections(getDb(c.env), principal.userId)).filter(
+          (account) => !['disabled', 'needs-auth'].includes(account.status),
+        )
+      : []
+  const sourceCatalog =
+    request.target === 'dashboard'
+      ? await listDataSources(c.env, { ...request.scope, parameters: {} }, invocation)
+      : undefined
   const basePlan = request.target === 'dashboard' ? panelPlanSchema.safeParse(request.base) : undefined
-  const descriptions = basePlan?.success ? await Promise.all(basePlan.data.sources.map(async source => {
-    if (source.reference.kind !== 'inline') return { id: source.id, unavailable: 'Resolve the saved query first.' }
-    const query = source.reference.content.query
-    try { return { id: source.id, description: await invokeDataSource(c.env, { operation: 'describe', source: query.source, scope: query.scope }, invocation) } }
-    catch { return { id: source.id, unavailable: 'Choose an account or reachable scope.' } }
-  })) : []
-  const projects = request.target === 'dashboard' ? await getDb(c.env).select({ id: schema.projects.id, name: schema.projects.name, githubOwner: schema.projects.githubOwner, githubName: schema.projects.githubName }).from(schema.projects).where(eq(schema.projects.workspaceId, request.scope.workspaceId)) : []
-  const links = request.target === 'dashboard' ? await getDb(c.env).select({ projectId: schema.workspaceExternalProjects.projectId, integrationId: schema.workspaceExternalProjects.integrationId, externalId: schema.workspaceExternalProjects.externalId }).from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, request.scope.workspaceId)) : []
-  const datasets = request.target === 'dashboard' ? (await import('../datasets/store')).listDatasets(getDb(c.env), request.scope.workspaceId, request.scope.projectId)
-    .map(dataset => ({ id: dataset.id, name: dataset.name, mode: dataset.mode, feeder: dataset.feeder, coverage: dataset.coverage })) : []
-  const accountFacts = request.target === 'dashboard' ? await Promise.all(accounts.slice(0, 20).map(async account => {
-    const source = sourceCatalog?.sources.find(entry => entry.providerId === account.provider)
-    if (!source) return { id: account.id, providerId: account.provider, name: account.name ?? account.label }
-    const scope = { ...request.scope, connectionId: account.id, parameters: {} }
-    try {
-      const description = await invokeDataSource(c.env, { operation: 'describe', source, scope }, invocation)
-      const identity = description.operations.identity ? await invokeDataSource(c.env, { operation: 'identity', source, scope }, invocation) : undefined
-      return { id: account.id, providerId: account.provider, name: account.name ?? account.label, identity }
-    } catch { return { id: account.id, providerId: account.provider, name: account.name ?? account.label } }
-  })) : []
+  const descriptions = basePlan?.success
+    ? await Promise.all(
+        basePlan.data.sources.map(async (source) => {
+          if (source.reference.kind !== 'inline')
+            return { id: source.id, unavailable: 'Resolve the saved query first.' }
+          const query = source.reference.content.query
+          try {
+            return {
+              id: source.id,
+              description: await invokeDataSource(
+                c.env,
+                { operation: 'describe', source: query.source, scope: query.scope },
+                invocation,
+              ),
+            }
+          } catch {
+            return { id: source.id, unavailable: 'Choose an account or reachable scope.' }
+          }
+        }),
+      )
+    : []
+  const projects =
+    request.target === 'dashboard'
+      ? await getDb(c.env)
+          .select({
+            id: schema.projects.id,
+            name: schema.projects.name,
+            githubOwner: schema.projects.githubOwner,
+            githubName: schema.projects.githubName,
+          })
+          .from(schema.projects)
+          .where(eq(schema.projects.workspaceId, request.scope.workspaceId))
+      : []
+  const links =
+    request.target === 'dashboard'
+      ? await getDb(c.env)
+          .select({
+            projectId: schema.workspaceExternalProjects.projectId,
+            integrationId: schema.workspaceExternalProjects.integrationId,
+            externalId: schema.workspaceExternalProjects.externalId,
+          })
+          .from(schema.workspaceExternalProjects)
+          .where(eq(schema.workspaceExternalProjects.workspaceId, request.scope.workspaceId))
+      : []
+  const datasets =
+    request.target === 'dashboard'
+      ? (await import('../datasets/store'))
+          .listDatasets(getDb(c.env), request.scope.workspaceId, request.scope.projectId)
+          .map((dataset) => ({
+            id: dataset.id,
+            name: dataset.name,
+            mode: dataset.mode,
+            feeder: dataset.feeder,
+            coverage: dataset.coverage,
+          }))
+      : []
+  const accountFacts =
+    request.target === 'dashboard'
+      ? await Promise.all(
+          accounts.slice(0, 20).map(async (account) => {
+            const source = sourceCatalog?.sources.find((entry) => entry.providerId === account.provider)
+            if (!source) return { id: account.id, providerId: account.provider, name: account.name ?? account.label }
+            const scope = { ...request.scope, connectionId: account.id, parameters: {} }
+            try {
+              const description = await invokeDataSource(c.env, { operation: 'describe', source, scope }, invocation)
+              const identity = description.operations.identity
+                ? await invokeDataSource(c.env, { operation: 'identity', source, scope }, invocation)
+                : undefined
+              return { id: account.id, providerId: account.provider, name: account.name ?? account.label, identity }
+            } catch {
+              return { id: account.id, providerId: account.provider, name: account.name ?? account.label }
+            }
+          }),
+        )
+      : []
   const validate = async (candidate: unknown): Promise<{ candidate?: unknown; problems: string[] }> => {
     try {
       if (request.target === 'query') {
@@ -76,11 +139,21 @@ export async function handleAuthoringTurn(c: Context<AppEnv>) {
         return { candidate: content, problems: [] }
       }
       const content = panelPlanSchema.parse(candidate)
-      const problems = (await dashboardContentProblems(c.env, request.scope, content, invocation)).map(describeDashboardProblem)
+      const problems = (await dashboardContentProblems(c.env, request.scope, content, invocation)).map(
+        describeDashboardProblem,
+      )
       const base = panelPlanSchema.safeParse(request.base)
       const originalRequest = base.success && base.data.request ? base.data.request : request.instruction
-      if (content.request !== originalRequest) problems.push('/request: Preserve the person\'s original request exactly.')
-      problems.push(...authoringAccountProblems(content, base.success ? base.data : undefined, sourceCatalog?.sources ?? [], accounts))
+      if (content.request !== originalRequest)
+        problems.push("/request: Preserve the person's original request exactly.")
+      problems.push(
+        ...authoringAccountProblems(
+          content,
+          base.success ? base.data : undefined,
+          sourceCatalog?.sources ?? [],
+          accounts,
+        ),
+      )
       problems.push(...checkRequirements(content, base.success ? base.data : undefined, request.instruction))
       // The same check publication runs, so the AI can't propose a panel that publish would refuse.
       return problems.length ? { problems } : { candidate: content, problems }
@@ -95,41 +168,70 @@ export async function handleAuthoringTurn(c: Context<AppEnv>) {
     const result = await runAuthoringTurn({
       request,
       system: authoringSystemPrompt(request.target, TARGET_PROMPTS[request.target]),
-      ...(request.target === 'dashboard' ? { facts: {
-        evaluationTime: Date.now(), time: basePlan?.success ? basePlan.data.time : undefined,
-        sources: sourceCatalog?.sources, accounts: accountFacts,
-        descriptions, projects, links, datasets, capabilities: PANEL_CAPABILITIES,
-      } } : {}),
+      ...(request.target === 'dashboard'
+        ? {
+            facts: {
+              evaluationTime: Date.now(),
+              time: basePlan?.success ? basePlan.data.time : undefined,
+              sources: sourceCatalog?.sources,
+              accounts: accountFacts,
+              descriptions,
+              projects,
+              links,
+              datasets,
+              capabilities: PANEL_CAPABILITIES,
+            },
+          }
+        : {}),
       signal: c.req.raw.signal,
-      generate: async input => {
+      generate: async (input) => {
         const generated = await models.generateText({
-          userId: ownerId(c), backendId: request.backendId,
+          userId: ownerId(c),
+          backendId: request.backendId,
           input: { ...input, ...(request.modelId ? { modelId: request.modelId } : {}) },
         })
         lastReply = generated.text
         return generated
       },
       validate,
-      metadata: metadataRequest => authoringMetadata({ env: c.env, turn: request, request: metadataRequest, invocation, validate }),
+      metadata: (metadataRequest) =>
+        authoringMetadata({ env: c.env, turn: request, request: metadataRequest, invocation, validate }),
     })
     if (request.target === 'dashboard' && result.state === 'proposal' && !result.problems.length) {
       const candidate = panelPlanSchema.safeParse(result.candidate)
       if (candidate.success) {
         try {
           const independent = await models.generateText({
-            userId: ownerId(c), backendId: request.backendId,
-            input: { system: 'List only the distinct requirements in the user request. You cannot see any proposed plan. Reply as a JSON array of short strings.',
-              prompt: JSON.stringify({ request: basePlan?.success && basePlan.data.request ? basePlan.data.request : request.instruction }), maxOutputTokens: 1500, signal: c.req.raw.signal,
-              ...(request.modelId ? { modelId: request.modelId } : {}) },
+            userId: ownerId(c),
+            backendId: request.backendId,
+            input: {
+              system:
+                'List only the distinct requirements in the user request. You cannot see any proposed plan. Reply as a JSON array of short strings.',
+              prompt: JSON.stringify({
+                request: basePlan?.success && basePlan.data.request ? basePlan.data.request : request.instruction,
+              }),
+              maxOutputTokens: 1500,
+              signal: c.req.raw.signal,
+              ...(request.modelId ? { modelId: request.modelId } : {}),
+            },
           })
           const items = JSON.parse(independent.text) as unknown
           if (Array.isArray(items)) {
-            const authored = (candidate.data.requirements ?? []).map(item => item.text.toLowerCase())
-            result.unaddressed = items.filter((item): item is string => typeof item === 'string' && item.length <= 200)
-              .filter(item => !authored.some(text => text.includes(item.toLowerCase()) || item.toLowerCase().includes(text)))
-            log.info('independent dashboard requirements pass', { missing: result.unaddressed.length, total: items.length })
+            const authored = (candidate.data.requirements ?? []).map((item) => item.text.toLowerCase())
+            result.unaddressed = items
+              .filter((item): item is string => typeof item === 'string' && item.length <= 200)
+              .filter(
+                (item) =>
+                  !authored.some((text) => text.includes(item.toLowerCase()) || item.toLowerCase().includes(text)),
+              )
+            log.info('independent dashboard requirements pass', {
+              missing: result.unaddressed.length,
+              total: items.length,
+            })
           }
-        } catch { /* An independent review can fail without changing a validated proposal. */ }
+        } catch {
+          /* An independent review can fail without changing a validated proposal. */
+        }
       }
     }
     // Both are a 200 to the client, so without this line a failed turn leaves no trace anywhere.
@@ -137,8 +239,12 @@ export async function handleAuthoringTurn(c: Context<AppEnv>) {
     const problems = result.state === 'stopped' ? [result.reason] : result.state === 'proposal' ? result.problems : []
     if (problems.length) {
       log.warn('turn ended without a valid candidate', {
-        target: request.target, state: result.state, provider: result.providerId, model: result.modelId,
-        problems: problems.join(' | '), reply: lastReply,
+        target: request.target,
+        state: result.state,
+        provider: result.providerId,
+        model: result.modelId,
+        problems: problems.join(' | '),
+        reply: lastReply,
       })
     }
     return c.json(result)
@@ -151,27 +257,49 @@ export async function handleAuthoringTurn(c: Context<AppEnv>) {
 
 function checkRequirements(content: PanelPlan, previous: PanelPlan | undefined, instruction: string): string[] {
   const problems: string[] = []
-  if (!content.request) problems.push('/request: Keep the person\'s original request in the plan.')
-  if (!content.requirements?.length) problems.push('/requirements: List each requested outcome, including unavailable parts.')
+  if (!content.request) problems.push("/request: Keep the person's original request in the plan.")
+  if (!content.requirements?.length)
+    problems.push('/requirements: List each requested outcome, including unavailable parts.')
   for (const [index, item] of (content.requirements ?? []).entries()) {
-    if (['covered', 'partial'].includes(item.status) && !item.paths?.length) problems.push(`/requirements/${index}: ${item.text} needs a plan pointer.`)
+    if (['covered', 'partial'].includes(item.status) && !item.paths?.length)
+      problems.push(`/requirements/${index}: ${item.text} needs a plan pointer.`)
     for (const path of item.paths ?? []) {
       const [section, key, child, choiceId, map, sourceId] = path.slice(1).split('/')
-      const exists = section === 'columns' ? content.columns.some(column => column.id === key &&
-        (child === undefined || child === 'choices' && column.choices?.some(choice => choice.id === choiceId &&
-          (map === undefined || map === 'writeValues' && !!sourceId && Object.hasOwn(choice.writeValues ?? {}, sourceId)))))
-        : section === 'sources' ? content.sources.some(source => source.id === key)
-          : section === 'stages' ? !!content.stages[Number(key)]
-            : section === 'view' ? key === undefined || key in content.view
-              : section === 'sort' ? !!content.sort?.[Number(key)]
-                : section === 'group' ? !!content.group?.[Number(key)] : false
+      const exists =
+        section === 'columns'
+          ? content.columns.some(
+              (column) =>
+                column.id === key &&
+                (child === undefined ||
+                  (child === 'choices' &&
+                    column.choices?.some(
+                      (choice) =>
+                        choice.id === choiceId &&
+                        (map === undefined ||
+                          (map === 'writeValues' && !!sourceId && Object.hasOwn(choice.writeValues ?? {}, sourceId))),
+                    ))),
+            )
+          : section === 'sources'
+            ? content.sources.some((source) => source.id === key)
+            : section === 'stages'
+              ? !!content.stages[Number(key)]
+              : section === 'view'
+                ? key === undefined || key in content.view
+                : section === 'sort'
+                  ? !!content.sort?.[Number(key)]
+                  : section === 'group'
+                    ? !!content.group?.[Number(key)]
+                    : false
       if (!exists) problems.push(`/requirements/${index}/paths: ${path} does not name a plan part.`)
     }
   }
   for (const item of previous?.requirements ?? []) {
-    const expresslyRemoved = /\b(remove|forget|drop)\b/i.test(instruction)
-      && (instruction.toLowerCase().includes(item.text.toLowerCase()) || instruction.toLowerCase().includes(item.id.toLowerCase()))
-    if (item.status === 'covered' && !expresslyRemoved && !content.requirements?.some(next => next.id === item.id)) problems.push(`/requirements: Previously covered item ${item.text} disappeared.`)
+    const expresslyRemoved =
+      /\b(remove|forget|drop)\b/i.test(instruction) &&
+      (instruction.toLowerCase().includes(item.text.toLowerCase()) ||
+        instruction.toLowerCase().includes(item.id.toLowerCase()))
+    if (item.status === 'covered' && !expresslyRemoved && !content.requirements?.some((next) => next.id === item.id))
+      problems.push(`/requirements: Previously covered item ${item.text} disappeared.`)
   }
   return problems
 }

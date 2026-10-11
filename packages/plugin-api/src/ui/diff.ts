@@ -20,7 +20,16 @@ export {
   rowIdentityKeys,
   toBands,
 } from '@acorn/client-core/kit/diff'
-export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff'
+export type {
+  CodeRow,
+  DiffFile,
+  GapRow,
+  ParsedFile,
+  Row,
+  SplitBand,
+  TokenizeLine,
+  ViewMode,
+} from '@acorn/client-core/kit/diff'
 
 // The tokenizer the async builders take. On this entrypoint rather than ./client because it's part of
 // the diff toolkit's contract, since `buildDiffRowsAsync(file, tokenizeDocument)` is the whole intended
@@ -43,8 +52,15 @@ export { documentTopology } from '@acorn/diff-document/document'
 // graph, and the barrel would bring the diff view state and segment loaders along with it.
 export { loadDiffLineContext } from '@acorn/client-core/features/diff/lineContext.ts'
 export type {
-  DiffDocumentFile, DiffDocumentTopology, DiffSearchMatch, DiffSearchPage, DiffSearchRequest, DiffSegmentDescriptor,
-  DiffSegmentPayload, DiffSegmentRequest, PlainDiffRow,
+  DiffDocumentFile,
+  DiffDocumentTopology,
+  DiffSearchMatch,
+  DiffSearchPage,
+  DiffSearchRequest,
+  DiffSegmentDescriptor,
+  DiffSegmentPayload,
+  DiffSegmentRequest,
+  PlainDiffRow,
 } from '@acorn/diff-document/document'
 // Session-only scroll and collapse memory, keyed by scope. `diffScopeKey` is here so a caller keying
 // its own session state by the same scope stays in step rather than writing a second spelling.

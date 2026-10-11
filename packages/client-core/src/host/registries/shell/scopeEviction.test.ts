@@ -17,7 +17,9 @@ describe('scope eviction', () => {
   // must not strand the others. This is the case the old hand-written call list could not survive.
   it('runs every evictor even when one throws', () => {
     const seen: string[] = []
-    onScopeEvicted(() => { throw new Error('boom') })
+    onScopeEvicted(() => {
+      throw new Error('boom')
+    })
     onScopeEvicted(() => seen.push('after'))
     expect(() => evictScope({ scope: 'node-switched' })).not.toThrow()
     expect(seen).toEqual(['after'])

@@ -5,8 +5,18 @@ import { isFieldKind, laysOut, type Node } from '../tree/node'
 import { sliceToWidth } from '../width'
 import { measuredField, toVisual } from '../wrap'
 import {
-  ATTRS, clipOf, fill, inside, intersect, isEmptyClip, put, wholeOf, writeRun,
-  type Buffer, type Clip, type Style,
+  ATTRS,
+  clipOf,
+  fill,
+  inside,
+  intersect,
+  isEmptyClip,
+  put,
+  wholeOf,
+  writeRun,
+  type Buffer,
+  type Clip,
+  type Style,
 } from './buffer'
 
 // The tree into the cells: one depth-first walk, and every behaviour the old renderables had.
@@ -90,9 +100,8 @@ const maskOf = (value: unknown): number =>
  *  `strong` inside a muted line means. */
 function styleOf(node: Node, inherited: Style): Style {
   const props = node.props
-  const bag = typeof props.style === 'object' && props.style !== null
-    ? (props.style as Record<string, unknown>)
-    : undefined
+  const bag =
+    typeof props.style === 'object' && props.style !== null ? (props.style as Record<string, unknown>) : undefined
   let attrs = inherited.attrs | maskOf(props.attributes)
   if (bag) {
     for (const name of Object.keys(ATTRS) as (keyof typeof ATTRS)[]) if (bag[name] === true) attrs |= ATTRS[name]
@@ -122,7 +131,10 @@ function piecesOf(segments: readonly Segment[], from: number, to: number): Segme
   for (const segment of segments) {
     const end = at + segment.text.length
     if (end > from && at < to) {
-      pieces.push({ text: segment.text.slice(Math.max(0, from - at), Math.min(segment.text.length, to - at)), style: segment.style })
+      pieces.push({
+        text: segment.text.slice(Math.max(0, from - at), Math.min(segment.text.length, to - at)),
+        style: segment.style,
+      })
     }
     at = end
     if (at >= to) break
@@ -167,9 +179,7 @@ function drawText(node: Node, buffer: Buffer, clip: Clip): void {
  *  A cell of edge either side of it, which is what a bordered panel reads as: `┌─Keys──────┐`.
  *  `left` is the only alignment this app asks for (`../panel.tsx`) and the other two are here because
  *  the prop offers them. */
-function drawTitle(
-  buffer: Buffer, clip: Clip, node: Node, sides: Sides, title: string, style: Style,
-): void {
+function drawTitle(buffer: Buffer, clip: Clip, node: Node, sides: Sides, title: string, style: Style): void {
   const rect = node.rect
   const from = rect.x + (sides.left ? 1 : 0)
   const to = rect.x + rect.w - (sides.right ? 1 : 0)
@@ -187,7 +197,11 @@ function drawTitle(
  *  `Rule` is one edge with no corners at all, which is how a single line becomes the divider between
  *  two regions. */
 function drawBorder(
-  buffer: Buffer, clip: Clip, rect: Node['rect'], sides: Sides, style: Style,
+  buffer: Buffer,
+  clip: Clip,
+  rect: Node['rect'],
+  sides: Sides,
+  style: Style,
   leftAccent?: { glyph: string; color: Color },
 ): void {
   if (rect.w <= 0 || rect.h <= 0) return
@@ -221,7 +235,14 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
   const sides = sidesOf(props.border)
   if (anySide(sides)) {
     const style: Style = { fg: toColor(props.borderColor), attrs: 0 }
-    drawBorder(buffer, own, node.rect, sides, style, props.borderLeftAccent as { glyph: string; color: Color } | undefined)
+    drawBorder(
+      buffer,
+      own,
+      node.rect,
+      sides,
+      style,
+      props.borderLeftAccent as { glyph: string; color: Color } | undefined,
+    )
     if (sides.top && typeof props.title === 'string') drawTitle(buffer, own, node, sides, props.title, style)
   }
 
@@ -324,8 +345,14 @@ function drawField(node: Node, buffer: Buffer, clip: Clip): void {
     const first = line ? 0 : scroll
     for (let at = first; at < rows.length && at - first < Math.max(node.rect.h, 1); at += 1) {
       const row = rows[at]!
-      writeRun(buffer, own, node.rect.x - (line ? scroll : 0), node.rect.y + at - first,
-        value.slice(row.from, row.to), style)
+      writeRun(
+        buffer,
+        own,
+        node.rect.x - (line ? scroll : 0),
+        node.rect.y + at - first,
+        value.slice(row.from, row.to),
+        style,
+      )
     }
   }
 
@@ -414,10 +441,11 @@ function drawPty(node: Node, buffer: Buffer, clip: Clip): void {
       const style: Style = {
         fg: cellColor(cell.getFgColor(), cell.isFgPalette(), cell.isFgRGB()),
         bg: cellColor(cell.getBgColor(), cell.isBgPalette(), cell.isBgRGB()),
-        attrs: (cell.isBold() ? ATTRS.bold : 0)
-          | (cell.isDim() ? ATTRS.dim : 0)
-          | (cell.isUnderline() ? ATTRS.underline : 0)
-          | (cell.isInverse() ? ATTRS.inverse : 0),
+        attrs:
+          (cell.isBold() ? ATTRS.bold : 0) |
+          (cell.isDim() ? ATTRS.dim : 0) |
+          (cell.isUnderline() ? ATTRS.underline : 0) |
+          (cell.isInverse() ? ATTRS.inverse : 0),
       }
       const chars = cell.getChars()
       put(buffer, own, node.rect.x + at, y, chars === '' ? ' ' : chars, style)
@@ -439,7 +467,10 @@ function drawNode(node: Node, buffer: Buffer, clip: Clip): void {
   // `visible === false` is skipped whole, which is also what Yoga does with `DISPLAY_NONE`, so the
   // two agree without a rule between them (../layout/props.ts § visible).
   if (node.props.visible === false) return
-  if (node.kind === 'text') { drawText(node, buffer, clip); return }
+  if (node.kind === 'text') {
+    drawText(node, buffer, clip)
+    return
+  }
   drawBox(node, buffer, clip)
   // A field's own content and caret go inside the box it also is, so a bordered or coloured field
   // draws both. Nothing in the kit gives one a border, and the box half costs one branch.

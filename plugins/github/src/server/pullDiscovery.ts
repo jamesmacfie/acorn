@@ -38,15 +38,26 @@ export function startPullDiscovery(ctx: DiscoveryContext): { dispose(): Promise<
       // Two results or a continuation are ambiguous. Never choose a primary by provider ordering.
       if (pulls.length !== 1 || /\brel="next"/.test(response.headers.get('link') ?? '')) return
       const [pull] = pulls
-      if (pull.state !== 'open' || pull.head.ref !== branch
-        || pull.head.repo?.full_name.toLowerCase() !== repository
-        || pull.base.repo.full_name.toLowerCase() !== repository) return
+      if (
+        pull.state !== 'open' ||
+        pull.head.ref !== branch ||
+        pull.head.repo?.full_name.toLowerCase() !== repository ||
+        pull.base.repo.full_name.toLowerCase() !== repository
+      )
+        return
 
       // The task or owner may change while GitHub answers. Core also guards the adoption write
       // against a primary claimed concurrently and a branch changed after its candidate read.
       if (stopped || ctx.core.identity.active() !== userId) return
       const current = await ctx.core.tasks.load(taskId)
-      if (stopped || !current || current.projectId !== task.projectId || current.branch !== branch || current.pullNumber != null) return
+      if (
+        stopped ||
+        !current ||
+        current.projectId !== task.projectId ||
+        current.branch !== branch ||
+        current.pullNumber != null
+      )
+        return
       await ctx.core.tasks.adoptPullNumbers(owner, repo, new Map([[branch, pull.number]]))
     })
   }
@@ -55,7 +66,9 @@ export function startPullDiscovery(ctx: DiscoveryContext): { dispose(): Promise<
     const event = frame as { channel: string } & AgentTurnChangedEvent
     if (stopped || event.status !== 'completed') return
     const work = discover(event.taskId)
-      .catch((error: unknown) => ctx.log.warn('Pull request discovery failed', { taskId: event.taskId, ...describeError(error) }))
+      .catch((error: unknown) =>
+        ctx.log.warn('Pull request discovery failed', { taskId: event.taskId, ...describeError(error) }),
+      )
       .finally(() => running.delete(work))
     running.add(work)
   })

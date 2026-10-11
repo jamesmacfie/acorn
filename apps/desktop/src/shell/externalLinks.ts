@@ -10,8 +10,10 @@ export function installExternalLinks(host: Window, openUrl: (url: string) => Pro
     const safe = safeContentHref(raw)
     if (!safe) return null
     const url = new URL(safe, host.location.href)
-    return url.protocol === 'mailto:' || (['http:', 'https:'].includes(url.protocol) && url.origin !== host.location.origin)
-      ? url.href : null
+    return url.protocol === 'mailto:' ||
+      (['http:', 'https:'].includes(url.protocol) && url.origin !== host.location.origin)
+      ? url.href
+      : null
   }
   const open = (href: string) => {
     void openUrl(href).catch((error: unknown) => log.error('Could not open external URL', error))

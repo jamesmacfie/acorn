@@ -17,7 +17,6 @@ export type MenuContext = { close: () => void; register: (element: HTMLElement |
 const triggerOf = (wrapper: HTMLElement | undefined): HTMLElement | undefined =>
   (wrapper?.firstElementChild as HTMLElement | null) ?? wrapper
 
-
 /** The menu itself: portal, `role="menu"`, roving focus, and first-item focus on open. Mounted only
  *  while the popover is open, which keeps the item list from growing a copy of every item on each
  *  re-open.
@@ -82,13 +81,20 @@ export function Menu(props: {
 
   return (
     <>
-      <span class="ui-popover-anchor" ref={anchorRef}
-        onPointerDown={() => { if (!popover.open()) props.onBeforeOpen?.() }}
-        onKeyDown={(event) => { if (!popover.open() && (event.key === 'Enter' || event.key === ' ')) props.onBeforeOpen?.() }}>
+      <span
+        class="ui-popover-anchor"
+        ref={anchorRef}
+        onPointerDown={() => {
+          if (!popover.open()) props.onBeforeOpen?.()
+        }}
+        onKeyDown={(event) => {
+          if (!popover.open() && (event.key === 'Enter' || event.key === ' ')) props.onBeforeOpen?.()
+        }}
+      >
         {props.trigger({ open: popover.open, toggle: popover.toggle })}
       </span>
       <Show when={popover.open()}>
-        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} >
+        <MenuSurface popover={popover} ariaLabel={props.ariaLabel}>
           {props.children}
         </MenuSurface>
       </Show>
@@ -125,7 +131,7 @@ export function ContextMenu(props: {
   return (
     <Show keyed when={props.at()}>
       {(_at) => (
-        <MenuSurface popover={popover} ariaLabel={props.ariaLabel} >
+        <MenuSurface popover={popover} ariaLabel={props.ariaLabel}>
           {props.children}
         </MenuSurface>
       )}
@@ -173,7 +179,7 @@ Menu.Item = (props: {
       class="ui-menu-item"
       role={props.kind === 'radio' ? 'menuitemradio' : props.kind === 'checkbox' ? 'menuitemcheckbox' : 'menuitem'}
       aria-checked={props.kind ? !!props.checked : undefined}
-      data-tone={isArmed() ? 'danger' : props.tone ?? 'neutral'}
+      data-tone={isArmed() ? 'danger' : (props.tone ?? 'neutral')}
       data-armed={isArmed() ? '' : undefined}
       disabled={props.disabled}
       data-tip={props.title}
@@ -193,18 +199,28 @@ Menu.Item = (props: {
       }}
     >
       <Show when={props.kind}>
-        <span class="ui-menu-check" aria-hidden="true"><Show when={props.checked}><Icon name="check" /></Show></span>
+        <span class="ui-menu-check" aria-hidden="true">
+          <Show when={props.checked}>
+            <Icon name="check" />
+          </Show>
+        </span>
       </Show>
-      <Show when={props.leading}><span class="ui-menu-leading">{props.leading}</span></Show>
+      <Show when={props.leading}>
+        <span class="ui-menu-leading">{props.leading}</span>
+      </Show>
       <span class="ui-menu-label">{isArmed() ? props.confirm : props.children}</span>
-      <Show when={props.trailing}><span class="ui-menu-trailing">{props.trailing}</span></Show>
+      <Show when={props.trailing}>
+        <span class="ui-menu-trailing">{props.trailing}</span>
+      </Show>
     </button>
   )
 }
 
 /** A non-interactive heading row. */
 Menu.Label = (props: { children: JSX.Element }) => (
-  <div class="ui-menu-label-row" role="presentation">{props.children}</div>
+  <div class="ui-menu-label-row" role="presentation">
+    {props.children}
+  </div>
 )
 
 Menu.Separator = () => <div class="ui-menu-separator" role="separator" />

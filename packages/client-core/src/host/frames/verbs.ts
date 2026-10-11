@@ -32,11 +32,11 @@ type VerbName<R> = R extends { kind: 'api'; method: infer M extends string }
   ? `api:${M}`
   : R extends { kind: 'api.bytes'; method: infer M extends string }
     ? `api.bytes:${M}`
-  : R extends { kind: infer K extends string; op: infer O extends string }
-    ? `${K}:${O}`
-    : R extends { kind: infer K extends string }
-      ? K
-      : never
+    : R extends { kind: infer K extends string; op: infer O extends string }
+      ? `${K}:${O}`
+      : R extends { kind: infer K extends string }
+        ? K
+        : never
 
 export type FrameVerb = VerbName<PluginBridgeRequest>
 

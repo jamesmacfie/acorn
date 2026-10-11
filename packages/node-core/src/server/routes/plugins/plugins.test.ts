@@ -32,7 +32,11 @@ const ROSTER: PluginRosterEntry[] = [
   { name: 'rollbar', required: false, disabled: true, state: 'disabled' },
 ]
 
-const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
+const NO_PERMISSIONS = {
+  api: [],
+  events: [],
+  node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+}
 const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
   label: `Plugin ${id}`,
@@ -40,13 +44,49 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
   emits: [],
-  contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [], cliCommands: [], documentServices: [] },
+  contributions: {
+    frames: [],
+    remote: [],
+    sources: [],
+    slots: [],
+    commands: [],
+    keybindings: [],
+    attention: [],
+    nodeStats: [],
+    contentLinks: [],
+    agentContexts: [],
+    refResolvers: [],
+    routes: [],
+    themes: [],
+    styles: [],
+    contextMenus: [],
+    extensionPoints: [],
+    extensions: [],
+    schedules: [],
+    taskChecks: [],
+    auditActions: [],
+    harnesses: [],
+    customAgents: [],
+    skills: [],
+    agentTools: [],
+    contextSections: [],
+    cliCommands: [],
+    documentServices: [],
+  },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
   ...over,
 })
 const activeSnapshot = (id: string, version: string): ActivePluginSnapshot => {
-  const { id: _id, label: _label, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = installedEntry(id, { version })
+  const {
+    id: _id,
+    label: _label,
+    hasNode: _hasNode,
+    source: _source,
+    installedAt: _installedAt,
+    bundled: _bundled,
+    ...identity
+  } = installedEntry(id, { version })
   return { id, identity: { ...identity, activation: 'node' }, bundle: null }
 }
 
@@ -72,7 +112,15 @@ type WireOptions = {
 
 const memoryGrants = (): InputGrantsStore => {
   const grants = new Map<string, InputGrant>()
-  return { get: (id) => grants.get(id), set: (grant) => { grants.set(grant.pluginId, grant) }, delete: (id) => { grants.delete(id) } }
+  return {
+    get: (id) => grants.get(id),
+    set: (grant) => {
+      grants.set(grant.pluginId, grant)
+    },
+    delete: (id) => {
+      grants.delete(id)
+    },
+  }
 }
 
 // The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
@@ -84,12 +132,16 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
   const grants = options.grants ?? memoryGrants()
   const skillState = options.skillState ?? skillStateStore(mkdtempSync(join(tmpdir(), 'acorn-skill-state-')))
   const developing = new Set<string>()
-  const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[]; approve: unknown[] } = { install: [], update: [], uninstall: [], reload: [], approve: [] }
+  const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[]; approve: unknown[] } =
+    { install: [], update: [], uninstall: [], reload: [], approve: [] }
   setRouteTestCapability(PLUGIN_STATE, {
     roster: () => options.roster ?? ROSTER,
     installed: () => installed,
-    booted: () => options.activeSnapshots ?? (options.booted ?? installed.map((entry) => ({ id: entry.id, version: entry.version })))
-      .map((entry) => activeSnapshot(entry.id, entry.version)),
+    booted: () =>
+      options.activeSnapshots ??
+      (options.booted ?? installed.map((entry) => ({ id: entry.id, version: entry.version }))).map((entry) =>
+        activeSnapshot(entry.id, entry.version),
+      ),
     clientBundle: async (id, hash) => {
       const source = options.bundlesByHash?.[hash] ?? options.bundles?.[id]
       if (source === undefined) return null
@@ -99,7 +151,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
     disabled: () => saved,
     loadFailures: () => (options.loadFailures ?? []).map((failure) => ({ ...failure, at: 1_700_000_000_000 })),
     pendingReview: () => options.pendingReview ?? null,
-    pendingReviewIds: () => options.pendingReview ? ['ntfy'] : [],
+    pendingReviewIds: () => (options.pendingReview ? ['ntfy'] : []),
     approveReview: (id, reviewId, fingerprint) => {
       calls.approve.push({ id, reviewId, fingerprint })
       if (!options.pendingReview) throw new Error('not under test')
@@ -124,7 +176,8 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
     development: {
       state: (id) => (options.folders?.includes(id) ? { on: developing.has(id) } : undefined),
       set: (id, on) => {
-        if (!options.folders?.includes(id)) throw new Error('Development mode is only for node plugins installed from a local folder.')
+        if (!options.folders?.includes(id))
+          throw new Error('Development mode is only for node plugins installed from a local folder.')
         if (on) developing.add(id)
         else developing.delete(id)
       },
@@ -186,23 +239,46 @@ describe('agent-requested staged review', () => {
     const source = { path: '/tmp/review-fixture' }
     const raised = raisePluginRequest({ taskId: 'task-1', action: 'install', source, dev: false })
     if (raised.state !== 'pending') throw new Error('expected pending request')
-    const marker = { reviewId: '00000000-0000-4000-8000-000000000002', requestId: raised.request.requestId,
-      fingerprint: 'a'.repeat(64), stagedAt: 1 }
+    const marker = {
+      reviewId: '00000000-0000-4000-8000-000000000002',
+      requestId: raised.request.requestId,
+      fingerprint: 'a'.repeat(64),
+      stagedAt: 1,
+    }
     const state = wire([], { pendingReview: marker })
     const node = asDevice()
 
-    const wrongSource = await node.request(at('/install', 'POST', {
-      source: { path: '/tmp/other' }, reviewRequestId: marker.requestId,
-    }, KEY))
+    const wrongSource = await node.request(
+      at(
+        '/install',
+        'POST',
+        {
+          source: { path: '/tmp/other' },
+          reviewRequestId: marker.requestId,
+        },
+        KEY,
+      ),
+    )
     expect(wrongSource.status).toBe(400)
     const staged = await node.request(at('/install', 'POST', { source, reviewRequestId: marker.requestId }, KEY))
     expect(staged.status).toBe(200)
-    expect(state.calls.install).toEqual([{ source, opts: { allowDowngrade: undefined, reviewRequestId: marker.requestId } }])
+    expect(state.calls.install).toEqual([
+      { source, opts: { allowDowngrade: undefined, reviewRequestId: marker.requestId } },
+    ])
 
-    const stale = await node.request(at('/ntfy/review', 'POST', { reviewId: marker.reviewId, fingerprint: 'b'.repeat(64), decision: 'approved' }, KEY))
+    const stale = await node.request(
+      at('/ntfy/review', 'POST', { reviewId: marker.reviewId, fingerprint: 'b'.repeat(64), decision: 'approved' }, KEY),
+    )
     expect(stale.status).toBe(409)
     expect(state.calls.approve).toEqual([])
-    const approved = await node.request(at('/ntfy/review', 'POST', { reviewId: marker.reviewId, fingerprint: marker.fingerprint, decision: 'approved' }, KEY))
+    const approved = await node.request(
+      at(
+        '/ntfy/review',
+        'POST',
+        { reviewId: marker.reviewId, fingerprint: marker.fingerprint, decision: 'approved' },
+        KEY,
+      ),
+    )
     expect(approved.status).toBe(200)
     expect(state.calls.approve).toEqual([{ id: 'ntfy', reviewId: marker.reviewId, fingerprint: marker.fingerprint }])
     const collected = raisePluginRequest({ taskId: 'task-1', action: 'install', source, dev: false })
@@ -213,18 +289,32 @@ describe('agent-requested staged review', () => {
     _resetPluginRequests()
     const raised = raisePluginRequest({ taskId: 'task-1', action: 'update', pluginId: 'ntfy', dev: false })
     if (raised.state !== 'pending') throw new Error('expected pending request')
-    const marker = { reviewId: '00000000-0000-4000-8000-000000000003', requestId: raised.request.requestId,
-      fingerprint: 'c'.repeat(64), stagedAt: 1 }
+    const marker = {
+      reviewId: '00000000-0000-4000-8000-000000000003',
+      requestId: raised.request.requestId,
+      fingerprint: 'c'.repeat(64),
+      stagedAt: 1,
+    }
     const state = wire([], { pendingReview: marker })
     const node = asDevice()
     const stage = await node.request(at('/ntfy/update', 'POST', { reviewRequestId: marker.requestId }, KEY))
     expect(stage.status).toBe(200)
-    expect(state.calls.update).toEqual([{ id: 'ntfy', opts: { allowDowngrade: undefined, reviewRequestId: marker.requestId } }])
-    const denied = await node.request(at('/ntfy/review', 'POST', { reviewId: marker.reviewId, fingerprint: marker.fingerprint, decision: 'denied' }, KEY))
+    expect(state.calls.update).toEqual([
+      { id: 'ntfy', opts: { allowDowngrade: undefined, reviewRequestId: marker.requestId } },
+    ])
+    const denied = await node.request(
+      at(
+        '/ntfy/review',
+        'POST',
+        { reviewId: marker.reviewId, fingerprint: marker.fingerprint, decision: 'denied' },
+        KEY,
+      ),
+    )
     expect(denied.status).toBe(200)
     expect(state.calls.uninstall).toEqual([{ id: 'ntfy', opts: {} }])
     expect(raisePluginRequest({ taskId: 'task-1', action: 'update', pluginId: 'ntfy', dev: false })).toMatchObject({
-      state: 'decided', outcome: { decision: 'denied' },
+      state: 'decided',
+      outcome: { decision: 'denied' },
     })
   })
 })
@@ -232,8 +322,12 @@ describe('agent-requested staged review', () => {
 describe('loaded CLI command dispatch', () => {
   const read = testCliCommandDescriptor()
   const write = testCliCommandDescriptor({
-    name: 'set', title: 'Set probe', summary: 'Replace one fixture value.',
-    effects: 'Replaces the fixture value.', risk: 'write', route: { method: 'POST', path: '/cli/set' },
+    name: 'set',
+    title: 'Set probe',
+    summary: 'Replace one fixture value.',
+    effects: 'Replaces the fixture value.',
+    risk: 'write',
+    route: { method: 'POST', path: '/cli/set' },
   })
   const snapshot = (version: string, commands = [read, write]) => {
     const entry = installedEntry('fixture', {
@@ -241,33 +335,61 @@ describe('loaded CLI command dispatch', () => {
       permissions: { ...NO_PERMISSIONS, node: { ...NO_PERMISSIONS.node, core: ['tasks'] } },
       contributions: { ...installedEntry('fixture').contributions, cliCommands: commands },
     })
-    const { id: _id, label: _label, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = entry
+    const {
+      id: _id,
+      label: _label,
+      hasNode: _hasNode,
+      source: _source,
+      installedAt: _installedAt,
+      bundled: _bundled,
+      ...identity
+    } = entry
     return { id: 'fixture', identity: { ...identity, activation: 'node' as const }, bundle: null }
   }
 
   it('rechecks the active descriptor, rejects invalid input/output, and replays a keyed write', async () => {
     const database = makeTestDb()
     const active = [snapshot('1.0.0')]
-    wire([], { roster: [{ name: 'fixture', required: false, disabled: false, state: 'active' }],
-      installed: [installedEntry('fixture', { version: '2.0.0' })], activeSnapshots: active })
+    wire([], {
+      roster: [{ name: 'fixture', required: false, disabled: false, state: 'active' }],
+      installed: [installedEntry('fixture', { version: '2.0.0' })],
+      activeSnapshots: active,
+    })
     let value = 'first'
     let writes = 0
     let malformed = false
     let sawBearer = false
-    registerRoute({ plugin: 'fixture', prefix: '', fetch: async (request) => {
-      sawBearer ||= request.headers.has('authorization')
-      const input = await request.json() as { value?: string }
-      if (new URL(request.url).pathname === '/cli/set') { writes++; value = input.value ?? 'set'; return Response.json({ value }) }
-      return Response.json({ value: malformed ? 12 : value })
-    } })
+    registerRoute({
+      plugin: 'fixture',
+      prefix: '',
+      fetch: async (request) => {
+        sawBearer ||= request.headers.has('authorization')
+        const input = (await request.json()) as { value?: string }
+        if (new URL(request.url).pathname === '/cli/set') {
+          writes++
+          value = input.value ?? 'set'
+          return Response.json({ value })
+        }
+        return Response.json({ value: malformed ? 12 : value })
+      },
+    })
     const hono = new Hono<AppEnv>()
     let principal: AppEnv['Variables']['principal'] = { kind: 'device', userId: 'james', deviceId: 'd1' }
-    hono.use('/v1/*', async (c, next) => { c.set('principal', principal); await next() })
+    hono.use('/v1/*', async (c, next) => {
+      c.set('principal', principal)
+      await next()
+    })
     hono.use('/v1/*', idempotency)
     hono.use('/v1/core/plugins/*', requireDevice)
     hono.route('/v1/core/plugins', plugins)
-    const env = testEnv({ NODE_ID: 'node-a', ACTIVE_IDENTITY: memoryIdentityStore('james'), DB: database.db, IDEMPOTENCY: idempotencyStore(database.db) })
-    const call = (command: string, input: unknown, headers: Record<string, string> = {}) => hono.fetch(at(`/fixture/cli/${command}`, 'POST', { input }, headers), env)
+    const env = testEnv({
+      NODE_ID: 'node-a',
+      ACTIVE_IDENTITY: memoryIdentityStore('james'),
+      DB: database.db,
+      IDEMPOTENCY: idempotencyStore(database.db),
+    })
+    const call = (command: string, input: unknown, headers: Record<string, string> = {}) =>
+      hono.fetch(at(`/fixture/cli/${command}`, 'POST', { input }, headers), env)
     try {
       expect((await call('probe', { nodeId: 'wrong' })).status).toBe(400)
       expect((await call('probe', { nodeId: 'node-a', extra: true })).status).toBe(400)
@@ -283,25 +405,62 @@ describe('loaded CLI command dispatch', () => {
       expect((await call('probe', { nodeId: 'node-a' })).status).toBe(502)
       malformed = false
       active[0] = snapshot('2.0.0', [read])
-      expect((await call('set', { nodeId: 'node-a' }, { 'idempotency-key': '22222222-2222-4222-8222-222222222222' })).status).toBe(404)
+      expect(
+        (await call('set', { nodeId: 'node-a' }, { 'idempotency-key': '22222222-2222-4222-8222-222222222222' })).status,
+      ).toBe(404)
       value = 'second'
-      expect(((await (await call('probe', { nodeId: 'node-a' })).json()) as { result: { value: string } }).result.value).toBe('second')
+      expect(
+        ((await (await call('probe', { nodeId: 'node-a' })).json()) as { result: { value: string } }).result.value,
+      ).toBe('second')
       database.db.insert(schema.workspaces).values({ id: 'w1', name: 'One', createdAt: 1, updatedAt: 1 }).run()
-      database.db.insert(schema.projects).values({ id: 'p1', name: 'One', workspaceId: 'w1', createdAt: 1, updatedAt: 1 }).run()
-      database.db.insert(schema.tasks).values({ id: 't1', title: 'One', origin: 'local', projectId: 'p1', status: 'active', createdAt: 1, updatedAt: 1 }).run()
-      const scoped = testCliCommandDescriptor({ scope: 'task', inputSchema: { type: 'object', properties: {
-        nodeId: { type: 'string' }, taskId: { type: 'string' }, projectId: { type: 'string' }, workspaceId: { type: 'string' },
-      }, required: ['nodeId', 'taskId'], additionalProperties: false } })
+      database.db
+        .insert(schema.projects)
+        .values({ id: 'p1', name: 'One', workspaceId: 'w1', createdAt: 1, updatedAt: 1 })
+        .run()
+      database.db
+        .insert(schema.tasks)
+        .values({
+          id: 't1',
+          title: 'One',
+          origin: 'local',
+          projectId: 'p1',
+          status: 'active',
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .run()
+      const scoped = testCliCommandDescriptor({
+        scope: 'task',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            nodeId: { type: 'string' },
+            taskId: { type: 'string' },
+            projectId: { type: 'string' },
+            workspaceId: { type: 'string' },
+          },
+          required: ['nodeId', 'taskId'],
+          additionalProperties: false,
+        },
+      })
       active[0] = snapshot('3.0.0', [scoped])
       expect((await call('probe', { nodeId: 'node-a' })).status).toBe(400)
       expect((await call('probe', { nodeId: 'node-a', taskId: 'missing' })).status).toBe(404)
       expect((await call('probe', { nodeId: 'node-a', taskId: 't1', projectId: 'other' })).status).toBe(404)
       expect((await call('probe', { nodeId: 'node-a', taskId: 't1', workspaceId: 'other' })).status).toBe(404)
-      expect((await call('probe', { nodeId: 'node-a', taskId: 't1', projectId: 'p1', workspaceId: 'w1' })).status).toBe(200)
-      wire(['fixture'], { roster: [{ name: 'fixture', required: false, disabled: false, state: 'active' }], activeSnapshots: active,
-        installed: [installedEntry('fixture')] })
+      expect((await call('probe', { nodeId: 'node-a', taskId: 't1', projectId: 'p1', workspaceId: 'w1' })).status).toBe(
+        200,
+      )
+      wire(['fixture'], {
+        roster: [{ name: 'fixture', required: false, disabled: false, state: 'active' }],
+        activeSnapshots: active,
+        installed: [installedEntry('fixture')],
+      })
       expect((await call('probe', { nodeId: 'node-a', taskId: 't1' })).status).toBe(404)
-    } finally { removePluginRoutes('fixture'); database.cleanup() }
+    } finally {
+      removePluginRoutes('fixture')
+      database.cleanup()
+    }
   })
 })
 
@@ -333,10 +492,20 @@ describe('GET /v1/core/plugins', () => {
     // A loaded plugin whose init threw. It is not disabled and its contributions are gone, but the
     // owner's list and the running set still agree, so the restart banner stays down and the client
     // learns about the failure from `state` and the attention inbox instead.
-    wire([], { roster: [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1_700_000_000_000 }] })
+    wire([], {
+      roster: [{ name: 'ntfy', required: false, disabled: false, state: 'failed', failedAt: 1_700_000_000_000 }],
+    })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins).toEqual([
-      { name: 'ntfy', required: false, disabled: false, running: true, state: 'failed', failedAt: 1_700_000_000_000, active: null },
+      {
+        name: 'ntfy',
+        required: false,
+        disabled: false,
+        running: true,
+        state: 'failed',
+        failedAt: 1_700_000_000_000,
+        active: null,
+      },
     ])
     expect(state.restartRequired).toBe(false)
   })
@@ -406,7 +575,35 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       emits: [],
       // Passed through untouched for the device to register surfaces from (docs/plugins.md). The node
       // neither reads nor renders it.
-      contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [], cliCommands: [], documentServices: [] },
+      contributions: {
+        frames: [],
+        remote: [],
+        sources: [],
+        slots: [],
+        commands: [],
+        keybindings: [],
+        attention: [],
+        nodeStats: [],
+        contentLinks: [],
+        agentContexts: [],
+        refResolvers: [],
+        routes: [],
+        themes: [],
+        styles: [],
+        contextMenus: [],
+        extensionPoints: [],
+        extensions: [],
+        schedules: [],
+        taskChecks: [],
+        auditActions: [],
+        harnesses: [],
+        customAgents: [],
+        skills: [],
+        agentTools: [],
+        contextSections: [],
+        cliCommands: [],
+        documentServices: [],
+      },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -434,7 +631,33 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
         emits: [],
-        contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [] },
+        contributions: {
+          frames: [],
+          remote: [],
+          sources: [],
+          slots: [],
+          commands: [],
+          keybindings: [],
+          attention: [],
+          nodeStats: [],
+          contentLinks: [],
+          agentContexts: [],
+          refResolvers: [],
+          routes: [],
+          themes: [],
+          styles: [],
+          contextMenus: [],
+          extensionPoints: [],
+          extensions: [],
+          schedules: [],
+          taskChecks: [],
+          auditActions: [],
+          harnesses: [],
+          customAgents: [],
+          skills: [],
+          agentTools: [],
+          contextSections: [],
+        },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },
     })
@@ -491,7 +714,9 @@ describe('GET /v1/core/plugins/:id/bundles/:hash', () => {
     const newHash = createHash('sha256').update(newBytes).digest('hex')
     const active = activeSnapshot('sparkline', '1.0.0')
     active.identity.client = { hash: oldHash, bytes: oldBytes.length }
-    const onDisk = [installedEntry('sparkline', { version: '2.0.0', client: { hash: newHash, bytes: newBytes.length } })]
+    const onDisk = [
+      installedEntry('sparkline', { version: '2.0.0', client: { hash: newHash, bytes: newBytes.length } }),
+    ]
     wire([], {
       roster: [{ name: 'sparkline', required: false, disabled: false, state: 'active' }],
       installed: onDisk,
@@ -500,8 +725,15 @@ describe('GET /v1/core/plugins/:id/bundles/:hash', () => {
     })
     const app = asDevice()
     const state = (await (await app.fetch(request('GET'))).json()) as NodePluginState
-    expect(state.plugins[0]).toMatchObject({ state: 'pending-restart', active: { version: '1.0.0', client: { hash: oldHash } }, installed: { version: '2.0.0', client: { hash: newHash } } })
-    for (const [hash, bytes] of [[oldHash, oldBytes], [newHash, newBytes]]) {
+    expect(state.plugins[0]).toMatchObject({
+      state: 'pending-restart',
+      active: { version: '1.0.0', client: { hash: oldHash } },
+      installed: { version: '2.0.0', client: { hash: newHash } },
+    })
+    for (const [hash, bytes] of [
+      [oldHash, oldBytes],
+      [newHash, newBytes],
+    ]) {
       const response = await app.fetch(at(`/sparkline/bundles/${hash}`, 'GET'))
       expect(response.status).toBe(200)
       expect(await response.text()).toBe(bytes)
@@ -524,7 +756,14 @@ describe('PUT /v1/core/plugins', () => {
     expect(res.status).toBe(200)
     expect(saved()).toEqual(['docker'])
     const state = (await res.json()) as NodePluginState
-    expect(state.plugins.find((row) => row.name === 'docker')).toEqual({ name: 'docker', required: false, disabled: true, running: true, state: 'active', active: null })
+    expect(state.plugins.find((row) => row.name === 'docker')).toEqual({
+      name: 'docker',
+      required: false,
+      disabled: true,
+      running: true,
+      state: 'active',
+      active: null,
+    })
     expect(state.restartRequired).toBe(true)
   })
 
@@ -546,7 +785,9 @@ describe('PUT /v1/core/plugins', () => {
     expect(res.status).toBe(200)
     expect(saved()).toEqual(['ntfy'])
     const state = (await res.json()) as NodePluginState
-    expect(state.plugins).toEqual([{ name: 'ntfy', required: false, disabled: true, running: false, state: 'disabled', active: null }])
+    expect(state.plugins).toEqual([
+      { name: 'ntfy', required: false, disabled: true, running: false, state: 'disabled', active: null },
+    ])
     expect(state.restartRequired).toBe(false)
   })
 
@@ -605,7 +846,9 @@ describe('the device gate over /v1/core/plugins', () => {
     // Which code a device runs is an owner decision. A task-scoped token belongs to an agent running
     // inside that decision's outcome, so it must not be able to pull a plugin's client bundle.
     wire([], { installed: [installedEntry('sparkline')], bundles: { sparkline: 'export default {}' } })
-    const res = await gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' }).fetch(bundleRequest('sparkline'))
+    const res = await gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' }).fetch(
+      bundleRequest('sparkline'),
+    )
     expect(res.status).toBe(403)
     expect((await asTaskAgent().fetch(bundleRequest('sparkline'))).status).toBe(200)
   })
@@ -673,7 +916,11 @@ describe('the pending-restart state', () => {
   })
 
   it('reports an uninstalled plugin that is still serving as pending', async () => {
-    wire([], { roster: [{ name: 'ntfy', required: false, disabled: false, state: 'active' }], installed: [], booted: [{ id: 'ntfy', version: '1.0.0' }] })
+    wire([], {
+      roster: [{ name: 'ntfy', required: false, disabled: false, state: 'active' }],
+      installed: [],
+      booted: [{ id: 'ntfy', version: '1.0.0' }],
+    })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins[0]).toMatchObject({ running: true, state: 'pending-restart' })
     expect(state.restartRequired).toBe(true)
@@ -703,7 +950,9 @@ describe('the pending-restart state', () => {
   })
 
   it('carries the source and install time through to the row', async () => {
-    wire([], { installed: [installedEntry('ntfy', { source: 'github:acme/ntfy@v1.0.0', installedAt: 1_700_000_000_000 })] })
+    wire([], {
+      installed: [installedEntry('ntfy', { source: 'github:acme/ntfy@v1.0.0', installedAt: 1_700_000_000_000 })],
+    })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.plugins.find((row) => row.name === 'ntfy')?.installed).toMatchObject({
       source: 'github:acme/ntfy@v1.0.0',
@@ -718,7 +967,9 @@ describe('the install, update and uninstall routes', () => {
     const res = await asDevice().fetch(at('/install', 'POST', { source: { github: 'acme/ntfy', tag: 'v1.0.0' } }, KEY))
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ id: 'ntfy', version: '1.0.0', state: 'installed-restart-required' })
-    expect(bridge.calls.install).toEqual([{ source: { github: 'acme/ntfy', tag: 'v1.0.0' }, opts: { allowDowngrade: undefined } }])
+    expect(bridge.calls.install).toEqual([
+      { source: { github: 'acme/ntfy', tag: 'v1.0.0' }, opts: { allowDowngrade: undefined } },
+    ])
   })
 
   it('demands an Idempotency-Key on every mutation', async () => {
@@ -736,7 +987,9 @@ describe('the install, update and uninstall routes', () => {
 
   it('rejects a source naming two forms at once rather than picking one', async () => {
     wire([])
-    const res = await asDevice().fetch(at('/install', 'POST', { source: { github: 'acme/ntfy', npm: 'acorn-ntfy' } }, KEY))
+    const res = await asDevice().fetch(
+      at('/install', 'POST', { source: { github: 'acme/ntfy', npm: 'acorn-ntfy' } }, KEY),
+    )
     expect(res.status).toBe(400)
   })
 
@@ -756,7 +1009,7 @@ describe('the install, update and uninstall routes', () => {
     expect(bridge.calls.update).toEqual([{ id: 'ntfy', opts: { allowDowngrade: true } }])
   })
 
-  it('uninstalls, defaulting to keeping the plugin\'s data', async () => {
+  it("uninstalls, defaulting to keeping the plugin's data", async () => {
     const bridge = wire([], { installed: [installedEntry('ntfy')] })
     const res = await asDevice().fetch(at('/ntfy', 'DELETE', {}, KEY))
     expect(await res.json()).toEqual({ restartRequired: true, dataPurged: false })
@@ -798,8 +1051,12 @@ describe('the install, update and uninstall routes', () => {
     wire([], { installed: [installedEntry('ntfy')], folders: ['ntfy'] })
     const on = await asDevice().fetch(at('/ntfy/development', 'PUT', { on: true }))
     expect(on.status).toBe(200)
-    expect(((await on.json()) as NodePluginState).plugins.find((row) => row.name === 'ntfy')?.development).toEqual({ on: true })
-    expect(await (await asDevice().fetch(at('/ntfy/logs', 'GET'))).json()).toEqual({ lines: [{ at: 1, level: 'info', message: 'refreshed 3 issues' }] })
+    expect(((await on.json()) as NodePluginState).plugins.find((row) => row.name === 'ntfy')?.development).toEqual({
+      on: true,
+    })
+    expect(await (await asDevice().fetch(at('/ntfy/logs', 'GET'))).json()).toEqual({
+      lines: [{ at: 1, level: 'info', message: 'refreshed 3 issues' }],
+    })
     await asDevice().fetch(at('/ntfy/development', 'PUT', { on: false }))
     expect((await asDevice().fetch(at('/ntfy/logs', 'GET'))).status).toBe(404)
   })
@@ -823,16 +1080,26 @@ describe('the install, update and uninstall routes', () => {
     // reconcile. An unanswered request is the only thing an agent can put here.
     wire([])
     _resetPluginRequests()
-    raisePluginRequest({ taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' }, reason: 'so I can iterate' })
+    raisePluginRequest({
+      taskId: 't1',
+      action: 'install',
+      dev: true,
+      source: { path: '/src/board' },
+      reason: 'so I can iterate',
+    })
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
-    expect(state.requests).toMatchObject([{ taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' }, reason: 'so I can iterate' }])
+    expect(state.requests).toMatchObject([
+      { taskId: 't1', action: 'install', dev: true, source: { path: '/src/board' }, reason: 'so I can iterate' },
+    ])
   })
 
   it('records the owner’s answer and drops the request from the queue', async () => {
     wire([])
     _resetPluginRequests()
     const raised = raisePluginRequest({ taskId: 't1', action: 'uninstall', dev: false, pluginId: 'ntfy' })
-    const res = await asDevice().fetch(at(`/requests/${raised.request.requestId}`, 'POST', { decision: 'approved', message: 'gone' }))
+    const res = await asDevice().fetch(
+      at(`/requests/${raised.request.requestId}`, 'POST', { decision: 'approved', message: 'gone' }),
+    )
     expect(res.status).toBe(200)
     const state = (await (await asDevice().fetch(request('GET'))).json()) as NodePluginState
     expect(state.requests).toEqual([])
@@ -853,7 +1120,12 @@ describe('the install, update and uninstall routes', () => {
     _resetPluginRequests()
     const raised = raisePluginRequest({ taskId: 't1', action: 'uninstall', dev: false, pluginId: 'ntfy' })
     const path = `/requests/${raised.request.requestId}`
-    for (const body of [{}, { decision: 'maybe' }, { decision: 'approved', extra: 1 }, { decision: 'approved', message: '' }]) {
+    for (const body of [
+      {},
+      { decision: 'maybe' },
+      { decision: 'approved', extra: 1 },
+      { decision: 'approved', message: '' },
+    ]) {
       expect((await asDevice().fetch(at(path, 'POST', body))).status, JSON.stringify(body)).toBe(400)
     }
   })
@@ -862,7 +1134,9 @@ describe('the install, update and uninstall routes', () => {
     setRouteTestCapability(PLUGIN_STATE, null)
     _resetPluginRequests()
     const raised = raisePluginRequest({ taskId: 't1', action: 'install', dev: false, source: { npm: 'x' } })
-    expect((await asDevice().fetch(at(`/requests/${raised.request.requestId}`, 'POST', { decision: 'denied' }))).status).toBe(200)
+    expect(
+      (await asDevice().fetch(at(`/requests/${raised.request.requestId}`, 'POST', { decision: 'denied' }))).status,
+    ).toBe(200)
   })
 
   it('503s every mutation when there is no bridge', async () => {
@@ -878,14 +1152,33 @@ describe('the install, update and uninstall routes', () => {
 })
 
 describe('the input grant routes', () => {
-  const readiness = (inputs: Record<string, { source: string; label: string; optional?: boolean }>) => installedEntry('readiness', {
-    contributions: {
-      ...installedEntry('readiness').contributions,
-      dataSources: [{ sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/readiness/board', inputs }],
+  const readiness = (inputs: Record<string, { source: string; label: string; optional?: boolean }>) =>
+    installedEntry('readiness', {
+      contributions: {
+        ...installedEntry('readiness').contributions,
+        dataSources: [
+          {
+            sourceId: 'board',
+            name: 'Release readiness',
+            singular: 'Issue',
+            plural: 'Issues',
+            identityScope: 'issue',
+            handler: '/v1/p/readiness/board',
+            inputs,
+          },
+        ],
+      },
+    })
+  const TWO = {
+    pulls: { source: 'github:pull-requests', label: 'Pull requests' },
+    issues: { source: 'linear:issues', label: 'Issues', optional: true },
+  }
+  const shown = {
+    board: {
+      pulls: { source: 'github:pull-requests', optional: false },
+      issues: { source: 'linear:issues', optional: true },
     },
-  })
-  const TWO = { pulls: { source: 'github:pull-requests', label: 'Pull requests' }, issues: { source: 'linear:issues', label: 'Issues', optional: true } }
-  const shown = { board: { pulls: { source: 'github:pull-requests', optional: false }, issues: { source: 'linear:issues', optional: true } } }
+  }
   const roster = [{ name: 'readiness', required: false, disabled: false, state: 'active' as const }]
   const env = () => {
     const database = makeTestDb()
@@ -896,11 +1189,17 @@ describe('the input grant routes', () => {
     const grants = memoryGrants()
     wire([], { roster, installed: [readiness(TWO)], grants })
     const node = asDevice()
-    const read = async () => await (await node.request(at('/readiness/input-grant', 'GET'), undefined, env())).json() as PluginInputGrantState
+    const read = async () =>
+      (await (
+        await node.request(at('/readiness/input-grant', 'GET'), undefined, env())
+      ).json()) as PluginInputGrantState
 
     const before = await read()
     expect(before.grant).toBeNull()
-    expect(before.inputs.map((input) => [input.name, input.approved])).toEqual([['pulls', false], ['issues', false]])
+    expect(before.inputs.map((input) => [input.name, input.approved])).toEqual([
+      ['pulls', false],
+      ['issues', false],
+    ])
     expect(before.usage).toEqual({})
 
     expect((await node.request(at('/readiness/input-grant', 'POST', { sources: shown }))).status).toBe(200)
@@ -928,8 +1227,12 @@ describe('the input grant routes', () => {
   it('marks only the new input as waiting after an update adds one', async () => {
     const grants = memoryGrants()
     grants.set({ pluginId: 'readiness', sources: shown, grantedAt: 1, grantedBy: 'device:d1' })
-    wire([], { roster, installed: [readiness({ ...TWO, checks: { source: 'github:checks', label: 'Checks' } })], grants })
-    const state = await (await asDevice().request(request('GET'))).json() as NodePluginState
+    wire([], {
+      roster,
+      installed: [readiness({ ...TWO, checks: { source: 'github:checks', label: 'Checks' } })],
+      grants,
+    })
+    const state = (await (await asDevice().request(request('GET'))).json()) as NodePluginState
     const row = state.plugins.find((entry) => entry.name === 'readiness')
     expect(row?.state).not.toBe('failed')
     expect(row?.inputs?.granted).toBe(true)
@@ -939,7 +1242,10 @@ describe('the input grant routes', () => {
   it('is out of reach of a task-scoped agent', async () => {
     wire([], { roster, installed: [readiness(TWO)] })
     const hono = new Hono<AppEnv>()
-    hono.use('/v1/*', async (c, next) => { c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' }); await next() })
+    hono.use('/v1/*', async (c, next) => {
+      c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
+      await next()
+    })
     hono.use('/v1/core/plugins/*', requireDevice)
     hono.route('/v1/core/plugins', plugins)
     expect((await hono.request(at('/readiness/input-grant', 'POST', { sources: shown }))).status).toBe(403)
@@ -949,14 +1255,24 @@ describe('the input grant routes', () => {
 describe('a loaded plugin’s skills', () => {
   const roster = [{ name: 'procedures', required: false, disabled: false, state: 'active' as const }]
   let undo: (() => void) | null = null
-  afterEach(() => { undo?.(); undo = null })
+  afterEach(() => {
+    undo?.()
+    undo = null
+  })
   // One skill in the catalogue, as the host registers it from a loaded package.
   const loadSkill = (): PackageSkill => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-skill-route-'))
     writeFileSync(join(dir, 'SKILL.md'), '---\nname: review\ndescription: Check a diff.\n---\nBody\n')
     const folder = skillFolderDigest(dir)
     if (!folder.ok) throw new Error(folder.reason)
-    const skill = { id: 'review', dir, file: join(dir, 'SKILL.md'), name: 'review', description: 'Check a diff.', digest: folder.digest }
+    const skill = {
+      id: 'review',
+      dir,
+      file: join(dir, 'SKILL.md'),
+      name: 'review',
+      description: 'Check a diff.',
+      digest: folder.digest,
+    }
     undo = registerSkill('procedures', skill).dispose
     return skill
   }
@@ -966,21 +1282,41 @@ describe('a loaded plugin’s skills', () => {
     const skillState = skillStateStore(mkdtempSync(join(tmpdir(), 'acorn-skill-state-')))
     wire([], { roster, installed: [installedEntry('procedures')], skillState })
     const node = asDevice()
-    const row = async () => ((await (await node.request(request('GET'))).json()) as NodePluginState).plugins.find((entry) => entry.name === 'procedures')
+    const row = async () =>
+      ((await (await node.request(request('GET'))).json()) as NodePluginState).plugins.find(
+        (entry) => entry.name === 'procedures',
+      )
     expect((await row())?.skills).toEqual({
       granted: false,
-      skills: [{ name: 'procedures:review', title: 'review', description: 'Check a diff.', digest: skill.digest, approved: false, enabled: true }],
+      skills: [
+        {
+          name: 'procedures:review',
+          title: 'review',
+          description: 'Check a diff.',
+          digest: skill.digest,
+          approved: false,
+          enabled: true,
+        },
+      ],
     })
 
     // What the prompt showed is no longer what runs: refused, and nothing is approved.
-    expect((await node.request(at('/procedures/skill-grant', 'POST', { digests: { 'procedures:review': 'f'.repeat(64) } }))).status).toBe(409)
+    expect(
+      (await node.request(at('/procedures/skill-grant', 'POST', { digests: { 'procedures:review': 'f'.repeat(64) } })))
+        .status,
+    ).toBe(409)
     expect((await node.request(at('/procedures/skill-grant', 'POST', { digests: {} }))).status).toBe(409)
     expect(skillState.get().approved).toEqual({})
 
-    expect((await node.request(at('/procedures/skill-grant', 'POST', { digests: { 'procedures:review': skill.digest } }))).status).toBe(200)
+    expect(
+      (await node.request(at('/procedures/skill-grant', 'POST', { digests: { 'procedures:review': skill.digest } })))
+        .status,
+    ).toBe(200)
     expect((await row())?.skills?.skills[0]?.approved).toBe(true)
-    const state = await (await node.request(at('/procedures/skills', 'GET'))).json() as PluginSkillState
-    expect(state.skills.map((entry) => [entry.name, entry.status, entry.deliveries])).toEqual([['procedures:review', 'ready', []]])
+    const state = (await (await node.request(at('/procedures/skills', 'GET'))).json()) as PluginSkillState
+    expect(state.skills.map((entry) => [entry.name, entry.status, entry.deliveries])).toEqual([
+      ['procedures:review', 'ready', []],
+    ])
   })
 
   it('switches one skill off for the next start, and answers 404 for a plugin with none', async () => {
@@ -989,9 +1325,13 @@ describe('a loaded plugin’s skills', () => {
     wire([], { roster, installed: [installedEntry('procedures')], skillState })
     const node = asDevice()
     const off = await node.request(at('/procedures/skills', 'PUT', { name: 'procedures:review', enabled: false }))
-    expect(((await off.json()) as PluginSkillState).skills.map((entry) => [entry.enabled, entry.status])).toEqual([[false, 'disabled']])
+    expect(((await off.json()) as PluginSkillState).skills.map((entry) => [entry.enabled, entry.status])).toEqual([
+      [false, 'disabled'],
+    ])
     expect(skillState.get().disabled).toEqual(['procedures:review'])
-    expect((await node.request(at('/procedures/skills', 'PUT', { name: 'procedures:other', enabled: false }))).status).toBe(404)
+    expect(
+      (await node.request(at('/procedures/skills', 'PUT', { name: 'procedures:other', enabled: false }))).status,
+    ).toBe(404)
     expect((await node.request(at('/github/skills', 'GET'))).status).toBe(404)
   })
 })

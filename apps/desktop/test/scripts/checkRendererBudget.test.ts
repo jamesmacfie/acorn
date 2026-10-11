@@ -32,10 +32,15 @@ describe('check-renderer-budget', () => {
   // Writes a built client the way Vite does: each chunk and stylesheet under assets/, an index.html
   // that loads the entry and preloads its static imports, and the manifest beside the client dir, with
   // the source modules in each chunk beside that (vite.config.ts writes both).
-  const build = (manifest: Record<string, Chunk>, bytes: Record<string, number> = {}, modules: Record<string, string[]> = {}) => {
+  const build = (
+    manifest: Record<string, Chunk>,
+    bytes: Record<string, number> = {},
+    modules: Record<string, string[]> = {},
+  ) => {
     mkdirSync(join(dir, 'assets'), { recursive: true })
     for (const chunk of Object.values(manifest)) {
-      for (const file of [chunk.file, ...chunk.css ?? []]) writeFileSync(join(dir, file), 'x'.repeat(bytes[file] ?? CHUNK))
+      for (const file of [chunk.file, ...(chunk.css ?? [])])
+        writeFileSync(join(dir, file), 'x'.repeat(bytes[file] ?? CHUNK))
     }
     const entry = Object.values(manifest).find((chunk) => chunk.isEntry)!
     const preloads = (entry.imports ?? []).map((key) => `<link rel="modulepreload" href="/${manifest[key]!.file}">`)
@@ -49,19 +54,34 @@ describe('check-renderer-budget', () => {
   }
 
   // index.html loading the app directly: the entry and its static imports are the startup set.
-  const direct = (imported: string, extra: Record<string, Chunk> = {}) => build({
-    'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'], css: ['assets/index-aaaa.css'], dynamicImports: Object.keys(extra) },
-    _x: { file: `assets/${imported}` },
-    ...extra,
-  })
+  const direct = (imported: string, extra: Record<string, Chunk> = {}) =>
+    build({
+      'index.html': {
+        file: 'assets/index-aaaa.js',
+        isEntry: true,
+        imports: ['_x'],
+        css: ['assets/index-aaaa.css'],
+        dynamicImports: Object.keys(extra),
+      },
+      _x: { file: `assets/${imported}` },
+      ...extra,
+    })
 
   // index.html loading a small guard module that dynamic-imports the app, the shape the renderer had
   // from 2026-09-20 to 2026-09-25.
-  const guarded = (imported: string) => build({
-    'index.html': { file: 'assets/index-aaaa.js', isEntry: true, dynamicImports: ['src/client/index.tsx'] },
-    'src/client/index.tsx': { file: 'assets/client-bbbb.js', imports: ['index.html', '_x'], css: ['assets/client-bbbb.css'] },
-    _x: { file: `assets/${imported}` },
-  }, { 'assets/index-aaaa.js': 1_000 })
+  const guarded = (imported: string) =>
+    build(
+      {
+        'index.html': { file: 'assets/index-aaaa.js', isEntry: true, dynamicImports: ['src/client/index.tsx'] },
+        'src/client/index.tsx': {
+          file: 'assets/client-bbbb.js',
+          imports: ['index.html', '_x'],
+          css: ['assets/client-bbbb.css'],
+        },
+        _x: { file: `assets/${imported}` },
+      },
+      { 'assets/index-aaaa.js': 1_000 },
+    )
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'renderer-budget-'))
@@ -103,10 +123,14 @@ describe('check-renderer-budget', () => {
   it('fails on a denylisted module that merged into a chunk named after something else', () => {
     // How plugin code reached startup before 2026-09-25: a client entry imported a component
     // statically, the component landed in the entry chunk, and every chunk name stayed innocent.
-    build({
-      'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
-      _x: { file: 'assets/store-bbbb.js' },
-    }, {}, { 'assets/index-aaaa.js': ['apps/desktop/src/client/index.tsx', 'plugins/memory/src/client/MemoryAddForm.tsx'] })
+    build(
+      {
+        'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
+        _x: { file: 'assets/store-bbbb.js' },
+      },
+      {},
+      { 'assets/index-aaaa.js': ['apps/desktop/src/client/index.tsx', 'plugins/memory/src/client/MemoryAddForm.tsx'] },
+    )
     const { code, output } = run(dir)
     expect(code).toBe(1)
     expect(output).toContain('plugins/memory/src/client/MemoryAddForm.tsx (in index-aaaa.js)')
@@ -114,10 +138,14 @@ describe('check-renderer-budget', () => {
 
   it('reads a module prefix the way a chunk would be named after it', () => {
     // `draft-` is the editor's draft.ts, not every module whose name starts with "draft".
-    build({
-      'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
-      _x: { file: 'assets/store-bbbb.js' },
-    }, {}, { 'assets/index-aaaa.js': ['packages/client-core/src/kit/lib/state/draftState.ts'] })
+    build(
+      {
+        'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
+        _x: { file: 'assets/store-bbbb.js' },
+      },
+      {},
+      { 'assets/index-aaaa.js': ['packages/client-core/src/kit/lib/state/draftState.ts'] },
+    )
     expect(run(dir).code).toBe(0)
   })
 
@@ -153,10 +181,13 @@ describe('check-renderer-budget', () => {
   })
 
   it('fails over the byte budget', () => {
-    build({
-      'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
-      _x: { file: 'assets/store-bbbb.js' },
-    }, { 'assets/index-aaaa.js': 700_000, 'assets/store-bbbb.js': 700_000 })
+    build(
+      {
+        'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
+        _x: { file: 'assets/store-bbbb.js' },
+      },
+      { 'assets/index-aaaa.js': 700_000, 'assets/store-bbbb.js': 700_000 },
+    )
     const { code, output } = run(dir)
     expect(code).toBe(1)
     expect(output).toContain('Renderer startup budget exceeded')
@@ -164,11 +195,21 @@ describe('check-renderer-budget', () => {
 
   // The compiled roster loads after the first frame, but the restore waits for it, so it has its own
   // ceiling and the same denylist.
-  const withRoster = (rosterFile: string, modules: Record<string, string[]> = {}, bytes: Record<string, number> = {}) => build({
-    'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'], dynamicImports: ['src/client/plugins.ts'] },
-    _x: { file: 'assets/store-bbbb.js' },
-    'src/client/plugins.ts': { file: `assets/${rosterFile}`, imports: ['_x'] },
-  }, bytes, modules)
+  const withRoster = (rosterFile: string, modules: Record<string, string[]> = {}, bytes: Record<string, number> = {}) =>
+    build(
+      {
+        'index.html': {
+          file: 'assets/index-aaaa.js',
+          isEntry: true,
+          imports: ['_x'],
+          dynamicImports: ['src/client/plugins.ts'],
+        },
+        _x: { file: 'assets/store-bbbb.js' },
+        'src/client/plugins.ts': { file: `assets/${rosterFile}`, imports: ['_x'] },
+      },
+      bytes,
+      modules,
+    )
 
   it('counts the roster beyond startup and passes it under its ceiling', () => {
     withRoster('plugins-cccc.js')
@@ -193,10 +234,13 @@ describe('check-renderer-budget', () => {
 
   it('fails under the floor, because a startup set that small is the wrong graph', () => {
     // A guard whose app import the check does not know about: only the guard is counted.
-    build({
-      'index.html': { file: 'assets/index-aaaa.js', isEntry: true, dynamicImports: ['src/client/app.tsx'] },
-      'src/client/app.tsx': { file: 'assets/app-bbbb.js' },
-    }, { 'assets/index-aaaa.js': 9_600 })
+    build(
+      {
+        'index.html': { file: 'assets/index-aaaa.js', isEntry: true, dynamicImports: ['src/client/app.tsx'] },
+        'src/client/app.tsx': { file: 'assets/app-bbbb.js' },
+      },
+      { 'assets/index-aaaa.js': 9_600 },
+    )
     const { code, output } = run(dir)
     expect(code).toBe(1)
     expect(output).toContain('under the 100000B floor')

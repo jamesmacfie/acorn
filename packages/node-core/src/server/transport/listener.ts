@@ -43,7 +43,9 @@ function describePortHolder(port: number): string {
   const capture = (file: string, args: string[]): string =>
     execFileSync(file, args, { encoding: 'utf8', timeout: 2_000, stdio: ['ignore', 'pipe', 'ignore'] })
   try {
-    const pid = capture('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN']).split('\n')[0]?.trim()
+    const pid = capture('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'])
+      .split('\n')[0]
+      ?.trim()
     if (!pid) return 'something this node could not identify'
     // The command line, not just the number, because the number is meaningless by the time anyone
     // reads the log and the path says whether this is a second checkout or an agent session.
@@ -172,7 +174,12 @@ export function startListener(
       // certificate fully against its IP:127.0.0.1 SAN. The address a remote client uses is the one the
       // operator was shown, not this.
       mark('bind')
-      resolveServer({ server, endpoint: { origin: `https://127.0.0.1:${address.port}`, port: address.port }, fingerprint, certPem })
+      resolveServer({
+        server,
+        endpoint: { origin: `https://127.0.0.1:${address.port}`, port: address.port },
+        fingerprint,
+        certPem,
+      })
     }
     server.on('error', onError)
     server.listen(requested, bindHost, onListening)
@@ -244,7 +251,13 @@ export async function drainWithDeadline(
 // the composition root, which reads it from the packaged app and passes it in ServiceStartConfig. The
 // plain-Node entry has no packaged version, and saying so is more useful than parsing a package.json
 // that will not exist beside the bundled artifact.
-export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev', capabilities = new CapabilityRegistry(), serviceInstanceId?: string, keys?: NodeKeys): RuntimeBindings {
+export function makeRuntime(
+  root: DataRoot,
+  appVersion = '0.0.0-dev',
+  capabilities = new CapabilityRegistry(),
+  serviceInstanceId?: string,
+  keys?: NodeKeys,
+): RuntimeBindings {
   return makeBindings({
     keys,
     dbPath: resolveDatabasePath(root.dir),

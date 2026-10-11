@@ -97,7 +97,8 @@ export function linkPreviewProps(request: LinkPreviewRequest): LinkPreviewProps 
     ...(request.scope.taskId ? { taskId: request.scope.taskId } : {}),
     ...(request.scope.projectId ? { projectId: request.scope.projectId } : {}),
     ...(typeof kind === 'string' && kind.length <= 64 && typeof id === 'string' && id && id.length <= 300
-      ? { ref: { kind, id } } : {}),
+      ? { ref: { kind, id } }
+      : {}),
   }
 }
 
@@ -151,8 +152,18 @@ export function createLinkPreviewBoundary(scope: () => LinkPreviewScope) {
 
   // A memo, because `on` re-runs whenever its source is read again, even with the same ids.
   const scopeKey = createMemo(() => `${scope().taskId ?? ''}\0${scope().projectId ?? ''}`)
-  createEffect(on(scopeKey, () => { if (ours()) closeLinkPreview() }, { defer: true }))
-  onCleanup(() => { if (ours()) closeLinkPreview() })
+  createEffect(
+    on(
+      scopeKey,
+      () => {
+        if (ours()) closeLinkPreview()
+      },
+      { defer: true },
+    ),
+  )
+  onCleanup(() => {
+    if (ours()) closeLinkPreview()
+  })
 
   // Hover only. Focus alone opens nothing: tabbing through a reply would pop a preview at every link,
   // and focus returning to a link after its preview closed would open it again. The keyboard asks

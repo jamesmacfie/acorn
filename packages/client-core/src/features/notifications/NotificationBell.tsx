@@ -1,7 +1,15 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
-import { markAllRead, markRead, noticesForActiveNode, openNoticeTarget, openTarget, unreadCount, type Notice } from './notifications'
+import {
+  markAllRead,
+  markRead,
+  noticesForActiveNode,
+  openNoticeTarget,
+  openTarget,
+  unreadCount,
+  type Notice,
+} from './notifications'
 import { createAttentionInbox, markAttentionSeen } from './attentionInbox'
 import { parseNotificationSettings } from './settings'
 import { onNoticeActivated } from '../../infra/platform'
@@ -71,10 +79,14 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
   // The banner carries the notice id as its tag, so an activation finds the notice it came from. The
   // active node's, matching what this popover shows: a notice raised before a node switch names a task
   // this client can no longer resolve.
-  onMount(() => onCleanup(onNoticeActivated((tag) => {
-    const notice = noticesForActiveNode().find((n) => n.id === tag)
-    if (notice) openNotice(notice)
-  })))
+  onMount(() =>
+    onCleanup(
+      onNoticeActivated((tag) => {
+        const notice = noticesForActiveNode().find((n) => n.id === tag)
+        if (notice) openNotice(notice)
+      }),
+    ),
+  )
 
   // The app icon carries the pill's number (badge.ts). The switch is read through the prefs query
   // rather than the device store, because turning the badge off has to clear it now rather than at
@@ -93,9 +105,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
       trigger={({ open, toggle }) => (
         <Button variant="ghost" size="sm" tip="Notifications" label="Notifications" expanded={open()} onPress={toggle}>
           <Icon name="bell" />
-          <Show when={pill()}>
-            {(count) => <span class="notify-count">{count()}</span>}
-          </Show>
+          <Show when={pill()}>{(count) => <span class="notify-count">{count()}</span>}</Show>
         </Button>
       )}
     >
@@ -106,7 +116,11 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
             {/* Partial results are a banner, never a failed list (docs/architecture/fleet.md § Fan-out and partial results). */}
             <Show when={inbox().unavailable.length}>
               <For each={inbox().unavailable}>
-                {(entry) => <Alert tone="warn" variant="banner">Couldn't reach {entry.label}</Alert>}
+                {(entry) => (
+                  <Alert tone="warn" variant="banner">
+                    Couldn't reach {entry.label}
+                  </Alert>
+                )}
               </For>
             </Show>
             <ul class="notify-list">
@@ -144,10 +158,14 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                         <span class="notify-title">{row.item.title}</span>
                         {/* The node badge only when there is more than one node — otherwise it is noise
                             naming the only machine there is (docs/ui-design.md: first-run never mentions nodes). */}
-                        <Show when={multiNode()}><span class="notify-node muted">{row.node.label}</span></Show>
+                        <Show when={multiNode()}>
+                          <span class="notify-node muted">{row.node.label}</span>
+                        </Show>
                         <span class="notify-time muted">{relTime(row.item.at)}</span>
                       </span>
-                      <Show when={row.item.detail}><span class="notify-detail muted">{row.item.detail}</span></Show>
+                      <Show when={row.item.detail}>
+                        <span class="notify-detail muted">{row.item.detail}</span>
+                      </Show>
                     </button>
                   </li>
                 )}
@@ -156,12 +174,27 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
           </Show>
           <SectionHeader
             level="group"
-            actions={<Show when={pill()}><Button variant="bare" onPress={clearAll}>Mark all read</Button></Show>}
+            actions={
+              <Show when={pill()}>
+                <Button variant="bare" onPress={clearAll}>
+                  Mark all read
+                </Button>
+              </Show>
+            }
           >
             Notifications
           </SectionHeader>
           <ul class="notify-list">
-            <For each={noticesForActiveNode()} fallback={<li><EmptyState align="start" size="sm">No notifications.</EmptyState></li>}>
+            <For
+              each={noticesForActiveNode()}
+              fallback={
+                <li>
+                  <EmptyState align="start" size="sm">
+                    No notifications.
+                  </EmptyState>
+                </li>
+              }
+            >
               {(n) => (
                 <li>
                   <button
@@ -173,14 +206,19 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                       openNotice(n)
                     }}
                   >
-                    <span class="notify-glyph" classList={{ 'notify-warn': noticeKindContribution(n.kind)?.severity !== 'info' }}>
+                    <span
+                      class="notify-glyph"
+                      classList={{ 'notify-warn': noticeKindContribution(n.kind)?.severity !== 'info' }}
+                    >
                       <Icon name={noticeKindContribution(n.kind)?.glyph ?? 'circle'} />
                     </span>
                     <span class="notify-line">
                       <span class="notify-title">{n.title}</span>
                       <span class="notify-time muted">{relTime(n.at)}</span>
                     </span>
-                    <Show when={n.detail}><span class="notify-detail muted">{n.detail}</span></Show>
+                    <Show when={n.detail}>
+                      <span class="notify-detail muted">{n.detail}</span>
+                    </Show>
                   </button>
                 </li>
               )}

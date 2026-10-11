@@ -1,6 +1,14 @@
 import { agentTelemetry } from './agentTelemetry'
 import { batch, createEffect, createRoot, createSignal, untrack, type Signal } from 'solid-js'
-import { activeNodeId, createLogger, describeError, latestSignal, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  createLogger,
+  describeError,
+  latestSignal,
+  nodeState,
+  observeAttention,
+  onScopeEvicted,
+} from '@acorn/plugin-api/client'
 import { fromManagedSession } from '../../contract/attention'
 import { wsOnAgentFrame } from './wsChannel'
 import type {
@@ -40,11 +48,15 @@ const storeContents = latestSignal()
 function captureRead(sessionId?: string) {
   const nodeId = activeNodeId()
   const contents = storeContents.signal
-  const current = () => !contents.aborted && nodeId === activeNodeId()
-    && (!sessionId || !deletedSessionIds.has(sessionId))
-  return { nodeId, current, check() {
-    if (!current()) throw new Error('This managed agent read no longer owns the active store.')
-  } }
+  const current = () =>
+    !contents.aborted && nodeId === activeNodeId() && (!sessionId || !deletedSessionIds.has(sessionId))
+  return {
+    nodeId,
+    current,
+    check() {
+      if (!current()) throw new Error('This managed agent read no longer owns the active store.')
+    },
+  }
 }
 
 let subscribers = 0
@@ -123,8 +135,7 @@ function trimSnapshots(): void {
   })
 }
 
-const byRecent = (a: AgentSession, b: AgentSession): number =>
-  b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
+const byRecent = (a: AgentSession, b: AgentSession): number => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id)
 
 const sameRows = (a: readonly AgentSession[], b: readonly AgentSession[]): boolean =>
   a.length === b.length && a.every((session, index) => session === b[index])
@@ -164,7 +175,7 @@ function upsertSession(session: AgentSession): void {
   setRoster((current) => {
     const found = current.some((item) => item.id === session.id)
     const next = found
-      ? current.map((item) => item.id === session.id ? newestManagedSession(item, session) : item)
+      ? current.map((item) => (item.id === session.id ? newestManagedSession(item, session) : item))
       : [...current, session]
     return next.sort(byRecent)
   })
@@ -216,11 +227,10 @@ function upsertSessions(incoming: readonly AgentSession[]): void {
   })
 }
 
-function replaceDelegations(
-  pageSessions: readonly AgentSession[],
-  incoming: readonly AgentSessionDelegation[],
-): void {
-  const sessionIds = new Set(pageSessions.filter((session) => !deletedSessionIds.has(session.id)).map((session) => session.id))
+function replaceDelegations(pageSessions: readonly AgentSession[], incoming: readonly AgentSessionDelegation[]): void {
+  const sessionIds = new Set(
+    pageSessions.filter((session) => !deletedSessionIds.has(session.id)).map((session) => session.id),
+  )
   setDelegations((current) => {
     const next = Object.fromEntries(Object.entries(current).filter(([sessionId]) => !sessionIds.has(sessionId)))
     for (const delegation of incoming) {
@@ -287,7 +297,12 @@ const pageReach = (events: AgentEventRecord[]): number =>
 // the node folds a page's tool and usage updates onto the card each one opened, so the rows after that
 // record may already be inside an earlier one (`foldedThroughSeq`). `from` is where the snapshot read
 // started, which is where the walk starts when that read came back with no events.
-async function pageToEnd(sessionId: string, snapshot: AgentSessionSnapshot, from: number, owner: ReturnType<typeof captureRead>): Promise<AgentEventRecord[]> {
+async function pageToEnd(
+  sessionId: string,
+  snapshot: AgentSessionSnapshot,
+  from: number,
+  owner: ReturnType<typeof captureRead>,
+): Promise<AgentEventRecord[]> {
   const events = [...snapshot.events]
   let cursor = Math.max(from, pageReach(events))
   while (cursor < snapshot.session.lastEventSeq) {
@@ -411,7 +426,7 @@ function upsertTurn(turn: AgentTurn): void {
     if (!snapshot) return current
     const known = snapshot.turns.some((item) => item.id === turn.id)
     const turns = known
-      ? snapshot.turns.map((item) => item.id === turn.id ? turn : item)
+      ? snapshot.turns.map((item) => (item.id === turn.id ? turn : item))
       : [...snapshot.turns, turn].sort((left, right) => left.ordinal - right.ordinal)
     return { ...current, [turn.sessionId]: { ...snapshot, turns } }
   })
@@ -423,7 +438,7 @@ function upsertRequest(request: AgentRequest): void {
     if (!snapshot) return current
     const known = snapshot.requests.some((item) => item.id === request.id)
     const requests = known
-      ? snapshot.requests.map((item) => item.id === request.id ? request : item)
+      ? snapshot.requests.map((item) => (item.id === request.id ? request : item))
       : [...snapshot.requests, request].sort((left, right) => left.createdAt - right.createdAt)
     return { ...current, [request.sessionId]: { ...snapshot, requests } }
   })
@@ -432,17 +447,21 @@ function upsertRequest(request: AgentRequest): void {
 function scheduleSnapshotRefresh(sessionId: string): void {
   const previous = snapshotRefreshTimers.get(sessionId)
   if (previous) clearTimeout(previous)
-  snapshotRefreshTimers.set(sessionId, setTimeout(() => {
-    snapshotRefreshTimers.delete(sessionId)
-    void managedAgentStore.loadSnapshot(sessionId).catch(() => undefined)
-  }, 50))
+  snapshotRefreshTimers.set(
+    sessionId,
+    setTimeout(() => {
+      snapshotRefreshTimers.delete(sessionId)
+      void managedAgentStore.loadSnapshot(sessionId).catch(() => undefined)
+    }, 50),
+  )
 }
 
 function refreshDelegationsForTask(taskId: string): Promise<void> {
   const held = delegationLoads.get(taskId)
   if (held) return held
   const owner = captureRead()
-  const run = managedAgentApi.sessions({ taskId, archived: false }, owner)
+  const run = managedAgentApi
+    .sessions({ taskId, archived: false }, owner)
     .then((page) => {
       owner.check()
       upsertSessions(page.sessions)
@@ -458,16 +477,22 @@ function refreshDelegationsForTask(taskId: string): Promise<void> {
 function isAgentFrame(value: unknown): value is AgentWsFrame {
   if (!value || typeof value !== 'object') return false
   const channel = (value as { channel?: unknown }).channel
-  return channel === 'agent:event' || channel === 'agent:session' || channel === 'agent:turn'
-    || channel === 'agent:request' || channel === 'agent:deleted'
+  return (
+    channel === 'agent:event' ||
+    channel === 'agent:session' ||
+    channel === 'agent:turn' ||
+    channel === 'agent:request' ||
+    channel === 'agent:deleted'
+  )
 }
 
 function onFrame(value: unknown): void {
   if (!isAgentFrame(value)) return
-  if (value.channel === 'agent:event') batch(() => {
-    appendEvent(value.event)
-    advanceSeq(value.event)
-  })
+  if (value.channel === 'agent:event')
+    batch(() => {
+      appendEvent(value.event)
+      advanceSeq(value.event)
+    })
   else if (value.channel === 'agent:session') {
     upsertSession(value.session)
     // The session row is published independently of its spawn projection. A fresh delegated row
@@ -476,8 +501,7 @@ function onFrame(value: unknown): void {
     if (value.session.kind === 'delegated' && !delegations()[value.session.id]) {
       void refreshDelegationsForTask(value.session.taskId).catch(() => undefined)
     }
-  }
-  else if (value.channel === 'agent:turn') upsertTurn(value.turn)
+  } else if (value.channel === 'agent:turn') upsertTurn(value.turn)
   else if (value.channel === 'agent:request') upsertRequest(value.request)
   else removeSession(value.sessionId)
 }
@@ -507,14 +531,18 @@ export const managedAgentStore = {
     customAgentId?: string,
   ): Promise<AgentSession> {
     const owner = captureRead()
-    const session = await managedAgentApi.createSession({
-      taskId,
-      providerId: provider.id,
-      profileId: provider.profileId,
-      kind: 'interactive',
-      ...(customAgentId ? { customAgentId } : {}),
-      config: {},
-    }, undefined, owner)
+    const session = await managedAgentApi.createSession(
+      {
+        taskId,
+        providerId: provider.id,
+        profileId: provider.profileId,
+        kind: 'interactive',
+        ...(customAgentId ? { customAgentId } : {}),
+        config: {},
+      },
+      undefined,
+      owner,
+    )
     owner.check()
     upsertSession(session)
     return session
@@ -527,15 +555,19 @@ export const managedAgentStore = {
     idempotencyKey: string,
   ): Promise<AgentSession> {
     const owner = captureRead()
-    const session = await managedAgentApi.createSession({
-      taskId,
-      providerId: provider.id,
-      profileId: provider.profileId,
-      kind: 'interactive',
-      origin,
-      title: `Ask about ${origin.path}:${origin.line}`,
-      config: { requestedConfigOptions },
-    }, idempotencyKey, owner)
+    const session = await managedAgentApi.createSession(
+      {
+        taskId,
+        providerId: provider.id,
+        profileId: provider.profileId,
+        kind: 'interactive',
+        origin,
+        title: `Ask about ${origin.path}:${origin.line}`,
+        config: { requestedConfigOptions },
+      },
+      idempotencyKey,
+      owner,
+    )
     owner.check()
     upsertSession(session)
     return session
@@ -612,7 +644,7 @@ export const managedAgentStore = {
    */
   loadSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
     const inflight = snapshotLoads.get(sessionId)
-    const held = snapshots()[sessionId] ? completeThrough.get(sessionId) ?? 0 : 0
+    const held = snapshots()[sessionId] ? (completeThrough.get(sessionId) ?? 0) : 0
     agentTelemetry.observe('agents.snapshot.load', 1, '1', { cache: inflight ? 'inflight' : held ? 'resume' : 'miss' })
     if (inflight) return inflight
     const owner = captureRead(sessionId)
@@ -646,7 +678,8 @@ export const managedAgentStore = {
         completeThrough.set(sessionId, Math.max(completeThrough.get(sessionId) ?? 0, reached))
         touch(sessionId)
         agentTelemetry.observe('agents.snapshot.events', snapshot.events.length)
-        if (eventsChanged) agentTelemetry.measure('agents.snapshot.index', () => indexEvents(sessionId, snapshot.events))
+        if (eventsChanged)
+          agentTelemetry.measure('agents.snapshot.index', () => indexEvents(sessionId, snapshot.events))
         upsertSession(snapshot.session)
       })
       return snapshot
@@ -745,7 +778,10 @@ export function activateManagedAgentNotifications(): () => void {
     })
     return dispose
   })
-  return () => { stopPrime(); release() }
+  return () => {
+    stopPrime()
+    release()
+  }
 }
 
 // Registered here rather than listed in the shell's evictor file, so this signal and the thing that

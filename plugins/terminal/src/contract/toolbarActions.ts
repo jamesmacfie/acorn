@@ -45,7 +45,13 @@ export function interruptRefusal(input: {
   if (!input.byPerson) return { ok: false, reason: 'needs_person' }
   const expected = (input.payload as Partial<TerminalInterruptPayload> | null)?.expectedSessionId
   const selected = input.selected
-  if (!input.live || !selected || selected.id !== expected || selected.taskId !== input.mountedTaskId || !selected.running) {
+  if (
+    !input.live ||
+    !selected ||
+    selected.id !== expected ||
+    selected.taskId !== input.mountedTaskId ||
+    !selected.running
+  ) {
     return { ok: false, reason: 'changed' }
   }
   return null

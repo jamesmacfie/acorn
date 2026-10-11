@@ -54,7 +54,6 @@ const boundedQuestion = (question: AgentQuestion): AgentQuestion => ({
   })),
 })
 
-
 // ── Web activity ──────────────────────────────────────────────────────────────────────────────
 // A search result set is the largest thing a provider hands this ledger that nobody asked it for: a
 // model chooses the query, a search engine chooses how many sources come back, and both the titles
@@ -152,10 +151,7 @@ const boundedWeb = (web: AgentWebActivity | undefined): AgentWebActivity | undef
 // Provider processes are trusted to execute only within their declared profile, but their protocol
 // text is still untrusted storage/rendering input. Keep normalized events bounded before they reach
 // SQLite or the client; large tool output and patches are moved to artifacts by the runtime.
-export function boundProviderEvent(
-  event: AgentNormalizedEvent,
-  secretValues: Iterable<string>,
-): AgentNormalizedEvent {
+export function boundProviderEvent(event: AgentNormalizedEvent, secretValues: Iterable<string>): AgentNormalizedEvent {
   switch (event.type) {
     case 'assistant_message':
     case 'reasoning':

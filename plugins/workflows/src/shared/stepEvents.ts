@@ -18,11 +18,7 @@ export type ProgressStepEvent = { type: 'progress'; text: string }
 /** How many rows a data kind has read so far. */
 export type RowsStepEvent = { type: 'rows'; count: number }
 
-export type WorkflowStepEventBody =
-  | ManagedAgentStepEvent
-  | OutputStepEvent
-  | ProgressStepEvent
-  | RowsStepEvent
+export type WorkflowStepEventBody = ManagedAgentStepEvent | OutputStepEvent | ProgressStepEvent | RowsStepEvent
 
 export const WORKFLOW_STEP_EVENT_TYPES = ['managed-agent', 'stdout', 'stderr', 'progress', 'rows'] as const
 

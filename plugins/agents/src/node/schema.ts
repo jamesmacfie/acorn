@@ -102,7 +102,9 @@ export const agentTurns = sqliteTable(
     uniqueIndex('agent_turns_session_ordinal_idx').on(t.sessionId, t.ordinal),
     uniqueIndex('agent_turns_session_idempotency_idx').on(t.sessionId, t.idempotencyKey),
     index('agent_turns_session_status_idx').on(t.sessionId, t.status),
-    index('agent_turns_queued_head_idx').on(t.sessionId, t.ordinal).where(sql`${t.status} = 'queued'`),
+    index('agent_turns_queued_head_idx')
+      .on(t.sessionId, t.ordinal)
+      .where(sql`${t.status} = 'queued'`),
   ],
 )
 
@@ -280,9 +282,7 @@ export const agentWebhooks = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [
-    index('agent_webhooks_task_enabled_idx').on(table.taskId, table.enabled),
-  ],
+  (table) => [index('agent_webhooks_task_enabled_idx').on(table.taskId, table.enabled)],
 )
 
 export const agentWebhookDeliveries = sqliteTable(
@@ -322,14 +322,18 @@ export const agentMcpServers = sqliteTable('agent_mcp_servers', {
 
 // One project owns its review history. Metadata remains queryable without opening instruction bodies.
 // A second row is retained for the previous approved version, never more than two per project.
-export const agentInstructionSnapshots = sqliteTable('agent_instruction_snapshots', {
-  id: text('id').primaryKey(),
-  projectId: text('project_id').notNull(),
-  digest: text('digest').notNull(),
-  scope: text('scope').notNull(),
-  analyzerVersion: integer('analyzer_version').notNull(),
-  filesJson: text('files_json').notNull(),
-  bodyEnc: text('body_enc').notNull(),
-  approvedAt: integer('approved_at'),
-  createdAt: integer('created_at').notNull(),
-}, (t) => [index('agent_instruction_snapshots_project_idx').on(t.projectId, t.createdAt)])
+export const agentInstructionSnapshots = sqliteTable(
+  'agent_instruction_snapshots',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id').notNull(),
+    digest: text('digest').notNull(),
+    scope: text('scope').notNull(),
+    analyzerVersion: integer('analyzer_version').notNull(),
+    filesJson: text('files_json').notNull(),
+    bodyEnc: text('body_enc').notNull(),
+    approvedAt: integer('approved_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [index('agent_instruction_snapshots_project_idx').on(t.projectId, t.createdAt)],
+)

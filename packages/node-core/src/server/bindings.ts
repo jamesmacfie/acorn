@@ -1,6 +1,16 @@
 import type { HttpBindings } from '@hono/node-server'
 import { randomUUID } from 'node:crypto'
-import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs'
 import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -239,7 +249,15 @@ export type BindingsOptions = {
 // Build the bindings object once at startup. The desktop shell resolves the data root, the OS
 // application-data path when packaged and the repo-local apps/node/.acorn in a checkout, and passes
 // the paths in; the standalone entry takes ACORN_DATA_DIR or that same dev root.
-export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, serviceInstanceId, capabilities, keys }: BindingsOptions): RuntimeBindings {
+export function makeBindings({
+  dbPath,
+  blobsDir,
+  nodeId,
+  appVersion,
+  serviceInstanceId,
+  capabilities,
+  keys,
+}: BindingsOptions): RuntimeBindings {
   const databasePath = resolve(dbPath)
   const blobCachePath = resolve(blobsDir)
   const db = openDb(databasePath)

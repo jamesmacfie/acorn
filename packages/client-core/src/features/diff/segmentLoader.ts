@@ -1,6 +1,11 @@
 import { batch, untrack } from 'solid-js'
 import { createStore } from 'solid-js/store'
-import { MAX_SEGMENTS_PER_REQUEST, segmentContentKey, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import {
+  MAX_SEGMENTS_PER_REQUEST,
+  segmentContentKey,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import { recordSample } from '../../infra/telemetry/emitter'
 import { diffRowsFromPlain, type DiffRow } from '../../kit/diff/diffModel'
 import type { SegmentRef } from './documentView'
@@ -120,50 +125,61 @@ export function createSegmentLoader(options: {
       inFlight.set(controller, keys)
       for (const key of keys) loading.add(key)
       pin()
-      batch(() => { for (const key of keys) setStatuses(key, 'loading') })
+      batch(() => {
+        for (const key of keys) setStatuses(key, 'loading')
+      })
       // By path and content: two files with the same patch, such as one version bump in several
       // manifests, have the same content key and are still two segments to answer.
       const byContent = new Map(refs.map((ref) => [`${ref.file.path}\u0000${ref.contentKey}`, ref]))
-      const requests = refs.map((ref): DiffSegmentRequest => ({ path: ref.file.path, patchKey: ref.file.patchKey!, ordinal: ref.ordinal }))
+      const requests = refs.map((ref): DiffSegmentRequest => ({
+        path: ref.file.path,
+        patchKey: ref.file.patchKey!,
+        ordinal: ref.ordinal,
+      }))
       const served = serving.signal
-      void options.load(requests, controller.signal).then(
-        (payloads) => {
-          if (served.aborted || controller.signal.aborted) return
-          const started = performance.now()
-          const answered = new Set<string>()
-          const inserted: { key: string; path: string; patchKey: string; plain: DiffRow[] }[] = []
-          for (const payload of payloads) {
-            const ref = byContent.get(`${payload.path}\u0000${segmentContentKey(payload.patchKey, payload.ordinal)}`)
-            if (!ref) continue
-            const key = keyOf(ref)
-            answered.add(key)
-            const plain = diffRowsFromPlain(ref.file.path, ref.file.sha, payload.rows)
-            remember(key, plain)
-            inserted.push({ key, path: ref.file.path, patchKey: payload.patchKey, plain })
-            if (!visibleKeys.has(key)) unvisited.add(key)
-          }
-          cache.insert(inserted)
-          batch(() => {
-            for (const key of keys) {
-              setStatuses(key, answered.has(key) ? undefined : 'error')
-              if (answered.has(key)) bump(key)
+      void options
+        .load(requests, controller.signal)
+        .then(
+          (payloads) => {
+            if (served.aborted || controller.signal.aborted) return
+            const started = performance.now()
+            const answered = new Set<string>()
+            const inserted: { key: string; path: string; patchKey: string; plain: DiffRow[] }[] = []
+            for (const payload of payloads) {
+              const ref = byContent.get(`${payload.path}\u0000${segmentContentKey(payload.patchKey, payload.ordinal)}`)
+              if (!ref) continue
+              const key = keyOf(ref)
+              answered.add(key)
+              const plain = diffRowsFromPlain(ref.file.path, ref.file.sha, payload.rows)
+              remember(key, plain)
+              inserted.push({ key, path: ref.file.path, patchKey: payload.patchKey, plain })
+              if (!visibleKeys.has(key)) unvisited.add(key)
             }
-          })
-          if (inserted.some((item) => visibleKeys.has(item.key))) painted('miss')
-          options.prepared?.(performance.now() - started)
-        },
-        () => {
-          if (served.aborted || controller.signal.aborted) return
-          batch(() => { for (const key of keys) setStatuses(key, 'error') })
-        },
-      ).finally(() => {
-        // Every way a request ends comes through here, so its pins always go.
-        if (inFlight.delete(controller)) for (const key of keys) loading.delete(key)
-        if (disposed || served.aborted) return
-        pin()
-        pump()
-        enrichNext()
-      })
+            cache.insert(inserted)
+            batch(() => {
+              for (const key of keys) {
+                setStatuses(key, answered.has(key) ? undefined : 'error')
+                if (answered.has(key)) bump(key)
+              }
+            })
+            if (inserted.some((item) => visibleKeys.has(item.key))) painted('miss')
+            options.prepared?.(performance.now() - started)
+          },
+          () => {
+            if (served.aborted || controller.signal.aborted) return
+            batch(() => {
+              for (const key of keys) setStatuses(key, 'error')
+            })
+          },
+        )
+        .finally(() => {
+          // Every way a request ends comes through here, so its pins always go.
+          if (inFlight.delete(controller)) for (const key of keys) loading.delete(key)
+          if (disposed || served.aborted) return
+          pin()
+          pump()
+          enrichNext()
+        })
     }
   }
 
@@ -212,50 +228,51 @@ export function createSegmentLoader(options: {
      * What the reader can see and what is near it, nearest first. Queued work for anything else is
      * dropped, and a request whose every segment has left the range is aborted.
      */
-    demand: (visible: readonly SegmentRef[], near: readonly SegmentRef[]) => untrack(() => {
-      // Untracked: a caller's effect should re-run when its range moves, not whenever a status or
-      // version this reads along the way changes.
-      if (disposed) return
-      visibleKeys = new Set(visible.map(keyOf))
-      const seen = new Set<string>()
-      const previous = wantedKeys
-      wanted = [...visible, ...near].filter((ref) => {
-        const key = keyOf(ref)
-        return !seen.has(key) && !!seen.add(key)
-      })
-      wantedKeys = seen
-      let hit = 0
-      let miss = 0
-      for (const ref of wanted) {
-        const key = keyOf(ref)
-        if (previous.has(key) || loading.has(key)) continue
-        if (cache.has(key)) hit++
-        else miss++
-      }
-      hits += hit
-      misses += miss
-      if (hit) recordSample('core', 'diff.segment_cache.hit', hit)
-      if (miss) recordSample('core', 'diff.segment_cache.miss', miss)
-      for (const key of visibleKeys) {
-        unvisited.delete(key)
-        if (cache.has(key)) painted('hit')
-      }
-      // Touched, so the least recently wanted segment is the first evicted.
-      cache.touch(visibleKeys)
-      for (const [controller, keys] of inFlight) {
-        if (keys.every((key) => !wantedKeys.has(key))) {
-          controller.abort()
-          inFlight.delete(controller)
-          for (const key of keys) {
-            loading.delete(key)
-            setStatuses(key, undefined)
+    demand: (visible: readonly SegmentRef[], near: readonly SegmentRef[]) =>
+      untrack(() => {
+        // Untracked: a caller's effect should re-run when its range moves, not whenever a status or
+        // version this reads along the way changes.
+        if (disposed) return
+        visibleKeys = new Set(visible.map(keyOf))
+        const seen = new Set<string>()
+        const previous = wantedKeys
+        wanted = [...visible, ...near].filter((ref) => {
+          const key = keyOf(ref)
+          return !seen.has(key) && !!seen.add(key)
+        })
+        wantedKeys = seen
+        let hit = 0
+        let miss = 0
+        for (const ref of wanted) {
+          const key = keyOf(ref)
+          if (previous.has(key) || loading.has(key)) continue
+          if (cache.has(key)) hit++
+          else miss++
+        }
+        hits += hit
+        misses += miss
+        if (hit) recordSample('core', 'diff.segment_cache.hit', hit)
+        if (miss) recordSample('core', 'diff.segment_cache.miss', miss)
+        for (const key of visibleKeys) {
+          unvisited.delete(key)
+          if (cache.has(key)) painted('hit')
+        }
+        // Touched, so the least recently wanted segment is the first evicted.
+        cache.touch(visibleKeys)
+        for (const [controller, keys] of inFlight) {
+          if (keys.every((key) => !wantedKeys.has(key))) {
+            controller.abort()
+            inFlight.delete(controller)
+            for (const key of keys) {
+              loading.delete(key)
+              setStatuses(key, undefined)
+            }
           }
         }
-      }
-      pin()
-      pump()
-      enrichNext()
-    }),
+        pin()
+        pump()
+        enrichNext()
+      }),
     retry: (ref: SegmentAddress) => {
       setStatuses(keyOf(ref), undefined)
       pump()
@@ -286,7 +303,15 @@ export function createSegmentLoader(options: {
         .filter((key) => !cache.has(key) && !loading.has(key) && statuses[key] !== 'error')
       const enrichment = wanted.filter(owesColour).length
       for (const key of unvisited) if (!cache.has(key)) unvisited.delete(key)
-      return { queued, loading: loading.size, enrichment, unvisited: unvisited.size, hits, misses, cache: cache.stats() }
+      return {
+        queued,
+        loading: loading.size,
+        enrichment,
+        unvisited: unvisited.size,
+        hits,
+        misses,
+        cache: cache.stats(),
+      }
     },
     dispose: () => {
       disposed = true

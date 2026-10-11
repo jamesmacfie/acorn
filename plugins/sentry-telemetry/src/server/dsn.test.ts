@@ -16,8 +16,9 @@ describe('parseDsn', () => {
     // `/api/<project>/envelope/` goes after the path, not before it, so losing this would post to
     // the wrong URL on every self-hosted node.
     expect(parseDsn('https://key@sentry.example.com/prefix/9')).toMatchObject({ path: 'prefix', projectId: '9' })
-    expect(envelopeEndpoint(parseDsn('https://key@sentry.example.com/prefix/9')!))
-      .toBe('https://sentry.example.com/prefix/api/9/envelope/')
+    expect(envelopeEndpoint(parseDsn('https://key@sentry.example.com/prefix/9')!)).toBe(
+      'https://sentry.example.com/prefix/api/9/envelope/',
+    )
   })
 
   it('accepts a DSN that still carries the deprecated secret half, and drops it', () => {
@@ -50,8 +51,9 @@ describe('the endpoint and the header', () => {
   })
 
   it('authenticates with protocol version 7 and the public key', () => {
-    expect(authHeader(dsn, 'acorn.sentry-telemetry/1.0.0'))
-      .toBe('Sentry sentry_version=7, sentry_client=acorn.sentry-telemetry/1.0.0, sentry_key=abc123')
+    expect(authHeader(dsn, 'acorn.sentry-telemetry/1.0.0')).toBe(
+      'Sentry sentry_version=7, sentry_client=acorn.sentry-telemetry/1.0.0, sentry_key=abc123',
+    )
   })
 
   it('describes a connection by host and project, never by key', () => {

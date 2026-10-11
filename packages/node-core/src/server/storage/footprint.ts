@@ -41,12 +41,16 @@ const databaseBytes = async (path: string): Promise<number> =>
 // id. Only the first counts as a plugin database. Counting the second reports bundle bytes as rows.
 async function pluginDatabases(dir: string): Promise<{ plugin: string; bytes: number }[]> {
   const names = await readdir(dir, { withFileTypes: true })
-    .then((entries) => entries.filter((entry) => entry.isFile() && entry.name.endsWith('.sqlite')).map((entry) => entry.name))
+    .then((entries) =>
+      entries.filter((entry) => entry.isFile() && entry.name.endsWith('.sqlite')).map((entry) => entry.name),
+    )
     .catch(() => [] as string[])
-  const sizes = await Promise.all(names.map(async (name) => ({
-    plugin: name.slice(0, -'.sqlite'.length),
-    bytes: await databaseBytes(join(dir, name)),
-  })))
+  const sizes = await Promise.all(
+    names.map(async (name) => ({
+      plugin: name.slice(0, -'.sqlite'.length),
+      bytes: await databaseBytes(join(dir, name)),
+    })),
+  )
   return sizes.sort((a, b) => b.bytes - a.bytes || a.plugin.localeCompare(b.plugin))
 }
 
@@ -72,7 +76,7 @@ export async function nodeStorageReport(dataDir: string, now = Date.now()): Prom
   if (!lastDisk || lastDisk.dataDir !== dataDir || now - lastDisk.at >= DISK_REUSE_MS) {
     lastDisk = { dataDir, at: now, sizes: measureDisk(dataDir) }
   }
-  return { rssBytes: process.memoryUsage().rss, ...await lastDisk.sizes }
+  return { rssBytes: process.memoryUsage().rss, ...(await lastDisk.sizes) }
 }
 
 /**
@@ -106,7 +110,12 @@ export async function logStorageFootprint(
       return null
     })
     // `null` is the failure above, and is not rendered as zeros.
-    if (counts) parts.push(`${contributor.plugin} ${Object.entries(counts).map(([key, value]) => `${key}=${value}`).join(' ')}`)
+    if (counts)
+      parts.push(
+        `${contributor.plugin} ${Object.entries(counts)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(' ')}`,
+      )
   }
   log.info(parts.join(' '))
 }

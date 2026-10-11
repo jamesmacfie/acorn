@@ -3,7 +3,12 @@ import { reportContributionError } from '../../lib/telemetry/contributionErrors'
 import { Button } from '../inputs/Button'
 import { EmptyState } from './EmptyState'
 
-export function ContributionBoundary(props: { contributionId: string; owner?: string; children: JSX.Element; quiet?: boolean }) {
+export function ContributionBoundary(props: {
+  contributionId: string
+  owner?: string
+  children: JSX.Element
+  quiet?: boolean
+}) {
   return (
     <ErrorBoundary
       fallback={(error, reset) => {
@@ -19,7 +24,9 @@ export function ContributionBoundary(props: { contributionId: string; owner?: st
             <EmptyState title="This view stopped working" action={<Button onPress={reset}>Try again</Button>}>
               Something went wrong while drawing it.
             </EmptyState>
-            <span class="sr-only">{props.contributionId}: {error instanceof Error ? error.message : String(error)}</span>
+            <span class="sr-only">
+              {props.contributionId}: {error instanceof Error ? error.message : String(error)}
+            </span>
           </section>
         )
       }}

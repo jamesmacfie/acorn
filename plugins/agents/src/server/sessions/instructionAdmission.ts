@@ -7,11 +7,20 @@ import { analyzeInstruction, instructionChanges } from './instructionAnalysis'
 import { InstructionAdmissionError } from './instructionAdmissionError'
 import type { InstructionReview } from '../../shared/instructionReview'
 
-export type InstructionAdmissionObservation = { taskId: string; projectId: string; checkedAt: number; outcome: 'passed' | 'blocked' | 'incomplete' }
+export type InstructionAdmissionObservation = {
+  taskId: string
+  projectId: string
+  checkedAt: number
+  outcome: 'passed' | 'blocked' | 'incomplete'
+}
 
 export class InstructionAdmission {
   private readonly observations = new Map<string, InstructionAdmissionObservation>()
-  constructor(private readonly core: CoreServices, private readonly dataDir: string, readonly store: InstructionReviewStore) {}
+  constructor(
+    private readonly core: CoreServices,
+    private readonly dataDir: string,
+    readonly store: InstructionReviewStore,
+  ) {}
 
   latest(projectId: string | null, taskId: string | null): InstructionAdmissionObservation | null {
     if (taskId) return this.observations.get(taskId) ?? null
@@ -42,34 +51,70 @@ export class InstructionAdmission {
     const { projectId, snapshot } = await this.scan(taskId, signal)
     this.checkCancellation(signal)
     const digest = snapshotDigest(snapshot)
-    const limits = 'A pre-turn scan cannot stop changes during a turn. Global instructions outside this scope are not reviewed. Host processes with owner access can change on-disk state.'
-    if (!snapshot.files.length) return {
-      id: null, taskId, projectId, digest, scope: snapshot.scope, analyzerVersion: snapshot.version,
-      baseline: false, empty: true, approved: false, findings: [], changes: [], limits,
-    }
+    const limits =
+      'A pre-turn scan cannot stop changes during a turn. Global instructions outside this scope are not reviewed. Host processes with owner access can change on-disk state.'
+    if (!snapshot.files.length)
+      return {
+        id: null,
+        taskId,
+        projectId,
+        digest,
+        scope: snapshot.scope,
+        analyzerVersion: snapshot.version,
+        baseline: false,
+        empty: true,
+        approved: false,
+        findings: [],
+        changes: [],
+        limits,
+      }
     let prior = null
     try {
       const matching = await this.store.approvedSnapshot(digest)
       this.checkCancellation(signal)
-      if (matching) return {
-        id: matching.id, taskId, projectId, digest, scope: snapshot.scope, analyzerVersion: snapshot.version,
-        baseline: false, approved: true, findings: [], changes: [], limits,
-      }
+      if (matching)
+        return {
+          id: matching.id,
+          taskId,
+          projectId,
+          digest,
+          scope: snapshot.scope,
+          analyzerVersion: snapshot.version,
+          baseline: false,
+          approved: true,
+          findings: [],
+          changes: [],
+          limits,
+        }
       const approved = await this.store.approved(projectId)
       prior = approved ? await this.store.get(approved.id) : null
-    } catch { /* Damaged or unavailable ciphertext means a fresh baseline review. */ }
+    } catch {
+      /* Damaged or unavailable ciphertext means a fresh baseline review. */
+    }
     this.checkCancellation(signal)
-    const previous = prior?.metadata.files.map((file) => ({
-      ...file, text: prior?.bodies.find((body) => body.path === file.path)?.text ?? null,
-    })) ?? null
+    const previous =
+      prior?.metadata.files.map((file) => ({
+        ...file,
+        text: prior?.bodies.find((body) => body.path === file.path)?.text ?? null,
+      })) ?? null
     const changes = instructionChanges(previous, snapshot)
     const changedPaths = new Set(changes.filter((change) => change.status !== 'removed').map((change) => change.path))
     this.checkCancellation(signal)
     const saved = await this.store.save(projectId, snapshot, signal)
     return {
-      id: saved.id, taskId, projectId, digest: saved.digest, scope: snapshot.scope,
-      analyzerVersion: snapshot.version, baseline: !previous, approved: false,
-      findings: analyzeInstruction({ ...snapshot, files: snapshot.files.filter((file) => changedPaths.has(file.path)) }), changes,
+      id: saved.id,
+      taskId,
+      projectId,
+      digest: saved.digest,
+      scope: snapshot.scope,
+      analyzerVersion: snapshot.version,
+      baseline: !previous,
+      approved: false,
+      findings: analyzeInstruction({
+        ...snapshot,
+        files: snapshot.files.filter((file) => changedPaths.has(file.path)),
+      }),
+      changes,
       limits,
     }
   }
@@ -80,7 +125,10 @@ export class InstructionAdmission {
     this.checkCancellation(signal)
     if (!pending) throw new Error('Review expired. Open the review again.')
     const current = await this.scan(taskId, signal)
-    if (pending.metadata.projectId !== current.projectId || pending.metadata.digest !== snapshotDigest(current.snapshot)) {
+    if (
+      pending.metadata.projectId !== current.projectId ||
+      pending.metadata.digest !== snapshotDigest(current.snapshot)
+    ) {
       throw new Error('Instruction files changed since this review opened. Open a new review.')
     }
     this.checkCancellation(signal)
@@ -99,11 +147,15 @@ export class InstructionAdmission {
     const task = await this.core.tasks.load(taskId)
     if (!task) throw new Error('Task no longer exists.')
     let result
-    try { result = await this.scan(taskId, signal) }
-    catch (error) {
+    try {
+      result = await this.scan(taskId, signal)
+    } catch (error) {
       if (signal?.aborted) throw error
       this.observe(taskId, task.projectId, 'incomplete')
-      throw new InstructionAdmissionError('instruction_scan_incomplete', `Instruction scan incomplete: ${error instanceof Error ? error.message : 'unknown error'}. Retry or change the checks in Settings > Security and backup.`)
+      throw new InstructionAdmissionError(
+        'instruction_scan_incomplete',
+        `Instruction scan incomplete: ${error instanceof Error ? error.message : 'unknown error'}. Retry or change the checks in Settings > Security and backup.`,
+      )
     }
     this.checkCancellation(signal)
     try {
@@ -111,15 +163,25 @@ export class InstructionAdmission {
         for (const file of result.snapshot.files) {
           if (file.text === null) continue
           const found = hiddenCharactersIn(file.text, file.path, 1)
-          if (found.length) throw new InstructionAdmissionError('instruction_hidden_characters', hiddenCharacterReason(found))
+          if (found.length)
+            throw new InstructionAdmissionError('instruction_hidden_characters', hiddenCharacterReason(found))
         }
       }
       if (settings.reviewChangedInstructions && result.snapshot.files.length) {
         let approved
-        try { approved = await this.store.approvedSnapshot(snapshotDigest(result.snapshot)) }
-        catch { throw new InstructionAdmissionError('instruction_review_required', 'Instruction review required: the saved approval could not be read. Review the instructions again.') }
+        try {
+          approved = await this.store.approvedSnapshot(snapshotDigest(result.snapshot))
+        } catch {
+          throw new InstructionAdmissionError(
+            'instruction_review_required',
+            'Instruction review required: the saved approval could not be read. Review the instructions again.',
+          )
+        }
         if (!approved || approved.digest !== snapshotDigest(result.snapshot)) {
-          throw new InstructionAdmissionError('instruction_review_required', 'Instruction review required: approve the instructions for this task before the agent continues.')
+          throw new InstructionAdmissionError(
+            'instruction_review_required',
+            'Instruction review required: approve the instructions for this task before the agent continues.',
+          )
         }
       }
       this.observe(taskId, result.projectId, 'passed')
@@ -130,6 +192,9 @@ export class InstructionAdmission {
   }
 
   private checkCancellation(signal?: AbortSignal): void {
-    if (signal?.aborted) throw new InstructionScanIncomplete('Instruction scan did not finish because the request was cancelled. Retry the review.')
+    if (signal?.aborted)
+      throw new InstructionScanIncomplete(
+        'Instruction scan did not finish because the request was cancelled. Retry the review.',
+      )
   }
 }

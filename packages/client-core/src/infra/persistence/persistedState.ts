@@ -60,7 +60,11 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
 // empty node id would produce an unqualified key that let one node read another node's layouts.
 // Encoding the scope id too keeps the split unambiguous, since a pane scope id can itself contain
 // a slash.
-export const storageKeyFor = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, scopeId: string, nodeId: string | null = activeNodeId()): string => {
+export const storageKeyFor = (
+  slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>,
+  scopeId: string,
+  nodeId: string | null = activeNodeId(),
+): string => {
   if (slice.scope === 'app') return slice.key
   // Both halves encoded (see the note above). `encodeURIComponent` cannot emit a `/`, so the
   // separator stays the only unescaped slash in the key either way.
@@ -84,7 +88,11 @@ export const nodeIdFromStorageKey = (key: string): string | null => {
   }
 }
 
-export const scopeIdFromStorageKey = (slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>, key: string, nodeId: string | null = activeNodeId()): string | null => {
+export const scopeIdFromStorageKey = (
+  slice: Pick<PersistedStateSlice<unknown>, 'key' | 'scope'>,
+  key: string,
+  nodeId: string | null = activeNodeId(),
+): string | null => {
   if (slice.scope === 'app') return key === slice.key ? '' : null
   const prefix = `${slice.key}:`
   if (!key.startsWith(prefix)) return null

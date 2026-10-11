@@ -29,7 +29,12 @@ export type GithubMirrorCapability = {
    * prompt is being built, and a cold mirror must render as an absent section rather than block on
    * GitHub.
    */
-  pullRequest(userId: string, repoOwner: string, repoName: string, pullNumber: number): Promise<MirroredPullRequest | null>
+  pullRequest(
+    userId: string,
+    repoOwner: string,
+    repoName: string,
+    pullNumber: number,
+  ): Promise<MirroredPullRequest | null>
 
   /**
    * Re-derived CI state for a task's PR, as the workflow runner's `checks-green` policy needs it.
@@ -49,7 +54,6 @@ export type GithubMirrorCapability = {
    * counts through this capability instead of exposing its database handle.
    */
   footprint(): Promise<Record<string, number>>
-
 }
 
 export const GITHUB_MIRROR = capabilityId<GithubMirrorCapability>('github.mirror')

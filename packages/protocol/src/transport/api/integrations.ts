@@ -1,4 +1,10 @@
-import type { IntegrationAuthKind, IntegrationConnectionStatus, ProviderAccountRef, ProviderErrorCode, PublicIntegrationProvider } from '../../integrations/providers.ts'
+import type {
+  IntegrationAuthKind,
+  IntegrationConnectionStatus,
+  ProviderAccountRef,
+  ProviderErrorCode,
+  PublicIntegrationProvider,
+} from '../../integrations/providers.ts'
 
 // Integrations allow multiple connections per provider (docs/integrations.md). GitHub appears as a
 // synthesized row while its encrypted token stays with the node's active provider credential.

@@ -11,7 +11,9 @@ export function ownOnboardingVisibility(): { update: (open: boolean) => void; di
   owner = token
   setVisible(false)
   return {
-    update: (open) => { if (owner === token) setVisible(open) },
+    update: (open) => {
+      if (owner === token) setVisible(open)
+    },
     dispose: () => {
       if (owner !== token) return
       owner = undefined

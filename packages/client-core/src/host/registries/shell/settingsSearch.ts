@@ -1,6 +1,12 @@
 import {
-  isStandaloneSettingsPage, SETTINGS_CATEGORY_LABELS, settingsCategoryOf, settingsScopeOf,
-  type SettingsContribution, type SettingsNavigate, type SettingsScopeKind, type SettingsSectionDeclaration,
+  isStandaloneSettingsPage,
+  SETTINGS_CATEGORY_LABELS,
+  settingsCategoryOf,
+  settingsScopeOf,
+  type SettingsContribution,
+  type SettingsNavigate,
+  type SettingsScopeKind,
+  type SettingsSectionDeclaration,
 } from './settings'
 
 // Settings search (docs/frontend/settings.md § Settings). Built from declarations only: each page's label,
@@ -55,10 +61,14 @@ export type SettingsSearchObject = {
 export function buildSettingsIndex(
   pages: readonly SettingsContribution[],
   objects: readonly SettingsSearchObject[] = [],
-  categoryLabel: (category: keyof typeof SETTINGS_CATEGORY_LABELS) => string = (category) => SETTINGS_CATEGORY_LABELS[category],
+  categoryLabel: (category: keyof typeof SETTINGS_CATEGORY_LABELS) => string = (category) =>
+    SETTINGS_CATEGORY_LABELS[category],
 ): SettingsSearchEntry[] {
   const entries: SettingsSearchEntry[] = []
-  const addSections = (base: Omit<SettingsSearchEntry, 'text' | 'tier'>, sections: readonly SettingsSectionDeclaration[]) => {
+  const addSections = (
+    base: Omit<SettingsSearchEntry, 'text' | 'tier'>,
+    sections: readonly SettingsSectionDeclaration[],
+  ) => {
     for (const section of sections) {
       const at = { ...base, section: section.id, sectionLabel: section.label }
       entries.push({ ...at, text: section.label, tier: 1 })
@@ -80,7 +90,10 @@ export function buildSettingsIndex(
   }
   for (const object of objects) {
     const base = {
-      page: object.page, pageLabel: object.isPage ? object.name : object.pageLabel, group: object.group, scope: object.scope,
+      page: object.page,
+      pageLabel: object.isPage ? object.name : object.pageLabel,
+      group: object.group,
+      scope: object.scope,
       ...(object.open ? { open: object.open } : {}),
     }
     const named = { ...base, ...(object.isPage ? {} : { sectionLabel: object.name }) }
@@ -113,18 +126,24 @@ export function searchSettings(index: readonly SettingsSearchEntry[], query: str
     const score = entry.tier * 3 + where
     // A section result and a page result are different places, but a section's row and the section
     // itself are the same one, so they share a key and the better match stands for both.
-    const key = entry.section ? `${entry.page}#${entry.section}` : entry.sectionLabel ? `${entry.page}@${entry.sectionLabel}` : entry.page
+    const key = entry.section
+      ? `${entry.page}#${entry.section}`
+      : entry.sectionLabel
+        ? `${entry.page}@${entry.sectionLabel}`
+        : entry.page
     const held = best.get(key)
     if (!held || score < held.score) best.set(key, { entry, score, order: held ? Math.min(held.order, order) : order })
   })
-  return [...best.values()]
-    // At an equal score the section wins over its page: a keyword both declare says more about where
-    // to land when the section declares it.
-    .sort((a, b) => a.score - b.score || Number(!a.entry.section) - Number(!b.entry.section) || a.order - b.order)
-    .map(({ entry }) => {
-      const shown = entry.text === entry.pageLabel || entry.text === entry.sectionLabel
-      return shown ? entry : { ...entry, matched: entry.text }
-    })
+  return (
+    [...best.values()]
+      // At an equal score the section wins over its page: a keyword both declare says more about where
+      // to land when the section declares it.
+      .sort((a, b) => a.score - b.score || Number(!a.entry.section) - Number(!b.entry.section) || a.order - b.order)
+      .map(({ entry }) => {
+        const shown = entry.text === entry.pageLabel || entry.text === entry.sectionLabel
+        return shown ? entry : { ...entry, matched: entry.text }
+      })
+  )
 }
 
 /** Every declared section, as the palette lists them: one row per section, after the page rows. */

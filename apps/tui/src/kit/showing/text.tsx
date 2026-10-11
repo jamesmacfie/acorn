@@ -10,8 +10,19 @@ import { LinkMenuContext } from '../paneContext'
 
 // The terminal form of these kit nodes follows docs/ui-design/every-node.md § Every node at 80 by 24.
 
-export function Text(props: { emphasis?: TextRole; tone?: Tone; wrap?: boolean; tip?: string; tipAt?: number; children: JSX.Element }) {
-  return <Line role={props.emphasis} tone={props.tone} wrap={props.wrap}>{props.children}</Line>
+export function Text(props: {
+  emphasis?: TextRole
+  tone?: Tone
+  wrap?: boolean
+  tip?: string
+  tipAt?: number
+  children: JSX.Element
+}) {
+  return (
+    <Line role={props.emphasis} tone={props.tone} wrap={props.wrap}>
+      {props.children}
+    </Line>
+  )
 }
 
 /** The text, underlined, pressable. Underline is the `control` border role's answer, which is what a
@@ -40,7 +51,9 @@ export function Link(props: { href?: string; onPress?: () => void; tip?: string;
   return (
     <box flexDirection="column" flexShrink={0} ref={control.ref}>
       <text {...style()}>{flatten(props.children)}</text>
-      <Show when={shown()}><Line role="mono">{props.href!}</Line></Show>
+      <Show when={shown()}>
+        <Line role="mono">{props.href!}</Line>
+      </Show>
     </box>
   )
 }
@@ -48,9 +61,15 @@ export function Link(props: { href?: string; onPress?: () => void; tip?: string;
 export function Heading(props: HeadingProps) {
   return (
     <box flexDirection="column">
-      <Show when={props.eyebrow}><Line role="eyebrow">{props.eyebrow!}</Line></Show>
+      <Show when={props.eyebrow}>
+        <Line role="eyebrow">{props.eyebrow!}</Line>
+      </Show>
       <Line role="heading">{props.children}</Line>
-      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
+      <Show when={props.help}>
+        <Line role="muted" wrap>
+          {props.help!}
+        </Line>
+      </Show>
     </box>
   )
 }

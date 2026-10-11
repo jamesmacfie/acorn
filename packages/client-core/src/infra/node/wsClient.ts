@@ -7,7 +7,18 @@
 //
 // Dispatch is a prefix registry (wsChannels.ts). Core handles the generic `term:status` chrome
 // invalidation and workflow notices; Terminal registers the PTY `term:` payload handler.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type {
+  AgentSessionChangedEvent,
+  ConnectionChangedEvent,
+  HeadChangedEvent,
+  ProjectChangedEvent,
+  RunTargetChangedEvent,
+  TaskChangedEvent,
+  WorkspaceChangedEvent,
+  WorkspaceProjectsChangedEvent,
+  WorkspacesModeChangedEvent,
+  WorktreeStatusChangedEvent,
+} from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 import { type WsClientFrame, type WsServerFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
@@ -67,7 +78,11 @@ export function registerWsBinaryHandler(handler: BinaryHandler): { dispose(): vo
   if (binaryHandler) throw new Error('binary stream handler already registered')
   binaryHandler = handler
   connect()
-  return { dispose: () => { if (binaryHandler === handler) binaryHandler = null } }
+  return {
+    dispose: () => {
+      if (binaryHandler === handler) binaryHandler = null
+    },
+  }
 }
 
 let bridged = false
@@ -117,7 +132,12 @@ function connect(): void {
     if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'plugins:changed') {
       for (const cb of fleetPluginsSubs) cb(nodeId)
     }
-    if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'workspace:changed' && typeof (raw as WorkspaceChangedEvent).workspaceId === 'string') {
+    if (
+      raw &&
+      typeof raw === 'object' &&
+      (raw as { channel?: unknown }).channel === 'workspace:changed' &&
+      typeof (raw as WorkspaceChangedEvent).workspaceId === 'string'
+    ) {
       for (const cb of fleetWorkspaceSubs) cb(nodeId, raw as WorkspaceChangedEvent)
     }
     if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'workspaces-mode:changed') {
@@ -174,9 +194,12 @@ function dispatch(raw: unknown): void {
 // Core handles only the generic `term:status` chrome invalidation. Terminal registers the PTY
 // payload handler for this prefix through the ordinary channel registry.
 registerWsChannel('workflow', (frame) => {
-  if (frame.channel === 'workflow:notice') return noticeSubs.forEach((cb) => cb(frame.notice as Parameters<NoticeCb>[0]))
-  if (frame.channel === 'workflow:step:event') return stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
-  if (frame.channel === 'workflow:step-changed') stepChangedSubs.forEach((cb) => cb(frame as unknown as Parameters<StepChangedCb>[0]))
+  if (frame.channel === 'workflow:notice')
+    return noticeSubs.forEach((cb) => cb(frame.notice as Parameters<NoticeCb>[0]))
+  if (frame.channel === 'workflow:step:event')
+    return stepEventSubs.forEach((cb) => cb(frame as unknown as Parameters<StepEventCb>[0]))
+  if (frame.channel === 'workflow:step-changed')
+    stepChangedSubs.forEach((cb) => cb(frame as unknown as Parameters<StepChangedCb>[0]))
 })
 
 // Core's third prefix (docs/api-reference/websocket.md § WebSocket). Content-free like `term:status`, so the
@@ -205,7 +228,13 @@ registerWsChannel('connection', (frame) => {
   if (typeof integrationId !== 'string' || typeof providerId !== 'string') return
   if (frame.deleted === true) return connectionSubs.forEach((cb) => cb({ integrationId, providerId, deleted: true }))
   if (typeof frame.status !== 'string') return
-  connectionSubs.forEach((cb) => cb({ integrationId, providerId, status: frame.status as Extract<ConnectionChangedEvent, { status: unknown }>['status'] }))
+  connectionSubs.forEach((cb) =>
+    cb({
+      integrationId,
+      providerId,
+      status: frame.status as Extract<ConnectionChangedEvent, { status: unknown }>['status'],
+    }),
+  )
 })
 
 // The rest of core's payload-carrying catalogue: HEAD moved, a run target started or stopped, an agent
@@ -214,13 +243,21 @@ registerWsChannel('connection', (frame) => {
 // colon, and the frame minus `channel` is the payload. Not narrowed field by field
 // like `connection` above: the frame came from this node over the authenticated socket, and a
 // subscriber that needs a field checked does it once at the point of use.
-for (const prefix of ['head', 'run', 'agent-session', 'project', 'workspace', 'workspace-projects', 'workspaces-mode', 'worktree']) {
+for (const prefix of [
+  'head',
+  'run',
+  'agent-session',
+  'project',
+  'workspace',
+  'workspace-projects',
+  'workspaces-mode',
+  'worktree',
+]) {
   registerWsChannel(prefix, (frame) => {
     const { channel, ...event } = frame
     nodeEventSubs.get(channel as keyof NodeEventMap)?.forEach((cb) => cb(event as never))
   })
 }
-
 
 // Core's twelfth, and the only one that is an apology. The node's hub shed invalidation frames because
 // this socket was too far behind to take them (node-core/server/transport/wsHub.ts). Nothing says which
@@ -286,7 +323,9 @@ export function wsOnFleetWorkspaceChanged(cb: (nodeId: string, event: WorkspaceC
 }
 
 /** Grouping changes from any paired Node, including one whose fleet picker is still mounted. */
-export function wsOnFleetWorkspacesModeChanged(cb: (nodeId: string, event: WorkspacesModeChangedEvent) => void): () => void {
+export function wsOnFleetWorkspacesModeChanged(
+  cb: (nodeId: string, event: WorkspacesModeChangedEvent) => void,
+): () => void {
   fleetWorkspacesModeSubs.add(cb)
   connect()
   return () => void fleetWorkspacesModeSubs.delete(cb)
@@ -316,7 +355,10 @@ export function wsOnConnectionChanged(cb: (event: ConnectionChangedEvent) => voi
 
 // Hear one of the payload-carrying node events (the registry above). Same subscriber shape as the
 // three named ones.
-export function wsOnNodeEvent<K extends keyof NodeEventMap>(channel: K, cb: (event: NodeEventMap[K]) => void): () => void {
+export function wsOnNodeEvent<K extends keyof NodeEventMap>(
+  channel: K,
+  cb: (event: NodeEventMap[K]) => void,
+): () => void {
   const subs = nodeEventSubs.get(channel) ?? new Set()
   subs.add(cb as (event: never) => void)
   nodeEventSubs.set(channel, subs)

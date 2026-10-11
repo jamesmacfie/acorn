@@ -7,8 +7,14 @@ it('records scrolling when remote props are replaced without changing the retain
   const host = document.createElement('div')
   const [row, setRow] = createSignal({ active: 'search', offset: 0, revision: 1 })
   const changed = vi.fn()
-  const dispose = render(() => <TabPanel idPrefix="stable" id="search" active={row().active}
-    scrollOffset={row().offset} onChange={changed}><div>{row().revision}</div></TabPanel>, host)
+  const dispose = render(
+    () => (
+      <TabPanel idPrefix="stable" id="search" active={row().active} scrollOffset={row().offset} onChange={changed}>
+        <div>{row().revision}</div>
+      </TabPanel>
+    ),
+    host,
+  )
   try {
     await new Promise((resolve) => setTimeout(resolve, 0))
     setRow({ active: 'search', offset: 0, revision: 2 })
@@ -16,7 +22,9 @@ it('records scrolling when remote props are replaced without changing the retain
     panel.scrollTop = 321
     panel.dispatchEvent(new Event('scroll'))
     expect(changed).toHaveBeenCalledWith(321)
-  } finally { dispose() }
+  } finally {
+    dispose()
+  }
 })
 
 it('restores a retained panel offset when remote props and content arrive after mounting', async () => {
@@ -24,16 +32,25 @@ it('restores a retained panel offset when remote props and content arrive after 
   document.body.append(host)
   const [ready, setReady] = createSignal(false)
   const [offset, setOffset] = createSignal<number>()
-  const dispose = render(() => <TabPanel idPrefix="delayed" id="search" active="search" scrollOffset={offset()}>
-    <Show when={ready()}><div>Late results</div></Show>
-  </TabPanel>, host)
+  const dispose = render(
+    () => (
+      <TabPanel idPrefix="delayed" id="search" active="search" scrollOffset={offset()}>
+        <Show when={ready()}>
+          <div>Late results</div>
+        </Show>
+      </TabPanel>
+    ),
+    host,
+  )
   try {
     const panel = host.querySelector<HTMLElement>('.ui-tab-panel')!
     let position = 0
     Object.defineProperty(panel, 'scrollTop', {
       configurable: true,
       get: () => position,
-      set: (offset: number) => { position = ready() ? offset : 0 },
+      set: (offset: number) => {
+        position = ready() ? offset : 0
+      },
     })
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(position).toBe(0)
@@ -53,15 +70,18 @@ it('restores a retained panel offset when remote props and content arrive after 
 // which is how one plugin's malformed `tabs` list took out both halves of the API panel.
 it('draws an empty strip when the tabs list never arrived', () => {
   const host = document.createElement('div')
-  const dispose = render(() => (
-    <Tabs
-      tabs={undefined as unknown as never}
-      active="body"
-      onChange={() => {}}
-      idPrefix="request"
-      ariaLabel="Request"
-    />
-  ), host)
+  const dispose = render(
+    () => (
+      <Tabs
+        tabs={undefined as unknown as never}
+        active="body"
+        onChange={() => {}}
+        idPrefix="request"
+        ariaLabel="Request"
+      />
+    ),
+    host,
+  )
   try {
     expect(host.querySelector('.ui-tabs')).not.toBeNull()
     expect(host.querySelectorAll('.ui-tab')).toHaveLength(0)
@@ -82,7 +102,11 @@ it('scrolls the active tab within one row while keeping trailing actions visible
     select = setActive
     return (
       <Tabs
-        tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }, { id: 'three', label: 'Three' }]}
+        tabs={[
+          { id: 'one', label: 'One' },
+          { id: 'two', label: 'Two' },
+          { id: 'three', label: 'Three' },
+        ]}
         active={active()}
         onChange={setActive}
         idPrefix="scrolling"
@@ -114,15 +138,21 @@ it('scrolls the active tab within one row while keeping trailing actions visible
 it('marks the edge of the strip that hides tabs', async () => {
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => (
-    <Tabs
-      tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }]}
-      active="one"
-      onChange={() => {}}
-      idPrefix="overflow"
-      ariaLabel="Sections"
-    />
-  ), host)
+  const dispose = render(
+    () => (
+      <Tabs
+        tabs={[
+          { id: 'one', label: 'One' },
+          { id: 'two', label: 'Two' },
+        ]}
+        active="one"
+        onChange={() => {}}
+        idPrefix="overflow"
+        ariaLabel="Sections"
+      />
+    ),
+    host,
+  )
   try {
     const strip = host.querySelector<HTMLElement>('.ui-tab-scroll')!
     Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 300 })
@@ -150,15 +180,22 @@ it('draws tree children as trailing actions, and no actions box when there are n
   const host = document.createElement('div')
   const tabs = [{ id: 'one', label: 'One' }]
   const [items, setItems] = createSignal<string[]>([])
-  const dispose = render(() => (
-    <Tabs tabs={tabs} active="one" onChange={() => {}} idPrefix="kids" ariaLabel="Kids">
-      {/* The shape a tree host hands over: a list that may be empty. */}
-      {items().map((item) => <b>{item}</b>)}
-    </Tabs>
-  ), host)
+  const dispose = render(
+    () => (
+      <Tabs tabs={tabs} active="one" onChange={() => {}} idPrefix="kids" ariaLabel="Kids">
+        {/* The shape a tree host hands over: a list that may be empty. */}
+        {items().map((item) => (
+          <b>{item}</b>
+        ))}
+      </Tabs>
+    ),
+    host,
+  )
   try {
     expect(host.querySelector('.ui-tabs-actions')).toBeNull()
     setItems(['Error'])
     expect(host.querySelector('.ui-tabs-actions')?.textContent).toBe('Error')
-  } finally { dispose() }
+  } finally {
+    dispose()
+  }
 })

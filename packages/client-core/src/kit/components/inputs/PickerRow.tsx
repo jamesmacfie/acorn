@@ -38,9 +38,7 @@ export default function PickerRow(props: {
         onClick={() => props.onSelect()}
       >
         <span>{props.label}</span>
-        <Show when={props.description}>
-          {(description) => <small>{description()}</small>}
-        </Show>
+        <Show when={props.description}>{(description) => <small>{description()}</small>}</Show>
       </button>
     </li>
   )

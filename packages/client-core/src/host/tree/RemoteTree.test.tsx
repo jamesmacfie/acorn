@@ -29,11 +29,16 @@ vi.mock('../frames/broker', () => ({
   postSurfaceAction: vi.fn(),
 }))
 vi.mock('./workerHost', async (original) => ({
-  ...await original<typeof import('./workerHost')>(),
+  ...(await original<typeof import('./workerHost')>()),
   acquireTreeWorker: (options: { connect: (port: MessagePort) => unknown }) => {
     return {
       transport: () => ({}),
-      mount: (_slot: string, _entry: string, _props: unknown, authority: () => { connect: (port: MessagePort) => unknown }) => {
+      mount: (
+        _slot: string,
+        _entry: string,
+        _props: unknown,
+        authority: () => { connect: (port: MessagePort) => unknown },
+      ) => {
         if (authority) authority().connect(null as unknown as MessagePort)
         else options.connect(null as unknown as MessagePort)
       },

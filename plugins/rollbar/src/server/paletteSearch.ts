@@ -52,7 +52,9 @@ export const rollbarSearchItem = (item: RollbarItemSummary): CommandSearchItem =
   id: rollbarRailItemId(item),
   title: item.title.slice(0, TITLE) || `#${item.identifier}`,
   subtitle: [`#${item.identifier}`, item.level, item.environment, item.integrationLabel]
-    .filter(Boolean).join(' · ').slice(0, SUBTITLE),
+    .filter(Boolean)
+    .join(' · ')
+    .slice(0, SUBTITLE),
   badge: `${item.totalOccurrences} occurrence${item.totalOccurrences === 1 ? '' : 's'}`.slice(0, BADGE),
   ref: item.identifier,
 })

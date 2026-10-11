@@ -1,13 +1,27 @@
 import { For, Show } from 'solid-js'
 import {
-  Alert, Badge, Button, ChipRow, CodeBlock, DetailColumn, EmptyState, Facts, Heading, IconButton,
-  ListColumn, ListDetail, Row, Section, Stack, TabPanel, Tabs, Text, Toolbar, ToolbarSpacer,
+  Alert,
+  Badge,
+  Button,
+  ChipRow,
+  CodeBlock,
+  DetailColumn,
+  EmptyState,
+  Facts,
+  Heading,
+  IconButton,
+  ListColumn,
+  ListDetail,
+  Row,
+  Section,
+  Stack,
+  TabPanel,
+  Tabs,
+  Text,
+  Toolbar,
+  ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
-import type {
-  RollbarItemMetadata,
-  RollbarOccurrenceDetail,
-  RollbarOccurrenceSummary,
-} from '../shared/api'
+import type { RollbarItemMetadata, RollbarOccurrenceDetail, RollbarOccurrenceSummary } from '../shared/api'
 import type { RollbarRailTarget } from '../shared/rail'
 import { levelWord, relativeTime, statusWord, traceText } from './model'
 
@@ -50,14 +64,26 @@ export function RollbarItemView(props: {
       {/* Was a header div, an eyebrow div and an h1 with three classes. `Heading` is that shape with a
           name, and the spacing comes from the Stack's role rather than from padding this plugin picked. */}
       <Toolbar variant="bar">
-        <Heading level={2} eyebrow={`${item().integrationLabel} · #${item().identifier}`}>{item().title}</Heading>
+        <Heading level={2} eyebrow={`${item().integrationLabel} · #${item().identifier}`}>
+          {item().title}
+        </Heading>
         <ToolbarSpacer />
-        <IconButton icon="refresh-cw" label="Refresh error" busy={props.refreshing} disabled={props.refreshing} onPress={props.onRefresh} />
+        <IconButton
+          icon="refresh-cw"
+          label="Refresh error"
+          busy={props.refreshing}
+          disabled={props.refreshing}
+          onPress={props.onRefresh}
+        />
       </Toolbar>
 
-      <Show when={props.refreshError}>{(detail) => (
-        <Alert variant="banner" title="Couldn't refresh this error. Showing the last data we got.">{detail()}</Alert>
-      )}</Show>
+      <Show when={props.refreshError}>
+        {(detail) => (
+          <Alert variant="banner" title="Couldn't refresh this error. Showing the last data we got.">
+            {detail()}
+          </Alert>
+        )}
+      </Show>
 
       {/* The status sits at the strip's end, so the strip meets the header with no row between.
           Level and status as words from a map; the environment stays as the project spelled it. */}
@@ -72,9 +98,21 @@ export function RollbarItemView(props: {
         ariaLabel="Error sections"
       >
         <ChipRow ariaLabel="Error status">
-          <Show when={item().level}>{(level) => <Badge tone={levelWord(level()).tone} size="xs">{levelWord(level()).label}</Badge>}</Show>
+          <Show when={item().level}>
+            {(level) => (
+              <Badge tone={levelWord(level()).tone} size="xs">
+                {levelWord(level()).label}
+              </Badge>
+            )}
+          </Show>
           <Show when={item().environment}>{(environment) => <Badge size="xs">{environment()}</Badge>}</Show>
-          <Show when={item().status}>{(status) => <Badge tone={statusWord(status()).tone} size="xs">{statusWord(status()).label}</Badge>}</Show>
+          <Show when={item().status}>
+            {(status) => (
+              <Badge tone={statusWord(status()).tone} size="xs">
+                {statusWord(status()).label}
+              </Badge>
+            )}
+          </Show>
         </ChipRow>
       </Tabs>
 
@@ -88,21 +126,37 @@ export function RollbarItemView(props: {
               { label: 'Last seen', value: relativeTime(item().lastOccurrenceAt) },
               { label: 'Framework', value: item().framework || 'Not reported' },
               { label: 'Assigned to', value: item().assignedTo || 'No one' },
-              { label: 'Resolved in', value: item().resolvedInVersion || 'Not resolved', mono: !!item().resolvedInVersion },
+              {
+                label: 'Resolved in',
+                value: item().resolvedInVersion || 'Not resolved',
+                mono: !!item().resolvedInVersion,
+              },
             ]}
           />
-          <Show when={props.state.occurrences.length} fallback={(
-            <Text tone="muted">Rollbar has no recent occurrences for this error.</Text>
-          )}>
+          <Show
+            when={props.state.occurrences.length}
+            fallback={<Text tone="muted">Rollbar has no recent occurrences for this error.</Text>}
+          >
             <Section label="Newest occurrence">
-              <Show when={props.latest.kind === 'ready' ? props.latest.detail : undefined} fallback={(
-                <Show
-                  when={props.latest.kind === 'error' ? props.latest.detail : undefined}
-                  fallback={<EmptyState busy align="start" size="sm">Loading occurrence…</EmptyState>}
-                >
-                  {(reason) => <Alert variant="banner" title="Couldn't load this occurrence.">{reason()}</Alert>}
-                </Show>
-              )}>
+              <Show
+                when={props.latest.kind === 'ready' ? props.latest.detail : undefined}
+                fallback={
+                  <Show
+                    when={props.latest.kind === 'error' ? props.latest.detail : undefined}
+                    fallback={
+                      <EmptyState busy align="start" size="sm">
+                        Loading occurrence…
+                      </EmptyState>
+                    }
+                  >
+                    {(reason) => (
+                      <Alert variant="banner" title="Couldn't load this occurrence.">
+                        {reason()}
+                      </Alert>
+                    )}
+                  </Show>
+                }
+              >
                 {(detail) => (
                   <Stack gap="row">
                     <Text wrap>{occurrenceTitle(detail())}</Text>
@@ -118,21 +172,27 @@ export function RollbarItemView(props: {
       <TabPanel idPrefix="rollbar" id="occurrences" active={props.activeTab}>
         <Show
           when={props.state.occurrences.length}
-          fallback={<EmptyState align="start" size="sm">Rollbar has no recent occurrences for this error.</EmptyState>}
+          fallback={
+            <EmptyState align="start" size="sm">
+              Rollbar has no recent occurrences for this error.
+            </EmptyState>
+          }
         >
           <ListDetail split>
             {/* Every occurrence of one error has the same class, so a row is told apart by when it
                 happened and where. */}
             <ListColumn label="Occurrences">
-              <For each={props.state.occurrences}>{(entry) => (
-                <Row
-                  onPress={() => props.onOccurrence(entry.id)}
-                  selected={chosenId(props.occurrence) === entry.id}
-                  meta={[entry.environment, entry.codeVersion].filter(Boolean).join(' · ')}
-                >
-                  {relativeTime(entry.occurredAt)}
-                </Row>
-              )}</For>
+              <For each={props.state.occurrences}>
+                {(entry) => (
+                  <Row
+                    onPress={() => props.onOccurrence(entry.id)}
+                    selected={chosenId(props.occurrence) === entry.id}
+                    meta={[entry.environment, entry.codeVersion].filter(Boolean).join(' · ')}
+                  >
+                    {relativeTime(entry.occurredAt)}
+                  </Row>
+                )}
+              </For>
             </ListColumn>
             <DetailColumn scroll>
               <OccurrenceDetail state={props.occurrence} onCopy={props.onCopy} />
@@ -144,17 +204,16 @@ export function RollbarItemView(props: {
   )
 }
 
-function OccurrenceDetail(props: {
-  state: OccurrenceState
-  onCopy(detail: RollbarOccurrenceDetail): void
-}) {
+function OccurrenceDetail(props: { state: OccurrenceState; onCopy(detail: RollbarOccurrenceDetail): void }) {
   return (
     <>
       <Show when={props.state.kind === 'empty'}>
         <EmptyState title="Choose an occurrence">Its stack trace shows here.</EmptyState>
       </Show>
       <Show when={props.state.kind === 'loading'}>
-        <EmptyState busy align="start" size="sm">Loading occurrence…</EmptyState>
+        <EmptyState busy align="start" size="sm">
+          Loading occurrence…
+        </EmptyState>
       </Show>
       <Show when={props.state.kind === 'error'}>
         <Alert variant="banner" title="Couldn't load this occurrence.">
@@ -168,20 +227,22 @@ function OccurrenceDetail(props: {
   )
 }
 
-function OccurrenceContent(props: {
-  detail: RollbarOccurrenceDetail
-  onCopy(detail: RollbarOccurrenceDetail): void
-}) {
+function OccurrenceContent(props: { detail: RollbarOccurrenceDetail; onCopy(detail: RollbarOccurrenceDetail): void }) {
   const detail = () => props.detail
   // The request spans the row, so a long URL has the width before it has to wrap. Mono only for the
   // host, the one value here that is a machine's name.
-  const facts = () => [
-    detail().request?.url
-      ? { label: 'Request', value: [detail().request?.method, detail().request?.url].filter(Boolean).join(' '), wide: true }
-      : null,
-    detail().context ? { label: 'Context', value: detail().context! } : null,
-    detail().server?.host ? { label: 'Server', value: detail().server!.host!, mono: true } : null,
-  ].filter((fact) => fact !== null)
+  const facts = () =>
+    [
+      detail().request?.url
+        ? {
+            label: 'Request',
+            value: [detail().request?.method, detail().request?.url].filter(Boolean).join(' '),
+            wide: true,
+          }
+        : null,
+      detail().context ? { label: 'Context', value: detail().context! } : null,
+      detail().server?.host ? { label: 'Server', value: detail().server!.host!, mono: true } : null,
+    ].filter((fact) => fact !== null)
 
   // A fragment, so the bar is the detail column's first child and the column seats it on its top edge
   // rather than a scroll pad below it.
@@ -191,7 +252,9 @@ function OccurrenceContent(props: {
         <Stack gap="row">
           <Text emphasis="strong">{occurrenceTitle(detail())}</Text>
           <Text tone="muted">
-            {[relativeTime(detail().occurredAt), detail().environment, detail().codeVersion].filter(Boolean).join(' · ')}
+            {[relativeTime(detail().occurredAt), detail().environment, detail().codeVersion]
+              .filter(Boolean)
+              .join(' · ')}
           </Text>
         </Stack>
         <ToolbarSpacer />
@@ -204,7 +267,9 @@ function OccurrenceContent(props: {
         </Button>
       </Toolbar>
       <Stack gap="section">
-        <Show when={facts().length}><Facts items={facts()} /></Show>
+        <Show when={facts().length}>
+          <Facts items={facts()} />
+        </Show>
         <Trace detail={detail()} />
       </Stack>
     </>
@@ -216,7 +281,9 @@ function OccurrenceContent(props: {
 function Trace(props: { detail: RollbarOccurrenceDetail }) {
   return (
     <Show when={props.detail.frames.length}>
-      <CodeBlock size="xs" wrap>{traceText(props.detail.frames)}</CodeBlock>
+      <CodeBlock size="xs" wrap>
+        {traceText(props.detail.frames)}
+      </CodeBlock>
     </Show>
   )
 }

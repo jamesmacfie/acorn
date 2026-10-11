@@ -14,14 +14,16 @@ import { Button, type ButtonProps } from './Button'
  *  text in it, so a button whose only child is a mark reads as nothing at all to a screen reader —
  *  the browser preview's back button announced itself as "‹" — and the terminal host, which draws
  *  the words instead of the mark, had nothing to print (apps/tui/src/kit/asking.tsx). */
-export function IconButton(props: Omit<ButtonProps, 'children' | 'iconOnly' | 'label'> & {
-  /** The mark, by the same name `Icon` takes: a Lucide name, or `brand:` and a registered one. */
-  icon: string
-  /** The accessible name. What the button does, in words, because the mark cannot say it. */
-  label: string
-  /** Turns the mark, for an action that is in flight. */
-  spin?: boolean
-}) {
+export function IconButton(
+  props: Omit<ButtonProps, 'children' | 'iconOnly' | 'label'> & {
+    /** The mark, by the same name `Icon` takes: a Lucide name, or `brand:` and a registered one. */
+    icon: string
+    /** The accessible name. What the button does, in words, because the mark cannot say it. */
+    label: string
+    /** Turns the mark, for an action that is in flight. */
+    spin?: boolean
+  },
+) {
   const [own, rest] = splitProps(props, ['icon', 'spin'])
   // A mark says nothing on its own, so a button with no tip of its own shows its label on hover.
   return (

@@ -43,7 +43,12 @@ const notSeed = (note: NoteSummary): boolean => !(note.author === 'workflow' && 
 const noteItem = (scope: NoteScope, note: NoteSummary): CommandSearchItem => ({
   id: `${scope}:${note.slug}`,
   title: note.title,
-  subtitle: note.kind === 'scratch' ? (scope === 'workspace' ? 'shared' : scope) : `${scope === 'workspace' ? 'shared' : scope} · ${note.kind}`,
+  subtitle:
+    note.kind === 'scratch'
+      ? scope === 'workspace'
+        ? 'shared'
+        : scope
+      : `${scope === 'workspace' ? 'shared' : scope} · ${note.kind}`,
   ref: note.slug,
 })
 
@@ -72,14 +77,19 @@ export const notesCommands: readonly ContributedCommand[] = [
     placeholder: 'Find a note…',
     ...localSearch(async (context) => {
       const api = notesApi()
-      const lists = await Promise.all(SCOPES.map(async (scope): Promise<ScopeList> => {
-        const location = locationFor(scope, context)
-        if (!location) return { scope, rows: [] }
-        const result = await api.list(location)
-        return 'error' in result ? { scope, error: result.error } : { scope, rows: result }
-      }))
+      const lists = await Promise.all(
+        SCOPES.map(async (scope): Promise<ScopeList> => {
+          const location = locationFor(scope, context)
+          if (!location) return { scope, rows: [] }
+          const result = await api.list(location)
+          return 'error' in result ? { scope, error: result.error } : { scope, rows: result }
+        }),
+      )
       return lists.flatMap((list) =>
-        'error' in list ? [problemItem(list.scope, list.error)] : list.rows.filter(notSeed).map((note) => noteItem(list.scope, note)))
+        'error' in list
+          ? [problemItem(list.scope, list.error)]
+          : list.rows.filter(notSeed).map((note) => noteItem(list.scope, note)),
+      )
     }),
     select: (item, context): CommandOutcome => {
       const taskId = context.taskId

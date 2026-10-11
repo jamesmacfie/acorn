@@ -103,15 +103,17 @@ export function measuredRun(node: Node, limit: number): Measured {
  *  OpenTUI's edit buffer answers the same way, and it was measured rather than assumed — a textarea
  *  stacked between two lines of text moves the line below it down one row per line of content, which
  *  is also why a `Textarea` without `grow` is exactly as tall as what is in it. */
-export const measureField = (node: Node): MeasureFunction => (width, widthMode) => {
-  const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
-  const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
-  const field = measuredField(node, limit)
-  return {
-    width: widthMode === MeasureMode.Exactly ? offered : Math.min(field.width, limit),
-    height: field.rows.length,
+export const measureField =
+  (node: Node): MeasureFunction =>
+  (width, widthMode) => {
+    const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
+    const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
+    const field = measuredField(node, limit)
+    return {
+      width: widthMode === MeasureMode.Exactly ? offered : Math.min(field.width, limit),
+      height: field.rows.length,
+    }
   }
-}
 
 /** The measure function Yoga calls, bound to the node whose run it measures.
  *
@@ -119,12 +121,14 @@ export const measureField = (node: Node): MeasureFunction => (width, widthMode) 
  *  is no limit to wrap at. `AtMost` is an offer, and a run that does not wrap answers with the offer
  *  rather than its natural width, so the box shrinks and paint clips one line instead of the layout
  *  growing past its parent. `Exactly` is not a question. */
-export const measureRun = (node: Node): MeasureFunction => (width, widthMode) => {
-  const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
-  const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
-  const run = measuredRun(node, limit)
-  return {
-    width: widthMode === MeasureMode.Exactly ? offered : Math.min(run.width, limit),
-    height: run.lines.length,
+export const measureRun =
+  (node: Node): MeasureFunction =>
+  (width, widthMode) => {
+    const offered = Number.isFinite(width) ? Math.max(0, Math.floor(width)) : Infinity
+    const limit = widthMode === MeasureMode.Undefined ? Infinity : offered
+    const run = measuredRun(node, limit)
+    return {
+      width: widthMode === MeasureMode.Exactly ? offered : Math.min(run.width, limit),
+      height: run.lines.length,
+    }
   }
-}

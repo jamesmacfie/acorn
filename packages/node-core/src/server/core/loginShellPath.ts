@@ -53,10 +53,15 @@ async function readLoginShellPath(): Promise<void> {
   const shell = process.env.SHELL || '/bin/zsh'
   try {
     const path = await new Promise<string>((resolve, reject) => {
-      execFile(shell, ['-lic', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: PROBE_TIMEOUT_MS }, (error, stdout) => {
-        if (error) reject(error)
-        else resolve(stdout.trim())
-      })
+      execFile(
+        shell,
+        ['-lic', 'printf %s "$PATH"'],
+        { encoding: 'utf8', timeout: PROBE_TIMEOUT_MS },
+        (error, stdout) => {
+          if (error) reject(error)
+          else resolve(stdout.trim())
+        },
+      )
     })
     if (path) process.env.PATH = path
   } catch (error) {

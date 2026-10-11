@@ -6,9 +6,12 @@ import { agentSecurityDiagnostics, setAgentSecurityDiagnosticsBridge } from './s
 const app = (kind: 'device' | 'task' | 'service') => {
   const router = new Hono<AppEnv>()
   router.use('/api/*', async (c, next) => {
-    c.set('principal', (kind === 'device'
-      ? { kind: 'device', userId: 'owner' }
-      : { kind: 'internal', userId: 'owner', scope: kind, taskId: 'task' }) as never)
+    c.set(
+      'principal',
+      (kind === 'device'
+        ? { kind: 'device', userId: 'owner' }
+        : { kind: 'internal', userId: 'owner', scope: kind, taskId: 'task' }) as never,
+    )
     await next()
   })
   return router.route('/api/agents', agentSecurityDiagnostics)
@@ -20,8 +23,14 @@ afterEach(() => setAgentSecurityDiagnosticsBridge(null))
 it('keeps reports and scope choices device only, including reads', async () => {
   const calls: string[] = []
   setAgentSecurityDiagnosticsBridge({
-    scopes: async () => { calls.push('scopes'); return { projects: [], sessions: [] } },
-    check: async () => { calls.push('check'); return { nodeId: 'node-1', projectId: null, sessionId: null, checkedAt: 0, expiresAt: 1, findings: [] } },
+    scopes: async () => {
+      calls.push('scopes')
+      return { projects: [], sessions: [] }
+    },
+    check: async () => {
+      calls.push('check')
+      return { nodeId: 'node-1', projectId: null, sessionId: null, checkedAt: 0, expiresAt: 1, findings: [] }
+    },
   })
   for (const kind of ['task', 'service'] as const) {
     expect((await app(kind).fetch(get('/security-diagnostics/scopes'), env)).status).toBe(403)
@@ -39,7 +48,10 @@ it('rejects malformed scope before a collector runs', async () => {
   const calls: string[] = []
   setAgentSecurityDiagnosticsBridge({
     scopes: async () => ({ projects: [], sessions: [] }),
-    check: async () => { calls.push('check'); throw new Error('unexpected') },
+    check: async () => {
+      calls.push('check')
+      throw new Error('unexpected')
+    },
   })
   expect((await app('device').fetch(get('/security-diagnostics?projectId=../other'), env)).status).toBe(400)
   expect(calls).toEqual([])

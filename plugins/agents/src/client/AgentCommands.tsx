@@ -1,6 +1,11 @@
 import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions, registerCommands, type ContributedCommand, type UiSlotContribution } from '@acorn/plugin-api/client'
+import {
+  prefsOptions,
+  registerCommands,
+  type ContributedCommand,
+  type UiSlotContribution,
+} from '@acorn/plugin-api/client'
 import { startSessionFromPalette } from './commands'
 import { agentProvidersOptions } from './providersClient'
 import { customAgentsOptions } from './settings/customAgentsClient'
@@ -89,7 +94,11 @@ export function AgentCommands() {
   const providers = createQuery(() => agentProvidersOptions())
   const customAgents = createQuery(() => customAgentsOptions())
   registerNewSessionCommands(() =>
-    newSessionChoices((providers.data ?? []).filter((provider) => provider.installed), customAgents.data ?? []))
+    newSessionChoices(
+      (providers.data ?? []).filter((provider) => provider.installed),
+      customAgents.data ?? [],
+    ),
+  )
 
   return null
 }
@@ -114,29 +123,31 @@ function registerNewSessionCommands(list: () => readonly NewSessionChoice[]): vo
   createEffect(() => {
     const ids = roster()
     if (!ids.length) return
-    const registered = registerCommands(ids.map((id): ContributedCommand => ({
-      id,
-      title: () => {
-        const choice = live(id)
-        return `New ${choice ? choiceLabel(choice) : 'agent'} session`
-      },
-      hint: () => (live(id)?.agent ? 'a custom agent, started in this task' : 'an agent session in this task'),
-      keywords: ['agent', 'new', 'session', id.startsWith('agents.custom-agent.') ? 'custom' : 'harness'],
-      category: 'action',
-      palette: true,
-      scope: 'task',
-      requires: { plugin: 'agents' },
-      when: () => !!live(id),
-      run: (context) => {
-        const choice = live(id)
-        if (!choice || !context.taskId) return
-        return startSessionFromPalette(
-          context.taskId,
-          { id: choice.provider.id, profileId: choice.agent?.profileId ?? choice.provider.profileId },
-          choice.agent?.id,
-        )
-      },
-    })))
+    const registered = registerCommands(
+      ids.map((id): ContributedCommand => ({
+        id,
+        title: () => {
+          const choice = live(id)
+          return `New ${choice ? choiceLabel(choice) : 'agent'} session`
+        },
+        hint: () => (live(id)?.agent ? 'a custom agent, started in this task' : 'an agent session in this task'),
+        keywords: ['agent', 'new', 'session', id.startsWith('agents.custom-agent.') ? 'custom' : 'harness'],
+        category: 'action',
+        palette: true,
+        scope: 'task',
+        requires: { plugin: 'agents' },
+        when: () => !!live(id),
+        run: (context) => {
+          const choice = live(id)
+          if (!choice || !context.taskId) return
+          return startSessionFromPalette(
+            context.taskId,
+            { id: choice.provider.id, profileId: choice.agent?.profileId ?? choice.provider.profileId },
+            choice.agent?.id,
+          )
+        },
+      })),
+    )
     onCleanup(() => registered.dispose())
   })
 }

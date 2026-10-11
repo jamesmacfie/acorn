@@ -1,7 +1,12 @@
 import type { Component } from 'solid-js'
 import {
-  isPluginSettingsCategory, isSettingsScope, SETTINGS_CATEGORIES, SETTINGS_SEARCH_MAX, SETTINGS_SECTION_ID_RE,
-  type SettingsCategory, type SettingsScope as SettingsScopeKind,
+  isPluginSettingsCategory,
+  isSettingsScope,
+  SETTINGS_CATEGORIES,
+  SETTINGS_SEARCH_MAX,
+  SETTINGS_SECTION_ID_RE,
+  type SettingsCategory,
+  type SettingsScope as SettingsScopeKind,
 } from '@acorn/protocol/settingsPages.ts'
 import type { Project, Workspace } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
@@ -102,18 +107,23 @@ export const SETTINGS_CATEGORY_LABELS: Record<SettingsCategory, string> = {
 /** Why a plugin may not register this page, or `undefined` when it may. Checked at the compiled
  *  contribution point; a loaded plugin's manifest is checked by the node, which keeps the page and
  *  reports the value instead (node-core/server/plugins/manifest.ts). */
-export const pluginSettingsPlacementProblem = (page: Pick<SettingsContribution, 'category' | 'scope'>): string | undefined => {
+export const pluginSettingsPlacementProblem = (
+  page: Pick<SettingsContribution, 'category' | 'scope'>,
+): string | undefined => {
   if (page.category !== undefined && !isPluginSettingsCategory(page.category)) {
     return `category '${String(page.category)}' is not one a plugin can use`
   }
-  if (page.scope !== undefined && !isSettingsScope(page.scope)) return `scope '${String(page.scope)}' is not a settings scope`
+  if (page.scope !== undefined && !isSettingsScope(page.scope))
+    return `scope '${String(page.scope)}' is not a settings scope`
   return undefined
 }
 
 /** What is wrong with a page's search declarations, or `undefined`. Checked for every compiled page at
  *  registration, because a list past the limit is a mistake its author can fix; a loaded plugin's
  *  manifest is checked by the node, which keeps the page and reports the list instead. */
-export const settingsSearchProblem = (page: Pick<SettingsContribution, 'keywords' | 'sections'>): string | undefined => {
+export const settingsSearchProblem = (
+  page: Pick<SettingsContribution, 'keywords' | 'sections'>,
+): string | undefined => {
   const over = (list: readonly unknown[] | undefined) => (list?.length ?? 0) > SETTINGS_SEARCH_MAX
   if (over(page.keywords)) return `more than ${SETTINGS_SEARCH_MAX} keywords`
   if (over(page.sections)) return `more than ${SETTINGS_SEARCH_MAX} sections`
@@ -158,9 +168,10 @@ export const resolveSettingsAlias = (
 // with seventeen sections would hand search a list nobody promised to rank.
 class SettingsRegistry extends Registry<SettingsContribution> {
   override register(entry: SettingsContribution, owner?: string): Disposable {
-    const problem = settingsSearchProblem(entry)
+    const problem =
+      settingsSearchProblem(entry) ??
       // Core's sources are never hidden, so a switch on one of core's pages would have nothing to name.
-      ?? (entry.railSourceVisibility?.length && !owner ? 'railSourceVisibility is for a plugin\'s own page' : undefined)
+      (entry.railSourceVisibility?.length && !owner ? "railSourceVisibility is for a plugin's own page" : undefined)
     if (problem) throw new Error(`Settings page '${entry.id}': ${problem}`)
     return super.register(entry, owner)
   }
@@ -195,10 +206,16 @@ export const projectSettingsTarget = (projectId: string): string => `${PROJECT_S
 
 /** The page core draws for every workspace or every project, found by what it is rather than by id:
  *  that scope, filed under Workspaces and projects, which only core may use. */
-export const settingsDetailPage = (pages: readonly SettingsContribution[], scope: 'workspace' | 'project'): SettingsContribution | undefined =>
+export const settingsDetailPage = (
+  pages: readonly SettingsContribution[],
+  scope: 'workspace' | 'project',
+): SettingsContribution | undefined =>
   pages.find((page) => settingsScopeOf(page) === scope && settingsCategoryOf(page) === 'workspaces')
 
 /** Every other page with that scope, a plugin's among them, in rail order. Each is drawn as a tab on
  *  the workspace's or the project's page rather than as a rail row. */
-export const settingsDetailTabs = (pages: readonly SettingsContribution[], scope: 'workspace' | 'project'): SettingsContribution[] =>
+export const settingsDetailTabs = (
+  pages: readonly SettingsContribution[],
+  scope: 'workspace' | 'project',
+): SettingsContribution[] =>
   pages.filter((page) => settingsScopeOf(page) === scope && settingsCategoryOf(page) !== 'workspaces')

@@ -80,7 +80,10 @@ const DOC = (() => {
   if (start === -1) throw new Error('docs/ui-design/every-node.md has no § Every node at 80 by 24')
   const body = page.slice(start)
   return new Map(
-    [...body.matchAll(/^\| `([A-Za-z][A-Za-z0-9]*)` \| ([a-z-]+) \| (.+?) \|$/gm)].map((m) => [m[1], { focus: m[2], at: m[3] }]),
+    [...body.matchAll(/^\| `([A-Za-z][A-Za-z0-9]*)` \| ([a-z-]+) \| (.+?) \|$/gm)].map((m) => [
+      m[1],
+      { focus: m[2], at: m[3] },
+    ]),
   )
 })()
 

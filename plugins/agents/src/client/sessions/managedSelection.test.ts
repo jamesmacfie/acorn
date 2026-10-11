@@ -1,14 +1,20 @@
 import { describe, expect, it, vi } from 'vitest'
 
 const paneIntent = vi.hoisted(() => ({
-  listener: undefined as undefined | ((event: { paneId: string; taskId: string; intent: { kind: string; item: string } }) => void),
+  listener: undefined as
+    | undefined
+    | ((event: { paneId: string; taskId: string; intent: { kind: string; item: string } }) => void),
 }))
 
 vi.mock('@acorn/plugin-api/client', () => ({
-  clientEvents: { on: (_name: string, listener: typeof paneIntent.listener) => {
-    paneIntent.listener = listener
-    return () => { paneIntent.listener = undefined }
-  } },
+  clientEvents: {
+    on: (_name: string, listener: typeof paneIntent.listener) => {
+      paneIntent.listener = listener
+      return () => {
+        paneIntent.listener = undefined
+      }
+    },
+  },
   consumePaneIntent: () => undefined,
   dispatchLayout: () => undefined,
   registerNoticeTargetHandler: () => () => undefined,

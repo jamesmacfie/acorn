@@ -37,9 +37,14 @@ export default function JsonTab(props: {
 
   // A new definition in the same surface replaces the box. `on` over the JSON, which is a string, so
   // it fires when the document changes rather than when the draft object is rebuilt.
-  createEffect(on(() => props.json, (next, previous) => {
-    if (previous === undefined || !text().trim()) replace(next)
-  }))
+  createEffect(
+    on(
+      () => props.json,
+      (next, previous) => {
+        if (previous === undefined || !text().trim()) replace(next)
+      },
+    ),
+  )
 
   const apply = (): void => {
     const problem = props.onApply(text())
@@ -65,13 +70,17 @@ export default function JsonTab(props: {
       {/* Above the box, as a bar, so the actions sit on the pane's inset rather than its edge. Apply
           is the one that changes the draft, so it is the solid one. */}
       <Toolbar size="sm" ariaLabel="Code actions">
-        <Button size="sm" variant="solid" disabled={props.readOnly} onPress={apply}>Apply</Button>
-        <Button size="sm" variant="ghost" onPress={format}>Format</Button>
-        <Button size="sm" variant="ghost" onPress={revert}>Revert</Button>
+        <Button size="sm" variant="solid" disabled={props.readOnly} onPress={apply}>
+          Apply
+        </Button>
+        <Button size="sm" variant="ghost" onPress={format}>
+          Format
+        </Button>
+        <Button size="sm" variant="ghost" onPress={revert}>
+          Revert
+        </Button>
       </Toolbar>
-      <Show when={error()}>
-        {(message) => <Alert tone="danger">{message()}</Alert>}
-      </Show>
+      <Show when={error()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
       <Show when={!error() && applied()}>
         <Text emphasis="muted">Applied.</Text>
       </Show>

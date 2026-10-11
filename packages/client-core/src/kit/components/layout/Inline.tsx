@@ -10,7 +10,13 @@ import type { Space } from '../../tokens/tokens'
    match. A child narrower than about 12rem wraps to a new line, so a narrow window stacks them.
 
    At 80×24: children on one line separated by a space, wrapping to a Stack when too wide. */
-export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; even?: boolean; children: JSX.Element }) {
+export function Inline(props: {
+  gap?: Space
+  wrap?: boolean
+  spread?: boolean
+  even?: boolean
+  children: JSX.Element
+}) {
   return (
     <div
       class="ui-inline"

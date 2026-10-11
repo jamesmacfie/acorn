@@ -8,7 +8,8 @@ import type { AgentStore } from './store'
 
 /** Any frame the runtime sends, not only the plugin's own: the core-named `agent-session:changed`
  *  goes out through the same door (docs/plugins/events.md § Hearing a core event). */
-export type PublishedFrame = AgentWsFrame
+export type PublishedFrame =
+  | AgentWsFrame
   | ({ channel: 'agent-session:changed' } & AgentSessionChangedEvent)
   | AgentLifecycleFrame
 
@@ -29,14 +30,15 @@ const webhookLog = createLogger('agents:webhook', 'agents')
  * that quieting changes is still compared. `config` is too large to compare per event, and the engine's
  * record() handles it separately.
  */
-const listedRow = (session: AgentSession): string => JSON.stringify({
-  ...session,
-  config: null,
-  lastEventSeq: 0,
-  lastEventAt: 0,
-  updatedAt: 0,
-  subagents: session.subagents.map(({ updatedAt: _heardAt, ...entry }) => entry),
-})
+const listedRow = (session: AgentSession): string =>
+  JSON.stringify({
+    ...session,
+    config: null,
+    lastEventSeq: 0,
+    lastEventAt: 0,
+    updatedAt: 0,
+    subagents: session.subagents.map(({ updatedAt: _heardAt, ...entry }) => entry),
+  })
 
 /**
  * Who hears a session frame: the agent socket, the Node's own listeners (waits and workflow steps),
@@ -49,12 +51,14 @@ export class SessionFrames {
   private readonly sentRows = new Map<string, string>()
   private readonly publications = new Set<Promise<void>>()
 
-  constructor(private readonly deps: {
-    publish?(frame: PublishedFrame): void
-    webhooks: Pick<AgentWebhookService, 'accept'>
-    store: Pick<AgentStore, 'requireSession'>
-    shutdown: AbortSignal
-  }) {}
+  constructor(
+    private readonly deps: {
+      publish?(frame: PublishedFrame): void
+      webhooks: Pick<AgentWebhookService, 'accept'>
+      store: Pick<AgentStore, 'requireSession'>
+      shutdown: AbortSignal
+    },
+  ) {}
 
   subscribe(listener: FrameListener): () => void {
     this.listeners.add(listener)
@@ -76,12 +80,16 @@ export class SessionFrames {
     // The socket gets the record without its search text; the Node's own listeners keep it.
     this.deps.publish?.(frame.channel === 'agent:event' ? { ...frame, event: clientEventRecord(frame.event) } : frame)
     for (const listener of this.listeners) listener(frame)
-    this.track(this.deps.webhooks.accept(frame).catch((error) => {
-      webhookLog.warn(`failed to queue delivery: ${describeError(error).message}`)
-    }))
-    this.track(this.announce(frame).catch((error) => {
-      log.warn(`failed to announce a session edge: ${describeError(error).message}`)
-    }))
+    this.track(
+      this.deps.webhooks.accept(frame).catch((error) => {
+        webhookLog.warn(`failed to queue delivery: ${describeError(error).message}`)
+      }),
+    )
+    this.track(
+      this.announce(frame).catch((error) => {
+        log.warn(`failed to announce a session edge: ${describeError(error).message}`)
+      }),
+    )
   }
 
   /** Waits for the webhook hand-offs and announcements already started, and drops every listener. */

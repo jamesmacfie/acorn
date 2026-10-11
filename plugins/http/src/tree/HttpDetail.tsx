@@ -5,9 +5,7 @@
 // A region rather than a column inside one tree. Everything it shares with the list beside it is in
 // ./panelModel.ts, which one worker holds for both.
 import { Show } from 'solid-js'
-import {
-  Badge, Button, Heading, Input, Select, Text, Toolbar, ToolbarSpacer,
-} from '@acorn/plugin-api/ui/tree'
+import { Badge, Button, Heading, Input, Select, Text, Toolbar, ToolbarSpacer } from '@acorn/plugin-api/ui/tree'
 import { httpMethods } from '../shared/model'
 import type { Draft } from './draft'
 import type { HttpPanelModel } from './panelModel'
@@ -69,8 +67,14 @@ export default function HttpDetail(props: { model: HttpPanelModel }) {
             </Show>
             <Text>{model().draft().name || 'Untitled request'}</Text>
           </Button>
-          <Show when={model().draft().taskId}><Badge size="xs">In this task</Badge></Show>
-          <Show when={model().dirty()}><Badge size="xs" tone="accent">Unsaved</Badge></Show>
+          <Show when={model().draft().taskId}>
+            <Badge size="xs">In this task</Badge>
+          </Show>
+          <Show when={model().dirty()}>
+            <Badge size="xs" tone="accent">
+              Unsaved
+            </Badge>
+          </Show>
           <ToolbarSpacer />
           <Button size="sm" variant="ghost" onPress={() => model().copyAsCurl()}>
             Copy as curl

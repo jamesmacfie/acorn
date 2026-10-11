@@ -44,7 +44,12 @@ export type AudioContextLike = {
   state?: string
   resume?(): Promise<void>
   destination: unknown
-  createOscillator(): { frequency: ParamLike; connect(to: unknown): void; start(at: number): void; stop(at: number): void }
+  createOscillator(): {
+    frequency: ParamLike
+    connect(to: unknown): void
+    start(at: number): void
+    stop(at: number): void
+  }
   createGain(): { gain: ParamLike; connect(to: unknown): void }
 }
 
@@ -86,7 +91,9 @@ function audio(): AudioContextLike | null {
 /** Play a sound for every unseen notice the settings allow, and unwedge the audio context on the
  *  first click or keypress so the first chime after boot sounds rather than warming up in silence. */
 export function initSoundNotices(): () => void {
-  const unlock = () => { if (context?.state === 'suspended') void context.resume?.().catch(() => {}) }
+  const unlock = () => {
+    if (context?.state === 'suspended') void context.resume?.().catch(() => {})
+  }
   document.addEventListener('pointerdown', unlock)
   document.addEventListener('keydown', unlock)
   const drop = registerNoticeSink(soundSink)

@@ -14,15 +14,19 @@ const fits = (frame: string, width: number) => frame.split('\n').every((line) =>
 
 describe('terminal settings route', () => {
   it('labels the scope category from the active Node mode', async () => {
-    const screen = await renderFixture({ cache: (client) => client.setQueryData(prefsKey, { 'core.workspaces': 'off' }) })
+    const screen = await renderFixture({
+      cache: (client) => client.setQueryData(prefsKey, { 'core.workspaces': 'off' }),
+    })
     try {
       await command(screen, 'settings')
       const frame = await screen.until('Projects')
       expect(frame).not.toContain('Workspaces and projects')
-    } finally { screen.done() }
+    } finally {
+      screen.done()
+    }
   }, 30_000)
 
-  it('opens from the palette on every one of the desktop\'s nine groups', async () => {
+  it("opens from the palette on every one of the desktop's nine groups", async () => {
     const screen = await renderFixture({ width: 80, height: 24 })
     try {
       await command(screen, 'settings')
@@ -90,14 +94,19 @@ describe('terminal settings route', () => {
     }
   }, 30_000)
 
-  it('asks the shell\'s one confirmation over the page, and the page is still there after', async () => {
+  it("asks the shell's one confirmation over the page, and the page is still there after", async () => {
     const screen = await renderFixture({ width: 80, height: 24 })
     try {
       const { openSettings } = await import('./settingsStore')
       const { confirmAction } = await import('../kit/host')
       openSettings('notifications')
       await screen.until('Terminal alerts')
-      const cancelled = confirmAction({ title: 'Delete agent', actionLabel: 'Delete agent', goes: 'Reviewer goes.', stays: 'Sessions stay.' })
+      const cancelled = confirmAction({
+        title: 'Delete agent',
+        actionLabel: 'Delete agent',
+        goes: 'Reviewer goes.',
+        stays: 'Sessions stay.',
+      })
       const dialog = await screen.until('Reviewer goes.')
       expect(dialog).toContain('Sessions stay.')
       expect(dialog).not.toContain('Terminal alerts')

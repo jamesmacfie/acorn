@@ -4,9 +4,12 @@ import type { TelemetryRecord } from '../../runtime/telemetry.ts'
 // run tools use (server/routes/plugins/harness.ts). Replaced the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run/default-url`
-export const runStartRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
-export const runStopRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
-export const runStatusRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
+export const runStartRoute = (taskId: string, targetId: string) =>
+  `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/start`
+export const runStopRoute = (taskId: string, targetId: string) =>
+  `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
+export const runStatusRoute = (taskId: string, targetId: string) =>
+  `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
 
 // Where every runtime that is not the node posts its telemetry (docs/telemetry/runtimes.md § Other runtimes).
 // Device-only, because a record admitted here reaches every sink, and a sink can send it off the

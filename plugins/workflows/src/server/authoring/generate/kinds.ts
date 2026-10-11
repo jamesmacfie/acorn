@@ -46,7 +46,8 @@ const fieldType = (field: StepField, detail: KindDetail): string => {
     return `number from ${field.min ?? 'any'} to ${field.max ?? 'any'}`
   }
   if (field.type === 'child-workflow') return 'child workflow object'
-  if (field.type === 'workflow-map-source') return 'object with step (predecessor ID) and pointer (JSON Pointer to its array)'
+  if (field.type === 'workflow-map-source')
+    return 'object with step (predecessor ID) and pointer (JSON Pointer to its array)'
   if (field.type === 'workflow-json-pointer') return 'JSON Pointer string'
   if (field.type === 'workflow-title') return 'bound title object'
   if (field.type === 'gate-form') return 'form object with fields and values'
@@ -62,9 +63,23 @@ const fieldLine = (field: PromptField, prefix: string, detail: KindDetail): stri
 /** Built-in keys that the editor draws as graph edges rather than form controls. The model needs
  *  these keys, but adding them to `describe` would create unusable inspector fields. */
 const UNDESCRIBED_FIELDS: Readonly<Record<string, readonly PromptField[]>> = {
-  'workflow-map': [{ id: 'agent', shape: 'agent configuration object', hint: 'Choose agent or childWorkflow, never both. Model and effort are chosen in the editor.' }],
-  decide: [{ id: 'branches', shape: 'object of verdict to downstream step ID, required', hint: 'Section 4 shows one.' }],
-  if: [{ id: 'branches', shape: 'object with true and otherwise keys naming downstream step IDs, required', hint: 'Deterministic condition; no AI call. condition uses the shared typed predicate and bindings.' }],
+  'workflow-map': [
+    {
+      id: 'agent',
+      shape: 'agent configuration object',
+      hint: 'Choose agent or childWorkflow, never both. Model and effort are chosen in the editor.',
+    },
+  ],
+  decide: [
+    { id: 'branches', shape: 'object of verdict to downstream step ID, required', hint: 'Section 4 shows one.' },
+  ],
+  if: [
+    {
+      id: 'branches',
+      shape: 'object with true and otherwise keys naming downstream step IDs, required',
+      hint: 'Deterministic condition; no AI call. condition uses the shared typed predicate and bindings.',
+    },
+  ],
 }
 
 type CatalogKind = WorkflowCatalog['kinds'][number]
@@ -73,18 +88,19 @@ type CatalogKind = WorkflowCatalog['kinds'][number]
 const orderedKinds = (catalog: WorkflowCatalog): CatalogKind[] =>
   [...catalog.kinds].sort((a, b) => Number(a.pluginId !== null) - Number(b.pluginId !== null))
 
-const kindFields = (kind: CatalogKind, detail: KindDetail): PromptField[] => [
-  ...(kind.describe?.fields ?? [])
-    .filter((field) => kind.pluginId !== null || !isForbiddenField(field.id))
-    .map((field) => ({
-      id: field.id,
-      shape: [fieldType(field, detail), ...(field.required ? ['required'] : [])].join(', '),
-      hint: field.hint,
-    })),
-  ...(kind.pluginId === null ? UNDESCRIBED_FIELDS[kind.id] ?? [] : []),
-  // Top-level keys, then nested ones, so an object is not split around one child key. The sort is
-  // stable, so each group keeps the order it was described in.
-].sort((a, b) => Number(a.id.includes('.')) - Number(b.id.includes('.')))
+const kindFields = (kind: CatalogKind, detail: KindDetail): PromptField[] =>
+  [
+    ...(kind.describe?.fields ?? [])
+      .filter((field) => kind.pluginId !== null || !isForbiddenField(field.id))
+      .map((field) => ({
+        id: field.id,
+        shape: [fieldType(field, detail), ...(field.required ? ['required'] : [])].join(', '),
+        hint: field.hint,
+      })),
+    ...(kind.pluginId === null ? (UNDESCRIBED_FIELDS[kind.id] ?? []) : []),
+    // Top-level keys, then nested ones, so an object is not split around one child key. The sort is
+    // stable, so each group keeps the order it was described in.
+  ].sort((a, b) => Number(a.id.includes('.')) - Number(b.id.includes('.')))
 
 const kindBlock = (kind: CatalogKind, detail: KindDetail): string => {
   const builtin = kind.pluginId === null
@@ -119,9 +135,16 @@ const kindOneLine = (kind: CatalogKind): string => {
 
 const kindsAt = (catalog: WorkflowCatalog, detail: KindDetail): string => {
   const kinds = orderedKinds(catalog)
-  if (!kinds.length) return [SECTION_KINDS_PREAMBLE, '', 'This node has no step kinds at all, so no definition it runs can have a step.'].join('\n')
+  if (!kinds.length)
+    return [
+      SECTION_KINDS_PREAMBLE,
+      '',
+      'This node has no step kinds at all, so no definition it runs can have a step.',
+    ].join('\n')
   if (detail === 4) {
-    return [SECTION_KINDS_PREAMBLE, '', 'Only the ids and their keys fit here.', '', ...kinds.map(kindOneLine)].join('\n')
+    return [SECTION_KINDS_PREAMBLE, '', 'Only the ids and their keys fit here.', '', ...kinds.map(kindOneLine)].join(
+      '\n',
+    )
   }
   return [SECTION_KINDS_PREAMBLE, ...kinds.map((kind) => kindBlock(kind, detail))].join('\n\n')
 }

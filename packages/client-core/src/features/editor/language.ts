@@ -27,8 +27,7 @@ import { languageIdForPath, type LanguageId } from '@acorn/protocol/languageIds.
 // so large documents trade highlighting for a responsive window.
 export const MAX_HIGHLIGHT_CHARACTERS = 256 * 1024
 
-export const shouldHighlightDocument = (characters: number): boolean =>
-  characters <= MAX_HIGHLIGHT_CHARACTERS
+export const shouldHighlightDocument = (characters: number): boolean => characters <= MAX_HIGHLIGHT_CHARACTERS
 
 const CODEMIRROR: Record<LanguageId, () => Promise<Extension>> = {
   // No grammar is a real answer here, not a missing one: plain text highlights as plain text, and it
@@ -37,7 +36,8 @@ const CODEMIRROR: Record<LanguageId, () => Promise<Extension>> = {
   // One pack, four dialects, told apart by two flags rather than by four grammars. All four resolve
   // the same import, so the second dialect a reader opens costs no request.
   typescript: async () => (await import('@codemirror/lang-javascript')).javascript({ typescript: true }),
-  typescriptreact: async () => (await import('@codemirror/lang-javascript')).javascript({ typescript: true, jsx: true }),
+  typescriptreact: async () =>
+    (await import('@codemirror/lang-javascript')).javascript({ typescript: true, jsx: true }),
   javascript: async () => (await import('@codemirror/lang-javascript')).javascript(),
   javascriptreact: async () => (await import('@codemirror/lang-javascript')).javascript({ jsx: true }),
   json: async () => (await import('@codemirror/lang-json')).json(),

@@ -7,9 +7,17 @@ import { KeyValueEditor } from './KeyValueEditor'
 // columns threw the whole template away and stacked every cell in one column.
 const mount = (props: Partial<Parameters<typeof KeyValueEditor>[0]>) => {
   const host = document.createElement('div')
-  const dispose = render(() => (
-    <KeyValueEditor ariaLabel="Params" rows={[{ key: 'page', value: '2', enabled: true }]} onChange={() => {}} {...props} />
-  ), host)
+  const dispose = render(
+    () => (
+      <KeyValueEditor
+        ariaLabel="Params"
+        rows={[{ key: 'page', value: '2', enabled: true }]}
+        onChange={() => {}}
+        {...props}
+      />
+    ),
+    host,
+  )
   return { grid: host.querySelector<HTMLElement>('.ui-kvgrid')!, dispose }
 }
 

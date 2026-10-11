@@ -38,7 +38,10 @@ export type CoreProcService = {
   KILL_GRACE_MS: number
   /** The environment a child will actually see: the allowlisted base, plus this spec's `env` and
    *  `passthrough`. Everything else is absent, including every `ACORN_*` token and every secret. */
-  brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent?: Record<string, string | undefined>): Record<string, string>
+  brokerEnv(
+    spec: Pick<ProcSpec, 'env' | 'passthrough'>,
+    parent?: Record<string, string | undefined>,
+  ): Record<string, string>
   runProcess(spec: ProcSpec): Promise<ProcResult>
   runProcessOrThrow(spec: ProcSpec): Promise<ProcResult>
   ProcessError: HostOwned<'node-core/server/core/exec/proc.ProcessError'>
@@ -80,7 +83,11 @@ export type ProcResult = {
  *  not be one: the plaintext is scoped to a callback and scrubbed out of anything thrown from it. */
 export type CoreSecretService = HostOwned<'node-core/server/core/security/secrets.SecretService'> & {
   use<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T>
-  useOptional<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T | null>
+  useOptional<T>(
+    ref: string | null | undefined,
+    purpose: string,
+    fn: (plaintext: string) => T | Promise<T>,
+  ): Promise<T | null>
   seal(plaintext: string): Promise<string>
 }
 

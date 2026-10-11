@@ -20,11 +20,23 @@ type Element = {
 function element(): Element {
   const values: Record<string, string> = {}
   return {
-    children: [], textContent: '', className: '', dataset: {},
-    style: { values, setProperty: (name, value) => { values[name] = value } },
+    children: [],
+    textContent: '',
+    className: '',
+    dataset: {},
+    style: {
+      values,
+      setProperty: (name, value) => {
+        values[name] = value
+      },
+    },
     listeners: new Map(),
-    append(...children) { this.children.push(...children) },
-    addEventListener(name, listener) { this.listeners.set(name, listener) },
+    append(...children) {
+      this.children.push(...children)
+    },
+    addEventListener(name, listener) {
+      this.listeners.set(name, listener)
+    },
   }
 }
 
@@ -32,7 +44,9 @@ it('connects the generated tree, draws its own pane, and handles a button press'
   const files = scaffoldFiles('my-widget', 'My widget') as Record<string, string>
   let hello: ((event: { data: Message; ports: unknown[] }) => void) | undefined
   runInNewContext(files['client.js']!, {
-    addEventListener: (_kind: string, listener: typeof hello) => { hello = listener },
+    addEventListener: (_kind: string, listener: typeof hello) => {
+      hello = listener
+    },
   })
   const bridge = new MessageChannel()
   const tree = new MessageChannel()
@@ -47,13 +61,22 @@ it('connects the generated tree, draws its own pane, and handles a button press'
     hello!({ data: { acornBridge: 1 }, ports: [bridge.port2, tree.port2] })
     bridge.port1.postMessage({ kind: 'ready', context: {} })
     await vi.waitFor(() => expect(bridgeMessages).toContainEqual({ kind: 'connected' }))
-    await vi.waitFor(() => expect(treeMessages).toContainEqual({ kind: 'tree:ready', version: 1, entries: ['pane'], scopedBridge: true }))
+    await vi.waitFor(() =>
+      expect(treeMessages).toContainEqual({ kind: 'tree:ready', version: 1, entries: ['pane'], scopedBridge: true }),
+    )
     expect(sandboxMessage.safeParse(treeMessages[0]).success).toBe(true)
 
-    tree.port1.postMessage({
-      kind: 'tree:mount', slot: 'pane-1', entry: 'pane', props: {},
-      context: { taskId: 'task 1' }, bridgePort: scoped.port2,
-    }, [scoped.port2])
+    tree.port1.postMessage(
+      {
+        kind: 'tree:mount',
+        slot: 'pane-1',
+        entry: 'pane',
+        props: {},
+        context: { taskId: 'task 1' },
+        bridgePort: scoped.port2,
+      },
+      [scoped.port2],
+    )
     scoped.port1.postMessage({ kind: 'ready', context: { surface: 'my-widget', target: 'pane' } })
     await vi.waitFor(() => expect(scopedMessages).toContainEqual({ kind: 'connected' }))
     await vi.waitFor(() => expect(treeMessages.some((message) => message.kind === 'tree:batch')).toBe(true))
@@ -68,14 +91,23 @@ it('connects the generated tree, draws its own pane, and handles a button press'
     const handler = (button.props.onPress as { $handler: number }).$handler
 
     tree.port1.postMessage({ kind: 'tree:event', slot: 'pane-1', handler, event: 'onPress', payload: null })
-    await vi.waitFor(() => expect(scopedMessages).toContainEqual({
-      kind: 'api', method: 'GET', path: '/v1/p/my-widget/greeting?taskId=task%201', id: 1,
-    }))
+    await vi.waitFor(() =>
+      expect(scopedMessages).toContainEqual({
+        kind: 'api',
+        method: 'GET',
+        path: '/v1/p/my-widget/greeting?taskId=task%201',
+        id: 1,
+      }),
+    )
     expect(bridgeMessages).toEqual([{ kind: 'connected' }])
     scoped.port1.postMessage({ id: 1, ok: true, body: { text: 'Hello from the node' } })
-    await vi.waitFor(() => expect(treeMessages).toContainEqual({
-      kind: 'tree:batch', slot: 'pane-1', ops: [{ op: 'text', id: greeting.id, value: 'Hello from the node' }],
-    }))
+    await vi.waitFor(() =>
+      expect(treeMessages).toContainEqual({
+        kind: 'tree:batch',
+        slot: 'pane-1',
+        ops: [{ op: 'text', id: greeting.id, value: 'Hello from the node' }],
+      }),
+    )
     expect(sandboxMessage.safeParse(treeMessages.at(-1)).success).toBe(true)
     tree.port1.postMessage({ kind: 'tree:ping' })
     await vi.waitFor(() => expect(treeMessages).toContainEqual({ kind: 'tree:pong' }))
@@ -85,7 +117,11 @@ it('connects the generated tree, draws its own pane, and handles a button press'
     expect(sandboxMessage.safeParse(replacement).success).toBe(true)
     expect((replacement.ops as { op: string; id?: string }[])[0]).toEqual({ op: 'remove', id: ops[0]!.node.id })
   } finally {
-    bridge.port1.close(); bridge.port2.close(); tree.port1.close(); tree.port2.close(); scoped.port1.close()
+    bridge.port1.close()
+    bridge.port2.close()
+    tree.port1.close()
+    tree.port2.close()
+    scoped.port1.close()
   }
 })
 
@@ -99,7 +135,9 @@ it('closes replaced slot bridges and drops replies after remount or unmount', as
   const files = scaffoldFiles('my-widget') as Record<string, string>
   let hello: ((event: { data: Message; ports: unknown[] }) => void) | undefined
   runInNewContext(files['client.js']!, {
-    addEventListener: (_kind: string, listener: typeof hello) => { hello = listener },
+    addEventListener: (_kind: string, listener: typeof hello) => {
+      hello = listener
+    },
   })
   const bootstrap = new MessageChannel()
   const tree = new MessageChannel()
@@ -110,31 +148,46 @@ it('closes replaced slot bridges and drops replies after remount or unmount', as
   const secondRequests: Message[] = []
   let firstClosed = false
   let secondClosed = false
-  tree.port1.on('message', (message: Message) => { if (message.kind === 'tree:batch') batches.push(message) })
+  tree.port1.on('message', (message: Message) => {
+    if (message.kind === 'tree:batch') batches.push(message)
+  })
   first.port1.on('message', (message: Message) => firstRequests.push(message))
   second.port1.on('message', (message: Message) => secondRequests.push(message))
-  first.port1.on('close', () => { firstClosed = true })
-  second.port1.on('close', () => { secondClosed = true })
+  first.port1.on('close', () => {
+    firstClosed = true
+  })
+  second.port1.on('close', () => {
+    secondClosed = true
+  })
   try {
     hello!({ data: { acornBridge: 1 }, ports: [bootstrap.port2, tree.port2] })
-    tree.port1.postMessage({ kind: 'tree:mount', slot: 'pane-1', entry: 'pane', props: {}, bridgePort: first.port2 }, [first.port2])
+    tree.port1.postMessage({ kind: 'tree:mount', slot: 'pane-1', entry: 'pane', props: {}, bridgePort: first.port2 }, [
+      first.port2,
+    ])
     await vi.waitFor(() => expect(batches).toHaveLength(1))
     const button = flatten((batches[0]!.ops as { node: TreeNode }[])[0]!.node).find((node) => node.type === 'Button')!
     const handler = (button.props.onPress as { $handler: number }).$handler
     tree.port1.postMessage({ kind: 'tree:event', slot: 'pane-1', handler, event: 'onPress', payload: null })
     await vi.waitFor(() => expect(firstRequests.some((message) => message.kind === 'api')).toBe(true))
 
-    tree.port1.postMessage({ kind: 'tree:mount', slot: 'pane-1', entry: 'pane', props: {}, bridgePort: second.port2 }, [second.port2])
+    tree.port1.postMessage({ kind: 'tree:mount', slot: 'pane-1', entry: 'pane', props: {}, bridgePort: second.port2 }, [
+      second.port2,
+    ])
     await vi.waitFor(() => expect(firstClosed).toBe(true))
     await vi.waitFor(() => expect(batches).toHaveLength(2))
     first.port1.postMessage({ id: 1, ok: true, body: { text: 'stale reply' } })
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(batches).toHaveLength(2)
 
-    const nextButton = flatten((batches[1]!.ops as { node?: TreeNode }[])[1]!.node!).find((node) => node.type === 'Button')!
+    const nextButton = flatten((batches[1]!.ops as { node?: TreeNode }[])[1]!.node!).find(
+      (node) => node.type === 'Button',
+    )!
     tree.port1.postMessage({
-      kind: 'tree:event', slot: 'pane-1', handler: (nextButton.props.onPress as { $handler: number }).$handler,
-      event: 'onPress', payload: null,
+      kind: 'tree:event',
+      slot: 'pane-1',
+      handler: (nextButton.props.onPress as { $handler: number }).$handler,
+      event: 'onPress',
+      payload: null,
     })
     await vi.waitFor(() => expect(secondRequests.some((message) => message.kind === 'api')).toBe(true))
     tree.port1.postMessage({ kind: 'tree:unmount', slot: 'pane-1' })
@@ -143,8 +196,12 @@ it('closes replaced slot bridges and drops replies after remount or unmount', as
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(batches).toHaveLength(2)
   } finally {
-    bootstrap.port1.close(); bootstrap.port2.close(); tree.port1.close(); tree.port2.close()
-    first.port1.close(); second.port1.close()
+    bootstrap.port1.close()
+    bootstrap.port2.close()
+    tree.port1.close()
+    tree.port2.close()
+    first.port1.close()
+    second.port1.close()
   }
 })
 
@@ -155,7 +212,9 @@ it('connects the generated frame, fetches its own greeting, and sends a toast', 
   let hello: ((event: { data: Message; ports: unknown[] }) => void) | undefined
   runInNewContext(files['client.js']!, {
     document: { body, documentElement, createElement: () => element() },
-    addEventListener: (_kind: string, listener: typeof hello) => { hello = listener },
+    addEventListener: (_kind: string, listener: typeof hello) => {
+      hello = listener
+    },
   })
   const bridge = new MessageChannel()
   const messages: Message[] = []
@@ -173,13 +232,20 @@ it('connects the generated frame, fetches its own greeting, and sends a toast', 
     const button = body.children[0]!.children[1]!
     expect(button.textContent).toBe('Say hello back')
     button.listeners.get('click')!()
-    await vi.waitFor(() => expect(messages).toContainEqual({
-      kind: 'ui', op: 'toast', title: 'My widget', detail: 'Hello from the frame', id: 2,
-    }))
+    await vi.waitFor(() =>
+      expect(messages).toContainEqual({
+        kind: 'ui',
+        op: 'toast',
+        title: 'My widget',
+        detail: 'Hello from the frame',
+        id: 2,
+      }),
+    )
     bridge.port1.postMessage({ kind: 'appearance', theme: 'dark', style: 'terminal', tokens: { '--bg': '#111' } })
     await vi.waitFor(() => expect(documentElement.dataset.theme).toBe('dark'))
     expect(documentElement.style.values['--bg']).toBe('#111')
   } finally {
-    bridge.port1.close(); bridge.port2.close()
+    bridge.port1.close()
+    bridge.port2.close()
   }
 })

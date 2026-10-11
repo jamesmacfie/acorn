@@ -40,7 +40,11 @@ type ShortcutGroup = {
 // capitals in it. Plugin groups keep a `plugin.` prefix so a plugin named like a core category cannot
 // take its anchor.
 const sectionId = (group: ShortcutGroup): string => {
-  const word = (text: string) => text.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
+  const word = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
   return group.pluginId ? `plugin.${word(group.pluginId)}` : word(group.label) || 'shortcuts'
 }
 
@@ -91,7 +95,7 @@ export default function ShortcutsSettings() {
         ...(pluginId ? { pluginId } : {}),
         disabled: binding.plugin?.state() === 'disabled',
         bindings: [],
-        claims: pluginId ? claims().get(pluginId) ?? [] : [],
+        claims: pluginId ? (claims().get(pluginId) ?? []) : [],
       }
       group.bindings.push(binding)
       map.set(key, group)
@@ -100,7 +104,14 @@ export default function ShortcutsSettings() {
       const key = `plugin:${pluginId}`
       if (map.has(key)) continue
       const row = (installedByNode().get(activeNodeId() ?? '') ?? []).find((candidate) => candidate.name === pluginId)
-      map.set(key, { key, label: pluginLabel(pluginId), pluginId, disabled: !row?.running, bindings: [], claims: pluginClaims })
+      map.set(key, {
+        key,
+        label: pluginLabel(pluginId),
+        pluginId,
+        disabled: !row?.running,
+        bindings: [],
+        claims: pluginClaims,
+      })
     }
     return [...map.values()]
   })
@@ -126,7 +137,8 @@ export default function ShortcutsSettings() {
     const chord = eventChord(event)
     if (!chord) return
     const conflict = keybindingConflict(binding.id, chord, contributions(), prefs.data ?? {})
-    if (conflict) return setRefused({ id: binding.id, message: `${formatChord(chord)} is already used by ${conflict.conflict}` })
+    if (conflict)
+      return setRefused({ id: binding.id, message: `${formatChord(chord)} is already used by ${conflict.conflict}` })
     setRefused(undefined)
     void save.run(() => saveOverride(binding, chord))
     input.blur()
@@ -151,7 +163,9 @@ export default function ShortcutsSettings() {
 
   return (
     <>
-      <Text emphasis="muted" wrap>To change a shortcut, click it and press the new keys.</Text>
+      <Text emphasis="muted" wrap>
+        To change a shortcut, click it and press the new keys.
+      </Text>
       <For each={groups()}>
         {(group) => {
           const reset = saveFor(`group:${group.key}`)
@@ -163,7 +177,9 @@ export default function ShortcutsSettings() {
               description={group.disabled ? 'This plugin is off. Changes here apply when you turn it on.' : undefined}
               actions={
                 <Show when={group.bindings.some(changed)}>
-                  <Button variant="ghost" size="sm" onPress={() => void reset.run(() => resetBindings(group.bindings))}>Reset section</Button>
+                  <Button variant="ghost" size="sm" onPress={() => void reset.run(() => resetBindings(group.bindings))}>
+                    Reset section
+                  </Button>
                 </Show>
               }
             >
@@ -192,7 +208,11 @@ export default function ShortcutsSettings() {
                         onKeyDown={(event) => captureKey(binding, save, event)}
                         aria-label={`Shortcut for ${binding.description}`}
                       />
-                      <IconButton icon="x" label={`Unbind ${binding.description}`} onPress={() => void save.run(() => saveOverride(binding, null))} />
+                      <IconButton
+                        icon="x"
+                        label={`Unbind ${binding.description}`}
+                        onPress={() => void save.run(() => saveOverride(binding, null))}
+                      />
                     </SettingRow>
                   )
                 }}
@@ -200,7 +220,11 @@ export default function ShortcutsSettings() {
               <Show when={group.claims.length}>
                 <div class="shortcut-claims">
                   <For each={group.claims}>
-                    {(claim) => <Text emphasis="muted" wrap>{claim.label} uses these keys itself: {claim.chords.map(formatChord).join(', ')}</Text>}
+                    {(claim) => (
+                      <Text emphasis="muted" wrap>
+                        {claim.label} uses these keys itself: {claim.chords.map(formatChord).join(', ')}
+                      </Text>
+                    )}
                   </For>
                 </div>
               </Show>
@@ -215,7 +239,9 @@ export default function ShortcutsSettings() {
             description={`${orphaned().length} shortcuts you set are for plugins that aren't installed anymore.`}
             error={cleanup.error()}
           >
-            <Button tone="danger" onPress={() => void removeOrphaned()}>Remove</Button>
+            <Button tone="danger" onPress={() => void removeOrphaned()}>
+              Remove
+            </Button>
           </SettingRow>
         </SettingsSection>
       </Show>

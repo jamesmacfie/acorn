@@ -26,7 +26,8 @@ export type TaskDeepLink = { pane: string; item?: string }
 // Pure, so the parsing rules are testable without a router. An unknown pane id is rejected here rather
 // than dispatched: `openPane` would otherwise push a pane nothing can render into the persisted layout.
 export function parseTaskDeepLink(search: Record<string, string | string[] | undefined>): TaskDeepLink | null {
-  const first = (value: string | string[] | undefined): string => (Array.isArray(value) ? value[0] ?? '' : value ?? '')
+  const first = (value: string | string[] | undefined): string =>
+    Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
   const pane = first(search[TASK_PANE_PARAM])
   const item = first(search[TASK_ITEM_PARAM])
   if (!pane || !paneContribution(pane)) return null
@@ -40,19 +41,21 @@ export type TaskDeepLinkOptions = {
 }
 
 export function createTaskDeepLink(options: TaskDeepLinkOptions): void {
-  createEffect(on(
-    () => {
-      const taskId = options.taskId()
-      // Gated on the task being active rather than merely named in the URL, because the intent
-      // opens a pane in the task view and the shell activates the routed task through its own
-      // restore. The params are still there when it lands.
-      return taskId ? ({ taskId, link: parseTaskDeepLink(options.search()) }) : null
-    },
-    (current) => {
-      if (!current?.link) return
-      const { pane, item } = current.link
-      openPane(current.taskId, pane, item ? { kind: 'plugin:select', item } : undefined)
-      options.navigate(taskPath(current.taskId), { replace: true })
-    },
-  ))
+  createEffect(
+    on(
+      () => {
+        const taskId = options.taskId()
+        // Gated on the task being active rather than merely named in the URL, because the intent
+        // opens a pane in the task view and the shell activates the routed task through its own
+        // restore. The params are still there when it lands.
+        return taskId ? { taskId, link: parseTaskDeepLink(options.search()) } : null
+      },
+      (current) => {
+        if (!current?.link) return
+        const { pane, item } = current.link
+        openPane(current.taskId, pane, item ? { kind: 'plugin:select', item } : undefined)
+        options.navigate(taskPath(current.taskId), { replace: true })
+      },
+    ),
+  )
 }

@@ -1,7 +1,13 @@
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { ConnectIntegrationRequest, IntegrationMappingsResponse, IntegrationProjectsResponse, IntegrationsResponse, RotateIntegrationRequest } from '@acorn/protocol/api.ts'
+import type {
+  ConnectIntegrationRequest,
+  IntegrationMappingsResponse,
+  IntegrationProjectsResponse,
+  IntegrationsResponse,
+  RotateIntegrationRequest,
+} from '@acorn/protocol/api.ts'
 import { MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
 import { auditRequest } from '../auditRequest'
 import { getDb, schema } from '../db'
@@ -36,18 +42,25 @@ const patchBody = z
   })
   .refine((body) => body.disabled !== undefined || body.name !== undefined)
 const credentialsSchema = z.record(z.string(), z.string())
-const credentialsBody = z.looseObject({ credentials: credentialsSchema })
+const credentialsBody = z
+  .looseObject({ credentials: credentialsSchema })
   .refine((body) => !Object.hasOwn(body, 'token'))
-const connectBody = z.looseObject({ providerId: z.string().optional(), credentials: credentialsSchema })
+const connectBody = z
+  .looseObject({ providerId: z.string().optional(), credentials: credentialsSchema })
   .refine((body) => !Object.hasOwn(body, 'token'))
 // The whole map for one connection, replaced in a single write. Bounds match the workspace-side PUT
 // (routes/workspaces.ts) because both land in the same table.
 const mappingsBody = z.object({
-  mappings: z.array(z.object({
-    workspaceId: z.string().min(1),
-    externalId: z.string().min(1),
-    projectId: z.string().min(1).optional(),
-  })).max(500).optional(),
+  mappings: z
+    .array(
+      z.object({
+        workspaceId: z.string().min(1),
+        externalId: z.string().min(1),
+        projectId: z.string().min(1).optional(),
+      }),
+    )
+    .max(500)
+    .optional(),
 })
 
 // Core-owned provider connection lifecycle. Provider descriptors validate and normalize credentials;
@@ -63,7 +76,10 @@ export const integrations = new Hono<AppEnv>()
   })
   .post('/', async (c) => {
     const parsed = connectBody.safeParse(await c.req.json().catch(() => ({})))
-    if (!parsed.success) return respondError(c, 400, 'provider_bad_config', ['Send provider credentials in the credentials object; top-level token is unsupported.'])
+    if (!parsed.success)
+      return respondError(c, 400, 'provider_bad_config', [
+        'Send provider credentials in the credentials object; top-level token is unsupported.',
+      ])
     const body = parsed.data
     const providerId = body.providerId ?? ''
     if (!providerId) return respondError(c, 400, 'provider_bad_config')
@@ -85,7 +101,10 @@ export const integrations = new Hono<AppEnv>()
   })
   .put('/:id', async (c) => {
     const parsed = credentialsBody.safeParse(await c.req.json().catch(() => ({})))
-    if (!parsed.success) return respondError(c, 400, 'provider_bad_config', ['Send provider credentials in the credentials object; top-level token is unsupported.'])
+    if (!parsed.success)
+      return respondError(c, 400, 'provider_bad_config', [
+        'Send provider credentials in the credentials object; top-level token is unsupported.',
+      ])
     const request: RotateIntegrationRequest = { credentials: parsed.data.credentials }
     try {
       const integration = await rotateConnection(getDb(c.env), ownerId(c), c.req.param('id'), request, c.env.SECRETS)
@@ -162,20 +181,23 @@ export const integrations = new Hono<AppEnv>()
     if (mappings.length) {
       await db
         .insert(schema.workspaceExternalProjects)
-        .values(mappings.map((mapping) => ({
-          workspaceId: mapping.workspaceId,
-          integrationId: id,
-          externalId: mapping.externalId,
-          projectId: mapping.projectId ?? '',
-          createdAt: now,
-        })))
+        .values(
+          mappings.map((mapping) => ({
+            workspaceId: mapping.workspaceId,
+            integrationId: id,
+            externalId: mapping.externalId,
+            projectId: mapping.projectId ?? '',
+            createdAt: now,
+          })),
+        )
         .onConflictDoNothing()
     }
     const current = await db
       .select()
       .from(schema.workspaceExternalProjects)
       .where(eq(schema.workspaceExternalProjects.integrationId, id))
-    const key = (mapping: typeof current[number]) => `${mapping.workspaceId}\0${mapping.externalId}\0${mapping.projectId}`
+    const key = (mapping: (typeof current)[number]) =>
+      `${mapping.workspaceId}\0${mapping.externalId}\0${mapping.projectId}`
     const previousKeys = new Set(previous.map(key))
     const changed = previousKeys.size !== current.length || current.some((mapping) => !previousKeys.has(key(mapping)))
     if (changed) {
@@ -203,9 +225,8 @@ export const integrations = new Hono<AppEnv>()
     const id = c.req.param('id')
     try {
       // A body carrying both applies both, and the second call returns the row that has them.
-      let integration = body.disabled === undefined
-        ? null
-        : await setConnectionDisabled(db, ownerId(c), id, body.disabled)
+      let integration =
+        body.disabled === undefined ? null : await setConnectionDisabled(db, ownerId(c), id, body.disabled)
       // Not audited, unlike the calls around it: `CoreAuditAction` is the write side of credentials,
       // and a rename changes a display string rather than what the connection can reach.
       if (body.name !== undefined) integration = await renameConnection(db, ownerId(c), id, body.name)

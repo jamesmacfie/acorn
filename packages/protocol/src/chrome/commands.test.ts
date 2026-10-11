@@ -16,15 +16,17 @@ const item = (over: Record<string, unknown> = {}) => ({ id: 'i-1', title: 'Issue
 
 describe('a search result row', () => {
   it('keeps display and identity facts', () => {
-    const parsed = commandSearchItemSchema.parse(item({
-      subtitle: 'runn/runn',
-      icon: 'bug',
-      badge: '12',
-      taskId: 't-1',
-      projectId: 'p-1',
-      workspaceId: 'w-1',
-      ref: 'ISS-42',
-    }))
+    const parsed = commandSearchItemSchema.parse(
+      item({
+        subtitle: 'runn/runn',
+        icon: 'bug',
+        badge: '12',
+        taskId: 't-1',
+        projectId: 'p-1',
+        workspaceId: 'w-1',
+        ref: 'ISS-42',
+      }),
+    )
     expect(parsed).toMatchObject({ id: 'i-1', title: 'Issue one', ref: 'ISS-42', taskId: 't-1' })
   })
 
@@ -32,11 +34,13 @@ describe('a search result row', () => {
     // The refusal this module exists for. A row that ships an action, a route or a URL loses all
     // three here, before a host can read one
     // (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
-    const parsed = commandSearchItemSchema.parse(item({
-      action: { verb: 'runNodeAction', path: '/somewhere/else' },
-      route: '/v1/core/tasks',
-      url: 'https://example.test',
-    }))
+    const parsed = commandSearchItemSchema.parse(
+      item({
+        action: { verb: 'runNodeAction', path: '/somewhere/else' },
+        route: '/v1/core/tasks',
+        url: 'https://example.test',
+      }),
+    )
     expect(parsed).toEqual({ id: 'i-1', title: 'Issue one' })
   })
 

@@ -11,7 +11,15 @@
 // Upgrade path if a node ever does spread its leftovers: give `KIT_NODE_SCHEMAS` real per-node
 // entries — every caller already goes through it.
 import { z } from 'zod'
-import { FORBIDDEN_PROPS, isKitEvent, KIT_NODES, ROLE_PROPS, ROLE_VALUES, TEXT_NODE, type KitNodeName } from './nodes.ts'
+import {
+  FORBIDDEN_PROPS,
+  isKitEvent,
+  KIT_NODES,
+  ROLE_PROPS,
+  ROLE_VALUES,
+  TEXT_NODE,
+  type KitNodeName,
+} from './nodes.ts'
 import { safeContentHref } from '../content/externalUrl.ts'
 
 /** A handler on the wire. Never a function: the sandbox mints an id, the host maps it back to a
@@ -99,7 +107,8 @@ export type SanitizedProps = { props: Record<string, unknown>; dropped: string[]
  */
 export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
   const dropped: string[] = []
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { props: type === TEXT_NODE ? { value: '' } : {}, dropped }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    return { props: type === TEXT_NODE ? { value: '' } : {}, dropped }
   // A text run is a string, or a finite number drawn as one, and nothing else. Handled first
   // because everything below is about props a component reads, and a text run has no component.
   if (type === TEXT_NODE) {

@@ -61,16 +61,17 @@ export const saveGeneratePick = (queryClient: QueryClient, next: ModelPick): Pro
  *  spending the key the owner configured on purpose and reaches for a CLI only when there is no key.
  *
  *  `null` when there is nothing to spend, which is what hides a Generate control. */
-export function effectiveModelPick(
-  backends: readonly ModelBackend[],
-  remembered: ModelPick | null,
-): ModelPick | null {
+export function effectiveModelPick(backends: readonly ModelBackend[], remembered: ModelPick | null): ModelPick | null {
   const held = remembered ? backends.find((candidate) => candidate.id === remembered.backendId) : undefined
   if (remembered && held) {
     // The model is checked against the backend's list too: a provider that dropped a model between
     // releases would otherwise be asked for one it no longer serves.
     const known = held.models.some((model) => model.id === remembered.modelId)
-    return { backendId: remembered.backendId, modelId: known || (held.catalogUnavailable && held.kind === 'harness') ? remembered.modelId : defaultModelIdFor(held) }
+    return {
+      backendId: remembered.backendId,
+      modelId:
+        known || (held.catalogUnavailable && held.kind === 'harness') ? remembered.modelId : defaultModelIdFor(held),
+    }
   }
   const first = backends[0]
   return first ? { backendId: first.id, modelId: defaultModelIdFor(first) } : null
@@ -78,7 +79,10 @@ export function effectiveModelPick(
 
 /** The pick as one line for a tip, such as "Claude Code, Opus". The model's catalog label when it has
  *  one, its id when the catalog no longer lists it, and only the backend for the backend's default. */
-export function modelPickLabel(backends: readonly ModelBackend[], pick: ModelPick | null | undefined): string | undefined {
+export function modelPickLabel(
+  backends: readonly ModelBackend[],
+  pick: ModelPick | null | undefined,
+): string | undefined {
   const backend = pick ? backends.find((candidate) => candidate.id === pick.backendId) : undefined
   if (!pick || !backend) return undefined
   const model = backend.models.find((candidate) => candidate.id === pick.modelId)?.label ?? pick.modelId

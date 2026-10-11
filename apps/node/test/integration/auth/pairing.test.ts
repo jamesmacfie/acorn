@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import '../../helpers/registerProviders'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { NODE_PROTOCOL_VERSION, type DevicesResponse, type NodeInfo, type PairResult, type PairingWindow } from '@acorn/protocol/node.ts'
+import {
+  NODE_PROTOCOL_VERSION,
+  type DevicesResponse,
+  type NodeInfo,
+  type PairResult,
+  type PairingWindow,
+} from '@acorn/protocol/node.ts'
 import { createApp } from '@acorn/node-core/server/index.ts'
 import { deviceService } from '@acorn/node-core/server/auth'
 import { pairingCodes } from '@acorn/node-core/server/auth'
@@ -43,7 +49,10 @@ afterEach(() => harness.cleanup())
 
 // Declares JSON like the client does. `contentType: null` drops the header entirely, which is what a
 // bodyless mutation actually looks like on the wire (see the no-content-type test below).
-const send = (path: string, init: { method?: string; body?: unknown; token?: string; requestId?: string; contentType?: string | null } = {}) =>
+const send = (
+  path: string,
+  init: { method?: string; body?: unknown; token?: string; requestId?: string; contentType?: string | null } = {},
+) =>
   app.fetch(
     new Request(`${ORIGIN}${path}`, {
       method: init.method ?? 'GET',
@@ -83,7 +92,12 @@ describe('GET /v1/node', () => {
     // Key-exact, not a subset match: the point of this route is what it does not say to anything
     // that can reach the port.
     expect(Object.keys(info).sort()).toEqual(['baseline', 'eventTransport', 'fingerprint', 'protocolVersion'])
-    expect(info).toEqual({ baseline: ACORN_BASELINE, protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, eventTransport: { viewers: 1 } })
+    expect(info).toEqual({
+      baseline: ACORN_BASELINE,
+      protocolVersion: NODE_PROTOCOL_VERSION,
+      fingerprint: FINGERPRINT,
+      eventTransport: { viewers: 1 },
+    })
   })
 
   it('adds the node identity once authenticated, and nothing else', async () => {
@@ -92,7 +106,13 @@ describe('GET /v1/node', () => {
     // `toEqual`, not `toMatchObject`, and that is the assertion: this response must stay readable by
     // every client forever (docs/api-reference/transport.md § Versioning), so the bar for a field on it is a
     // consumer. `appVersion` used to ride along here with no reader anywhere and was dropped.
-    expect(info).toEqual({ baseline: ACORN_BASELINE, protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, nodeId: NODE_ID, eventTransport: { viewers: 1 } })
+    expect(info).toEqual({
+      baseline: ACORN_BASELINE,
+      protocolVersion: NODE_PROTOCOL_VERSION,
+      fingerprint: FINGERPRINT,
+      nodeId: NODE_ID,
+      eventTransport: { viewers: 1 },
+    })
   })
 })
 
@@ -114,7 +134,11 @@ describe('POST /v1/pair', () => {
 
     // Same X-Request-Id on both, since requestIdMiddleware echoes a valid one, so the envelopes are
     // comparable in full rather than after deleting the one field that is meant to differ.
-    const wrong = await send('/v1/pair', { method: 'POST', body: { code: 'not-the-code', deviceName: 'attacker' }, requestId: 'fixed-id' })
+    const wrong = await send('/v1/pair', {
+      method: 'POST',
+      body: { code: 'not-the-code', deviceName: 'attacker' },
+      requestId: 'fixed-id',
+    })
     await send('/v1/pair', { method: 'POST', body }) // consumes the window (single use)
     const consumed = await send('/v1/pair', { method: 'POST', body, requestId: 'fixed-id' })
 
@@ -122,7 +146,11 @@ describe('POST /v1/pair', () => {
     expect(wrong.status).toBe(consumed.status)
     expect(await wrong.text()).toBe(expected)
     // ...and a malformed body is the same answer again, down to the byte.
-    const malformed = await send('/v1/pair', { method: 'POST', body: { code, deviceName: '', extra: true }, requestId: 'fixed-id' })
+    const malformed = await send('/v1/pair', {
+      method: 'POST',
+      body: { code, deviceName: '', extra: true },
+      requestId: 'fixed-id',
+    })
     expect(malformed.status).toBe(consumed.status)
     expect(await malformed.text()).toBe(expected)
   })
@@ -131,7 +159,9 @@ describe('POST /v1/pair', () => {
     const { token: seed } = await env.DEVICES.issue('seed')
     const code = await openWindow(seed)
     for (let i = 0; i < 5; i += 1) {
-      expect((await send('/v1/pair', { method: 'POST', body: { code: `wrong-${i}`, deviceName: 'attacker' } })).status).toBe(401)
+      expect(
+        (await send('/v1/pair', { method: 'POST', body: { code: `wrong-${i}`, deviceName: 'attacker' } })).status,
+      ).toBe(401)
     }
     const sixth = await send('/v1/pair', { method: 'POST', body: { code, deviceName: 'attacker' } })
     expect(sixth.status).toBe(401)
@@ -177,7 +207,11 @@ describe('device administration', () => {
   // 204. /v1 is bearer-only, so the Origin check was protecting a credential no browser can attach.
   it('accepts a bearer DELETE that carries no content-type at all', async () => {
     const paired = await pairDevice('laptop')
-    const revoke = await send(`/v1/core/devices/${paired.device.id}`, { method: 'DELETE', token: paired.deviceToken, contentType: null })
+    const revoke = await send(`/v1/core/devices/${paired.device.id}`, {
+      method: 'DELETE',
+      token: paired.deviceToken,
+      contentType: null,
+    })
     expect(revoke.status).toBe(204)
   })
 

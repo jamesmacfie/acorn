@@ -5,17 +5,33 @@ import { createBoardWrite } from './boardWrite'
 import type { BoardMove } from './boardMoves'
 
 const row: DashboardDisplayRow = { id: 'one', pluginId: 'github', sourceId: 'pulls', values: {} }
-const move: BoardMove = { ref: { pluginId: 'github', sourceId: 'pull-requests', recordId: 'one' },
-  field: '/state', expected: 'open', target: 'closed', risk: 'write', sourceLabel: 'GitHub', choiceId: 'closed', columnId: 'state' }
+const move: BoardMove = {
+  ref: { pluginId: 'github', sourceId: 'pull-requests', recordId: 'one' },
+  field: '/state',
+  expected: 'open',
+  target: 'closed',
+  risk: 'write',
+  sourceLabel: 'GitHub',
+  choiceId: 'closed',
+  columnId: 'state',
+}
 
 it('cancels before dispatch, reuses a failed intent key, and rolls back before retry', async () => {
   const send = vi.fn().mockRejectedValueOnce(new Error('Provider unavailable')).mockResolvedValueOnce('done')
   const optimistic = vi.fn()
   const message = vi.fn()
   const refresh = vi.fn().mockResolvedValue(undefined)
-  const controller = createRoot(dispose => ({
-    write: createBoardWrite({ resolve: () => ({ move }), send, refresh, onOptimistic: optimistic,
-      onMessage: message, key: () => 'key-one', now: () => 10 }), dispose,
+  const controller = createRoot((dispose) => ({
+    write: createBoardWrite({
+      resolve: () => ({ move }),
+      send,
+      refresh,
+      onOptimistic: optimistic,
+      onMessage: message,
+      key: () => 'key-one',
+      now: () => 10,
+    }),
+    dispose,
   }))
   controller.write.request(row, 'closed')
   expect(controller.write.pending()?.key).toBe('key-one')
@@ -40,10 +56,17 @@ it('refuses missing mappings and stale writes, and gives changed intents new key
   const message = vi.fn()
   const optimistic = vi.fn()
   let nextKey = 0
-  const controller = createRoot(dispose => ({
-    write: createBoardWrite({ resolve: (_row, choice) => choice === 'missing' ? { reason: 'No write value for GitHub here.' } : { move },
-      send, refresh: vi.fn(), onOptimistic: optimistic, onMessage: message,
-      key: () => `key-${++nextKey}`, now: () => 10 }), dispose,
+  const controller = createRoot((dispose) => ({
+    write: createBoardWrite({
+      resolve: (_row, choice) => (choice === 'missing' ? { reason: 'No write value for GitHub here.' } : { move }),
+      send,
+      refresh: vi.fn(),
+      onOptimistic: optimistic,
+      onMessage: message,
+      key: () => `key-${++nextKey}`,
+      now: () => 10,
+    }),
+    dispose,
   }))
   controller.write.request(row, 'missing')
   expect(message).toHaveBeenLastCalledWith('No write value for GitHub here.')
@@ -51,7 +74,9 @@ it('refuses missing mappings and stale writes, and gives changed intents new key
   controller.write.request(row, 'closed')
   const first = controller.write.pending()!
   await controller.write.send(first)
-  expect(message).toHaveBeenLastCalledWith('GitHub: This record has moved since the board loaded. Refresh and try again.')
+  expect(message).toHaveBeenLastCalledWith(
+    'GitHub: This record has moved since the board loaded. Refresh and try again.',
+  )
   expect(optimistic).toHaveBeenLastCalledWith(undefined)
   controller.write.request(row, 'closed')
   expect(controller.write.pending()!.key).not.toBe(first.key)

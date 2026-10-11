@@ -32,7 +32,11 @@ export function parseRailVisibility(json: string | undefined): RailVisibility {
   try {
     const value: unknown = JSON.parse(json)
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-    return Object.fromEntries(Object.entries(value).filter(([, shown]) => typeof shown === 'boolean').slice(0, MAX_ENTRIES))
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, shown]) => typeof shown === 'boolean')
+        .slice(0, MAX_ENTRIES),
+    )
   } catch {
     return {}
   }
@@ -49,7 +53,8 @@ export function shownInRail(sourceId: string, visibility: RailVisibility): boole
 /** Every source a plugin contributed, in rail order. Core's own are absent: they are not
  *  user-hideable. Pass a plugin id to narrow it to that plugin's. */
 export function pluginSources(pluginId?: string): { pluginId: string; source: SourceContribution }[] {
-  return sourceRegistry.entries()
+  return sourceRegistry
+    .entries()
     .flatMap((source) => {
       const owner = sourceRegistry.ownerOf(source.id)
       return owner && (pluginId === undefined || owner === pluginId) ? [{ pluginId: owner, source }] : []
@@ -62,9 +67,16 @@ export function pluginSources(pluginId?: string): { pluginId: string; source: So
  *  user Home, which is the one place this preference changes what is selected. Resolves whether the
  *  write landed, so a settings switch can show the stored value again when it did not. */
 export async function setShownInRail(
-  queryClient: QueryClient, pluginId: string, sourceId: string, shown: boolean, options?: SavePrefOptions,
+  queryClient: QueryClient,
+  pluginId: string,
+  sourceId: string,
+  shown: boolean,
+  options?: SavePrefOptions,
 ): Promise<boolean> {
-  const next = { ...parseRailVisibility(readDevicePrefs()[PrefKeys.railVisibility]), [railVisibilityKey(pluginId, sourceId)]: shown }
+  const next = {
+    ...parseRailVisibility(readDevicePrefs()[PrefKeys.railVisibility]),
+    [railVisibilityKey(pluginId, sourceId)]: shown,
+  }
   const saved = await saveJsonPref(queryClient, PrefKeys.railVisibility, next, options)
   if (saved && !shown && selectedSource() === sourceId) setSelectedSource(defaultSourceId() ?? null)
   return saved
@@ -89,7 +101,12 @@ export const pluginOpenerId = (sourceId: string): string => `source.${sourceId}.
 
 /** Which openable sources get a generated palette opener: the ones the rail is not drawing, less any
  *  whose plugin already opens it with its own command. */
-export function hiddenSourcesToOpen(available: readonly SourceEntry[], railVisibility: string | undefined): SourceEntry[] {
+export function hiddenSourcesToOpen(
+  available: readonly SourceEntry[],
+  railVisibility: string | undefined,
+): SourceEntry[] {
   const visibility = parseRailVisibility(railVisibility)
-  return available.filter((source) => !shownInRail(source.id, visibility) && !commandRegistry.get(pluginOpenerId(source.id)))
+  return available.filter(
+    (source) => !shownInRail(source.id, visibility) && !commandRegistry.get(pluginOpenerId(source.id)),
+  )
 }

@@ -45,7 +45,9 @@ export class RouteRegistry {
       throw new Error(`Plugin route prefix must be empty or start with '/': '${contribution.prefix}'.`)
     }
     if (contribution.prefix.startsWith('/v1')) {
-      throw new Error(`Plugin route prefix is relative to ${PLUGIN_NAMESPACE}/<plugin>, so it must not repeat '/v1': '${contribution.prefix}'.`)
+      throw new Error(
+        `Plugin route prefix is relative to ${PLUGIN_NAMESPACE}/<plugin>, so it must not repeat '/v1': '${contribution.prefix}'.`,
+      )
     }
     this.#contributions.push(contribution)
     return {

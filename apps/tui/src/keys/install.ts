@@ -31,8 +31,19 @@ import { BARE_KEYS } from '@acorn/client-core/kit/keys'
 import { activeToasts, dismissToast } from '@acorn/client-core/features/notifications'
 import { recordDuration, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import {
-  crossParent, focusedRegion, focusedRenderable, installRegions, isField, moveBack, moveColumn, moveRegion,
-  movePane, moveStop, onFocusMove, scopeDepth, walkSteps,
+  crossParent,
+  focusedRegion,
+  focusedRenderable,
+  installRegions,
+  isField,
+  moveBack,
+  moveColumn,
+  moveRegion,
+  movePane,
+  moveStop,
+  onFocusMove,
+  scopeDepth,
+  walkSteps,
 } from './regions'
 import { tuiKeymapHost } from './keymapHost'
 import { REGION, TYPING } from './tiers'
@@ -119,8 +130,8 @@ const logPath = (): string => {
 
 /** `HH:MM:SS.mmm`, local, because the reader comparing this to what they just pressed is here. */
 const stamp = (at: Date): string =>
-  `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
-  + `:${String(at.getSeconds()).padStart(2, '0')}.${String(at.getMilliseconds()).padStart(3, '0')}`
+  `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}` +
+  `:${String(at.getSeconds()).padStart(2, '0')}.${String(at.getMilliseconds()).padStart(3, '0')}`
 
 /** The open log, or null where the state directory could not be made. One per process: the flag is
  *  read once at install and a suite installs the keyboard per test, so the stream is reused rather
@@ -149,41 +160,45 @@ function installKeyIntercepts(engine: TuiKeymap): void {
   // the event: dispatch is synchronous, so the `key:after` that reads this is always the one for the
   // `key` that wrote it.
   let pressedAt = 0
-  onCleanup(engine.intercept('key', () => {
-    if (telemetryEnabled()) pressedAt = performance.now()
-  }))
-  onCleanup(engine.intercept('key:after', (ctx) => {
-    // Taken once and shared, so the trace line and the histogram describe the same key press.
-    const steps = walkSteps.take()
-    if (telemetryEnabled()) {
-      // `reason` is the engine's seven-value enum, which is a label a person can group by. The step
-      // count is a second seam rather than a label on this one, because a count that varies per
-      // press would mint a series per press. Its unit reads as milliseconds because the emitter's
-      // fold writes one; it is renderables visited, and it is only ever collected under the
-      // developer flag that turns the counter on (./regions.ts § The step counter).
-      recordDuration('core', 'tui.key', performance.now() - pressedAt, { reason: ctx.reason })
-      if (walkSteps.counting()) recordDuration('core', 'tui.key.steps', steps, { reason: ctx.reason })
-    }
-    if (!file) return
-    // The store, which is the only answer there is: the line used to carry an `agree` field beside
-    // this, for the renderer's own idea of focus, and a disagreement was the commonest bug this app
-    // had. There is nothing left to disagree (./regions.ts § The one owner).
-    const node = focusedRenderable()
-    const region = focusedRegion()
-    const depth = scopeDepth()
-    const fields = [
-      `key=${engine.formatKey(ctx.event.name ?? '?').padEnd(13)}`,
-      `reason=${ctx.reason.padEnd(17)}`,
-      `focused=${node ? `${node.constructor.name}#${node.id}` : 'none'}`,
-      `region=${region ? `${region.paneId}/${region.regionId}` : 'none'}`,
-      `scope=${depth === 1 ? 'screen' : `overlay:${depth}`}`,
-      // How many renderables the walks behind this key visited. The number the phase 9 work is
-      // about: a key press should cost the depth of the focus tree and not the size of the region
-      // (./regions.ts § The step counter).
-      `steps=${steps}`,
-    ]
-    file.write(`${stamp(new Date())} ${fields.join(' ')}\n`)
-  }))
+  onCleanup(
+    engine.intercept('key', () => {
+      if (telemetryEnabled()) pressedAt = performance.now()
+    }),
+  )
+  onCleanup(
+    engine.intercept('key:after', (ctx) => {
+      // Taken once and shared, so the trace line and the histogram describe the same key press.
+      const steps = walkSteps.take()
+      if (telemetryEnabled()) {
+        // `reason` is the engine's seven-value enum, which is a label a person can group by. The step
+        // count is a second seam rather than a label on this one, because a count that varies per
+        // press would mint a series per press. Its unit reads as milliseconds because the emitter's
+        // fold writes one; it is renderables visited, and it is only ever collected under the
+        // developer flag that turns the counter on (./regions.ts § The step counter).
+        recordDuration('core', 'tui.key', performance.now() - pressedAt, { reason: ctx.reason })
+        if (walkSteps.counting()) recordDuration('core', 'tui.key.steps', steps, { reason: ctx.reason })
+      }
+      if (!file) return
+      // The store, which is the only answer there is: the line used to carry an `agree` field beside
+      // this, for the renderer's own idea of focus, and a disagreement was the commonest bug this app
+      // had. There is nothing left to disagree (./regions.ts § The one owner).
+      const node = focusedRenderable()
+      const region = focusedRegion()
+      const depth = scopeDepth()
+      const fields = [
+        `key=${engine.formatKey(ctx.event.name ?? '?').padEnd(13)}`,
+        `reason=${ctx.reason.padEnd(17)}`,
+        `focused=${node ? `${node.constructor.name}#${node.id}` : 'none'}`,
+        `region=${region ? `${region.paneId}/${region.regionId}` : 'none'}`,
+        `scope=${depth === 1 ? 'screen' : `overlay:${depth}`}`,
+        // How many renderables the walks behind this key visited. The number the phase 9 work is
+        // about: a key press should cost the depth of the focus tree and not the size of the region
+        // (./regions.ts § The step counter).
+        `steps=${steps}`,
+      ]
+      file.write(`${stamp(new Date())} ${fields.join(' ')}\n`)
+    }),
+  )
 }
 
 // ── The typing shadow ─────────────────────────────────────────────────────────────────────────
@@ -273,8 +288,7 @@ const pasteInto = (event: { text?: string; bytes?: Uint8Array }): void => {
   const node = focusedRenderable()
   if (!node) return
   const text = event.text ?? (event.bytes ? new TextDecoder().decode(event.bytes) : '')
-  if (text !== '') (node as unknown as { handlePaste?: (event: { text: string }) => void })
-    .handlePaste?.({ text })
+  if (text !== '') (node as unknown as { handlePaste?: (event: { text: string }) => void }).handlePaste?.({ text })
 }
 
 const syncTypingShadow = (engine: TuiKeymap): void => {
@@ -358,7 +372,9 @@ export function installKeymap(renderer: Renderer): TuiKeymap {
   // reaches layers and commands, and a bare key's "not while somebody is typing" is a property of one
   // binding. Without this the engine ignores `active` and a `j` in a filter field walks the list.
   engine.registerBindingFields({
-    active(value, ctx) { ctx.activeWhen(value as () => boolean) },
+    active(value, ctx) {
+      ctx.activeWhen(value as () => boolean)
+    },
   })
 
   // Region and pane chords. Global, because they are how you get back to a region you can no longer
@@ -419,10 +435,12 @@ export function bindKeys(
   // without every component above it carrying the engine.
   const engine = keymap<Renderable, KeyEvent>()
   if (!engine) return
-  onCleanup(engine.registerLayer({
-    target,
-    targetMode: options.mode ?? 'focus-within',
-    priority,
-    bindings: bindings.map(({ key, cmd }) => ({ key, cmd })),
-  }))
+  onCleanup(
+    engine.registerLayer({
+      target,
+      targetMode: options.mode ?? 'focus-within',
+      priority,
+      bindings: bindings.map(({ key, cmd }) => ({ key, cmd })),
+    }),
+  )
 }

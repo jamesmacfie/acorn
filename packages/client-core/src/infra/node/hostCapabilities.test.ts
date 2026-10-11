@@ -5,7 +5,11 @@ import { hasHostCapability } from './hostCapabilities'
 // of the file: a pane gated on a seam group has to disappear on a shell that ships without it, which
 // is a supported product state (../platform/contract.ts pins the no-preview shape).
 
-const state = vi.hoisted(() => ({ activeNode: 'node-a' as string | null, services: [] as string[], loaded: [] as string[] }))
+const state = vi.hoisted(() => ({
+  activeNode: 'node-a' as string | null,
+  services: [] as string[],
+  loaded: [] as string[],
+}))
 vi.mock('./activeNode', () => ({ activeNodeId: () => state.activeNode }))
 vi.mock('../../host/plugins/distribution', () => ({
   distribution: () => ({ byNode: new Map([['node-a', {}]]) }),
@@ -19,8 +23,14 @@ const host = (acorn: unknown): void => {
 }
 
 const previewGroup = {
-  ensure: () => {}, setBounds: () => {}, show: () => {}, hide: () => {},
-  load: () => {}, command: () => {}, evict: () => {}, onEvent: () => () => {},
+  ensure: () => {},
+  setBounds: () => {},
+  show: () => {},
+  hide: () => {},
+  load: () => {},
+  command: () => {},
+  evict: () => {},
+  onEvent: () => () => {},
 }
 
 afterEach(() => {

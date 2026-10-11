@@ -17,7 +17,9 @@ export function createProjectAddNavigation(input: {
     input.settingsOpen()
     place.next()
   })
-  onCleanup(() => { disposed = true })
+  onCleanup(() => {
+    disposed = true
+  })
 
   return () => {
     const startedAt = place.signal
@@ -25,7 +27,14 @@ export function createProjectAddNavigation(input: {
     const pathname = input.pathname()
     const settingsOpen = input.settingsOpen()
     return (id) => {
-      if (disposed || startedAt.aborted || input.nodeId() !== nodeId || input.pathname() !== pathname || input.settingsOpen() !== settingsOpen) return
+      if (
+        disposed ||
+        startedAt.aborted ||
+        input.nodeId() !== nodeId ||
+        input.pathname() !== pathname ||
+        input.settingsOpen() !== settingsOpen
+      )
+        return
       input.openProject(id)
     }
   }

@@ -57,7 +57,7 @@ export function Fold(props: {
   children: JSX.Element
 }) {
   const [local, setLocal] = createSignal(readOpen(props.persistKey, props.defaultOpen ?? false))
-  const open = () => (props.onOpenChange ? props.open ?? false : local())
+  const open = () => (props.onOpenChange ? (props.open ?? false) : local())
   // Closed transcripts can hold thousands of nested cards. Build them on first open, then retain
   // them so closing a section does not discard drafts, selection, or a child's own disclosure state.
   const visited = createMemo((previous) => previous || open(), false)
@@ -85,11 +85,17 @@ export function Fold(props: {
       <summary class="section-header ui-fold-summary" data-level={props.level ?? 'group'}>
         <span class="ui-fold-marker" aria-hidden="true" />
         <Show when={leading()}>
-          <span class="ui-fold-leading" onClick={(event) => event.stopPropagation()}>{leading()}</span>
+          <span class="ui-fold-leading" onClick={(event) => event.stopPropagation()}>
+            {leading()}
+          </span>
         </Show>
         <span class="ui-section-header-label">{props.label}</span>
-        <Show when={props.count != null}><span class="ui-section-header-count">{props.count}</span></Show>
-        <Show when={meta()}><span class="ui-fold-meta">{meta()}</span></Show>
+        <Show when={props.count != null}>
+          <span class="ui-section-header-count">{props.count}</span>
+        </Show>
+        <Show when={meta()}>
+          <span class="ui-fold-meta">{meta()}</span>
+        </Show>
         <Show when={actions()}>
           <span class="ui-section-header-actions" onClick={(event) => event.stopPropagation()}>
             {actions()}

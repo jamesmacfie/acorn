@@ -83,7 +83,11 @@ export class SecretService {
 
   // For callers that have to tell "not connected" from "failed". githubToken() relies on this to
   // converge never-connected and revoked onto one user-visible outcome.
-  async useOptional<T>(ref: string | null | undefined, purpose: string, fn: (plaintext: string) => T | Promise<T>): Promise<T | null> {
+  async useOptional<T>(
+    ref: string | null | undefined,
+    purpose: string,
+    fn: (plaintext: string) => T | Promise<T>,
+  ): Promise<T | null> {
     try {
       return await this.use(ref, purpose, fn)
     } catch (error) {

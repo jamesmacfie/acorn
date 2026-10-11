@@ -40,6 +40,8 @@ export const configTrust = new Hono<AppEnv>()
     } catch (error) {
       // The repo's config changed under the owner mid-review. 409, not 500: nothing is wrong with the
       // request, the world moved.
-      return respondError(c, 409, 'config-changed', [error instanceof Error ? error.message : 'Repo configuration changed during review.'])
+      return respondError(c, 409, 'config-changed', [
+        error instanceof Error ? error.message : 'Repo configuration changed during review.',
+      ])
     }
   })

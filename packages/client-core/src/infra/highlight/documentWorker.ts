@@ -25,9 +25,19 @@ export function createDocumentWorker<Request extends { id: number }, Response ex
     const worker = generation.worker
     generation.worker = null
     // A browser termination failure must not strand callers or their deadline timers.
-    try { worker?.terminate() } catch { /* The generation is fenced even if termination fails. */ }
+    try {
+      worker?.terminate()
+    } catch {
+      /* The generation is fenced even if termination fails. */
+    }
     for (const entry of [...generation.pending.values()]) entry.settle({ kind })
-    if (kind === 'fallback') { try { options.unavailable?.(reason) } catch { /* Diagnostics do not own settlement. */ } }
+    if (kind === 'fallback') {
+      try {
+        options.unavailable?.(reason)
+      } catch {
+        /* Diagnostics do not own settlement. */
+      }
+    }
   }
 
   const spawn = (generation: Generation<Value>): Promise<void> => {
@@ -48,10 +58,13 @@ export function createDocumentWorker<Request extends { id: number }, Response ex
             const message = event.data
             const entry = generation.pending.get(message.id)
             if (entry) entry.settle(options.response(message))
-          } catch { retire(generation, 'fallback', 'invalid worker response') }
+          } catch {
+            retire(generation, 'fallback', 'invalid worker response')
+          }
         }
         worker.onerror = () => {
-          if (current === generation && generation.worker === worker) retire(generation, 'fallback', 'worker script failed to load or run')
+          if (current === generation && generation.worker === worker)
+            retire(generation, 'fallback', 'worker script failed to load or run')
         }
       } catch {
         if (current === generation) retire(generation, 'fallback', 'worker import or construction failed')
@@ -69,19 +82,37 @@ export function createDocumentWorker<Request extends { id: number }, Response ex
         if (current !== generation || !generation.pending.has(id)) return
         // Do not replay a potentially pathological batch on the renderer.
         retire(generation, 'degraded', 'request deadline')
-        try { options.timeout?.() } catch { /* Diagnostics do not own settlement. */ }
+        try {
+          options.timeout?.()
+        } catch {
+          /* Diagnostics do not own settlement. */
+        }
       }, 10_000)
-      generation.pending.set(id, { settle: (result) => {
-        if (!generation.pending.delete(id)) return
-        clearTimeout(timer)
-        resolve(result)
-      } })
-      try { options.pending?.(generation.pending.size) } catch { /* Diagnostics do not own settlement. */ }
-      void spawn(generation).then(() => {
-        if (current !== generation || generation.dead || !generation.pending.has(id)) return
-        try { generation.worker?.postMessage(build(id)) }
-        catch { retire(generation, 'fallback', 'worker postMessage failed') }
-      }, () => { if (current === generation) retire(generation, 'fallback', 'worker startup failed') })
+      generation.pending.set(id, {
+        settle: (result) => {
+          if (!generation.pending.delete(id)) return
+          clearTimeout(timer)
+          resolve(result)
+        },
+      })
+      try {
+        options.pending?.(generation.pending.size)
+      } catch {
+        /* Diagnostics do not own settlement. */
+      }
+      void spawn(generation).then(
+        () => {
+          if (current !== generation || generation.dead || !generation.pending.has(id)) return
+          try {
+            generation.worker?.postMessage(build(id))
+          } catch {
+            retire(generation, 'fallback', 'worker postMessage failed')
+          }
+        },
+        () => {
+          if (current === generation) retire(generation, 'fallback', 'worker startup failed')
+        },
+      )
     })
   }
 
@@ -89,5 +120,5 @@ export function createDocumentWorker<Request extends { id: number }, Response ex
     retire(current, 'degraded', 'reset')
     current = fresh()
   }
-  return { request, reset, workerCount: () => current.worker ? 1 : 0 }
+  return { request, reset, workerCount: () => (current.worker ? 1 : 0) }
 }

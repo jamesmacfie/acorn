@@ -1,6 +1,12 @@
 import { readFile } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { makeTestNodeContext, makeTestPluginDb, schema, type TestNodeContext, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import {
+  makeTestNodeContext,
+  makeTestPluginDb,
+  schema,
+  type TestNodeContext,
+  type TestPluginDb,
+} from '@acorn/plugin-api/testkit'
 import * as agentSchema from '../../node/schema'
 import { AgentAttachmentStore } from './attachmentStore'
 import { createDraftAttachments } from './draftAttachments'
@@ -106,16 +112,26 @@ describe('creating a replacement', () => {
   it('deduplicates identical bytes back to the source', async () => {
     const source = await store.upload('task', 'shot.png', 'image/png', PNG)
     const same = await drafts.createReplacement({
-      taskId: 'task', sourceAttachmentId: source.id, filename: 'shot-annotated.png', mediaType: 'image/png', bytes: PNG,
+      taskId: 'task',
+      sourceAttachmentId: source.id,
+      filename: 'shot-annotated.png',
+      mediaType: 'image/png',
+      bytes: PNG,
     })
     expect(same.id).toBe(source.id)
   })
 
   it('refuses a source that belongs to another task', async () => {
     const source = await store.upload('other', 'shot.png', 'image/png', PNG)
-    await expect(drafts.createReplacement({
-      taskId: 'task', sourceAttachmentId: source.id, filename: 'x.png', mediaType: 'image/png', bytes: EDITED,
-    })).rejects.toThrow(/unsent draft/)
+    await expect(
+      drafts.createReplacement({
+        taskId: 'task',
+        sourceAttachmentId: source.id,
+        filename: 'x.png',
+        mediaType: 'image/png',
+        bytes: EDITED,
+      }),
+    ).rejects.toThrow(/unsent draft/)
   })
 
   // The race the whole compare-and-swap exists for: an editor stays open while a person draws, and the
@@ -123,31 +139,53 @@ describe('creating a replacement', () => {
   it('refuses a source that has been sent since the editor opened', async () => {
     const source = await store.upload('task', 'shot.png', 'image/png', PNG)
     await reference(source.id)
-    await expect(drafts.createReplacement({
-      taskId: 'task', sourceAttachmentId: source.id, filename: 'x.png', mediaType: 'image/png', bytes: EDITED,
-    })).rejects.toThrow(/unsent draft/)
+    await expect(
+      drafts.createReplacement({
+        taskId: 'task',
+        sourceAttachmentId: source.id,
+        filename: 'x.png',
+        mediaType: 'image/png',
+        bytes: EDITED,
+      }),
+    ).rejects.toThrow(/unsent draft/)
   })
 
   // A GIF may be animated. Decoding one to a canvas and re-encoding would silently keep one frame, so
   // the answer is no rather than a quiet conversion.
   it('refuses bytes that are neither PNG nor JPEG', async () => {
     const source = await store.upload('task', 'shot.png', 'image/png', PNG)
-    await expect(drafts.createReplacement({
-      taskId: 'task', sourceAttachmentId: source.id, filename: 'x.gif', mediaType: 'image/png', bytes: GIF,
-    })).rejects.toThrow(/PNG or a JPEG/)
+    await expect(
+      drafts.createReplacement({
+        taskId: 'task',
+        sourceAttachmentId: source.id,
+        filename: 'x.gif',
+        mediaType: 'image/png',
+        bytes: GIF,
+      }),
+    ).rejects.toThrow(/PNG or a JPEG/)
   })
 
   it('refuses bytes that are not what the caller said they were', async () => {
     const source = await store.upload('task', 'shot.png', 'image/png', PNG)
-    await expect(drafts.createReplacement({
-      taskId: 'task', sourceAttachmentId: source.id, filename: 'x.png', mediaType: 'image/png', bytes: JPEG,
-    })).rejects.toThrow(/image\/jpeg, not image\/png/)
+    await expect(
+      drafts.createReplacement({
+        taskId: 'task',
+        sourceAttachmentId: source.id,
+        filename: 'x.png',
+        mediaType: 'image/png',
+        bytes: JPEG,
+      }),
+    ).rejects.toThrow(/image\/jpeg, not image\/png/)
   })
 
   it('normalizes the filename the same way an upload does', async () => {
     const source = await store.upload('task', 'shot.png', 'image/png', PNG)
     const replacement = await drafts.createReplacement({
-      taskId: 'task', sourceAttachmentId: source.id, filename: '../../escaped.png', mediaType: 'image/png', bytes: EDITED,
+      taskId: 'task',
+      sourceAttachmentId: source.id,
+      filename: '../../escaped.png',
+      mediaType: 'image/png',
+      bytes: EDITED,
     })
     expect(replacement.filename).toBe('escaped.png')
   })
@@ -156,8 +194,14 @@ describe('creating a replacement', () => {
     const source = await store.upload('task', 'shot.png', 'image/png', PNG)
     const huge = new Uint8Array(10 * 1024 * 1024 + 1)
     huge.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-    await expect(drafts.createReplacement({
-      taskId: 'task', sourceAttachmentId: source.id, filename: 'x.png', mediaType: 'image/png', bytes: huge,
-    })).rejects.toThrow(/10 MiB/)
+    await expect(
+      drafts.createReplacement({
+        taskId: 'task',
+        sourceAttachmentId: source.id,
+        filename: 'x.png',
+        mediaType: 'image/png',
+        bytes: huge,
+      }),
+    ).rejects.toThrow(/10 MiB/)
   })
 })

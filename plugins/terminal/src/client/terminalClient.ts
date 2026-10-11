@@ -4,9 +4,21 @@
 // PTY verbs only. Task lifecycle, per-repo checkout/config, preview URLs and agent delivery are
 // platform concerns and live in client-core/features/tasks/taskBridge.ts.
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute, terminalTaskSetupRoute } from '../shared/api'
+import {
+  terminalProfilesRoute,
+  terminalSessionActionRoute,
+  terminalSessionsRoute,
+  terminalTaskSetupRoute,
+} from '../shared/api'
 import type { SendSubmit } from '../shared/send'
-import { activeNodeId, readJson, writeJson, wsOnNotice, wsOnWorkflowStepEvent, type WorkflowNotice } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  readJson,
+  writeJson,
+  wsOnNotice,
+  wsOnWorkflowStepEvent,
+  type WorkflowNotice,
+} from '@acorn/plugin-api/client'
 import { wsAttach, wsRememberSize, wsWrite } from './wsChannel'
 
 export type TerminalApi = {
@@ -34,7 +46,13 @@ export type TerminalApi = {
 // anything this file has an opinion about (the node-first platform seam design, in Git history). Whether the node
 // runs terminals at all is `hasHostCapability({ plugin: 'terminal' })`, read from the node's plugin roster.
 export const terminalApi = (nodeId: string | null = activeNodeId()): TerminalApi => {
-  const post = <T>(url: string, body?: unknown) => writeJson<T>(url, { nodeId, method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  const post = <T>(url: string, body?: unknown) =>
+    writeJson<T>(url, {
+      nodeId,
+      method: 'POST',
+      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
   return {
     list: () => readJson<TerminalSession[]>(terminalSessionsRoute, { nodeId }),
     profiles: () => readJson<TerminalProfile[]>(terminalProfilesRoute, { nodeId }),
@@ -51,8 +69,14 @@ export const terminalApi = (nodeId: string | null = activeNodeId()): TerminalApi
     write: (id, data) => wsWrite(id, data, nodeId),
     attach: (id, on, size) => wsAttach(id, on, size, nodeId),
     workflow: {
-      onNotice: (cb) => wsOnNotice((notice) => { if (activeNodeId() === nodeId) cb(notice) }),
-      onStepEvent: (cb) => wsOnWorkflowStepEvent((event) => { if (activeNodeId() === nodeId) cb(event) }),
+      onNotice: (cb) =>
+        wsOnNotice((notice) => {
+          if (activeNodeId() === nodeId) cb(notice)
+        }),
+      onStepEvent: (cb) =>
+        wsOnWorkflowStepEvent((event) => {
+          if (activeNodeId() === nodeId) cb(event)
+        }),
     },
   }
 }

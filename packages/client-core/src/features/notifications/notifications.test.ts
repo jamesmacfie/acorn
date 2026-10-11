@@ -21,7 +21,10 @@ import {
 
 describe('ring cap + read state + pref round-trip', () => {
   it('caps at NOTICE_CAP keeping the newest', () => {
-    const list = Array.from({ length: 60 }, (_, i) => ({ id: `n${i}`, taskId: 't', kind: 'agent-completed', title: `x${i}`, at: i, read: false }) as Notice)
+    const list = Array.from(
+      { length: 60 },
+      (_, i) => ({ id: `n${i}`, taskId: 't', kind: 'agent-completed', title: `x${i}`, at: i, read: false }) as Notice,
+    )
     const capped = capNotices(list)
     expect(capped).toHaveLength(NOTICE_CAP)
     expect(capped[0].id).toBe('n0')
@@ -94,12 +97,22 @@ describe('notices are scoped to the node that raised them', () => {
     const agent = (id: string) => ({ kind: 'managed-agent', resourceId: id })
     pushNotice({ taskId: 't', kind: 'agent-completed', title: 'one', at: 1, target: agent('s1') })
     pushNotice({ taskId: 't', kind: 'agent-completed', title: 'two', at: 2, target: agent('s2') })
-    pushNotice({ taskId: 't', kind: 'workflow', title: 'run', at: 3, target: { kind: 'workflow-run', resourceId: 's1' } })
+    pushNotice({
+      taskId: 't',
+      kind: 'workflow',
+      title: 'run',
+      at: 3,
+      target: { kind: 'workflow-run', resourceId: 's1' },
+    })
     setActiveNode('node-b')
     pushNotice({ taskId: 't', kind: 'agent-completed', title: 'elsewhere', at: 4, target: agent('s1') })
     setActiveNode('node-a')
     markTargetsRead('managed-agent', new Set(['s1']))
-    expect(noticesForActiveNode().filter((n) => !n.read).map((n) => n.title)).toEqual(['run', 'two'])
+    expect(
+      noticesForActiveNode()
+        .filter((n) => !n.read)
+        .map((n) => n.title),
+    ).toEqual(['run', 'two'])
     setActiveNode('node-b')
     expect(unreadCount()).toBe(1)
   })

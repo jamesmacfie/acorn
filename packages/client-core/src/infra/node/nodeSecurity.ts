@@ -8,7 +8,11 @@ import {
   type BackupSuggestion,
   type NodeSecurityPosture,
 } from '@acorn/protocol/api.ts'
-import { coreSecretPublicationAllowRoute, coreSecretPublicationRoute, type SecretPublicationState } from '@acorn/protocol/secretChecks.ts'
+import {
+  coreSecretPublicationAllowRoute,
+  coreSecretPublicationRoute,
+  type SecretPublicationState,
+} from '@acorn/protocol/secretChecks.ts'
 import { readJson, writeJson } from './apiClient'
 import { pushNotice } from '../../features/notifications/notifications'
 import { readDevicePrefs } from '../persistence/devicePrefs'
@@ -32,7 +36,10 @@ export function nodeAuditPage(options: { nodeId?: string; before?: number; limit
   if (options.before !== undefined) params.set('before', String(options.before))
   if (options.limit !== undefined) params.set('limit', String(options.limit))
   const query = params.toString()
-  return readJson<AuditPage>(`${coreAuditRoute}${query ? `?${query}` : ''}`, options.nodeId ? { nodeId: options.nodeId } : {})
+  return readJson<AuditPage>(
+    `${coreAuditRoute}${query ? `?${query}` : ''}`,
+    options.nodeId ? { nodeId: options.nodeId } : {},
+  )
 }
 
 // --- Secret publication checks (docs/security/secret-publication.md) ---
@@ -47,7 +54,12 @@ export function nodeSecretPublication(nodeId?: string): Promise<SecretPublicatio
 export function setSecretPublicationBlocking(block: boolean, nodeId?: string): Promise<SecretPublicationState> {
   return writeJson<SecretPublicationState>(
     coreSecretPublicationRoute,
-    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ block }), ...(nodeId ? { nodeId } : {}) },
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ block }),
+      ...(nodeId ? { nodeId } : {}),
+    },
     (res) => `secret publication setting ${res.status}`,
   )
 }
@@ -55,7 +67,12 @@ export function setSecretPublicationBlocking(block: boolean, nodeId?: string): P
 export function allowSecretPublication(decisionId: string, nodeId?: string): Promise<SecretPublicationState> {
   return writeJson<SecretPublicationState>(
     coreSecretPublicationAllowRoute,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decisionId }), ...(nodeId ? { nodeId } : {}) },
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ decisionId }),
+      ...(nodeId ? { nodeId } : {}),
+    },
     (res) => `allow ${res.status}`,
   )
 }

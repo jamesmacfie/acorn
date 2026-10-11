@@ -11,19 +11,29 @@ type Listener = () => void
 class FakeTarget {
   listeners: Record<string, Listener[]> = {}
   setPointerCapture() {}
-  addEventListener(type: string, fn: Listener) { (this.listeners[type] ??= []).push(fn) }
+  addEventListener(type: string, fn: Listener) {
+    ;(this.listeners[type] ??= []).push(fn)
+  }
   removeEventListener(type: string, fn: Listener) {
     this.listeners[type] = (this.listeners[type] ?? []).filter((listener) => listener !== fn)
   }
-  fire(type: string) { [...(this.listeners[type] ?? [])].forEach((listener) => listener()) }
-  count(type: string) { return (this.listeners[type] ?? []).length }
+  fire(type: string) {
+    ;[...(this.listeners[type] ?? [])].forEach((listener) => listener())
+  }
+  count(type: string) {
+    return (this.listeners[type] ?? []).length
+  }
 }
 
 function stub() {
   const props = new Map<string, string>()
   const style = {
-    get userSelect() { return props.get('user-select') ?? '' },
-    set userSelect(value: string) { props.set('user-select', value) },
+    get userSelect() {
+      return props.get('user-select') ?? ''
+    },
+    set userSelect(value: string) {
+      props.set('user-select', value)
+    },
     removeProperty: (name: string) => void props.delete(name),
   }
   const handle = new FakeTarget()

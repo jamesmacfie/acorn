@@ -20,24 +20,28 @@ export type AgentRailState = { working: number; attention: number }
  *  "what is this task's agent doing", and "it needs you" is the answer that matters. */
 export function agentRailMarkers({ working, attention }: AgentRailState): RailMarker[] {
   if (attention)
-    return [{
-      id: 'attention',
-      label: `${attention} agent${attention > 1 ? 's' : ''} need${attention > 1 ? '' : 's'} you`,
-      // The same shape the pane header, the task sidebar and Agent Center give these two states
-      // (stateTone.ts), so a reader learns one vocabulary.
-      icon: runtimeIcon('waiting'),
-      tone: 'warn',
-      placements: ['top-end'],
-    }]
+    return [
+      {
+        id: 'attention',
+        label: `${attention} agent${attention > 1 ? 's' : ''} need${attention > 1 ? '' : 's'} you`,
+        // The same shape the pane header, the task sidebar and Agent Center give these two states
+        // (stateTone.ts), so a reader learns one vocabulary.
+        icon: runtimeIcon('waiting'),
+        tone: 'warn',
+        placements: ['top-end'],
+      },
+    ]
   if (working)
-    return [{
-      id: 'working',
-      label: `${working} agent${working > 1 ? 's' : ''} working`,
-      icon: runtimeIcon('working'),
-      tone: 'accent',
-      busy: true,
-      placements: ['top-end'],
-    }]
+    return [
+      {
+        id: 'working',
+        label: `${working} agent${working > 1 ? 's' : ''} working`,
+        icon: runtimeIcon('working'),
+        tone: 'accent',
+        busy: true,
+        placements: ['top-end'],
+      },
+    ]
   return []
 }
 
@@ -50,9 +54,10 @@ const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) 
 // spinner only for this task's workflow agents, so a spinner on the Agent button with none here says
 // the agent at work is not the workflow's.
 const WORKFLOWS_PANE_ID = 'workflows'
-const hasAgentWork = (session: AgentSession) => isActiveAgent(session)
-  || (!['stopped', 'failed', 'archived'].includes(session.runtimeState)
-    && session.subagents.some((child) => child.status === 'pending' || child.status === 'running'))
+const hasAgentWork = (session: AgentSession) =>
+  isActiveAgent(session) ||
+  (!['stopped', 'failed', 'archived'].includes(session.runtimeState) &&
+    session.subagents.some((child) => child.status === 'pending' || child.status === 'running'))
 const isWorkingWorkflowAgent = (session: AgentSession) => session.kind === 'workflow' && hasAgentWork(session)
 
 export const agentRailMarkerContribution: RailMarkerContribution = {
@@ -63,14 +68,13 @@ export const agentRailMarkerContribution: RailMarkerContribution = {
       return agentRailMarkers({ working: forTask(target.taskId, isWorkingWorkflowAgent), attention: 0 })
     // The same answer on the task's rail row and on its Agent button in the pane rail, so the corner
     // that says "working" on the left says it on the right too.
-    const taskId = target.kind === 'task' ? target.id
-      : target.kind === 'pane' && target.id === AGENT_PANE_ID ? target.taskId : null
+    const taskId =
+      target.kind === 'task' ? target.id : target.kind === 'pane' && target.id === AGENT_PANE_ID ? target.taskId : null
     if (!taskId) return []
     return agentRailMarkers({
       // `idle` means the harness has gone quiet, which is the PTY tier's nearest thing to "not
       // working" (docs/terminal/activity.md § Activity and status).
-      working: agentSessionsFor(taskId).filter((session) => !session.idle).length
-        + forTask(taskId, hasAgentWork),
+      working: agentSessionsFor(taskId).filter((session) => !session.idle).length + forTask(taskId, hasAgentWork),
       attention: forTask(taskId, needsAttention),
     })
   },

@@ -9,7 +9,11 @@ describe('agentRailMarkers', () => {
   it('turns a loader in the top-right corner while an agent is working', () => {
     const [marker] = agentRailMarkers({ working: 1, attention: 0 })
     expect(marker).toMatchObject({
-      id: 'working', label: '1 agent working', icon: 'loader-circle', busy: true, placements: ['top-end'],
+      id: 'working',
+      label: '1 agent working',
+      icon: 'loader-circle',
+      busy: true,
+      placements: ['top-end'],
     })
   })
 

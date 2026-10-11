@@ -156,7 +156,7 @@ export function createOverlayPalette(opts: {
         title,
         category: 'navigation',
         when: opts.active,
-        run: () => open() ? close() : show(),
+        run: () => (open() ? close() : show()),
       })
       const binding = keybindingRegistry.register({
         id: `overlay.${opts.id}.toggle`,
@@ -167,7 +167,10 @@ export function createOverlayPalette(opts: {
         when: 'global',
         active: opts.active,
       })
-      onCleanup(() => { binding.dispose(); command.dispose() })
+      onCleanup(() => {
+        binding.dispose()
+        command.dispose()
+      })
     })
   })
 

@@ -4,7 +4,13 @@ import { useNavigate } from '@solidjs/router'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { TREE_LIMITS, batchBytes } from '@acorn/protocol/tree/messages.ts'
-import { answerOwnerInvoke, createGestureClock, unknownHostOp, unsupportedOverlay, type OwnerActions } from './hostRequests'
+import {
+  answerOwnerInvoke,
+  createGestureClock,
+  unknownHostOp,
+  unsupportedOverlay,
+  type OwnerActions,
+} from './hostRequests'
 import type { FrameBinding } from '../frames/broker'
 import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/overlays'
 import { createTreeBridgeFactory } from './bridgeFactory'
@@ -18,7 +24,13 @@ import { TreeHost } from './TreeHost'
 import { fenceScope } from '../markdownFences/fenceViewers'
 import { recordTreeFailure } from './treeFailures'
 import type { RemoteContribution } from './treeRegistry'
-import { acquireTreeWorker, treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant, type TreeHostResult } from './workerHost'
+import {
+  acquireTreeWorker,
+  treeAuthorityKey,
+  treeModelAuthorityKey,
+  treeDocumentGrant,
+  type TreeHostResult,
+} from './workerHost'
 
 // One tree from one plugin, drawn where the owner asked for it.
 //
@@ -80,9 +92,11 @@ export type RemoteTreeProps = {
 
 const treeRefusal = (contribution: RemoteContribution) => {
   const log = createLogger('plugins', contribution.pluginId)
-  return (reason: string): void => log.warn(`${contribution.id}: ${reason}`, undefined, {
-    'plugin.id': contribution.pluginId, 'plugin.surface': contribution.id,
-  })
+  return (reason: string): void =>
+    log.warn(`${contribution.id}: ${reason}`, undefined, {
+      'plugin.id': contribution.pluginId,
+      'plugin.surface': contribution.id,
+    })
 }
 
 let slotSeq = 0
@@ -139,8 +153,8 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // its own mount against an event that has already fired — the same split a frame region makes
   // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
   // current selection rather than a one-shot.
-  const opened = scope().item
-    ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id, 'plugin:select') : undefined)
+  const opened =
+    scope().item ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id, 'plugin:select') : undefined)
   const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
   const context: PluginFrameContext = {
     surface: bound.surface,
@@ -155,7 +169,8 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   }
   const documentGrant = treeDocumentGrant(componentProps.document)
   context.authority = treeModelAuthorityKey(contribution.hash, qc, bound, context, componentProps.document)
-  const legacyContext = componentProps.openingItem === undefined ? context : { ...context, item: componentProps.openingItem }
+  const legacyContext =
+    componentProps.openingItem === undefined ? context : { ...context, item: componentProps.openingItem }
   const worker = acquireTreeWorker({
     pluginId: contribution.pluginId,
     hash: contribution.hash,
@@ -165,7 +180,9 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     onRefused: refuse,
     connect: createTreeBridgeFactory(
       { binding: bound, hash: contribution.hash, ...(documentGrant ? { document: documentGrant } : {}) },
-      { qc, navigate }, context, refuse,
+      { qc, navigate },
+      context,
+      refuse,
     ),
   })
 
@@ -200,7 +217,9 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     // remote trees and has no iframe to put one in, so a plugin catches this and leaves its static
     // preview up (apps/tui/src/plugins/RemoteTree.tsx).
     const owner = eligiblePlugins().find((entry) => entry.pluginId === contribution.pluginId)
-    const declared = (owner?.installed.contributions.frames ?? []).some((frame) => frame.id === wanted && frame.target === 'overlay')
+    const declared = (owner?.installed.contributions.frames ?? []).some(
+      (frame) => frame.id === wanted && frame.target === 'overlay',
+    )
     if (!declared) return unsupportedOverlay()
     // A modal is a person's act, and this is where that is checked: either the shell's focus is inside
     // this tree, or somebody pressed something in it a moment ago. Both are things only a person
@@ -214,7 +233,8 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     }
     if (now - lastOverlayAt < 1_000) return fail('throttled', 'openOverlay is limited to one overlay per second')
     lastOverlayAt = now
-    if (batchBytes(input ?? null) > TREE_LIMITS.hostRequestBytes) return fail('too_large', `an overlay input is capped at ${TREE_LIMITS.hostRequestBytes} bytes`)
+    if (batchBytes(input ?? null) > TREE_LIMITS.hostRequestBytes)
+      return fail('too_large', `an overlay input is capped at ${TREE_LIMITS.hostRequestBytes} bytes`)
     const opened = openPluginOverlayInvocation({
       pluginId: contribution.pluginId,
       surface: contribution.overlay,
@@ -241,11 +261,12 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   })
 
   const transport = worker.transport(slot)
-  const pushAppearance = (): void => worker.appearance(slot, {
-    theme: document.documentElement.dataset.theme ?? 'light',
-    style: document.documentElement.dataset.style ?? 'terminal',
-    tokens: {},
-  })
+  const pushAppearance = (): void =>
+    worker.appearance(slot, {
+      theme: document.documentElement.dataset.theme ?? 'light',
+      style: document.documentElement.dataset.style ?? 'terminal',
+      tokens: {},
+    })
   pushAppearance()
   const unwatchAppearance = watchAppearance(pushAppearance)
   // Mount is also update: the first call starts the tree, every later one carries new props. Solid's
@@ -256,10 +277,16 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   //
   // A rail row picked while the pane is already open. `defer`, because the selection that opened the
   // pane crossed in the mount props and posting it again would restart a load already in flight.
-  createEffect(on(() => scope().item, (next, previous) => {
-    if (!next || next === previous) return
-    worker.select(slot, next)
-  }, { defer: true }))
+  createEffect(
+    on(
+      () => scope().item,
+      (next, previous) => {
+        if (!next || next === previous) return
+        worker.select(slot, next)
+      },
+      { defer: true },
+    ),
+  )
   const unselect = clientEvents.on('presentation:pane-intent', (event) => {
     if (event.taskId !== scope().taskId || event.paneId !== contribution.id) return
     if (event.intent.kind !== 'plugin:select') return
@@ -290,11 +317,23 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
 
   const pluginId = createMemo(() => contribution.pluginId)
   return (
-    <div class="remote-tree" ref={(element) => { container = element; unwatchGestures = gestures.watch(element) }}>
-      <TreeHost pluginId={pluginId()} transport={transport} onRefused={refuse} onFailed={(reason) => {
-        recordTreeFailure(contribution.id, reason)
-        componentProps.onFailed?.(reason)
-      }} {...fenceScope(componentProps.markdownFences, boundScope)} />
+    <div
+      class="remote-tree"
+      ref={(element) => {
+        container = element
+        unwatchGestures = gestures.watch(element)
+      }}
+    >
+      <TreeHost
+        pluginId={pluginId()}
+        transport={transport}
+        onRefused={refuse}
+        onFailed={(reason) => {
+          recordTreeFailure(contribution.id, reason)
+          componentProps.onFailed?.(reason)
+        }}
+        {...fenceScope(componentProps.markdownFences, boundScope)}
+      />
     </div>
   )
 }

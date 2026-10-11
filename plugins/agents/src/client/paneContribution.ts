@@ -8,7 +8,9 @@ export { AGENT_PANE_ID } from './paneIdentity'
 
 const AgentPaneDetail = lazy(() => import('./sessions/AgentPane'))
 const AgentTaskSidebar = lazy(() => import('./sessions/AgentTaskSidebar'))
-const AgentSidebarHeader = lazy(async () => ({ default: (await import('./sessions/AgentTaskSidebar')).AgentSidebarHeader }))
+const AgentSidebarHeader = lazy(async () => ({
+  default: (await import('./sessions/AgentTaskSidebar')).AgentSidebarHeader,
+}))
 
 // `list-detail`, with the sessions in this task on the left and the open one on the right
 // (docs/panes/layout.md § Layout model). The header over the list is its own region so it stays put while

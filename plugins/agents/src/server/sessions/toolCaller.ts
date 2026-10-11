@@ -29,17 +29,28 @@ export function createToolCallers(store: Pick<AgentStore, 'getSession' | 'active
     },
     onTurnSettled: (listener) => {
       listeners.add(listener)
-      return () => { listeners.delete(listener) }
+      return () => {
+        listeners.delete(listener)
+      }
     },
   }
   return {
     lookup,
     turnChanged: (event: AgentTurnChangedEvent): void => {
       if (!SETTLED.has(event.status)) return
-      const turn = { taskId: event.taskId, sessionId: event.sessionId, turnId: event.turnId, status: event.status as AgentSettledTurn['status'] }
+      const turn = {
+        taskId: event.taskId,
+        sessionId: event.sessionId,
+        turnId: event.turnId,
+        status: event.status as AgentSettledTurn['status'],
+      }
       for (const listener of listeners) {
         // A subscriber's failure is its own, and must not stop the publisher or the next subscriber.
-        try { listener(turn) } catch (error) { log.warn(`A settled-turn subscriber failed: ${error instanceof Error ? error.message : String(error)}`) }
+        try {
+          listener(turn)
+        } catch (error) {
+          log.warn(`A settled-turn subscriber failed: ${error instanceof Error ? error.message : String(error)}`)
+        }
       }
     },
   }

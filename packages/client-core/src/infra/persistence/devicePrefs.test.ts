@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrefKeys } from './prefKeys'
-import { isDevicePref, mergePrefs, readDevicePrefs, writeDevicePref, setDevicePluginIds, removeDevicePluginPrefs } from './devicePrefs'
+import {
+  isDevicePref,
+  mergePrefs,
+  readDevicePrefs,
+  writeDevicePref,
+  setDevicePluginIds,
+  removeDevicePluginPrefs,
+} from './devicePrefs'
 
 const store = new Map<string, string>()
 const layoutKey = `${PrefKeys.taskLayoutsScoped}:node-a/task-1`
@@ -8,7 +15,9 @@ beforeEach(() => {
   store.clear()
   setDevicePluginIds([])
   ;(globalThis as { localStorage?: unknown }).localStorage = {
-    get length() { return store.size },
+    get length() {
+      return store.size
+    },
     key: (index: number) => [...store.keys()][index] ?? null,
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => void store.set(key, value),
@@ -40,8 +49,14 @@ describe('isDevicePref', () => {
     // list — flat or nested, sorted how, grouped by what — is about the person reading it, not about
     // the worktree it is a list of (plugins/git/src/client/changes/changesPrefs.ts).
     for (const key of [
-      PrefKeys.theme, PrefKeys.style, PrefKeys.keybindings, PrefKeys.railOrder,
-      PrefKeys.lastSource, PrefKeys.notices, PrefKeys.diffView, PrefKeys.changesView,
+      PrefKeys.theme,
+      PrefKeys.style,
+      PrefKeys.keybindings,
+      PrefKeys.railOrder,
+      PrefKeys.lastSource,
+      PrefKeys.notices,
+      PrefKeys.diffView,
+      PrefKeys.changesView,
       PrefKeys.generatePick,
     ]) {
       expect(isDevicePref(key), key).toBe(true)
@@ -59,7 +74,12 @@ describe('isDevicePref', () => {
 
   it('leaves the four COMPOSITION kinds on the node whose resources they describe', () => {
     // These keys describe one node's tasks and repos and must not become device preferences.
-    for (const key of [PrefKeys.taskLayoutsScoped, PrefKeys.editorOpenFilesScoped, PrefKeys.prFiltersScoped, PrefKeys.contextSelectionScoped]) {
+    for (const key of [
+      PrefKeys.taskLayoutsScoped,
+      PrefKeys.editorOpenFilesScoped,
+      PrefKeys.prFiltersScoped,
+      PrefKeys.contextSelectionScoped,
+    ]) {
       expect(isDevicePref(key), key).toBe(false)
       expect(isDevicePref(`${key}:node-a/task-1`), key).toBe(false)
     }
@@ -117,8 +137,12 @@ describe('the storage round trip', () => {
 
   it('tolerates storage that exists but refuses access', () => {
     ;(globalThis as { localStorage?: unknown }).localStorage = {
-      get length() { throw new Error('blocked') },
-      setItem: () => { throw new Error('blocked') },
+      get length() {
+        throw new Error('blocked')
+      },
+      setItem: () => {
+        throw new Error('blocked')
+      },
     }
     expect(readDevicePrefs()).toEqual({})
     expect(() => writeDevicePref(PrefKeys.theme, 'dark')).not.toThrow()
@@ -127,10 +151,12 @@ describe('the storage round trip', () => {
 
 describe('mergePrefs', () => {
   it('uses only the owner of each key', () => {
-    expect(mergePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.onboarded]: 'true' }, { [PrefKeys.theme]: 'light' }))
-      .toEqual({ [PrefKeys.theme]: 'light', [PrefKeys.onboarded]: 'true' })
-    expect(mergePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.onboarded]: 'true' }, {}))
-      .toEqual({ [PrefKeys.onboarded]: 'true' })
+    expect(
+      mergePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.onboarded]: 'true' }, { [PrefKeys.theme]: 'light' }),
+    ).toEqual({ [PrefKeys.theme]: 'light', [PrefKeys.onboarded]: 'true' })
+    expect(mergePrefs({ [PrefKeys.theme]: 'dark', [PrefKeys.onboarded]: 'true' }, {})).toEqual({
+      [PrefKeys.onboarded]: 'true',
+    })
   })
 
   it('keeps node-owned layouts independent of local storage', () => {

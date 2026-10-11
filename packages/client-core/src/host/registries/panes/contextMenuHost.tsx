@@ -30,15 +30,17 @@ export function ContextMenuItems(props: {
     <For each={items()}>
       {(item, index) => (
         <>
-        <Show when={index() > 0 && index() === firstDanger()}><Menu.Separator /></Show>
-        <Menu.Item
-          context={props.context}
-          tone={item.tone ?? 'neutral'}
-          leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
-          onSelect={() => runContextMenuItem(item, props.target)}
-        >
-          {item.label}
-        </Menu.Item>
+          <Show when={index() > 0 && index() === firstDanger()}>
+            <Menu.Separator />
+          </Show>
+          <Menu.Item
+            context={props.context}
+            tone={item.tone ?? 'neutral'}
+            leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
+            onSelect={() => runContextMenuItem(item, props.target)}
+          >
+            {item.label}
+          </Menu.Item>
         </>
       )}
     </For>
@@ -47,7 +49,10 @@ export function ContextMenuItems(props: {
 
 /** What a right-click opened: where the pointer was, and what was under it. Held by the surface that
  *  owns the rows, one menu per list, not one per row. */
-export type ContextMenuOpening<L extends ContextMenuLocation = ContextMenuLocation> = { at: { x: number; y: number }; target: TargetAt<L> }
+export type ContextMenuOpening<L extends ContextMenuLocation = ContextMenuLocation> = {
+  at: { x: number; y: number }
+  target: TargetAt<L>
+}
 
 let activeClose: (() => void) | undefined
 
@@ -74,7 +79,9 @@ export function ContextMenuHost<L extends ContextMenuLocation>(props: {
       activeClose = close
     } else if (activeClose === close) activeClose = undefined
   })
-  onCleanup(() => { if (activeClose === close) activeClose = undefined })
+  onCleanup(() => {
+    if (activeClose === close) activeClose = undefined
+  })
   return (
     <ContextMenu
       at={() => props.opening()?.at ?? null}

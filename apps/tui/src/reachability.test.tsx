@@ -5,7 +5,13 @@ import type { Renderer } from './renderer'
 import { focusedKind, words, activeHints, type FocusedKind } from './chrome/bindings'
 import { renderFixture, type Caret, type Screen } from './harness'
 import {
-  _allStops, _columns, focusedInScope, focusedRegion, focusedRenderable, focusRenderable, onScreen,
+  _allStops,
+  _columns,
+  focusedInScope,
+  focusedRegion,
+  focusedRenderable,
+  focusRenderable,
+  onScreen,
   parentOf,
 } from './keys/regions'
 import { topology } from './chrome/topology'
@@ -58,7 +64,10 @@ const SURFACES: Surface[] = [
     // The cheat sheet, because `?` is a key rather than a fixture and it draws a plain `Modal` with
     // nothing focusable in it. The scope's own last-resort stop is therefore its frame, which is the
     // hardest case for "the keys are somewhere a reader can see" (./chrome/CheatSheet.tsx).
-    open: async (screen) => { await screen.press('?'); await screen.until('Keys') },
+    open: async (screen) => {
+      await screen.press('?')
+      await screen.until('Keys')
+    },
   },
   {
     name: 'settings',
@@ -88,7 +97,10 @@ const SURFACES: Surface[] = [
  * (docs/testing/layers.md § Test layers).
  */
 const SIZES: { width: number; height: number }[] = process.env.ACORN_TUI_WIDE
-  ? [{ width: 80, height: 24 }, { width: 120, height: 40 }]
+  ? [
+      { width: 80, height: 24 },
+      { width: 120, height: 40 },
+    ]
   : [{ width: 80, height: 24 }]
 
 /** Presses per surface. Enough for the shell's five regions, a pane's own, and the stops in each. */
@@ -132,7 +144,9 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
   //    one value is honest — the node is in the tree under the root, and it is still something that
   //    can hold the keys (./keys/regions.ts § The one owner, docs/tui/reporting.md § The invariants).
   const drawn = focusedRenderable()
-  expect(attached(drawn, renderer.root), `${where}: the keys are on ${name(drawn)}, which is not in the tree`).toBe(true)
+  expect(attached(drawn, renderer.root), `${where}: the keys are on ${name(drawn)}, which is not in the tree`).toBe(
+    true,
+  )
   if (drawn) expect(drawn.focusable, `${where}: the keys are on a node that cannot hold them`).toBe(true)
 
   // 10. Focus is inside the top scope. With a dialog open, no key moves the keys out of it: the
@@ -160,7 +174,11 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
   const says = words()
   const hints = activeHints()
   const said = (keys: string): string | undefined => hints.find((hint) => hint.keys === keys)?.label
-  for (const [keys, word] of [[says.moveKeys, says.move], ['enter', says.act], ['h/l', says.cross]] as const) {
+  for (const [keys, word] of [
+    [says.moveKeys, says.move],
+    ['enter', says.act],
+    ['h/l', says.cross],
+  ] as const) {
     const label = said(keys)
     if (label === undefined) continue
     expect(label, `${where}: the footer offers "${keys} ${label}" on a ${focusedKind()}`).toBe(word)
@@ -223,9 +241,7 @@ const crossKeys = async (where: string, screen: Screen, met: Map<FocusedKind, Re
       invariants(`${where}: after ${key} on a ${kind}`, await screen.caret(), await screen.frame(), screen.renderer)
 
       const at = before.columns.at
-      const beyond = at === null
-        ? false
-        : before.columns.all.some((x) => (key === 'l' ? x > at : x < at))
+      const beyond = at === null ? false : before.columns.all.some((x) => (key === 'l' ? x > at : x < at))
       const bubbled = after.columns.at !== at || !beyond
       const changed = after.content !== before.content
       const held = word === 'column' ? bubbled : changed || bubbled
@@ -234,7 +250,7 @@ const crossKeys = async (where: string, screen: Screen, met: Map<FocusedKind, Re
   }
 }
 
-const sweep = async (surface: Surface, size: typeof SIZES[number]): Promise<void> => {
+const sweep = async (surface: Surface, size: (typeof SIZES)[number]): Promise<void> => {
   const where = `${surface.name} at ${size.width} by ${size.height}`
   const screen: Screen = await renderFixture({ ...size, ...(surface.pane ? { pane: surface.pane } : {}) })
   try {
@@ -262,7 +278,10 @@ const sweep = async (surface: Surface, size: typeof SIZES[number]): Promise<void
     //    a tab switch replaced — is not owed, because it is no longer on the screen being asked about.
     const frame = await screen.frame()
     const missed = owed.filter((node) => !reached.has(node) && onScreen(node))
-    expect(missed.map((node) => labelOf(node, frame)), `${where}: ${missed.length} stops the walk never landed on`).toEqual([])
+    expect(
+      missed.map((node) => labelOf(node, frame)),
+      `${where}: ${missed.length} stops the walk never landed on`,
+    ).toEqual([])
 
     // 11. And a claimed key changed something. After the walk, because pressing `l` and `h` moves the
     //     keys and opens things, and the walk order is fixed on purpose (§ crossKeys).
@@ -273,10 +292,16 @@ const sweep = async (surface: Surface, size: typeof SIZES[number]): Promise<void
 }
 
 describe('every stop is reachable, and the invariants hold on the way', () => {
-  const cases = SIZES.flatMap((size) => SURFACES.map((surface) => [`${surface.name} at ${size.width} by ${size.height}`, surface, size] as const))
-  it.each(cases)('%s', async (_name, surface, size) => {
-    await sweep(surface, size)
-  }, 180_000)
+  const cases = SIZES.flatMap((size) =>
+    SURFACES.map((surface) => [`${surface.name} at ${size.width} by ${size.height}`, surface, size] as const),
+  )
+  it.each(cases)(
+    '%s',
+    async (_name, surface, size) => {
+      await sweep(surface, size)
+    },
+    180_000,
+  )
 })
 
 // ── Escape is bounded ─────────────────────────────────────────────────────────────────────────
@@ -305,21 +330,27 @@ describe('escape is bounded', () => {
   // contract and ../keys/keys.test.tsx's case; it is not the climb this property is about, and a
   // surface that opens a dialog would spend its first Escape closing it (./keys/trap.ts).
   const climbs = SURFACES.filter((surface) => !surface.open)
-  it.each(climbs.map((surface) => [surface.name, surface] as const))('%s climbs to the rail', async (name, surface) => {
-    const screen = await renderFixture({ width: 80, height: 24, ...(surface.pane ? { pane: surface.pane } : {}) })
-    try {
-      await screen.until(surface.until, 45)
-      // Down to the deepest thing the arrows reach in the region that opens the screen.
-      await screen.walk(12)
-      const budget = escapesFrom(focusedRenderable())
-      for (let press = 0; press < budget; press += 1) await screen.press('ESCAPE')
-      // The rail is where a climb ends: Menu, Browse or Tasks. Escape from there is the shell's own
-      // layer and clears a notification rather than moving the keys (./chrome/topology.ts).
-      const landed = focusedRegion()
-      expect(['menu', 'browse', 'tasks'], `${name}: ${budget} escapes landed in ${landed?.paneId}/${landed?.regionId}`)
-        .toContain(landed?.regionId)
-    } finally {
-      screen.done()
-    }
-  }, 180_000)
+  it.each(climbs.map((surface) => [surface.name, surface] as const))(
+    '%s climbs to the rail',
+    async (name, surface) => {
+      const screen = await renderFixture({ width: 80, height: 24, ...(surface.pane ? { pane: surface.pane } : {}) })
+      try {
+        await screen.until(surface.until, 45)
+        // Down to the deepest thing the arrows reach in the region that opens the screen.
+        await screen.walk(12)
+        const budget = escapesFrom(focusedRenderable())
+        for (let press = 0; press < budget; press += 1) await screen.press('ESCAPE')
+        // The rail is where a climb ends: Menu, Browse or Tasks. Escape from there is the shell's own
+        // layer and clears a notification rather than moving the keys (./chrome/topology.ts).
+        const landed = focusedRegion()
+        expect(
+          ['menu', 'browse', 'tasks'],
+          `${name}: ${budget} escapes landed in ${landed?.paneId}/${landed?.regionId}`,
+        ).toContain(landed?.regionId)
+      } finally {
+        screen.done()
+      }
+    },
+    180_000,
+  )
 })

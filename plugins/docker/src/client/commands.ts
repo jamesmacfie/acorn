@@ -79,15 +79,21 @@ export const dockerCommands: readonly ContributedCommand[] = [
       // socket; the other three are read here, because nothing keeps them resident.
       await refreshDocker()
       if (!owner.current()) return []
-      const [images, volumes, networks] = await Promise.all([fetchImages(owner.nodeId), fetchVolumes(owner.nodeId), fetchNetworks(owner.nodeId)])
+      const [images, volumes, networks] = await Promise.all([
+        fetchImages(owner.nodeId),
+        fetchVolumes(owner.nodeId),
+        fetchNetworks(owner.nodeId),
+      ])
       if (!owner.current()) return []
       const items = [
-        ...containers().map((container) => resourceItem(
-          'containers',
-          container.id,
-          container.name,
-          [container.image, container.composeProject].filter(Boolean).join(' · ') || undefined,
-        )),
+        ...containers().map((container) =>
+          resourceItem(
+            'containers',
+            container.id,
+            container.name,
+            [container.image, container.composeProject].filter(Boolean).join(' · ') || undefined,
+          ),
+        ),
         ...images.map((image) => resourceItem('images', image.id, `${image.repository}:${image.tag}`, image.size)),
         // A volume has no id of its own; its name is the key the daemon addresses it by.
         ...volumes.map((volume) => resourceItem('volumes', volume.name, volume.name, volume.driver)),

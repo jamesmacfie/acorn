@@ -78,6 +78,7 @@ export const ghGraphQLResult = async <T>(res: Response): Promise<GhGraphQLResult
   const err = ghError(res)
   if (err) return { ok: false, kind: 'http', failure: err }
   const body = (await res.json().catch(() => ({}))) as { data?: T; errors?: { message?: string }[] }
-  if (body.errors?.length) return { ok: false, kind: 'graphql', messages: body.errors.map((e) => e.message ?? 'unknown graphql error') }
+  if (body.errors?.length)
+    return { ok: false, kind: 'graphql', messages: body.errors.map((e) => e.message ?? 'unknown graphql error') }
   return { ok: true, data: body.data as T }
 }

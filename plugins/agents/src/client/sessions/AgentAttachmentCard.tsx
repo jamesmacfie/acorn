@@ -2,7 +2,11 @@ import { createResource, createSignal, Show } from 'solid-js'
 import { saveFile } from '@acorn/plugin-api/client'
 import { Button, Card, Icon, Markdown, Modal, Stack, Text } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
-import { AGENT_TRANSCRIPT_ATTACHMENT_POINT, transcriptMediaType, type TranscriptMediaProps } from '../../contract/transcriptMedia.ts'
+import {
+  AGENT_TRANSCRIPT_ATTACHMENT_POINT,
+  transcriptMediaType,
+  type TranscriptMediaProps,
+} from '../../contract/transcriptMedia.ts'
 import type { AgentAttachment } from '../../contract/wire.ts'
 import { MediaDownloadRow } from './AgentArtifactCard'
 import { createAgentMedia, type holdAgentMedia } from './agentMediaStore'
@@ -33,8 +37,7 @@ const KIND_ICON = (mediaType: string): string => {
   return 'file'
 }
 
-const sizeLabel = (byteSize: number): string =>
-  `${Math.max(1, Math.round(byteSize / 1024)).toLocaleString()} KiB`
+const sizeLabel = (byteSize: number): string => `${Math.max(1, Math.round(byteSize / 1024)).toLocaleString()} KiB`
 
 // The owner's own tile. Its picture is fetched here, so a tile a plugin draws instead fetches nothing.
 function AttachmentTile(props: { lease: MediaLease; attachment: AgentAttachment; onDownload: () => void }) {
@@ -45,7 +48,7 @@ function AttachmentTile(props: { lease: MediaLease; attachment: AgentAttachment;
   )
   // A resource retains its previous value during a replacement read. Keep that value with its lease.
   // `undefined` while reading, `null` for no picture.
-  const source = () => preview()?.lease === props.lease ? preview()?.source : undefined
+  const source = () => (preview()?.lease === props.lease ? preview()?.source : undefined)
   const alt = () => imageAlt(props.attachment.filename) || 'Attachment'
 
   // Drawn once the picture is settled, so an image tile never shows its icon first.
@@ -58,7 +61,10 @@ function AttachmentTile(props: { lease: MediaLease; attachment: AgentAttachment;
         fit
         pad="sm"
         title={`${props.attachment.filename} · ${sizeLabel(props.attachment.byteSize)}`}
-        onPress={() => { if (source()) setOpen(true); else props.onDownload() }}
+        onPress={() => {
+          if (source()) setOpen(true)
+          else props.onDownload()
+        }}
       >
         <Stack gap="inline">
           <Show when={source()} fallback={<Icon name={KIND_ICON(props.attachment.mediaType)} />}>
@@ -74,8 +80,12 @@ function AttachmentTile(props: { lease: MediaLease; attachment: AgentAttachment;
               <Markdown text={`![${alt()}](${full()})`} images="inline" />
             </Modal.Body>
             <Modal.Actions>
-              <Button variant="ghost" onPress={() => setOpen(false)}>Close</Button>
-              <Button variant="solid" tone="accent" onPress={props.onDownload}>Download</Button>
+              <Button variant="ghost" onPress={() => setOpen(false)}>
+                Close
+              </Button>
+              <Button variant="solid" tone="accent" onPress={props.onDownload}>
+                Download
+              </Button>
             </Modal.Actions>
           </Modal>
         )}
@@ -90,14 +100,21 @@ export default function AgentAttachmentCard(props: {
   transcript?: { taskId: string; sessionId: string }
 }) {
   const media = createAgentMedia('attachment', () => props.attachmentId)
-  const [loaded] = createResource(media, async (lease) => ({ lease, attachment: await lease.attachment().catch(() => null) }))
+  const [loaded] = createResource(media, async (lease) => ({
+    lease,
+    attachment: await lease.attachment().catch(() => null),
+  }))
   // A resource retains its previous value during a replacement read. Keep that value with its lease.
-  const attachment = () => loaded()?.lease === media() ? loaded()?.attachment ?? undefined : undefined
+  const attachment = () => (loaded()?.lease === media() ? (loaded()?.attachment ?? undefined) : undefined)
   const download = async (): Promise<void> => {
     const current = attachment()
     if (!current) return
     const content = await media().content()
-    await saveFile({ bytes: content.bytes, mimeType: content.type, suggestedName: content.filename ?? current.filename })
+    await saveFile({
+      bytes: content.bytes,
+      mimeType: content.type,
+      suggestedName: content.filename ?? current.filename,
+    })
   }
   const [replaced, setReplaced] = createSignal(false)
 
@@ -129,7 +146,11 @@ export default function AgentAttachmentCard(props: {
                   {tile()}
                 </Slot>
                 <Show when={replaced()}>
-                  <MediaDownloadRow title={present().filename} byteSize={present().byteSize} onDownload={() => void download()} />
+                  <MediaDownloadRow
+                    title={present().filename}
+                    byteSize={present().byteSize}
+                    onDownload={() => void download()}
+                  />
                 </Show>
               </Stack>
             )}

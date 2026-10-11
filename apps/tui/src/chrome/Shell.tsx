@@ -1,5 +1,19 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack, type Accessor, type JSX } from 'solid-js'
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  lazy,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  untrack,
+  type Accessor,
+  type JSX,
+} from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
@@ -13,7 +27,15 @@ import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusedPane, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
-import { buildLink, clientEvents, registerCommands, registerNavigationCommands, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
+import {
+  buildLink,
+  clientEvents,
+  registerCommands,
+  registerNavigationCommands,
+  sourcePlaceFromPath,
+  taskPlace,
+  type Place,
+} from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
@@ -37,7 +59,11 @@ import { taskLaunchRequest } from '@acorn/client-core/features/tabs/taskLaunch.t
 import { actionPickerRequest } from '@acorn/client-core/host/registries/commands'
 import { closeLinkPreviewOnNodeChange, linkPreview } from '@acorn/client-core/host/linkPreview/linkPreview.ts'
 import { clientCapability } from '@acorn/client-core/infra/node'
-import { WORKFLOW_GIT_LAUNCH, workflowGitLaunchRequest, closeWorkflowGitLaunch } from '@acorn/plugin-workflows/contract/gitLaunch.ts'
+import {
+  WORKFLOW_GIT_LAUNCH,
+  workflowGitLaunchRequest,
+  closeWorkflowGitLaunch,
+} from '@acorn/plugin-workflows/contract/gitLaunch.ts'
 import { cyclePane } from './panes'
 import { Rail, railCells } from './Rail'
 import { PANES, SOURCE, topology } from './topology'
@@ -87,28 +113,48 @@ const TaskLaunchHost = lazy(() => import('./TaskLaunchHost'))
 const ActionPickerHost = lazy(() => import('./ActionPickerHost'))
 const LinkPreviewDialog = lazy(() => import('./LinkPreviewDialog'))
 
-export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void; link?: Address; linkReady?: Accessor<boolean> }) {
-  createEffect(() => { if (taskLaunchRequest()) openOverlay('task-launch'); else closeOverlay('task-launch') })
-  createEffect(() => { if (actionPickerRequest()) openOverlay('action-picker'); else closeOverlay('action-picker') })
-  createEffect(() => { if (linkPreview()) openOverlay('link-preview'); else closeOverlay('link-preview') })
+export function Shell(props: {
+  nodeId: string
+  supervised: boolean
+  onQuit: () => void
+  link?: Address
+  linkReady?: Accessor<boolean>
+}) {
+  createEffect(() => {
+    if (taskLaunchRequest()) openOverlay('task-launch')
+    else closeOverlay('task-launch')
+  })
+  createEffect(() => {
+    if (actionPickerRequest()) openOverlay('action-picker')
+    else closeOverlay('action-picker')
+  })
+  createEffect(() => {
+    if (linkPreview()) openOverlay('link-preview')
+    else closeOverlay('link-preview')
+  })
   closeLinkPreviewOnNodeChange()
-  createEffect(() => { if (workflowGitLaunchRequest()) openOverlay('workflow-launch'); else closeOverlay('workflow-launch') })
+  createEffect(() => {
+    if (workflowGitLaunchRequest()) openOverlay('workflow-launch')
+    else closeOverlay('workflow-launch')
+  })
   const model = createShellModel()
   // One session for the whole shell, not one per open: `./Palette.tsx` is mounted only while the
   // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
   const palette = createShellPalette(model)
   // A navigation search opened during node startup may see an empty roster. Refresh only that
   // frame when its local source changes; the shared session still owns its query and selection.
-  createEffect(on(
-    () => [model.ready(), model.workspaces(), model.allTasks(), nodes()],
-    () => {
-      const frame = untrack(palette.frame)
-      if (untrack(palette.open) && frame?.kind === 'search' && frame.commandId?.startsWith('core.goto.')) {
-        palette.retry()
-      }
-    },
-    { defer: true },
-  ))
+  createEffect(
+    on(
+      () => [model.ready(), model.workspaces(), model.allTasks(), nodes()],
+      () => {
+        const frame = untrack(palette.frame)
+        if (untrack(palette.open) && frame?.kind === 'search' && frame.commandId?.startsWith('core.goto.')) {
+          palette.retry()
+        }
+      },
+      { defer: true },
+    ),
+  )
   const prefs = createQuery(() => prefsOptions(true))
   // Keep the last confirmed wording on screen during a refetch. The empty-node decision below still
   // requires fresh successful reads, so retained labels cannot turn cached zero into an empty Node.
@@ -135,7 +181,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     return mode() === 'on' ? 'workspace' : 'project'
   }
   const [setupStep, setSetupStep] = createSignal<SetupStep>('mode')
-  const openSetup = (step?: SetupStep) => { setSetupStep(step ?? firstSetupStep()); openOverlay('setup') }
+  const openSetup = (step?: SetupStep) => {
+    setSetupStep(step ?? firstSetupStep())
+    openOverlay('setup')
+  }
 
   // An empty node has no project or task that the rail can create. Wait for the Node's real roster
   // before offering setup: the cached startup path may briefly look empty while the Node boots.
@@ -144,7 +193,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const node = activeNodeId()
     const projects = model.projects()
     if (!node || !projects || !prefs.isSuccess || prefs.isFetching) return
-    if (projects.length) { emptyNode = null; return }
+    if (projects.length) {
+      emptyNode = null
+      return
+    }
     if (emptyNode === node) return
     emptyNode = node
     openSetup()
@@ -187,9 +239,11 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     loadingLink = true
     cancelLinkRequest = startLinkRequest({
       load: () => import('./link'),
-      apply: ({ resolveTerminalLink, openTerminalLink }) => setResolvedLink({
-        place: resolveTerminalLink(link, model), open: openTerminalLink,
-      }),
+      apply: ({ resolveTerminalLink, openTerminalLink }) =>
+        setResolvedLink({
+          place: resolveTerminalLink(link, model),
+          open: openTerminalLink,
+        }),
       currentNodeId: activeNodeId,
       nodeId: props.nodeId,
       onError: reportLinkError,
@@ -201,15 +255,20 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     // A project source is visible only after the destination workspace's provider scope answers.
     // Switch first, then let this effect run again with that workspace's source list.
     const projectId = resolved.place.projectId
-    const owner = projectId && model.workspaces().find((workspace) => workspace.projects.some((project) => project.id === projectId))
+    const owner =
+      projectId &&
+      model.workspaces().find((workspace) => workspace.projects.some((project) => project.id === projectId))
     if (owner && model.workspace()?.id !== owner.id) {
       model.chooseWorkspace(owner.id)
       return
     }
     if (!model.sourcesReady()) return
     linked = true
-    try { resolved.open(resolved.place, model) }
-    catch (error) { reportLinkError(error) }
+    try {
+      resolved.open(resolved.place, model)
+    } catch (error) {
+      reportLinkError(error)
+    }
   })
 
   // A bundle this device has never decided about. Raised rather than opened by a key, because nobody
@@ -274,7 +333,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // a palette row and each chord is one the reader can rebind, which is what every other command in
   // the app already is (docs/command-palette-and-shortcuts.md).
   const linkPlace = (): Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' }> | null => {
-    if (isOverlayOpen('settings')) return { kind: 'settings', ...(settingsPlace().pageId ? { pageId: settingsPlace().pageId } : {}) }
+    if (isOverlayOpen('settings'))
+      return { kind: 'settings', ...(settingsPlace().pageId ? { pageId: settingsPlace().pageId } : {}) }
     const source = selectedSource()
     if (!source) {
       const task = model.task()
@@ -292,30 +352,101 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       else props.onQuit()
     }
     const commands = registerCommands([
-      { id: 'core.copy-link', title: 'Copy link', category: 'action', palette: true,
-        when: () => !!linkPlace(), run: () => {
+      {
+        id: 'core.copy-link',
+        title: 'Copy link',
+        category: 'action',
+        palette: true,
+        when: () => !!linkPlace(),
+        run: () => {
           const place = linkPlace()
           if (!place) return
           const href = buildLink(props.nodeId, place)
           return copyToTerminal(href) ? { effect: 'close' as const } : { effect: 'stay' as const, status: href }
-        } },
+        },
+      },
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
-      { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
-      { id: 'core.settings.open', title: 'Open settings', hint: 'every settings page, grouped as on the desktop', category: 'navigation', palette: true, run: () => openSettings() },
-      { id: 'core.setup.open', title: 'Set up acorn', hint: () => mode() === 'off' ? 'projects, tasks, and providers' : 'workspaces, projects, tasks, and providers', category: 'workspace', palette: true, run: () => openSetup() },
-      { id: 'core.task.create', title: 'New task', hint: 'create a task in a project', category: 'task', palette: true, run: () => openSetup(model.projects()?.length ? 'task' : undefined) },
-      { id: 'core.terminal.sessions', title: 'Open terminal sessions', hint: 'start or resume a task terminal', category: 'task', palette: true, requires: { plugin: 'terminal' }, when: () => !!model.task(), run: () => {
-        const task = model.task()
-        if (task) setTerminalOpen(task.id, true)
-      } },
+      {
+        id: 'core.shortcuts.cheat-sheet',
+        title: 'Help',
+        hint: 'what the keyboard does right here',
+        category: 'navigation',
+        palette: true,
+        run: () => openOverlay('help'),
+      },
+      {
+        id: 'core.settings.open',
+        title: 'Open settings',
+        hint: 'every settings page, grouped as on the desktop',
+        category: 'navigation',
+        palette: true,
+        run: () => openSettings(),
+      },
+      {
+        id: 'core.setup.open',
+        title: 'Set up acorn',
+        hint: () =>
+          mode() === 'off' ? 'projects, tasks, and providers' : 'workspaces, projects, tasks, and providers',
+        category: 'workspace',
+        palette: true,
+        run: () => openSetup(),
+      },
+      {
+        id: 'core.task.create',
+        title: 'New task',
+        hint: 'create a task in a project',
+        category: 'task',
+        palette: true,
+        run: () => openSetup(model.projects()?.length ? 'task' : undefined),
+      },
+      {
+        id: 'core.terminal.sessions',
+        title: 'Open terminal sessions',
+        hint: 'start or resume a task terminal',
+        category: 'task',
+        palette: true,
+        requires: { plugin: 'terminal' },
+        when: () => !!model.task(),
+        run: () => {
+          const task = model.task()
+          if (task) setTerminalOpen(task.id, true)
+        },
+      },
       // Chord-only. The overlay pickers stay — `w` and `p` are how a reader switches without opening
       // the palette at all — but the palette's own row for each is the search under Go to, and two rows
       // saying "Switch workspace" is one too many
       // (client-core/host/registries/commands/navigationCommands.ts).
-      { id: 'core.workspace.switch', title: () => `Switch ${words().singular}`, category: 'workspace', palette: false, run: () => openOverlay('workspace') },
-      { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: false, run: () => openOverlay(mode() === 'off' ? 'workspace' : 'project') },
-      { id: 'core.rail.toggle', title: 'Rail', category: 'navigation', palette: true, run: () => { setHidden((value) => !value) } },
-      { id: 'core.notifications.open', title: 'Notifications', hint: 'what needs you, and what happened', category: 'navigation', palette: true, run: () => openOverlay('notifications') },
+      {
+        id: 'core.workspace.switch',
+        title: () => `Switch ${words().singular}`,
+        category: 'workspace',
+        palette: false,
+        run: () => openOverlay('workspace'),
+      },
+      {
+        id: 'core.project.switch',
+        title: 'Switch project',
+        category: 'workspace',
+        palette: false,
+        run: () => openOverlay(mode() === 'off' ? 'workspace' : 'project'),
+      },
+      {
+        id: 'core.rail.toggle',
+        title: 'Rail',
+        category: 'navigation',
+        palette: true,
+        run: () => {
+          setHidden((value) => !value)
+        },
+      },
+      {
+        id: 'core.notifications.open',
+        title: 'Notifications',
+        hint: 'what needs you, and what happened',
+        category: 'navigation',
+        palette: true,
+        run: () => openOverlay('notifications'),
+      },
       { id: 'core.quit', title: 'Quit', category: 'action', palette: true, run: quit },
     ])
     // Ctrl and not `meta`, which is acorn's spelling for the platform command key: a terminal
@@ -324,26 +455,92 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     createEffect(() => {
       const label = words().capitalized
       const bindings = registerKeybindings([
-        { id: 'core.palette.open', command: 'core.palette.open', description: 'Commands', category: 'Global', defaultChord: 'ctrl+k', when: 'global' },
-        { id: 'core.shortcuts.cheat-sheet', command: 'core.shortcuts.cheat-sheet', description: 'Help', category: 'Global', defaultChord: '?', when: 'global' },
-        { id: 'core.workspace.switch', command: 'core.workspace.switch', description: label, category: 'Global', defaultChord: 'w', when: 'global' },
-        { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
+        {
+          id: 'core.palette.open',
+          command: 'core.palette.open',
+          description: 'Commands',
+          category: 'Global',
+          defaultChord: 'ctrl+k',
+          when: 'global',
+        },
+        {
+          id: 'core.shortcuts.cheat-sheet',
+          command: 'core.shortcuts.cheat-sheet',
+          description: 'Help',
+          category: 'Global',
+          defaultChord: '?',
+          when: 'global',
+        },
+        {
+          id: 'core.workspace.switch',
+          command: 'core.workspace.switch',
+          description: label,
+          category: 'Global',
+          defaultChord: 'w',
+          when: 'global',
+        },
+        {
+          id: 'core.project.switch',
+          command: 'core.project.switch',
+          description: 'Project',
+          category: 'Global',
+          defaultChord: 'p',
+          when: 'global',
+        },
         // Beside `w`, because it is the other half of switching workspace, and bare for the same
         // reason. The command is the palette's Last workspace row
         // (client-core/host/registries/commands/navigationCommands.ts), and it is dropped from this
         // layer while there is nowhere to go back to.
-        { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: `Last ${words().singular}`, category: 'Global', defaultChord: ';', when: 'global' },
-        { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
-        { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
-        { id: 'core.terminal.sessions', command: 'core.terminal.sessions', description: 'Terminal sessions', category: 'Task', defaultChord: 't', when: 'task' },
-        { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
+        {
+          id: 'core.goto.workspace-last',
+          command: 'core.goto.workspace-last',
+          description: `Last ${words().singular}`,
+          category: 'Global',
+          defaultChord: ';',
+          when: 'global',
+        },
+        {
+          id: 'core.rail.toggle',
+          command: 'core.rail.toggle',
+          description: 'Rail',
+          category: 'Global',
+          defaultChord: 'ctrl+b',
+          when: 'global',
+        },
+        {
+          id: 'core.notifications.open',
+          command: 'core.notifications.open',
+          description: 'Notifications',
+          category: 'Global',
+          defaultChord: 'n',
+          when: 'global',
+        },
+        {
+          id: 'core.terminal.sessions',
+          command: 'core.terminal.sessions',
+          description: 'Terminal sessions',
+          category: 'Task',
+          defaultChord: 't',
+          when: 'task',
+        },
+        {
+          id: 'core.quit',
+          command: 'core.quit',
+          description: 'Quit',
+          category: 'Global',
+          defaultChord: 'q',
+          when: 'global',
+        },
       ])
       onCleanup(() => bindings.dispose())
     })
     // Go to task, switch workspace, go to project and switch node, as one group of searches. Switching
     // node was one command per paired node until 2026-09-03, which put the whole roster in the root.
     const navigation = registerNavigationCommands(shellNavigation(model, words))
-    onCleanup(() => { navigation.dispose(); commands.dispose() })
+    onCleanup(() => {
+      navigation.dispose()
+      commands.dispose()
+    })
   })
 
   // Settings: core's pages from the table the desktop draws from, beside the pages the roster's plugins
@@ -361,11 +558,19 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     let unregister: (() => void) | undefined
     let live = true
     void import('./settingsPages').then(({ registerCoreSettingsPages }) => {
-      if (live) { unregister = registerCoreSettingsPages(); setSettingsReady(true) }
+      if (live) {
+        unregister = registerCoreSettingsPages()
+        setSettingsReady(true)
+      }
     })
     const offEvent = clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))
     const offTarget = registerNoticeTargetHandler('settings', (_taskId, target) => openSettings(target.resourceId))
-    onCleanup(() => { live = false; offTarget(); offEvent(); unregister?.() })
+    onCleanup(() => {
+      live = false
+      offTarget()
+      offEvent()
+      unregister?.()
+    })
   })
 
   return (
@@ -387,7 +592,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       <box flexDirection="row" flexGrow={1} visible={!topOverlay() && !activeConfirmation()}>
         {/* No rule between the column and the pane: each panel draws its own frame, and a rule beside
             a border is two lines saying one thing (../panel.tsx). */}
-        <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} nodeId={props.nodeId} /></Show>
+        <Show when={!hidden()}>
+          <Rail model={model} cells={railCells(cells())} nodeId={props.nodeId} />
+        </Show>
         <box flexDirection="column" flexGrow={1}>
           {/* The strip is a region only while a task gives it something to draw. Keeping the ref
               outside this Show left an empty, focusable box in the source-view Tab cycle. */}
@@ -418,8 +625,20 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                   (client-core/host/registries/sources/sources.ts § regions). */}
               {/* A new source owns a new region lifetime. Reusing the Match while a lazy source
                   starts a resource retained the previous tree and disposed the new focus claim. */}
-              <Match when={source()?.regions?.detail} keyed>{(detail) => <SourceRegion><Dynamic component={detail} /></SourceRegion>}</Match>
-              <Match when={source()?.component} keyed>{(component) => <SourceRegion><Dynamic component={component} /></SourceRegion>}</Match>
+              <Match when={source()?.regions?.detail} keyed>
+                {(detail) => (
+                  <SourceRegion>
+                    <Dynamic component={detail} />
+                  </SourceRegion>
+                )}
+              </Match>
+              <Match when={source()?.component} keyed>
+                {(component) => (
+                  <SourceRegion>
+                    <Dynamic component={component} />
+                  </SourceRegion>
+                )}
+              </Match>
               <Match when={model.task()}>{(task) => <PaneBody task={task()} nodeId={props.nodeId} />}</Match>
             </Switch>
           </PanelBody>
@@ -434,24 +653,79 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
         {(name) => (
           <box flexDirection="column" flexGrow={1} visible={!activeConfirmation()}>
             <Switch>
-              <Match when={name() === 'palette'}><Palette session={palette} /></Match>
-              <Match when={name() === 'help'}><CheatSheet /></Match>
-              <Match when={name() === 'workspace'}><WorkspacePicker model={model} words={words} /></Match>
-              <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>
-              <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
-              <Match when={name() === 'trust'}><Dynamic component={trustPromptComponent() ?? undefined} /></Match>
-              <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
-              <Match when={name() === 'setup'}><Show when={activeNodeId()} keyed>{(nodeId) => <SetupHost model={model} nodeId={nodeId} initialStep={setupStep()} onClose={() => closeOverlay('setup')} />}</Show></Match>
-              <Match when={name() === 'task-launch'}><Show when={taskLaunchRequest()} keyed>{(request) => <TaskLaunchHost request={request} />}</Show></Match>
-              <Match when={name() === 'action-picker'}><Show when={actionPickerRequest()} keyed>{(request) => <ActionPickerHost request={request} />}</Show></Match>
-              <Match when={name() === 'link-preview'}><Show when={linkPreview()} keyed>{(request) => <LinkPreviewDialog request={request} nodeId={props.nodeId} model={model} />}</Show></Match>
-              <Match when={name() === 'workflow-launch'}><Show when={workflowGitLaunchRequest()} keyed>{(request) =>
-                <Dynamic component={clientCapability(WORKFLOW_GIT_LAUNCH)?.Dialog} request={request} onClose={() => closeWorkflowGitLaunch(request)} />
-              }</Show></Match>
-              <Match when={name() === 'settings'}><SettingsHost nodeId={props.nodeId} onClose={closeSettings} onSetup={() => openSetup()} /></Match>
-              <Match when={name() === 'promotion'}><Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show></Match>
-              <Match when={name() === 'sessions'}><Show when={model.task()}>{(task) => <SessionsHost task={task()} onClose={() => closeOverlay('sessions')} />}</Show></Match>
-              <Match when={name() === 'file'}><Show when={activeFilePrompt()}>{(prompt) => <FileDialog prompt={prompt()} />}</Show></Match>
+              <Match when={name() === 'palette'}>
+                <Palette session={palette} />
+              </Match>
+              <Match when={name() === 'help'}>
+                <CheatSheet />
+              </Match>
+              <Match when={name() === 'workspace'}>
+                <WorkspacePicker model={model} words={words} />
+              </Match>
+              <Match when={name() === 'project'}>
+                <ProjectPicker model={model} />
+              </Match>
+              <Match when={name() === 'quit'}>
+                <QuitConfirm onQuit={props.onQuit} />
+              </Match>
+              <Match when={name() === 'trust'}>
+                <Dynamic component={trustPromptComponent() ?? undefined} />
+              </Match>
+              <Match when={name() === 'notifications'}>
+                <Inbox model={model} />
+              </Match>
+              <Match when={name() === 'setup'}>
+                <Show when={activeNodeId()} keyed>
+                  {(nodeId) => (
+                    <SetupHost
+                      model={model}
+                      nodeId={nodeId}
+                      initialStep={setupStep()}
+                      onClose={() => closeOverlay('setup')}
+                    />
+                  )}
+                </Show>
+              </Match>
+              <Match when={name() === 'task-launch'}>
+                <Show when={taskLaunchRequest()} keyed>
+                  {(request) => <TaskLaunchHost request={request} />}
+                </Show>
+              </Match>
+              <Match when={name() === 'action-picker'}>
+                <Show when={actionPickerRequest()} keyed>
+                  {(request) => <ActionPickerHost request={request} />}
+                </Show>
+              </Match>
+              <Match when={name() === 'link-preview'}>
+                <Show when={linkPreview()} keyed>
+                  {(request) => <LinkPreviewDialog request={request} nodeId={props.nodeId} model={model} />}
+                </Show>
+              </Match>
+              <Match when={name() === 'workflow-launch'}>
+                <Show when={workflowGitLaunchRequest()} keyed>
+                  {(request) => (
+                    <Dynamic
+                      component={clientCapability(WORKFLOW_GIT_LAUNCH)?.Dialog}
+                      request={request}
+                      onClose={() => closeWorkflowGitLaunch(request)}
+                    />
+                  )}
+                </Show>
+              </Match>
+              <Match when={name() === 'settings'}>
+                <SettingsHost nodeId={props.nodeId} onClose={closeSettings} onSetup={() => openSetup()} />
+              </Match>
+              <Match when={name() === 'promotion'}>
+                <Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show>
+              </Match>
+              <Match when={name() === 'sessions'}>
+                <Show when={model.task()}>
+                  {(task) => <SessionsHost task={task()} onClose={() => closeOverlay('sessions')} />}
+                </Show>
+              </Match>
+              <Match when={name() === 'file'}>
+                <Show when={activeFilePrompt()}>{(prompt) => <FileDialog prompt={prompt()} />}</Show>
+              </Match>
             </Switch>
           </box>
         )}
@@ -460,7 +734,11 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
           the way the main row stays under an overlay. So the page that asked is still there, with its
           state, when the answer lands (./confirmStore.ts). */}
       <Show when={activeConfirmation()} keyed>
-        {(request) => <box flexDirection="column" flexGrow={1}><Confirmation request={request} /></box>}
+        {(request) => (
+          <box flexDirection="column" flexGrow={1}>
+            <Confirmation request={request} />
+          </box>
+        )}
       </Show>
       <Notifications />
       <Footer nodeId={props.nodeId} />
@@ -478,12 +756,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
  */
 function SourceRegion(props: { children: JSX.Element }) {
   return (
-    <box
-      flexDirection="column"
-      flexGrow={1}
-      minWidth={0}
-      ref={regionFocus(SOURCE, 0)}
-    >
+    <box flexDirection="column" flexGrow={1} minWidth={0} ref={regionFocus(SOURCE, 0)}>
       {props.children}
     </box>
   )
@@ -501,7 +774,10 @@ function QuitConfirm(props: { onQuit: () => void }) {
           <Rows
             id="chrome.quit"
             ariaLabel="Quit"
-            items={[{ key: 'quit', label: 'Quit and stop the node' }, { key: 'stay', label: 'Stay' }]}
+            items={[
+              { key: 'quit', label: 'Quit and stop the node' },
+              { key: 'stay', label: 'Stay' },
+            ]}
             onActivate={(key) => (key === 'quit' ? props.onQuit() : close())}
           >
             {(row, item) => <Row item={item}>{row.label}</Row>}
@@ -533,10 +809,15 @@ function ProjectPicker(props: { model: ShellModel }) {
               id="chrome.projects"
               ariaLabel="Projects"
               items={rows()}
-              onActivate={(id) => { chooseProject(id); close() }}
+              onActivate={(id) => {
+                chooseProject(id)
+                close()
+              }}
             >
               {(project, item) => (
-                <Row item={item} selected={project.id === routedProjectId()}>{project.name}</Row>
+                <Row item={item} selected={project.id === routedProjectId()}>
+                  {project.name}
+                </Row>
               )}
             </Rows>
           </Show>
@@ -552,7 +833,10 @@ function ProjectPicker(props: { model: ShellModel }) {
  *  overlay is the shape that takes the keys and gives them back (./state.ts, ../keys/regions.ts). */
 function WorkspacePicker(props: { model: ShellModel; words: () => ReturnType<typeof workspaceWords> }) {
   const close = () => closeOverlay('workspace')
-  const rows = keyedRows(() => props.model.workspaces(), (workspace) => ({ key: workspace.id, ...workspace }))
+  const rows = keyedRows(
+    () => props.model.workspaces(),
+    (workspace) => ({ key: workspace.id, ...workspace }),
+  )
   return (
     <Modal onDismiss={close} title={props.words().capitalized} size="sm">
       <ModalBody>
@@ -561,10 +845,15 @@ function WorkspacePicker(props: { model: ShellModel; words: () => ReturnType<typ
             id="chrome.workspaces"
             ariaLabel={props.words().capitalizedPlural}
             items={rows()}
-            onActivate={(id) => { props.model.chooseWorkspace(id); close() }}
+            onActivate={(id) => {
+              props.model.chooseWorkspace(id)
+              close()
+            }}
           >
             {(workspace, item) => (
-              <Row item={item} selected={workspace.id === props.model.workspace()?.id}>{workspace.name}</Row>
+              <Row item={item} selected={workspace.id === props.model.workspace()?.id}>
+                {workspace.name}
+              </Row>
             )}
           </Rows>
         </box>

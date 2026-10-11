@@ -57,7 +57,11 @@ export function registerNodeAction(action: NodeAction): Disposable {
     throw new Error(`Duplicate node action '${id}': already registered for ${clash.path}, now for ${action.path}.`)
   }
   actions.set(id, action)
-  return { dispose: () => { if (actions.get(id) === action) actions.delete(id) } }
+  return {
+    dispose: () => {
+      if (actions.get(id) === action) actions.delete(id)
+    },
+  }
 }
 
 export const nodeAction = (pluginId: string, actionId: string): NodeAction | undefined =>

@@ -7,7 +7,7 @@ import { MAX_DOCKER_CONFIG_BYTES, readRepoDockerConfig } from './repoDockerConfi
 import { loadDockerLayers } from './dockerConfig'
 
 const home = vi.hoisted(() => vi.fn())
-vi.mock('node:os', async (original) => ({ ...await original<typeof import('node:os')>(), homedir: home }))
+vi.mock('node:os', async (original) => ({ ...(await original<typeof import('node:os')>()), homedir: home }))
 
 const temps: string[] = []
 async function fixture() {
@@ -18,7 +18,9 @@ async function fixture() {
   await mkdir(join(root, '.acorn'), { recursive: true })
   return { dir, root, path: join(root, '.acorn', 'config.toml') }
 }
-afterEach(async () => { await Promise.all(temps.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))) })
+afterEach(async () => {
+  await Promise.all(temps.splice(0).map((dir) => rm(dir, { recursive: true, force: true })))
+})
 
 describe('repository Docker configuration read', () => {
   it('reads ordinary files and safe internal aliases', async () => {
@@ -66,9 +68,13 @@ describe('repository Docker configuration read', () => {
     expect(layers.effective).toEqual({ composeProject: 'owner-choice', matchLabels: [], matchName: false })
   })
 
-  it.skipIf(process.platform === 'win32')('rejects a FIFO without waiting for a writer', async () => {
-    const { root, path } = await fixture()
-    execFileSync('mkfifo', [path])
-    await expect(readRepoDockerConfig(root)).rejects.toThrow('Invalid')
-  }, 2_000)
+  it.skipIf(process.platform === 'win32')(
+    'rejects a FIFO without waiting for a writer',
+    async () => {
+      const { root, path } = await fixture()
+      execFileSync('mkfifo', [path])
+      await expect(readRepoDockerConfig(root)).rejects.toThrow('Invalid')
+    },
+    2_000,
+  )
 })

@@ -25,14 +25,18 @@ export default function StartupScreen(props: { stage: StartupStage; onRetry: () 
       <Show when={props.stage.kind === 'offline'}>
         <p class="muted">Acorn will open your workspace when your computer is back online.</p>
         <div class="node-gate-actions">
-          <Button variant="solid" onPress={props.onRetry}>Try again</Button>
+          <Button variant="solid" onPress={props.onRetry}>
+            Try again
+          </Button>
         </div>
       </Show>
       <Show when={failure()}>
         {(failed) => (
           <>
             <div class="node-gate-actions">
-              <Button variant="solid" onPress={props.onRetry}>Try again</Button>
+              <Button variant="solid" onPress={props.onRetry}>
+                Try again
+              </Button>
               <Button expanded={showReason()} onPress={() => setShowReason((v) => !v)}>
                 Show details
               </Button>

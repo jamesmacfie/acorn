@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   runSetup: vi.fn(),
 }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
-  ...await importOriginal<Record<string, unknown>>(),
+  ...(await importOriginal<Record<string, unknown>>()),
   runApi: { targets: mocks.targets, start: mocks.start, stop: mocks.stop, status: mocks.status },
   setTerminalOpen: mocks.setTerminalOpen,
   dispatchLayout: mocks.dispatchLayout,
@@ -45,10 +45,20 @@ import { terminalCommands, TERMINAL_GROUP } from './commands'
 // failed configuration read is now a message rather than an empty list, and one frame is one fetch.
 
 const search = (id: string): SearchCommand => terminalCommands.find((command) => command.id === id) as SearchCommand
-const setupCommand = () => terminalCommands.find((command) => command.id === 'terminal.run.setup') as Extract<ContributedCommand, { run: unknown }>
+const setupCommand = () =>
+  terminalCommands.find((command) => command.id === 'terminal.run.setup') as Extract<
+    ContributedCommand,
+    { run: unknown }
+  >
 
 const context = (taskId: string): CommandExecutionContext => ({
-  host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId, paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId: 'node-1',
+  workspaceId: 'w-1',
+  projectId: 'p-1',
+  taskId,
+  paneId: null,
+  surfaceId: null,
 })
 
 const signal = (): AbortSignal => new AbortController().signal
@@ -68,7 +78,11 @@ describe('the terminal plugin catalogue', () => {
     // `terminal.run`, not `core.terminal`: the drawer and the plain shell belong to the shell, and a
     // plugin may not name another owner's group as its parent (graph.ts § cross-owner-parent).
     expect(terminalCommands.map((command) => command.id)).toEqual([
-      TERMINAL_GROUP, 'terminal.run.setup', 'terminal.run.targets', 'terminal.run.layouts', 'terminal.run.sessions',
+      TERMINAL_GROUP,
+      'terminal.run.setup',
+      'terminal.run.targets',
+      'terminal.run.layouts',
+      'terminal.run.sessions',
     ])
     for (const command of terminalCommands) {
       expect(command.scope, command.id).toBe('task')
@@ -98,7 +112,11 @@ describe('the terminal plugin catalogue', () => {
   })
 
   it('asks the node once per frame, however much is typed', async () => {
-    mocks.targets.mockResolvedValue({ targets: [target('dev', false)], layouts: [{ id: 'review', panes: ['pr'] }], errors: [] })
+    mocks.targets.mockResolvedValue({
+      targets: [target('dev', false)],
+      layouts: [{ id: 'review', panes: ['pr'] }],
+      errors: [],
+    })
     const world = context('task-1')
     const targets = search('terminal.run.targets')
     expect(ids(await targets.query('', world, signal()))).toEqual(['target:dev'])
@@ -111,7 +129,9 @@ describe('the terminal plugin catalogue', () => {
   it('says why the list is empty when the configuration read failed', async () => {
     mocks.targets.mockResolvedValue({ error: 'repo config is untrusted' })
     // The old source answered with no rows here, so a reader saw an empty list and no reason for it.
-    await expect(search('terminal.run.targets').query('', context('task-1'), signal())).rejects.toThrow('repo config is untrusted')
+    await expect(search('terminal.run.targets').query('', context('task-1'), signal())).rejects.toThrow(
+      'repo config is untrusted',
+    )
     // Not cached: pressing Enter on the failure asks again.
     mocks.targets.mockResolvedValue({ targets: [target('dev', false)], layouts: [], errors: [] })
     expect(ids(await search('terminal.run.targets').query('', context('task-1'), signal()))).toEqual(['target:dev'])
@@ -158,8 +178,9 @@ describe('the terminal plugin catalogue', () => {
     mocks.targets.mockResolvedValue({ targets: [target('dev', false)], layouts: [], errors: [] })
     const world = context('task-1')
     await search('terminal.run.targets').query('', world, signal())
-    await expect(search('terminal.run.targets').select({ id: 'target:gone', title: 'x', ref: 'gone' }, world))
-      .rejects.toThrow('no longer a target')
+    await expect(
+      search('terminal.run.targets').select({ id: 'target:gone', title: 'x', ref: 'gone' }, world),
+    ).rejects.toThrow('no longer a target')
     expect(mocks.start).not.toHaveBeenCalled()
   })
 
@@ -172,11 +193,17 @@ describe('the terminal plugin catalogue', () => {
   })
 
   it('restates a config problem and keeps the frame open, since there is nothing to run', async () => {
-    mocks.targets.mockResolvedValue({ targets: [], layouts: [], errors: [{ source: 'repo', message: 'cycle: a → b → a' }] })
+    mocks.targets.mockResolvedValue({
+      targets: [],
+      layouts: [],
+      errors: [{ source: 'repo', message: 'cycle: a → b → a' }],
+    })
     const world = context('task-1')
     const rows = await search('terminal.run.targets').query('', world, signal())
-    expect(await search('terminal.run.targets').select(rows[0], world))
-      .toEqual({ effect: 'stay', status: 'repo: cycle: a → b → a' })
+    expect(await search('terminal.run.targets').select(rows[0], world)).toEqual({
+      effect: 'stay',
+      status: 'repo: cycle: a → b → a',
+    })
     expect(mocks.start).not.toHaveBeenCalled()
   })
 
@@ -185,9 +212,15 @@ describe('the terminal plugin catalogue', () => {
     const world = context('task-1')
     const layouts = search('terminal.run.layouts')
     const rows = await layouts.query('', world, signal())
-    expect(rows).toEqual([{ id: 'layout:review', title: 'review', subtitle: 'open panes + start target', ref: 'review' }])
+    expect(rows).toEqual([
+      { id: 'layout:review', title: 'review', subtitle: 'open panes + start target', ref: 'review' },
+    ])
     expect(await layouts.select(rows[0], world)).toEqual({ effect: 'close' })
-    expect(mocks.invokeLayoutRecipe).toHaveBeenCalledWith('task-1', { id: 'review', panes: ['pr', 'changes'] }, expect.any(Object))
+    expect(mocks.invokeLayoutRecipe).toHaveBeenCalledWith(
+      'task-1',
+      { id: 'review', panes: ['pr', 'changes'] },
+      expect.any(Object),
+    )
 
     mocks.invokeLayoutRecipe.mockResolvedValue({ ok: false, reason: 'unknown pane' })
     await expect(layouts.select(rows[0], world)).rejects.toThrow('unknown pane')

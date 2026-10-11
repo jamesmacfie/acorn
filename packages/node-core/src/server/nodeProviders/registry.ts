@@ -1,4 +1,9 @@
-import { NODE_LIFECYCLE_VERBS, type NodeLifecycleVerb, type NodeProviderDescriptor, type ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
+import {
+  NODE_LIFECYCLE_VERBS,
+  type NodeLifecycleVerb,
+  type NodeProviderDescriptor,
+  type ProvidedNode,
+} from '@acorn/protocol/nodeProviders.ts'
 import type { Disposable } from '../pluginHost/capabilities'
 
 // Node providers: a plugin that knows about nodes, and optionally can make and remove them
@@ -74,7 +79,11 @@ export function registerNodeProvider(pluginId: string, provider: NodeProviderCon
   if (providers.has(qualifiedId)) throw new Error(`Duplicate node provider '${qualifiedId}'.`)
   const registered = { ...provider, qualifiedId, pluginId }
   providers.set(qualifiedId, registered)
-  return { dispose: () => { if (providers.get(qualifiedId) === registered) providers.delete(qualifiedId) } }
+  return {
+    dispose: () => {
+      if (providers.get(qualifiedId) === registered) providers.delete(qualifiedId)
+    },
+  }
 }
 
 export function clearNodeProviders(pluginId: string): void {

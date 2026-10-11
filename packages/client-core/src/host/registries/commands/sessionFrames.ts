@@ -4,7 +4,14 @@ import type { CommandNode } from './graph'
 import type { SessionFrame, SessionFrameKind, SessionSearchState, SessionSettingState } from './sessionStore'
 
 export const ROOT: SessionFrame = {
-  kind: 'root', commandId: null, title: null, breadcrumb: [], query: '', selectedId: null, status: '', placeholder: '',
+  kind: 'root',
+  commandId: null,
+  title: null,
+  breadcrumb: [],
+  query: '',
+  selectedId: null,
+  status: '',
+  placeholder: '',
 }
 
 const frameKind = (command: CommandContribution): SessionFrameKind =>
@@ -33,9 +40,10 @@ export const frameFor = (node: CommandNode): SessionFrame => ({
   query: '',
   selectedId: null,
   status: '',
-  placeholder: node.command.kind === 'setting'
-    ? 'Filter the choices…'
-    : (node.command.kind === 'search' || node.command.kind === 'input' ? node.command.placeholder : '') ?? '',
+  placeholder:
+    node.command.kind === 'setting'
+      ? 'Filter the choices…'
+      : ((node.command.kind === 'search' || node.command.kind === 'input' ? node.command.placeholder : '') ?? ''),
   ...(node.command.kind === 'search' ? { search: instructionState(node.command) } : {}),
   ...(node.command.kind === 'setting' ? { setting: SETTING_LOADING } : {}),
 })

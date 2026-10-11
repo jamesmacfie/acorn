@@ -39,7 +39,7 @@ const parseObject = (json: string | undefined): Record<string, unknown> => {
   if (!json) return {}
   try {
     const value = JSON.parse(json) as unknown
-    return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
   } catch {
     return {}
   }
@@ -74,7 +74,8 @@ export function resolveKeybindings(
     if (!a.plugin && !b.plugin) return 0
     if (!a.plugin) return -1
     if (!b.plugin) return 1
-    const installed = (a.plugin.installedAt() ?? Number.MAX_SAFE_INTEGER) - (b.plugin.installedAt() ?? Number.MAX_SAFE_INTEGER)
+    const installed =
+      (a.plugin.installedAt() ?? Number.MAX_SAFE_INTEGER) - (b.plugin.installedAt() ?? Number.MAX_SAFE_INTEGER)
     return installed || a.plugin.id.localeCompare(b.plugin.id) || a.id.localeCompare(b.id)
   })
 
@@ -87,14 +88,17 @@ export function resolveKeybindings(
   // Explicit user choices outrank every default. Within each tier, the deterministic source order
   // remains the tiebreak, so a malformed persisted map containing two colliding overrides still has
   // one stable winner and a visible loser.
-  const precedence = [...candidates].sort((a, b) => Number(b.overridden) - Number(a.overridden) || a.sourceIndex - b.sourceIndex)
+  const precedence = [...candidates].sort(
+    (a, b) => Number(b.overridden) - Number(a.overridden) || a.sourceIndex - b.sourceIndex,
+  )
   const claimed: ResolvedKeybinding[] = []
   const byId = new Map<string, ResolvedKeybinding>()
   for (const { binding, chord } of precedence) {
     const participates = options.includeInactiveConflicts || (binding.active?.() ?? true)
-    const conflict = chord && participates
-      ? claimed.find((candidate) => candidate.chord === chord && scopesConflict(binding, candidate))
-      : undefined
+    const conflict =
+      chord && participates
+        ? claimed.find((candidate) => candidate.chord === chord && scopesConflict(binding, candidate))
+        : undefined
     const resolved: ResolvedKeybinding = {
       ...binding,
       chord: conflict || !chord ? null : chord,
@@ -149,11 +153,7 @@ export function registerKeybindings(bindings: readonly KeybindingContribution[])
   return { dispose: () => [...disposables].reverse().forEach((disposable) => disposable.dispose()) }
 }
 
-export function KeybindingDispatcher(props: {
-  prefs: KeybindingPrefs
-  taskActive: boolean
-  focusedPane?: string
-}) {
+export function KeybindingDispatcher(props: { prefs: KeybindingPrefs; taskActive: boolean; focusedPane?: string }) {
   const resolved = createMemo(() => resolveKeybindings(keybindingRegistry.entries(), props.prefs))
   // The shell's one keyboard listener, and it is not one of ours any more: `keys/install.ts` puts
   // `@opentui/keymap` on the document root and registers these bindings as a layer over the command

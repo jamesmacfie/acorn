@@ -69,9 +69,6 @@ it('reads the node as live once its first status lands', async () => {
 
 it('lets a hard error win over starting', async () => {
   // A fingerprint that changed is a security stop (docs/security.md), and "Starting" would hide it.
-  await seed(
-    [record('local-1', true)],
-    [{ nodeId: 'local-1', state: 'offline', error: { code: 'identity_mismatch' } }],
-  )
+  await seed([record('local-1', true)], [{ nodeId: 'local-1', state: 'offline', error: { code: 'identity_mismatch' } }])
   expect(chipText('local-1')).toContain('Identity changed')
 })

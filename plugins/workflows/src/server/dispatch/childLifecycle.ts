@@ -15,11 +15,7 @@ import type {
   WorkflowStepRow,
 } from '../../shared/workflowContracts'
 import type { WorkflowDispatchRequest, WorkflowDispatchResult } from './dispatcher'
-import {
-  resolveChildWorkflowInputs,
-  resolveWorkflowMapRoster,
-  type WorkflowMapRoster,
-} from '../validation/bindings'
+import { resolveChildWorkflowInputs, resolveWorkflowMapRoster, type WorkflowMapRoster } from '../validation/bindings'
 import { workflowContentFingerprint } from '../definitions/fingerprint'
 import { workflowRunUsage } from '../runs/read/readModel'
 import { WorkflowSafetyRailError } from '../validation/treeSafety'
@@ -32,7 +28,10 @@ const TERMINAL_RUN = new Set(['done', 'completed-with-failures', 'failed', 'safe
 const SUMMARY_LIMIT = 2_000
 
 type ChildLifecycleServices = {
-  select?(request: WorkflowSelectionRequest, signal?: AbortSignal): Promise<{ selectionId: string; children: WorkflowDispatchResult[] }>
+  select?(
+    request: WorkflowSelectionRequest,
+    signal?: AbortSignal,
+  ): Promise<{ selectionId: string; children: WorkflowDispatchResult[] }>
   dispatch(request: WorkflowDispatchRequest, signal?: AbortSignal): Promise<WorkflowDispatchResult>
   dispatchMany(requests: readonly WorkflowDispatchRequest[], signal?: AbortSignal): Promise<WorkflowDispatchResult[]>
   steps(runId: string): Promise<WorkflowStepRow[]>
@@ -44,8 +43,11 @@ type ChildLifecycleServices = {
 type ChangeWait = { promise: Promise<void>; cancel(): void }
 
 const asRunStatus = (status: string | undefined): WorkflowChildRunSummary['runStatus'] =>
-  status && ['running', 'gated', 'cancelling', 'done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'].includes(status)
-    ? status as WorkflowChildRunSummary['runStatus']
+  status &&
+  ['running', 'gated', 'cancelling', 'done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'].includes(
+    status,
+  )
+    ? (status as WorkflowChildRunSummary['runStatus'])
     : null
 
 const bounded = (value: string | null | undefined): string | null => {
@@ -59,7 +61,13 @@ function itemGoal(steps: readonly WorkflowStepRow[]): Pick<WorkflowChildRunSumma
   const raw = steps.find((step) => step.goalJson)?.goalJson
   if (!raw) return {}
   const goal = JSON.parse(raw) as AgentExecuteGoalSummary
-  return { goal: { status: goal.status, continuations: goal.continuations, reason: goal.reason ?? goal.verdict?.reason ?? null } }
+  return {
+    goal: {
+      status: goal.status,
+      continuations: goal.continuations,
+      reason: goal.reason ?? goal.verdict?.reason ?? null,
+    },
+  }
 }
 
 export class WorkflowChildLifecycle {
@@ -87,26 +95,33 @@ export class WorkflowChildLifecycle {
           ctx.predecessorValues,
         )
       } catch (error) {
-        return { status: 'failed', error: error instanceof Error ? error.message : 'Child workflow input binding failed.' }
+        return {
+          status: 'failed',
+          error: error instanceof Error ? error.message : 'Child workflow input binding failed.',
+        }
       }
 
       await this.services.setStep(ctx.step.id, { status: 'waiting-children' })
       let dispatched: WorkflowDispatchResult
       try {
-        dispatched = await this.services.dispatch({
-          callerKey: `${ctx.run.id}:${ctx.step.id}:single`,
-          parentRunId: ctx.run.id,
-          parentStepId: ctx.step.id,
-          task: {
-            title: `${ctx.run.name}: ${ctx.def.name}`.slice(0, 500),
-            branch: slugifyBranch(`${ctx.run.name}-${ctx.def.name}`),
+        dispatched = await this.services.dispatch(
+          {
+            callerKey: `${ctx.run.id}:${ctx.step.id}:single`,
+            parentRunId: ctx.run.id,
+            parentStepId: ctx.step.id,
+            task: {
+              title: `${ctx.run.name}: ${ctx.def.name}`.slice(0, 500),
+              branch: slugifyBranch(`${ctx.run.name}-${ctx.def.name}`),
+            },
+            workflow: snapshot.definition,
+            inputs: childInputs,
           },
-          workflow: snapshot.definition,
-          inputs: childInputs,
-        }, ctx.signal)
+          ctx.signal,
+        )
       } catch (error) {
         if (ctx.signal.aborted) return { status: 'cancelled', error: 'Child workflow dispatch cancelled.' }
-        if (error instanceof WorkflowSafetyRailError) return { status: 'safety-rail', scope: 'admission', error: error.message }
+        if (error instanceof WorkflowSafetyRailError)
+          return { status: 'safety-rail', scope: 'admission', error: error.message }
         return { status: 'failed', error: error instanceof Error ? error.message : 'Child workflow dispatch failed.' }
       }
 
@@ -130,8 +145,16 @@ export class WorkflowChildLifecycle {
 
       let roster: WorkflowMapRoster
       try {
-        roster = this.persistedRoster(ctx.step)
-          ?? resolveWorkflowMapRoster(ctx.def, ctx.inputs, await this.services.steps(ctx.run.id), snapshot.defaultInputs, ctx.predecessorValues, snapshot.definition.name)
+        roster =
+          this.persistedRoster(ctx.step) ??
+          resolveWorkflowMapRoster(
+            ctx.def,
+            ctx.inputs,
+            await this.services.steps(ctx.run.id),
+            snapshot.defaultInputs,
+            ctx.predecessorValues,
+            snapshot.definition.name,
+          )
         await this.services.setStep(ctx.step.id, { inputsJson: JSON.stringify({ mapRoster: roster }) })
       } catch (error) {
         return { status: 'failed', error: error instanceof Error ? error.message : 'Workflow map binding failed.' }
@@ -150,28 +173,57 @@ export class WorkflowChildLifecycle {
           inputs: entry.inputs,
         }))
         if (this.services.select) {
-          const source = ctx.def.items && ctx.predecessorValues?.[ctx.def.items.step] as (DataSourceResult & { provenance?: ResolvedQuery }) | undefined
+          const source =
+            ctx.def.items &&
+            (ctx.predecessorValues?.[ctx.def.items.step] as
+              | (DataSourceResult & { provenance?: ResolvedQuery })
+              | undefined)
           let checkpoint: WorkflowSelectionRequest['checkpoint']
           if (source?.provenance?.query.incremental) {
-            if (source.mode !== 'execution' || source.completeness.kind !== 'complete' || source.incrementalBoundary === undefined || source.provenance.query.take) throw new Error('Incremental selection is not complete')
+            if (
+              source.mode !== 'execution' ||
+              source.completeness.kind !== 'complete' ||
+              source.incrementalBoundary === undefined ||
+              source.provenance.query.take
+            )
+              throw new Error('Incremental selection is not complete')
             const { incremental, ...query } = source.provenance.query
-            checkpoint = { queryFingerprint: workflowContentFingerprint(query), boundary: source.incrementalBoundary,
-              ...(incremental.kind === 'continue' ? { previousBoundary: incremental.boundary } : {}) }
+            checkpoint = {
+              queryFingerprint: workflowContentFingerprint(query),
+              boundary: source.incrementalBoundary,
+              ...(incremental.kind === 'continue' ? { previousBoundary: incremental.boundary } : {}),
+            }
           }
-          const selected = await this.services.select({ invocationKey: `${ctx.run.id}:${ctx.step.id}:selection`, runId: ctx.run.id,
-            stepId: ctx.step.id, policy: ctx.def.repeat ?? { mode: 'every-match' },
-            records: roster.entries.map((entry, index) => ({ key: entry.itemKey, snapshot: parseDataValue(entry.item), dispatch: requests[index] })),
-            ...(source?.provenance ? { provenance: parseDataValue({
-              source: source.provenance.query.source,
-              connectionId: source.provenance.query.scope.connectionId ?? null,
-              sourceRevision: source.revision,
-              savedQuery: source.provenance.published
-                ? { id: source.provenance.published.queryId, revision: source.provenance.published.revision }
-                : null,
-              evaluationTime: source.evaluationTime,
-              readTime: source.readTime,
-              completeness: source.completeness,
-            }) } : {}), ...(checkpoint ? { checkpoint } : {}) }, ctx.signal)
+          const selected = await this.services.select(
+            {
+              invocationKey: `${ctx.run.id}:${ctx.step.id}:selection`,
+              runId: ctx.run.id,
+              stepId: ctx.step.id,
+              policy: ctx.def.repeat ?? { mode: 'every-match' },
+              records: roster.entries.map((entry, index) => ({
+                key: entry.itemKey,
+                snapshot: parseDataValue(entry.item),
+                dispatch: requests[index],
+              })),
+              ...(source?.provenance
+                ? {
+                    provenance: parseDataValue({
+                      source: source.provenance.query.source,
+                      connectionId: source.provenance.query.scope.connectionId ?? null,
+                      sourceRevision: source.revision,
+                      savedQuery: source.provenance.published
+                        ? { id: source.provenance.published.queryId, revision: source.provenance.published.revision }
+                        : null,
+                      evaluationTime: source.evaluationTime,
+                      readTime: source.readTime,
+                      completeness: source.completeness,
+                    }),
+                  }
+                : {}),
+              ...(checkpoint ? { checkpoint } : {}),
+            },
+            ctx.signal,
+          )
           dispatched = selected.children
         } else {
           if (ctx.def.repeat) throw new Error('Record processing is unavailable')
@@ -179,7 +231,8 @@ export class WorkflowChildLifecycle {
         }
       } catch (error) {
         if (ctx.signal.aborted) return { status: 'cancelled', error: 'Workflow map dispatch cancelled.' }
-        if (error instanceof WorkflowSafetyRailError) return { status: 'safety-rail', scope: 'admission', error: error.message }
+        if (error instanceof WorkflowSafetyRailError)
+          return { status: 'safety-rail', scope: 'admission', error: error.message }
         return { status: 'failed', error: error instanceof Error ? error.message : 'Workflow map dispatch failed.' }
       }
       if (ctx.signal.aborted) return { status: 'cancelled', error: 'Workflow map dispatch cancelled.' }
@@ -204,9 +257,11 @@ export class WorkflowChildLifecycle {
       .select()
       .from(schema.workflowDispatches)
       .where(eq(schema.workflowDispatches.parentStepId, parentStepId))
-    return Promise.all(dispatches
-      .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
-      .map((row) => this.summary(row)))
+    return Promise.all(
+      dispatches
+        .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
+        .map((row) => this.summary(row)),
+    )
   }
 
   private persistedRoster(step: WorkflowStepRow): WorkflowMapRoster | null {
@@ -224,17 +279,15 @@ export class WorkflowChildLifecycle {
     if (!run.resolvedGraphJson) return null
     try {
       const graph = JSON.parse(run.resolvedGraphJson) as ResolvedWorkflowGraph
-      return graph.nodes.find((node) => node.path.length === 2 && node.path[0] === '$' && node.path[1] === stepName) ?? null
+      return (
+        graph.nodes.find((node) => node.path.length === 2 && node.path[0] === '$' && node.path[1] === stepName) ?? null
+      )
     } catch {
       return null
     }
   }
 
-  async waitForChild(
-    parentRunId: string,
-    childRunId: string,
-    signal: AbortSignal,
-  ): Promise<StepHandlerOutcome> {
+  async waitForChild(parentRunId: string, childRunId: string, signal: AbortSignal): Promise<StepHandlerOutcome> {
     for (;;) {
       if (signal.aborted) return { status: 'cancelled', error: 'Child workflow dispatch cancelled.' }
       const change = this.waitForChange(childRunId, signal)
@@ -274,25 +327,49 @@ export class WorkflowChildLifecycle {
     for (;;) {
       if (signal.aborted) return { status: 'cancelled', error: 'Workflow map dispatch cancelled.' }
       const change = this.waitForAnyChange(runIds, signal)
-      const runRows = await this.db.select({ id: schema.workflowRuns.id, status: schema.workflowRuns.status, error: schema.workflowRuns.error }).from(schema.workflowRuns).where(inArray(schema.workflowRuns.id, runIds))
-      const dispatchRows = await this.db.select({ runId: schema.workflowDispatches.runId, state: schema.workflowDispatches.state, error: schema.workflowDispatches.error }).from(schema.workflowDispatches).where(inArray(schema.workflowDispatches.runId, runIds))
-      const runs = runIds.map(id => runRows.find(run => run.id === id))
-      const settled = runs.map((run, index) => TERMINAL_RUN.has(run?.status ?? '')
-        || (!run && dispatchRows.find(row => row.runId === runIds[index])?.state === 'terminal'))
+      const runRows = await this.db
+        .select({ id: schema.workflowRuns.id, status: schema.workflowRuns.status, error: schema.workflowRuns.error })
+        .from(schema.workflowRuns)
+        .where(inArray(schema.workflowRuns.id, runIds))
+      const dispatchRows = await this.db
+        .select({
+          runId: schema.workflowDispatches.runId,
+          state: schema.workflowDispatches.state,
+          error: schema.workflowDispatches.error,
+        })
+        .from(schema.workflowDispatches)
+        .where(inArray(schema.workflowDispatches.runId, runIds))
+      const runs = runIds.map((id) => runRows.find((run) => run.id === id))
+      const settled = runs.map(
+        (run, index) =>
+          TERMINAL_RUN.has(run?.status ?? '') ||
+          (!run && dispatchRows.find((row) => row.runId === runIds[index])?.state === 'terminal'),
+      )
       if (settled.every(Boolean)) {
         change.cancel()
         const at = Date.now()
-        await Promise.all(runIds.map((runId, index) => this.db
-          .update(schema.workflowDispatches)
-          .set({ state: 'terminal', error: runs[index]?.error ?? dispatchRows.find(row => row.runId === runId)?.error ?? null, updatedAt: at + index })
-          .where(eq(schema.workflowDispatches.runId, runId))))
+        await Promise.all(
+          runIds.map((runId, index) =>
+            this.db
+              .update(schema.workflowDispatches)
+              .set({
+                state: 'terminal',
+                error: runs[index]?.error ?? dispatchRows.find((row) => row.runId === runId)?.error ?? null,
+                updatedAt: at + index,
+              })
+              .where(eq(schema.workflowDispatches.runId, runId)),
+          ),
+        )
         await this.services.setParentStatus(parentRunId, 'running')
         const terminal = await Promise.all(runIds.map((runId) => this.summaryForRun(runId)))
         const complete = terminal.filter((summary): summary is WorkflowChildRunSummary => summary !== null)
         for (const summary of complete) this.services.childChanged?.({ ...summary, ownerTaskId: summary.parentTaskId })
         return this.mapOutcome(stepName, roster, complete)
       }
-      await this.services.setParentStatus(parentRunId, runs.some((run) => run?.status === 'gated') ? 'gated' : 'running')
+      await this.services.setParentStatus(
+        parentRunId,
+        runs.some((run) => run?.status === 'gated') ? 'gated' : 'running',
+      )
       await change.promise
     }
   }
@@ -305,8 +382,12 @@ export class WorkflowChildLifecycle {
     const data = {
       inputs: { mapRoster: roster },
       result: { children: summaries, failed: summaries.filter((summary) => summary.runStatus !== 'done').length },
-      structured: { children: summaries, selected: roster.entries.length, skipped: roster.entries.length - summaries.length,
-        emptyReason: !roster.entries.length ? 'no-matches' : !summaries.length ? 'all-skipped' : null },
+      structured: {
+        children: summaries,
+        selected: roster.entries.length,
+        skipped: roster.entries.length - summaries.length,
+        emptyReason: !roster.entries.length ? 'no-matches' : !summaries.length ? 'all-skipped' : null,
+      },
       handoff: JSON.stringify({ children: summaries }, null, 2),
     }
     const failed = summaries.filter((summary) => summary.runStatus !== 'done')
@@ -327,7 +408,12 @@ export class WorkflowChildLifecycle {
       handoff: JSON.stringify(summary, null, 2),
     }
     if (run.status === 'done') return { status: 'done', ...data }
-    if (run.status === 'completed-with-failures') return { status: 'completed-with-failures', error: run.error ?? 'Child workflow completed with failures.', ...data }
+    if (run.status === 'completed-with-failures')
+      return {
+        status: 'completed-with-failures',
+        error: run.error ?? 'Child workflow completed with failures.',
+        ...data,
+      }
     const detail = run.error ? `: ${run.error}` : ''
     if (run.status === 'safety-rail') {
       return { status: 'failed', error: `Child workflow '${run.name}' stopped at a safety rail${detail}`, ...data }
@@ -359,13 +445,21 @@ export class WorkflowChildLifecycle {
       itemKey: dispatch.itemKey,
       taskId: dispatch.taskId,
       runId: dispatch.runId,
-      ...(dispatch.taskMode === 'parent' ? { taskMode: 'parent', agentSessionId: result?.agentSessionId ?? steps.find(step => step.agentSessionId)?.agentSessionId ?? null,
-        result: result ? JSON.parse(result.structuredJson ?? result.resultJson!) : null, ...itemGoal(steps) } : {}),
+      ...(dispatch.taskMode === 'parent'
+        ? {
+            taskMode: 'parent',
+            agentSessionId: result?.agentSessionId ?? steps.find((step) => step.agentSessionId)?.agentSessionId ?? null,
+            result: result ? JSON.parse(result.structuredJson ?? result.resultJson!) : null,
+            ...itemGoal(steps),
+          }
+        : {}),
       name: run?.name ?? null,
       dispatchState: dispatch.state as WorkflowChildRunSummary['dispatchState'],
       runStatus: asRunStatus(run?.status),
       resultSummary: bounded(result?.structuredJson ?? result?.resultJson),
-      ...(run && ['done', 'completed-with-failures'].includes(run.status) ? { outputs: workflowOutputs(JSON.parse(run.defJson), steps) } : {}),
+      ...(run && ['done', 'completed-with-failures'].includes(run.status)
+        ? { outputs: workflowOutputs(JSON.parse(run.defJson), steps) }
+        : {}),
       error: bounded(run?.error ?? dispatch.error),
       usage: await workflowRunUsage(this.db, dispatch.runId),
       updatedAt: Math.max(dispatch.updatedAt, run?.updatedAt ?? 0),

@@ -14,7 +14,13 @@ import { managedAgentApi } from './sessions/managedClient'
 import { openManagedSession, requestComposerFocus } from './sessions/managedSelection'
 import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { managedAgentStore } from './sessions/managedStore'
-import { choiceDescription, choiceGlyph, choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
+import {
+  choiceDescription,
+  choiceGlyph,
+  choiceLabel,
+  newSessionChoices,
+  type NewSessionChoice,
+} from './sessions/newSessionChoices'
 import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
 import { requestSessionGoalEditor } from './sessions/sessionGoalCommand'
 
@@ -63,8 +69,13 @@ const MAX_SESSION_ROWS = 50
 
 export const agentsCommands: readonly ContributedCommand[] = [
   {
-    id: 'agents.goal.set', title: 'Set session goal', category: 'action', palette: true,
-    scope: 'task', requires: { plugin: 'agents' }, run: (context) => requestSessionGoalEditor(context.taskId),
+    id: 'agents.goal.set',
+    title: 'Set session goal',
+    category: 'action',
+    palette: true,
+    scope: 'task',
+    requires: { plugin: 'agents' },
+    run: (context) => requestSessionGoalEditor(context.taskId),
   },
   {
     id: 'agents.sessions.new',
@@ -90,22 +101,24 @@ export const agentsCommands: readonly ContributedCommand[] = [
         readJson<CustomAgent[]>(customAgentsRoute).catch(() => []),
       ])
       pickedRows.clear()
-      return newSessionChoices(providers.filter((provider) => provider.installed), agents)
-        .map((choice): CommandSearchItem => {
-          const glyph = choiceGlyph(choice)
-          const id = choice.agent ? `custom-agent:${choice.agent.id}` : choice.provider.id
-          pickedRows.set(id, choice)
-          return {
-            id,
-            title: choiceLabel(choice),
-            subtitle: choiceDescription(choice),
-            ...(glyph ? { icon: glyph } : {}),
-            ...(choice.agent ? { badge: 'Agent' } : {}),
-            // The profile the session runs under. The row carries it because a picked row is all
-            // `select` gets, and the two ids differ for a provider that ships more than one profile.
-            ref: choice.provider.profileId,
-          }
-        })
+      return newSessionChoices(
+        providers.filter((provider) => provider.installed),
+        agents,
+      ).map((choice): CommandSearchItem => {
+        const glyph = choiceGlyph(choice)
+        const id = choice.agent ? `custom-agent:${choice.agent.id}` : choice.provider.id
+        pickedRows.set(id, choice)
+        return {
+          id,
+          title: choiceLabel(choice),
+          subtitle: choiceDescription(choice),
+          ...(glyph ? { icon: glyph } : {}),
+          ...(choice.agent ? { badge: 'Agent' } : {}),
+          // The profile the session runs under. The row carries it because a picked row is all
+          // `select` gets, and the two ids differ for a provider that ships more than one profile.
+          ref: choice.provider.profileId,
+        }
+      })
     }),
     select: async (item, context) => {
       const taskId = context.taskId
@@ -201,14 +214,12 @@ const SESSION_GROUP = 'agents.session'
  * drawn or picked, so a session that gains an action gains a command with it.
  */
 export function registerSessionActionCommands(model: AgentPaneModel): void {
-  const live = (id: string): SessionAction | undefined =>
-    model.sessionActions().find((action) => action.id === id)
+  const live = (id: string): SessionAction | undefined => model.sessionActions().find((action) => action.id === id)
   // Which actions exist changes with the session, the provider and the last turn; their labels and
   // their disabled flag do not need a re-registration, because a command reads both through `live`.
   // So this notifies on the id set alone, and typing in the palette does not race a re-register.
   const roster = createMemo(() => model.sessionActions(), [] as readonly SessionAction[], {
-    equals: (before, after) =>
-      before.map((action) => action.id).join() === after.map((action) => action.id).join(),
+    equals: (before, after) => before.map((action) => action.id).join() === after.map((action) => action.id).join(),
   })
   createEffect(() => {
     const actions = roster()

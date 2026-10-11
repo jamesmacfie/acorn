@@ -271,8 +271,7 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   // The graph is projected against the identity this session captured, so a command about a task is
   // simply not in a session that opened over no task (./graph.ts). Closed, there is no world to hold
   // the scopes against and the projection is the plain one.
-  const graph = createMemo<CommandGraph>(() =>
-    buildCommandGraph(commandRegistry.entries(), captured() ?? undefined))
+  const graph = createMemo<CommandGraph>(() => buildCommandGraph(commandRegistry.entries(), captured() ?? undefined))
   const frame = (): SessionFrame | null => frames()[frames().length - 1] ?? null
 
   const patchFrame = (patch: Partial<SessionFrame>): void => {
@@ -286,7 +285,10 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   /** The command a frame is showing, when it is the kind the frame says it is. A frame outlives
    *  nothing — a disposed contribution simply stops answering — so every reader checks. */
   type InteractiveKind = { search: SearchCommand; input: InputCommand; setting: SettingCommand }
-  const commandFor = <K extends keyof InteractiveKind>(frameAt: SessionFrame | null, kind: K): InteractiveKind[K] | null => {
+  const commandFor = <K extends keyof InteractiveKind>(
+    frameAt: SessionFrame | null,
+    kind: K,
+  ): InteractiveKind[K] | null => {
     if (!frameAt?.commandId || frameAt.kind !== kind) return null
     const command = commandRegistry.get(frameAt.commandId)
     if (!command || command.kind !== kind) return null
@@ -299,7 +301,11 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     return command ? command.select(result.item, result.context) : undefined
   }
 
-  const writeSetting = async (command: SettingCommand, option: CommandSettingOption, context: CommandExecutionContext): Promise<CommandOutcome> => {
+  const writeSetting = async (
+    command: SettingCommand,
+    option: CommandSettingOption,
+    context: CommandExecutionContext,
+  ): Promise<CommandOutcome> => {
     // A write has the session lifetime: typing does not cancel it, closing does.
     const signal = whileOpen?.signal ?? new AbortController().signal
     const canonical = await command.write(option.value, context, signal)
@@ -317,7 +323,11 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     if (current.kind === 'input') return inputRows(pending())
     if (current.kind === 'setting') {
       const command = commandFor(current, 'setting')
-      return command && current.setting ? settingRows(command, current.setting, current.query, (option, context) => writeSetting(command, option, context)) : []
+      return command && current.setting
+        ? settingRows(command, current.setting, current.query, (option, context) =>
+            writeSetting(command, option, context),
+          )
+        : []
     }
     return current.commandId === null
       ? rootRows(graph(), current.query, executeCommand)
@@ -361,7 +371,10 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
   // ── Searching ───────────────────────────────────────────────────────────────────────────────────
 
   /** Which worlds one query is asked in: the captured one, or one per capable node under `fleet`. */
-  const searchTargets = (command: SearchCommand, base: CommandExecutionContext): readonly { context: CommandExecutionContext; label?: string }[] => {
+  const searchTargets = (
+    command: SearchCommand,
+    base: CommandExecutionContext,
+  ): readonly { context: CommandExecutionContext; label?: string }[] => {
     if (commandScope(command) !== 'fleet') return [{ context: base }]
     const fleet = options.fleet?.() ?? []
     if (!fleet.length) return [{ context: base }]
@@ -386,13 +399,15 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     // A fan-out is what carries node labels, and it is what namespaces a row id — including a fleet of
     // one, so the id a row has does not depend on how many machines happen to be paired today.
     const fleet = targets.some((target) => target.label !== undefined)
-    void Promise.all(targets.map(async (target) => {
-      try {
-        return { target, items: await command.query(text, target.context, signal) }
-      } catch (error) {
-        return { target, error }
-      }
-    })).then((settled) => {
+    void Promise.all(
+      targets.map(async (target) => {
+        try {
+          return { target, items: await command.query(text, target.context, signal) }
+        } catch (error) {
+          return { target, error }
+        }
+      }),
+    ).then((settled) => {
       // Aborted means somebody else owns the frame now, or this answer was already given up on.
       if (signal.aborted) return
       const results: SessionSearchResult[] = []
@@ -692,15 +707,13 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     breadcrumb: () => {
       const current = frame()
       if (!current) return []
-      return current.kind === 'search' && current.placeholder
-        ? current.breadcrumb.slice(0, -1)
-        : current.breadcrumb
+      return current.kind === 'search' && current.placeholder ? current.breadcrumb.slice(0, -1) : current.breadcrumb
     },
     kind: () => frame()?.kind ?? 'root',
     query: () => frame()?.query ?? '',
     placeholder: () => {
       const value = frame()?.placeholder
-      return typeof value === 'function' ? value() : value ?? ''
+      return typeof value === 'function' ? value() : (value ?? '')
     },
     status: () => frame()?.status ?? '',
     // A search waiting on its provider is busy too, and the loading row says so where a spinner cannot.

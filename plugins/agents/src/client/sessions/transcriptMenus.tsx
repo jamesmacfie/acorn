@@ -1,6 +1,10 @@
 import { For, Show, untrack, type JSX } from 'solid-js'
 import {
-  contextMenuItems, runContextMenuItem, type AgentMessageTarget, type AgentTurnTarget, type ContentSelectionTarget,
+  contextMenuItems,
+  runContextMenuItem,
+  type AgentMessageTarget,
+  type AgentTurnTarget,
+  type ContentSelectionTarget,
 } from '@acorn/plugin-api/client'
 import { Icon, IconButton, Menu } from '@acorn/plugin-api/ui'
 import { SelectionActions, type SelectedContent } from '@acorn/plugin-api/ui/host'
@@ -46,9 +50,14 @@ export const messageMenuTarget = (
   const event = item.event
   if ((event.type !== 'user_message' && event.type !== 'assistant_message') || !turn) return undefined
   return {
-    location: 'agent.message', ...scope, itemId: item.key, turnId: turn.id,
-    role: event.type === 'user_message' ? 'user' : 'assistant', status: turn.status,
-    ...capped(shownMessageText(event, turn)), revision: item.lastSeq,
+    location: 'agent.message',
+    ...scope,
+    itemId: item.key,
+    turnId: turn.id,
+    role: event.type === 'user_message' ? 'user' : 'assistant',
+    status: turn.status,
+    ...capped(shownMessageText(event, turn)),
+    revision: item.lastSeq,
   }
 }
 
@@ -64,7 +73,17 @@ export const turnMenuTarget = (
 
 // What makes a target the same message or turn the card drew when its menu opened. The text follows
 // the revision, so it needn't be compared.
-const IDENTITY = ['location', 'nodeId', 'taskId', 'projectId', 'sessionId', 'itemId', 'turnId', 'status', 'revision'] as const
+const IDENTITY = [
+  'location',
+  'nodeId',
+  'taskId',
+  'projectId',
+  'sessionId',
+  'itemId',
+  'turnId',
+  'status',
+  'revision',
+] as const
 const sameTarget = (a: TranscriptTarget, b: TranscriptTarget | undefined): boolean =>
   !!b && IDENTITY.every((key) => (a as Record<string, unknown>)[key] === (b as Record<string, unknown>)[key])
 
@@ -88,14 +107,18 @@ export function ContributedTranscriptRows(props: {
   const rows = () => transcriptMenuRows(opened)
   return (
     <Show when={rows().length}>
-      <Show when={props.separated}><Menu.Separator /></Show>
+      <Show when={props.separated}>
+        <Menu.Separator />
+      </Show>
       <For each={rows()}>
         {(row) => (
           <Menu.Item
             context={props.context}
             // No icon, no slot: an empty one indents the label past the owner's rows.
             leading={row.icon ? <Icon name={row.icon} /> : undefined}
-            onSelect={() => { if (opened && sameTarget(opened, props.target())) runContextMenuItem(row, opened) }}
+            onSelect={() => {
+              if (opened && sameTarget(opened, props.target())) runContextMenuItem(row, opened)
+            }}
           >
             {row.label}
           </Menu.Item>
@@ -110,7 +133,9 @@ export function ContributedTranscriptRows(props: {
 export function TurnActionsMenu(props: { target: () => AgentTurnTarget | undefined }) {
   return (
     <Show when={transcriptMenuRows(props.target()).length}>
-      <Menu ariaLabel="Actions for this turn" placement="bottom-end"
+      <Menu
+        ariaLabel="Actions for this turn"
+        placement="bottom-end"
         trigger={({ toggle, open }) => (
           <IconButton icon="ellipsis" label="Actions for this turn" opens="menu" expanded={open()} onPress={toggle} />
         )}
@@ -127,19 +152,34 @@ export const messageSelectionTarget = (
   message: AgentMessageTarget | undefined,
   selected: SelectedContent | undefined,
 ): ContentSelectionTarget | undefined =>
-  message && selected && {
-    location: 'content.selection', nodeId: message.nodeId, taskId: message.taskId, projectId: message.projectId,
-    ownerId: 'agents', contentKind: selected.contentKind,
+  message &&
+  selected && {
+    location: 'content.selection',
+    nodeId: message.nodeId,
+    taskId: message.taskId,
+    projectId: message.projectId,
+    ownerId: 'agents',
+    contentKind: selected.contentKind,
     ...(selected.languageId === undefined ? {} : { languageId: selected.languageId }),
-    readOnly: true, text: selected.text, revision: message.revision,
+    readOnly: true,
+    text: selected.text,
+    revision: message.revision,
     resource: { kind: 'message', sessionId: message.sessionId, itemId: message.itemId },
   }
 
 /** Does the card still show the message this selection came from, at the same revision? */
-export const messageSelectionIsCurrent = (selection: ContentSelectionTarget, message: AgentMessageTarget | undefined): boolean =>
-  !!message && selection.resource?.kind === 'message' && selection.nodeId === message.nodeId && selection.taskId === message.taskId
-  && selection.projectId === message.projectId && selection.resource.sessionId === message.sessionId
-  && selection.resource.itemId === message.itemId && selection.revision === message.revision
+export const messageSelectionIsCurrent = (
+  selection: ContentSelectionTarget,
+  message: AgentMessageTarget | undefined,
+): boolean =>
+  !!message &&
+  selection.resource?.kind === 'message' &&
+  selection.nodeId === message.nodeId &&
+  selection.taskId === message.taskId &&
+  selection.projectId === message.projectId &&
+  selection.resource.sessionId === message.sessionId &&
+  selection.resource.itemId === message.itemId &&
+  selection.revision === message.revision
 
 /** A message's text, open to other plugins' actions on what the person selects in it. A host with no
  *  selection offers the message's whole text, as plain text the way a rendered selection is. */

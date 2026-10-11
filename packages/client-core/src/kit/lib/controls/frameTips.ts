@@ -16,7 +16,9 @@ export function mountFrameTips(doc: Document = document): () => void {
   const tipEl = (target: EventTarget | null): HTMLElement | null =>
     target instanceof Element ? (target.closest('[data-tip]') as HTMLElement | null) : null
 
-  const hide = () => { bubble.hidden = true }
+  const hide = () => {
+    bubble.hidden = true
+  }
 
   const show = (element: HTMLElement) => {
     const title = element.getAttribute('data-tip')
@@ -74,7 +76,10 @@ export function mountFrameTips(doc: Document = document): () => void {
       bubble.style.left = ''
       bubble.style.right = `${view.innerWidth - rect.left + 8}px`
     }
-    const middle = Math.max(margin + height / 2, Math.min(rect.top + rect.height / 2, view.innerHeight - margin - height / 2))
+    const middle = Math.max(
+      margin + height / 2,
+      Math.min(rect.top + rect.height / 2, view.innerHeight - margin - height / 2),
+    )
     bubble.style.top = `${middle}px`
   }
 

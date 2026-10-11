@@ -57,7 +57,10 @@ export type AppStartupOptions = {
   workspaces: Accessor<Workspace[] | undefined>
 }
 
-export function createAppStartupRestore(options: AppStartupOptions): { restored: Accessor<boolean>; lastWorkspaceId: Accessor<string> } {
+export function createAppStartupRestore(options: AppStartupOptions): {
+  restored: Accessor<boolean>
+  lastWorkspaceId: Accessor<string>
+} {
   let disposeTheme = () => {}
   createEffect(() => {
     const prefs = options.prefs()
@@ -72,13 +75,21 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
   // before the pane layouts land in the last phase gets a default layout that the saved one then
   // declines to overwrite.
   const [lastWorkspaceId, setLastWorkspaceId] = createSignal('')
-  const shellSlices = [workspaceHistorySlice, lastWorkspaceSlice(setLastWorkspaceId)] as readonly PersistedStateSlice<unknown>[]
+  const shellSlices = [
+    workspaceHistorySlice,
+    lastWorkspaceSlice(setLastWorkspaceId),
+  ] as readonly PersistedStateSlice<unknown>[]
 
   const { restored } = createStartupRestore({
     queryClient: options.queryClient,
     prefs: options.prefs,
-    ready: () => (options.contributionsReady?.() ?? true) && !options.cacheRestoring() && options.prefsSettled() && options.projects() !== undefined
-      && options.tasks() !== undefined && options.workspaces() !== undefined,
+    ready: () =>
+      (options.contributionsReady?.() ?? true) &&
+      !options.cacheRestoring() &&
+      options.prefsSettled() &&
+      options.projects() !== undefined &&
+      options.tasks() !== undefined &&
+      options.workspaces() !== undefined,
     slices: () => [...persistedStateRegistry.entries(), ...shellSlices],
   })
   return { restored, lastWorkspaceId }

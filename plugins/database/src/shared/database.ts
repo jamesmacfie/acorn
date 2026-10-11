@@ -52,22 +52,29 @@ export type DbSavedQuery = { id: string; name: string; notes: string | null; sql
 // table cannot drift apart. The manifest declares the scratch and completions paths as literals with
 // `:taskId` in them, the one form these helpers cannot produce.
 export const DATABASE_ROUTE_PREFIX = '/v1/p/database'
-const taskRoute = (taskId: string, rest: string) => `${DATABASE_ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}${rest}`
+const taskRoute = (taskId: string, rest: string) =>
+  `${DATABASE_ROUTE_PREFIX}/tasks/${encodeURIComponent(taskId)}${rest}`
 
 export const databaseTablesRoute = (taskId: string) => taskRoute(taskId, '/tables')
 export const databaseColumnsRoute = (taskId: string, schema: string, name: string) =>
   taskRoute(taskId, `/columns?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}`)
 export const databaseRowsRoute = (taskId: string, schema: string, name: string, offset?: number) =>
-  taskRoute(taskId, `/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`)
-export const databaseActionRoute = (taskId: string, action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate') =>
-  taskRoute(taskId, `/${action}`)
+  taskRoute(
+    taskId,
+    `/rows?schema=${encodeURIComponent(schema)}&name=${encodeURIComponent(name)}${offset ? `&offset=${offset}` : ''}`,
+  )
+export const databaseActionRoute = (
+  taskId: string,
+  action: 'connect' | 'disconnect' | 'query' | 'update' | 'insert' | 'delete' | 'generate',
+) => taskRoute(taskId, `/${action}`)
 // Saved queries: project-scoped rows, addressed through the task (the project is resolved server-side).
 export const databaseQueriesRoute = (taskId: string) => taskRoute(taskId, '/queries')
 // The task's scratch document, as this plugin's own route rather than the host's document handle: the
 // panel reads it back after the palette's `Generate SQL` wrote it, which is a question about the stored
 // row and not about what is in the editor right now.
 export const databaseScratchRoute = (taskId: string) => taskRoute(taskId, '/scratch')
-export const databaseQueryRoute = (taskId: string, queryId: string) => taskRoute(taskId, `/queries/${encodeURIComponent(queryId)}`)
+export const databaseQueryRoute = (taskId: string, queryId: string) =>
+  taskRoute(taskId, `/queries/${encodeURIComponent(queryId)}`)
 // Which backends this owner could generate with — a stored key, or an agent CLI installed on this
 // machine. A plugin route rather than a bridge call because `/v1/core/integrations` has no bridge
 // scope, and the frame needs ids and labels, not keys.

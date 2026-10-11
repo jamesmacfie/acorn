@@ -12,17 +12,19 @@ const context = (priced = true): SessionHeaderProps => ({
   providerId: 'codex',
   tokenAccounting: 'cumulative',
   costAccounting: 'cumulative',
-  turns: [{
-    turnId: 'turn-1',
-    model: 'gpt-5.6-terra',
-    usage: {
-      inputTokens: 100_000,
-      outputTokens: 10_000,
-      cachedInputTokens: 40_000,
-      cacheWriteInputTokens: 10_000,
+  turns: [
+    {
+      turnId: 'turn-1',
+      model: 'gpt-5.6-terra',
+      usage: {
+        inputTokens: 100_000,
+        outputTokens: 10_000,
+        cachedInputTokens: 40_000,
+        cacheWriteInputTokens: 10_000,
+      },
+      price: priced ? { input: 2, output: 12, cacheWrite: 2.5, cacheRead: 0.2 } : null,
     },
-    price: priced ? { input: 2, output: 12, cacheWrite: 2.5, cacheRead: 0.2 } : null,
-  }],
+  ],
 })
 
 async function emitted(props: SessionHeaderProps): Promise<TreeNode[]> {
@@ -57,8 +59,9 @@ describe('session cost remote tree', () => {
       size: 'xs',
       tip: expect.stringContaining('Estimated from the tokens used'),
     })
-    expect(nodes.find((node) => node.type === 'Badge')?.props.tip)
-      .toContain('40% of 100K input tokens came from the prompt cache, 10K written to it.')
+    expect(nodes.find((node) => node.type === 'Badge')?.props.tip).toContain(
+      '40% of 100K input tokens came from the prompt cache, 10K written to it.',
+    )
     expect(nodes.find((node) => node.type === '#text')?.props.value).toBe('≈$0.25')
   })
 

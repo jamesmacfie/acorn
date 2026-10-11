@@ -64,7 +64,10 @@ const PROVIDER = 'linear'
 
 // `identifiers` is capped further down by the provider's own resolution budget; the schema's job is
 // only to say that what arrived is a list of strings.
-const issuesBody = z.object({ identifiers: z.array(z.string()).default([]) }) satisfies z.ZodType<LinearIssuesRequest, Partial<LinearIssuesRequest>>
+const issuesBody = z.object({ identifiers: z.array(z.string()).default([]) }) satisfies z.ZodType<
+  LinearIssuesRequest,
+  Partial<LinearIssuesRequest>
+>
 const commentBody = z.object({ body: z.string(), parentId: z.string().optional() })
 const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id === LINEAR_ISSUES_RESOURCE)!.ttlMs
 
@@ -208,10 +211,15 @@ async function searchMappedIssues(
       const err = linearError(res)
       if (err) {
         search.failed++
-        search.failure ??= { code: err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status: err.status }
+        search.failure ??= {
+          code: err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable',
+          status: err.status,
+        }
         continue
       }
-      const { issues } = await linearData<{ issues: { nodes: LinearNode[]; pageInfo?: { hasNextPage?: boolean } } }>(res)
+      const { issues } = await linearData<{ issues: { nodes: LinearNode[]; pageInfo?: { hasNextPage?: boolean } } }>(
+        res,
+      )
       for (const node of issues.nodes) search.found.push({ row, node })
       if (issues.pageInfo?.hasNextPage) search.more = true
     } catch {
@@ -231,265 +239,293 @@ const allFailed = (search: MappedSearch): boolean => search.asked > 0 && search.
 function railRows(found: { row: StoredConnection; node: LinearNode }[]) {
   const issues = found.map(({ row, node }) => triageRow(row, node))
   const names = new Map(found.map(({ row }) => [row.id, connectionName(row)]))
-  return sortLinearIssues(issues).map((issue) => linearRailItem(issue, names.size > 1 ? names.get(issue.integrationId) : undefined))
+  return sortLinearIssues(issues).map((issue) =>
+    linearRailItem(issue, names.size > 1 ? names.get(issue.integrationId) : undefined),
+  )
 }
 
 // /v1/p/linear: read Linear issues referenced from a PR, plus the rail source's rows. Per-user, cached
 // locally (never shared). A bare identifier is resolved across all connected Linear integrations;
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
 // Provider CRUD (connect/disconnect) lives in core's routes/integrations.ts.
-export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {}) => new Hono<AppEnv>()
-  // Active issues for the given mapped ids within one connection (?integration=<id>&ids=). No shell
-  // caller left: the rail builds its mapped rows from the same query. Kept as the single-connection
-  // form, and as the one place a test covers the active-only filter and the branch-suggestion
-  // passthrough.
-  //
-  // Enumerating a connection's projects is a provider contribution the host calls, so there is no
-  // `/projects` route here (docs/integrations/project-sources.md § Project sources).
-  .get('/project-issues', async (c) => {
-    const connections = await linearConnections(c)
-    const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
-    if (!connection) return respondError(c, 403, 'provider_not_connected')
-    const { row, key } = connection
-    const ids = [...new Set((c.req.query('ids') ?? '').split(',').map((s) => s.trim()).filter(Boolean))]
-    if (!ids.length) return c.json({ issues: [] } satisfies LinearProjectIssuesResponse)
-    const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(ids) })
-    const err = linearError(res)
-    if (err) return respondError(c, err.status, err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable')
-    const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-    return c.json({ issues: issues.nodes.map((node) => triageRow(row, node)) } satisfies LinearProjectIssuesResponse)
-  })
-  // The declarative rail source's rows (docs/plugins/descriptors.md § Descriptors). Degrades to an empty list at
-  // every step rather than erroring: none of these conditions is the user doing something wrong.
-  // There is no fallback to the viewer's own assigned issues; the source authors an `emptyState`
-  // instead (docs/integrations/linear.md § Linear).
-  .get('/rail-items', async (c) => {
-    const connections = await linearConnections(c)
-    if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
-    const mapped = await mappedScopes(c, c.req.query('project'), projects)
-    // Named per connection that actually returned rows, not per connection that exists: a workspace
-    // that is connected but mapped to nothing, or that failed, must not put a column on this list.
-    const found: { row: StoredConnection; node: LinearNode }[] = []
-    for (const { row, key } of connections) {
-      const scopeIds = mapped?.get(row.id) ?? []
-      // Nothing mapped for this connection, whether the workspace maps other connections or none at
-      // all, means this connection contributes no rows.
-      if (!scopeIds.length) continue
-      try {
-        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(scopeIds) })
-        if (linearError(res)) continue
-        const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-        for (const node of issues.nodes) found.push({ row, node })
-      } catch {
-        // Partial success is honest: one workspace failing must not erase another's rows.
-      }
-    }
-    return c.json({ items: railRows(found) } satisfies LinearRailItemsResponse)
-  })
-  // The rail's Search field (docs/integrations/linear.md § Rail search). The same scope as the rows
-  // above, narrowed by the reader's text on Linear's side, so it finds an issue past the list's first
-  // 250. `project` is the host's routed project and `q` the typed text; neither is anything the
-  // manifest or an earlier answer chose.
-  //
-  // Each connection sends one bounded page. `incomplete` says when a page was full or a connection
-  // failed, because either way there may be matches this answer does not hold.
-  .get('/rail-search', async (c) => {
-    const search = await searchMappedIssues(c, projects, c.req.query('project'), c.req.query('q') ?? '')
-    if (allFailed(search)) return respondError(c, search.failure!.status, search.failure!.code)
-    return c.json({ items: railRows(search.found), incomplete: search.more || search.failed > 0 } satisfies PluginRailSearchResult)
-  })
-  // The `Find a Linear issue` command's rows (docs/plugins/commands.md § Command kinds), through the
-  // same search as the rail's Search field. `projectId` is the project the palette session captured.
-  //
-  // Unlike the rail list, a total failure is reported. A rail that quietly empties is a list that looks
-  // finished; a search that quietly empties is a reader retyping a word that was never the problem.
-  .get('/palette/issues', async (c) => {
-    const search = await searchMappedIssues(c, projects, c.req.query('projectId'), c.req.query('q') ?? '')
-    if (allFailed(search)) return respondError(c, search.failure!.status, search.failure!.code)
-    return c.json({
-      items: linearSearchItems(search.found.map(({ row, node }) => ({ issue: triageRow(row, node), connectionLabel: connectionName(row) }))),
+export const createLinearRoutes = (
+  projects?: LinearProjectScope,
+  emit: (frame: { channel: string } & Record<string, unknown>) => void = () => {},
+) =>
+  new Hono<AppEnv>()
+    // Active issues for the given mapped ids within one connection (?integration=<id>&ids=). No shell
+    // caller left: the rail builds its mapped rows from the same query. Kept as the single-connection
+    // form, and as the one place a test covers the active-only filter and the branch-suggestion
+    // passthrough.
+    //
+    // Enumerating a connection's projects is a provider contribution the host calls, so there is no
+    // `/projects` route here (docs/integrations/project-sources.md § Project sources).
+    .get('/project-issues', async (c) => {
+      const connections = await linearConnections(c)
+      const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
+      if (!connection) return respondError(c, 403, 'provider_not_connected')
+      const { row, key } = connection
+      const ids = [
+        ...new Set(
+          (c.req.query('ids') ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ),
+      ]
+      if (!ids.length) return c.json({ issues: [] } satisfies LinearProjectIssuesResponse)
+      const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(ids) })
+      const err = linearError(res)
+      if (err) return respondError(c, err.status, err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable')
+      const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+      return c.json({ issues: issues.nodes.map((node) => triageRow(row, node)) } satisfies LinearProjectIssuesResponse)
     })
-  })
-  // Batch enrichment for referenced tickets: summaries, 10-minute TTL over core's external-item cache.
-  // Stale identifiers are resolved across all connections; each result is cached under its connection.
-  //
-  // Declared as this plugin's `refResolvers` route (docs/plugins/client-half.md § Loaded plugins: the client half),
-  // answering the host's shape rather than a Linear-flavoured one.
-  .post('/issues', async (c) => {
-    const storedConnections = await linearStored(c)
-    if (!storedConnections.length) return respondError(c, 403, 'provider_not_connected')
-    const connections = await linearConnections(c)
-
-    const parsed = issuesBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success) return respondError(c, 400, 'bad_request')
-    const identifiers = [...new Set(parsed.data.identifiers)].slice(0, linearProvider.budgets.maxResolutionBatch)
-    if (!identifiers.length) return c.json([] satisfies PluginRefResolutionBody[])
-
-    // Not scoped to one connection: a bare `ENG-42` has no workspace yet, so the cache read spans
-    // every connected Linear and the sort below picks the winner. `listByIdentifier` also absorbs the
-    // empty-list case that `inArray` turns into a SQL error. No per-connection `resource()` call can
-    // express a read across connections, which is why the loaded tier needs an item-store seam.
-    const items = linearItems(c)
-    const cached = await items.listByIdentifier(identifiers)
-    const now = Date.now()
-    const byId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
-    const byConnectionAndId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
-    const fresh = new Set<string>()
-    const order = new Map(storedConnections.map((row, index) => [row.id, index]))
-    cached.sort((a, b) => (order.get(a.integrationId) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.integrationId) ?? Number.MAX_SAFE_INTEGER))
-    for (const row of cached) {
-      const parsed = parseCached(linearProvider.codec!, row.data, linearRef(row.integrationId, row.identifier))
-      if (parsed.ok) {
-        byConnectionAndId.set(`${row.integrationId}:${row.identifier}`, parsed.value)
-        if (!byId.has(row.identifier)) {
-          byId.set(row.identifier, parsed.value)
-          if (row.fetchedAt + ISSUES_TTL_MS > now) fresh.add(row.identifier)
+    // The declarative rail source's rows (docs/plugins/descriptors.md § Descriptors). Degrades to an empty list at
+    // every step rather than erroring: none of these conditions is the user doing something wrong.
+    // There is no fallback to the viewer's own assigned issues; the source authors an `emptyState`
+    // instead (docs/integrations/linear.md § Linear).
+    .get('/rail-items', async (c) => {
+      const connections = await linearConnections(c)
+      if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
+      const mapped = await mappedScopes(c, c.req.query('project'), projects)
+      // Named per connection that actually returned rows, not per connection that exists: a workspace
+      // that is connected but mapped to nothing, or that failed, must not put a column on this list.
+      const found: { row: StoredConnection; node: LinearNode }[] = []
+      for (const { row, key } of connections) {
+        const scopeIds = mapped?.get(row.id) ?? []
+        // Nothing mapped for this connection, whether the workspace maps other connections or none at
+        // all, means this connection contributes no rows.
+        if (!scopeIds.length) continue
+        try {
+          const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(scopeIds) })
+          if (linearError(res)) continue
+          const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+          for (const node of issues.nodes) found.push({ row, node })
+        } catch {
+          // Partial success is honest: one workspace failing must not erase another's rows.
         }
       }
-    }
-
-    let stale = identifiers.filter((id) => !fresh.has(id))
-    // Try each connection for whatever's still unresolved; found ids drop out of the next pass.
-    for (const { row, key } of connections) {
-      if (!stale.length) break
-      const filter = issuesFilter(stale)
-      if (!filter) break
-      try {
-        const res = await providerFetch(row, key, ISSUES_QUERY, { filter })
-        if (linearError(res)) continue
-        const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-        const found = new Set<string>()
-        for (const node of issues.nodes) {
-          const summary = linearSummaryOf(linearNodeToDetail(node))
-          const item = linearProvider.codec!.mergeSummary(
-            byConnectionAndId.get(`${row.id}:${node.identifier}`) ?? null,
-            linearRef(row.id, node.identifier, node.url),
-            summary,
-            now,
-          )
-          byId.set(node.identifier, item)
-          byConnectionAndId.set(`${row.id}:${node.identifier}`, item)
-          found.add(node.identifier)
-          const data = encodeCached(item, linearProvider.budgets.maxCachedItemBytes)
-          await items.write({ connectionId: row.id, identifier: node.identifier, data, fetchedAt: now })
-        }
-        stale = stale.filter((id) => !found.has(id))
-        // The resource runtime announces its own refreshes; this batch writes past it, so it says so
-        // itself. Once per connection that wrote, not per issue.
-        if (found.size) emit({ channel: pluginChannel('linear', 'items-changed'), connectionId: row.id })
-      } catch {
-        // try the next connection
-      }
-    }
-
-    const out = identifiers.map((id) => byId.get(id)).filter((item): item is NonNullable<typeof item> => !!item)
-    // Down to the host's vocabulary: a label and a state chip. `assignee` is dropped because nothing
-    // renders it here, and a resolver's answer is the same handful of fields for every provider.
-    return c.json(out.map((item) => {
-      const summary = linearProvider.codec!.summary(item)
-      return {
-        identifier: summary.identifier,
-        label: summary.title,
-        url: summary.url,
-        ...(summary.state ? { state: { name: summary.state.name, color: summary.state.color, kind: summary.state.type } } : {}),
-      }
-    }) satisfies PluginRefResolutionBody[])
-  })
-  // Full detail for the panel, always through the mirrored resource, which owns the cache read, the
-  // TTL, the secret scope, and the write-back.
-  //
-  // Without ?integration this asks each connected workspace in turn and takes the first that answers,
-  // because which workspace owns a bare `ENG-42` is what is unknown. The loop is the resolution and
-  // the resource is the cache. `refresh=1`, which opening the panel always sends, forces a live read.
-  .get('/issues/:identifier', async (c) => {
-    const identifier = c.req.param('identifier')
-    const requested = c.req.query('integration')
-    const force = c.req.query('refresh') === '1'
-    const stored = await linearStored(c)
-    const candidates = requested ? stored.filter((row) => row.id === requested) : stored
-    if (!candidates.length) return respondError(c, 403, 'provider_not_connected')
-
-    let failure: RouteFailure | null = null
-    for (const connection of candidates) {
-      const result = await linearResource<LinearResourceInput, LinearIssueDetail>(c, {
-        providerId: PROVIDER,
-        connectionId: connection.id,
-        resourceId: LINEAR_ISSUES_RESOURCE,
-        input: { kind: 'detail', identifier },
-        force,
+      return c.json({ items: railRows(found) } satisfies LinearRailItemsResponse)
+    })
+    // The rail's Search field (docs/integrations/linear.md § Rail search). The same scope as the rows
+    // above, narrowed by the reader's text on Linear's side, so it finds an issue past the list's first
+    // 250. `project` is the host's routed project and `q` the typed text; neither is anything the
+    // manifest or an earlier answer chose.
+    //
+    // Each connection sends one bounded page. `incomplete` says when a page was full or a connection
+    // failed, because either way there may be matches this answer does not hold.
+    .get('/rail-search', async (c) => {
+      const search = await searchMappedIssues(c, projects, c.req.query('project'), c.req.query('q') ?? '')
+      if (allFailed(search)) return respondError(c, search.failure!.status, search.failure!.code)
+      return c.json({
+        items: railRows(search.found),
+        incomplete: search.more || search.failed > 0,
+      } satisfies PluginRailSearchResult)
+    })
+    // The `Find a Linear issue` command's rows (docs/plugins/commands.md § Command kinds), through the
+    // same search as the rail's Search field. `projectId` is the project the palette session captured.
+    //
+    // Unlike the rail list, a total failure is reported. A rail that quietly empties is a list that looks
+    // finished; a search that quietly empties is a reader retyping a word that was never the problem.
+    .get('/palette/issues', async (c) => {
+      const search = await searchMappedIssues(c, projects, c.req.query('projectId'), c.req.query('q') ?? '')
+      if (allFailed(search)) return respondError(c, search.failure!.status, search.failure!.code)
+      return c.json({
+        items: linearSearchItems(
+          search.found.map(({ row, node }) => ({ issue: triageRow(row, node), connectionLabel: connectionName(row) })),
+        ),
       })
-      if (result.ok) return c.json(result.value)
-      // "Not in this workspace" is the expected answer from every connection but one, so a real failure
-      // from any of them is the more useful thing to report.
-      if (!failure || failure.status === 404) failure = result.failure
-    }
-    return respondError(c, failure!.status, failure!.error, failure!.detail)
-  })
-  // Add a comment (or threaded reply via parentId) to a ticket. Client refetches detail after.
-  .post('/issues/:identifier/comments', async (c) => {
-    const requestedConnectionId = c.req.query('integration')
-    const allConnections = await linearConnections(c)
-    const connections = requestedConnectionId
-      ? allConnections.filter(({ row }) => row.id === requestedConnectionId)
-      : allConnections
-    if (!connections.length) return respondError(c, 403, 'provider_not_connected')
+    })
+    // Batch enrichment for referenced tickets: summaries, 10-minute TTL over core's external-item cache.
+    // Stale identifiers are resolved across all connections; each result is cached under its connection.
+    //
+    // Declared as this plugin's `refResolvers` route (docs/plugins/client-half.md § Loaded plugins: the client half),
+    // answering the host's shape rather than a Linear-flavoured one.
+    .post('/issues', async (c) => {
+      const storedConnections = await linearStored(c)
+      if (!storedConnections.length) return respondError(c, 403, 'provider_not_connected')
+      const connections = await linearConnections(c)
 
-    const identifier = c.req.param('identifier')
-    const parsed = commentBody.safeParse(await c.req.json().catch(() => null))
-    if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
-    const { body, parentId } = parsed.data
+      const parsed = issuesBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success) return respondError(c, 400, 'bad_request')
+      const identifiers = [...new Set(parsed.data.identifiers)].slice(0, linearProvider.budgets.maxResolutionBatch)
+      if (!identifiers.length) return c.json([] satisfies PluginRefResolutionBody[])
 
-    // commentCreate keys off the internal issue UUID; resolve it (and the owning connection's key).
-    const filter = issuesFilter([identifier])
-    if (!filter) return respondError(c, 404, 'provider_resource_not_found')
-    const resolved = await resolveIssues(connections, ISSUE_ID_QUERY, { filter })
-    const issueId = resolved?.nodes[0]?.id
-    if (!resolved || !issueId) return respondError(c, 404, 'provider_resource_not_found')
-    // On the loaded tier the default registry argument is the bundle's own empty copy, so this
-    // resolves from the stored capability map that linear's `normalize` writes. The row records what
-    // the connection was granted; the descriptor is only its default.
-    if (!connectionHasCapability(resolved.row, 'comments')) return respondError(c, 403, 'provider_missing_scope')
-
-    try {
-      await providerRequestScheduler.run(PROVIDER, resolved.row.id, linearProvider.budgets, () =>
-        createLinearComment(resolved.key, { issueId, body: body.trim(), ...(parentId ? { parentId } : {}) }),
+      // Not scoped to one connection: a bare `ENG-42` has no workspace yet, so the cache read spans
+      // every connected Linear and the sort below picks the winner. `listByIdentifier` also absorbs the
+      // empty-list case that `inArray` turns into a SQL error. No per-connection `resource()` call can
+      // express a read across connections, which is why the loaded tier needs an item-store seam.
+      const items = linearItems(c)
+      const cached = await items.listByIdentifier(identifiers)
+      const now = Date.now()
+      const byId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
+      const byConnectionAndId = new Map<string, ReturnType<NonNullable<typeof linearProvider.codec>['mergeSummary']>>()
+      const fresh = new Set<string>()
+      const order = new Map(storedConnections.map((row, index) => [row.id, index]))
+      cached.sort(
+        (a, b) =>
+          (order.get(a.integrationId) ?? Number.MAX_SAFE_INTEGER) -
+          (order.get(b.integrationId) ?? Number.MAX_SAFE_INTEGER),
       )
-    } catch (error) {
-      if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
-      return respondError(c, 502, 'provider_unavailable')
-    }
-    return c.json({ ok: true })
-  })
-  // One image out of a ticket body, inlined as a data URL: docs/integrations/linear.md § Linear covers why
-  // this route exists (the frame's CSP, and the private upload host) and why `url` is host-locked.
-  .get('/uploads', async (c) => {
-    const target = linearUploadTarget(c.req.query('url'))
-    if (!target) return respondError(c, 400, 'bad_request')
+      for (const row of cached) {
+        const parsed = parseCached(linearProvider.codec!, row.data, linearRef(row.integrationId, row.identifier))
+        if (parsed.ok) {
+          byConnectionAndId.set(`${row.integrationId}:${row.identifier}`, parsed.value)
+          if (!byId.has(row.identifier)) {
+            byId.set(row.identifier, parsed.value)
+            if (row.fetchedAt + ISSUES_TTL_MS > now) fresh.add(row.identifier)
+          }
+        }
+      }
 
-    const requested = c.req.query('integration')
-    const all = await linearConnections(c)
-    const candidates = requested ? all.filter(({ row }) => row.id === requested) : all
-    if (!candidates.length) return respondError(c, 403, 'provider_not_connected')
+      let stale = identifiers.filter((id) => !fresh.has(id))
+      // Try each connection for whatever's still unresolved; found ids drop out of the next pass.
+      for (const { row, key } of connections) {
+        if (!stale.length) break
+        const filter = issuesFilter(stale)
+        if (!filter) break
+        try {
+          const res = await providerFetch(row, key, ISSUES_QUERY, { filter })
+          if (linearError(res)) continue
+          const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+          const found = new Set<string>()
+          for (const node of issues.nodes) {
+            const summary = linearSummaryOf(linearNodeToDetail(node))
+            const item = linearProvider.codec!.mergeSummary(
+              byConnectionAndId.get(`${row.id}:${node.identifier}`) ?? null,
+              linearRef(row.id, node.identifier, node.url),
+              summary,
+              now,
+            )
+            byId.set(node.identifier, item)
+            byConnectionAndId.set(`${row.id}:${node.identifier}`, item)
+            found.add(node.identifier)
+            const data = encodeCached(item, linearProvider.budgets.maxCachedItemBytes)
+            await items.write({ connectionId: row.id, identifier: node.identifier, data, fetchedAt: now })
+          }
+          stale = stale.filter((id) => !found.has(id))
+          // The resource runtime announces its own refreshes; this batch writes past it, so it says so
+          // itself. Once per connection that wrote, not per issue.
+          if (found.size) emit({ channel: pluginChannel('linear', 'items-changed'), connectionId: row.id })
+        } catch {
+          // try the next connection
+        }
+      }
 
-    // Same shape as the detail route above: without ?integration, which workspace owns this file is
-    // exactly what is unknown, so ask each in turn and take the first that answers.
-    for (const { key } of candidates) {
-      const res = await fetchLinearUpload(key, target)
-      if (!res?.ok) continue
-      // Images only. Anything else is either a document the reader should open in Linear, or a content
-      // type this route has no business turning into a `data:` URL.
-      const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
-      if (!type.startsWith('image/')) return respondError(c, 415, 'provider_unsupported_media')
-      const bytes = Buffer.from(await res.arrayBuffer())
-      if (bytes.byteLength > MAX_UPLOAD_BYTES) return respondError(c, 413, 'provider_resource_too_large')
-      return c.json({ dataUrl: `data:${type};base64,${bytes.toString('base64')}` } satisfies LinearUploadResponse)
-    }
-    return respondError(c, 404, 'provider_resource_not_found')
-  })
+      const out = identifiers.map((id) => byId.get(id)).filter((item): item is NonNullable<typeof item> => !!item)
+      // Down to the host's vocabulary: a label and a state chip. `assignee` is dropped because nothing
+      // renders it here, and a resolver's answer is the same handful of fields for every provider.
+      return c.json(
+        out.map((item) => {
+          const summary = linearProvider.codec!.summary(item)
+          return {
+            identifier: summary.identifier,
+            label: summary.title,
+            url: summary.url,
+            ...(summary.state
+              ? { state: { name: summary.state.name, color: summary.state.color, kind: summary.state.type } }
+              : {}),
+          }
+        }) satisfies PluginRefResolutionBody[],
+      )
+    })
+    // Full detail for the panel, always through the mirrored resource, which owns the cache read, the
+    // TTL, the secret scope, and the write-back.
+    //
+    // Without ?integration this asks each connected workspace in turn and takes the first that answers,
+    // because which workspace owns a bare `ENG-42` is what is unknown. The loop is the resolution and
+    // the resource is the cache. `refresh=1`, which opening the panel always sends, forces a live read.
+    .get('/issues/:identifier', async (c) => {
+      const identifier = c.req.param('identifier')
+      const requested = c.req.query('integration')
+      const force = c.req.query('refresh') === '1'
+      const stored = await linearStored(c)
+      const candidates = requested ? stored.filter((row) => row.id === requested) : stored
+      if (!candidates.length) return respondError(c, 403, 'provider_not_connected')
+
+      let failure: RouteFailure | null = null
+      for (const connection of candidates) {
+        const result = await linearResource<LinearResourceInput, LinearIssueDetail>(c, {
+          providerId: PROVIDER,
+          connectionId: connection.id,
+          resourceId: LINEAR_ISSUES_RESOURCE,
+          input: { kind: 'detail', identifier },
+          force,
+        })
+        if (result.ok) return c.json(result.value)
+        // "Not in this workspace" is the expected answer from every connection but one, so a real failure
+        // from any of them is the more useful thing to report.
+        if (!failure || failure.status === 404) failure = result.failure
+      }
+      return respondError(c, failure!.status, failure!.error, failure!.detail)
+    })
+    // Add a comment (or threaded reply via parentId) to a ticket. Client refetches detail after.
+    .post('/issues/:identifier/comments', async (c) => {
+      const requestedConnectionId = c.req.query('integration')
+      const allConnections = await linearConnections(c)
+      const connections = requestedConnectionId
+        ? allConnections.filter(({ row }) => row.id === requestedConnectionId)
+        : allConnections
+      if (!connections.length) return respondError(c, 403, 'provider_not_connected')
+
+      const identifier = c.req.param('identifier')
+      const parsed = commentBody.safeParse(await c.req.json().catch(() => null))
+      if (!parsed.success || !parsed.data.body.trim()) return respondError(c, 400, 'bad_request')
+      const { body, parentId } = parsed.data
+
+      // commentCreate keys off the internal issue UUID; resolve it (and the owning connection's key).
+      const filter = issuesFilter([identifier])
+      if (!filter) return respondError(c, 404, 'provider_resource_not_found')
+      const resolved = await resolveIssues(connections, ISSUE_ID_QUERY, { filter })
+      const issueId = resolved?.nodes[0]?.id
+      if (!resolved || !issueId) return respondError(c, 404, 'provider_resource_not_found')
+      // On the loaded tier the default registry argument is the bundle's own empty copy, so this
+      // resolves from the stored capability map that linear's `normalize` writes. The row records what
+      // the connection was granted; the descriptor is only its default.
+      if (!connectionHasCapability(resolved.row, 'comments')) return respondError(c, 403, 'provider_missing_scope')
+
+      try {
+        await providerRequestScheduler.run(PROVIDER, resolved.row.id, linearProvider.budgets, () =>
+          createLinearComment(resolved.key, { issueId, body: body.trim(), ...(parentId ? { parentId } : {}) }),
+        )
+      } catch (error) {
+        if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
+        return respondError(c, 502, 'provider_unavailable')
+      }
+      return c.json({ ok: true })
+    })
+    // One image out of a ticket body, inlined as a data URL: docs/integrations/linear.md § Linear covers why
+    // this route exists (the frame's CSP, and the private upload host) and why `url` is host-locked.
+    .get('/uploads', async (c) => {
+      const target = linearUploadTarget(c.req.query('url'))
+      if (!target) return respondError(c, 400, 'bad_request')
+
+      const requested = c.req.query('integration')
+      const all = await linearConnections(c)
+      const candidates = requested ? all.filter(({ row }) => row.id === requested) : all
+      if (!candidates.length) return respondError(c, 403, 'provider_not_connected')
+
+      // Same shape as the detail route above: without ?integration, which workspace owns this file is
+      // exactly what is unknown, so ask each in turn and take the first that answers.
+      for (const { key } of candidates) {
+        const res = await fetchLinearUpload(key, target)
+        if (!res?.ok) continue
+        // Images only. Anything else is either a document the reader should open in Linear, or a content
+        // type this route has no business turning into a `data:` URL.
+        const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
+        if (!type.startsWith('image/')) return respondError(c, 415, 'provider_unsupported_media')
+        const bytes = Buffer.from(await res.arrayBuffer())
+        if (bytes.byteLength > MAX_UPLOAD_BYTES) return respondError(c, 413, 'provider_resource_too_large')
+        return c.json({ dataUrl: `data:${type};base64,${bytes.toString('base64')}` } satisfies LinearUploadResponse)
+      }
+      return respondError(c, 404, 'provider_resource_not_found')
+    })
 
 // The Hono routes over the portable carrier (docs/plugins/loaded-plugins.md § Loaded plugins), the only way in. Its
 // request context supplies the identity-bound provider runtime without exposing host database or
 // secret-service handles to the bundle. `projects` is optional for suites that drive these routes
 // without a project scope; `/rail-items` then returns no rows.
-export const createLinearFetch = (projects?: LinearProjectScope, emit?: (frame: { channel: string } & Record<string, unknown>) => void): PluginFetchHandler =>
-  portableFetch(createLinearRoutes(projects, emit))
+export const createLinearFetch = (
+  projects?: LinearProjectScope,
+  emit?: (frame: { channel: string } & Record<string, unknown>) => void,
+): PluginFetchHandler => portableFetch(createLinearRoutes(projects, emit))

@@ -22,7 +22,11 @@ describe('ws channel registry', () => {
 
   it('collects reattach frames from every owner, at call time', () => {
     let attached = ['a']
-    registerWsChannel('docker', () => {}, () => attached.map((id) => ({ channel: 'docker:logs:attach', id })))
+    registerWsChannel(
+      'docker',
+      () => {},
+      () => attached.map((id) => ({ channel: 'docker:logs:attach', id })),
+    )
     registerWsChannel('term', () => {}) // no reattach hook: contributes nothing
     expect(wsReattachFrames()).toEqual([{ channel: 'docker:logs:attach', id: 'a' }])
     // Recomputed, not captured: a pane that mounted since the last reconnect must be re-attached too.

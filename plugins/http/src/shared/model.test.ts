@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { applyAuth, fromCurl, interpolate, joinUrl, missingVars, serializeBody, splitUrl, toCurl, tokenizeShell, type AuthConfig } from './model'
+import {
+  applyAuth,
+  fromCurl,
+  interpolate,
+  joinUrl,
+  missingVars,
+  serializeBody,
+  splitUrl,
+  toCurl,
+  tokenizeShell,
+  type AuthConfig,
+} from './model'
 
 describe('interpolate', () => {
   it('substitutes known variables and leaves unknown ones literal', () => {
@@ -22,7 +33,9 @@ describe('interpolate', () => {
 
 describe('applyAuth', () => {
   it('builds a bearer header', () => {
-    expect(applyAuth({ mode: 'bearer', token: 'abc' }).headers).toEqual([{ name: 'Authorization', value: 'Bearer abc', enabled: true }])
+    expect(applyAuth({ mode: 'bearer', token: 'abc' }).headers).toEqual([
+      { name: 'Authorization', value: 'Bearer abc', enabled: true },
+    ])
   })
 
   it('base64-encodes basic credentials', () => {
@@ -117,7 +130,11 @@ describe('fromCurl', () => {
   })
 
   it('turns -u into basic auth', () => {
-    expect(fromCurl(`curl http://x -u 'me:secret'`)?.auth).toEqual({ mode: 'basic', username: 'me', password: 'secret' })
+    expect(fromCurl(`curl http://x -u 'me:secret'`)?.auth).toEqual({
+      mode: 'basic',
+      username: 'me',
+      password: 'secret',
+    })
   })
 
   it('accepts --header=value as well as --header value', () => {

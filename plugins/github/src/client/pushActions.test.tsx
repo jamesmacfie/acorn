@@ -66,19 +66,21 @@ afterEach(() => {
 
 /** The five facts the owner hands over, with an upstream and no pull request unless a case says so. */
 const draw = (props: Partial<Parameters<typeof GithubPushActions>[0]> = {}) => {
-  disposers.push(render(
-    () => (
-      <GithubPushActions
-        taskId="t1"
-        projectId="p1"
-        branch="james/fix-login"
-        upstream="origin/james/fix-login"
-        ahead={2}
-        {...props}
-      />
+  disposers.push(
+    render(
+      () => (
+        <GithubPushActions
+          taskId="t1"
+          projectId="p1"
+          branch="james/fix-login"
+          upstream="origin/james/fix-login"
+          ahead={2}
+          {...props}
+        />
+      ),
+      host,
     ),
-    host,
-  ))
+  )
   return host.querySelector<HTMLButtonElement>('button')
 }
 

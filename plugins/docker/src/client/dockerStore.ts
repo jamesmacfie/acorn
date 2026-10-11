@@ -35,7 +35,8 @@ export async function refreshDocker(force = false): Promise<void> {
       }
       setLoadError('')
     } catch (e) {
-      if (owner.current() && inflight === pending) setLoadError(e instanceof Error ? e.message : 'Could not reach the docker routes.')
+      if (owner.current() && inflight === pending)
+        setLoadError(e instanceof Error ? e.message : 'Could not reach the docker routes.')
     } finally {
       if (inflight === pending) {
         setLoading(false)
@@ -55,7 +56,10 @@ export function wireDockerRefresh(): void {
     if (scopes.includes('containers')) void refreshDocker(true)
   })
   const offReconnect = wsOnReconnect(() => void refreshDocker(true))
-  offRefresh = () => { offChanged(); offReconnect() }
+  offRefresh = () => {
+    offChanged()
+    offReconnect()
+  }
 }
 
 export function disposeDockerStore(): void {
@@ -74,20 +78,33 @@ let summaryInflight: Promise<void> | null = null
 export async function refreshDockerTaskSummaries(): Promise<void> {
   if (summaryInflight) return summaryInflight
   const owner = captureDockerScope()
-  const pending = fetchTaskSummaries(owner.nodeId).then((list) => {
-    if (!owner.current()) return
-    setTaskSummaries((current) => {
-      if (Object.keys(current).length === list.length && list.every((summary) => {
-        const previous = current[summary.taskId]
-        return previous && previous.total === summary.total && previous.running === summary.running
-          && previous.projects.length === summary.projects.length
-          && previous.projects.every((project, index) => project === summary.projects[index])
-      })) return current
-      return Object.fromEntries(list.map((summary) => [summary.taskId, summary]))
+  const pending = fetchTaskSummaries(owner.nodeId)
+    .then((list) => {
+      if (!owner.current()) return
+      setTaskSummaries((current) => {
+        if (
+          Object.keys(current).length === list.length &&
+          list.every((summary) => {
+            const previous = current[summary.taskId]
+            return (
+              previous &&
+              previous.total === summary.total &&
+              previous.running === summary.running &&
+              previous.projects.length === summary.projects.length &&
+              previous.projects.every((project, index) => project === summary.projects[index])
+            )
+          })
+        )
+          return current
+        return Object.fromEntries(list.map((summary) => [summary.taskId, summary]))
+      })
     })
-  }).catch(() => {
-    // A failed observation cannot authorize removing last-known task links.
-  }).finally(() => { if (summaryInflight === pending) summaryInflight = null })
+    .catch(() => {
+      // A failed observation cannot authorize removing last-known task links.
+    })
+    .finally(() => {
+      if (summaryInflight === pending) summaryInflight = null
+    })
   summaryInflight = pending
   return pending
 }
@@ -106,7 +123,8 @@ export const dockerTaskScheduleContribution: ClientScheduleContribution = {
   id: 'docker.task-containers',
   intervalMs: 15_000,
   run: refreshDockerTaskSummaries,
-  subscribe: (refresh) => wsOnDockerChanged((scopes) => {
-    if (scopes.includes('containers')) refresh()
-  }),
+  subscribe: (refresh) =>
+    wsOnDockerChanged((scopes) => {
+      if (scopes.includes('containers')) refresh()
+    }),
 }

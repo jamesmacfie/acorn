@@ -29,17 +29,20 @@ export class SessionDefaultsCommands {
     if (!Object.keys(wanted).length) return
     const session = await this.read(() => this.deps.store.requireSession(sessionId), signal)
     const advertised = Array.isArray(session.config.configOptions)
-      ? session.config.configOptions as AgentConfigOption[]
+      ? (session.config.configOptions as AgentConfigOption[])
       : []
     const configOptions = optionsWithDefaults(advertised, wanted)
     if (configOptions === advertised) return
     signal?.throwIfAborted()
     // Applying a saved value must not write the same value back as a new preference.
-    await this.deps.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
+    await this.deps
+      .patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
       .catch(async (error) => {
         signal?.throwIfAborted()
-        await this.deps.recordWarning(sessionId,
-          `Your saved defaults could not be applied to this session: ${error instanceof Error ? error.message : 'unknown error'}`)
+        await this.deps.recordWarning(
+          sessionId,
+          `Your saved defaults could not be applied to this session: ${error instanceof Error ? error.message : 'unknown error'}`,
+        )
       })
   }
 
@@ -47,24 +50,30 @@ export class SessionDefaultsCommands {
     if (!Object.keys(wanted).length) return
     const session = await this.read(() => this.deps.store.requireSession(sessionId), signal)
     const advertised = Array.isArray(session.config.configOptions)
-      ? session.config.configOptions as AgentConfigOption[]
+      ? (session.config.configOptions as AgentConfigOption[])
       : []
     const configOptions = optionsWithDefaults(advertised, wanted)
-    const dropped = Object.entries(wanted).filter(([id, value]) =>
-      !configOptions.some((option) => option.id === id && option.currentValue === value))
+    const dropped = Object.entries(wanted).filter(
+      ([id, value]) => !configOptions.some((option) => option.id === id && option.currentValue === value),
+    )
     signal?.throwIfAborted()
     if (dropped.length) {
-      await this.deps.recordWarning(sessionId,
-        `This provider does not offer ${dropped.map(([id, value]) => `${id} = ${value}`).join(', ')}, so the session kept its own setting.`)
+      await this.deps.recordWarning(
+        sessionId,
+        `This provider does not offer ${dropped.map(([id, value]) => `${id} = ${value}`).join(', ')}, so the session kept its own setting.`,
+      )
     }
     if (configOptions === advertised) return
     signal?.throwIfAborted()
     // A workflow file's choice belongs to this run, not to the owner's next session.
-    await this.deps.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
+    await this.deps
+      .patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
       .catch(async (error) => {
         signal?.throwIfAborted()
-        await this.deps.recordWarning(sessionId,
-          `The step's provider settings could not be applied: ${error instanceof Error ? error.message : 'unknown error'}`)
+        await this.deps.recordWarning(
+          sessionId,
+          `The step's provider settings could not be applied: ${error instanceof Error ? error.message : 'unknown error'}`,
+        )
       })
   }
 

@@ -12,26 +12,56 @@ vi.mock('../../features/settings/savePref', () => ({ savePref: mocks.savePref })
 vi.mock('../../host/registries/commands/clientEvents', () => ({ clientEvents: { emit: mocks.emit } }))
 vi.mock('../../features/notifications/notifications', () => ({ pushBackgroundError: mocks.pushBackgroundError }))
 type State = { keep: number; transient: number }
-const slice = (id: string, values: () => Record<string, State>, hydrate: (scope: string, value: State) => void = () => {}): PersistedStateSlice<State> => ({
-  id, key: id, scope: 'task', restore: 'panes', version: 1, unknownIds: 'retain-inert',
+const slice = (
+  id: string,
+  values: () => Record<string, State>,
+  hydrate: (scope: string, value: State) => void = () => {},
+): PersistedStateSlice<State> => ({
+  id,
+  key: id,
+  scope: 'task',
+  restore: 'panes',
+  version: 1,
+  unknownIds: 'retain-inert',
   codec: { parse: (raw) => JSON.parse(String(raw)), serialize: vi.fn((value) => ({ keep: value.keep })) },
-  empty: () => ({ keep: 0, transient: 0 }), binding: { values, hydrate },
+  empty: () => ({ keep: 0, transient: 0 }),
+  binding: { values, hydrate },
 })
 const cleanups: (() => void)[] = []
-const boot = (slices: () => readonly PersistedStateSlice<unknown>[], prefs: Record<string, string>, client = new QueryClient()) => {
-  cleanups.push(createRoot((dispose) => { createStartupRestore({ queryClient: client, ready: () => true, prefs: () => prefs, slices }); return dispose }))
+const boot = (
+  slices: () => readonly PersistedStateSlice<unknown>[],
+  prefs: Record<string, string>,
+  client = new QueryClient(),
+) => {
+  cleanups.push(
+    createRoot((dispose) => {
+      createStartupRestore({ queryClient: client, ready: () => true, prefs: () => prefs, slices })
+      return dispose
+    }),
+  )
 }
-beforeEach(() => { vi.useFakeTimers(); vi.clearAllMocks(); mocks.savePref.mockResolvedValue(true); setActiveNode(null) })
-afterEach(() => { for (const dispose of cleanups.splice(0)) dispose(); setActiveNode(null); vi.useRealTimers() })
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.clearAllMocks()
+  mocks.savePref.mockResolvedValue(true)
+  setActiveNode(null)
+})
+afterEach(() => {
+  for (const dispose of cleanups.splice(0)) dispose()
+  setActiveNode(null)
+  vi.useRealTimers()
+})
 
 describe('independent persisted slice effects', () => {
   it('serializes only the changed slice, retains deep dependencies, and does not recreate siblings on registry changes', async () => {
     const [a, setA] = createStore({ task: { keep: 0, transient: 0 } })
     const [b] = createSignal({ task: { keep: 0, transient: 0 } })
-    const first = slice('a', () => a), second = slice('b', b)
+    const first = slice('a', () => a),
+      second = slice('b', b)
     const [registry, setRegistry] = createSignal<readonly PersistedStateSlice<unknown>[]>([first, second])
     boot(registry, { [storageKeyFor(first, 'task')]: '{"keep":0}', [storageKeyFor(second, 'task')]: '{"keep":0}' })
-    vi.mocked(first.codec.serialize).mockClear(); vi.mocked(second.codec.serialize).mockClear()
+    vi.mocked(first.codec.serialize).mockClear()
+    vi.mocked(second.codec.serialize).mockClear()
     setA('task', 'keep', 1)
     expect(first.codec.serialize).toHaveBeenCalledTimes(1)
     expect(second.codec.serialize).not.toHaveBeenCalled()
@@ -61,7 +91,8 @@ describe('independent persisted slice effects', () => {
     const [state, setState] = createSignal({ task: { keep: 0, transient: 0 } })
     const descriptor = slice('revert', state)
     boot(() => [descriptor], { [storageKeyFor(descriptor, 'task')]: '{"keep":0}' })
-    setState({ task: { keep: 1, transient: 0 } }); setState({ task: { keep: 0, transient: 0 } })
+    setState({ task: { keep: 1, transient: 0 } })
+    setState({ task: { keep: 0, transient: 0 } })
     await vi.advanceTimersByTimeAsync(500)
     expect(mocks.savePref).not.toHaveBeenCalled()
   })
@@ -70,7 +101,12 @@ describe('independent persisted slice effects', () => {
     const [state, setState] = createSignal({ task: { keep: 0, transient: 0 } })
     const descriptor = slice('inflight', state)
     let acknowledge!: (saved: boolean) => void
-    mocks.savePref.mockImplementationOnce(() => new Promise<boolean>((resolve) => { acknowledge = resolve }))
+    mocks.savePref.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          acknowledge = resolve
+        }),
+    )
     boot(() => [descriptor], { [storageKeyFor(descriptor, 'task')]: '{"keep":0}' })
     setState({ task: { keep: 1, transient: 0 } })
     await vi.advanceTimersByTimeAsync(500)
@@ -78,7 +114,12 @@ describe('independent persisted slice effects', () => {
     acknowledge(true)
     await vi.advanceTimersByTimeAsync(500)
     expect(mocks.savePref.mock.calls.map((call) => call[2])).toEqual(['{"keep":1}', '{"keep":0}'])
-    mocks.savePref.mockImplementationOnce(() => new Promise<boolean>((resolve) => { acknowledge = resolve }))
+    mocks.savePref.mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          acknowledge = resolve
+        }),
+    )
     setState({ task: { keep: 1, transient: 0 } })
     await vi.advanceTimersByTimeAsync(500)
     setState({ task: { keep: 2, transient: 0 } })
@@ -91,7 +132,9 @@ describe('independent persisted slice effects', () => {
     const [state, setState] = createSignal({ task: { keep: 0, transient: 0 } })
     const descriptor = slice('lifecycle', state)
     const [registry, setRegistry] = createSignal<readonly PersistedStateSlice<unknown>[]>([descriptor])
-    const qc = new QueryClient(); registerQueryOwner(qc, 'A'); setActiveNode('A')
+    const qc = new QueryClient()
+    registerQueryOwner(qc, 'A')
+    setActiveNode('A')
     const key = storageKeyFor(descriptor, 'task')
     boot(registry, { [key]: '{"keep":0}' }, qc)
     mocks.savePref.mockResolvedValueOnce(false)
@@ -112,9 +155,13 @@ describe('independent persisted slice effects', () => {
 
   it('skips a malformed encoded Node prefix without stopping restore or rewriting its raw value', () => {
     const [state, setState] = createSignal<Record<string, State>>({})
-    const descriptor = slice('malformed', state, (scope, value) => setState((current) => ({ ...current, [scope]: value })))
+    const descriptor = slice('malformed', state, (scope, value) =>
+      setState((current) => ({ ...current, [scope]: value })),
+    )
     const prefs = { 'malformed:%zz/task': '{"keep":99}', 'malformed:A/task': '{"keep":7}' }
-    const qc = new QueryClient(); registerQueryOwner(qc, 'A'); setActiveNode('B')
+    const qc = new QueryClient()
+    registerQueryOwner(qc, 'A')
+    setActiveNode('B')
     boot(() => [descriptor], prefs, qc)
     expect(state()).toEqual({ task: { keep: 7 } })
     expect(prefs['malformed:%zz/task']).toBe('{"keep":99}')
@@ -133,6 +180,10 @@ describe('independent persisted slice effects', () => {
     boot(() => [bounded], {})
     await vi.advanceTimersByTimeAsync(500)
     expect(mocks.savePref).toHaveBeenCalledTimes(1)
-    expect(mocks.pushBackgroundError).toHaveBeenCalledWith('', 'Could not save bounded', expect.stringContaining('3 bytes'))
+    expect(mocks.pushBackgroundError).toHaveBeenCalledWith(
+      '',
+      'Could not save bounded',
+      expect.stringContaining('3 bytes'),
+    )
   })
 })

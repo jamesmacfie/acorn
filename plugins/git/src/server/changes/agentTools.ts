@@ -9,20 +9,25 @@ import { gitLog, localDiff, localStatus } from './localDiff'
 
 // Not an error: a task can legitimately exist before its worktree does, and an agent asking about
 // changes in that state should get an explanation rather than a failed tool call.
-const NO_WORKTREE = { status: 'no-worktree', hint: 'This task has no worktree — git tools need a checked-out worktree.' }
+const NO_WORKTREE = {
+  status: 'no-worktree',
+  hint: 'This task has no worktree — git tools need a checked-out worktree.',
+}
 
 // `load`, not `root`: `root()` creates the worktree on first use, and a read-only tool must not have
 // that side effect.
 type ToolCore = Pick<CoreServices, 'tasks'>
 
-const worktreeFor = async (core: ToolCore, taskId: string): Promise<string | null> => (await core.tasks.load(taskId))?.worktreePath ?? null
+const worktreeFor = async (core: ToolCore, taskId: string): Promise<string | null> =>
+  (await core.tasks.load(taskId))?.worktreePath ?? null
 
 export function localGitAgentTools(core: ToolCore): AgentToolContribution[] {
   const empty = z.object({})
   return [
     {
       name: 'local_changes',
-      description: 'Uncommitted changes in the task worktree (git status): staged, unstaged, untracked, and conflicted files.',
+      description:
+        'Uncommitted changes in the task worktree (git status): staged, unstaged, untracked, and conflicted files.',
       input: empty,
       scope: 'task',
       risk: 'read',
@@ -37,7 +42,10 @@ export function localGitAgentTools(core: ToolCore): AgentToolContribution[] {
     {
       name: 'local_diff',
       description: 'The unified diff of one uncommitted file in the task worktree.',
-      input: z.object({ path: z.string().describe('repo-relative file path'), scope: z.enum(['unstaged', 'staged']).optional() }),
+      input: z.object({
+        path: z.string().describe('repo-relative file path'),
+        scope: z.enum(['unstaged', 'staged']).optional(),
+      }),
       scope: 'task',
       risk: 'read',
       handler: async (a, ctx) => {

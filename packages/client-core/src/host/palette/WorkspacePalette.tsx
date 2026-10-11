@@ -1,6 +1,10 @@
 import { createMemo, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { createFleetWorkspaces, selectFleetWorkspace, type FleetWorkspace } from '../../features/workspaces/fleetWorkspaces'
+import {
+  createFleetWorkspaces,
+  selectFleetWorkspace,
+  type FleetWorkspace,
+} from '../../features/workspaces/fleetWorkspaces'
 import { byRecentVisit } from '../../features/workspaces/lastWorkspace'
 import { createWorkspaceWords } from '../../features/workspaces/words'
 import { fuzzyScore } from '../../kit/lib/controls/fuzzy'
@@ -33,7 +37,10 @@ export default function WorkspacePalette() {
     // The node label is part of the haystack, not a separate filter: two nodes both having a "Default"
     // workspace is the normal case, and typing the node name is how the owner disambiguates.
     return all
-      .map((entry) => ({ entry, score: fuzzyScore(q, fleet().grouped ? `${entry.workspace.name} ${entry.node.label}` : entry.workspace.name) }))
+      .map((entry) => ({
+        entry,
+        score: fuzzyScore(q, fleet().grouped ? `${entry.workspace.name} ${entry.node.label}` : entry.workspace.name),
+      }))
       .filter((x): x is { entry: FleetWorkspace; score: number } => x.score !== null)
       .sort((a, b) => b.score - a.score)
       .map((x) => x.entry)

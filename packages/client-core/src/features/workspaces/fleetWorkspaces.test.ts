@@ -7,24 +7,34 @@ import { pickerWorkspaces, selectFleetWorkspace, type FleetWorkspace } from './f
 import type { Project } from '@acorn/protocol/api.ts'
 
 const node = (nodeId: string, label: string): NodeRecord => ({
-  nodeId, label, endpoint: `https://127.0.0.1:9${nodeId.length}00`, local: nodeId === 'a',
+  nodeId,
+  label,
+  endpoint: `https://127.0.0.1:9${nodeId.length}00`,
+  local: nodeId === 'a',
 })
 
 const workspace = (id: string, name: string, projects: { id: string; name: string }[] = []): Workspace =>
-  ({ id, name, color: null, icon: null, sort: 0, projects } as unknown as Workspace)
+  ({ id, name, color: null, icon: null, sort: 0, projects }) as unknown as Workspace
 
-const entry = (nodeId: string, label: string, ws: Workspace): FleetWorkspace =>
-  ({ workspace: ws, nodeId, node: node(nodeId, label) })
+const entry = (nodeId: string, label: string, ws: Workspace): FleetWorkspace => ({
+  workspace: ws,
+  nodeId,
+  node: node(nodeId, label),
+})
 
 beforeEach(async () => {
   _resetFleet()
   ;(globalThis as { window?: unknown }).window = {
     acorn: {
       desktop: true,
-      fleetList: () => Promise.resolve({
-        nodes: [node('a', 'Node A'), node('b', 'Node B')],
-        statuses: [{ nodeId: 'a', state: 'online' as const }, { nodeId: 'b', state: 'online' as const }],
-      }),
+      fleetList: () =>
+        Promise.resolve({
+          nodes: [node('a', 'Node A'), node('b', 'Node B')],
+          statuses: [
+            { nodeId: 'a', state: 'online' as const },
+            { nodeId: 'b', state: 'online' as const },
+          ],
+        }),
       onNodeStatus: () => () => {},
     },
   }

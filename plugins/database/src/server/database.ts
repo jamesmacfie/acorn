@@ -37,7 +37,7 @@ export type DatabaseBridge = {
 export type DatabaseCoreServices = Pick<CoreServices, 'data'>
 
 const ROW_CAP = 500
-const errText = (error: unknown): string => error instanceof Error ? error.message : String(error)
+const errText = (error: unknown): string => (error instanceof Error ? error.message : String(error))
 
 const findTable = (tables: readonly DataTable[], schema: string, name: string): DataTable => {
   const table = tables.find((candidate) => candidate.schema === schema && candidate.name === name)

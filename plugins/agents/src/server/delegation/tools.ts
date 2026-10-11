@@ -29,7 +29,8 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
     },
     {
       name: 'agent_prompt',
-      description: 'Send another message to an agent you started. It waits behind any turn the agent is running, and its answer reports back like the first one.',
+      description:
+        'Send another message to an agent you started. It waits behind any turn the agent is running, and its answer reports back like the first one.',
       input: agentPromptInputSchema,
       scope: 'task',
       risk: 'execute',
@@ -38,7 +39,8 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
     },
     {
       name: 'agent_wait',
-      description: 'Wait up to 30 seconds for an agent you started to reach a condition. Call it again if it times out.',
+      description:
+        'Wait up to 30 seconds for an agent you started to reach a condition. Call it again if it times out.',
       input: agentWaitInputSchema,
       scope: 'task',
       risk: 'execute',
@@ -47,7 +49,8 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
     },
     {
       name: 'agent_read',
-      description: 'Read a page of messages, tool calls, and results from an agent you started. Pass nextCursor back as afterSeq to read the next page.',
+      description:
+        'Read a page of messages, tool calls, and results from an agent you started. Pass nextCursor back as afterSeq to read the next page.',
       input: agentReadInputSchema,
       scope: 'task',
       risk: 'execute',

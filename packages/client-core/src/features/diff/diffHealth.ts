@@ -92,7 +92,8 @@ export function createDiffHealth() {
     const positions = items.map((item) => (item.kind === 'segment' ? ordinal++ : ordinal))
     items.forEach((item, index) => {
       // Keyed as the loader's queue is, so a queued segment finds its position.
-      if (item.kind === 'segment') segmentAt.set(residentKey(item.segment.contentKey, item.file.path, item.file.sha), positions[index]!)
+      if (item.kind === 'segment')
+        segmentAt.set(residentKey(item.segment.contentKey, item.file.path, item.file.sha), positions[index]!)
     })
     for (const vi of inputs.layout.range()) {
       const item = items[vi.index]
@@ -132,7 +133,13 @@ export function createDiffHealth() {
         ready,
         lateSourceBlocks,
       },
-      mounted: { segments: mountedSegments, fixedRows: mountedFixed, dynamicBlocks: mountedDynamic, blankBlocks: shown.blank, uncoveredRanges: shown.uncovered },
+      mounted: {
+        segments: mountedSegments,
+        fixedRows: mountedFixed,
+        dynamicBlocks: mountedDynamic,
+        blankBlocks: shown.blank,
+        uncoveredRanges: shown.uncovered,
+      },
       work: {
         queuedSegments: stats.queued.length + stats.loading,
         queuedEnrichment: stats.enrichment,
@@ -167,9 +174,13 @@ export function createDiffHealth() {
   const probe = registerSurfaceHealth('diff', read)
 
   return {
-    attach: (next: DiffHealthInputs) => { inputs = next },
+    attach: (next: DiffHealthInputs) => {
+      inputs = next
+    },
     /** Time spent building a segment's rows or applying its colour. */
-    prepared: (ms: number) => { prepareMs += ms },
+    prepared: (ms: number) => {
+      prepareMs += ms
+    },
     /** The topology and the source's threads have both arrived. The first time per file set, the
      *  document's structure is complete. */
     ready: () => {

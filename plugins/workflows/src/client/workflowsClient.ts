@@ -10,12 +10,24 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // Commands use HTTP. Workflow notices and step events use the shared WebSocket.
 
 import type { QueryClient } from '@tanstack/solid-query'
-import { activeNodeId, queryOwner, openRepoConfigTrust, readJson as readWorkflowJson, writeJson as writeWorkflowJson } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  queryOwner,
+  openRepoConfigTrust,
+  readJson as readWorkflowJson,
+  writeJson as writeWorkflowJson,
+} from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import type { WorkflowGenerateRequest, WorkflowGenerateResult, WorkflowRunProjection, WorkflowStepProjection, WorkflowTaskGroup } from '../shared/api'
+import type {
+  WorkflowGenerateRequest,
+  WorkflowGenerateResult,
+  WorkflowRunProjection,
+  WorkflowStepProjection,
+  WorkflowTaskGroup,
+} from '../shared/api'
 import type { WorkflowCatalog } from '../shared/workflowContracts'
 import type { WorkflowRecordAttempt, WorkflowRecordFilter, WorkflowRecordPage } from '../shared/workflowProcessing'
 import type {
@@ -24,7 +36,11 @@ import type {
   WorkflowSchedulePreparation,
   WorkflowScheduleView,
 } from '../shared/workflowSchedules'
-import type { WorkflowInvocationApproval, WorkflowInvocationPolicy, WorkflowInvocationReview } from '../shared/workflowInvocation'
+import type {
+  WorkflowInvocationApproval,
+  WorkflowInvocationPolicy,
+  WorkflowInvocationReview,
+} from '../shared/workflowInvocation'
 
 /** How long the generate route may take.
  *
@@ -47,7 +63,8 @@ export const workflowCancelRoute = (runId: string) => `/v1/p/workflows/workflows
 export const workflowKillRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/kill`
 export const workflowRetryRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/retry`
 export const workflowRecordsRoute = (runId: string) => `/v1/p/workflows/workflows/runs/${runId}/records`
-export const workflowRecordRoute = (runId: string, recordId: string) => `${workflowRecordsRoute(runId)}/${encodeURIComponent(recordId)}`
+export const workflowRecordRoute = (runId: string, recordId: string) =>
+  `${workflowRecordsRoute(runId)}/${encodeURIComponent(recordId)}`
 // Which run a managed agent session belongs to, for the agent pane's chip.
 export const workflowSessionRunRoute = (sessionId: string) => `/v1/p/workflows/sessions/${sessionId}/run`
 // Every run on this node, the same route core's merged run list reads.
@@ -98,23 +115,41 @@ function workflowApiAt(nodeId?: string | null) {
     schedules: () => readJson<WorkflowScheduleView[]>(workflowSchedulesRoute),
     schedule: (id: string) => readJson<WorkflowScheduleView>(workflowScheduleRoute(id)),
     scheduleDefaults: () => readJson<{ timezone: string }>(`${workflowSchedulesRoute}/defaults`),
-    prepareSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowSchedulePreparation>(`${workflowSchedulesRoute}/prepare`, input),
+    prepareSchedule: (input: WorkflowScheduleDraftInput) =>
+      post<WorkflowSchedulePreparation>(`${workflowSchedulesRoute}/prepare`, input),
     saveSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowScheduleView>(workflowSchedulesRoute, input),
     approveSchedule: (id: string, firstCheck: WorkflowScheduleFirstCheck, freshEpoch: boolean) =>
       post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/approve`, { firstCheck, freshEpoch }),
-    pauseSchedule: (id: string, paused: boolean) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
+    pauseSchedule: (id: string, paused: boolean) =>
+      post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
     runScheduleNow: (id: string) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/run`, {}),
     deleteSchedule: (id: string) => writeJson<{ deleted: true }>(workflowScheduleRoute(id), { method: 'DELETE' }),
     invocationReview: (projectId: string, definitionKey: string) =>
-      readJson<WorkflowInvocationReview>(`${workflowInvocationRoute}/review?projectId=${encodeURIComponent(projectId)}&definition=${encodeURIComponent(definitionKey)}`),
-    approveInvocation: (approval: WorkflowInvocationApproval) => post<WorkflowInvocationPolicy>(`${workflowInvocationRoute}/approve`, approval),
+      readJson<WorkflowInvocationReview>(
+        `${workflowInvocationRoute}/review?projectId=${encodeURIComponent(projectId)}&definition=${encodeURIComponent(definitionKey)}`,
+      ),
+    approveInvocation: (approval: WorkflowInvocationApproval) =>
+      post<WorkflowInvocationPolicy>(`${workflowInvocationRoute}/approve`, approval),
     revokeInvocation: (projectId: string, definitionKey: string) =>
       post<WorkflowInvocationPolicy | null>(`${workflowInvocationRoute}/revoke`, { projectId, definitionKey }),
-    files: (request: import('../shared/workflowFileAuthoring').WorkflowFileRequest) => post<import('../shared/workflowFileAuthoring').WorkflowFileResult>(`${workflowDefsRoute}/files`, request),
-    preparePublication: (input: import('../shared/workflowPublication').WorkflowPublicationSelection) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/prepare`, input),
-    publish: (id: string) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/publish`, {}),
-    discardPublication: (id: string) => post<{ ok: boolean }>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/discard`, {}),
-    publications: (workspaceId: string) => readJson<import('../shared/workflowPublication').WorkflowPublication[]>(`${workflowDefsRoute}/publications?workspaceId=${encodeURIComponent(workspaceId)}`),
+    files: (request: import('../shared/workflowFileAuthoring').WorkflowFileRequest) =>
+      post<import('../shared/workflowFileAuthoring').WorkflowFileResult>(`${workflowDefsRoute}/files`, request),
+    preparePublication: (input: import('../shared/workflowPublication').WorkflowPublicationSelection) =>
+      post<import('../shared/workflowPublication').WorkflowPublication>(
+        `${workflowDefsRoute}/publications/prepare`,
+        input,
+      ),
+    publish: (id: string) =>
+      post<import('../shared/workflowPublication').WorkflowPublication>(
+        `${workflowDefsRoute}/publications/${encodeURIComponent(id)}/publish`,
+        {},
+      ),
+    discardPublication: (id: string) =>
+      post<{ ok: boolean }>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/discard`, {}),
+    publications: (workspaceId: string) =>
+      readJson<import('../shared/workflowPublication').WorkflowPublication[]>(
+        `${workflowDefsRoute}/publications?workspaceId=${encodeURIComponent(workspaceId)}`,
+      ),
     defs: (taskId: string) => readJson<Defs>(workflowTaskDefsRoute(taskId)),
     runs: (taskId: string) => readJson<WorkflowRunProjection[]>(workflowRunsRoute(taskId)),
     steps: (runId: string, at: At = {}) => readJson<WorkflowStepProjection[]>(workflowStepsRoute(runId), at),
@@ -127,7 +162,16 @@ function workflowApiAt(nodeId?: string | null) {
     // node: a retry that an agent could ask for is a loop around the rail that stopped it.
     retry: (runId: string, stepId: string, prompt?: string) =>
       post<{ ok: boolean; error?: string }>(workflowRetryRoute(runId), { stepId, ...(prompt ? { prompt } : {}) }),
-    records: (runId: string, input: { selectionId?: string; stepId?: string; after?: number; limit?: number; filter?: WorkflowRecordFilter } = {}) => {
+    records: (
+      runId: string,
+      input: {
+        selectionId?: string
+        stepId?: string
+        after?: number
+        limit?: number
+        filter?: WorkflowRecordFilter
+      } = {},
+    ) => {
       const query = new URLSearchParams()
       if (input.selectionId) query.set('selectionId', input.selectionId)
       if (input.stepId) query.set('stepId', input.stepId)
@@ -138,43 +182,72 @@ function workflowApiAt(nodeId?: string | null) {
       return readJson<WorkflowRecordPage>(`${workflowRecordsRoute(runId)}${suffix}`)
     },
     record: (runId: string, recordId: string) =>
-      readJson<{ snapshot: DataValue; provenance: WorkflowRecordPage['provenance']; record: WorkflowRecordPage['records'][number] | null } | null>(workflowRecordRoute(runId, recordId)),
+      readJson<{
+        snapshot: DataValue
+        provenance: WorkflowRecordPage['provenance']
+        record: WorkflowRecordPage['records'][number] | null
+      } | null>(workflowRecordRoute(runId, recordId)),
     recordAttempts: (runId: string, recordId: string, after?: string) => {
       const query = new URLSearchParams({ limit: '20' })
       if (after) query.set('after', after)
-      return readJson<{ attempts: WorkflowRecordAttempt[]; next: string | null }>(`${workflowRecordRoute(runId, recordId)}/attempts?${query}`)
+      return readJson<{ attempts: WorkflowRecordAttempt[]; next: string | null }>(
+        `${workflowRecordRoute(runId, recordId)}/attempts?${query}`,
+      )
     },
     prepareReprocess: (runId: string, recordId: string) =>
-      post<{ recordId: string; digest: string; previousAttemptId: string; title: string }>(`${workflowRecordRoute(runId, recordId)}/prepare-reprocess`, {}),
+      post<{ recordId: string; digest: string; previousAttemptId: string; title: string }>(
+        `${workflowRecordRoute(runId, recordId)}/prepare-reprocess`,
+        {},
+      ),
     reprocess: (runId: string, recordId: string, digest: string, requestId: string) =>
-      post<{ selectionId: string; taskId: string; runId: string; state: string }>(`${workflowRecordRoute(runId, recordId)}/reprocess`, { digest, requestId }),
+      post<{ selectionId: string; taskId: string; runId: string; state: string }>(
+        `${workflowRecordRoute(runId, recordId)}/reprocess`,
+        { digest, requestId },
+      ),
     runForSession: (sessionId: string) =>
       readJson<{ run: WorkflowRunRow; step: WorkflowStepRow } | null>(workflowSessionRunRoute(sessionId)),
     // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
     // `body` is either the whole definition or `{ defId }`; the node resolves the second itself, which
     // is what lets it apply the repo trust snapshot to a committed file.
-    start: async (taskId: string, body: { def: unknown } | { defId: string }, inputs?: Record<string, DataValue>, onTrusted?: (runId: string) => void, launchId?: string): Promise<{ runId?: string; error?: string }> => {
-      const execute = () => post<{ runId?: string; error?: string }>(workflowStartRoute(taskId), { ...body, ...(inputs ? { inputs } : {}), ...(launchId ? { launchId } : {}) })
+    start: async (
+      taskId: string,
+      body: { def: unknown } | { defId: string },
+      inputs?: Record<string, DataValue>,
+      onTrusted?: (runId: string) => void,
+      launchId?: string,
+    ): Promise<{ runId?: string; error?: string }> => {
+      const execute = () =>
+        post<{ runId?: string; error?: string }>(workflowStartRoute(taskId), {
+          ...body,
+          ...(inputs ? { inputs } : {}),
+          ...(launchId ? { launchId } : {}),
+        })
       try {
         const result = await execute()
-        if (result.error === 'needs-trust') openRepoConfigTrust(taskId, async () => {
-          const trusted = await execute()
-          if (trusted.runId) onTrusted?.(trusted.runId)
-          return trusted
-        })
+        if (result.error === 'needs-trust')
+          openRepoConfigTrust(taskId, async () => {
+            const trusted = await execute()
+            if (trusted.runId) onTrusted?.(trusted.runId)
+            return trusted
+          })
         return result
       } catch (e) {
         return { error: e instanceof Error ? e.message : 'Failed to start workflow.' }
       }
     },
     // The merged list for a workspace: rows, every project's committed files, and the user layer.
-    defsList: (workspaceId: string) => readJson<Defs>(`${workflowDefsRoute}?workspaceId=${encodeURIComponent(workspaceId)}`),
+    defsList: (workspaceId: string) =>
+      readJson<Defs>(`${workflowDefsRoute}?workspaceId=${encodeURIComponent(workspaceId)}`),
     // A row by id, or a committed file addressed as `repo:<fileId>` / `user:<fileId>`. A file answers
     // with `revision: 0`, which is how the editor knows it is read-only.
     def: (id: string, projectId?: string) =>
-      readJson<WorkflowDefRow>(`${workflowDefRoute(encodeURIComponent(id))}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+      readJson<WorkflowDefRow>(
+        `${workflowDefRoute(encodeURIComponent(id))}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`,
+      ),
     catalog: (projectId?: string) =>
-      readJson<WorkflowCatalog>(`${workflowCatalogRoute}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+      readJson<WorkflowCatalog>(
+        `${workflowCatalogRoute}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`,
+      ),
     providers: () => readJson<AgentProviderDescriptor[]>(agentProvidersRoute),
     // Every run on this node, as this plugin's contribution to the merged run list. The rail narrows it
     // to the workspace's tasks, because the route is node-wide by construction (@acorn/protocol/runs.ts).
@@ -183,15 +256,22 @@ function workflowApiAt(nodeId?: string | null) {
     // A select field's own options, from the route its `describe` named. The host substitutes the two
     // placeholders and the contributing plugin answers `{ options }` (docs/workflows/step-kinds.md § Contributed
     // step kinds).
-    fieldOptions: (route: string) => readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
-    createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) => post<WorkflowDefRow>(workflowDefsRoute, input),
-    updateDef: (id: string, def: unknown, revision: number) => post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
+    fieldOptions: (route: string) =>
+      readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
+    createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) =>
+      post<WorkflowDefRow>(workflowDefsRoute, input),
+    updateDef: (id: string, def: unknown, revision: number) =>
+      post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
     deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
-    validateDef: (def: unknown, projectId?: string) => post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
+    validateDef: (def: unknown, projectId?: string) =>
+      post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
     authoringTurn: (request: AuthoringTurnRequest, signal: AbortSignal) =>
       writeJson<AuthoringTurnResult>(`${workflowDefsRoute}/authoring/turn`, {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
-        signal, timeoutMs: 11 * 60_000,
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(request),
+        signal,
+        timeoutMs: 11 * 60_000,
       }),
     modelBackends: () => readJson<ModelBackend[]>(workflowModelBackendsRoute),
     // The one call here that says how long it may take, because the broker's default kills it first.

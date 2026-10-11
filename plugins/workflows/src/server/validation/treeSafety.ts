@@ -16,9 +16,9 @@ export function descendantLimit(def: { maxDescendants?: number }): number {
 function ancestors(run: WorkflowRunRow, runs: WorkflowRunRow[]): WorkflowRunRow[] {
   const result: WorkflowRunRow[] = []
   let current: WorkflowRunRow | undefined = run
-  while (current && !result.some(row => row.id === current!.id)) {
+  while (current && !result.some((row) => row.id === current!.id)) {
     result.push(current)
-    current = runs.find(row => row.id === current!.parentRunId)
+    current = runs.find((row) => row.id === current!.parentRunId)
   }
   return result
 }
@@ -37,7 +37,7 @@ function subtreeIds(ancestor: WorkflowRunRow, runs: WorkflowRunRow[]): Set<strin
     const id = pending.pop()!
     if (ids.has(id)) continue
     ids.add(id)
-    pending.push(...children.get(id) ?? [])
+    pending.push(...(children.get(id) ?? []))
   }
   return ids
 }
@@ -72,20 +72,25 @@ export function parseEffectiveTools(run: WorkflowRunRow): ToolCeiling {
 export function parseEffectiveBudget(run: WorkflowRunRow): WorkflowBudget {
   try {
     const value = JSON.parse(run.effectiveBudgetJson) as unknown
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return {
-      maxWallTimeMs: 0,
-      maxCostUsd: 0,
-      maxInputTokens: 0,
-      maxOutputTokens: 0,
-      maxTurns: 0,
-    }
+    if (!value || typeof value !== 'object' || Array.isArray(value))
+      return {
+        maxWallTimeMs: 0,
+        maxCostUsd: 0,
+        maxInputTokens: 0,
+        maxOutputTokens: 0,
+        maxTurns: 0,
+      }
     const budget = value as Record<string, unknown>
     const parsed: WorkflowBudget = {}
     for (const field of ['maxWallTimeMs', 'maxCostUsd', 'maxInputTokens', 'maxOutputTokens', 'maxTurns'] as const) {
       const candidate = budget[field]
       if (candidate == null) continue
-      if (typeof candidate !== 'number' || !Number.isFinite(candidate) || candidate <= 0
-        || (field !== 'maxCostUsd' && !Number.isSafeInteger(candidate))) {
+      if (
+        typeof candidate !== 'number' ||
+        !Number.isFinite(candidate) ||
+        candidate <= 0 ||
+        (field !== 'maxCostUsd' && !Number.isSafeInteger(candidate))
+      ) {
         return { maxTurns: 0 }
       }
       parsed[field] = candidate
@@ -113,15 +118,18 @@ export function childSafetyEnvelope(
 }
 
 function usageOf(rows: Array<typeof schema.workflowTurnAdmissions.$inferSelect>): WorkflowUsage {
-  return rows.reduce((total, row) => ({
-    costUsd: total.costUsd + row.costUsd,
-    inputTokens: total.inputTokens + row.inputTokens,
-    outputTokens: total.outputTokens + row.outputTokens,
-  }), { ...EMPTY_USAGE })
+  return rows.reduce(
+    (total, row) => ({
+      costUsd: total.costUsd + row.costUsd,
+      inputTokens: total.inputTokens + row.inputTokens,
+      outputTokens: total.outputTokens + row.outputTokens,
+    }),
+    { ...EMPTY_USAGE },
+  )
 }
 
 function budgetViolation(budget: WorkflowBudget, usage: WorkflowUsage, admission: boolean): string | null {
-  const crossed = (spent: number, limit: number) => admission ? spent >= limit : spent > limit
+  const crossed = (spent: number, limit: number) => (admission ? spent >= limit : spent > limit)
   if (budget.maxCostUsd != null && crossed(usage.costUsd, budget.maxCostUsd)) {
     return `cost budget ${admission ? 'exhausted' : 'exceeded'} (${usage.costUsd.toFixed(4)} of ${budget.maxCostUsd.toFixed(4)} USD reported)`
   }
@@ -159,14 +167,16 @@ export class WorkflowTreeSafety {
     return this.db.transaction((tx) => {
       const { root, currentRun, at } = this.#admissible(tx, run, step, stepBudget, true)
       const admissionId = this.id()
-      tx.insert(schema.workflowTurnAdmissions).values({
-        id: admissionId,
-        rootRunId: root.id,
-        runId: currentRun.id,
-        stepId: step.id,
-        state: 'reserved',
-        createdAt: at,
-      }).run()
+      tx.insert(schema.workflowTurnAdmissions)
+        .values({
+          id: admissionId,
+          rootRunId: root.id,
+          runId: currentRun.id,
+          stepId: step.id,
+          state: 'reserved',
+          createdAt: at,
+        })
+        .run()
       return admissionId
     })
   }
@@ -188,21 +198,25 @@ export class WorkflowTreeSafety {
   ): string | null {
     try {
       this.db.transaction((tx) => {
-        tx.update(schema.workflowTurnAdmissions).set(cleanUsage(usage)).where(and(
-          eq(schema.workflowTurnAdmissions.id, openingId),
-          eq(schema.workflowTurnAdmissions.state, 'reserved'),
-        )).run()
+        tx.update(schema.workflowTurnAdmissions)
+          .set(cleanUsage(usage))
+          .where(
+            and(eq(schema.workflowTurnAdmissions.id, openingId), eq(schema.workflowTurnAdmissions.state, 'reserved')),
+          )
+          .run()
         const { root, currentRun, at } = this.#admissible(tx, run, step, stepBudget, kind === 'turn')
         if (kind === 'check') return
-        tx.insert(schema.workflowTurnAdmissions).values({
-          id: this.id(),
-          rootRunId: root.id,
-          runId: currentRun.id,
-          stepId: step.id,
-          state: 'settled',
-          createdAt: at,
-          settledAt: at,
-        }).run()
+        tx.insert(schema.workflowTurnAdmissions)
+          .values({
+            id: this.id(),
+            rootRunId: root.id,
+            runId: currentRun.id,
+            stepId: step.id,
+            state: 'settled',
+            createdAt: at,
+            settledAt: at,
+          })
+          .run()
       })
       return null
     } catch (error) {
@@ -221,36 +235,53 @@ export class WorkflowTreeSafety {
     countTurns: boolean,
   ): { root: WorkflowRunRow; currentRun: WorkflowRunRow; at: number } {
     const currentRun = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, run.id)).get()
-    const root = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, run.rootRunId ?? run.id)).get()
-    if (!currentRun || !root
-      || !['running', 'gated'].includes(currentRun.status)
-      || !['running', 'gated'].includes(root.status)) {
+    const root = tx
+      .select()
+      .from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.id, run.rootRunId ?? run.id))
+      .get()
+    if (
+      !currentRun ||
+      !root ||
+      !['running', 'gated'].includes(currentRun.status) ||
+      !['running', 'gated'].includes(root.status)
+    ) {
       throw new WorkflowSafetyRailError('Workflow turn admission stopped because the run tree is not running.')
     }
     const at = Date.now()
     if (currentRun.deadlineAt != null && currentRun.deadlineAt <= at) {
       throw new WorkflowSafetyRailError('Workflow deadline exhausted before turn admission.')
     }
-    const rows = tx.select().from(schema.workflowTurnAdmissions)
-      .where(eq(schema.workflowTurnAdmissions.rootRunId, root.id)).all()
+    const rows = tx
+      .select()
+      .from(schema.workflowTurnAdmissions)
+      .where(eq(schema.workflowTurnAdmissions.rootRunId, root.id))
+      .all()
     const runs = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.rootRunId, root.id)).all()
     const chain = ancestors(currentRun, runs)
-    if (chain.at(-1)?.id !== root.id || chain.some(owner => !['running', 'gated'].includes(owner.status))) {
+    if (chain.at(-1)?.id !== root.id || chain.some((owner) => !['running', 'gated'].includes(owner.status))) {
       throw new WorkflowSafetyRailError('Workflow ancestor no longer admits agent turns.')
     }
-    const ancestorViolation = chain.map(owner => {
-      const ids = subtreeIds(owner, runs)
-      const subtree = rows.filter(row => ids.has(row.runId))
-      const budget = parseEffectiveBudget(owner)
-      return budgetViolation(budget, usageOf(subtree), true)
-        ?? (countTurns && budget.maxTurns != null && subtree.length >= budget.maxTurns
-          ? `turn budget exhausted (${subtree.length} of ${budget.maxTurns} admitted)` : null)
-    }).find(Boolean)
+    const ancestorViolation = chain
+      .map((owner) => {
+        const ids = subtreeIds(owner, runs)
+        const subtree = rows.filter((row) => ids.has(row.runId))
+        const budget = parseEffectiveBudget(owner)
+        return (
+          budgetViolation(budget, usageOf(subtree), true) ??
+          (countTurns && budget.maxTurns != null && subtree.length >= budget.maxTurns
+            ? `turn budget exhausted (${subtree.length} of ${budget.maxTurns} admitted)`
+            : null)
+        )
+      })
+      .find(Boolean)
     const stepRows = rows.filter((row) => row.stepId === step.id)
-    const violation = ancestorViolation
-      ?? budgetViolation(stepBudget, usageOf(stepRows), true)
-      ?? (countTurns && stepBudget.maxTurns != null && stepRows.length >= stepBudget.maxTurns
-        ? `step turn budget exhausted (${stepRows.length} of ${stepBudget.maxTurns} admitted)` : null)
+    const violation =
+      ancestorViolation ??
+      budgetViolation(stepBudget, usageOf(stepRows), true) ??
+      (countTurns && stepBudget.maxTurns != null && stepRows.length >= stepBudget.maxTurns
+        ? `step turn budget exhausted (${stepRows.length} of ${stepBudget.maxTurns} admitted)`
+        : null)
     if (violation) throw new WorkflowSafetyRailError(`Safety rail: ${violation}.`)
     return { root, currentRun, at }
   }
@@ -261,50 +292,69 @@ export class WorkflowTreeSafety {
     error?: string,
     stepBudget: WorkflowBudget = {},
   ): Promise<string | null> {
-    await this.db.update(schema.workflowTurnAdmissions).set({
-      state: 'settled',
-      ...cleanUsage(usage),
-      error: error ?? null,
-      settledAt: Date.now(),
-    }).where(and(
-      eq(schema.workflowTurnAdmissions.id, admissionId),
-      eq(schema.workflowTurnAdmissions.state, 'reserved'),
-    ))
-    const [admission] = await this.db.select().from(schema.workflowTurnAdmissions)
+    await this.db
+      .update(schema.workflowTurnAdmissions)
+      .set({
+        state: 'settled',
+        ...cleanUsage(usage),
+        error: error ?? null,
+        settledAt: Date.now(),
+      })
+      .where(
+        and(eq(schema.workflowTurnAdmissions.id, admissionId), eq(schema.workflowTurnAdmissions.state, 'reserved')),
+      )
+    const [admission] = await this.db
+      .select()
+      .from(schema.workflowTurnAdmissions)
       .where(eq(schema.workflowTurnAdmissions.id, admissionId))
     if (!admission) return 'Safety rail: workflow turn admission disappeared before settlement.'
-    const [root] = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, admission.rootRunId))
+    const [root] = await this.db
+      .select()
+      .from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.id, admission.rootRunId))
     const [run] = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, admission.runId))
     if (!root || !run) return 'workflow accounting owner disappeared before settlement'
-    const rows = await this.db.select().from(schema.workflowTurnAdmissions)
+    const rows = await this.db
+      .select()
+      .from(schema.workflowTurnAdmissions)
       .where(eq(schema.workflowTurnAdmissions.rootRunId, root.id))
     const runs = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.rootRunId, root.id))
-    return ancestors(run, runs).map(owner => {
-      const ids = subtreeIds(owner, runs)
-      return budgetViolation(parseEffectiveBudget(owner), usageOf(rows.filter(row => ids.has(row.runId))), false)
-    }).find(Boolean)
-      ?? budgetViolation(stepBudget, usageOf(rows.filter((row) => row.stepId === admission.stepId)), false)
+    return (
+      ancestors(run, runs)
+        .map((owner) => {
+          const ids = subtreeIds(owner, runs)
+          return budgetViolation(parseEffectiveBudget(owner), usageOf(rows.filter((row) => ids.has(row.runId))), false)
+        })
+        .find(Boolean) ??
+      budgetViolation(stepBudget, usageOf(rows.filter((row) => row.stepId === admission.stepId)), false)
+    )
   }
 
   async usage(rootRunId: string): Promise<WorkflowUsage> {
-    return usageOf(await this.db.select().from(schema.workflowTurnAdmissions)
-      .where(eq(schema.workflowTurnAdmissions.rootRunId, rootRunId)))
+    return usageOf(
+      await this.db
+        .select()
+        .from(schema.workflowTurnAdmissions)
+        .where(eq(schema.workflowTurnAdmissions.rootRunId, rootRunId)),
+    )
   }
 
   async recover(): Promise<number> {
-    const reserved = await this.db.select().from(schema.workflowTurnAdmissions)
+    const reserved = await this.db
+      .select()
+      .from(schema.workflowTurnAdmissions)
       .where(eq(schema.workflowTurnAdmissions.state, 'reserved'))
     if (!reserved.length) return 0
     const at = Date.now()
     for (const row of reserved) {
-      await this.db.update(schema.workflowTurnAdmissions).set({
-        state: 'settled',
-        error: 'Provider usage was unavailable after restart; the admitted turn remains counted.',
-        settledAt: at,
-      }).where(and(
-        eq(schema.workflowTurnAdmissions.id, row.id),
-        eq(schema.workflowTurnAdmissions.state, 'reserved'),
-      ))
+      await this.db
+        .update(schema.workflowTurnAdmissions)
+        .set({
+          state: 'settled',
+          error: 'Provider usage was unavailable after restart; the admitted turn remains counted.',
+          settledAt: at,
+        })
+        .where(and(eq(schema.workflowTurnAdmissions.id, row.id), eq(schema.workflowTurnAdmissions.state, 'reserved')))
     }
     return reserved.length
   }

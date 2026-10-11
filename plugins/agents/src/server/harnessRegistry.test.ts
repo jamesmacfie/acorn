@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { lineDelimitedJsonAdapter, textAdapter, type AgentProfileContribution, type ManifestHarness } from '@acorn/plugin-api/node'
+import {
+  lineDelimitedJsonAdapter,
+  textAdapter,
+  type AgentProfileContribution,
+  type ManifestHarness,
+} from '@acorn/plugin-api/node'
 import { createHarnessRegistry } from './harnessRegistry'
 import { AgentDriverRegistry } from './drivers/registry'
 import { AgentUsageCollectorRegistry } from './usage/collectors'
@@ -72,12 +77,14 @@ describe('a contributed harness becomes a driver like any other', () => {
 
   it('turns a usage probe into a collector and derives the health itself', async () => {
     const { collectors, registry } = registries()
-    registry.register(harness({
-      probeUsage: async () => ({
-        plan: 'Pro',
-        quotas: [{ id: 'session', label: 'Session', percentRemaining: 12 }],
+    registry.register(
+      harness({
+        probeUsage: async () => ({
+          plan: 'Pro',
+          quotas: [{ id: 'session', label: 'Session', percentRemaining: 12 }],
+        }),
       }),
-    }))
+    )
 
     const [entry] = collectors.entries()
     expect(entry).toMatchObject({ provider: 'opencode:opencode', label: 'OpenCode' })
@@ -94,7 +101,9 @@ describe('a contributed harness becomes a driver like any other', () => {
   it('refuses a usage answer it cannot read, rather than inventing one', async () => {
     const { collectors, registry } = registries()
     registry.register(harness({ probeUsage: async () => ({ quotas: 'lots' }) }))
-    await expect(collectors.entries()[0].collect(emptyAgentPricingPreferences())).rejects.toThrow(/shape acorn cannot read/)
+    await expect(collectors.entries()[0].collect(emptyAgentPricingPreferences())).rejects.toThrow(
+      /shape acorn cannot read/,
+    )
   })
 
   it('reads an unusable auth answer as “cannot tell”, never as signed out', async () => {
@@ -107,20 +116,24 @@ describe('a contributed harness becomes a driver like any other', () => {
 
   it('registers a terminal profile with the data parts only', () => {
     const { profiles, registry } = registries()
-    const handle = registry.register(harness({
-      terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: ['--acorn'] },
-    }))
+    const handle = registry.register(
+      harness({
+        terminal: { command: 'opencode', backendPreference: 'tmux', launchArgs: ['--acorn'] },
+      }),
+    )
 
-    expect(profiles).toEqual([{
-      id: 'opencode:opencode',
-      label: 'OpenCode',
-      kind: 'agent',
-      command: 'opencode',
-      managedProvider: 'opencode:opencode',
-      backendPreference: 'tmux',
-      transport: 'pty',
-      launchArgs: ['--acorn'],
-    }])
+    expect(profiles).toEqual([
+      {
+        id: 'opencode:opencode',
+        label: 'OpenCode',
+        kind: 'agent',
+        command: 'opencode',
+        managedProvider: 'opencode:opencode',
+        backendPreference: 'tmux',
+        transport: 'pty',
+        launchArgs: ['--acorn'],
+      },
+    ])
     // A `terminal` block is what makes it a terminal, so nothing says otherwise here.
     expect(profiles[0].interactive).toBeUndefined()
     // No headless argv and no stream-JSON adapter. A workflow step runs this harness through the managed
@@ -188,20 +201,27 @@ describe('a manifest one-shot block becomes an aiArgv', () => {
   })
 
   it('carries a model behind the declared flag, and nothing when no model is asked for', () => {
-    expect(aiArgv(runOnce, { prompt: 'p', model: 'anthropic/claude-sonnet-4-5' }).args)
-      .toEqual(['run', '--model', 'anthropic/claude-sonnet-4-5', 'p'])
+    expect(aiArgv(runOnce, { prompt: 'p', model: 'anthropic/claude-sonnet-4-5' }).args).toEqual([
+      'run',
+      '--model',
+      'anthropic/claude-sonnet-4-5',
+      'p',
+    ])
     expect(aiArgv(runOnce, { prompt: 'p' }).args).not.toContain('--model')
   })
 
   it('drops a model the harness declared no flag for, rather than passing it bare', () => {
     // A bare value would reach the CLI as a second positional argument where it expects one prompt.
-    expect(aiArgv({ args: ['run'], output: 'text' }, { prompt: 'p', model: 'anthropic/claude-sonnet-4-5' }).args)
-      .toEqual(['run', 'p'])
+    expect(
+      aiArgv({ args: ['run'], output: 'text' }, { prompt: 'p', model: 'anthropic/claude-sonnet-4-5' }).args,
+    ).toEqual(['run', 'p'])
   })
 
   it('prepends the system half to the prompt, because a manifest cannot declare a flag for it', () => {
-    expect(aiArgv(runOnce, { prompt: 'What colour is the sky?', system: 'Answer with a single word.' }).args)
-      .toEqual(['run', 'Answer with a single word.\n\nWhat colour is the sky?'])
+    expect(aiArgv(runOnce, { prompt: 'What colour is the sky?', system: 'Answer with a single word.' }).args).toEqual([
+      'run',
+      'Answer with a single word.\n\nWhat colour is the sky?',
+    ])
   })
 
   it('picks the stdout reading the block names', () => {

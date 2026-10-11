@@ -23,9 +23,7 @@ const descriptorFor = (provider: ConnectionProviderContribution): PublicIntegrat
     fields: provider.connection.fields.map(publicCredentialField),
     connectable: provider.connection.connectable,
     disconnectable: provider.connection.disconnectable,
-    ...(provider.connection.maxConnections === undefined
-      ? {}
-      : { maxConnections: provider.connection.maxConnections }),
+    ...(provider.connection.maxConnections === undefined ? {} : { maxConnections: provider.connection.maxConnections }),
   },
   capabilities: provider.capabilities,
   // Derived from the contribution; see docs/integrations/project-sources.md § Project sources for why a provider
@@ -60,10 +58,7 @@ export class ConnectionProviderRegistry {
     if (!positiveInteger(provider.budgets.maxConcurrentRequestsPerConnection)) {
       throw new Error(`Provider '${provider.id}' has an invalid connection request limit.`)
     }
-    if (
-      provider.connection.maxConnections !== undefined &&
-      !positiveInteger(provider.connection.maxConnections)
-    ) {
+    if (provider.connection.maxConnections !== undefined && !positiveInteger(provider.connection.maxConnections)) {
       throw new Error(`Provider '${provider.id}' has an invalid connection count limit.`)
     }
 
@@ -114,7 +109,8 @@ export class ConnectionProviderRegistry {
    * registry would refuse a plugin the use of its own connection.
    */
   assertOwnedBy(id: string, plugin: string): void {
-    if (!this.#providers.has(id)) throw new Error(`Plugin provider runtime names unregistered connection provider '${id}'.`)
+    if (!this.#providers.has(id))
+      throw new Error(`Plugin provider runtime names unregistered connection provider '${id}'.`)
     if (this.#owners.get(id) !== plugin) {
       throw new Error(`Plugin '${plugin}' cannot use connection provider '${id}' because it does not own it.`)
     }

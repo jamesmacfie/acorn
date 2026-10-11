@@ -8,8 +8,14 @@ vi.mock('./apiClient', () => ({ readJson: mocks.readJson }))
 import { pluginFailureAttention } from './pluginFailures'
 import { clearSurfaceFailures, recordSurfaceFailure } from '../../host/plugins/surfaceFailures'
 
-const row = (over: Partial<NodePluginRow>): NodePluginRow =>
-  ({ name: 'ntfy', required: false, disabled: false, running: true, state: 'active', ...over })
+const row = (over: Partial<NodePluginRow>): NodePluginRow => ({
+  name: 'ntfy',
+  required: false,
+  disabled: false,
+  running: true,
+  state: 'active',
+  ...over,
+})
 
 const serve = (plugins: NodePluginRow[]): void => {
   mocks.readJson.mockResolvedValue({ plugins, restartRequired: false } satisfies NodePluginState)
@@ -29,18 +35,27 @@ beforeEach(() => {
 describe('pluginFailureAttention', () => {
   it('puts the node’s own reason on the row, and names the stage it died in', async () => {
     serve([row({ state: 'failed', stage: 'load', failedAt: 5, reason: 'could not import node/index.js: SyntaxError' })])
-    expect(await items()).toEqual([{
-      id: 'core.pluginFailures:ntfy',
-      title: 'Plugin ntfy failed to load',
-      detail: 'could not import node/index.js: SyntaxError',
-      severity: 'warn',
-      at: 5,
-      target: SETTINGS,
-    }])
+    expect(await items()).toEqual([
+      {
+        id: 'core.pluginFailures:ntfy',
+        title: 'Plugin ntfy failed to load',
+        detail: 'could not import node/index.js: SyntaxError',
+        severity: 'warn',
+        at: 5,
+        target: SETTINGS,
+      },
+    ])
   })
 
   it('says "failed to start" for a plugin that ran and threw', async () => {
-    serve([row({ state: 'failed', stage: 'init', failedAt: 5, reason: "TypeError: Cannot read properties of undefined (reading 'load')" })])
+    serve([
+      row({
+        state: 'failed',
+        stage: 'init',
+        failedAt: 5,
+        reason: "TypeError: Cannot read properties of undefined (reading 'load')",
+      }),
+    ])
     expect((await items())[0]).toMatchObject({
       title: 'Plugin ntfy failed to start',
       detail: "TypeError: Cannot read properties of undefined (reading 'load')",
@@ -55,14 +70,16 @@ describe('pluginFailureAttention', () => {
   it('reports a surface this device could not register, under the node that offers the plugin', async () => {
     recordSurfaceFailure('ntfy', 'board', new Error("pane 'board' is already registered"))
     serve([row({})])
-    expect(await items()).toEqual([{
-      id: 'core.pluginFailures:surface:ntfy:board',
-      title: "Plugin ntfy could not contribute 'board'",
-      detail: "pane 'board' is already registered",
-      severity: 'warn',
-      at: expect.any(Number),
-      target: SETTINGS,
-    }])
+    expect(await items()).toEqual([
+      {
+        id: 'core.pluginFailures:surface:ntfy:board',
+        title: "Plugin ntfy could not contribute 'board'",
+        detail: "pane 'board' is already registered",
+        severity: 'warn',
+        at: expect.any(Number),
+        target: SETTINGS,
+      },
+    ])
   })
 
   it('keeps a surface failure off the card of a node that does not have the plugin', async () => {

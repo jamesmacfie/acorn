@@ -4,13 +4,23 @@ export type CliErrorShape = {
 }
 
 export class CliError extends Error {
-  constructor(readonly code: string, message: string, readonly exitCode: number, readonly requestId?: string, readonly retryable?: boolean, readonly partial?: unknown) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly exitCode: number,
+    readonly requestId?: string,
+    readonly retryable?: boolean,
+    readonly partial?: unknown,
+  ) {
     super(message)
   }
 }
 
 export function reportError(error: unknown, output: 'text' | 'json' | 'jsonl'): number {
-  const safe = error instanceof CliError ? error : new CliError('internal_error', error instanceof Error ? error.message : String(error), 1)
+  const safe =
+    error instanceof CliError
+      ? error
+      : new CliError('internal_error', error instanceof Error ? error.message : String(error), 1)
   const envelope: CliErrorShape = {
     apiVersion: 'acorn.cli/v1',
     error: {

@@ -3,13 +3,15 @@ import { parseDeviceConfig } from './deviceConfig'
 
 describe('device configuration', () => {
   it('accepts device appearance, keybindings, slot picks and plugin installation requests', () => {
-    const parsed = parseDeviceConfig(JSON.stringify({
-      style: 'plugin:board:dense',
-      keybindings: { 'core.settings.open': 'meta+,' },
-      exclusiveSlots: { 'pane.switcher': 'board' },
-      plugins: [{ id: 'board', source: { github: 'owner/board' } }],
-      future: { setting: true },
-    }))
+    const parsed = parseDeviceConfig(
+      JSON.stringify({
+        style: 'plugin:board:dense',
+        keybindings: { 'core.settings.open': 'meta+,' },
+        exclusiveSlots: { 'pane.switcher': 'board' },
+        plugins: [{ id: 'board', source: { github: 'owner/board' } }],
+        future: { setting: true },
+      }),
+    )
     expect(parsed.ok).toBe(true)
     if (parsed.ok) expect(parsed.value.future).toEqual({ setting: true })
   })

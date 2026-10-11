@@ -29,7 +29,10 @@ vi.mock('../../infra/node/activeNode', () => ({
   setActiveNode: (id: string) => void events.push(`node:${id}`),
 }))
 vi.mock('../../infra/node/fleet', () => ({
-  nodes: () => [{ nodeId: 'node-a', label: 'laptop' }, { nodeId: 'node-b', label: 'desktop' }],
+  nodes: () => [
+    { nodeId: 'node-a', label: 'laptop' },
+    { nodeId: 'node-b', label: 'desktop' },
+  ],
 }))
 vi.mock('../../features/tasks/activate', () => ({
   activateTaskSignals: (task: { id: string }) => void events.push(`activate:${task.id}`),
@@ -38,19 +41,31 @@ vi.mock('../../features/tasks/activate', () => ({
 // The fleet fan-out, answering with one remote task on node-b. The hook is a query in real life; here
 // it is the shape the command reads.
 vi.mock('../../infra/node/fanout', () => ({
-  createFleetQuery: () => [() => ({
-    rows: [
-      { nodeId: 'node-a', node: { label: 'laptop' }, data: [makeTask('t-local', 'Local task')] },
-      { nodeId: 'node-b', node: { label: 'desktop' }, data: [makeTask('t-remote', 'Remote task')] },
-    ],
-  })],
+  createFleetQuery: () => [
+    () => ({
+      rows: [
+        { nodeId: 'node-a', node: { label: 'laptop' }, data: [makeTask('t-local', 'Local task')] },
+        { nodeId: 'node-b', node: { label: 'desktop' }, data: [makeTask('t-remote', 'Remote task')] },
+      ],
+    }),
+  ],
 }))
 
 function makeTask(id: string, title: string): Task {
   return {
-    id, title, icon: null, origin: 'manual', projectId: 'p1', branch: `james/${id}`,
-    github: null, worktreePath: `/tmp/${id}`, pullNumber: null, status: 'active',
-    parentId: null, sort: 0, links: [],
+    id,
+    title,
+    icon: null,
+    origin: 'manual',
+    projectId: 'p1',
+    branch: `james/${id}`,
+    github: null,
+    worktreePath: `/tmp/${id}`,
+    pullNumber: null,
+    status: 'active',
+    parentId: null,
+    sort: 0,
+    links: [],
   }
 }
 
@@ -61,8 +76,13 @@ type SearchCommand = import('../registries/commands/commands').SearchCommand
 type CommandExecutionContext = import('../registries/commands/commands').CommandExecutionContext
 
 const contextFor = (nodeId: string): CommandExecutionContext => ({
-  host: 'desktop', nodeId, workspaceId: 'w-1', projectId: 'p1', taskId: null,
-  paneId: null, surfaceId: null,
+  host: 'desktop',
+  nodeId,
+  workspaceId: 'w-1',
+  projectId: 'p1',
+  taskId: null,
+  paneId: null,
+  surfaceId: null,
 })
 
 let host: HTMLElement
@@ -80,10 +100,24 @@ beforeEach(() => {
     { id: 'p2', name: 'hidden one', color: null, hidden: true },
   ])
   const Registrar = () => {
-    held.push(registerNavigationCommands(createRouterNavigation({ open: () => true, fleetWorkspaces: () => ({ entries: [], grouped: false, unavailable: [] }) })))
+    held.push(
+      registerNavigationCommands(
+        createRouterNavigation({
+          open: () => true,
+          fleetWorkspaces: () => ({ entries: [], grouped: false, unavailable: [] }),
+        }),
+      ),
+    )
     return <span />
   }
-  dispose = render(() => <QueryClientProvider client={client}><Registrar /></QueryClientProvider>, host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Registrar />
+      </QueryClientProvider>
+    ),
+    host,
+  )
 })
 
 afterEach(() => {
@@ -128,8 +162,9 @@ describe('go to task', () => {
 
   it('says so rather than navigating when the task has gone since the list was drawn', async () => {
     const command = search('core.goto.task')
-    expect(() => command.select({ id: 'vanished', title: 'Vanished' }, contextFor('node-a')))
-      .toThrow("isn't here any more")
+    expect(() => command.select({ id: 'vanished', title: 'Vanished' }, contextFor('node-a'))).toThrow(
+      "isn't here any more",
+    )
     expect(navigated).toEqual([])
   })
 })

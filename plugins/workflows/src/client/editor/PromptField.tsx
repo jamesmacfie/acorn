@@ -29,12 +29,7 @@ export default function PromptField(props: {
     change(current && !current.endsWith('\n') ? `${current}\n${token}` : `${current}${token}`)
   }
   return (
-    <Field
-      label={props.label}
-      hint={props.hint}
-      error={required.error()}
-      group
-    >
+    <Field label={props.label} hint={props.hint} error={required.error()} group>
       <Textarea
         rows={8}
         grow
@@ -50,7 +45,11 @@ export default function PromptField(props: {
         <ChipRow>
           <Text emphasis="muted">Insert</Text>
           <For each={props.references}>
-            {(reference) => <Chip size="xs" onPress={() => append(reference)}>{reference}</Chip>}
+            {(reference) => (
+              <Chip size="xs" onPress={() => append(reference)}>
+                {reference}
+              </Chip>
+            )}
           </For>
         </ChipRow>
       </Show>

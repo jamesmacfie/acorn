@@ -4,9 +4,23 @@
 // use. Bootstrap disposes it on quit.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
-import type { DockerContainerSummary, DockerImage, DockerInfo, DockerNetwork, DockerScope, DockerVolume } from '../shared/model'
+import type {
+  DockerContainerSummary,
+  DockerImage,
+  DockerInfo,
+  DockerNetwork,
+  DockerScope,
+  DockerVolume,
+} from '../shared/model'
 import { docker, DockerCliError, dockerEnv } from './cli'
-import { eventScope, parseImagesOutput, parseJsonLines, parseNetworksOutput, parsePsOutput, parseVolumesOutput } from './parse'
+import {
+  eventScope,
+  parseImagesOutput,
+  parseJsonLines,
+  parseNetworksOutput,
+  parsePsOutput,
+  parseVolumesOutput,
+} from './parse'
 
 const INFO_TTL_MS = 10_000
 const LIST_TTL_MS = 5_000 // backstop only; the events watcher invalidates eagerly
@@ -33,15 +47,17 @@ class DockerService {
     const cached = this.infoCache
     if (cached && Date.now() - cached.at < INFO_TTL_MS) return cached.value
     if (this.pendingInfo) return this.pendingInfo
-    const pending = this.loadInfo().then((value) => {
-      if (!this.disposed && this.pendingInfo === pending) {
-        this.infoCache = { at: Date.now(), value }
-        if (value.available) this.ensureEventsWatcher()
-      }
-      return value
-    }).finally(() => {
-      if (this.pendingInfo === pending) this.pendingInfo = null
-    })
+    const pending = this.loadInfo()
+      .then((value) => {
+        if (!this.disposed && this.pendingInfo === pending) {
+          this.infoCache = { at: Date.now(), value }
+          if (value.available) this.ensureEventsWatcher()
+        }
+        return value
+      })
+      .finally(() => {
+        if (this.pendingInfo === pending) this.pendingInfo = null
+      })
     this.pendingInfo = pending
     return pending
   }
@@ -53,7 +69,11 @@ class DockerService {
       return { available: true, version: parsed.Server?.Version ?? 'unknown', context: parsed.Client?.Context ?? null }
     } catch (err) {
       const e = err instanceof DockerCliError ? err : new DockerCliError('failed', String(err))
-      return { available: false, reason: e.kind === 'not_installed' ? 'not_installed' : 'daemon_down', detail: e.message }
+      return {
+        available: false,
+        reason: e.kind === 'not_installed' ? 'not_installed' : 'daemon_down',
+        detail: e.message,
+      }
     }
   }
 
@@ -69,11 +89,15 @@ class DockerService {
   }
 
   async volumes(): Promise<DockerVolume[]> {
-    return this.cachedList('volumes', async () => parseVolumesOutput(await docker(['volume', 'ls', '--format', '{{json .}}'])))
+    return this.cachedList('volumes', async () =>
+      parseVolumesOutput(await docker(['volume', 'ls', '--format', '{{json .}}'])),
+    )
   }
 
   async networks(): Promise<DockerNetwork[]> {
-    return this.cachedList('networks', async () => parseNetworksOutput(await docker(['network', 'ls', '--format', '{{json .}}'])))
+    return this.cachedList('networks', async () =>
+      parseNetworksOutput(await docker(['network', 'ls', '--format', '{{json .}}'])),
+    )
   }
 
   // Mutations bypass the cache and dirty it immediately. The events watcher confirms shortly after,
@@ -94,7 +118,9 @@ class DockerService {
         if (!this.disposed && this.pending.get(scope) === p) this.lists.set(scope, { at: Date.now(), data })
         return data
       })
-      .finally(() => { if (this.pending.get(scope) === p) this.pending.delete(scope) })
+      .finally(() => {
+        if (this.pending.get(scope) === p) this.pending.delete(scope)
+      })
     this.pending.set(scope, p)
     return p
   }
@@ -164,11 +190,14 @@ class DockerService {
     if (this.disposed || this.streams.size >= MAX_STREAM_CHILDREN) {
       return this.rejectedStream(onEnd)
     }
-    const args = kind === 'logs'
-      ? ['logs', '--tail', '300', '--follow', '--timestamps', ref]
-      : ['stats', '--format', '{{json .}}', ref]
+    const args =
+      kind === 'logs'
+        ? ['logs', '--tail', '300', '--follow', '--timestamps', ref]
+        : ['stats', '--format', '{{json .}}', ref]
     let child: ChildProcessWithoutNullStreams
-    try { child = spawn('docker', args, { env: dockerEnv() }) } catch {
+    try {
+      child = spawn('docker', args, { env: dockerEnv() })
+    } catch {
       return this.rejectedStream(onEnd)
     }
     this.streams.add(child)
@@ -185,7 +214,11 @@ class DockerService {
       if (settled) return
       stopped = true
       settle()
-      try { child.kill('SIGKILL') } catch { /* Continue retiring sibling children. */ }
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        /* Continue retiring sibling children. */
+      }
     }
     this.streamStops.add(stop)
     // Logs keep raw chunk text, no line framing needed downstream. Stats are parsed per line, so
@@ -209,8 +242,14 @@ class DockerService {
 
   private rejectedStream(onEnd: () => void): { stop(): void } {
     let stopped = false
-    queueMicrotask(() => { if (!stopped) onEnd() })
-    return { stop: () => { stopped = true } }
+    queueMicrotask(() => {
+      if (!stopped) onEnd()
+    })
+    return {
+      stop: () => {
+        stopped = true
+      },
+    }
   }
 
   dispose(): void {
@@ -220,7 +259,11 @@ class DockerService {
     if (this.broadcastTimer) clearTimeout(this.broadcastTimer)
     const events = this.events
     this.events = null
-    try { events?.kill('SIGKILL') } catch { /* Continue disposing owned streams. */ }
+    try {
+      events?.kill('SIGKILL')
+    } catch {
+      /* Continue disposing owned streams. */
+    }
     for (const stop of this.streamStops) stop()
     this.streams.clear()
     this.lists.clear()

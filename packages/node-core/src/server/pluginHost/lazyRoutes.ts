@@ -22,10 +22,11 @@ export class LazyRouteLoadError extends Error {
 // until a restart.
 function loadOnce<T>(load: () => Promise<T>): () => Promise<T> {
   let loading: Promise<T> | undefined
-  return () => loading ??= load().catch((cause: unknown) => {
-    loading = undefined
-    throw new LazyRouteLoadError('A route failed to load on first use', { cause })
-  })
+  return () =>
+    (loading ??= load().catch((cause: unknown) => {
+      loading = undefined
+      throw new LazyRouteLoadError('A route failed to load on first use', { cause })
+    }))
 }
 
 /** A fetch handler for `ctx.routes.fetch` that loads on its first request:
@@ -65,7 +66,8 @@ export function lazyRouter(load: () => Promise<Hono<AppEnv>>): Hono<AppEnv> {
     if (!app) {
       app = new Hono<AppEnv>()
         .use(async (c, next) => {
-          for (const [key, value] of Object.entries(carried.get(c.req.raw) ?? {})) c.set(key as keyof AppEnv['Variables'], value as never)
+          for (const [key, value] of Object.entries(carried.get(c.req.raw) ?? {}))
+            c.set(key as keyof AppEnv['Variables'], value as never)
           await next()
         })
         .route(base, loaded)
@@ -75,7 +77,9 @@ export function lazyRouter(load: () => Promise<Hono<AppEnv>>): Hono<AppEnv> {
         })
         // Rethrown so the error reaches the outer app's onServerError with the outer context, the
         // same as a handler in a router mounted at boot.
-        .onError((error) => { throw error })
+        .onError((error) => {
+          throw error
+        })
       mounted.set(base, app)
     }
     return app
@@ -87,7 +91,12 @@ export function lazyRouter(load: () => Promise<Hono<AppEnv>>): Hono<AppEnv> {
     // A middleware that already read the body, such as idempotency hashing it, leaves the stream
     // used, so the copy Hono kept goes in its place (fetchRoute.ts § servePluginFetch does the same).
     const request = raw.bodyUsed
-      ? new Request(raw.url, { method: raw.method, headers: raw.headers, signal: raw.signal, body: await c.req.arrayBuffer() })
+      ? new Request(raw.url, {
+          method: raw.method,
+          headers: raw.headers,
+          signal: raw.signal,
+          body: await c.req.arrayBuffer(),
+        })
       : raw
     carried.set(request, c.var)
     const response = await app.fetch(request, c.env)

@@ -23,12 +23,25 @@ const { hydrateWorkspaceHistory, workspaceWords } = await import('@acorn/client-
 const { shellNavigation } = await import('./navigation')
 
 const task = (id: string, branch: string | null): Task => ({
-  id, title: `Task ${id}`, icon: null, origin: 'manual', projectId: 'p1', branch,
-  github: null, worktreePath: `/tmp/${id}`, pullNumber: null, status: 'active',
-  parentId: null, sort: 0, links: [],
+  id,
+  title: `Task ${id}`,
+  icon: null,
+  origin: 'manual',
+  projectId: 'p1',
+  branch,
+  github: null,
+  worktreePath: `/tmp/${id}`,
+  pullNumber: null,
+  status: 'active',
+  parentId: null,
+  sort: 0,
+  links: [],
 })
 const workspace = (id: string, projects: string[]): Workspace => ({
-  id, name: `Workspace ${id}`, isDefault: false, sort: 0,
+  id,
+  name: `Workspace ${id}`,
+  isDefault: false,
+  sort: 0,
   projects: projects.map((projectId, sort) => ({ id: projectId, name: `Project ${projectId}`, sort })),
 })
 
@@ -41,7 +54,13 @@ const model = {
 } as Pick<ShellModel, 'allTasks' | 'workspaces' | 'workspace' | 'chooseWorkspace'> as ShellModel
 
 const context: CommandExecutionContext = {
-  host: 'tui', nodeId: 'node-a', workspaceId: 'w1', projectId: null, taskId: 't2', paneId: null, surfaceId: null,
+  host: 'tui',
+  nodeId: 'node-a',
+  workspaceId: 'w1',
+  projectId: null,
+  taskId: 't2',
+  paneId: null,
+  surfaceId: null,
 }
 const search = (id: string) => commandRegistry.get(id) as SearchCommand
 const ask = (id: string) => search(id).query('', context, new AbortController().signal)
@@ -81,7 +100,9 @@ describe('the Go to commands in the terminal', () => {
   it('goes back to the last workspace', () => {
     registered = register('on')
     hydrateWorkspaceHistory({ recent: ['w1', 'w2'] })
-    const command = commandRegistry.get('core.goto.workspace-last') as { run: (context: CommandExecutionContext) => unknown }
+    const command = commandRegistry.get('core.goto.workspace-last') as {
+      run: (context: CommandExecutionContext) => unknown
+    }
     command.run(context)
     expect(events).toEqual(['workspace:w2'])
   })

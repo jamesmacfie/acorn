@@ -18,14 +18,18 @@ const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'
 /** The `hooks` entry for Claude's settings: one command hook per point that has a handler. Claude runs
  *  these beside the person's own hooks, and a deny from any of them refuses the call. */
 export function claudeLoopHookSettings(bridge: AgentDriverLoopHooks): Record<string, unknown> {
-  const entry = (event: AgentLoopHookEvent) => [{
-    matcher: '*',
-    hooks: [{
-      type: 'command',
-      command: [bridge.command, ...bridge.args, 'claude', event].map(shellQuote).join(' '),
-      timeout: LOOP_HOOK_TIMEOUT_SECONDS,
-    }],
-  }]
+  const entry = (event: AgentLoopHookEvent) => [
+    {
+      matcher: '*',
+      hooks: [
+        {
+          type: 'command',
+          command: [bridge.command, ...bridge.args, 'claude', event].map(shellQuote).join(' '),
+          timeout: LOOP_HOOK_TIMEOUT_SECONDS,
+        },
+      ],
+    },
+  ]
   return {
     ...(bridge.beforeTool ? { PreToolUse: entry('PreToolUse') } : {}),
     ...(bridge.afterTool ? { PostToolUse: entry('PostToolUse') } : {}),
@@ -40,7 +44,11 @@ const FILE_GUARD_TIMEOUT_SECONDS = 10
  *  outside it, so a PreToolUse hook runs the file guard on each call, which checks the real path against
  *  the block, including a file created after the start. The deny rules keep Claude's own permission
  *  check out of the entries that existed at the start too, so the guard isn't the only line. */
-export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox: Record<string, unknown>; deny: string[]; preToolUse: unknown[] } {
+export function claudeReadBlockSettings(block: AgentDriverReadBlock): {
+  sandbox: Record<string, unknown>
+  deny: string[]
+  preToolUse: unknown[]
+} {
   const policy = encodeFileGuardPolicy({
     dataDir: [block.dataDir],
     read: block.readable,
@@ -55,19 +63,33 @@ export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox:
       allowUnsandboxedCommands: false,
       // A machine that can't run the sandbox refuses the session rather than running it unconfined.
       failIfUnavailable: true,
-      filesystem: { denyRead: [block.dataDir], allowRead: block.readable, allowWrite: block.writable, denyWrite: block.writeDenied },
+      filesystem: {
+        denyRead: [block.dataDir],
+        allowRead: block.readable,
+        allowWrite: block.writable,
+        denyWrite: block.writeDenied,
+      },
       ...(block.loopback ? { network: { allowedDomains: [block.loopback] } } : {}),
     },
     // `//` anchors at the filesystem root, as the skill allow rules below do.
-    deny: block.hidden.flatMap((path) => [`Read(/${path})`, `Read(/${path}/**)`, `Edit(/${path})`, `Edit(/${path}/**)`]),
-    preToolUse: [{
-      matcher: FILE_GUARD_MATCHER,
-      hooks: [{
-        type: 'command',
-        command: [block.fileGuard.command, ...block.fileGuard.args, policy].map(shellQuote).join(' '),
-        timeout: FILE_GUARD_TIMEOUT_SECONDS,
-      }],
-    }],
+    deny: block.hidden.flatMap((path) => [
+      `Read(/${path})`,
+      `Read(/${path}/**)`,
+      `Edit(/${path})`,
+      `Edit(/${path}/**)`,
+    ]),
+    preToolUse: [
+      {
+        matcher: FILE_GUARD_MATCHER,
+        hooks: [
+          {
+            type: 'command',
+            command: [block.fileGuard.command, ...block.fileGuard.args, policy].map(shellQuote).join(' '),
+            timeout: FILE_GUARD_TIMEOUT_SECONDS,
+          },
+        ],
+      },
+    ],
   }
 }
 
@@ -113,17 +135,32 @@ export const claudeHarness: HarnessLaunchSpec = {
       sessionCustomAgent(session.config)?.instructions,
       attendanceInstructions,
       typeof session.config.standingContext === 'string' ? session.config.standingContext : undefined,
-    ].filter(Boolean).join('\n\n')
+    ]
+      .filter(Boolean)
+      .join('\n\n')
     const block = readBlock ? claudeReadBlockSettings(readBlock) : null
     const allow = skills.folders.map((dir) => `Read(/${dir}/**)`)
-    const permissions = allow.length || block ? { permissions: { ...(allow.length ? { allow } : {}), ...(block ? { deny: block.deny } : {}) } } : {}
+    const permissions =
+      allow.length || block
+        ? { permissions: { ...(allow.length ? { allow } : {}), ...(block ? { deny: block.deny } : {}) } }
+        : {}
     const plugins = skills.plugins.length ? { plugins: skills.plugins.map((path) => ({ type: 'local', path })) } : {}
     const bridged = loopHooks ? claudeLoopHookSettings(loopHooks) : {}
     const preToolUse = [...(block?.preToolUse ?? []), ...((bridged.PreToolUse as unknown[] | undefined) ?? [])]
     const hookSettings = { ...bridged, ...(preToolUse.length ? { PreToolUse: preToolUse } : {}) }
     const hooks = Object.keys(hookSettings).length ? { hooks: hookSettings } : {}
     return {
-      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions, ...hooks, ...(block ? { sandbox: block.sandbox } : {}) }, ...plugins } },
+      claudeCode: {
+        options: {
+          settings: {
+            autoContinueAtUsageLimit: false,
+            ...permissions,
+            ...hooks,
+            ...(block ? { sandbox: block.sandbox } : {}),
+          },
+          ...plugins,
+        },
+      },
       ...(append ? { systemPrompt: { append } } : {}),
     }
   },

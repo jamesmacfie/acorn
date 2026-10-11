@@ -21,7 +21,9 @@ let pluginChange: ((nodeId: string) => void) | undefined
 vi.mock('../../infra/node/wsClient', () => ({
   wsOnFleetPluginsChanged: (callback: (nodeId: string) => void) => {
     pluginChange = callback
-    return () => { pluginChange = undefined }
+    return () => {
+      pluginChange = undefined
+    }
   },
 }))
 const forgetPluginNode = vi.fn()
@@ -34,7 +36,10 @@ vi.mock('./distribution', () => ({
   onPluginDistributionCommit: () => () => {},
   syncPluginDistribution: vi.fn(async () => {}),
 }))
-vi.mock('./syncContributions', () => ({ syncPluginContributions: vi.fn(async () => {}), syncPluginContributionsInBackground: vi.fn() }))
+vi.mock('./syncContributions', () => ({
+  syncPluginContributions: vi.fn(async () => {}),
+  syncPluginContributionsInBackground: vi.fn(),
+}))
 
 const { watchPluginChanges, reconcileDevicePluginChange, preparePluginContributionsForNode } = await import('./reload')
 const { syncPluginDistribution } = await import('./distribution')
@@ -83,7 +88,12 @@ it('reconciles device changes without requesting node rosters', async () => {
 
 it('waits for the selected node roster before registering loaded contributions', async () => {
   let finish!: () => void
-  vi.mocked(syncPluginDistribution).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+  vi.mocked(syncPluginDistribution).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+  )
   vi.mocked(syncPluginContributions).mockClear()
   const ready = preparePluginContributionsForNode('linked-node')
   expect(syncPluginDistribution).toHaveBeenLastCalledWith({ nodeIds: ['linked-node'] })
@@ -95,9 +105,16 @@ it('waits for the selected node roster before registering loaded contributions',
 
 it('resolves only once the contribution hosts have loaded and registered', async () => {
   let loaded!: () => void
-  vi.mocked(syncPluginContributions).mockImplementationOnce(() => new Promise<void>((resolve) => { loaded = resolve }))
+  vi.mocked(syncPluginContributions).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        loaded = resolve
+      }),
+  )
   let settled = false
-  const ready = preparePluginContributionsForNode('linked-node').then(() => { settled = true })
+  const ready = preparePluginContributionsForNode('linked-node').then(() => {
+    settled = true
+  })
   await vi.waitFor(() => expect(loaded).toBeTypeOf('function'))
   expect(settled).toBe(false)
   loaded()

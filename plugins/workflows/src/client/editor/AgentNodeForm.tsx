@@ -25,14 +25,19 @@ export default function AgentNodeForm(props: {
   const profiles = () => props.catalog?.profiles ?? []
   const provider = () => (props.providers ?? []).find((entry) => entry.profileId === props.step.profileId)
   // Sorted so model comes first and reasoning second, which is the order a person reaches for them.
-  const options = () => [...(provider()?.configOptions ?? [])]
-    .sort((a, b) => (OPTION_ORDER[a.category] ?? 9) - (OPTION_ORDER[b.category] ?? 9) || a.label.localeCompare(b.label))
+  const options = () =>
+    [...(provider()?.configOptions ?? [])].sort(
+      (a, b) => (OPTION_ORDER[a.category] ?? 9) - (OPTION_ORDER[b.category] ?? 9) || a.label.localeCompare(b.label),
+    )
 
   const setOption = (id: string, value: string): void => {
     const current = { ...(props.step.configOptions ?? {}) }
     if (value) current[id] = value
     else delete current[id]
-    props.onStep({ configOptions: Object.keys(current).length ? current : undefined, ...(id === 'model' ? { model: undefined } : {}) })
+    props.onStep({
+      configOptions: Object.keys(current).length ? current : undefined,
+      ...(id === 'model' ? { model: undefined } : {}),
+    })
   }
 
   return (
@@ -46,7 +51,9 @@ export default function AgentNodeForm(props: {
             { value: '', label: 'Workflow default' },
             ...profiles().map((profile) => ({ value: profile.id, label: profile.label })),
           ]}
-          onChange={(value) => props.onStep({ profileId: value || undefined, model: undefined, configOptions: undefined })}
+          onChange={(value) =>
+            props.onStep({ profileId: value || undefined, model: undefined, configOptions: undefined })
+          }
         />
       </Field>
 
@@ -68,51 +75,54 @@ export default function AgentNodeForm(props: {
         )}
       </For>
       <Show when={provider() && !options().length}>
-        <Text emphasis="muted" wrap>{`Open a ${provider()!.label} session once to load its model, effort, and mode choices.`}</Text>
+        <Text
+          emphasis="muted"
+          wrap
+        >{`Open a ${provider()!.label} session once to load its model, effort, and mode choices.`}</Text>
       </Show>
       <Show when={!props.step.profileId}>
-        <Text emphasis="muted" wrap>Choose a harness to set its model and effort. Workflow default uses your usual agent settings.</Text>
+        <Text emphasis="muted" wrap>
+          Choose a harness to set its model and effort. Workflow default uses your usual agent settings.
+        </Text>
       </Show>
       <Show when={props.step.profileId && !provider()}>
-        <Field
-          hint="This agent isn't installed on this computer, so its models can't be listed."
-          group
-        >
+        <Field hint="This agent isn't installed on this computer, so its models can't be listed." group>
           <Select label="Options" disabled options={[{ value: '', label: 'Nothing to choose' }]} value="" />
         </Field>
       </Show>
 
-      <Show when={!props.sharedTask}><Field
-        label="Where it runs"
-        help="In its own worktree, a step gets a child task and branch. Use it for steps that change code."
-        group
-      >
-        <SegmentedControl
-          ariaLabel="Where it runs"
-          value={props.step.isolation ?? 'shared'}
-          options={[
-            { value: 'shared', label: "Task's folder" },
-            { value: 'worktree', label: 'Own worktree' },
-          ]}
-          onChange={(value) => props.onStep({ isolation: value === 'shared' ? undefined : 'worktree' })}
-        />
-      </Field>
+      <Show when={!props.sharedTask}>
+        <Field
+          label="Where it runs"
+          help="In its own worktree, a step gets a child task and branch. Use it for steps that change code."
+          group
+        >
+          <SegmentedControl
+            ariaLabel="Where it runs"
+            value={props.step.isolation ?? 'shared'}
+            options={[
+              { value: 'shared', label: "Task's folder" },
+              { value: 'worktree', label: 'Own worktree' },
+            ]}
+            onChange={(value) => props.onStep({ isolation: value === 'shared' ? undefined : 'worktree' })}
+          />
+        </Field>
 
-      <Field
-        label="Earlier results"
-        group
-      >
-        <SegmentedControl
-          ariaLabel="Earlier results"
-          value={props.step.inputs ?? 'append'}
-          options={[
-            { value: 'append', label: 'After the prompt' },
-            { value: 'template', label: 'Where I reference them' },
-            { value: 'none', label: 'Leave out' },
-          ]}
-          onChange={(value) => props.onStep({ inputs: value === 'append' ? undefined : (value as 'template' | 'none') })}
-        />
-      </Field></Show>
+        <Field label="Earlier results" group>
+          <SegmentedControl
+            ariaLabel="Earlier results"
+            value={props.step.inputs ?? 'append'}
+            options={[
+              { value: 'append', label: 'After the prompt' },
+              { value: 'template', label: 'Where I reference them' },
+              { value: 'none', label: 'Leave out' },
+            ]}
+            onChange={(value) =>
+              props.onStep({ inputs: value === 'append' ? undefined : (value as 'template' | 'none') })
+            }
+          />
+        </Field>
+      </Show>
     </Stack>
   )
 }

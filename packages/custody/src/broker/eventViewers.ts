@@ -55,18 +55,28 @@ export class EventViewers {
     this.legacyOwner = null
   }
 
-  externalId(viewerId: string): string | undefined { return viewerId === this.defaultId ? undefined : viewerId }
-  legacyRecipient(): string | undefined { return this.legacyOwner ? this.externalId(this.legacyOwner) : undefined }
+  externalId(viewerId: string): string | undefined {
+    return viewerId === this.defaultId ? undefined : viewerId
+  }
+  legacyRecipient(): string | undefined {
+    return this.legacyOwner ? this.externalId(this.legacyOwner) : undefined
+  }
 
   private admit(viewerId: string): boolean {
     if (this.probed && !this.multiplexed && this.legacyOwner && this.legacyOwner !== viewerId) {
       this.retire(viewerId)
-      this.reject(viewerId, { code: 'viewers_unsupported', message: 'This Node supports one event viewer. Upgrade the Node to use another window.' })
+      this.reject(viewerId, {
+        code: 'viewers_unsupported',
+        message: 'This Node supports one event viewer. Upgrade the Node to use another window.',
+      })
       return false
     }
     if (this.owners.has(viewerId)) return true
     if (this.owners.size >= WS_MAX_VIEWERS) {
-      this.reject(viewerId, { code: 'viewer_limit', message: `This Node connection has reached its ${WS_MAX_VIEWERS}-viewer limit.` })
+      this.reject(viewerId, {
+        code: 'viewer_limit',
+        message: `This Node connection has reached its ${WS_MAX_VIEWERS}-viewer limit.`,
+      })
       return false
     }
     this.owners.set(viewerId, new Map())

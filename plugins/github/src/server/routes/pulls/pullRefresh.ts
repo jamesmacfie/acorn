@@ -1,5 +1,10 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { chunkRowsByColumnBudget, type CoreServices, type PluginDatabase, type RefreshResult } from '@acorn/plugin-api/node'
+import {
+  chunkRowsByColumnBudget,
+  type CoreServices,
+  type PluginDatabase,
+  type RefreshResult,
+} from '@acorn/plugin-api/node'
 import { pullsResource } from '../../resourceKeys'
 import { gh, ghError } from '../../githubApi'
 import { mirrorFiles, mirrorPr, type PatchBlobStore } from '../mirror/prMirror'
@@ -43,9 +48,13 @@ export async function refreshOpenPulls(
     .select()
     .from(syncState)
     .where(and(eq(syncState.userId, userId), eq(syncState.resource, resource)))
-  const res = await fetcher(token, `/repos/${owner}/${repo}/pulls?state=open&sort=updated&direction=desc&per_page=100`, {
-    headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
-  })
+  const res = await fetcher(
+    token,
+    `/repos/${owner}/${repo}/pulls?state=open&sort=updated&direction=desc&per_page=100`,
+    {
+      headers: sync?.etag ? { 'If-None-Match': sync.etag } : {},
+    },
+  )
   const now = Date.now()
 
   if (res.status === 304) {
@@ -66,13 +75,7 @@ export async function refreshOpenPulls(
     await db
       .select({ userId: pullRequests.userId, repoId: pullRequests.repoId, number: pullRequests.number })
       .from(pullRequests)
-      .where(
-        and(
-          eq(pullRequests.userId, userId),
-          eq(pullRequests.repoId, repoId),
-          eq(pullRequests.state, 'open'),
-        ),
-      )
+      .where(and(eq(pullRequests.userId, userId), eq(pullRequests.repoId, repoId), eq(pullRequests.state, 'open')))
   ).filter((pull) => !retainedNumbers.has(pull.number))
   const rows = body.map((pull) => ({
     userId,
@@ -139,7 +142,12 @@ export async function refreshPullDetail(
   const { fetchPullComposite } = await import('../mirror/prFetch')
   const pull = await fetchPullComposite(token, key.owner, key.repo, key.number)
   if (!pull.ok) return pull
-  const { checksChanged } = await mirrorPr(db, { userId: key.userId, repoId: key.repoId, number: key.number }, pull.value, Date.now())
+  const { checksChanged } = await mirrorPr(
+    db,
+    { userId: key.userId, repoId: key.repoId, number: key.number },
+    pull.value,
+    Date.now(),
+  )
   announcePrSynced(emit, key, pull.value.headRefOid, checksChanged)
   return { ok: true }
 }
@@ -185,7 +193,12 @@ export async function refreshPullFiles(
 
 /** One PR's composite landed. `checks-changed` rides alongside only when a check flipped: it is the
  *  verb a consumer keys a green-to-red alert on, so it must not fire on every sync. */
-export function announcePrSynced(emit: GithubEmit, key: PullRefreshKey & { number: number }, headSha: string | null, checksChanged: boolean): void {
+export function announcePrSynced(
+  emit: GithubEmit,
+  key: PullRefreshKey & { number: number },
+  headSha: string | null,
+  checksChanged: boolean,
+): void {
   const payload = { repoOwner: key.owner, repoName: key.repo, pullNumber: key.number, headSha }
   emit('pr-synced', payload)
   if (checksChanged) emit('checks-changed', payload)

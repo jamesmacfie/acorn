@@ -22,7 +22,9 @@ type Case = {
   check: (frame: Frame) => void
 }
 
-const region = (text: string): Region => () => <Line>{text}</Line>
+const region =
+  (text: string): Region =>
+  () => <Line>{text}</Line>
 
 const CASES: Case[] = [
   {
@@ -48,17 +50,22 @@ const CASES: Case[] = [
     projects: 'one line, the rest, one line',
     props: { regions: { header: region('a header'), body: region('a body'), footer: region('a footer') } },
     check: (frame) => {
-      expect(frame.lines.findIndex((line) => line.includes('a header')))
-        .toBeLessThan(frame.lines.findIndex((line) => line.includes('a body')))
-      expect(frame.lines.findIndex((line) => line.includes('a body')))
-        .toBeLessThan(frame.lines.findIndex((line) => line.includes('a footer')))
+      expect(frame.lines.findIndex((line) => line.includes('a header'))).toBeLessThan(
+        frame.lines.findIndex((line) => line.includes('a body')),
+      )
+      expect(frame.lines.findIndex((line) => line.includes('a body'))).toBeLessThan(
+        frame.lines.findIndex((line) => line.includes('a footer')),
+      )
     },
   },
   {
     layout: 'tabs',
     projects: 'the bar is one line; hidden panels never mount',
     props: {
-      tabs: [{ id: 'one', label: 'Overview' }, { id: 'two', label: 'Checks' }],
+      tabs: [
+        { id: 'one', label: 'Overview' },
+        { id: 'two', label: 'Checks' },
+      ],
       regions: { 'panel:one': region('the overview'), 'panel:two': region('the checks') },
     },
     check: (frame) => {
@@ -76,8 +83,9 @@ const CASES: Case[] = [
     projects: 'the document above, the frame below, a rule between',
     props: { regions: { document: region('the document'), frame: region('the frame') } },
     check: (frame) => {
-      expect(frame.lines.findIndex((line) => line.includes('the document')))
-        .toBeLessThan(frame.lines.findIndex((line) => line.includes('the frame')))
+      expect(frame.lines.findIndex((line) => line.includes('the document'))).toBeLessThan(
+        frame.lines.findIndex((line) => line.includes('the frame')),
+      )
     },
   },
   {
@@ -95,15 +103,20 @@ const CASES: Case[] = [
     projects: 'two blocks with a rule between, the split moved by a key',
     props: { regions: { top: region('the top'), bottom: region('the bottom') } },
     check: (frame) => {
-      expect(frame.lines.findIndex((line) => line.includes('the top')))
-        .toBeLessThan(frame.lines.findIndex((line) => line.includes('the bottom')))
+      expect(frame.lines.findIndex((line) => line.includes('the top'))).toBeLessThan(
+        frame.lines.findIndex((line) => line.includes('the bottom')),
+      )
     },
   },
   {
     layout: 'wizard',
     projects: 'one step at a time, the count on the header line, the actions on the footer',
     props: {
-      steps: [{ id: 'a', label: 'Repos' }, { id: 'b', label: 'Agents' }, { id: 'c', label: 'Done' }],
+      steps: [
+        { id: 'a', label: 'Repos' },
+        { id: 'b', label: 'Agents' },
+        { id: 'c', label: 'Done' },
+      ],
       current: 'b',
       regions: { step: region('the step') },
     },
@@ -169,7 +182,10 @@ describe('the layouts in cells', () => {
 
   it('list-detail draws both halves above 80 cells and one below, and a key switches them', async () => {
     // The one projection with a width in it, so it gets a test with a width in it.
-    const wide = await draw(CASES.find((entry) => entry.layout === 'list-detail')!, { width: 100, height: 24 })
+    const wide = await draw(
+      CASES.find((entry) => entry.layout === 'list-detail')!,
+      { width: 100, height: 24 },
+    )
     try {
       expect(wide.text).toContain('a list')
       expect(wide.text).toContain('a detail')
@@ -177,7 +193,10 @@ describe('the layouts in cells', () => {
       wide.done()
     }
 
-    const narrow = await draw(CASES.find((entry) => entry.layout === 'list-detail')!, { width: 60, height: 24 })
+    const narrow = await draw(
+      CASES.find((entry) => entry.layout === 'list-detail')!,
+      { width: 60, height: 24 },
+    )
     try {
       expect(narrow.text).toContain('a list')
       expect(narrow.text).not.toContain('a detail')
@@ -196,7 +215,10 @@ describe('the layouts in cells', () => {
     // the chord as written on the desktop is one nobody can press here (../keys/commandLayer.ts §
     // asCtrl). Both the chord and the strip's own arrows write the same stored selection, so a reader
     // who switches one way and then the other does not find two answers (./Tabs.tsx).
-    const frame = await draw(CASES.find((entry) => entry.layout === 'tabs')!, { width: 80, height: 24 })
+    const frame = await draw(
+      CASES.find((entry) => entry.layout === 'tabs')!,
+      { width: 80, height: 24 },
+    )
     try {
       const second = await frame.press('2', { ctrl: true })
       expect(second.lines[0]).toContain('[Checks]')
@@ -215,7 +237,10 @@ describe('the layouts in cells', () => {
     // `SIGWINCH` is the renderer's: it listens for the signal itself and re-lays out, and no layout
     // reads the terminal's size, so a resize is one thing rather than eight
     // (docs/tui/rectangles.md § What the TUI never does).
-    const frame = await draw(CASES.find((entry) => entry.layout === 'list-detail')!, { width: 60, height: 24 })
+    const frame = await draw(
+      CASES.find((entry) => entry.layout === 'list-detail')!,
+      { width: 60, height: 24 },
+    )
     try {
       expect(frame.text).not.toContain('a detail')
       const wider = await frame.resize(100, 24)

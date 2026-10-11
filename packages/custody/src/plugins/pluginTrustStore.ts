@@ -3,7 +3,16 @@ import { join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type {
+  PluginAgentToolGrant,
+  PluginContextSectionGrant,
+  PluginHarnessGrant,
+  PluginKeyClaimGrant,
+  PluginNavigationDestinationGrant,
+  PluginScheduleGrant,
+  PluginTaskCheckGrant,
+  PluginWebviewGrant,
+} from '@acorn/protocol/api.ts'
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
@@ -23,7 +32,8 @@ const log = createLogger('plugins')
 // chmod after write.
 
 const TRUST_FILE = `${ACORN_BASELINE}-plugin-trust.json`
-const sourceOf = (source: BundleSource | string): BundleSource => typeof source === 'string' ? { kind: 'node', nodeId: source } : source
+const sourceOf = (source: BundleSource | string): BundleSource =>
+  typeof source === 'string' ? { kind: 'node', nodeId: source } : source
 const sameSource = (left: BundleSource, right: BundleSource): boolean =>
   left.kind === right.kind && (left.kind === 'device' || (right.kind === 'node' && left.nodeId === right.nodeId))
 
@@ -149,7 +159,11 @@ export type PluginDevGrant = z.infer<typeof devGrantSchema>
 
 // Read loosely. The rows are validated one at a time below, so a single unreadable acknowledgement
 // cannot condemn the ones beside it.
-const fileSchema = z.strictObject({ version: z.literal(1), acks: z.array(z.unknown()), devGrants: z.array(z.unknown()) })
+const fileSchema = z.strictObject({
+  version: z.literal(1),
+  acks: z.array(z.unknown()),
+  devGrants: z.array(z.unknown()),
+})
 
 export class PluginTrustStore {
   #acks: PluginAck[] | null = null
@@ -168,24 +182,50 @@ export class PluginTrustStore {
   }
 
   devGrantFor(pluginId: string, source: BundleSource | string): PluginDevGrant | undefined {
-    return this.listDevGrants().find((grant) => grant.pluginId === pluginId && sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, sourceOf(source)))
+    return this.listDevGrants().find(
+      (grant) =>
+        grant.pluginId === pluginId &&
+        sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, sourceOf(source)),
+    )
   }
 
   /** Put a plugin into development mode on this device. Upsert, so re-approving does not stack rows. */
   grantDev(grant: PluginDevGrant): void {
     const parsed = devGrantSchema.parse(grant)
-    this.write(
-      this.list(),
-      [...this.listDevGrants().filter((existing) => !(existing.pluginId === parsed.pluginId && sameSource(existing.source ?? { kind: 'node', nodeId: existing.nodeId }, parsed.source ?? { kind: 'node', nodeId: parsed.nodeId }))), { ...parsed, source: parsed.source ?? { kind: 'node', nodeId: parsed.nodeId } }],
-    )
+    this.write(this.list(), [
+      ...this.listDevGrants().filter(
+        (existing) =>
+          !(
+            existing.pluginId === parsed.pluginId &&
+            sameSource(
+              existing.source ?? { kind: 'node', nodeId: existing.nodeId },
+              parsed.source ?? { kind: 'node', nodeId: parsed.nodeId },
+            )
+          ),
+      ),
+      { ...parsed, source: parsed.source ?? { kind: 'node', nodeId: parsed.nodeId } },
+    ])
   }
 
   /** End development mode. See docs/security.md, "The dev grant". */
   revokeDev(pluginId: string, source: BundleSource | string): void {
     const provenance = sourceOf(source)
     this.write(
-      this.list().filter((ack) => !(ack.dev && ack.pluginId === pluginId && sameSource(ack.source ?? { kind: 'node', nodeId: ack.nodeId }, provenance))),
-      this.listDevGrants().filter((grant) => !(grant.pluginId === pluginId && sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, provenance))),
+      this.list().filter(
+        (ack) =>
+          !(
+            ack.dev &&
+            ack.pluginId === pluginId &&
+            sameSource(ack.source ?? { kind: 'node', nodeId: ack.nodeId }, provenance)
+          ),
+      ),
+      this.listDevGrants().filter(
+        (grant) =>
+          !(
+            grant.pluginId === pluginId &&
+            sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, provenance)
+          ),
+      ),
     )
   }
 
@@ -194,7 +234,13 @@ export class PluginTrustStore {
     const provenance = sourceOf(source)
     this.write(
       this.list(),
-      this.listDevGrants().filter((grant) => !(grant.pluginId === pluginId && sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, provenance))),
+      this.listDevGrants().filter(
+        (grant) =>
+          !(
+            grant.pluginId === pluginId &&
+            sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, provenance)
+          ),
+      ),
     )
   }
 
@@ -248,7 +294,10 @@ export class PluginTrustStore {
           results.push({ ack: stored })
           continue
         }
-        acks = [...acks.filter((existing) => !(existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)), parsed]
+        acks = [
+          ...acks.filter((existing) => !(existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)),
+          parsed,
+        ]
         changed = true
         results.push({ ack: parsed })
       } catch (error) {
@@ -267,7 +316,13 @@ export class PluginTrustStore {
    * Always `partial`, because there is no disclosure behind it. See docs/security.md, "The dev
    * grant".
    */
-  recordDevAccept(input: { pluginId: string; hash: string; nodeId: string; source?: BundleSource; version: string }): boolean {
+  recordDevAccept(input: {
+    pluginId: string
+    hash: string
+    nodeId: string
+    source?: BundleSource
+    version: string
+  }): boolean {
     const source = input.source ?? { kind: 'node', nodeId: input.nodeId }
     if (!this.devGrantFor(input.pluginId, source)) return false
     // A per-source development grant cannot overwrite a later manual decision on the globally
@@ -277,7 +332,11 @@ export class PluginTrustStore {
     this.record({
       ...input,
       source,
-      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+      permissions: {
+        api: [],
+        events: [],
+        node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      },
       webviews: [],
       keyClaims: [],
       navigationDestinations: [],
@@ -345,7 +404,8 @@ export class PluginTrustStore {
     let dropped = 0
     for (const entry of file.data.acks) {
       const parsed = ackSchema.safeParse(entry)
-      if (parsed.success) acks.push({ ...parsed.data, source: parsed.data.source ?? { kind: 'node', nodeId: parsed.data.nodeId } })
+      if (parsed.success)
+        acks.push({ ...parsed.data, source: parsed.data.source ?? { kind: 'node', nodeId: parsed.data.nodeId } })
       else dropped++
     }
     if (dropped) {
@@ -356,7 +416,8 @@ export class PluginTrustStore {
     const grants: PluginDevGrant[] = []
     for (const entry of file.data.devGrants) {
       const parsed = devGrantSchema.safeParse(entry)
-      if (parsed.success) grants.push({ ...parsed.data, source: parsed.data.source ?? { kind: 'node', nodeId: parsed.data.nodeId } })
+      if (parsed.success)
+        grants.push({ ...parsed.data, source: parsed.data.source ?? { kind: 'node', nodeId: parsed.data.nodeId } })
     }
     this.#acks = acks
     this.#grants = grants
@@ -376,7 +437,11 @@ export class PluginTrustStore {
   private write(acks: PluginAck[], devGrants: PluginDevGrant[]): void {
     const path = join(this.userDataDir, TRUST_FILE)
     mkdirSync(this.userDataDir, { recursive: true, mode: 0o700 })
-    const file = { version: 1, acks, devGrants } satisfies { version: 1; acks: PluginAck[]; devGrants: PluginDevGrant[] }
+    const file = { version: 1, acks, devGrants } satisfies {
+      version: 1
+      acks: PluginAck[]
+      devGrants: PluginDevGrant[]
+    }
     // The shared open-write-fsync-close-rename, not a plain write: a torn trust file is a security
     // record the user set once, and the recovery from a half-written one is quarantine plus a prompt
     // for every plugin. The blob cache next door deliberately keeps the looser variant; see

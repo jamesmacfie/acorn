@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { defaultPaneForTask, defaultSourceId, sourceIsProjectScoped, sourceRegistry, sourceRouteContributions, taskPathFromSources, taskTracksRef, type SourceContribution } from './sources'
+import {
+  defaultPaneForTask,
+  defaultSourceId,
+  sourceIsProjectScoped,
+  sourceRegistry,
+  sourceRouteContributions,
+  taskPathFromSources,
+  taskTracksRef,
+  type SourceContribution,
+} from './sources'
 import type { Task } from '../../../infra/queries'
 
 const source = (id: string, order: number, isDefault?: boolean): SourceContribution => ({
@@ -35,7 +44,10 @@ describe('source defaults', () => {
 
   it('orders contributed route shapes by declared order', () => {
     const disposable = sourceRegistry.register({
-      id: 'test.routes', order: 1, glyph: 'x', label: 'Routes',
+      id: 'test.routes',
+      order: 1,
+      glyph: 'x',
+      label: 'Routes',
       routes: [
         { id: 'test.detail', path: '/p/:projectId/pulls/:number', order: 30 },
         { id: 'test.create', path: '/p/:projectId/new', order: 20 },
@@ -43,7 +55,11 @@ describe('source defaults', () => {
       ],
     })
     try {
-      expect(sourceRouteContributions().map((route) => route.id)).toEqual(['test.project', 'test.create', 'test.detail'])
+      expect(sourceRouteContributions().map((route) => route.id)).toEqual([
+        'test.project',
+        'test.create',
+        'test.detail',
+      ])
     } finally {
       disposable.dispose()
     }
@@ -51,11 +67,23 @@ describe('source defaults', () => {
 })
 
 describe('task paths', () => {
-  const task = (id: string): Task => ({ id } as Task)
+  const task = (id: string): Task => ({ id }) as Task
 
   it('takes the first source that claims the task', () => {
-    const declines = sourceRegistry.register({ id: 'test.declines', order: 1, glyph: 'x', label: 'Declines', taskPath: () => undefined })
-    const claims = sourceRegistry.register({ id: 'test.claims', order: 2, glyph: 'x', label: 'Claims', taskPath: (t) => `/claimed/${t.id}` })
+    const declines = sourceRegistry.register({
+      id: 'test.declines',
+      order: 1,
+      glyph: 'x',
+      label: 'Declines',
+      taskPath: () => undefined,
+    })
+    const claims = sourceRegistry.register({
+      id: 'test.claims',
+      order: 2,
+      glyph: 'x',
+      label: 'Claims',
+      taskPath: (t) => `/claimed/${t.id}`,
+    })
     try {
       expect(taskPathFromSources(task('task-1'))).toBe('/claimed/task-1')
     } finally {
@@ -65,7 +93,13 @@ describe('task paths', () => {
   })
 
   it('leaves an unclaimed task to core', () => {
-    const declines = sourceRegistry.register({ id: 'test.declines', order: 1, glyph: 'x', label: 'Declines', taskPath: () => undefined })
+    const declines = sourceRegistry.register({
+      id: 'test.declines',
+      order: 1,
+      glyph: 'x',
+      label: 'Declines',
+      taskPath: () => undefined,
+    })
     try {
       expect(taskPathFromSources(task('task-1'))).toBeUndefined()
     } finally {
@@ -77,13 +111,28 @@ describe('task paths', () => {
 // "Is there already a task for this?", the question a reference panel asks before offering to create
 // one, and the question that got a wrong answer the first time it was asked.
 describe('taskTracksRef', () => {
-  const linked = (links: Task['links']): Task => ({ id: 'task-1', links } as Task)
+  const linked = (links: Task['links']): Task => ({ id: 'task-1', links }) as Task
 
   it('matches a task whose links name the same provider and identifier', () => {
-    expect(taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), { providerId: 'linear', displayId: 'ENG-42' })).toBe(true)
-    expect(taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), { providerId: 'linear', displayId: 'ENG-43' })).toBe(false)
+    expect(
+      taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), {
+        providerId: 'linear',
+        displayId: 'ENG-42',
+      }),
+    ).toBe(true)
+    expect(
+      taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), {
+        providerId: 'linear',
+        displayId: 'ENG-43',
+      }),
+    ).toBe(false)
     // Same identifier, different provider. `ENG-42` is not a globally unique name and never was.
-    expect(taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), { providerId: 'board', displayId: 'ENG-42' })).toBe(false)
+    expect(
+      taskTracksRef(linked([{ connectionId: 'c1', providerId: 'linear', identifier: 'ENG-42' }]), {
+        providerId: 'board',
+        displayId: 'ENG-42',
+      }),
+    ).toBe(false)
   })
 
   it('compares the connection only when both sides carry one', () => {
@@ -103,7 +152,10 @@ describe('taskTracksRef', () => {
   it('asks each source for its own second spelling of the same relationship', () => {
     const task = { id: 'task-1', links: [], pullNumber: 42 } as unknown as Task
     const github = sourceRegistry.register({
-      id: 'test.github', order: 1, glyph: 'x', label: 'GitHub',
+      id: 'test.github',
+      order: 1,
+      glyph: 'x',
+      label: 'GitHub',
       tracksRef: (t, ref) => ref.providerId === 'github' && ref.displayId === `runn/acorn#${t.pullNumber}`,
     })
     try {
@@ -127,11 +179,21 @@ describe('the pane a task first opens on', () => {
 
   it('prefers the source that owns the task URL over one that only holds a link', () => {
     const github = sourceRegistry.register({
-      id: 'test.pane.github', order: 1, glyph: 'x', label: 'GitHub', providerId: 'github', defaultPane: 'pr',
+      id: 'test.pane.github',
+      order: 1,
+      glyph: 'x',
+      label: 'GitHub',
+      providerId: 'github',
+      defaultPane: 'pr',
       taskPath: (task) => (task.pullNumber != null ? `/pulls/${task.pullNumber}` : undefined),
     })
     const tracker = sourceRegistry.register({
-      id: 'test.pane.tracker', order: 2, glyph: 'x', label: 'Tracker', providerId: 'tracker', defaultPane: 'ticket',
+      id: 'test.pane.tracker',
+      order: 2,
+      glyph: 'x',
+      label: 'Tracker',
+      providerId: 'tracker',
+      defaultPane: 'ticket',
     })
     try {
       expect(defaultPaneForTask(withLinks([{ providerId: 'tracker', identifier: 'ENG-42' }], 7))).toBe('pr')
@@ -146,7 +208,11 @@ describe('the pane a task first opens on', () => {
 
   it('ignores a source that tracks the task but names no pane', () => {
     const quiet = sourceRegistry.register({
-      id: 'test.pane.quiet', order: 1, glyph: 'x', label: 'Quiet', providerId: 'tracker',
+      id: 'test.pane.quiet',
+      order: 1,
+      glyph: 'x',
+      label: 'Quiet',
+      providerId: 'tracker',
     })
     try {
       expect(defaultPaneForTask(withLinks([{ providerId: 'tracker', identifier: 'ENG-42' }]))).toBeUndefined()

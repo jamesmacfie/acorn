@@ -7,7 +7,11 @@ import { STYLES } from './uiStyles'
 // style with no pack behind it would silently render as Terminal.
 describe('STYLES ↔ stylesheets', () => {
   it('lists exactly the styles the stylesheets define', () => {
-    const css = stripComments(readStyleSheets().map((f) => f.text).join('\n'))
+    const css = stripComments(
+      readStyleSheets()
+        .map((f) => f.text)
+        .join('\n'),
+    )
     // 'terminal' is the :root default (no data-style block), exactly as 'light' is for themes.
     const inCss = new Set(['terminal', ...[...css.matchAll(/:root\[data-style=["']([^"']+)["']\]/g)].map((m) => m[1])])
     expect(new Set(STYLES().map(([value]) => value))).toEqual(inCss)

@@ -34,7 +34,11 @@ export type WorktreeStatus = { dirty: boolean; count: number; branch: string | n
 type Read = { text: string | null; at: number; running: Promise<string | null> | null }
 const reads = new Map<string, Map<string, Read>>()
 const checkoutKey = (path: string): string => {
-  try { return realpathSync(path) } catch { return path }
+  try {
+    return realpathSync(path)
+  } catch {
+    return path
+  }
 }
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
 let expiryAt = Infinity
@@ -52,21 +56,24 @@ function scheduleExpiry(at: number): void {
   if (at >= expiryAt) return
   if (expiryTimer) clearTimeout(expiryTimer)
   expiryAt = at
-  expiryTimer = setTimeout(() => {
-    expiryTimer = undefined
-    expiryAt = Infinity
-    const now = Date.now()
-    let next = Infinity
-    for (const [path, entries] of reads) {
-      for (const [key, read] of entries) {
-        if (read.text === null) continue
-        const expires = read.at + WORKTREE_STATUS_TTL_MS
-        if (expires <= now) removeRead(path, key, read)
-        else next = Math.min(next, expires)
+  expiryTimer = setTimeout(
+    () => {
+      expiryTimer = undefined
+      expiryAt = Infinity
+      const now = Date.now()
+      let next = Infinity
+      for (const [path, entries] of reads) {
+        for (const [key, read] of entries) {
+          if (read.text === null) continue
+          const expires = read.at + WORKTREE_STATUS_TTL_MS
+          if (expires <= now) removeRead(path, key, read)
+          else next = Math.min(next, expires)
+        }
       }
-    }
-    scheduleExpiry(next)
-  }, Math.max(0, at - Date.now()))
+      scheduleExpiry(next)
+    },
+    Math.max(0, at - Date.now()),
+  )
   expiryTimer.unref()
 }
 
@@ -96,7 +103,13 @@ export const setWorktreeStatusCeiling = (worktreesRoot: string): void => {
 
 const run = async (path: string, args: readonly string[], timeoutMs: number): Promise<string | null> => {
   try {
-    return (await gitOrThrow(args, { cwd: path, timeoutMs, ...(ceiling ? { env: { GIT_CEILING_DIRECTORIES: ceiling } } : {}) })).stdout
+    return (
+      await gitOrThrow(args, {
+        cwd: path,
+        timeoutMs,
+        ...(ceiling ? { env: { GIT_CEILING_DIRECTORIES: ceiling } } : {}),
+      })
+    ).stdout
   } catch {
     return null
   }
@@ -111,7 +124,11 @@ const run = async (path: string, args: readonly string[], timeoutMs: number): Pr
  *  writers invalidate on exactly that, and nothing else. The changes pane's `git diff --numstat` pair
  *  and its `rev-parse --git-dir` come through here; before, two clients on one task cost four
  *  numstat processes a poll where the status beside them cost one. */
-export async function worktreeGitText(path: string, args: readonly string[], opts: { fresh?: boolean; timeoutMs?: number } = {}): Promise<string | null> {
+export async function worktreeGitText(
+  path: string,
+  args: readonly string[],
+  opts: { fresh?: boolean; timeoutMs?: number } = {},
+): Promise<string | null> {
   path = checkoutKey(path)
   const key = args.join('\0')
   const known = reads.get(path)?.get(key)
@@ -164,11 +181,20 @@ export async function worktreeStatusText(path: string, opts?: { fresh?: boolean 
  *  null when the tree is unborn. */
 export function parseWorktreeStatus(text: string): WorktreeStatus {
   const lines = text.split('\n').filter((l) => l.trim().length > 0)
-  const header = (key: string) => lines.find((l) => l.startsWith(`# ${key} `))?.slice(key.length + 3).trim() ?? null
+  const header = (key: string) =>
+    lines
+      .find((l) => l.startsWith(`# ${key} `))
+      ?.slice(key.length + 3)
+      .trim() ?? null
   const count = lines.filter((l) => !l.startsWith('#')).length
   const branch = header('branch.head')
   const head = header('branch.oid')
-  return { dirty: count > 0, count, branch: branch === '(detached)' ? null : branch, head: head === '(initial)' ? null : head }
+  return {
+    dirty: count > 0,
+    count,
+    branch: branch === '(detached)' ? null : branch,
+    head: head === '(initial)' ? null : head,
+  }
 }
 
 /** Dirty flag, changed-file count and where HEAD is, for the rail and footer markers

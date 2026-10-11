@@ -2,7 +2,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { openDataRoot, readNodeAttachment, recordEnrollmentFailure, recordNodeAttachment, type DataRoot } from './dataRoot'
+import {
+  openDataRoot,
+  readNodeAttachment,
+  recordEnrollmentFailure,
+  recordNodeAttachment,
+  type DataRoot,
+} from './dataRoot'
 
 const dirs: string[] = []
 const open: DataRoot[] = []

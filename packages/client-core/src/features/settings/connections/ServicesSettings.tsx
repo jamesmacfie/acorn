@@ -21,11 +21,23 @@ export default function ServicesSettings(props: { context: SettingsPageContext }
             id="connections"
             label="Connections"
             help="Services acorn reads issues, errors, and pull requests from, such as GitHub, Linear, and Rollbar."
-            actions={<Button size="sm" onPress={list.openAdd}><Icon name="plus" /> Add connection</Button>}
+            actions={
+              <Button size="sm" onPress={list.openAdd}>
+                <Icon name="plus" /> Add connection
+              </Button>
+            }
           >
             <For
               each={list.connections()}
-              fallback={<Show when={!list.failed()}><EmptyState align="start" size="sm" busy={list.pending()}>{list.pending() ? 'Reading connections…' : 'Nothing connected. Add a connection to see its issues and errors in the rail.'}</EmptyState></Show>}
+              fallback={
+                <Show when={!list.failed()}>
+                  <EmptyState align="start" size="sm" busy={list.pending()}>
+                    {list.pending()
+                      ? 'Reading connections…'
+                      : 'Nothing connected. Add a connection to see its issues and errors in the rail.'}
+                  </EmptyState>
+                </Show>
+              }
             >
               {(connection) => {
                 const provider = () => list.providerOf(connection)
@@ -35,7 +47,14 @@ export default function ServicesSettings(props: { context: SettingsPageContext }
                     description={connectionRowText(connection, provider())}
                   >
                     <Badge tone={connectionTone(connection)}>{connectionStatusLabel(connection)}</Badge>
-                    <Button size="sm" variant="ghost" label={`Manage ${connectionName(connection)}`} onPress={() => list.openConnection(connection)}>Manage</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      label={`Manage ${connectionName(connection)}`}
+                      onPress={() => list.openConnection(connection)}
+                    >
+                      Manage
+                    </Button>
                   </SettingRow>
                 )
               }}

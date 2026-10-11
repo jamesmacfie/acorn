@@ -41,27 +41,40 @@ describe('subagent roster on the session row', () => {
     ctx.cleanup()
   })
 
-  const session = () => store.createSession({
-    taskId: randomUUID(),
-    providerId: 'fake',
-    profileId: 'fake',
-    kind: 'interactive',
-    config: {},
-  }, PROVIDER)
+  const session = () =>
+    store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      PROVIDER,
+    )
 
   it('starts empty and accumulates in spawn order', async () => {
     const created = await session()
     expect(created.subagents).toEqual([])
 
-    await store.recordEvent(created.id, null, { type: 'subagent', subagent: { id: 'b', title: 'beta', status: 'running' } })
-    await store.recordEvent(created.id, null, { type: 'subagent', subagent: { id: 'a', title: 'alpha', status: 'running' } })
+    await store.recordEvent(created.id, null, {
+      type: 'subagent',
+      subagent: { id: 'b', title: 'beta', status: 'running' },
+    })
+    await store.recordEvent(created.id, null, {
+      type: 'subagent',
+      subagent: { id: 'a', title: 'alpha', status: 'running' },
+    })
     const roster = (await store.requireSession(created.id)).subagents
     expect(roster.map((entry) => entry.title)).toEqual(['beta', 'alpha'])
   })
 
   it('folds a later update onto the row it opened', async () => {
     const created = await session()
-    await store.recordEvent(created.id, null, { type: 'subagent', subagent: { id: 'a', title: 'alpha', status: 'running' } })
+    await store.recordEvent(created.id, null, {
+      type: 'subagent',
+      subagent: { id: 'a', title: 'alpha', status: 'running' },
+    })
     await store.recordEvent(created.id, null, {
       type: 'subagent',
       subagent: { id: 'a', status: 'completed', model: 'opus', usage: { contextUsed: 17_375 } },
@@ -100,7 +113,6 @@ describe('subagent roster on the session row', () => {
     expect(snapshot.events.map((event) => event.id)).toContain(record.id)
     expect(snapshot.session.subagents.map((entry) => entry.id)).toEqual(['a'])
   })
-
 })
 
 // Web activity through the index, against the real FTS5 table rather than against the string the
@@ -120,13 +132,16 @@ describe('finding a run by what it did on the web', () => {
   })
 
   it('indexes the query, the filters, the sources and their words', async () => {
-    const created = await store.createSession({
-      taskId: randomUUID(),
-      providerId: 'fake',
-      profileId: 'fake',
-      kind: 'interactive',
-      config: {},
-    }, PROVIDER)
+    const created = await store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      PROVIDER,
+    )
     await store.recordEvent(created.id, null, {
       type: 'tool',
       tool: {
@@ -135,24 +150,23 @@ describe('finding a run by what it did on the web', () => {
         status: 'completed',
         web: {
           action: { type: 'search', queries: ['piranhagram'], allowedDomains: ['zaphodhost.example'] },
-          results: [{
-            url: 'https://zaphodhost.example/betelgeuse',
-            title: 'Ravenousbugblatter',
-            domain: 'zaphodhost.example',
-            snippet: 'A sentence about frogstarcorp.',
-          }],
+          results: [
+            {
+              url: 'https://zaphodhost.example/betelgeuse',
+              title: 'Ravenousbugblatter',
+              domain: 'zaphodhost.example',
+              snippet: 'A sentence about frogstarcorp.',
+            },
+          ],
         },
       },
     })
 
-    for (const needle of [
-      'piranhagram',
-      'zaphodhost.example',
-      'betelgeuse',
-      'Ravenousbugblatter',
-      'frogstarcorp',
-    ]) {
-      expect((await store.searchSessions(needle)).map((session) => session.id), needle).toEqual([created.id])
+    for (const needle of ['piranhagram', 'zaphodhost.example', 'betelgeuse', 'Ravenousbugblatter', 'frogstarcorp']) {
+      expect(
+        (await store.searchSessions(needle)).map((session) => session.id),
+        needle,
+      ).toEqual([created.id])
     }
     expect(await store.searchSessions('vogonpoetry')).toEqual([])
   })
@@ -173,13 +187,17 @@ describe('searching a streamed reply', () => {
     ctx.cleanup()
   })
 
-  const session = () => store.createSession({
-    taskId: randomUUID(),
-    providerId: 'fake',
-    profileId: 'fake',
-    kind: 'interactive',
-    config: {},
-  }, PROVIDER)
+  const session = () =>
+    store.createSession(
+      {
+        taskId: randomUUID(),
+        providerId: 'fake',
+        profileId: 'fake',
+        kind: 'interactive',
+        config: {},
+      },
+      PROVIDER,
+    )
   const chunk = (text: string) => ({ type: 'assistant_message' as const, text, messageId: 'm1', append: true })
 
   it('indexes the whole message on its first event, and nothing on the rest', async () => {
@@ -198,7 +216,10 @@ describe('searching a streamed reply', () => {
   it('starts a new message after anything that is not the same stream', async () => {
     const created = await session()
     await store.recordEvent(created.id, 'turn-1', chunk('before the '))
-    await store.recordEvent(created.id, 'turn-1', { type: 'tool', tool: { id: 't', title: 'Run', status: 'completed' } })
+    await store.recordEvent(created.id, 'turn-1', {
+      type: 'tool',
+      tool: { id: 't', title: 'Run', status: 'completed' },
+    })
     const after = await store.recordEvent(created.id, 'turn-1', chunk('tool call'))
     expect(after.searchText).toBe('tool call')
     // The two halves were never one message, so no indexed row holds both words.
@@ -207,7 +228,10 @@ describe('searching a streamed reply', () => {
 
   it('ranks a word in the conversation above the same word in tool output', async () => {
     const inTool = await session()
-    await store.recordEvent(inTool.id, null, { type: 'tool', tool: { id: 't', title: 'cat', status: 'completed', output: 'marvin marvin marvin' } })
+    await store.recordEvent(inTool.id, null, {
+      type: 'tool',
+      tool: { id: 't', title: 'cat', status: 'completed', output: 'marvin marvin marvin' },
+    })
     const inReply = await session()
     await store.recordEvent(inReply.id, null, { type: 'assistant_message', text: 'marvin said hello' })
     expect((await store.searchSessions('marvin')).map((row) => row.id)).toEqual([inReply.id, inTool.id])
@@ -229,7 +253,8 @@ describe('searching the sessions of chosen tasks', () => {
     ctx.cleanup()
   })
 
-  const session = (taskId: string) => store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, PROVIDER)
+  const session = (taskId: string) =>
+    store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, PROVIDER)
 
   it('finds an archived session in scope, with an excerpt, and nothing outside it', async () => {
     const archived = await session('task-a')
@@ -239,12 +264,14 @@ describe('searching the sessions of chosen tasks', () => {
     await store.recordEvent(elsewhere.id, null, { type: 'assistant_message', text: 'Another improbability entirely.' })
 
     const hits = await store.searchTaskSessions('improbability drive', ['task-a'], 10)
-    expect(hits).toEqual([{
-      taskId: 'task-a',
-      title: archived.title,
-      preview: expect.stringContaining('improbability drive'),
-      target: { kind: 'managed-agent', resourceId: archived.id },
-    }])
+    expect(hits).toEqual([
+      {
+        taskId: 'task-a',
+        title: archived.title,
+        preview: expect.stringContaining('improbability drive'),
+        target: { kind: 'managed-agent', resourceId: archived.id },
+      },
+    ])
     expect(await store.searchTaskSessions('improbability', [], 10)).toEqual([])
   })
 })
@@ -263,7 +290,10 @@ describe('a workflow session’s attention', () => {
   })
 
   const attentionAfter = async (kind: 'interactive' | 'workflow', event: Parameters<AgentStore['recordEvent']>[2]) => {
-    const created = await store.createSession({ taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind, config: {} }, PROVIDER)
+    const created = await store.createSession(
+      { taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind, config: {} },
+      PROVIDER,
+    )
     await store.recordEvent(created.id, null, event)
     return (await store.requireSession(created.id)).attention
   }
@@ -271,7 +301,9 @@ describe('a workflow session’s attention', () => {
   it('is not raised by a finished or failed step, only by a request', async () => {
     expect(await attentionAfter('workflow', { type: 'turn_completed' })).toBe('none')
     expect(await attentionAfter('workflow', { type: 'error', code: 'x', message: 'x', retryable: false })).toBe('none')
-    expect(await attentionAfter('workflow', { type: 'request', requestId: 'r', kind: 'question', title: 'Which?' })).toBe('question')
+    expect(
+      await attentionAfter('workflow', { type: 'request', requestId: 'r', kind: 'question', title: 'Which?' }),
+    ).toBe('question')
     expect(await attentionAfter('interactive', { type: 'turn_completed' })).toBe('completed')
   })
 })

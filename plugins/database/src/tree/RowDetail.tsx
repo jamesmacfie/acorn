@@ -1,5 +1,18 @@
 import { createEffect, createSignal, For, on, Show } from 'solid-js'
-import { Button, Checkbox, ConfirmButton, DetailColumn, Field, Heading, IconButton, Stack, Text, Textarea, Toolbar, ToolbarSpacer } from '@acorn/plugin-api/ui/tree'
+import {
+  Button,
+  Checkbox,
+  ConfirmButton,
+  DetailColumn,
+  Field,
+  Heading,
+  IconButton,
+  Stack,
+  Text,
+  Textarea,
+  Toolbar,
+  ToolbarSpacer,
+} from '@acorn/plugin-api/ui/tree'
 import type { DbCell, DbColumn, DbTable } from '../shared/database'
 
 export type RowDraft = Record<string, { value: string; isNull: boolean }>
@@ -25,12 +38,22 @@ export default function RowDetail(props: {
   const editable = () => !!props.table && props.meta.some((c) => c.isPk)
   // Draft state per column: value + explicit-null flag. Edit mode seeds from the row; insert mode
   // starts every column null (so untouched columns take their DB default / are omitted).
-  const seed = (): RowDraft => Object.fromEntries(props.columns.map((col, i) => [col,
-    props.insert ? { value: '', isNull: true } : { value: props.row[i] ?? '', isNull: props.row[i] === null },
-  ]))
+  const seed = (): RowDraft =>
+    Object.fromEntries(
+      props.columns.map((col, i) => [
+        col,
+        props.insert ? { value: '', isNull: true } : { value: props.row[i] ?? '', isNull: props.row[i] === null },
+      ]),
+    )
   const [draft, setDraft] = createSignal<RowDraft>(props.initialDraft ?? seed())
   // A refreshed result must seed the new row, while a returning pane keeps its unsaved edits.
-  createEffect(on(() => [props.columns, props.row], () => setDraft(seed()), { defer: true }))
+  createEffect(
+    on(
+      () => [props.columns, props.row],
+      () => setDraft(seed()),
+      { defer: true },
+    ),
+  )
   const set = (col: string, patch: Partial<{ value: string; isNull: boolean }>) => {
     const next = { ...draft(), [col]: { ...draft()[col], ...patch } }
     setDraft(next)
@@ -78,7 +101,7 @@ export default function RowDetail(props: {
                       rows={1}
                       assist={false}
                       disabled={!editable() || draft()[col]?.isNull}
-                      value={draft()[col]?.isNull ? '' : draft()[col]?.value ?? ''}
+                      value={draft()[col]?.isNull ? '' : (draft()[col]?.value ?? '')}
                       placeholder={draft()[col]?.isNull ? 'NULL' : ''}
                       onChange={(value: string) => set(col, { value })}
                     />
@@ -86,7 +109,11 @@ export default function RowDetail(props: {
                   {/* Insert mode always offers the null toggle (columns start null so untouched ones take
                       their DB default); edit mode only for nullable columns. */}
                   <Show when={editable() && (props.insert || (m?.nullable ?? true))}>
-                    <Checkbox label="Set to NULL" checked={draft()[col]?.isNull} onChange={(checked: boolean) => set(col, { isNull: checked })} />
+                    <Checkbox
+                      label="Set to NULL"
+                      checked={draft()[col]?.isNull}
+                      onChange={(checked: boolean) => set(col, { isNull: checked })}
+                    />
                   </Show>
                 </Stack>
               )
@@ -97,15 +124,25 @@ export default function RowDetail(props: {
               when={editable()}
               fallback={
                 <Text tone="muted">
-                  {props.table ? "This table has no primary key, so its rows can't be edited here." : 'To edit a row, open its table from the list.'}
+                  {props.table
+                    ? "This table has no primary key, so its rows can't be edited here."
+                    : 'To edit a row, open its table from the list.'}
                 </Text>
               }
             >
-              <Button size="sm" variant="solid" disabled={props.busy} onPress={save}>Save</Button>
+              <Button size="sm" variant="solid" disabled={props.busy} onPress={save}>
+                Save
+              </Button>
               <Show when={!props.insert}>
                 {/* Remount the armed control with its row so a second press cannot delete another row. */}
                 <Show when={props.row} keyed>
-                  <ConfirmButton size="sm" tone="danger" disabled={props.busy} confirmLabel="Delete row?" onConfirm={() => void props.onDelete?.()}>
+                  <ConfirmButton
+                    size="sm"
+                    tone="danger"
+                    disabled={props.busy}
+                    confirmLabel="Delete row?"
+                    onConfirm={() => void props.onDelete?.()}
+                  >
                     Delete
                   </ConfirmButton>
                 </Show>

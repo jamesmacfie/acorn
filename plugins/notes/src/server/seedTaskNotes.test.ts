@@ -13,10 +13,17 @@ describe('buildCommentsBody', () => {
         { author: 'bo', body: 'second', createdAt: 200 },
         { author: 'al', body: 'first', createdAt: 100 },
       ],
-      threads: [{ path: 'a.ts', line: 42, resolved: true, comments: [
-        { author: 'al', body: 'original', createdAt: 10 },
-        { author: 'bo', body: 'reply', createdAt: 20 },
-      ] }],
+      threads: [
+        {
+          path: 'a.ts',
+          line: 42,
+          resolved: true,
+          comments: [
+            { author: 'al', body: 'original', createdAt: 10 },
+            { author: 'bo', body: 'reply', createdAt: 20 },
+          ],
+        },
+      ],
     })
     expect(body).toContain('**Review by ana — CHANGES_REQUESTED**')
     expect(body).not.toContain('noise')
@@ -30,7 +37,8 @@ describe('buildCommentsBody', () => {
   })
 
   it('keeps the linked Linear connection in note-seeding reads', () => {
-    expect(linearIssueSeedUrl('http://127.0.0.1:1234', { integrationId: 'work/team', identifier: 'ENG-42' }))
-      .toBe('http://127.0.0.1:1234/v1/p/linear/issues/ENG-42?refresh=1&integration=work%2Fteam')
+    expect(linearIssueSeedUrl('http://127.0.0.1:1234', { integrationId: 'work/team', identifier: 'ENG-42' })).toBe(
+      'http://127.0.0.1:1234/v1/p/linear/issues/ENG-42?refresh=1&integration=work%2Fteam',
+    )
   })
 })

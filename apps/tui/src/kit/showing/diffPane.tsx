@@ -2,7 +2,13 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import { diffRowsFromPlain, type CodeRow, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
-import { segmentContentKey, type DiffDocumentFile, type DiffDocumentTopology, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import {
+  segmentContentKey,
+  type DiffDocumentFile,
+  type DiffDocumentTopology,
+  type DiffSegmentPayload,
+  type DiffSegmentRequest,
+} from '@acorn/diff-document/document'
 import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
 import { requestAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
 import { Line, runStyle } from '../cells'
@@ -66,7 +72,8 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
   // keeps any segment whose content survived.
   const [loaded, setLoaded] = createSignal<ReadonlyMap<string, DiffRowT[]>>(new Map())
   const asked = new Set<string>()
-  const keyOf = (path: string, patchKey: string, ordinal: number): string => `${path}\u0000${segmentContentKey(patchKey, ordinal)}`
+  const keyOf = (path: string, patchKey: string, ordinal: number): string =>
+    `${path}\u0000${segmentContentKey(patchKey, ordinal)}`
   const blockKey = (block: DiffBlock): string => keyOf(block.file.path, block.file.patchKey!, block.ordinal)
   // Leaving the pane aborts the loads still in flight.
   const abort = new AbortController()
@@ -114,33 +121,40 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
     if (!wanted.length) return
     for (const block of wanted) asked.add(blockKey(block))
     const byKey = new Map(wanted.map((block) => [blockKey(block), block]))
-    void props.source.loadSegments(
-      wanted.map((block) => ({ path: block.file.path, patchKey: block.file.patchKey!, ordinal: block.ordinal })),
-      abort.signal,
-    ).then((payloads) => {
-      const next = new Map(untrack(loaded))
-      for (const payload of payloads) {
-        const key = keyOf(payload.path, payload.patchKey, payload.ordinal)
-        const block = byKey.get(key)
-        if (block) next.set(key, diffRowsFromPlain(block.file.path, block.file.sha, payload.rows))
-      }
-      // Oldest first out.
-      for (const key of next.keys()) {
-        if (next.size <= DIFF_HELD_SEGMENTS) break
-        next.delete(key)
-        asked.delete(key)
-      }
-      setLoaded(next)
-    }, () => {
-      // Asked again the next time the window reaches it.
-      for (const key of byKey.keys()) asked.delete(key)
-    })
+    void props.source
+      .loadSegments(
+        wanted.map((block) => ({ path: block.file.path, patchKey: block.file.patchKey!, ordinal: block.ordinal })),
+        abort.signal,
+      )
+      .then(
+        (payloads) => {
+          const next = new Map(untrack(loaded))
+          for (const payload of payloads) {
+            const key = keyOf(payload.path, payload.patchKey, payload.ordinal)
+            const block = byKey.get(key)
+            if (block) next.set(key, diffRowsFromPlain(block.file.path, block.file.sha, payload.rows))
+          }
+          // Oldest first out.
+          for (const key of next.keys()) {
+            if (next.size <= DIFF_HELD_SEGMENTS) break
+            next.delete(key)
+            asked.delete(key)
+          }
+          setLoaded(next)
+        },
+        () => {
+          // Asked again the next time the window reaches it.
+          for (const key of byKey.keys()) asked.delete(key)
+        },
+      )
   })
 
   // The code rows in the window, asked about in one request per contributor rather than one per line.
   // `requestAnnotations` compares the key set, so a render that moves nothing re-asks nothing
   // (client-core/host/annotations).
-  const keys = createMemo(() => window().rows.flatMap((entry) => (entry.code && isCode(entry.code) ? [annotationKey(entry.code)] : [])))
+  const keys = createMemo(() =>
+    window().rows.flatMap((entry) => (entry.code && isCode(entry.code) ? [annotationKey(entry.code)] : [])),
+  )
   createEffect(() => {
     const point = props.annotations
     if (!point) return
@@ -152,16 +166,18 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
     // handler from the node under the pointer upwards, so a listener here sees the scroll after the
     // scrollbox below has already moved its offset. On the scrollbox itself it would see it before
     // (../../tree/hit.ts § wheelAt).
-    <box
-      flexGrow={1}
-      flexShrink={1}
-      flexBasis={0}
-      minHeight={0}
-      onMouseScroll={sync}
-      onSizeChange={sync}
-    >
-      <ScrollViewport onScroll={sync} onBox={(box) => { viewport = box; sync() }}>
-        <Show when={props.source.topology()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
+    <box flexGrow={1} flexShrink={1} flexBasis={0} minHeight={0} onMouseScroll={sync} onSizeChange={sync}>
+      <ScrollViewport
+        onScroll={sync}
+        onBox={(box) => {
+          viewport = box
+          sync()
+        }}
+      >
+        <Show
+          when={props.source.topology()}
+          fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}
+        >
           {/* The rows above the window, as height rather than as renderables, so the scrollbox's own
               offset and bar are about the whole diff and not about the slice. */}
           <box flexShrink={0} height={window().from} />
@@ -169,14 +185,20 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
             {(entry) => (
               <Show
                 when={entry.code}
-                fallback={entry.head ? (
-                  /* `flexShrink={0}` for the reason each row carries it: a column taller than the
+                fallback={
+                  entry.head ? (
+                    /* `flexShrink={0}` for the reason each row carries it: a column taller than the
                      panel is squeezed rather than scrolled, and one file's rows are then drawn over
                      the next file's. The scroll is this pane's, at the box above. */
-                  <box flexDirection="column" flexShrink={0}>
-                    <FileHead file={entry.head} />
-                  </box>
-                ) : <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>loading…</text>}
+                    <box flexDirection="column" flexShrink={0}>
+                      <FileHead file={entry.head} />
+                    </box>
+                  ) : (
+                    <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>
+                      loading…
+                    </text>
+                  )
+                }
               >
                 {(row) => (
                   <Show when={isCode(row())} fallback={<NonCodeRow row={row() as Exclude<DiffRowT, CodeRow>} />}>

@@ -52,11 +52,14 @@ describe('GET /v1/core/storage', () => {
   it('reports memory, each database with its WAL, and the blob cache, but not plugin packages', async () => {
     const response = await get(DEVICE, dataDir)
     expect(response.status).toBe(200)
-    const report = await response.json() as NodeStorageReport
+    const report = (await response.json()) as NodeStorageReport
     expect(report.rssBytes).toBeGreaterThan(0)
     expect(report).toMatchObject({
       coreDatabaseBytes: 5096,
-      pluginDatabases: [{ plugin: 'agents', bytes: 10_224 }, { plugin: 'github', bytes: 4096 }],
+      pluginDatabases: [
+        { plugin: 'agents', bytes: 10_224 },
+        { plugin: 'github', bytes: 4096 },
+      ],
       blobCacheBytes: 500,
     })
   })

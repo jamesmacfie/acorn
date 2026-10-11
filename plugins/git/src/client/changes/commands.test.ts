@@ -73,7 +73,9 @@ describe('the remote palette rows', () => {
 
   it('runs the verb its row names', () => {
     run.remote.mockClear()
-    remoteRows().find((command) => command.id === 'changes.pull')!.run()
+    remoteRows()
+      .find((command) => command.id === 'changes.pull')!
+      .run()
     expect(run.remote).toHaveBeenCalledWith('pull')
   })
 
@@ -94,7 +96,7 @@ describe('the remote palette rows', () => {
 // The pane id both bindings and the remote rows' gate are written against. Named here so a rename of
 // the pane contribution shows up as a test failure rather than as three dead commands.
 describe('the pane id', () => {
-  it('is the git pane contribution\'s own', () => {
+  it("is the git pane contribution's own", () => {
     expect(GIT_PANE).toBe('git')
   })
 })

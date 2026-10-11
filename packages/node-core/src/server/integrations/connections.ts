@@ -54,7 +54,11 @@ export async function listConnections(db: AppDatabase, userId: string): Promise<
     .orderBy(asc(schema.integrations.createdAt), asc(schema.integrations.id))
 }
 
-export async function listProviderConnections(db: AppDatabase, userId: string, providerId: string): Promise<StoredConnection[]> {
+export async function listProviderConnections(
+  db: AppDatabase,
+  userId: string,
+  providerId: string,
+): Promise<StoredConnection[]> {
   connectionProviderRegistry.require(providerId)
   return db
     .select()
@@ -115,7 +119,7 @@ export async function connectProvider(
       await db.insert(schema.integrations).values(row)
       broadcastConnectionChanged({ integrationId: row.id, providerId: row.provider, status: 'connected' })
       return connectionSummary(row)
-    }
+    },
   )
 }
 
@@ -165,7 +169,12 @@ export async function rotateConnection(
   })
 }
 
-export async function testConnection(db: AppDatabase, userId: string, id: string, secrets: SecretService): Promise<Integration> {
+export async function testConnection(
+  db: AppDatabase,
+  userId: string,
+  id: string,
+  secrets: SecretService,
+): Promise<Integration> {
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
   const provider = connectionProviderRegistry.require(row.provider)
@@ -174,12 +183,17 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
   // line.
   const health = await secrets
     .use(row.encryptedCredentials, `${row.provider}: test connection`, (secret) =>
-      providerRequestScheduler.run(provider.id, row.id, provider.budgets, () => provider.connection.test(secret, json(row.config, {}))),
+      providerRequestScheduler.run(provider.id, row.id, provider.budgets, () =>
+        provider.connection.test(secret, json(row.config, {})),
+      ),
     )
     .catch(async (error: unknown) => {
       if (!(error instanceof SecretUnavailableError)) throw error
       const now = Date.now()
-      await db.update(schema.integrations).set({ status: 'needs-auth', lastValidatedAt: now, lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, id))
+      await db
+        .update(schema.integrations)
+        .set({ status: 'needs-auth', lastValidatedAt: now, lastError: 'provider_secret_unreadable', updatedAt: now })
+        .where(eq(schema.integrations.id, id))
       broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status: 'needs-auth' })
       throw new ProviderOperationError('provider_secret_unreadable', 400)
     })
@@ -190,10 +204,21 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
     .set({ status, lastValidatedAt: now, lastError: health.ok ? null : health.error, updatedAt: now })
     .where(eq(schema.integrations.id, id))
   broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status })
-  return connectionSummary({ ...row, status, lastValidatedAt: now, lastError: health.ok ? null : health.error, updatedAt: now })
+  return connectionSummary({
+    ...row,
+    status,
+    lastValidatedAt: now,
+    lastError: health.ok ? null : health.error,
+    updatedAt: now,
+  })
 }
 
-export async function setConnectionDisabled(db: AppDatabase, userId: string, id: string, disabled: boolean): Promise<Integration> {
+export async function setConnectionDisabled(
+  db: AppDatabase,
+  userId: string,
+  id: string,
+  disabled: boolean,
+): Promise<Integration> {
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
   const status = disabled ? 'disabled' : 'connected'
@@ -206,7 +231,12 @@ export async function setConnectionDisabled(db: AppDatabase, userId: string, id:
 // Clearing the name is a real request, not a missing field: it puts the connection back to whatever
 // the provider calls it. So `null` and a string of spaces both mean "go back to the label", and
 // `rotateConnection` is deliberately not touched here, which is what keeps a rotate from wiping it.
-export async function renameConnection(db: AppDatabase, userId: string, id: string, name: string | null): Promise<Integration> {
+export async function renameConnection(
+  db: AppDatabase,
+  userId: string,
+  id: string,
+  name: string | null,
+): Promise<Integration> {
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
   const trimmed = name?.trim() ?? ''
@@ -214,7 +244,11 @@ export async function renameConnection(db: AppDatabase, userId: string, id: stri
   const next = trimmed || null
   const now = Date.now()
   await db.update(schema.integrations).set({ name: next, updatedAt: now }).where(eq(schema.integrations.id, id))
-  broadcastConnectionChanged({ integrationId: id, providerId: row.provider, status: row.status as Integration['status'] })
+  broadcastConnectionChanged({
+    integrationId: id,
+    providerId: row.provider,
+    status: row.status as Integration['status'],
+  })
   return connectionSummary({ ...row, name: next, updatedAt: now })
 }
 
@@ -257,11 +291,16 @@ export async function forEachConnection<T>(
     let value: T | undefined
     try {
       // The visitor, which is what actually calls the provider, runs inside the scope.
-      value = await secrets.use(row.encryptedCredentials, `${row.provider}: use connection`, (secret) => visit(row, secret))
+      value = await secrets.use(row.encryptedCredentials, `${row.provider}: use connection`, (secret) =>
+        visit(row, secret),
+      )
     } catch (error) {
       if (!(error instanceof SecretUnavailableError)) throw error
       const now = Date.now()
-      await db.update(schema.integrations).set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: now }).where(eq(schema.integrations.id, row.id))
+      await db
+        .update(schema.integrations)
+        .set({ status: 'needs-auth', lastError: 'provider_secret_unreadable', updatedAt: now })
+        .where(eq(schema.integrations.id, row.id))
       // The demotion the owner never asked for, so it is the one that most needs announcing: nothing on
       // screen and no plugin knows this credential stopped working until something says so.
       broadcastConnectionChanged({ integrationId: row.id, providerId: row.provider, status: 'needs-auth' })
@@ -272,12 +311,24 @@ export async function forEachConnection<T>(
   return out
 }
 
-export function externalRefForConnection(row: StoredConnection, identifier: string, input?: Partial<ExternalRef>): ExternalRef {
+export function externalRefForConnection(
+  row: StoredConnection,
+  identifier: string,
+  input?: Partial<ExternalRef>,
+): ExternalRef {
   if (input?.providerId && input.providerId !== row.provider) {
-    throw new ProviderOperationError('provider_bad_config', 400, `The reference claims provider '${input.providerId}', but connection ${row.id} is a ${row.provider} connection.`)
+    throw new ProviderOperationError(
+      'provider_bad_config',
+      400,
+      `The reference claims provider '${input.providerId}', but connection ${row.id} is a ${row.provider} connection.`,
+    )
   }
   if (input?.connectionId && input.connectionId !== row.id) {
-    throw new ProviderOperationError('provider_bad_config', 400, `The reference claims connection '${input.connectionId}', but it is being stamped onto ${row.id}.`)
+    throw new ProviderOperationError(
+      'provider_bad_config',
+      400,
+      `The reference claims connection '${input.connectionId}', but it is being stamped onto ${row.id}.`,
+    )
   }
   const fallback = {
     providerId: row.provider,
@@ -288,10 +339,19 @@ export function externalRefForConnection(row: StoredConnection, identifier: stri
     locator: input?.locator,
   }
   const provider = integrationProviderRegistry.get(row.provider)
-  if (!provider) throw new ProviderOperationError('provider_bad_config', 400, `No integration provider named '${row.provider}' is registered on this node.`)
+  if (!provider)
+    throw new ProviderOperationError(
+      'provider_bad_config',
+      400,
+      `No integration provider named '${row.provider}' is registered on this node.`,
+    )
   const parsed = provider.externalIds.parse(fallback, fallback)
   if (!parsed || parsed.connectionId !== row.id || parsed.displayId !== identifier) {
-    throw new ProviderOperationError('provider_bad_config', 400, `Provider '${row.provider}' did not accept its own reference for '${identifier}'.`)
+    throw new ProviderOperationError(
+      'provider_bad_config',
+      400,
+      `Provider '${row.provider}' did not accept its own reference for '${identifier}'.`,
+    )
   }
   return parsed
 }

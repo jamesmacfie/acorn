@@ -1,11 +1,17 @@
 import { isDeepStrictEqual } from 'node:util'
 
-const owns = (value: Record<string, unknown>, key: string): boolean =>
-  Object.prototype.hasOwnProperty.call(value, key)
+const owns = (value: Record<string, unknown>, key: string): boolean => Object.prototype.hasOwnProperty.call(value, key)
 
 // Written by admission or a dedicated authority operation, not generic provider configuration.
 const serverOwnedKeys = [
-  'toolCeiling', 'mcpServers', 'workflowRunId', 'workflowStepId', 'delegationSpawnId', 'customAgent', 'standingContext', 'initialAttendance',
+  'toolCeiling',
+  'mcpServers',
+  'workflowRunId',
+  'workflowStepId',
+  'delegationSpawnId',
+  'customAgent',
+  'standingContext',
+  'initialAttendance',
   // The skill names the agent was last told about, natively or in the index (../drivers/skillIndex.ts).
   'skillIndex',
 ] as const
@@ -39,10 +45,7 @@ export function mergeSessionConfigChange(
   for (const key of candidateKeys) {
     const baseOwns = owns(base, key)
     const requestedOwns = owns(requested, key)
-    if (
-      baseOwns === requestedOwns
-      && (!baseOwns || isDeepStrictEqual(base[key], requested[key]))
-    ) continue
+    if (baseOwns === requestedOwns && (!baseOwns || isDeepStrictEqual(base[key], requested[key]))) continue
     if (requestedOwns) merged[key] = requested[key]
     else delete merged[key]
   }

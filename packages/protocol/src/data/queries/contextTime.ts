@@ -4,8 +4,13 @@ type TimeAddress = Extract<DataBindingAddress, { from: 'context'; name: 'now' | 
 type Policy = { zone: string; weekStart: 'monday' | 'sunday' | 'saturday' }
 
 const localParts = (instant: number, zone: string) => {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(instant)
-  const part = (kind: string) => Number(parts.find(item => item.type === kind)?.value)
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(instant)
+  const part = (kind: string) => Number(parts.find((item) => item.type === kind)?.value)
   return { year: part('year'), month: part('month'), day: part('day') }
 }
 
@@ -36,7 +41,10 @@ export function resolveContextTime(address: TimeAddress, evaluationTime: number,
   const utc = new Date(Date.UTC(date.year, date.month - 1, date.day))
   if (address.boundary === 'startOfWeek') {
     const weekday = utc.getUTCDay()
-    utc.setUTCDate(utc.getUTCDate() - ((weekday - (policy.weekStart === 'monday' ? 1 : policy.weekStart === 'saturday' ? 6 : 0) + 7) % 7))
+    utc.setUTCDate(
+      utc.getUTCDate() -
+        ((weekday - (policy.weekStart === 'monday' ? 1 : policy.weekStart === 'saturday' ? 6 : 0) + 7) % 7),
+    )
   } else if (address.boundary === 'startOfMonth') utc.setUTCDate(1)
   if (unit === 'M') utc.setUTCMonth(utc.getUTCMonth() + amount)
   else utc.setUTCDate(utc.getUTCDate() + amount * (unit === 'W' ? 7 : 1))

@@ -30,15 +30,26 @@ export function createRuntimeService(
   onChange?: RuntimeDeps['onChange'],
   hooks?: Pick<PluginHookRegistry, 'run'>,
 ): RuntimeService {
-  const runScript = async (taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }> => {
+  const runScript = async (
+    taskId: string,
+    script: string,
+    cwd: string,
+  ): Promise<{ ok: boolean; output?: string; reason?: string }> => {
     const t = await core.tasks.load(taskId)
     const project = t?.projectId ? await core.projects.byId(t.projectId) : null
     const env = buildSessionEnv({
       taskId,
       cwd,
-      task: t && project
-        ? { projectId: project.id, projectName: project.name, github: project.github, branch: t.branch, title: t.title }
-        : null,
+      task:
+        t && project
+          ? {
+              projectId: project.id,
+              projectName: project.name,
+              github: project.github,
+              branch: t.branch,
+              title: t.title,
+            }
+          : null,
     })
     // CoreServices.proc: bounded output and a process-group kill. A stop/url script routinely leaves
     // a grandchild behind, and the previous execFile only killed the direct child on timeout.

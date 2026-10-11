@@ -40,8 +40,7 @@ export function createDatabaseClient(captured: AcornBridge['api'] | (() => Acorn
   const disconnectDb = async (taskId: string): Promise<{ ok: true }> =>
     api().post(databaseActionRoute(taskId, 'disconnect'))
 
-  const listTables = async (taskId: string): Promise<DbTablesResult> =>
-    api().get(databaseTablesRoute(taskId))
+  const listTables = async (taskId: string): Promise<DbTablesResult> => api().get(databaseTablesRoute(taskId))
 
   const listColumns = async (taskId: string, schema: string, name: string): Promise<DbColumnsResult> =>
     api().get(databaseColumnsRoute(taskId, schema, name))
@@ -52,11 +51,21 @@ export function createDatabaseClient(captured: AcornBridge['api'] | (() => Acorn
   const runQuery = async (taskId: string, sql: string): Promise<DbQueryResult> =>
     api().post(databaseActionRoute(taskId, 'query'), { sql })
 
-  const updateCell = async (taskId: string, schema: string, name: string, column: string, value: DbCell, pk: DbPk): Promise<DbWriteResult> =>
-    api().post(databaseActionRoute(taskId, 'update'), { schema, name, column, value, pk })
+  const updateCell = async (
+    taskId: string,
+    schema: string,
+    name: string,
+    column: string,
+    value: DbCell,
+    pk: DbPk,
+  ): Promise<DbWriteResult> => api().post(databaseActionRoute(taskId, 'update'), { schema, name, column, value, pk })
 
-  const insertRow = async (taskId: string, schema: string, name: string, values: Record<string, DbCell>): Promise<DbWriteResult> =>
-    api().post(databaseActionRoute(taskId, 'insert'), { schema, name, values })
+  const insertRow = async (
+    taskId: string,
+    schema: string,
+    name: string,
+    values: Record<string, DbCell>,
+  ): Promise<DbWriteResult> => api().post(databaseActionRoute(taskId, 'insert'), { schema, name, values })
 
   const deleteRow = async (taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult> =>
     api().post(databaseActionRoute(taskId, 'delete'), { schema, name, pk })
@@ -72,8 +81,7 @@ export function createDatabaseClient(captured: AcornBridge['api'] | (() => Acorn
   const readScratch = async (taskId: string): Promise<string> =>
     (await api().get<{ text?: string }>(databaseScratchRoute(taskId))).text ?? ''
 
-  const listSavedQueries = async (taskId: string): Promise<DbSavedQuery[]> =>
-    api().get(databaseQueriesRoute(taskId))
+  const listSavedQueries = async (taskId: string): Promise<DbSavedQuery[]> => api().get(databaseQueriesRoute(taskId))
 
   const saveQuery = async (taskId: string, body: { name: string; notes: string; sql: string }): Promise<DbSavedQuery> =>
     api().post(databaseQueriesRoute(taskId), body)
@@ -89,7 +97,23 @@ export function createDatabaseClient(captured: AcornBridge['api'] | (() => Acorn
   // leaves the node.
   const listModelBackends = async (taskId: string): Promise<ModelBackend[]> =>
     (await api().get<{ backends: ModelBackend[] }>(databaseModelBackendsRoute(taskId))).backends
-  return { connectDb, disconnectDb, listTables, listColumns, listRows, runQuery, updateCell, insertRow, deleteRow, generateSql, readScratch, listSavedQueries, saveQuery, deleteSavedQuery, listModelBackends }
+  return {
+    connectDb,
+    disconnectDb,
+    listTables,
+    listColumns,
+    listRows,
+    runQuery,
+    updateCell,
+    insertRow,
+    deleteRow,
+    generateSql,
+    readScratch,
+    listSavedQueries,
+    saveQuery,
+    deleteSavedQuery,
+    listModelBackends,
+  }
 }
 
 export type DatabaseClient = ReturnType<typeof createDatabaseClient>

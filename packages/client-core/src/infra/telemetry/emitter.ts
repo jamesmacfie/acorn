@@ -31,12 +31,24 @@ import type {
   TelemetrySpan,
   PostedTelemetryRuntime,
 } from '@acorn/protocol/telemetry.ts'
-import { telemetryHistogramKey, ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparent } from '@acorn/protocol/telemetry.ts'
+import {
+  telemetryHistogramKey,
+  ATTRS_MAX,
+  ATTR_KEY_MAX,
+  ATTR_VALUE_MAX,
+  LOG_BODY_MAX,
+  formatTraceparent,
+} from '@acorn/protocol/telemetry.ts'
 import { setContributionErrorHandler } from '../../kit/lib/telemetry/contributionErrors'
 import { setWorkTelemetry } from '../../kit/lib/telemetry/workTelemetry'
 import { setScrollPlaceHandler } from '../../kit/lib/telemetry/scrollPlace'
 import { setSurfaceHealthHandler, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
-import { beginInteractionWork, clearInteractionWork, recordInteractionWork, takeInteractionWork } from './interactionWork'
+import {
+  beginInteractionWork,
+  clearInteractionWork,
+  recordInteractionWork,
+  takeInteractionWork,
+} from './interactionWork'
 import { telemetryQueue, type TelemetryQueue } from './queue'
 import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSignal'
 
@@ -123,7 +135,11 @@ export function setTelemetryEnabled(on: boolean): void {
   if (state.enabled === on) return
   state.collection.next()
   slowSamples = 0
-  if (!on) { activity = null; clearInteractionWork(); renderBatches.clear() }
+  if (!on) {
+    activity = null
+    clearInteractionWork()
+    renderBatches.clear()
+  }
   state.enabled = on
   notifyActivity()
   if (on) return arm()
@@ -195,7 +211,10 @@ function push(record: TelemetryRecord): void {
 
 const hex = (bytes: number): string => {
   let out = ''
-  for (let index = 0; index < bytes; index += 1) out += Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+  for (let index = 0; index < bytes; index += 1)
+    out += Math.floor(Math.random() * 256)
+      .toString(16)
+      .padStart(2, '0')
   return out
 }
 export const newTraceId = (): string => hex(16)
@@ -258,11 +277,13 @@ export function startOperation(owner: string, input: SpanInput): SpanHandle {
 export type TelemetryActivity = { owner: string; operation: string; traceId: string; spanId: string }
 let activity: TelemetryActivity | null = null
 const activityListeners = new Set<() => void>()
-export const currentActivity = (): TelemetryActivity | null => state.enabled ? activity : null
+export const currentActivity = (): TelemetryActivity | null => (state.enabled ? activity : null)
 /** Hosts forward only bounded operation names and correlation IDs, never span attributes. */
 export const onTelemetryActivity = (listener: () => void): (() => void) => {
   activityListeners.add(listener)
-  return () => { activityListeners.delete(listener) }
+  return () => {
+    activityListeners.delete(listener)
+  }
 }
 function notifyActivity(): void {
   for (const listener of activityListeners) safely(listener)
@@ -287,7 +308,10 @@ export function setSpansOnTimeline(on: boolean): void {
   spansOnTimeline = on
 }
 
-export function emitSpan(owner: string, span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
+export function emitSpan(
+  owner: string,
+  span: Omit<TelemetrySpan, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs },
+): void {
   if (!telemetryEnabled()) return
   safely(() => {
     const attrs = cleanAttrs(span.attrs, owner)
@@ -295,14 +319,20 @@ export function emitSpan(owner: string, span: Omit<TelemetrySpan, 'kind' | 'attr
     if (spansOnTimeline) {
       // `start` is wall-clock milliseconds, so the entry's start is to the millisecond; its duration is exact.
       const start = span.start - performance.timeOrigin
-      performance.measure(`acorn:${span.name}`, { start, duration: span.durationMs, detail: { status: span.status, ...attrs } })
+      performance.measure(`acorn:${span.name}`, {
+        start,
+        duration: span.durationMs,
+        detail: { status: span.status, ...attrs },
+      })
     }
   })
 }
 
 export function emitLog(owner: string, log: Omit<TelemetryLog, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
   if (!telemetryEnabled()) return
-  safely(() => push({ ...log, kind: 'log', body: log.body.slice(0, LOG_BODY_MAX), attrs: cleanAttrs(log.attrs, owner) }))
+  safely(() =>
+    push({ ...log, kind: 'log', body: log.body.slice(0, LOG_BODY_MAX), attrs: cleanAttrs(log.attrs, owner) }),
+  )
 }
 
 export function emitEvent(owner: string, name: string, attrs?: TelemetryAttrs): void {
@@ -310,7 +340,10 @@ export function emitEvent(owner: string, name: string, attrs?: TelemetryAttrs): 
   safely(() => push({ kind: 'event', at: Date.now(), name, attrs: cleanAttrs(attrs, owner) }))
 }
 
-export function emitMetric(owner: string, metric: Omit<TelemetryMetric, 'kind' | 'at' | 'attrs'> & { at?: number; attrs?: TelemetryAttrs }): void {
+export function emitMetric(
+  owner: string,
+  metric: Omit<TelemetryMetric, 'kind' | 'at' | 'attrs'> & { at?: number; attrs?: TelemetryAttrs },
+): void {
   if (!telemetryEnabled()) return
   safely(() => push({ ...metric, kind: 'metric', at: metric.at ?? Date.now(), attrs: cleanAttrs(metric.attrs, owner) }))
 }
@@ -440,7 +473,9 @@ export function startRenderTransition(
   })
 
   return {
-    update: (next) => { attrs = { ...attrs, ...next } },
+    update: (next) => {
+      attrs = { ...attrs, ...next }
+    },
     cancel: () => finish('cancelled'),
   }
 }
@@ -459,12 +494,7 @@ const renderBatches = new Map<string, RenderBatch>()
  * count, time inside the wrapped factories, and wall time from the first factory to the microtask
  * checkpoint. Outside an interaction it is the original call with no allocation or scheduling.
  */
-export function measureRenderBatch<T>(
-  owner: string,
-  operation: string,
-  run: () => T,
-  attrs?: TelemetryAttrs,
-): T {
+export function measureRenderBatch<T>(owner: string, operation: string, run: () => T, attrs?: TelemetryAttrs): T {
   const trace = currentTrace()
   if (!telemetryEnabled() || !trace) return run()
   const key = `${trace.spanId}\u0000${owner}\u0000${operation}`
@@ -520,7 +550,13 @@ export function recordSample(owner: string, seam: string, ms: number, unit = '1'
       return
     }
     if (!slot) {
-      slot = { owner, seam, unit, attrs: { ...attrs, seam }, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
+      slot = {
+        owner,
+        seam,
+        unit,
+        attrs: { ...attrs, seam },
+        histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] },
+      }
       state.histograms.set(key, slot)
     }
     const h = slot.histogram
@@ -547,9 +583,14 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
     if (durationMs >= 100 && slowSamples < 20) {
       slowSamples++
       emitSpan(owner, {
-        traceId: trace?.traceId ?? newTraceId(), spanId: newSpanId(),
+        traceId: trace?.traceId ?? newTraceId(),
+        spanId: newSpanId(),
         ...(trace ? { parentSpanId: trace.spanId } : {}),
-        name: seam, start: started, durationMs, status, attrs: { ...attrs, slow: true },
+        name: seam,
+        start: started,
+        durationMs,
+        status,
+        attrs: { ...attrs, slow: true },
       })
     }
   }
@@ -561,10 +602,17 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
     throw error
   }
   // Both outcomes are counted; a rejection also marks a slow exemplar as failed.
-  if (result instanceof Promise) return result.then(
-    (value) => { finish(); return value },
-    (error: unknown) => { finish('error'); throw error },
-  ) as T
+  if (result instanceof Promise)
+    return result.then(
+      (value) => {
+        finish()
+        return value
+      },
+      (error: unknown) => {
+        finish('error')
+        throw error
+      },
+    ) as T
   finish()
   return result
 }
@@ -604,17 +652,38 @@ export async function flushTelemetry(): Promise<void> {
   if (state.refused > 0) {
     const refused = state.refused
     state.refused = 0
-    state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.histogram.refused', type: 'count', value: refused, attrs: cleanAttrs({}, 'core') })
+    state.queue.push({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.histogram.refused',
+      type: 'count',
+      value: refused,
+      attrs: cleanAttrs({}, 'core'),
+    })
   }
   slowSamples = 0
   const dropped = state.queue.takeDropped()
   if (dropped > 0) {
-    state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.dropped', type: 'count', value: dropped, attrs: cleanAttrs({}, 'core') })
+    state.queue.push({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.dropped',
+      type: 'count',
+      value: dropped,
+      attrs: cleanAttrs({}, 'core'),
+    })
   }
   if (state.truncated > 0) {
     const truncated = state.truncated
     state.truncated = 0
-    state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.truncated', type: 'count', value: truncated, attrs: cleanAttrs({}, 'core') })
+    state.queue.push({
+      kind: 'metric',
+      at: Date.now(),
+      name: 'telemetry.truncated',
+      type: 'count',
+      value: truncated,
+      attrs: cleanAttrs({}, 'core'),
+    })
   }
   const post = state.post
   if (!post || state.queue.size() === 0) return

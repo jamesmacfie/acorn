@@ -47,7 +47,11 @@ export function PluginStrip(props: {
   }
   // Checked again here, and not only at registration: a switch is drawn only for a source this plugin
   // really registered, under the owner the registry recorded.
-  const rail = createMemo(() => pluginSources(props.pluginId).map(({ pluginId, source }) => ({ pluginId, ...source })).filter((source) => props.railSources?.includes(source.id)))
+  const rail = createMemo(() =>
+    pluginSources(props.pluginId)
+      .map(({ pluginId, source }) => ({ pluginId, ...source }))
+      .filter((source) => props.railSources?.includes(source.id)),
+  )
   const enabled = () => {
     const current = plugin()
     return current?.kind === 'device' ? !current.entry.row.disabled : !current?.row.disabled
@@ -61,21 +65,22 @@ export function PluginStrip(props: {
   const railSaves = new Map<string, ReturnType<typeof createSettingSave>>()
   const railSave = (id: string) => {
     let save = railSaves.get(id)
-    if (!save) railSaves.set(id, save = createSettingSave())
+    if (!save) railSaves.set(id, (save = createSettingSave()))
     return save
   }
-  const setEnabled = (on: boolean) => enableSave.run(async () => {
-    const current = plugin()
-    if (!current) return
-    if (current.kind === 'node') {
-      await setNodePluginEnabled(nodePlugins()?.plugins ?? [], current.id, on)
-      return
-    }
-    await setDevicePluginEnabled(qc, current.id, on)
-    // A device plugin stops at once and its page goes with it, so the person lands where they can turn
-    // it back on rather than on the first page settings has.
-    if (!on) openPluginPage(props.navigate, current.id, 'device')
-  })
+  const setEnabled = (on: boolean) =>
+    enableSave.run(async () => {
+      const current = plugin()
+      if (!current) return
+      if (current.kind === 'node') {
+        await setNodePluginEnabled(nodePlugins()?.plugins ?? [], current.id, on)
+        return
+      }
+      await setDevicePluginEnabled(qc, current.id, on)
+      // A device plugin stops at once and its page goes with it, so the person lands where they can turn
+      // it back on rather than on the first page settings has.
+      if (!on) openPluginPage(props.navigate, current.id, 'device')
+    })
   const line = () => {
     const current = status()
     if (!current?.line) return undefined
@@ -88,7 +93,13 @@ export function PluginStrip(props: {
         <span class="settings-plugin-strip-name">
           <strong>{name()}</strong> plugin<Show when={plugin()}>{(current) => `, ${pluginOrigin(current())}`}</Show>
         </span>
-        <Button variant="ghost" size="sm" onPress={() => openPluginPage(props.navigate, props.pluginId, plugin()?.kind)}>Manage plugin</Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onPress={() => openPluginPage(props.navigate, props.pluginId, plugin()?.kind)}
+        >
+          Manage plugin
+        </Button>
         <span class="settings-plugin-strip-controls">
           <For each={rail()}>
             {(source) => (
@@ -97,7 +108,11 @@ export function PluginStrip(props: {
                 size="sm"
                 label={rail().length > 1 ? `Show ${source.label} in left rail` : 'Show in left rail'}
                 checked={visibility.shown(source.id)}
-                onChange={(on) => railSave(source.id).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))}
+                onChange={(on) =>
+                  railSave(source.id).run(() =>
+                    visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }),
+                  )
+                }
               />
             )}
           </For>
@@ -107,10 +122,25 @@ export function PluginStrip(props: {
         </span>
       </div>
       <Show when={line()}>
-        {(text) => <p class="settings-plugin-strip-status" role="status" data-tone={status()?.tone}>{text()}</p>}
+        {(text) => (
+          <p class="settings-plugin-strip-status" role="status" data-tone={status()?.tone}>
+            {text()}
+          </p>
+        )}
       </Show>
-      <Show when={enableSave.error() ?? rail().map((source) => railSave(source.id).error()).find(Boolean)}>
-        {(message) => <p class="settings-error" role="alert">{message()}</p>}
+      <Show
+        when={
+          enableSave.error() ??
+          rail()
+            .map((source) => railSave(source.id).error())
+            .find(Boolean)
+        }
+      >
+        {(message) => (
+          <p class="settings-error" role="alert">
+            {message()}
+          </p>
+        )}
       </Show>
     </div>
   )

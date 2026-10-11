@@ -62,7 +62,15 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
         // the task rather than make a second one. A target with no connection cannot seed one, so
         // that case creates a plain task, and the link can be added from the task side.
         ...(props.target.connectionId
-          ? { links: [{ connectionId: props.target.connectionId, identifier: props.target.displayId, providerId: props.target.providerId }] }
+          ? {
+              links: [
+                {
+                  connectionId: props.target.connectionId,
+                  identifier: props.target.displayId,
+                  providerId: props.target.providerId,
+                },
+              ],
+            }
           : {}),
       })
       await queryClient.invalidateQueries({ queryKey: tasksKey })
@@ -76,12 +84,20 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
     <Toolbar>
       <Show
         when={existing()}
-        fallback={(
+        fallback={
           <>
             {/* One repo needs no question asked; several do. Zero means there is nothing to create INTO,
                 and offering a button that cannot work is worse than offering none. */}
             <Show when={choices().length > 1}>
-              <Select value={projectId()} onChange={(value) => setChosen(value)} label="Project for the new task" options={[{ value: '', label: 'Choose a project…' }, ...choices().map((project) => ({ value: project.id, label: project.name }))]} />
+              <Select
+                value={projectId()}
+                onChange={(value) => setChosen(value)}
+                label="Project for the new task"
+                options={[
+                  { value: '', label: 'Choose a project…' },
+                  ...choices().map((project) => ({ value: project.id, label: project.name })),
+                ]}
+              />
             </Show>
             <Show when={choices().length}>
               <Button disabled={!projectId() || busy()} onPress={() => void create()}>
@@ -89,7 +105,7 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
               </Button>
             </Show>
           </>
-        )}
+        }
       >
         {(task) => <Button onPress={() => open(task())}>Open task</Button>}
       </Show>

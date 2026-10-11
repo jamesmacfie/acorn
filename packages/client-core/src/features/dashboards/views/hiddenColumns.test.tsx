@@ -7,7 +7,10 @@ const { default: ListView } = await import('./ListView')
 const { default: TableView } = await import('./TableView')
 
 let dispose: (() => void) | undefined
-afterEach(() => { dispose?.(); document.body.replaceChildren() })
+afterEach(() => {
+  dispose?.()
+  document.body.replaceChildren()
+})
 
 const fields: DashboardDisplayField[] = [
   { id: 'title', name: 'Title', type: 'text', role: 'title' },
@@ -19,10 +22,15 @@ const rows = [{ id: 'one', pluginId: 'core', sourceId: 'tasks', values: { title:
 it('leaves hidden columns out of a table and a list', () => {
   const host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <>
-    <TableView view={{ kind: 'table' }} schema={{ fields }} fields={fields} rows={rows} />
-    <ListView view={{ kind: 'list' }} schema={{ fields }} fields={fields} rows={rows} />
-  </>, host)
+  dispose = render(
+    () => (
+      <>
+        <TableView view={{ kind: 'table' }} schema={{ fields }} fields={fields} rows={rows} />
+        <ListView view={{ kind: 'list' }} schema={{ fields }} fields={fields} rows={rows} />
+      </>
+    ),
+    host,
+  )
   expect(host.textContent).toContain('Owner')
   expect(host.textContent).toContain('Ada')
   expect(host.textContent).not.toContain('Rank')

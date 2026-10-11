@@ -13,9 +13,11 @@ describe('session cost label', () => {
   })
 
   it('describes the cache share, and writes only when reported', () => {
-    expect(sessionCacheLabel({ inputTokens: 160_000, readTokens: 90_000, writeTokens: 15_000 }))
-      .toBe('56% of 160K input tokens came from the prompt cache, 15K written to it.')
-    expect(sessionCacheLabel({ inputTokens: 1_250_000, readTokens: 1_000_000, writeTokens: null }))
-      .toBe('80% of 1.3M input tokens came from the prompt cache.')
+    expect(sessionCacheLabel({ inputTokens: 160_000, readTokens: 90_000, writeTokens: 15_000 })).toBe(
+      '56% of 160K input tokens came from the prompt cache, 15K written to it.',
+    )
+    expect(sessionCacheLabel({ inputTokens: 1_250_000, readTokens: 1_000_000, writeTokens: null })).toBe(
+      '80% of 1.3M input tokens came from the prompt cache.',
+    )
   })
 })

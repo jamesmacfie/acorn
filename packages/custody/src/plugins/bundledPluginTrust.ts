@@ -1,6 +1,17 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
+import {
+  pluginAgentToolGrants,
+  pluginContextSectionGrants,
+  pluginCustomAgentGrants,
+  pluginExtensionGrants,
+  pluginHarnessGrants,
+  pluginKeyClaimGrants,
+  pluginNavigationDestinationGrants,
+  pluginScheduleGrants,
+  pluginTaskCheckGrants,
+  pluginWebviewGrants,
+} from '@acorn/protocol/plugin/grants.ts'
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import { readPluginManifest, readPluginFile, MAX_CLIENT_BUNDLE_BYTES } from '@acorn/node-core/server/plugins'
 import type { PluginCache } from './pluginCache'
@@ -56,14 +67,20 @@ export function trustBundledClientPlugins(
   }
   if (!packages.size) return []
   try {
-    const cached = cache.putBundledBatch(Array.from(packages, ([pluginId, { manifest, dir }]) => ({
-      pluginId, version: manifest.version, read: () => readPluginFile(dir, manifest.client!, MAX_CLIENT_BUNDLE_BYTES),
-    })))
+    const cached = cache.putBundledBatch(
+      Array.from(packages, ([pluginId, { manifest, dir }]) => ({
+        pluginId,
+        version: manifest.version,
+        read: () => readPluginFile(dir, manifest.client!, MAX_CLIENT_BUNDLE_BYTES),
+      })),
+    )
     const acks: PluginAck[] = []
     for (const result of cached) {
       const id = result.pluginId
       if ('error' in result) {
-        log.error(`bundled client for ${id} could not be trusted: ${describeError(result.error).message}`, { 'plugin.id': id })
+        log.error(`bundled client for ${id} could not be trusted: ${describeError(result.error).message}`, {
+          'plugin.id': id,
+        })
         continue
       }
       try {
@@ -95,7 +112,10 @@ export function trustBundledClientPlugins(
     const accepted: string[] = []
     for (const result of trust.recordBatch(acks)) {
       if ('error' in result) {
-        log.error(`bundled client for ${result.ack.pluginId} could not be trusted: ${describeError(result.error).message}`, { 'plugin.id': result.ack.pluginId })
+        log.error(
+          `bundled client for ${result.ack.pluginId} could not be trusted: ${describeError(result.error).message}`,
+          { 'plugin.id': result.ack.pluginId },
+        )
       } else accepted.push(result.ack.pluginId)
     }
     return accepted

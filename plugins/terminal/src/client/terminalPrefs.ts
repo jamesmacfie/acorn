@@ -40,4 +40,7 @@ export const saveTerminalFontSize = (qc: QueryClient, value: string): Promise<bo
   savePref(qc, PrefKeys.terminalFontSize, value)
 
 export const terminalFontSizeChoices = (): CommandSettingOption[] =>
-  TERMINAL_FONT_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}px${size === 15 ? ' (default)' : ''}` }))
+  TERMINAL_FONT_SIZE_OPTIONS.map((size) => ({
+    value: String(size),
+    label: `${size}px${size === 15 ? ' (default)' : ''}`,
+  }))

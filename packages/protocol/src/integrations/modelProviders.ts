@@ -68,17 +68,17 @@ export const availableModelConnections = (response: IntegrationsResponse): Model
 
   return response.integrations.flatMap((connection) => {
     const provider = providers.get(connection.providerId)
-    return provider &&
-      connection.status === 'connected' &&
-      connection.capabilities.textGeneration === 'available'
-      ? [{
-          id: `${CONNECTION_BACKEND_PREFIX}${connection.id}`,
-          kind: 'connection' as const,
-          label: connection.label || provider.label,
-          ...(provider.glyph ? { glyph: provider.glyph } : {}),
-          models: provider.models ?? [],
-          defaultModelId: provider.defaultModelId ?? '',
-        }]
+    return provider && connection.status === 'connected' && connection.capabilities.textGeneration === 'available'
+      ? [
+          {
+            id: `${CONNECTION_BACKEND_PREFIX}${connection.id}`,
+            kind: 'connection' as const,
+            label: connection.label || provider.label,
+            ...(provider.glyph ? { glyph: provider.glyph } : {}),
+            models: provider.models ?? [],
+            defaultModelId: provider.defaultModelId ?? '',
+          },
+        ]
       : []
   })
 }

@@ -36,7 +36,8 @@ describe('the ambient context', () => {
   it('survives a timer', async () => {
     const owner = await runWithTelemetryContext(
       CONTEXT,
-      () => new Promise<string | undefined>((resolve) => setTimeout(() => resolve(currentTelemetryContext()?.owner), 1)),
+      () =>
+        new Promise<string | undefined>((resolve) => setTimeout(() => resolve(currentTelemetryContext()?.owner), 1)),
     )
     expect(owner).toBe('rollbar')
   })
@@ -78,7 +79,8 @@ describe('what the seams read off it', () => {
     flushTelemetry()
     return seen
   }
-  const metrics = (): TelemetryMetric[] => records().filter((record): record is TelemetryMetric => record.kind === 'metric')
+  const metrics = (): TelemetryMetric[] =>
+    records().filter((record): record is TelemetryMetric => record.kind === 'metric')
 
   it("gives 'core' the ambient owner and leaves a named one alone", () => {
     runWithTelemetry(CONTEXT, () => {
@@ -92,10 +94,12 @@ describe('what the seams read off it', () => {
   })
 
   it('resolves the owner through measure, including after the promise settles', async () => {
-    await runWithTelemetry(CONTEXT, async () => measure('core', 'sql.select', async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1))
-      return 42
-    }))
+    await runWithTelemetry(CONTEXT, async () =>
+      measure('core', 'sql.select', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 1))
+        return 42
+      }),
+    )
     expect(metrics()[0]).toMatchObject({ name: 'sql.select', attrs: { owner: 'rollbar' } })
   })
 
@@ -156,9 +160,12 @@ describe('a histogram keeps one label set', () => {
     const series = metrics().filter((metric) => metric.name === 'ws.frame')
     expect(series).toHaveLength(200)
     // Admitted histograms remain separate from refused sample counts.
-    const counted = series.reduce((total, metric) => total + (typeof metric.value === 'number' ? 0 : metric.value.count), 0)
+    const counted = series.reduce(
+      (total, metric) => total + (typeof metric.value === 'number' ? 0 : metric.value.count),
+      0,
+    )
     expect(counted).toBe(200)
     // And the overflow is visible instead of silent.
-    expect(metrics().find(metric => metric.name === 'telemetry.histogram.refused')?.value).toBe(60)
+    expect(metrics().find((metric) => metric.name === 'telemetry.histogram.refused')?.value).toBe(60)
   })
 })

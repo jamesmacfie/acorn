@@ -20,7 +20,11 @@ import { projectBranches } from '../../worktrees/branches'
 // Unlike the removed pair-keyed route, this demands nothing of the folder: facets are detected, not
 // validated. Project ids are the only live core identity for local folders and remote candidates.
 
-const createBody = z.object({ path: z.string().min(1), workspaceId: z.string().optional(), name: z.string().max(120).optional() })
+const createBody = z.object({
+  path: z.string().min(1),
+  workspaceId: z.string().optional(),
+  name: z.string().max(120).optional(),
+})
 const patchBody = z.object({
   name: z.string().max(120).optional(),
   workspaceId: z.string().optional(),
@@ -66,7 +70,10 @@ export const toWireProject = (row: ProjectRow): Project => ({
   vcs: (row.vcs as 'git' | null) ?? null,
   defaultBranch: row.defaultBranch,
   remoteUrl: row.remoteUrl,
-  github: row.githubOwner && row.githubName ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId } : null,
+  github:
+    row.githubOwner && row.githubName
+      ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId }
+      : null,
 })
 
 // MCP config inspector (docs/mcp.md § Configuration): read only the known candidate files and mask
@@ -115,7 +122,13 @@ export const projects = new Hono<AppEnv>()
     const parsed = configBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['Invalid project configuration.'])
     const result = await setProjectConfig(getDb(c.env), c.req.param('id'), parsed.data.patch)
-    if (!result.ok) return respondError(c, result.reason === 'No such project.' ? 404 : 400, result.reason === 'No such project.' ? 'not_found' : 'bad_request', [result.reason])
+    if (!result.ok)
+      return respondError(
+        c,
+        result.reason === 'No such project.' ? 404 : 400,
+        result.reason === 'No such project.' ? 'not_found' : 'bad_request',
+        [result.reason],
+      )
     return c.json(result.response)
   })
   // Absolute paths of every free worktree are a layout disclosure, so a task-confined caller gets
@@ -145,10 +158,16 @@ export const projects = new Hono<AppEnv>()
     const project = await getProject(db, c.req.param('id'))
     if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
     const branchSource = c.req.query('branchSource')
-    if (branchSource !== undefined && branchSource !== 'derived' && branchSource !== 'exact') return respondError(c, 400, 'bad_request')
+    if (branchSource !== undefined && branchSource !== 'derived' && branchSource !== 'exact')
+      return respondError(c, 400, 'bad_request')
     const { taskBranchAvailability, TaskBranchError } = await import('../../worktrees/taskBranch')
     try {
-      const result = await taskBranchAvailability(db, project, { branch, branchSource, baseBranch: c.req.query('baseBranch'), baseCommit: c.req.query('baseCommit') })
+      const result = await taskBranchAvailability(db, project, {
+        branch,
+        branchSource,
+        baseBranch: c.req.query('baseBranch'),
+        baseCommit: c.req.query('baseCommit'),
+      })
       // Preserve the response for callers that do not request a preview.
       if (!branchSource && c.req.query('baseBranch') === undefined && c.req.query('baseCommit') === undefined) {
         const { branch: _branch, ...availability } = result
@@ -178,7 +197,11 @@ export const projects = new Hono<AppEnv>()
       await writeFile(resolve(row.path, '.mcp.json'), STARTER_MCP_JSON, { encoding: 'utf8', flag: 'wx' })
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code
-      return c.json({ ok: false, reason: code === 'EEXIST' ? '.mcp.json already exists.' : `Could not write .mcp.json: ${code ?? 'unknown error'}.` })
+      return c.json({
+        ok: false,
+        reason:
+          code === 'EEXIST' ? '.mcp.json already exists.' : `Could not write .mcp.json: ${code ?? 'unknown error'}.`,
+      })
     }
     return c.json({ ok: true })
   })
@@ -186,7 +209,13 @@ export const projects = new Hono<AppEnv>()
     const parsed = runTargetsBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['runTargets is required.'])
     const result = await setProjectRunTargets(getDb(c.env), c.req.param('id'), parsed.data.runTargets)
-    if (!result.ok) return respondError(c, result.reason === 'No such project.' ? 404 : 400, result.reason === 'No such project.' ? 'not_found' : 'bad_request', [result.reason])
+    if (!result.ok)
+      return respondError(
+        c,
+        result.reason === 'No such project.' ? 404 : 400,
+        result.reason === 'No such project.' ? 'not_found' : 'bad_request',
+        [result.reason],
+      )
     return c.json(result.response)
   })
   .patch('/:id', async (c) => {

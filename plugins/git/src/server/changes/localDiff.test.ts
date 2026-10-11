@@ -1,5 +1,16 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
@@ -42,24 +53,71 @@ describe('parsePorcelainV2 (pure)', () => {
       ].join('\n'),
     )
     expect(out).toEqual([
-      { path: 'src/mod.ts', status: 'modified', staged: false, additions: null, deletions: null, contentKey: '100644 100644 def' },
-      { path: 'src/staged-new.ts', status: 'added', staged: true, additions: null, deletions: null, contentKey: '000000 100644 000 def' },
-      { path: 'src/gone.ts', status: 'deleted', staged: false, additions: null, deletions: null, contentKey: '100644 000000 abc' },
-      { path: 'src/both.ts', status: 'modified', staged: true, additions: null, deletions: null, contentKey: '100644 100644 abc def' },
-      { path: 'src/both.ts', status: 'modified', staged: false, additions: null, deletions: null, contentKey: '100644 100644 def' },
+      {
+        path: 'src/mod.ts',
+        status: 'modified',
+        staged: false,
+        additions: null,
+        deletions: null,
+        contentKey: '100644 100644 def',
+      },
+      {
+        path: 'src/staged-new.ts',
+        status: 'added',
+        staged: true,
+        additions: null,
+        deletions: null,
+        contentKey: '000000 100644 000 def',
+      },
+      {
+        path: 'src/gone.ts',
+        status: 'deleted',
+        staged: false,
+        additions: null,
+        deletions: null,
+        contentKey: '100644 000000 abc',
+      },
+      {
+        path: 'src/both.ts',
+        status: 'modified',
+        staged: true,
+        additions: null,
+        deletions: null,
+        contentKey: '100644 100644 abc def',
+      },
+      {
+        path: 'src/both.ts',
+        status: 'modified',
+        staged: false,
+        additions: null,
+        deletions: null,
+        contentKey: '100644 100644 def',
+      },
       { path: 'notes.md', status: 'untracked', staged: false, additions: null, deletions: null, contentKey: '' },
     ])
   })
   it('parses renames with the orig path', () => {
-    const { changes: out } = parsePorcelainV2('2 R. N... 100644 100644 100644 abc abc R100 src/new-name.ts\tsrc/old-name.ts')
+    const { changes: out } = parsePorcelainV2(
+      '2 R. N... 100644 100644 100644 abc abc R100 src/new-name.ts\tsrc/old-name.ts',
+    )
     expect(out).toEqual([
-      { path: 'src/new-name.ts', oldPath: 'src/old-name.ts', status: 'renamed', staged: true, additions: null, deletions: null, contentKey: '100644 100644 abc abc src/old-name.ts' },
+      {
+        path: 'src/new-name.ts',
+        oldPath: 'src/old-name.ts',
+        status: 'renamed',
+        staged: true,
+        additions: null,
+        deletions: null,
+        contentKey: '100644 100644 abc abc src/old-name.ts',
+      },
     ])
   })
   it('keys each entry by the objects on its line, and a submodule not at all', () => {
     // A submodule's new commit is not on its line, so no key could see it move.
     expect(parsePorcelainV2('1 .M SC.. 160000 160000 160000 abc abc vendor/lib').changes[0]?.contentKey).toBeUndefined()
-    expect(parsePorcelainV2('1 .M N... 100644 100755 100755 abc abc a.ts').changes[0]?.contentKey).toBe('100755 100755 abc')
+    expect(parsePorcelainV2('1 .M N... 100644 100755 100755 abc abc a.ts').changes[0]?.contentKey).toBe(
+      '100755 100755 abc',
+    )
   })
   it('merges numstat per scope', () => {
     const { changes } = parsePorcelainV2('1 .M N... 100644 100644 100644 abc def a.ts')
@@ -87,7 +145,16 @@ describe('the branch headers', () => {
       upstream: 'origin/james/vnext',
       ahead: 2,
       behind: 5,
-      changes: [{ path: 'a.ts', status: 'modified', staged: false, additions: null, deletions: null, contentKey: '100644 100644 def' }],
+      changes: [
+        {
+          path: 'a.ts',
+          status: 'modified',
+          staged: false,
+          additions: null,
+          deletions: null,
+          contentKey: '100644 100644 def',
+        },
+      ],
     })
   })
 
@@ -111,7 +178,14 @@ describe('an unmerged file', () => {
 
   it('is conflicted rather than modified, and never staged', () => {
     expect(parsePorcelainV2(LINE).changes).toEqual([
-      { path: 'src/clash.ts', status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: '100644 100644 100644 100644 aaa bbb ccc' },
+      {
+        path: 'src/clash.ts',
+        status: 'conflicted',
+        staged: false,
+        additions: null,
+        deletions: null,
+        contentKey: '100644 100644 100644 100644 aaa bbb ccc',
+      },
     ])
   })
 
@@ -129,8 +203,15 @@ describe('commitArgs (pure)', () => {
   // The order is the behaviour under test: git takes these flags in any order, so a test that pins one
   // is the only way a reader can tell which one they will see in a shell history.
   it('spells every flag once, in the order the panel offers them', () => {
-    expect(commitArgs('subject', { all: true, amend: true, signoff: true, noVerify: true }))
-      .toEqual(['commit', '-a', '--amend', '--signoff', '--no-verify', '-m', 'subject'])
+    expect(commitArgs('subject', { all: true, amend: true, signoff: true, noVerify: true })).toEqual([
+      'commit',
+      '-a',
+      '--amend',
+      '--signoff',
+      '--no-verify',
+      '-m',
+      'subject',
+    ])
   })
 
   it('leaves out the flags nobody set', () => {
@@ -153,9 +234,15 @@ describe('the remote argv (pure)', () => {
   it('pushes with an upstream always, and with a lease when forced', () => {
     expect(pushArgs()).toEqual(['push', '--set-upstream', 'origin', 'HEAD'])
     expect(pushArgs({ force: true, expectedBranch: 'main', expectedRemoteId: 'a'.repeat(40) })).toEqual([
-      'push', `--force-with-lease=refs/heads/main:${'a'.repeat(40)}`, '--set-upstream', 'origin', 'HEAD:refs/heads/main',
+      'push',
+      `--force-with-lease=refs/heads/main:${'a'.repeat(40)}`,
+      '--set-upstream',
+      'origin',
+      'HEAD:refs/heads/main',
     ])
-    expect(pushArgs({ force: true, expectedBranch: 'main', expectedRemoteId: 'a'.repeat(40) }).includes('--force')).toBe(false)
+    expect(
+      pushArgs({ force: true, expectedBranch: 'main', expectedRemoteId: 'a'.repeat(40) }).includes('--force'),
+    ).toBe(false)
   })
 
   it('aborts whichever operation it is told about', () => {
@@ -217,7 +304,16 @@ describe('local diff over a real worktree', () => {
   it('modified file → LocalChange + a patch the existing diff parser accepts', async () => {
     writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nCHANGED\nline3\n')
     const { changes } = await localStatus(dir)
-    expect(changes).toEqual([{ path: 'src/a.ts', status: 'modified', staged: false, additions: 1, deletions: 1, contentKey: expect.any(String) }])
+    expect(changes).toEqual([
+      {
+        path: 'src/a.ts',
+        status: 'modified',
+        staged: false,
+        additions: 1,
+        deletions: 1,
+        contentKey: expect.any(String),
+      },
+    ])
     const { patch } = await localDiff(dir, 'src/a.ts', 'unstaged')
     expect(patch.startsWith('@@')).toBe(true)
     const [file] = gitdiffParser.parse(synth('src/a.ts', patch))
@@ -230,7 +326,16 @@ describe('local diff over a real worktree', () => {
   it('untracked file renders as an all-additions patch (--no-index exits 1 on success)', async () => {
     writeFileSync(join(dir, 'new.md'), 'hello\nworld\n')
     const { changes } = await localStatus(dir)
-    expect(changes).toEqual([{ path: 'new.md', status: 'untracked', staged: false, additions: null, deletions: null, contentKey: expect.any(String) }])
+    expect(changes).toEqual([
+      {
+        path: 'new.md',
+        status: 'untracked',
+        staged: false,
+        additions: null,
+        deletions: null,
+        contentKey: expect.any(String),
+      },
+    ])
     const { patch } = await localDiff(dir, 'new.md', 'unstaged')
     const [file] = gitdiffParser.parse(synth('new.md', patch))
     expect(file.hunks[0].changes.every((c) => c.type === 'insert')).toBe(true)
@@ -238,7 +343,17 @@ describe('local diff over a real worktree', () => {
   })
 
   it('keeps quoted Unicode and control filenames exact through status, keys, stage, unstage, and discard', async () => {
-    const names = ['café.txt', '🌳.txt', '\ufeffmark.txt', '\ufffdmark.txt', 'tab\tname.txt', 'line\nname.txt', 'quote"name.txt', 'back\\slash.txt', 'literal {old => new}.txt']
+    const names = [
+      'café.txt',
+      '🌳.txt',
+      '\ufeffmark.txt',
+      '\ufffdmark.txt',
+      'tab\tname.txt',
+      'line\nname.txt',
+      'quote"name.txt',
+      'back\\slash.txt',
+      'literal {old => new}.txt',
+    ]
     for (const name of names) writeFileSync(join(dir, name), 'base\n')
     const first = await localStatus(dir)
     expect(first.changes.map((c) => c.path).sort()).toEqual([...names].sort())
@@ -258,7 +373,9 @@ describe('local diff over a real worktree', () => {
     await unstageFiles(dir, names)
     const changed = await localStatus(dir)
     expect(changed.changes.map((c) => c.path).sort()).toEqual([...names].sort())
-    expect(changed.changes.every((c) => c.additions === 2 && c.deletions === 1 && c.contentKey !== undefined)).toBe(true)
+    expect(changed.changes.every((c) => c.additions === 2 && c.deletions === 1 && c.contentKey !== undefined)).toBe(
+      true,
+    )
     expect(await stageFiles(dir, names)).toEqual({ ok: true })
     expect(await unstageFiles(dir, names)).toEqual({ ok: true })
     for (const name of names) expect(await discardFile(dir, name, false)).toEqual({ ok: true })
@@ -294,14 +411,19 @@ describe('local diff over a real worktree', () => {
     writeFileSync(join(dir, 'utf8.txt'), 'café🌳\n')
     expect((await localDiff(dir, 'utf8.txt', 'unstaged')).patch).toBe('@@ -0,0 +1 @@\n+café🌳\n')
     writeFileSync(join(dir, 'utf8.txt'), 'café🌳')
-    expect((await localDiff(dir, 'utf8.txt', 'unstaged')).patch).toBe('@@ -0,0 +1 @@\n+café🌳\n\\ No newline at end of file\n')
+    expect((await localDiff(dir, 'utf8.txt', 'unstaged')).patch).toBe(
+      '@@ -0,0 +1 @@\n+café🌳\n\\ No newline at end of file\n',
+    )
   })
 
-  it.runIf(process.platform === 'linux')('refuses undecodable filesystem names rather than deriving a guessed path', async () => {
-    const badPath = Buffer.concat([Buffer.from(`${dir}/bad-`), Buffer.from([255]), Buffer.from('.txt')])
-    writeFileSync(badPath, 'fixture\n')
-    await expect(localStatus(dir)).rejects.toThrow('Unsupported Git path encoding.')
-  })
+  it.runIf(process.platform === 'linux')(
+    'refuses undecodable filesystem names rather than deriving a guessed path',
+    async () => {
+      const badPath = Buffer.concat([Buffer.from(`${dir}/bad-`), Buffer.from([255]), Buffer.from('.txt')])
+      writeFileSync(badPath, 'fixture\n')
+      await expect(localStatus(dir)).rejects.toThrow('Unsupported Git path encoding.')
+    },
+  )
 
   it('keeps submodule changes on the unknown-key fallback while stamping ordinary deletions', async () => {
     const nested = mkdtempSync(join(tmpdir(), 'acorn-diff-submodule-'))
@@ -321,8 +443,13 @@ describe('local diff over a real worktree', () => {
       const { changes } = await localStatus(dir)
       expect(changes.find((c) => c.path === 'vendor')).toMatchObject({ status: 'modified', staged: false })
       expect(changes.find((c) => c.path === 'vendor')?.contentKey).toBeUndefined()
-      expect(changes.find((c) => c.path === 'src/a.ts')).toMatchObject({ status: 'deleted', contentKey: expect.stringMatching(/ gone$/) })
-    } finally { rmSync(nested, { recursive: true, force: true }) }
+      expect(changes.find((c) => c.path === 'src/a.ts')).toMatchObject({
+        status: 'deleted',
+        contentKey: expect.stringMatching(/ gone$/),
+      })
+    } finally {
+      rmSync(nested, { recursive: true, force: true })
+    }
   })
 
   it('staged scope diffs the index; renames carry oldPath', async () => {
@@ -367,7 +494,9 @@ describe('local diff over a real worktree', () => {
       symlinkSync(join(outside, 'missing.txt'), join(dir, 'dangling.txt'))
       await expect(localNewSideText(dir, 'dangling.txt', 'unstaged')).rejects.toThrow('Invalid path')
       await expect(localDiff(dir, 'dangling.txt', 'unstaged')).rejects.toThrow('Invalid path')
-    } finally { rmSync(outside, { recursive: true, force: true }) }
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+    }
   })
 
   it('retains working-tree text and untracked diffs through safe directory aliases', async () => {
@@ -432,32 +561,43 @@ describe('local diff over a real worktree', () => {
 
   // `git commit -a` is what the Commit tracked button asks for: every tracked change, and nothing
   // untracked. Amend on top of it rewrites the commit rather than adding one.
-  it('commits tracked changes with -a, leaves untracked files alone, and amends in place', { timeout: 15_000 }, async () => {
-    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nTRACKED\nline3\n')
-    writeFileSync(join(dir, 'stray.txt'), 'not mine\n')
-    const before = git('rev-list', '--count', 'HEAD').trim()
+  it(
+    'commits tracked changes with -a, leaves untracked files alone, and amends in place',
+    { timeout: 15_000 },
+    async () => {
+      writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nTRACKED\nline3\n')
+      writeFileSync(join(dir, 'stray.txt'), 'not mine\n')
+      const before = git('rev-list', '--count', 'HEAD').trim()
 
-    expect(await commitStaged(dir, 'feat: all tracked', { all: true })).toEqual({ ok: true })
-    expect(git('show', 'HEAD:src/a.ts')).toContain('TRACKED')
-    // Still untracked, so the commit walked past it.
-    expect((await localStatus(dir)).changes).toEqual([
-      { path: 'stray.txt', status: 'untracked', staged: false, additions: null, deletions: null, contentKey: expect.any(String) },
-    ])
-    expect(Number(git('rev-list', '--count', 'HEAD').trim())).toBe(Number(before) + 1)
+      expect(await commitStaged(dir, 'feat: all tracked', { all: true })).toEqual({ ok: true })
+      expect(git('show', 'HEAD:src/a.ts')).toContain('TRACKED')
+      // Still untracked, so the commit walked past it.
+      expect((await localStatus(dir)).changes).toEqual([
+        {
+          path: 'stray.txt',
+          status: 'untracked',
+          staged: false,
+          additions: null,
+          deletions: null,
+          contentKey: expect.any(String),
+        },
+      ])
+      expect(Number(git('rev-list', '--count', 'HEAD').trim())).toBe(Number(before) + 1)
 
-    // The amend keeps the count where it was and takes the new subject.
-    expect(await commitStaged(dir, 'feat: reworded', { amend: true, signoff: true })).toEqual({ ok: true })
-    expect(Number(git('rev-list', '--count', 'HEAD').trim())).toBe(Number(before) + 1)
-    expect(git('log', '-1', '--pretty=%s').trim()).toBe('feat: reworded')
-    expect(git('log', '-1', '--pretty=%b')).toContain('Signed-off-by:')
+      // The amend keeps the count where it was and takes the new subject.
+      expect(await commitStaged(dir, 'feat: reworded', { amend: true, signoff: true })).toEqual({ ok: true })
+      expect(Number(git('rev-list', '--count', 'HEAD').trim())).toBe(Number(before) + 1)
+      expect(git('log', '-1', '--pretty=%s').trim()).toBe('feat: reworded')
+      expect(git('log', '-1', '--pretty=%b')).toContain('Signed-off-by:')
 
-    // Refused here rather than by git, which would answer with its commit-template help instead.
-    expect(await commitStaged(dir, '   ', { amend: true })).toEqual({ ok: false, reason: 'Commit message required.' })
+      // Refused here rather than by git, which would answer with its commit-template help instead.
+      expect(await commitStaged(dir, '   ', { amend: true })).toEqual({ ok: false, reason: 'Commit message required.' })
 
-    await discardFile(dir, 'stray.txt', true)
-  })
+      await discardFile(dir, 'stray.txt', true)
+    },
+  )
 
-  it('reads HEAD\'s hash and whole message for the field an amend fills', async () => {
+  it("reads HEAD's hash and whole message for the field an amend fills", async () => {
     const head = await headCommit(dir)
     expect(head?.sha).toMatch(/^[0-9a-f]{40}$/)
     expect(head?.message).toBe(git('log', '-1', '--pretty=%B').replace(/\n+$/, ''))
@@ -488,15 +628,22 @@ describe('local diff over a real worktree', () => {
     git('checkout', '-q', 'main')
     writeFileSync(join(dir, 'src/a.ts'), 'OURS\n')
     git('commit', '-q', '-am', 'ours')
-    for (const [args, operation] of [[['cherry-pick', 'other'], 'cherry-pick'], [['revert', '--no-edit', 'other'], 'revert']] as const) {
-      try { git(...args) } catch { /* A conflicting pick or revert exits non-zero and stops. */ }
+    for (const [args, operation] of [
+      [['cherry-pick', 'other'], 'cherry-pick'],
+      [['revert', '--no-edit', 'other'], 'revert'],
+    ] as const) {
+      try {
+        git(...args)
+      } catch {
+        /* A conflicting pick or revert exits non-zero and stops. */
+      }
       expect((await localStatus(dir)).operation).toBe(operation)
       expect(await abortOperation(dir, operation)).toEqual({ ok: true })
       expect((await localStatus(dir)).operation).toBeNull()
     }
   })
 
-  it('sees a merge in flight through the worktree\'s real git directory', async () => {
+  it("sees a merge in flight through the worktree's real git directory", async () => {
     const path = 'src/clash\t\n café.ts'
     git('mv', 'src/a.ts', path)
     git('commit', '-qm', 'quoted path')
@@ -516,11 +663,21 @@ describe('local diff over a real worktree', () => {
     const status = await localStatus(dir)
     expect(status.operation).toBe('merge')
     const clash = status.changes.find((c) => c.path === path)
-    expect(clash).toEqual({ path, status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: expect.any(String) })
+    expect(clash).toEqual({
+      path,
+      status: 'conflicted',
+      staged: false,
+      additions: null,
+      deletions: null,
+      contentKey: expect.any(String),
+    })
 
     // Git's own answer to "stage a conflict" is "mark it resolved".
     expect(await stageFiles(dir, [path])).toEqual({ ok: true })
-    expect((await localStatus(dir)).changes.find((c) => c.path === path)).toMatchObject({ status: 'modified', staged: true })
+    expect((await localStatus(dir)).changes.find((c) => c.path === path)).toMatchObject({
+      status: 'modified',
+      staged: true,
+    })
   })
 
   // The pane re-reads a file's patch only when this key moves (DiffSource.contentKey), so it has to
@@ -567,34 +724,38 @@ describe('local diff over a real worktree', () => {
       expect(await keyOf('src/a.ts', false)).not.toBe(key)
     })
 
-    it('follows the index for staging, and survives a commit that leaves the working-tree patch alone', { timeout: 15_000 }, async () => {
-      const file = join(dir, 'src', 'a.ts')
-      writeFileSync(file, 'line1\nONE\nline3\n')
-      await stageFiles(dir, ['src/a.ts'])
-      writeFileSync(file, 'line1\nTWO\nline3\n')
-      const staged = await keyOf('src/a.ts', true)
-      const unstaged = await keyOf('src/a.ts', false)
+    it(
+      'follows the index for staging, and survives a commit that leaves the working-tree patch alone',
+      { timeout: 15_000 },
+      async () => {
+        const file = join(dir, 'src', 'a.ts')
+        writeFileSync(file, 'line1\nONE\nline3\n')
+        await stageFiles(dir, ['src/a.ts'])
+        writeFileSync(file, 'line1\nTWO\nline3\n')
+        const staged = await keyOf('src/a.ts', true)
+        const unstaged = await keyOf('src/a.ts', false)
 
-      // Staging the second edit moves the index: the staged patch changed, and so did what the
-      // working tree is compared against. The file on disk did not change.
-      await stageFiles(dir, ['src/a.ts'])
-      writeFileSync(file, 'line1\nTHREE\nline3\n')
-      const staged2 = await keyOf('src/a.ts', true)
-      const unstaged2 = await keyOf('src/a.ts', false)
-      expect(staged2).not.toBe(staged)
-      expect(unstaged2).not.toBe(unstaged)
+        // Staging the second edit moves the index: the staged patch changed, and so did what the
+        // working tree is compared against. The file on disk did not change.
+        await stageFiles(dir, ['src/a.ts'])
+        writeFileSync(file, 'line1\nTHREE\nline3\n')
+        const staged2 = await keyOf('src/a.ts', true)
+        const unstaged2 = await keyOf('src/a.ts', false)
+        expect(staged2).not.toBe(staged)
+        expect(unstaged2).not.toBe(unstaged)
 
-      // Committing moves HEAD to the index. The unstaged patch is the index against the disk, and
-      // neither moved, so neither does its key.
-      expect(await commitStaged(dir, 'feat: two')).toEqual({ ok: true })
-      expect(await keyOf('src/a.ts', true)).toBeUndefined()
-      expect(await keyOf('src/a.ts', false)).toBe(unstaged2)
+        // Committing moves HEAD to the index. The unstaged patch is the index against the disk, and
+        // neither moved, so neither does its key.
+        expect(await commitStaged(dir, 'feat: two')).toEqual({ ok: true })
+        expect(await keyOf('src/a.ts', true)).toBeUndefined()
+        expect(await keyOf('src/a.ts', false)).toBe(unstaged2)
 
-      // Unstaging after a second stage puts the index back, which the working-tree side sees.
-      await stageFiles(dir, ['src/a.ts'])
-      await unstageFiles(dir, ['src/a.ts'])
-      expect(await keyOf('src/a.ts', false)).toBe(unstaged2)
-    })
+        // Unstaging after a second stage puts the index back, which the working-tree side sees.
+        await stageFiles(dir, ['src/a.ts'])
+        await unstageFiles(dir, ['src/a.ts'])
+        expect(await keyOf('src/a.ts', false)).toBe(unstaged2)
+      },
+    )
 
     it('names the old path of a rename', async () => {
       git('mv', 'src/a.ts', 'src/b.ts')
@@ -603,7 +764,9 @@ describe('local diff over a real worktree', () => {
   })
 
   it('stripToHunks drops the git header only', () => {
-    expect(stripToHunks('diff --git a/x b/x\nindex 1..2\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n')).toBe('@@ -1 +1 @@\n-a\n+b\n')
+    expect(stripToHunks('diff --git a/x b/x\nindex 1..2\n--- a/x\n+++ b/x\n@@ -1 +1 @@\n-a\n+b\n')).toBe(
+      '@@ -1 +1 @@\n-a\n+b\n',
+    )
     expect(stripToHunks('@@ -1 +1 @@\n-a\n+b\n')).toBe('@@ -1 +1 @@\n-a\n+b\n')
     expect(stripToHunks('')).toBe('')
   })
@@ -655,13 +818,17 @@ describe('the remote verbs over a real origin', () => {
     }
   }
 
-  it('publishes a branch that has no upstream, and the status read says so afterwards', { timeout: 30_000 }, async () => {
-    expect(await localStatus(dir)).toMatchObject({ upstream: null, ahead: null, behind: null })
+  it(
+    'publishes a branch that has no upstream, and the status read says so afterwards',
+    { timeout: 30_000 },
+    async () => {
+      expect(await localStatus(dir)).toMatchObject({ upstream: null, ahead: null, behind: null })
 
-    expect(await pushBranch(dir)).toEqual({ ok: true })
-    // Publish and Push are the same call: `--set-upstream` is what turns the nulls into counts.
-    expect(await localStatus(dir)).toMatchObject({ upstream: 'origin/main', ahead: 0, behind: 0 })
-  })
+      expect(await pushBranch(dir)).toEqual({ ok: true })
+      // Publish and Push are the same call: `--set-upstream` is what turns the nulls into counts.
+      expect(await localStatus(dir)).toMatchObject({ upstream: 'origin/main', ahead: 0, behind: 0 })
+    },
+  )
 
   it('counts a commit as ahead, sends it, and comes back level', { timeout: 30_000 }, async () => {
     await pushBranch(dir)
@@ -673,7 +840,7 @@ describe('the remote verbs over a real origin', () => {
     expect(await localStatus(dir)).toMatchObject({ ahead: 0, behind: 0 })
   })
 
-  it('sees somebody else\'s commit after a fetch and fast-forwards onto it', { timeout: 30_000 }, async () => {
+  it("sees somebody else's commit after a fetch and fast-forwards onto it", { timeout: 30_000 }, async () => {
     await pushBranch(dir)
     const other = otherClone()
     other.commit('theirs\n')
@@ -715,10 +882,15 @@ describe('the remote verbs over a real origin', () => {
     await pushBranch(dir)
 
     expect(await commitStaged(dir, 'second, reworded', { amend: true })).toEqual({ ok: true })
-    expect(await pushBranch(dir)).toMatchObject({ ok: false, reason: expect.stringMatching(/rejected|non-fast-forward/i) })
+    expect(await pushBranch(dir)).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/rejected|non-fast-forward/i),
+    })
 
     const observed = (await localStatus(dir)).upstreamId!
-    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed })).toEqual({ ok: true })
+    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed })).toEqual({
+      ok: true,
+    })
     expect(await localStatus(dir)).toMatchObject({ ahead: 0, behind: 0 })
     expect(git('log', '-1', '--pretty=%s').trim()).toBe('second, reworded')
   })
@@ -733,7 +905,10 @@ describe('the remote verbs over a real origin', () => {
     git('commit', '-q', '-am', 'mine')
 
     const observed = (await localStatus(dir)).upstreamId!
-    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed })).toMatchObject({ ok: false, reason: expect.stringMatching(/stale info|rejected/i) })
+    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed })).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/stale info|rejected/i),
+    })
     other.cleanup()
   })
 
@@ -746,8 +921,10 @@ describe('the remote verbs over a real origin', () => {
     git('commit', '-q', '-am', 'mine')
     await fetchRemote(dir)
     expect((await localStatus(dir)).upstreamId).not.toBe(observed)
-    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed }))
-      .toMatchObject({ ok: false, reason: expect.stringMatching(/stale info|rejected/i) })
+    expect(await pushBranch(dir, { force: true, expectedBranch: 'main', expectedRemoteId: observed })).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/stale info|rejected/i),
+    })
     expect(git('ls-remote', 'origin', 'refs/heads/main').split('\t')[0]).toBe((await localStatus(dir)).upstreamId)
     other.cleanup()
   })

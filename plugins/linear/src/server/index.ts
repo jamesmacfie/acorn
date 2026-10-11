@@ -28,7 +28,11 @@ export const linearFetch = (apiKey: string, query: string, variables: Record<str
   })
 
 export const linearError = (res: Response): { error: string; status: 401 | 502 } | null =>
-  res.ok ? null : res.status === 401 || res.status === 403 ? { error: 'linear_reauth', status: 401 } : { error: 'linear_unavailable', status: 502 }
+  res.ok
+    ? null
+    : res.status === 401 || res.status === 403
+      ? { error: 'linear_reauth', status: 401 }
+      : { error: 'linear_unavailable', status: 502 }
 
 // Parse a GraphQL body, throwing on transport/GraphQL errors so the route's catch maps to 502.
 export async function linearData<T>(res: Response): Promise<T> {
@@ -206,12 +210,22 @@ export type LinearNode = {
   project?: { id: string; name: string } | null
   cycle?: { number: number; endsAt: string | null } | null
   labels?: { nodes: { id: string; name: string; color: string }[] }
-  attachments?: { nodes: { id: string; title: string | null; subtitle: string | null; url: string; sourceType: string | null }[] }
+  attachments?: {
+    nodes: { id: string; title: string | null; subtitle: string | null; url: string; sourceType: string | null }[]
+  }
   parent?: LinearRelatedNode | null
   children?: { nodes: LinearRelatedNode[] }
   relations?: { nodes: { id: string; type: string; relatedIssue: LinearRelatedNode | null }[] }
   inverseRelations?: { nodes: { id: string; type: string; issue: LinearRelatedNode | null }[] }
-  comments?: { nodes: { id: string; body: string; createdAt: string; user: { name: string } | null; parent: { id: string } | null }[] }
+  comments?: {
+    nodes: {
+      id: string
+      body: string
+      createdAt: string
+      user: { name: string } | null
+      parent: { id: string } | null
+    }[]
+  }
   history?: { nodes: LinearHistoryNode[] }
 }
 
@@ -278,7 +292,9 @@ const UPLOAD_TIMEOUT_MS = 30_000
 
 /** One private upload, fetched with the key that can read it. Null when the fetch fails outright. */
 export const fetchLinearUpload = (apiKey: string, target: URL): Promise<Response | null> =>
-  fetch(target, { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }).catch(() => null)
+  fetch(target, { headers: { Authorization: apiKey }, signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS) }).catch(
+    () => null,
+  )
 
 // "ENG-123" → { key: 'ENG', number: 123 }; null if it isn't a valid identifier.
 export function parseIdentifier(id: string): { key: string; number: number } | null {

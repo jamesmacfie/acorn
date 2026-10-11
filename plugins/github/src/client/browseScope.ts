@@ -37,7 +37,8 @@ export function createBrowseScope(): BrowseScope {
     emptyMessage: () => {
       if (!projects.data) return undefined
       const selected = project()
-      if (!selected) return { title: 'Choose a project', body: 'Pick one in the project menu to see its pull requests.' }
+      if (!selected)
+        return { title: 'Choose a project', body: 'Pick one in the project menu to see its pull requests.' }
       return {
         title: `${selected.name} isn't on GitHub`,
         body: 'Its folder has no GitHub remote, so there are no pull requests to show.',

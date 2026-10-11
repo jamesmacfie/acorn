@@ -53,7 +53,12 @@ export type { Extension, ExtensionPointId } from '@acorn/node-core/server/plugin
 // shape live in node-core rather than in the agents plugin, because the host delivers a
 // manifest-declared harness and neither package may import the other.
 export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost'
-export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/pluginHost'
+export type {
+  HarnessProbe,
+  HarnessRegistry,
+  ManifestHarness,
+  ManifestHarnessSpawn,
+} from '@acorn/node-core/server/pluginHost'
 export { AGENTS_CUSTOM_AGENT_REGISTRY } from '@acorn/node-core/server/pluginHost'
 export type { CustomAgentRegistry, ManifestCustomAgent } from '@acorn/node-core/server/pluginHost'
 // The skill catalogue (docs/managed-agents/skills.md § Skills). Core owns the list and the owner's
@@ -64,7 +69,14 @@ export type { DeliverableSkill } from '@acorn/node-core/server/pluginHost'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-export { isTaskConfined, mayActOnTask, ownerId, principalMayActOnTask, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+export {
+  isTaskConfined,
+  mayActOnTask,
+  ownerId,
+  principalMayActOnTask,
+  requireDevice,
+  requireUser,
+} from '@acorn/node-core/server/middleware/requireUser.ts'
 export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 // The portable carrier a loaded plugin uses to run its own Hono router through
 // `ctx.routes.fetch` (docs/plugins/loaded-plugins.md § Loaded plugins).
@@ -72,7 +84,13 @@ export { portableCarrier } from '@acorn/node-core/server/pluginHost'
 // Routes whose module loads on the first request rather than at boot
 // (docs/plugin-authoring/the-node-half.md § Load a route on first use).
 export { LazyRouteLoadError, lazyFetch, lazyRouter } from '@acorn/node-core/server/pluginHost'
-export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
+export {
+  BridgeError,
+  routeCapability,
+  routeCapabilityFor,
+  setRouteTestCapability,
+  viaBridge,
+} from '@acorn/node-core/server/bridge.ts'
 export { ScheduleSkipped } from '@acorn/node-core/server/schedules/scheduler.ts'
 export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // `Env`, core's runtime bindings, is not here. A loaded plugin may inherit only environment names
@@ -104,11 +122,7 @@ export type { Logger } from '@acorn/node-core/server/telemetry'
 // whole job is egress, is the copy that would rot unnoticed.
 export { scrub } from '@acorn/node-core/server/telemetry'
 export type { TelemetryService } from '@acorn/node-core/server/core'
-export type {
-  TelemetryAttrs,
-  TelemetryBatch,
-  TelemetryRecord,
-} from '@acorn/protocol/telemetry.ts'
+export type { TelemetryAttrs, TelemetryBatch, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
 // The handle type only. See docs/data-layer.md and docs/plugins/data-ownership.md § Data ownership for
@@ -144,7 +158,13 @@ export type { PrefService } from '@acorn/node-core/server/core'
 export { confineExistingFile, readConfigFileSync, resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 // The local secret detector, pure and bounded. The publication gate is `ctx.core.secretPublication`
 // (docs/security/secret-publication.md).
-export { decodeSecretInput, redactSecretText, scanSecretText, secretReport, SECRET_DETECTOR_VERSION } from '@acorn/node-core/server/secretChecks/detector.ts'
+export {
+  decodeSecretInput,
+  redactSecretText,
+  scanSecretText,
+  secretReport,
+  SECRET_DETECTOR_VERSION,
+} from '@acorn/node-core/server/secretChecks/detector.ts'
 export { describeSecretRefusal } from '@acorn/node-core/server/secretChecks/gate.ts'
 export type { SecretPublicationGate } from '@acorn/node-core/server/secretChecks/gate.ts'
 export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core'
@@ -195,7 +215,17 @@ export {
   tmuxAvailable,
 } from '@acorn/node-core/server/profiles.ts'
 export type { ProfileDef } from '@acorn/node-core/server/profiles.ts'
-export { acornFileGuard, acornLoopHook, acornMcp, configureAcornMcp, envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export {
+  acornFileGuard,
+  acornLoopHook,
+  acornMcp,
+  configureAcornMcp,
+  envFlags,
+  launcherSpec,
+  registerAcornMcp,
+  resolveMcpEntry,
+  serverName,
+} from '@acorn/node-core/server/mcpRegister.ts'
 export { encodeFileGuardPolicy, FILE_GUARD_MATCHER, type FileGuardPolicy } from '@acorn/node-core/mcp/fileGuard.ts'
 export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
@@ -211,7 +241,10 @@ export {
   PLUGIN_TOOL_SCHEMA_MAX_DEPTH,
   PLUGIN_TOOL_TIMEOUT_MAX_MS,
 } from '@acorn/protocol/plugin/runtimeContributions.ts'
-export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
+export type {
+  PluginAgentToolDescriptor,
+  PluginContextSectionDescriptor,
+} from '@acorn/protocol/plugin/runtimeContributions.ts'
 export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
 // that own their rows (docs/agent-tools/context-sections.md § Context sections). `pastedContent` is also how agents
@@ -249,21 +282,82 @@ export type { StoredConnection } from '@acorn/node-core/server/integrations'
 export { providerCredential } from '@acorn/node-core/server/integrations'
 export { providerError } from '@acorn/node-core/server/integrations'
 export { providerRequestScheduler } from '@acorn/node-core/server/integrations'
-export { defaultBudgets, externalIdsFor, publicConnectionProvider, publicProvider } from '@acorn/node-core/server/integrations'
+export {
+  defaultBudgets,
+  externalIdsFor,
+  publicConnectionProvider,
+  publicProvider,
+} from '@acorn/node-core/server/integrations'
 export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders'
 // The node-provider contract (docs/plugins/node-providers.md § Node providers). Types only: the provider arrives on
 // `ctx.providers.nodes`, and a plugin that imported the registry directly would get its own copy of
 // the map, since a loaded bundle inlines every @acorn/* import it makes. `ProvidedNode` and its state
 // enum live in @acorn/protocol, which a plugin already depends on.
-export type { NodeProviderContribution, NodeSpec, ProvidedNodeRecord } from '@acorn/node-core/server/nodeProviders/registry.ts'
-export { DATA_VERSION, DATA_LIMITS, MISSING, parseDataValue, parseVersionedDataValue, parseDataPointer, readDataPointer, canonicalDataEncoding, canonicalDataProjection } from '@acorn/protocol/dataValues.ts'
+export type {
+  NodeProviderContribution,
+  NodeSpec,
+  ProvidedNodeRecord,
+} from '@acorn/node-core/server/nodeProviders/registry.ts'
+export {
+  DATA_VERSION,
+  DATA_LIMITS,
+  MISSING,
+  parseDataValue,
+  parseVersionedDataValue,
+  parseDataPointer,
+  readDataPointer,
+  canonicalDataEncoding,
+  canonicalDataProjection,
+} from '@acorn/protocol/dataValues.ts'
 export type { DataValue, DataPrimitive, DataRead, VersionedDataValue } from '@acorn/protocol/dataValues.ts'
 export { parseDataSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 export type { DataSchema, DataType } from '@acorn/protocol/dataSchemas.ts'
-export { DATA_OPERATORS, dataPointerSchema, dataBindingSchema, dataFieldSchema, dataFieldsSchema, parseDataPredicate, compareDataValues } from '@acorn/protocol/dataBindings.ts'
-export type { DataBinding, DataBindingAddress, DataField, DataOperator, DataPredicate } from '@acorn/protocol/dataBindings.ts'
-export type { DataSourceRef, DataSourceDescriptor, DataSourceRegistration, DataSourceDiscovery, DataSourceScope, DataSourceDescription, DataSourceQuery, DataSourceRequest, DataRecordRef, DataRecord, DataSourcePage, DataSourceResult, DataSourceOptions, DataSourceDetails, DataSourceResponse, DataSourceDiscoveryRequest, DataSourceDiscoveryPage } from '@acorn/protocol/dataSources.ts'
+export {
+  DATA_OPERATORS,
+  dataPointerSchema,
+  dataBindingSchema,
+  dataFieldSchema,
+  dataFieldsSchema,
+  parseDataPredicate,
+  compareDataValues,
+} from '@acorn/protocol/dataBindings.ts'
+export type {
+  DataBinding,
+  DataBindingAddress,
+  DataField,
+  DataOperator,
+  DataPredicate,
+} from '@acorn/protocol/dataBindings.ts'
+export type {
+  DataSourceRef,
+  DataSourceDescriptor,
+  DataSourceRegistration,
+  DataSourceDiscovery,
+  DataSourceScope,
+  DataSourceDescription,
+  DataSourceQuery,
+  DataSourceRequest,
+  DataRecordRef,
+  DataRecord,
+  DataSourcePage,
+  DataSourceResult,
+  DataSourceOptions,
+  DataSourceDetails,
+  DataSourceResponse,
+  DataSourceDiscoveryRequest,
+  DataSourceDiscoveryPage,
+} from '@acorn/protocol/dataSources.ts'
 export { createDataSelectionPager, dataComparisons, selectDataRecords } from '@acorn/node-core/server/dataSources'
-export type { QueryScope, QueryContent, QueryReference, QueryConsumer, QueryRevision, QueryDraft, QueryBindingContext, QueryBindings, ResolvedQuery } from '@acorn/protocol/dataQueries.ts'
+export type {
+  QueryScope,
+  QueryContent,
+  QueryReference,
+  QueryConsumer,
+  QueryRevision,
+  QueryDraft,
+  QueryBindingContext,
+  QueryBindings,
+  ResolvedQuery,
+} from '@acorn/protocol/dataQueries.ts'
 export { queryContentSchema, queryReferenceSchema, queryScopeSchema } from '@acorn/protocol/dataQueries.ts'
 export { resolveDataBinding, resolveQueryParameters, resolveQueryContent } from '@acorn/protocol/dataQueryResolution.ts'

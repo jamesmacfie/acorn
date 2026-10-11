@@ -12,12 +12,22 @@ export function SettingsSection(props: SettingsSectionProps) {
   return (
     <box flexDirection="column" flexShrink={0} marginTop={spaceLines('section')}>
       <box flexDirection="row" gap={1} flexShrink={0}>
-        <Line role="strong" {...(props.tone ? { tone: props.tone } : {})}>{props.label}</Line>
+        <Line role="strong" {...(props.tone ? { tone: props.tone } : {})}>
+          {props.label}
+        </Line>
       </box>
       <Show when={props.actions}>{slot(props.actions)}</Show>
-      <Show when={props.description}><Line role="muted" wrap>{props.description!}</Line></Show>
+      <Show when={props.description}>
+        <Line role="muted" wrap>
+          {props.description!}
+        </Line>
+      </Show>
       {/* No hover here to hide the help behind, so it prints where the description does. */}
-      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
+      <Show when={props.help}>
+        <Line role="muted" wrap>
+          {props.help!}
+        </Line>
+      </Show>
       {props.children}
     </box>
   )
@@ -30,20 +40,42 @@ export function SettingRow(props: SettingRowProps) {
   const saved = createSavedSignal(() => props.savedAt)
   return (
     <box flexDirection="column" flexShrink={0}>
-      <box flexDirection={props.layout === 'stacked' ? 'column' : 'row'} gap={props.layout === 'stacked' ? 0 : 1} flexShrink={0}>
+      <box
+        flexDirection={props.layout === 'stacked' ? 'column' : 'row'}
+        gap={props.layout === 'stacked' ? 0 : 1}
+        flexShrink={0}
+      >
         <Line>{`${props.label}${props.onReset ? ' •' : ''}`}</Line>
-        <Show when={props.scope === 'device'}><Line role="muted">(this device)</Line></Show>
+        <Show when={props.scope === 'device'}>
+          <Line role="muted">(this device)</Line>
+        </Show>
         <Show when={props.from} fallback={props.children}>
           <Line role="muted">{`From ${props.from}`}</Line>
         </Show>
-        <Show when={saved() && !props.error}><Line tone="ok">Saved</Line></Show>
+        <Show when={saved() && !props.error}>
+          <Line tone="ok">Saved</Line>
+        </Show>
         <Show when={props.onReset && !props.from}>
-          <Button variant="bare" label="Reset" onPress={() => props.onReset?.()}>Reset</Button>
+          <Button variant="bare" label="Reset" onPress={() => props.onReset?.()}>
+            Reset
+          </Button>
         </Show>
       </box>
-      <Show when={props.description}><Line role="muted" wrap>{props.description!}</Line></Show>
-      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
-      <Show when={props.error}><Line tone="danger" wrap>{props.error!}</Line></Show>
+      <Show when={props.description}>
+        <Line role="muted" wrap>
+          {props.description!}
+        </Line>
+      </Show>
+      <Show when={props.help}>
+        <Line role="muted" wrap>
+          {props.help!}
+        </Line>
+      </Show>
+      <Show when={props.error}>
+        <Line tone="danger" wrap>
+          {props.error!}
+        </Line>
+      </Show>
     </box>
   )
 }

@@ -1,6 +1,12 @@
 import { z } from 'zod'
-import type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
-import { qualifiedPluginContextSectionId, qualifiedPluginToolName } from '@acorn/protocol/plugin/runtimeContributions.ts'
+import type {
+  PluginAgentToolDescriptor,
+  PluginContextSectionDescriptor,
+} from '@acorn/protocol/plugin/runtimeContributions.ts'
+import {
+  qualifiedPluginContextSectionId,
+  qualifiedPluginToolName,
+} from '@acorn/protocol/plugin/runtimeContributions.ts'
 import type { ContextItem } from '@acorn/protocol/api.ts'
 import type { Env } from '../bindings'
 import { ToolError, type AgentToolContribution, type ToolContext } from '../agentTools/registry'
@@ -25,20 +31,27 @@ export function registerManifestRuntimeContributions(
 }
 
 const sourceSchema = z.object({ label: z.string().min(1).max(200), uri: z.string().max(2_048).optional() }).strict()
-const itemSchema = z.object({
-  id: z.string().min(1).max(200),
-  kind: z.string().min(1).max(80),
-  label: z.string().min(1).max(500),
-  body: z.string().optional(),
-  details: z.array(z.string().max(2_000)).max(20).optional(),
-  sources: z.array(sourceSchema).max(20).optional(),
-}).strict()
-const sectionResponseSchema = z.object({
-  items: z.array(itemSchema).max(100).default([]),
-  compact: z.string(),
-  omitted: z.number().int().min(0).max(1_000_000).default(0),
-  unavailable: z.object({ detail: z.string().min(1).max(500) }).strict().optional(),
-}).strict()
+const itemSchema = z
+  .object({
+    id: z.string().min(1).max(200),
+    kind: z.string().min(1).max(80),
+    label: z.string().min(1).max(500),
+    body: z.string().optional(),
+    details: z.array(z.string().max(2_000)).max(20).optional(),
+    sources: z.array(sourceSchema).max(20).optional(),
+  })
+  .strict()
+const sectionResponseSchema = z
+  .object({
+    items: z.array(itemSchema).max(100).default([]),
+    compact: z.string(),
+    omitted: z.number().int().min(0).max(1_000_000).default(0),
+    unavailable: z
+      .object({ detail: z.string().min(1).max(500) })
+      .strict()
+      .optional(),
+  })
+  .strict()
 
 const principalFor = (ctx: ToolContext): Principal => ({
   kind: 'internal',
@@ -50,7 +63,11 @@ const principalFor = (ctx: ToolContext): Principal => ({
 })
 
 const responseError = async (response: Response, maxBytes: number): Promise<ToolError> => {
-  const text = await boundedResponseText(response, maxBytes, () => new ToolError('failed', `Plugin handler error exceeded its ${maxBytes}-byte output limit.`))
+  const text = await boundedResponseText(
+    response,
+    maxBytes,
+    () => new ToolError('failed', `Plugin handler error exceeded its ${maxBytes}-byte output limit.`),
+  )
   const body = (() => {
     try {
       return JSON.parse(text) as { error?: { code?: string; message?: string } }
@@ -59,12 +76,18 @@ const responseError = async (response: Response, maxBytes: number): Promise<Tool
     }
   })()
   const code = body?.error?.code
-  const kind = code === 'not_found' ? 'not_found'
-    : code === 'bad_request' ? 'bad_request'
-      : code === 'needs-trust' ? 'needs-trust'
-        : code === 'conflict' || response.status === 409 ? 'conflict'
-          : response.status === 408 || response.status === 504 ? 'timeout'
-            : 'failed'
+  const kind =
+    code === 'not_found'
+      ? 'not_found'
+      : code === 'bad_request'
+        ? 'bad_request'
+        : code === 'needs-trust'
+          ? 'needs-trust'
+          : code === 'conflict' || response.status === 409
+            ? 'conflict'
+            : response.status === 408 || response.status === 504
+              ? 'timeout'
+              : 'failed'
   return new ToolError(kind, body?.error?.message ?? `plugin handler returned HTTP ${response.status}`)
 }
 
@@ -101,7 +124,11 @@ async function boundedResponseText(response: Response, maxBytes: number, exceede
   return text + decoder.decode()
 }
 
-export function manifestAgentTool(env: Env, pluginId: string, descriptor: PluginAgentToolDescriptor): AgentToolContribution {
+export function manifestAgentTool(
+  env: Env,
+  pluginId: string,
+  descriptor: PluginAgentToolDescriptor,
+): AgentToolContribution {
   // The manifest parser has already rejected the unsupported language. Compile once at registration;
   // safeParse below is still run for every call, like a compiled contribution's Zod schema.
   const input = z.fromJSONSchema(descriptor.inputSchema as Parameters<typeof z.fromJSONSchema>[0])
@@ -116,13 +143,24 @@ export function manifestAgentTool(env: Env, pluginId: string, descriptor: Plugin
       const signal = deadline(descriptor.timeoutMs)
       let response: Response
       try {
-        response = await beforeDeadline(dispatchPluginRoute(env, pluginId, descriptor.handler, {
-          method: 'POST',
-          body: JSON.stringify({
-            arguments: args,
-            origin: { taskId: context.taskId, sessionId: context.sessionId, callId: context.callId },
-          }),
-        }, signal, principalFor(context)), signal, `Plugin tool '${pluginId}_${descriptor.id}' timed out.`)
+        response = await beforeDeadline(
+          dispatchPluginRoute(
+            env,
+            pluginId,
+            descriptor.handler,
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                arguments: args,
+                origin: { taskId: context.taskId, sessionId: context.sessionId, callId: context.callId },
+              }),
+            },
+            signal,
+            principalFor(context),
+          ),
+          signal,
+          `Plugin tool '${pluginId}_${descriptor.id}' timed out.`,
+        )
       } catch (error) {
         if (signal.aborted) throw new ToolError('timeout', `Plugin tool '${pluginId}_${descriptor.id}' timed out.`)
         throw error
@@ -142,8 +180,15 @@ export function manifestAgentTool(env: Env, pluginId: string, descriptor: Plugin
       let text: string
       try {
         text = await beforeDeadline(
-          boundedResponseText(response, descriptor.maxOutputBytes, () =>
-            new ToolError('failed', `Plugin tool '${pluginId}_${descriptor.id}' exceeded its ${descriptor.maxOutputBytes}-byte output limit.`)),
+          boundedResponseText(
+            response,
+            descriptor.maxOutputBytes,
+            () =>
+              new ToolError(
+                'failed',
+                `Plugin tool '${pluginId}_${descriptor.id}' exceeded its ${descriptor.maxOutputBytes}-byte output limit.`,
+              ),
+          ),
           signal,
           `Plugin tool '${pluginId}_${descriptor.id}' timed out.`,
         )
@@ -160,7 +205,11 @@ export function manifestAgentTool(env: Env, pluginId: string, descriptor: Plugin
   }
 }
 
-export function manifestContextSection(env: Env, pluginId: string, descriptor: PluginContextSectionDescriptor): PluginContextSection {
+export function manifestContextSection(
+  env: Env,
+  pluginId: string,
+  descriptor: PluginContextSectionDescriptor,
+): PluginContextSection {
   return {
     id: qualifiedPluginContextSectionId(pluginId, descriptor.id),
     label: descriptor.label,
@@ -174,35 +223,66 @@ export function manifestContextSection(env: Env, pluginId: string, descriptor: P
       const principal: Principal = { kind: 'internal', scope: 'task', userId: userLogin, taskId: task.id }
       let response: Response
       try {
-        response = await beforeDeadline(dispatchPluginRoute(env, pluginId, descriptor.read, {
-          method: 'POST',
-          body: JSON.stringify({ origin: { taskId: task.id }, scope: 'task' }),
-        }, signal, principal), signal, `Context section '${descriptor.id}' timed out.`)
-      } catch (error) {
-        if (signal.aborted) throw new ContextSectionAssemblyError('timeout', `Context section '${descriptor.id}' timed out.`)
-        throw error
-      }
-      if (!response.ok) throw new ContextSectionAssemblyError('unavailable', `Context section '${descriptor.id}' returned HTTP ${response.status}.`)
-      let text: string
-      try {
-        text = await beforeDeadline(
-          boundedResponseText(response, descriptor.maxBytes, () =>
-            new ContextSectionAssemblyError('invalid-response', `Context section '${descriptor.id}' exceeded its ${descriptor.maxBytes}-byte response limit.`)),
+        response = await beforeDeadline(
+          dispatchPluginRoute(
+            env,
+            pluginId,
+            descriptor.read,
+            {
+              method: 'POST',
+              body: JSON.stringify({ origin: { taskId: task.id }, scope: 'task' }),
+            },
+            signal,
+            principal,
+          ),
           signal,
           `Context section '${descriptor.id}' timed out.`,
         )
       } catch (error) {
-        if (signal.aborted) throw new ContextSectionAssemblyError('timeout', `Context section '${descriptor.id}' timed out.`)
+        if (signal.aborted)
+          throw new ContextSectionAssemblyError('timeout', `Context section '${descriptor.id}' timed out.`)
+        throw error
+      }
+      if (!response.ok)
+        throw new ContextSectionAssemblyError(
+          'unavailable',
+          `Context section '${descriptor.id}' returned HTTP ${response.status}.`,
+        )
+      let text: string
+      try {
+        text = await beforeDeadline(
+          boundedResponseText(
+            response,
+            descriptor.maxBytes,
+            () =>
+              new ContextSectionAssemblyError(
+                'invalid-response',
+                `Context section '${descriptor.id}' exceeded its ${descriptor.maxBytes}-byte response limit.`,
+              ),
+          ),
+          signal,
+          `Context section '${descriptor.id}' timed out.`,
+        )
+      } catch (error) {
+        if (signal.aborted)
+          throw new ContextSectionAssemblyError('timeout', `Context section '${descriptor.id}' timed out.`)
         throw error
       }
       let value: unknown
       try {
         value = JSON.parse(text)
       } catch {
-        throw new ContextSectionAssemblyError('invalid-response', `Context section '${descriptor.id}' returned invalid JSON.`)
+        throw new ContextSectionAssemblyError(
+          'invalid-response',
+          `Context section '${descriptor.id}' returned invalid JSON.`,
+        )
       }
       const parsed = sectionResponseSchema.safeParse(value)
-      if (!parsed.success) throw new ContextSectionAssemblyError('invalid-response', `Context section '${descriptor.id}' returned an invalid response: ${parsed.error.issues[0]?.message ?? 'invalid data'}`)
+      if (!parsed.success)
+        throw new ContextSectionAssemblyError(
+          'invalid-response',
+          `Context section '${descriptor.id}' returned an invalid response: ${parsed.error.issues[0]?.message ?? 'invalid data'}`,
+        )
       return {
         items: parsed.data.items as ContextItem[],
         absent: parsed.data.unavailable ? { reason: 'unavailable', detail: parsed.data.unavailable.detail } : undefined,

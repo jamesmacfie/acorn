@@ -20,7 +20,10 @@ import {
 // pointer arithmetic and CSS, which this repo's vitest (node, no Solid plugin) cannot check anyway.
 
 const size = (over: Partial<PanelSize> = {}): PanelSize => ({ minW: 1, minH: 1, w: 2, h: 2, ...over })
-const uniform = (value: PanelSize = size()) => () => value
+const uniform =
+  (value: PanelSize = size()) =>
+  () =>
+    value
 
 const layoutOf = (rects: Record<string, Rect>, extra: string[] = []): PanelLayout => ({
   order: [...Object.keys(rects), ...extra],
@@ -119,10 +122,7 @@ describe('normalize', () => {
   })
 
   it('auto-places only the panels that are missing a rect', () => {
-    const out = normalize(
-      { order: ['a', 'b'], rects: { a: at(0, 0, 6, 4) } },
-      uniform(size({ w: 6, h: 4 })),
-    )
+    const out = normalize({ order: ['a', 'b'], rects: { a: at(0, 0, 6, 4) } }, uniform(size({ w: 6, h: 4 })))
     expect(out.rects.a).toEqual(at(0, 0, 6, 4))
     expect(out.rects.b).toEqual(at(6, 0, 6, 4))
   })
@@ -139,10 +139,7 @@ describe('normalize', () => {
   })
 
   it('produces a layout with no two panels overlapping, whatever it was handed', () => {
-    const out = normalize(
-      layoutOf({ a: at(0, 0, 12, 4), b: at(0, 0, 12, 4), c: at(1, 1, 4, 4) }),
-      uniform(),
-    )
+    const out = normalize(layoutOf({ a: at(0, 0, 12, 4), b: at(0, 0, 12, 4), c: at(1, 1, 4, 4) }), uniform())
     const rects = Object.values(out.rects)
     for (const [index, rect] of rects.entries()) {
       for (const other of rects.slice(index + 1)) expect(collides(rect, other)).toBe(false)
@@ -231,13 +228,13 @@ describe('sizeFor', () => {
 })
 
 describe('the wizard size presets', () => {
-  it('offers three widths over the kind\'s own defaults, at the kind\'s height', () => {
+  it("offers three widths over the kind's own defaults, at the kind's height", () => {
     const presets = sizePresets('stat')
     expect([presets.s.w, presets.m.w, presets.l.w]).toEqual([sizeFor('stat').minW, sizeFor('stat').w, COLS])
     expect([presets.s.h, presets.m.h, presets.l.h]).toEqual([sizeFor('stat').h, sizeFor('stat').h, sizeFor('stat').h])
   })
 
-  it('never offers a rect below the kind\'s minimum or past the grid', () => {
+  it("never offers a rect below the kind's minimum or past the grid", () => {
     for (const kind of ['stat', 'list', 'table', 'board', 'chart', 'made-up']) {
       const size = sizeFor(kind)
       for (const rect of Object.values(sizePresets(kind))) {

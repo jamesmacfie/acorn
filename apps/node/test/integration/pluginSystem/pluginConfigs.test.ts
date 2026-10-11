@@ -46,13 +46,16 @@ it('lists every remote or annotation point a loadable plugin declares in the aut
       contributions?: { extensionPoints?: { id: string; kind?: string; mode?: string; max?: number }[] }
     }
     for (const point of config.contributions?.extensionPoints ?? []) {
-      if (point.kind === 'remote' || point.kind === 'annotation') declared.push({ id: `${id}:${point.id}`, kind: point.kind, mode: point.mode, max: point.max })
+      if (point.kind === 'remote' || point.kind === 'annotation')
+        declared.push({ id: `${id}:${point.id}`, kind: point.kind, mode: point.mode, max: point.max })
     }
   }
   expect(declared.length).toBeGreaterThan(1)
   for (const point of declared) {
     const listed = PUBLIC_EXTENSION_POINTS.find((entry) => entry.id === point.id)
-    expect(listed && { kind: listed.kind, mode: 'mode' in listed ? listed.mode : undefined, max: listed.max }, point.id)
-      .toEqual({ kind: point.kind, mode: point.mode, max: point.max })
+    expect(
+      listed && { kind: listed.kind, mode: 'mode' in listed ? listed.mode : undefined, max: listed.max },
+      point.id,
+    ).toEqual({ kind: point.kind, mode: point.mode, max: point.max })
   }
 })

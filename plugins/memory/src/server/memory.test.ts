@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  contentHashId,
-  parseMemory,
-  serializeMemory,
-  type MemoryFile,
-} from './memory'
+import { contentHashId, parseMemory, serializeMemory, type MemoryFile } from './memory'
 
 const mem = (over: Partial<MemoryFile>): MemoryFile => ({
   name: 'auth-conventions',

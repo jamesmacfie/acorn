@@ -32,7 +32,9 @@ export default function Home() {
   // See docs/dashboards/placements.md § Placements for why a deleted tab falls back to the default. A tab the
   // other workspace owned is the same case, so switching workspaces lands on its default board.
   const activeTab = () => (tabs().some((tab) => tab.id === activeHomeTab()) ? activeHomeTab() : '')
-  const bar = <DashboardTabs tabs={tabs()} workspaceId={workspaceId()} active={activeTab()} onSelect={setActiveHomeTab} />
+  const bar = (
+    <DashboardTabs tabs={tabs()} workspaceId={workspaceId()} active={activeTab()} onSelect={setActiveHomeTab} />
+  )
 
   // Adopts a board composed while no workspace was known. Idempotent and a no-op once there is
   // nothing left to adopt, which is why it can live in a render effect rather than in boot: it needs
@@ -70,7 +72,12 @@ export default function Home() {
           </EmptyState>
         )}
       />
-      <DashboardPanelHost session={adding() ? {} : undefined} scope={scope()} returnLabel={tabName()} onClose={() => setAdding(false)} />
+      <DashboardPanelHost
+        session={adding() ? {} : undefined}
+        scope={scope()}
+        returnLabel={tabName()}
+        onClose={() => setAdding(false)}
+      />
     </main>
   )
 }

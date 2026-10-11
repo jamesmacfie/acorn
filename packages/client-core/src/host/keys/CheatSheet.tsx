@@ -24,7 +24,8 @@ type Group = { name: string; lines: Line[] }
 const groups = (): Group[] => {
   const engine = keymap()
   if (!engine) return []
-  const lines = engine.getActiveKeys({ includeMetadata: true })
+  const lines = engine
+    .getActiveKeys({ includeMetadata: true })
     .map((key): Line => ({
       display: formatChord(engine.formatKey(key.display, { separator: ' ' })),
       group: String(key.commandAttrs?.group ?? key.bindingAttrs?.group ?? 'Other'),
@@ -43,23 +44,33 @@ export function CheatSheet() {
   const [sections, setSections] = createSignal<Group[]>([])
 
   onMount(() => {
-    const commands = registerCommands([{
-      id: 'core.shortcuts.cheat-sheet',
-      title: 'Show keyboard shortcuts',
-      hint: 'what the keyboard does right here',
-      category: 'navigation',
-      palette: true,
-      run: () => { setSections(groups()); setOpen(true) },
-    }])
-    const bindings = registerKeybindings([{
-      id: 'core.shortcuts.cheat-sheet',
-      command: 'core.shortcuts.cheat-sheet',
-      description: 'Show keyboard shortcuts',
-      category: 'Global',
-      defaultChord: 'meta+/',
-      when: 'global',
-    }])
-    onCleanup(() => { bindings.dispose(); commands.dispose() })
+    const commands = registerCommands([
+      {
+        id: 'core.shortcuts.cheat-sheet',
+        title: 'Show keyboard shortcuts',
+        hint: 'what the keyboard does right here',
+        category: 'navigation',
+        palette: true,
+        run: () => {
+          setSections(groups())
+          setOpen(true)
+        },
+      },
+    ])
+    const bindings = registerKeybindings([
+      {
+        id: 'core.shortcuts.cheat-sheet',
+        command: 'core.shortcuts.cheat-sheet',
+        description: 'Show keyboard shortcuts',
+        category: 'Global',
+        defaultChord: 'meta+/',
+        when: 'global',
+      },
+    ])
+    onCleanup(() => {
+      bindings.dispose()
+      commands.dispose()
+    })
   })
 
   return (
@@ -77,7 +88,9 @@ export function CheatSheet() {
                       // started at a different edge in every section.
                       <TableRow>
                         <TableCell>{line.desc}</TableCell>
-                        <TableCell align="end"><Kbd>{line.display}</Kbd></TableCell>
+                        <TableCell align="end">
+                          <Kbd>{line.display}</Kbd>
+                        </TableCell>
                       </TableRow>
                     )}
                   </For>
@@ -87,7 +100,9 @@ export function CheatSheet() {
           </For>
         </Modal.Body>
         <Modal.Actions>
-          <Button variant="ghost" onPress={() => setOpen(false)}>Close</Button>
+          <Button variant="ghost" onPress={() => setOpen(false)}>
+            Close
+          </Button>
         </Modal.Actions>
       </Modal>
     </Show>

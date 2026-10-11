@@ -63,14 +63,25 @@ export function TreeHost(props: TreeHostProps) {
       {/* One boundary per tree, not per node: a kit component that throws on a stranger's props takes
           its own tree down and nothing else. A failed optional contribution stays out of the owner's
           UI rather than replacing it with an error. */}
-      <ErrorBoundary fallback={(error) => { props.onFailed?.(String(error)); return null }}>
+      <ErrorBoundary
+        fallback={(error) => {
+          props.onFailed?.(String(error))
+          return null
+        }}
+      >
         {/* One boundary per root, the same shape client-core's TreeHost takes. Every entry in this
             host's table is a component today, so nothing suspends; the boundary is here because the
             table's type allows a loader and because the kit is drawn from one set of names on both
             hosts. It was safe under the old painter only because a reconciler patch tied a node's
             destruction to its creating owner rather than to being detached; a node here is a plain
             object with no destruction to be on the wrong side of. */}
-        <For each={state.roots()}>{(id) => <Suspense fallback={null}><NodeView id={id} /></Suspense>}</For>
+        <For each={state.roots()}>
+          {(id) => (
+            <Suspense fallback={null}>
+              <NodeView id={id} />
+            </Suspense>
+          )}
+        </For>
       </ErrorBoundary>
     </Show>
   )

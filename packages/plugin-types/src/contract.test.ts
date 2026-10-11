@@ -80,40 +80,87 @@ type WidenNumbers<T> = { [K in keyof T]: T[K] extends number ? number : T[K] }
 // `CompiledNodePluginContext` beside it — so there is nothing to subtract here any more. `core` is the
 // one exception, and not a tier one: its big facets are compared one at a time below.
 type LoadedContext = Omit<NodePluginContext, 'core'> & {
-  core: WidenNumbers<Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'data' | 'secrets' | 'git' | 'telemetry'>>
+  core: WidenNumbers<
+    Omit<CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'data' | 'secrets' | 'git' | 'telemetry'>
+  >
 }
 type PublishedContext = Omit<Published.NodePluginContext<Real[0], Real[1]>, 'core'> & {
-  core: WidenNumbers<Omit<Published.CoreServices, 'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'data' | 'secrets' | 'git' | 'telemetry'>>
+  core: WidenNumbers<
+    Omit<
+      Published.CoreServices,
+      'tasks' | 'projects' | 'proc' | 'context' | 'models' | 'data' | 'secrets' | 'git' | 'telemetry'
+    >
+  >
 }
 
-const _context: Mutual<Hole<LoadedContext, (typeof HOLES.context)[number]>, Hole<PublishedContext, (typeof HOLES.context)[number]>> = [true, true]
+const _context: Mutual<
+  Hole<LoadedContext, (typeof HOLES.context)[number]>,
+  Hole<PublishedContext, (typeof HOLES.context)[number]>
+> = [true, true]
 const _task: Mutual<TaskRef, Published.TaskRef> = [true, true]
 const _project: Mutual<ProjectRef, Published.ProjectRef> = [true, true]
 const _capabilityId: Mutual<CapabilityId<string>, Published.CapabilityId<string>> = [true, true]
 const _capabilities: Mutual<NodePluginContext['capabilities'], Published.PluginCapabilities> = [true, true]
 const _modelAdapter: Mutual<ModelProviderAdapter, Published.ModelProviderAdapter> = [true, true]
-const _modelRegistration: Mutual<NodePluginContext['providers']['model'], Published.PluginProviderRegistry['model']> = [true, true]
+const _modelRegistration: Mutual<NodePluginContext['providers']['model'], Published.PluginProviderRegistry['model']> = [
+  true,
+  true,
+]
 // `core.models` as a loaded plugin receives it: the owner-bound facet, where `backendId` is optional.
 // `available` stays out because its rows are protocol's `ModelBackend`, opaque on the published side.
 type PluginModels = ReturnType<CompiledCoreServices['models']['forPlugin']>
-const _modelRequest: Mutual<Parameters<PluginModels['generateText']>[0], Published.PluginGenerateTextRequest> = [true, true]
-const _modelResult: Mutual<Awaited<ReturnType<PluginModels['generateText']>>, Published.GenerateTextResult> = [true, true]
+const _modelRequest: Mutual<Parameters<PluginModels['generateText']>[0], Published.PluginGenerateTextRequest> = [
+  true,
+  true,
+]
+const _modelResult: Mutual<Awaited<ReturnType<PluginModels['generateText']>>, Published.GenerateTextResult> = [
+  true,
+  true,
+]
 void [_modelRequest, _modelResult]
 const _fs: Mutual<CoreServices['fs'], Published.CoreServices['fs']> = [true, true]
 const _git: Mutual<WidenNumbers<CoreServices['git']>, WidenNumbers<Published.CoreServices['git']>> = [true, true]
 const _prefs: Mutual<CoreServices['prefs'], Published.CoreServices['prefs']> = [true, true]
 const _data: Mutual<CoreServices['data'], Published.CoreServices['data']> = [true, true]
 const _identity: Mutual<CoreServices['identity'], Published.CoreServices['identity']> = [true, true]
-const _proc: Mutual<WidenNumbers<Hole<CoreServices['proc'], (typeof HOLES.proc)[number]>>, WidenNumbers<Hole<Published.CoreServices['proc'], (typeof HOLES.proc)[number]>>> = [true, true]
+const _proc: Mutual<
+  WidenNumbers<Hole<CoreServices['proc'], (typeof HOLES.proc)[number]>>,
+  WidenNumbers<Hole<Published.CoreServices['proc'], (typeof HOLES.proc)[number]>>
+> = [true, true]
 const _tasks: Mutual<CoreServices['tasks'], Published.CoreServices['tasks']> = [true, true]
 const _projects: Mutual<CoreServices['projects'], Published.CoreServices['projects']> = [true, true]
 const _request: Mutual<PluginRequestContext, Published.PluginRequestContext<Real[0], Real[1]>> = [true, true]
 // The sink contract, compared apart from the batch's `records`, whose element type is protocol's
 // and therefore opaque on the published side.
 type BatchOf<T> = T extends { onBatch(sink: (batch: infer B) => void): unknown } ? B : never
-const _telemetryBatch: Mutual<Hole<BatchOf<CoreServices['telemetry']>, 'records'>, Hole<BatchOf<Published.CoreTelemetryService>, 'records'>> = [true, true]
-const _telemetry: Mutual<Omit<NodePluginContext['telemetry'], 'measure'>, Omit<Published.PluginTelemetry, 'measure'>> = [true, true]
-void [_context, _task, _project, _capabilityId, _capabilities, _modelAdapter, _modelRegistration, _fs, _git, _prefs, _data, _identity, _proc, _tasks, _projects, _request, _telemetryBatch, _telemetry]
+const _telemetryBatch: Mutual<
+  Hole<BatchOf<CoreServices['telemetry']>, 'records'>,
+  Hole<BatchOf<Published.CoreTelemetryService>, 'records'>
+> = [true, true]
+const _telemetry: Mutual<
+  Omit<NodePluginContext['telemetry'], 'measure'>,
+  Omit<Published.PluginTelemetry, 'measure'>
+> = [true, true]
+void [
+  _context,
+  _task,
+  _project,
+  _capabilityId,
+  _capabilities,
+  _modelAdapter,
+  _modelRegistration,
+  _fs,
+  _git,
+  _prefs,
+  _data,
+  _identity,
+  _proc,
+  _tasks,
+  _projects,
+  _request,
+  _telemetryBatch,
+  _telemetry,
+]
 
 const _loadedMeasure = (telemetry: Published.PluginTelemetry): number => {
   // @ts-expect-error the synchronous worker call cannot time Promise settlement
@@ -139,16 +186,32 @@ const _loadedTool = {
   maxOutputBytes: 65_536,
 } satisfies Published.PluginAgentToolDescriptor
 const _loadedContext = {
-  id: 'references', label: 'References', order: 60,
-  read: '/v1/p/example/context/references', maxBytes: 32_768, maxTokens: 4_096,
+  id: 'references',
+  label: 'References',
+  order: 60,
+  read: '/v1/p/example/context/references',
+  maxBytes: 32_768,
+  maxTokens: 4_096,
 } satisfies Published.PluginContextSectionDescriptor
 const _loadedCliCommand = {
-  name: 'inspect', title: 'Inspect', summary: 'Read one project.', risk: 'read',
-  scope: 'project', capability: 'projects:read', route: { method: 'POST', path: '/cli/inspect' },
-  inputSchema: { type: 'object', properties: { nodeId: { type: 'string' }, projectId: { type: 'string' } }, required: ['nodeId', 'projectId'] },
+  name: 'inspect',
+  title: 'Inspect',
+  summary: 'Read one project.',
+  risk: 'read',
+  scope: 'project',
+  capability: 'projects:read',
+  route: { method: 'POST', path: '/cli/inspect' },
+  inputSchema: {
+    type: 'object',
+    properties: { nodeId: { type: 'string' }, projectId: { type: 'string' } },
+    required: ['nodeId', 'projectId'],
+  },
   outputSchema: { type: 'object', properties: { status: { type: 'string' } }, required: ['status'] },
 } satisfies Published.PluginCliCommandDescriptor
-const _loadedSkill = { id: 'review-checklist', path: 'skills/review-checklist' } satisfies Published.PluginSkillDescriptor
+const _loadedSkill = {
+  id: 'review-checklist',
+  path: 'skills/review-checklist',
+} satisfies Published.PluginSkillDescriptor
 void [_loadedTool, _loadedContext, _loadedCliCommand, _loadedSkill]
 
 it('leaves most of the surface compared, not substituted', () => {
@@ -159,9 +222,22 @@ it('leaves most of the surface compared, not substituted', () => {
   // Thirteen of the context's sixteen members are compared in full, `core` facet by facet above, and
   // that is where most of the surface a plugin actually calls lives.
   const published: Array<keyof Published.NodePluginContext> = [
-    'name', 'routes', 'schedules', 'dataSources', 'taskChecks',
-    'runs', 'audit', 'extensionPoints', 'hooks', 'providers', 'capabilities', 'storage', 'core', 'events',
-    'telemetry', 'log',
+    'name',
+    'routes',
+    'schedules',
+    'dataSources',
+    'taskChecks',
+    'runs',
+    'audit',
+    'extensionPoints',
+    'hooks',
+    'providers',
+    'capabilities',
+    'storage',
+    'core',
+    'events',
+    'telemetry',
+    'log',
   ]
   expect(published.length - HOLES.context.length).toBe(12)
 })
@@ -170,27 +246,51 @@ it('names every capability the first-party plugins publish', () => {
   // The discovery half of the capability work: these ids are declared in
   // `plugins/*/src/contract/` modules a loaded plugin cannot import.
   const ids: Array<keyof Published.CapabilityCatalogue> = [
-    'agents.sessionExecute', 'agents.sessionControl', 'agents.runtime', 'agents.turns', 'agents.requests', 'agents.sessions',
-    'agents.reviewInput.v1', 'agents.activity.v1', 'agents.draftAttachments', 'agents.transcriptMedia', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
-    'editor.files', 'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'notes.store', 'notes.seedTask',
-    'memory.library', 'browser.captures', 'github.mirror', 'preview.rules', 'preview.urls',
-    'workflows.runner', 'workflows.gates', 'workflows.notices',
+    'agents.sessionExecute',
+    'agents.sessionControl',
+    'agents.runtime',
+    'agents.turns',
+    'agents.requests',
+    'agents.sessions',
+    'agents.reviewInput.v1',
+    'agents.activity.v1',
+    'agents.draftAttachments',
+    'agents.transcriptMedia',
+    'agents.harnessRegistry',
+    'core.taskWorktreeCreated',
+    'editor.files',
+    'terminal.sessions',
+    'terminal.sendToAgent',
+    'terminal.runTargets',
+    'notes.store',
+    'notes.seedTask',
+    'memory.library',
+    'browser.captures',
+    'github.mirror',
+    'preview.rules',
+    'preview.urls',
+    'workflows.runner',
+    'workflows.gates',
+    'workflows.notices',
   ]
   expect(new Set(ids).size).toBe(26)
 })
 
 it('keeps every published declaration module free of runtime statements', () => {
   const src = dirname(fileURLToPath(import.meta.url))
-  const files = [join(src, 'public.ts'), ...readdirSync(join(src, 'contracts')).map((file) => join(src, 'contracts', file))]
+  const files = [
+    join(src, 'public.ts'),
+    ...readdirSync(join(src, 'contracts')).map((file) => join(src, 'contracts', file)),
+  ]
   expect(files.length).toBeGreaterThan(10)
   for (const file of files) {
     const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
     for (const statement of source.statements) {
       expect(
-        ts.isTypeAliasDeclaration(statement)
-        || ts.isInterfaceDeclaration(statement)
-        || (ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly)
-        || (ts.isExportDeclaration(statement) && statement.isTypeOnly),
+        ts.isTypeAliasDeclaration(statement) ||
+          ts.isInterfaceDeclaration(statement) ||
+          (ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly) ||
+          (ts.isExportDeclaration(statement) && statement.isTypeOnly),
         `${file}: ${statement.getText(source).slice(0, 80)}`,
       ).toBe(true)
     }

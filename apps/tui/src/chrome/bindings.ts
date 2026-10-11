@@ -24,7 +24,14 @@ import { isTyping, keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { BARE_KEYS } from '@acorn/client-core/kit/keys'
 import { hostKeysFor } from '../keys/install'
 import {
-  bubbledCrossWord, focusedExpands, focusedItem, focusedRenderable, isField, isParentStop, isViewport, regionsInScope,
+  bubbledCrossWord,
+  focusedExpands,
+  focusedItem,
+  focusedRenderable,
+  isField,
+  isParentStop,
+  isViewport,
+  regionsInScope,
 } from '../keys/regions'
 import { focusedCrosses, focusedOpens } from '../keys/stops'
 import { openOverlays } from './state'
@@ -246,9 +253,16 @@ export function activeHints(): Hint[] {
   const typing = isTyping()
   // And which layers are registered, which is the rest of the answer (§ When the answer moves).
   const revision = layerRevision()
-  if (last
-    && last.node === node && last.overlays === overlays && last.regions === regions
-    && last.typing === typing && last.revision === revision && last.engine === engine) return last.hints
+  if (
+    last &&
+    last.node === node &&
+    last.overlays === overlays &&
+    last.regions === regions &&
+    last.typing === typing &&
+    last.revision === revision &&
+    last.engine === engine
+  )
+    return last.hints
 
   // One ask, with the metadata. It was two — the plain list and then the same collect again for the
   // descriptions — and the second answers the first as well, because `includeMetadata` enriches the
@@ -266,11 +280,10 @@ export function activeHints(): Hint[] {
   // Every command with a chord and a description of its own — the palette, the cheat sheet, quitting,
   // and whatever a plugin registered. These the engine does know the words for, because a command
   // layer binding carries them (../keys/commandLayer.ts).
-  const commands = active
-    .flatMap((key): Hint[] => {
-      const desc = String(key.bindingAttrs?.desc ?? key.commandAttrs?.desc ?? '')
-      return desc ? [{ keys: engine.formatKey(key.display), label: desc.toLowerCase() }] : []
-    })
+  const commands = active.flatMap((key): Hint[] => {
+    const desc = String(key.bindingAttrs?.desc ?? key.commandAttrs?.desc ?? '')
+    return desc ? [{ keys: engine.formatKey(key.display), label: desc.toLowerCase() }] : []
+  })
   // Move, open and back first, because they are what a reader reaches for and Escape is what a reader
   // who is lost reaches for hardest; the chords next because they are the ones nobody can guess; the
   // rest after, where the footer's own truncation reaches them first.

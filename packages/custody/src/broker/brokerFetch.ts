@@ -12,23 +12,38 @@ type Health = { result(response: NodeFetchResponse): void; failure(error: unknow
 export class BrokerFetch {
   private readonly inFlight = new Map<string, AbortController>()
 
-  async fetch(nodeId: string, request: NodeFetchRequest, target: Target, health: Health, limits: { maxResponseBytes?: number } = {}): Promise<NodeFetchResponse> {
+  async fetch(
+    nodeId: string,
+    request: NodeFetchRequest,
+    target: Target,
+    health: Health,
+    limits: { maxResponseBytes?: number } = {},
+  ): Promise<NodeFetchResponse> {
     if (this.inFlight.has(request.requestId)) throw new Error('A request with this transport ID is already in flight.')
     const controller = new AbortController()
     this.inFlight.set(request.requestId, controller)
     let timedOut = false
     const timeoutMs = request.timeoutMs ?? DEFAULT_TIMEOUT_MS
-    const timeout = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
+    const timeout = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, timeoutMs)
     try {
-      const response = await measure('core', 'broker.request', () => nodeRequest({
-        url: new URL(request.path, target.node.endpoint),
-        method: request.method ?? 'GET',
-        headers: { ...request.headers, authorization: `Bearer ${target.node.token}` },
-        body: request.body,
-        agent: target.agent,
-        signal: controller.signal,
-        maxResponseBytes: limits.maxResponseBytes ?? request.maxResponseBytes,
-      }), { 'node.id': nodeId, method: request.method ?? 'GET' })
+      const response = await measure(
+        'core',
+        'broker.request',
+        () =>
+          nodeRequest({
+            url: new URL(request.path, target.node.endpoint),
+            method: request.method ?? 'GET',
+            headers: { ...request.headers, authorization: `Bearer ${target.node.token}` },
+            body: request.body,
+            agent: target.agent,
+            signal: controller.signal,
+            maxResponseBytes: limits.maxResponseBytes ?? request.maxResponseBytes,
+          }),
+        { 'node.id': nodeId, method: request.method ?? 'GET' },
+      )
       health.result(response)
       return response
     } catch (error) {
@@ -46,6 +61,11 @@ export class BrokerFetch {
     }
   }
 
-  abort(requestId: string): void { this.inFlight.get(requestId)?.abort() }
-  dispose(): void { for (const controller of this.inFlight.values()) controller.abort(); this.inFlight.clear() }
+  abort(requestId: string): void {
+    this.inFlight.get(requestId)?.abort()
+  }
+  dispose(): void {
+    for (const controller of this.inFlight.values()) controller.abort()
+    this.inFlight.clear()
+  }
 }

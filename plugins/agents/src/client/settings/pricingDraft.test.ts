@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
-import {
-  blankAgentPriceDraft,
-  preferencesFromPricingDraft,
-  pricingDraftFromPreferences,
-} from './pricingDraft'
+import { blankAgentPriceDraft, preferencesFromPricingDraft, pricingDraftFromPreferences } from './pricingDraft'
 
 describe('agent pricing settings draft', () => {
   it('does not persist unchanged built-in prices', () => {

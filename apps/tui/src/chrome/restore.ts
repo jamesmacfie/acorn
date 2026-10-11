@@ -11,7 +11,13 @@
 
 import { createEffect } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { createStartupRestore, lastWorkspaceSlice, type PersistedStateSlice, workspaceHistorySlice, workspaceViewSlice } from '@acorn/client-core/infra/persistence'
+import {
+  createStartupRestore,
+  lastWorkspaceSlice,
+  type PersistedStateSlice,
+  workspaceHistorySlice,
+  workspaceViewSlice,
+} from '@acorn/client-core/infra/persistence'
 import { chosenWorkspace, setPlaceRestored } from './state'
 import type { ShellModel } from './model'
 
@@ -28,10 +34,12 @@ import type { ShellModel } from './model'
  * restore and the model resolves an unknown id to the first workspace, which is what an empty
  * preference does too.
  */
-const restoreLastWorkspace = (model: ShellModel) => (saved: string): void => {
-  if (!saved || chosenWorkspace()) return
-  model.chooseWorkspace(saved)
-}
+const restoreLastWorkspace =
+  (model: ShellModel) =>
+  (saved: string): void => {
+    if (!saved || chosenWorkspace()) return
+    model.chooseWorkspace(saved)
+  }
 
 /**
  * Wire the shell to its persisted place. Called once, from `Shell.tsx`, inside its reactive root.
@@ -40,12 +48,13 @@ const restoreLastWorkspace = (model: ShellModel) => (saved: string): void => {
  * roster to resolve it is overwritten by the model's fallback a tick later, and a remembered task
  * with no list to find it in silently degrades to the workspace's default source.
  */
-export function installRestore(
-  model: ShellModel,
-  prefs: () => Readonly<Record<string, string>> | undefined,
-): void {
+export function installRestore(model: ShellModel, prefs: () => Readonly<Record<string, string>> | undefined): void {
   const queryClient = useQueryClient()
-  const slices = [workspaceViewSlice, workspaceHistorySlice, lastWorkspaceSlice(restoreLastWorkspace(model))] as readonly PersistedStateSlice<unknown>[]
+  const slices = [
+    workspaceViewSlice,
+    workspaceHistorySlice,
+    lastWorkspaceSlice(restoreLastWorkspace(model)),
+  ] as readonly PersistedStateSlice<unknown>[]
   const pass = createStartupRestore({
     queryClient,
     prefs,

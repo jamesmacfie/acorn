@@ -8,10 +8,15 @@ export function validateChrome(refs: ManifestReferences): void {
     if (entry.items !== undefined) route(entry.items, ['contributions', 'sources', i, 'items'])
     if (entry.search !== undefined) route(entry.search, ['contributions', 'sources', i, 'search'])
     if (entry.tree && !manifest.client) {
-      ctx.addIssue({ code: 'custom', path: ['contributions', 'sources', i, 'tree'], message: 'a remote-tree source requires a client bundle' })
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'sources', i, 'tree'],
+        message: 'a remote-tree source requires a client bundle',
+      })
     }
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])
-    if (entry.emptyState?.action) action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
+    if (entry.emptyState?.action)
+      action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
     // The default pane must belong to this plugin.
     if (entry.defaultPane !== undefined && !taskPanes.has(entry.defaultPane)) {
       ctx.addIssue({
@@ -25,7 +30,8 @@ export function validateChrome(refs: ManifestReferences): void {
       ctx.addIssue({
         code: 'custom',
         path: ['contributions', 'sources', i, 'panels'],
-        message: 'a source cannot reserve a panel region and navigate to a project-scoped surface — both draw beside the rail list',
+        message:
+          'a source cannot reserve a panel region and navigate to a project-scoped surface — both draw beside the rail list',
       })
     }
   })
@@ -37,10 +43,16 @@ export function validateChrome(refs: ManifestReferences): void {
   contextMenus.forEach((entry, i) => {
     const at = ['contributions', 'contextMenus', i] as (string | number)[]
     if (isRailMenuLocation(entry.location)) {
-      const owned = entry.location === 'rail.source'
-        ? sources.some((source) => source.id === entry.surface)
-        : taskPanes.has(entry.surface ?? '')
-      if (!entry.surface || !owned) ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `${entry.location} requires a surface declared by this plugin` })
+      const owned =
+        entry.location === 'rail.source'
+          ? sources.some((source) => source.id === entry.surface)
+          : taskPanes.has(entry.surface ?? '')
+      if (!entry.surface || !owned)
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'surface'],
+          message: `${entry.location} requires a surface declared by this plugin`,
+        })
     } else if (entry.surface !== undefined) {
       ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `${entry.location} does not accept a surface` })
     }
@@ -72,7 +84,11 @@ export function validateChrome(refs: ManifestReferences): void {
         const values = new Set<string>()
         entry.options.forEach((option, at2) => {
           if (values.has(option.value)) {
-            ctx.addIssue({ code: 'custom', path: [...at, 'options', at2, 'value'], message: `setting '${entry.id}' declares '${option.value}' twice` })
+            ctx.addIssue({
+              code: 'custom',
+              path: [...at, 'options', at2, 'value'],
+              message: `setting '${entry.id}' declares '${option.value}' twice`,
+            })
           }
           values.add(option.value)
         })
@@ -82,7 +98,11 @@ export function validateChrome(refs: ManifestReferences): void {
     // Search, input, and setting commands call routes served by the node half.
     if ((entry.kind === 'search' || entry.kind === 'input' || entry.kind === 'setting') && !manifest.node) {
       const article = entry.kind === 'input' ? 'an' : 'a'
-      ctx.addIssue({ code: 'custom', path: at, message: `${article} ${entry.kind} command calls a node route; declare \`node\` in the manifest` })
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `${article} ${entry.kind} command calls a node route; declare \`node\` in the manifest`,
+      })
     }
   })
   // Reject broken command groups at installation. The client also guards older roster rows.
@@ -91,11 +111,19 @@ export function validateChrome(refs: ManifestReferences): void {
     const at = ['contributions', 'commands', i, 'parentId'] as (string | number)[]
     const parent = commandKind.get(entry.parentId)
     if (parent === undefined) {
-      ctx.addIssue({ code: 'custom', path: at, message: `command '${entry.id}' names an undeclared parent '${entry.parentId}'` })
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `command '${entry.id}' names an undeclared parent '${entry.parentId}'`,
+      })
       return
     }
     if (parent !== 'group') {
-      ctx.addIssue({ code: 'custom', path: at, message: `command '${entry.id}' names '${entry.parentId}', which is not a group` })
+      ctx.addIssue({
+        code: 'custom',
+        path: at,
+        message: `command '${entry.id}' names '${entry.parentId}', which is not a group`,
+      })
       return
     }
     // Walk the short parent chain and report the command that closes a cycle.
@@ -115,17 +143,33 @@ export function validateChrome(refs: ManifestReferences): void {
   keybindings.forEach((entry, i) => {
     const at = ['contributions', 'keybindings', i] as (string | number)[]
     if (!commandIds.has(entry.command)) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'command'], message: `keybinding names undeclared command '${entry.command}'` })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'command'],
+        message: `keybinding names undeclared command '${entry.command}'`,
+      })
     }
     if (boundCommands.has(entry.command)) {
-      ctx.addIssue({ code: 'custom', path: [...at, 'command'], message: `command '${entry.command}' has more than one keybinding` })
+      ctx.addIssue({
+        code: 'custom',
+        path: [...at, 'command'],
+        message: `command '${entry.command}' has more than one keybinding`,
+      })
     }
     boundCommands.add(entry.command)
     if (entry.when === 'surface') {
       if (!entry.surface) {
-        ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: 'surface is required when a keybinding uses surface scope' })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'surface'],
+          message: 'surface is required when a keybinding uses surface scope',
+        })
       } else if (!surfaceIds.has(entry.surface)) {
-        ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `keybinding names undeclared surface '${entry.surface}'` })
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'surface'],
+          message: `keybinding names undeclared surface '${entry.surface}'`,
+        })
       }
     } else if (entry.surface !== undefined) {
       ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: 'surface is only valid with surface scope' })

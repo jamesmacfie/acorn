@@ -36,11 +36,22 @@ export const MAX_DOCUMENT_FILES = 5_000
 
 // Plain rows: what a patch parses into, before any colour. The renderer adds the path, the new-side
 // key and the tokens when it builds its own rows from these.
-export type PlainCodeRow = { kind: 'normal' | 'insert' | 'delete'; oldNo: number | null; newNo: number | null; raw: string }
+export type PlainCodeRow = {
+  kind: 'normal' | 'insert' | 'delete'
+  oldNo: number | null
+  newNo: number | null
+  raw: string
+}
 export type PlainHunkRow = { kind: 'hunk'; text: string }
 // A run of unchanged lines hidden above, between, or below hunks. `count` is null for the bottom gap:
 // its size needs the file's length, known only once the new side is read.
-export type PlainGapRow = { kind: 'gap'; side: 'top' | 'mid' | 'bottom'; oldStart: number; newStart: number; count: number | null }
+export type PlainGapRow = {
+  kind: 'gap'
+  side: 'top' | 'mid' | 'bottom'
+  oldStart: number
+  newStart: number
+  count: number | null
+}
 export type PlainDiffRow = PlainCodeRow | PlainHunkRow | PlainGapRow
 
 /**
@@ -92,9 +103,17 @@ export type DiffSegmentPayload = DiffSegmentRequest & { rows: PlainDiffRow[] }
 export type DiffSearchRequest = { query: string; caseSensitive: boolean; cursor: string | null }
 /** A match by segment and row, so the reader can be taken to one without the renderer holding the
  *  document. `start` and `end` are offsets into the row's text. */
-export type DiffSearchMatch = { path: string; patchKey: string; ordinal: number; row: number; start: number; end: number }
+export type DiffSearchMatch = {
+  path: string
+  patchKey: string
+  ordinal: number
+  row: number
+  start: number
+  end: number
+}
 export type DiffSearchPage = { matches: DiffSearchMatch[]; nextCursor: string | null }
 
 /** A segment's identity by content. Stable while other files come and go, and different whenever the
  *  patch or the parser is, so a cache keyed by it can never serve rows from another revision. */
-export const segmentContentKey = (patchKey: string, ordinal: number): string => `v${DIFF_DOCUMENT_VERSION}:${patchKey}:${ordinal}`
+export const segmentContentKey = (patchKey: string, ordinal: number): string =>
+  `v${DIFF_DOCUMENT_VERSION}:${patchKey}:${ordinal}`

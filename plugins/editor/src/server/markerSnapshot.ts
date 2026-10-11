@@ -1,28 +1,37 @@
 import { createHash } from 'node:crypto'
 import { open } from 'node:fs/promises'
 import type { BigIntStats } from 'node:fs'
-import { normalizedLineRanges, type EditorLineMarkerProvider, type EditorLineMarkerSet, type EditorLineMarkerSnapshot } from '../contract/lineMarkers'
+import {
+  normalizedLineRanges,
+  type EditorLineMarkerProvider,
+  type EditorLineMarkerSet,
+  type EditorLineMarkerSnapshot,
+} from '../contract/lineMarkers'
 
 export async function readMarkerProviders(
-  providers: readonly EditorLineMarkerProvider[], taskId: string, path: string, root: string,
+  providers: readonly EditorLineMarkerProvider[],
+  taskId: string,
+  path: string,
+  root: string,
 ): Promise<EditorLineMarkerSet[]> {
-  const settled = await Promise.allSettled(providers.map(async (provider): Promise<EditorLineMarkerSet> => ({
-    kind: provider.kind,
-    ranges: normalizedLineRanges(await provider.read(taskId, path, { root })),
-  })))
+  const settled = await Promise.allSettled(
+    providers.map(async (provider): Promise<EditorLineMarkerSet> => ({
+      kind: provider.kind,
+      ranges: normalizedLineRanges(await provider.read(taskId, path, { root })),
+    })),
+  )
   const byKind = new Map<EditorLineMarkerSet['kind'], EditorLineMarkerSet['ranges']>()
   for (const result of settled) {
     if (result.status !== 'fulfilled') continue // Provenance is optional presentation.
-    byKind.set(result.value.kind, normalizedLineRanges([
-      ...(byKind.get(result.value.kind) ?? []),
-      ...result.value.ranges,
-    ]))
+    byKind.set(
+      result.value.kind,
+      normalizedLineRanges([...(byKind.get(result.value.kind) ?? []), ...result.value.ranges]),
+    )
   }
   return [...byKind].map(([kind, ranges]) => ({ kind, ranges }))
 }
 
-const identity = (s: BigIntStats): string =>
-  [s.dev, s.ino, s.size, s.mtimeNs, s.ctimeNs].join(':')
+const identity = (s: BigIntStats): string => [s.dev, s.ino, s.size, s.mtimeNs, s.ctimeNs].join(':')
 
 async function observe(path: string) {
   const file = await open(path, 'r')
@@ -32,7 +41,9 @@ async function observe(path: string) {
     const after = identity(await file.stat({ bigint: true }))
     if (before !== after) return null
     return { identity: after, revision: createHash('sha256').update(bytes).digest('hex') }
-  } finally { await file.close() }
+  } finally {
+    await file.close()
+  }
 }
 
 /** Byte identity rejects restored-mtime edits; ctime and inode also reject ordinary write/restore races. */

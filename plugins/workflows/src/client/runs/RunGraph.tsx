@@ -20,16 +20,18 @@ const cardTone = (status: string | undefined): GraphCard['tone'] => {
 export function RunGraph(props: { model: RunPaneModel }) {
   const model = props.model
 
-  const cards = createMemo<GraphCard[]>(() => model.nodes().map((node) => ({
-    // The step's name, not its row id: an edge is `after`, which names steps, and a pending node has
-    // no row yet. Selecting maps the name back to the row.
-    id: node.name,
-    label: node.label,
-    detail: statusLabel(node.step?.status),
-    glyph: stepGlyph(node.step?.status),
-    tone: cardTone(node.step?.status),
-    selected: !!node.step && node.step.id === model.selectedStepId(),
-  })))
+  const cards = createMemo<GraphCard[]>(() =>
+    model.nodes().map((node) => ({
+      // The step's name, not its row id: an edge is `after`, which names steps, and a pending node has
+      // no row yet. Selecting maps the name back to the row.
+      id: node.name,
+      label: node.label,
+      detail: statusLabel(node.step?.status),
+      glyph: stepGlyph(node.step?.status),
+      tone: cardTone(node.step?.status),
+      selected: !!node.step && node.step.id === model.selectedStepId(),
+    })),
+  )
 
   const edges = createMemo(() => model.nodes().flatMap((node) => node.parents.map((from) => ({ from, to: node.name }))))
 

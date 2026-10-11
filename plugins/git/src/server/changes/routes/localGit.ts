@@ -4,10 +4,26 @@ import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { SecretPublicationRefusal } from '@acorn/protocol/secretChecks.ts'
 import type {
-  CommitMessageRequest, CommitOptions, DependencyReview, GeneratedCommitMessage, GitSecretCheckResult, HeadCommit, LocalDocumentRequest, LocalDocumentResponse, LocalSearchRequest,
-  LocalSegmentsRequest, PullOptions, PushOptions,
+  CommitMessageRequest,
+  CommitOptions,
+  DependencyReview,
+  GeneratedCommitMessage,
+  GitSecretCheckResult,
+  HeadCommit,
+  LocalDocumentRequest,
+  LocalDocumentResponse,
+  LocalSearchRequest,
+  LocalSegmentsRequest,
+  PullOptions,
+  PushOptions,
 } from '../../../shared/changes/api'
-import { MAX_DOCUMENT_FILES, MAX_SEGMENTS_PER_REQUEST, SEARCH_MAX_QUERY, type DiffSearchPage, type DiffSegmentPayload } from '@acorn/diff-document/document'
+import {
+  MAX_DOCUMENT_FILES,
+  MAX_SEGMENTS_PER_REQUEST,
+  SEARCH_MAX_QUERY,
+  type DiffSearchPage,
+  type DiffSegmentPayload,
+} from '@acorn/diff-document/document'
 import {
   type AppEnv,
   BridgeError,
@@ -80,7 +96,11 @@ export const setLocalGitBridge = (bridge: LocalGitBridge | null): void => setRou
 // did not happen.
 const pathsBody = z.object({ paths: z.array(z.string().min(1)).min(1) })
 // `oldPath` is a rename's other name, so discarding one row puts both back (../localDiff.ts § discardFile).
-const discardBody = z.object({ path: z.string().min(1), untracked: z.boolean().optional(), oldPath: z.string().min(1).optional() })
+const discardBody = z.object({
+  path: z.string().min(1),
+  untracked: z.boolean().optional(),
+  oldPath: z.string().min(1).optional(),
+})
 // Every flag the commit menu can set, each optional and each strictly a boolean: `{ amend: 'yes' }`
 // is a caller bug, and coercing it would commit an amend somebody never asked for.
 const commitBody = z.object({
@@ -94,7 +114,14 @@ const commitBody = z.object({
 // coerced would turn a fast-forward pull into a rebase, or an ordinary push into one that replaces a
 // commit on the remote.
 const pullBody = z.object({ rebase: z.boolean().optional() })
-const pushBody = z.object({ force: z.boolean().optional(), expectedBranch: z.string().min(1).max(240).optional(), expectedRemoteId: z.string().regex(/^[0-9a-f]{40,64}$/).optional() })
+const pushBody = z.object({
+  force: z.boolean().optional(),
+  expectedBranch: z.string().min(1).max(240).optional(),
+  expectedRemoteId: z
+    .string()
+    .regex(/^[0-9a-f]{40,64}$/)
+    .optional(),
+})
 // Which backend the wand spends. `backendId` is required because a route that guessed would spend a
 // key nobody chose; `modelId` is optional because a backend that declares no model leaves the choice
 // to itself (@acorn/protocol/modelProviders.ts § defaultModelIdFor).
@@ -112,7 +139,10 @@ const documentBody = z.object({
 }) satisfies z.ZodType<LocalDocumentRequest>
 const segmentsBody = z.object({
   scope,
-  requests: z.array(z.object({ path, patchKey, ordinal: z.number().int().min(0) })).min(1).max(MAX_SEGMENTS_PER_REQUEST),
+  requests: z
+    .array(z.object({ path, patchKey, ordinal: z.number().int().min(0) }))
+    .min(1)
+    .max(MAX_SEGMENTS_PER_REQUEST),
 }) satisfies z.ZodType<LocalSegmentsRequest>
 // The query is never logged or counted: it is a piece of somebody's source.
 const searchBody = z.object({
@@ -139,14 +169,18 @@ const mayGenerate = (principal: Principal | null): boolean =>
  *  `viaBridge` cannot serve these. It turns anything but a `BridgeError` into a 500, and a
  *  `ProviderOperationError` carries the status the reader needs to act on — 401 to reconnect the key,
  *  429 to try again shortly — which is the mapping the database plugin's generate route makes too. */
-async function viaModels<T>(c: Context<AppEnv>, fn: (bridge: LocalGitBridge, userId: string) => Promise<T>): Promise<Response> {
+async function viaModels<T>(
+  c: Context<AppEnv>,
+  fn: (bridge: LocalGitBridge, userId: string) => Promise<T>,
+): Promise<Response> {
   if (!mayGenerate(c.get('principal'))) return respondError(c, 403, 'interactive_user_required')
   const bridge = routeCapabilityFor(c, LOCAL_GIT)
   if (!bridge) return respondError(c, 503, 'bridge-unavailable')
   try {
     return c.json(await fn(bridge, ownerId(c)))
   } catch (error) {
-    if (error instanceof BridgeError) return respondError(c, error.status, error.code, error.message ? [error.message] : undefined)
+    if (error instanceof BridgeError)
+      return respondError(c, error.status, error.code, error.message ? [error.message] : undefined)
     if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
     // Anything else is flattened, as core does for its own provider calls: an upstream exception
     // message can quote a URL or a response body (docs/integrations/provider-boundaries.md § Provider boundaries).
@@ -186,7 +220,9 @@ export const localGit = new Hono<AppEnv>()
   .get('/:id/local/new-side', (c) => {
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, LOCAL_GIT, (b) => b.newSide(id(c), path, c.req.query('scope') === 'staged' ? 'staged' : 'unstaged'))
+    return viaBridge(c, LOCAL_GIT, (b) =>
+      b.newSide(id(c), path, c.req.query('scope') === 'staged' ? 'staged' : 'unstaged'),
+    )
   })
   .post('/:id/local/stage', async (c) => {
     const p = pathsBody.safeParse(await c.req.json().catch(() => null))

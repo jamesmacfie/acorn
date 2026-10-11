@@ -34,11 +34,15 @@ describe('a loaded JSON diagnostics provider', () => {
   let running: Awaited<ReturnType<typeof initPlugins>> | null = null
 
   // A paired device, which is who the host's editor asks as.
-  const check = async (text: string, revision = 3) => createApp().fetch(new Request('http://127.0.0.1/v1/p/json-diagnostics/check', {
-    method: 'POST',
-    headers: { authorization: 'Bearer paired-device-token', 'content-type': 'application/json' },
-    body: JSON.stringify({ text, revision }),
-  }), env)
+  const check = async (text: string, revision = 3) =>
+    createApp().fetch(
+      new Request('http://127.0.0.1/v1/p/json-diagnostics/check', {
+        method: 'POST',
+        headers: { authorization: 'Bearer paired-device-token', 'content-type': 'application/json' },
+        body: JSON.stringify({ text, revision }),
+      }),
+      env,
+    )
 
   beforeAll(async () => {
     dataRoot = mkdtempSync(join(tmpdir(), 'acorn-document-services-'))
@@ -49,7 +53,8 @@ describe('a loaded JSON diagnostics provider', () => {
       DATA_DIR: dataRoot,
       ACTIVE_IDENTITY: { get: () => 'james', set: () => {}, clear: () => {} },
       DEVICES: {
-        authenticate: async (candidate: string) => candidate === 'paired-device-token' ? { deviceId: 'device-1' } : null,
+        authenticate: async (candidate: string) =>
+          candidate === 'paired-device-token' ? { deviceId: 'device-1' } : null,
       } as Env['DEVICES'],
     })
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -59,7 +64,12 @@ describe('a loaded JSON diagnostics provider', () => {
       loaded = result.loaded[0]!
       running = await initPlugins([loaded.plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore('james'), ...testCoreSeams() }),
+        core: createCoreServices({
+          db: core.db,
+          secrets: core.secrets,
+          activeIdentity: memoryIdentityStore('james'),
+          ...testCoreSeams(),
+        }),
         dataDir: dataRoot,
         env,
         loaded: new Map([[loaded.manifest.id, binding(loaded)]]),
@@ -77,21 +87,29 @@ describe('a loaded JSON diagnostics provider', () => {
 
   it('declares JSON diagnostics on its own route', () => {
     expect(loaded.manifest.contributions.documentServices).toEqual([
-      { id: 'json-syntax', label: 'JSON syntax', languageId: 'json', diagnostics: { route: '/v1/p/json-diagnostics/check' } },
+      {
+        id: 'json-syntax',
+        label: 'JSON syntax',
+        languageId: 'json',
+        diagnostics: { route: '/v1/p/json-diagnostics/check' },
+      },
     ])
   })
 
   it('marks a syntax error at a one-based position, echoes the revision, and clears once the JSON is fixed', async () => {
     const broken = await check('{\n  "a": 1,\n}', 5)
     expect(broken.status).toBe(200)
-    const answer = await broken.json() as { revision: number; items: { range: { start: { line: number; column: number } }; severity: string; source: string }[] }
+    const answer = (await broken.json()) as {
+      revision: number
+      items: { range: { start: { line: number; column: number } }; severity: string; source: string }[]
+    }
     expect(answer.revision).toBe(5)
     expect(answer.items).toHaveLength(1)
     expect(answer.items[0]).toMatchObject({ severity: 'error', source: 'JSON.parse', range: { start: { line: 3 } } })
 
     expect(await (await check('{\n  "a": 1\n}', 6)).json()).toEqual({ revision: 6, items: [] })
     // V8 leaves the position out of an "Unexpected token" message. The mark still lands on the token.
-    const token = await (await check('{\n  "items": [1, 2,]\n}', 7)).json() as typeof answer
+    const token = (await (await check('{\n  "items": [1, 2,]\n}', 7)).json()) as typeof answer
     expect(token.items[0]!.range).toEqual({ start: { line: 2, column: 18 }, end: { line: 2, column: 19 } })
   })
 })

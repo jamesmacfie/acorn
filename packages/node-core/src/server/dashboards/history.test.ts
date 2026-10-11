@@ -1,14 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '../../testkit/db'
-import {
-  appendSample,
-  compactHistory,
-  DAY_MS,
-  HOUR_MS,
-  HOURLY_RETENTION_MS,
-  hourBucket,
-  readSeries,
-} from './history'
+import { appendSample, compactHistory, DAY_MS, HOUR_MS, HOURLY_RETENTION_MS, hourBucket, readSeries } from './history'
 
 // The store's own arithmetic, against a fake clock. Nothing here samples anything: the pass that
 // produces values is sampler.test.ts. These are the retention and invalidation rules on their own,
@@ -37,9 +29,22 @@ describe('appending', () => {
   it('relabels a series written under the signature it adopts instead of resetting it', async () => {
     const bucket = hourBucket(NOW)
     await write('p1', bucket, 6, 'before-query-identity')
-    const result = await appendSample(test.db, { panelId: 'p1', signature: 'with-query-identity', adopt: 'before-query-identity', bucket: bucket + HOUR_MS, value: 7, recordedAt: bucket })
+    const result = await appendSample(test.db, {
+      panelId: 'p1',
+      signature: 'with-query-identity',
+      adopt: 'before-query-identity',
+      bucket: bucket + HOUR_MS,
+      value: 7,
+      recordedAt: bucket,
+    })
     expect(result.reset).toBe(false)
-    expect(await readSeries(test.db, 'p1')).toEqual({ signature: 'with-query-identity', samples: [{ bucket, value: 6 }, { bucket: bucket + HOUR_MS, value: 7 }] })
+    expect(await readSeries(test.db, 'p1')).toEqual({
+      signature: 'with-query-identity',
+      samples: [
+        { bucket, value: 6 },
+        { bucket: bucket + HOUR_MS, value: 7 },
+      ],
+    })
   })
 
   it('keeps one sample per bucket, and a later look wins', async () => {
@@ -63,12 +68,19 @@ describe('appending', () => {
     await write('p1', base - HOUR_MS, 1, 'before')
     await write('p1', base, 2, 'before')
     const { reset } = await appendSample(test.db, {
-      panelId: 'p1', signature: 'after', bucket: base + HOUR_MS, value: 9, recordedAt: base + HOUR_MS,
+      panelId: 'p1',
+      signature: 'after',
+      bucket: base + HOUR_MS,
+      value: 9,
+      recordedAt: base + HOUR_MS,
     })
     expect(reset).toBe(true)
     // The old series is gone rather than left beside the new one: a filter added yesterday makes
     // last week's samples a lie, and a visibly restarting trend is the honest rendering of that.
-    expect(await readSeries(test.db, 'p1')).toEqual({ signature: 'after', samples: [{ bucket: base + HOUR_MS, value: 9 }] })
+    expect(await readSeries(test.db, 'p1')).toEqual({
+      signature: 'after',
+      samples: [{ bucket: base + HOUR_MS, value: 9 }],
+    })
   })
 
   it('leaves other panels alone when one resets', async () => {
@@ -95,7 +107,10 @@ describe('compaction', () => {
     expect(result.collapsed).toBe(2)
     const samples = (await readSeries(test.db, 'p1')).samples
     // The day's last value, not an average (docs/dashboards/sampling.md § Sampling and retention).
-    expect(samples).toEqual([{ bucket: day + 23 * HOUR_MS, value: 30 }, { bucket: recent, value: 99 }])
+    expect(samples).toEqual([
+      { bucket: day + 23 * HOUR_MS, value: 30 },
+      { bucket: recent, value: 99 },
+    ])
   })
 
   it('drops daily samples past the long window', async () => {

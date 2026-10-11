@@ -242,15 +242,17 @@ export const terminalCommands: readonly ContributedCommand[] = [
     requires: { plugin: 'terminal' },
     placeholder: 'Find a terminal…',
     // No fetch here: Terminal's session store already keeps this roster in step with the node.
-    ...localSearch((context) => sessions()
-      .filter((session) => session.taskId === context.taskId)
-      .map((session): CommandSearchItem => ({
-        id: session.id,
-        title: session.title,
-        subtitle: session.command,
-        ...(session.status === 'exited' ? { badge: 'exited' } : {}),
-        ref: session.id,
-      }))),
+    ...localSearch((context) =>
+      sessions()
+        .filter((session) => session.taskId === context.taskId)
+        .map((session): CommandSearchItem => ({
+          id: session.id,
+          title: session.title,
+          subtitle: session.command,
+          ...(session.status === 'exited' ? { badge: 'exited' } : {}),
+          ref: session.id,
+        })),
+    ),
     select: (item, context): CommandOutcome => {
       const taskId = context.taskId
       if (!taskId) return COMMAND_CLOSED

@@ -87,7 +87,8 @@ class AgentToolRegistry {
   // be an agent calling a tool it didn't mean to.
   register(owner: string, tool: AgentToolContribution): Disposable {
     const clash = this.#registrations.find((r) => r.tool.name === tool.name)
-    if (clash) throw new Error(`Duplicate agent tool '${tool.name}': already registered by '${clash.owner}', now by '${owner}'.`)
+    if (clash)
+      throw new Error(`Duplicate agent tool '${tool.name}': already registered by '${clash.owner}', now by '${owner}'.`)
     const registration = { owner, tool }
     this.#registrations.push(registration)
     return {
@@ -119,7 +120,8 @@ class AgentToolRegistry {
 
 const registry = new AgentToolRegistry()
 
-export const registerAgentTool = (owner: string, tool: AgentToolContribution): Disposable => registry.register(owner, tool)
+export const registerAgentTool = (owner: string, tool: AgentToolContribution): Disposable =>
+  registry.register(owner, tool)
 export const removeAgentTools = (owner: string): void => registry.remove(owner)
 export const agentToolContributions = (): readonly AgentToolContribution[] => registry.list()
 /** Who contributed the tool of this name, for the `tool.call` span. `core` for a name nobody

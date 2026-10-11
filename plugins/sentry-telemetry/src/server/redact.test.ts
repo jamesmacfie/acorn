@@ -27,15 +27,26 @@ describe('redactRecord', () => {
   })
 
   it('drops task ids when the owner turned them off', () => {
-    const event: TelemetryRecord = { kind: 'event', at: 0, name: 'notice.delivered', attrs: { 'task.id': 'task-7', kind: 'agent' } }
+    const event: TelemetryRecord = {
+      kind: 'event',
+      at: 0,
+      name: 'notice.delivered',
+      attrs: { 'task.id': 'task-7', kind: 'agent' },
+    }
     expect(redactRecord(event, { taskIds: false, stacks: true }).attrs).toEqual({ kind: 'agent' })
     expect(redactRecord(event, both).attrs).toEqual({ 'task.id': 'task-7', kind: 'agent' })
   })
 
   it('removes the stack key entirely when stacks are off', () => {
     const failure: TelemetryRecord = {
-      kind: 'error', at: 0, name: 'TypeError', message: 'boom', stack: 'TypeError: boom\n    at x (/a/b.ts:1:1)',
-      level: 'error', handled: true, attrs: {},
+      kind: 'error',
+      at: 0,
+      name: 'TypeError',
+      message: 'boom',
+      stack: 'TypeError: boom\n    at x (/a/b.ts:1:1)',
+      level: 'error',
+      handled: true,
+      attrs: {},
     }
     expect(redactRecord(failure, { taskIds: true, stacks: false })).not.toHaveProperty('stack')
     expect(redactRecord(failure, both)).toHaveProperty('stack')
@@ -47,7 +58,14 @@ describe('redactRecord', () => {
   })
 
   it('leaves an ordinary record alone', () => {
-    const log: TelemetryRecord = { kind: 'log', at: 3, level: 'info', logger: 'schedules', body: 'ran', attrs: { owner: 'core' } }
+    const log: TelemetryRecord = {
+      kind: 'log',
+      at: 3,
+      level: 'info',
+      logger: 'schedules',
+      body: 'ran',
+      attrs: { owner: 'core' },
+    }
     expect(redactRecord(log, both)).toEqual(log)
   })
 })

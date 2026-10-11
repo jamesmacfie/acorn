@@ -8,11 +8,7 @@ import {
   validateAgentConcurrency,
   type AgentConcurrencyLimits,
 } from '../../shared/concurrency'
-import {
-  agentConcurrencyOptions,
-  agentConcurrencyQueryKey,
-  saveAgentConcurrency,
-} from './concurrencyClient'
+import { agentConcurrencyOptions, agentConcurrencyQueryKey, saveAgentConcurrency } from './concurrencyClient'
 
 // Settings → Agents → Limits and cost, its first section: the two ceilings the turn dispatcher counts
 // against (docs/managed-agents/operations.md § Operations and failure). Each field saves on its own, on blur or
@@ -23,18 +19,19 @@ export default function AgentConcurrencySettings() {
   const queryClient = useQueryClient()
   const limits = createQuery(() => agentConcurrencyOptions())
 
-  const ceiling = (key: keyof AgentConcurrencyLimits) => createTextSetting({
-    value: () => (limits.data ? String(limits.data[key]) : ''),
-    save: async (value) => {
-      const stored = limits.data
-      if (!stored) throw new Error('Agent concurrency has not loaded.')
-      // The same validator the route runs, so a bad number is refused beside the field rather than
-      // by a 400, and the field keeps what was typed.
-      const result = validateAgentConcurrency({ ...stored, [key]: Number(value) })
-      if (!result.ok) throw new Error(result.errors.join(' '))
-      queryClient.setQueryData(agentConcurrencyQueryKey, await saveAgentConcurrency(result.value))
-    },
-  })
+  const ceiling = (key: keyof AgentConcurrencyLimits) =>
+    createTextSetting({
+      value: () => (limits.data ? String(limits.data[key]) : ''),
+      save: async (value) => {
+        const stored = limits.data
+        if (!stored) throw new Error('Agent concurrency has not loaded.')
+        // The same validator the route runs, so a bad number is refused beside the field rather than
+        // by a 400, and the field keeps what was typed.
+        const result = validateAgentConcurrency({ ...stored, [key]: Number(value) })
+        if (!result.ok) throw new Error(result.errors.join(' '))
+        queryClient.setQueryData(agentConcurrencyQueryKey, await saveAgentConcurrency(result.value))
+      },
+    })
   const provider = ceiling('provider')
   const workspace = ceiling('workspace')
   // The built-in ceilings are what the node runs on with nothing stored, so Reset goes back to them.
@@ -45,9 +42,7 @@ export default function AgentConcurrencySettings() {
   return (
     <>
       <Show when={limits.error}>
-        <Alert>
-          {limits.error instanceof Error ? limits.error.message : 'Agent concurrency could not be loaded.'}
-        </Alert>
+        <Alert>{limits.error instanceof Error ? limits.error.message : 'Agent concurrency could not be loaded.'}</Alert>
       </Show>
       <SettingsSection
         id="limits"

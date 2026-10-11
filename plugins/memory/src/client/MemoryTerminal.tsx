@@ -11,11 +11,16 @@ export default function MemoryTerminal(props: { body: string; onExit: (body?: st
   const io: PtyIo = {
     open: ({ cols, rows }, onEvent) => {
       listeners.set(id, (frame) => {
-        if (frame.channel === 'memory:editor:out' && typeof frame.data === 'string') onEvent({ kind: 'out', data: frame.data })
+        if (frame.channel === 'memory:editor:out' && typeof frame.data === 'string')
+          onEvent({ kind: 'out', data: frame.data })
         if (frame.channel === 'memory:editor:exit') props.onExit(frame.code === 0 ? frame.body : undefined)
       })
-      wsConnect(); wsSend({ channel: 'memory:editor:open', id, body: props.body, cols, rows })
-      return () => { listeners.delete(id); wsSend({ channel: 'memory:editor:kill', id }) }
+      wsConnect()
+      wsSend({ channel: 'memory:editor:open', id, body: props.body, cols, rows })
+      return () => {
+        listeners.delete(id)
+        wsSend({ channel: 'memory:editor:kill', id })
+      }
     },
     input: (data) => wsSend({ channel: 'memory:editor:input', id, data }),
     resize: ({ cols, rows }) => wsSend({ channel: 'memory:editor:resize', id, cols, rows }),

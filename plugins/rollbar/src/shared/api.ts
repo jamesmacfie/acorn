@@ -63,7 +63,16 @@ export type RollbarItemMetadata = RollbarItemSummary & {
 // Person is flattened to the username only: list rows never carry emails into the cache.
 export type RollbarOccurrenceSummary = Pick<
   RollbarOccurrenceDetail,
-  'id' | 'occurredAt' | 'uuid' | 'url' | 'kind' | 'exceptionClass' | 'message' | 'environment' | 'codeVersion' | 'request'
+  | 'id'
+  | 'occurredAt'
+  | 'uuid'
+  | 'url'
+  | 'kind'
+  | 'exceptionClass'
+  | 'message'
+  | 'environment'
+  | 'codeVersion'
+  | 'request'
 > & { personUsername: string | null }
 
 export type RollbarOccurrencesResponse = {
@@ -93,12 +102,20 @@ export const rollbarItemMetadataRoute = (integrationId: string, identifier: stri
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/detail?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarOccurrencesRoute = (integrationId: string, identifier: string, refresh = false) =>
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
-export const rollbarOccurrenceRoute = (integrationId: string, identifier: string, occurrenceId: string, refresh = false) =>
+export const rollbarOccurrenceRoute = (
+  integrationId: string,
+  identifier: string,
+  occurrenceId: string,
+  refresh = false,
+) =>
   `/v1/p/rollbar/items/${encodeURIComponent(identifier)}/occurrences/${encodeURIComponent(occurrenceId)}?integration=${encodeURIComponent(integrationId)}${refresh ? '&refresh=true' : ''}`
 export const rollbarItemsKey = (integrationIds: readonly string[]) =>
   ['rollbar-items', 'connections', ...[...new Set(integrationIds)].sort()] as const
-export const rollbarItemKey = (integrationId: string, identifier: string) => ['rollbar-item', integrationId, identifier] as const
-export const rollbarItemMetadataKey = (integrationId: string, identifier: string) => ['rollbar-item-metadata', integrationId, identifier] as const
-export const rollbarOccurrencesKey = (integrationId: string, identifier: string) => ['rollbar-occurrences', integrationId, identifier] as const
+export const rollbarItemKey = (integrationId: string, identifier: string) =>
+  ['rollbar-item', integrationId, identifier] as const
+export const rollbarItemMetadataKey = (integrationId: string, identifier: string) =>
+  ['rollbar-item-metadata', integrationId, identifier] as const
+export const rollbarOccurrencesKey = (integrationId: string, identifier: string) =>
+  ['rollbar-occurrences', integrationId, identifier] as const
 export const rollbarOccurrenceKey = (integrationId: string, identifier: string, occurrenceId: string) =>
   ['rollbar-occurrence', integrationId, identifier, occurrenceId] as const

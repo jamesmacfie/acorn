@@ -48,8 +48,12 @@ describe('a browse list longer than its panel', () => {
       // (./browseSlow.test.tsx is the test that reaches that shape on purpose) — kept because it is one line and it catches a regression for free.
       const logged: string[] = []
       const [error, warn] = [console.error, console.warn]
-      console.error = (...args: unknown[]) => { logged.push(args.map(String).join(' ')) }
-      console.warn = (...args: unknown[]) => { logged.push(args.map(String).join(' ')) }
+      console.error = (...args: unknown[]) => {
+        logged.push(args.map(String).join(' '))
+      }
+      console.warn = (...args: unknown[]) => {
+        logged.push(args.map(String).join(' '))
+      }
       for (let step = 0; step < 6; step += 1) await screen.press('ARROW_DOWN')
       await screen.frame()
       screen.done()

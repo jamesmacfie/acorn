@@ -76,7 +76,8 @@ export function readConfigFileSync(path: string): string {
   try {
     const stat = fstatSync(fd)
     if (!stat.isFile()) throw new Error(`${path} is not a regular file.`)
-    const tooLarge = () => new Error(`${path} is larger than the ${MAX_CONFIG_FILE_BYTES}-byte limit for configuration files.`)
+    const tooLarge = () =>
+      new Error(`${path} is larger than the ${MAX_CONFIG_FILE_BYTES}-byte limit for configuration files.`)
     if (stat.size > MAX_CONFIG_FILE_BYTES) throw tooLarge()
     // Count what is actually read too: the file can grow after the stat.
     const chunks: Buffer[] = []

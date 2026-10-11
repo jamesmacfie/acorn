@@ -118,7 +118,7 @@ function edgeControl(from: GraphPoint, to: GraphPoint, cards: readonly PlacedCar
     }
   }
   if (bestStart === -1) return { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
-  const ratio = ((bestStart + bestEnd) / 2) / (EDGE_SAMPLES - 1)
+  const ratio = (bestStart + bestEnd) / 2 / (EDGE_SAMPLES - 1)
   return { x: from.x + (to.x - from.x) * ratio, y: from.y + (to.y - from.y) * ratio }
 }
 

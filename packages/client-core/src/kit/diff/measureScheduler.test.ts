@@ -11,13 +11,21 @@ let frames: (() => void)[] = []
 let observers: { callback: ResizeObserverCallback; watched: Set<unknown>; disconnected: boolean }[] = []
 
 class ModelResizeObserver {
-  private readonly own = { callback: (() => {}) as ResizeObserverCallback, watched: new Set<unknown>(), disconnected: false }
+  private readonly own = {
+    callback: (() => {}) as ResizeObserverCallback,
+    watched: new Set<unknown>(),
+    disconnected: false,
+  }
   constructor(callback: ResizeObserverCallback) {
     this.own.callback = callback
     observers.push(this.own)
   }
-  observe(element: unknown) { this.own.watched.add(element) }
-  unobserve(element: unknown) { this.own.watched.delete(element) }
+  observe(element: unknown) {
+    this.own.watched.add(element)
+  }
+  unobserve(element: unknown) {
+    this.own.watched.delete(element)
+  }
   disconnect() {
     this.own.disconnected = true
     this.own.watched.clear()
@@ -28,7 +36,11 @@ class ModelResizeObserver {
 const report = (...elements: Fake[]) => {
   for (const observer of observers) {
     const due = elements.filter((element) => observer.watched.has(element))
-    if (due.length && !observer.disconnected) observer.callback(due.map((target) => ({ target, contentRect: { width: 800, height: 600 } })) as unknown as ResizeObserverEntry[], {} as ResizeObserver)
+    if (due.length && !observer.disconnected)
+      observer.callback(
+        due.map((target) => ({ target, contentRect: { width: 800, height: 600 } })) as unknown as ResizeObserverEntry[],
+        {} as ResizeObserver,
+      )
   }
 }
 

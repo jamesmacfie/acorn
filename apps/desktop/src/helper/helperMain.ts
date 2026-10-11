@@ -131,7 +131,8 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
       frame: (nodeId, frame, viewerId) => server?.push({ push: 'node-frame', nodeId, frame }, viewerId),
       bytes: (nodeId, frame, viewerId) => server?.pushBytes(nodeId, frame, viewerId),
       status: (status) => server?.push({ push: 'node-status', status }),
-      transportError: (nodeId, error, viewerId) => server?.push({ push: 'node-transport-error', nodeId, error }, viewerId),
+      transportError: (nodeId, error, viewerId) =>
+        server?.push({ push: 'node-transport-error', nodeId, error }, viewerId),
     },
     // The renderer is told and reloads itself. The node it was talking to has a new endpoint,
     // certificate, and token.
@@ -178,29 +179,40 @@ let queue: Promise<unknown> = Promise.resolve()
 createInterface({ input: process.stdin }).on('line', (line) => {
   const trimmed = line.trim()
   if (!trimmed) return
-  queue = queue.then(async () => {
-    if (!booted) {
-      const handshake = handshakeSchema.parse(JSON.parse(trimmed))
-      helperMark('handshake')
-      booted = boot(handshake)
-      const { server } = await booted
-      // The ready line. `nodeVersion` lets Rust check that the runtime pin it shipped is the runtime
-      // that booted.
-      console.log(JSON.stringify({ [TAG]: 'ready', protocol: HELPER_PROTOCOL, port: server.port, secret: server.secret, nodeVersion: process.version }))
-      // The line Rust has been blocked on since it spawned this process, so this offset is the whole of
-      // the shell's wait before it creates the window (docs/shell.md, "The shell process").
-      helperMark('ready line')
-      return
-    }
-    const parsed = commandSchema.parse(JSON.parse(trimmed))
-    if (parsed.command === 'stop') return stop(0)
-    if (parsed.command === 'footprint') return (await booted).helper.footprint({ renderer: parsed.renderer, helper: parsed.helper })
-    // The owner's answer to the recovery screen. Forgive the spent budget and try once more.
-    await (await booted).helper.retry()
-  }).catch((error: unknown) => {
-    log.error(`failed: ${describeError(error).message}`)
-    void stop(1)
-  })
+  queue = queue
+    .then(async () => {
+      if (!booted) {
+        const handshake = handshakeSchema.parse(JSON.parse(trimmed))
+        helperMark('handshake')
+        booted = boot(handshake)
+        const { server } = await booted
+        // The ready line. `nodeVersion` lets Rust check that the runtime pin it shipped is the runtime
+        // that booted.
+        console.log(
+          JSON.stringify({
+            [TAG]: 'ready',
+            protocol: HELPER_PROTOCOL,
+            port: server.port,
+            secret: server.secret,
+            nodeVersion: process.version,
+          }),
+        )
+        // The line Rust has been blocked on since it spawned this process, so this offset is the whole of
+        // the shell's wait before it creates the window (docs/shell.md, "The shell process").
+        helperMark('ready line')
+        return
+      }
+      const parsed = commandSchema.parse(JSON.parse(trimmed))
+      if (parsed.command === 'stop') return stop(0)
+      if (parsed.command === 'footprint')
+        return (await booted).helper.footprint({ renderer: parsed.renderer, helper: parsed.helper })
+      // The owner's answer to the recovery screen. Forgive the spent budget and try once more.
+      await (await booted).helper.retry()
+    })
+    .catch((error: unknown) => {
+      log.error(`failed: ${describeError(error).message}`)
+      void stop(1)
+    })
 })
 
 // A shell that died takes its end of these pipes with it, and the next `console.log` in the drain

@@ -23,9 +23,16 @@ beforeEach(() => {
     prefs: { read: async () => preference },
     tasks: { load: async () => ({ id: 'task', projectId: 'project' }), requireRoot: async () => dir },
   } as unknown as CoreServices
-  admission = new InstructionAdmission(core, dir, new InstructionReviewStore(testDb.db, new SecretService('33'.repeat(32))))
+  admission = new InstructionAdmission(
+    core,
+    dir,
+    new InstructionReviewStore(testDb.db, new SecretService('33'.repeat(32))),
+  )
 })
-afterEach(() => { testDb.cleanup(); rmSync(dir, { recursive: true, force: true }) })
+afterEach(() => {
+  testDb.cleanup()
+  rmSync(dir, { recursive: true, force: true })
+})
 
 it('does no scan when disabled; enabled checks stop on hidden input and incomplete reads', async () => {
   writeFileSync(join(dir, 'AGENTS.md'), 'x'.repeat(1_000_001))
@@ -75,7 +82,7 @@ it('still requires approval when the scan scope changes but the file text does n
   await expect(admission.admit('task')).rejects.toMatchObject({ code: 'instruction_review_required' })
 })
 
-it('requires a separate review for copied project instructions and rejects approving another project\'s review', async () => {
+it("requires a separate review for copied project instructions and rejects approving another project's review", async () => {
   preference = JSON.stringify({ reviewChangedInstructions: true })
   writeFileSync(join(dir, 'AGENTS.md'), 'Same bytes.\n')
   const approved = await admission.review('task')
@@ -84,10 +91,15 @@ it('requires a separate review for copied project instructions and rejects appro
   mkdirSync(otherRoot)
   writeFileSync(join(otherRoot, 'AGENTS.md'), 'Same bytes.\n')
   // Identical text at a different canonical path is a different instruction snapshot.
-  const different = new InstructionAdmission({
-    identity: { active: () => 'owner' }, prefs: { read: async () => preference },
-    tasks: { load: async () => ({ id: 'other', projectId: 'other-project' }), requireRoot: async () => otherRoot },
-  } as unknown as CoreServices, dir, admission.store)
+  const different = new InstructionAdmission(
+    {
+      identity: { active: () => 'owner' },
+      prefs: { read: async () => preference },
+      tasks: { load: async () => ({ id: 'other', projectId: 'other-project' }), requireRoot: async () => otherRoot },
+    } as unknown as CoreServices,
+    dir,
+    admission.store,
+  )
   await expect(different.admit('other')).rejects.toThrow(/review required/)
   await expect(different.approve('other', approved.id!)).rejects.toThrow(/changed/)
 })
@@ -102,12 +114,21 @@ it('reuses exact shared skills across projects, but detects changed skills and a
   const project = (id: string) => {
     const root = join(dir, id)
     mkdirSync(root)
-    return { root, admission: new InstructionAdmission({
-      identity: { active: () => 'owner' }, prefs: { read: async () => preference },
-      tasks: { load: async () => ({ id, projectId: id }), requireRoot: async () => root },
-    } as unknown as CoreServices, dir, admission.store) }
+    return {
+      root,
+      admission: new InstructionAdmission(
+        {
+          identity: { active: () => 'owner' },
+          prefs: { read: async () => preference },
+          tasks: { load: async () => ({ id, projectId: id }), requireRoot: async () => root },
+        } as unknown as CoreServices,
+        dir,
+        admission.store,
+      ),
+    }
   }
-  const first = project('first'), second = project('second')
+  const first = project('first'),
+    second = project('second')
   const review = await first.admission.review('first')
   await expect(second.admission.admit('second')).rejects.toMatchObject({ code: 'instruction_review_required' })
   await first.admission.approve('first', review.id!)
@@ -149,10 +170,15 @@ it('shows findings for changed files without repeating an unchanged baseline fin
 
 it('cancels before task discovery or encrypted review state is read or written', async () => {
   const taskLoads = vi.fn(async () => ({ id: 'task', projectId: 'project' }))
-  const cancelled = new InstructionAdmission({
-    identity: { active: () => 'owner' }, prefs: { read: vi.fn() },
-    tasks: { load: taskLoads, requireRoot: vi.fn(async () => dir) },
-  } as unknown as CoreServices, dir, admission.store)
+  const cancelled = new InstructionAdmission(
+    {
+      identity: { active: () => 'owner' },
+      prefs: { read: vi.fn() },
+      tasks: { load: taskLoads, requireRoot: vi.fn(async () => dir) },
+    } as unknown as CoreServices,
+    dir,
+    admission.store,
+  )
   const read = vi.spyOn(admission.store, 'get')
   const save = vi.spyOn(admission.store, 'save')
   const approve = vi.spyOn(admission.store, 'approve')

@@ -1,4 +1,10 @@
-import { pluginCustody, type PluginDevGrantRequest, type PluginHostState, type PluginPutResult, type PluginTrustDecision } from '../../infra/platform'
+import {
+  pluginCustody,
+  type PluginDevGrantRequest,
+  type PluginHostState,
+  type PluginPutResult,
+  type PluginTrustDecision,
+} from '../../infra/platform'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 
 // The client's platform adapter for third-party plugin bundles

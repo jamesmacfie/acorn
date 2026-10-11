@@ -37,7 +37,10 @@ const answer = (nodeId: string, data: NodeProvidersResponse): FleetRow<NodeProvi
   freshness: 'live',
 })
 
-const result = (...rows: FleetRow<NodeProvidersResponse>[]): FleetResult<NodeProvidersResponse> => ({ rows, unavailable: [] })
+const result = (...rows: FleetRow<NodeProvidersResponse>[]): FleetResult<NodeProvidersResponse> => ({
+  rows,
+  unavailable: [],
+})
 
 const cloud = { id: 'cloud:machines', label: 'Acme Cloud', verbs: ['create', 'destroy', 'start', 'stop'] as const }
 
@@ -45,8 +48,16 @@ describe('mergeProvidedNodes', () => {
   it('unions what every node answered, carrying which node listed each row', () => {
     const merged = mergeProvidedNodes(
       result(
-        answer('node-a', { providers: [{ ...cloud, verbs: [...cloud.verbs] }], nodes: [{ ...provided('m-1'), providerId: cloud.id }], failures: [] }),
-        answer('node-b', { providers: [{ id: 'file:file', label: 'From a file', verbs: [] }], nodes: [{ ...provided('f-1'), providerId: 'file:file' }], failures: [] }),
+        answer('node-a', {
+          providers: [{ ...cloud, verbs: [...cloud.verbs] }],
+          nodes: [{ ...provided('m-1'), providerId: cloud.id }],
+          failures: [],
+        }),
+        answer('node-b', {
+          providers: [{ id: 'file:file', label: 'From a file', verbs: [] }],
+          nodes: [{ ...provided('f-1'), providerId: 'file:file' }],
+          failures: [],
+        }),
       ),
       [],
     )
@@ -61,7 +72,11 @@ describe('mergeProvidedNodes', () => {
   })
 
   it('shows one row when two nodes list the same machine, and asks the first one', () => {
-    const both = { providers: [{ ...cloud, verbs: [...cloud.verbs] }], nodes: [{ ...provided('m-1'), providerId: cloud.id }], failures: [] }
+    const both = {
+      providers: [{ ...cloud, verbs: [...cloud.verbs] }],
+      nodes: [{ ...provided('m-1'), providerId: cloud.id }],
+      failures: [],
+    }
     const merged = mergeProvidedNodes(result(answer('node-a', both), answer('node-b', both)), [])
     expect(merged).toHaveLength(1)
     // Fleet order, not completion order: the row does not reshuffle when the other node answers faster,
@@ -71,11 +86,19 @@ describe('mergeProvidedNodes', () => {
 
   it('does not confuse two providers that use the same node id', () => {
     const merged = mergeProvidedNodes(
-      result(answer('node-a', {
-        providers: [{ ...cloud, verbs: [] }, { id: 'file:file', label: 'From a file', verbs: [] }],
-        nodes: [{ ...provided('m-1'), providerId: cloud.id }, { ...provided('m-1'), providerId: 'file:file' }],
-        failures: [],
-      })),
+      result(
+        answer('node-a', {
+          providers: [
+            { ...cloud, verbs: [] },
+            { id: 'file:file', label: 'From a file', verbs: [] },
+          ],
+          nodes: [
+            { ...provided('m-1'), providerId: cloud.id },
+            { ...provided('m-1'), providerId: 'file:file' },
+          ],
+          failures: [],
+        }),
+      ),
       [],
     )
     // Deduped on the pair, not on `providerNodeId` alone: two control planes number their nodes
@@ -107,12 +130,20 @@ describe('the provider summaries a fleet surface draws from', () => {
   it('offers one create target per provider, deduped across the nodes that report it', () => {
     const withCreate = { providers: [{ ...cloud, verbs: [...cloud.verbs] }], nodes: [], failures: [] }
     const noCreate = { providers: [{ id: 'file:file', label: 'From a file', verbs: [] }], nodes: [], failures: [] }
-    const targets = creatableProviders(result(answer('node-a', withCreate), answer('node-b', withCreate), answer('node-c', noCreate)))
+    const targets = creatableProviders(
+      result(answer('node-a', withCreate), answer('node-b', withCreate), answer('node-c', noCreate)),
+    )
     expect(targets.map((target) => [target.id, target.sourceNodeId])).toEqual([[cloud.id, 'node-a']])
   })
 
   it('reports a provider that could not answer, and stays hidden when there is no provider at all', () => {
-    const failing = result(answer('node-a', { providers: [{ ...cloud, verbs: [] }], nodes: [], failures: [{ providerId: cloud.id, reason: 'timed out' }] }))
+    const failing = result(
+      answer('node-a', {
+        providers: [{ ...cloud, verbs: [] }],
+        nodes: [],
+        failures: [{ providerId: cloud.id, reason: 'timed out' }],
+      }),
+    )
     expect(providerFailures(failing)).toEqual([{ providerId: cloud.id, reason: 'timed out' }])
     expect(hasNodeProviders(failing)).toBe(true)
     // An install with no cloud plugin: every node answers an empty list, and the whole section is

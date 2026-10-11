@@ -3,7 +3,12 @@
 //
 // This module holds no JSX import (docs/frontend/registries.md § Registries and plugins): the host that draws
 // these rows lives in `./contextMenuHost.tsx`, a `<For>` over `contextMenuItems()`.
-import { fileExtensionFact, matchesWhen, type ContextMenuLocation, type SelectionContentKind } from '@acorn/protocol/contextMenus.ts'
+import {
+  fileExtensionFact,
+  matchesWhen,
+  type ContextMenuLocation,
+  type SelectionContentKind,
+} from '@acorn/protocol/contextMenus.ts'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 import { sourceRegistry } from '../sources/sources'
@@ -172,8 +177,15 @@ export type ContentSelectionTarget = {
 }
 
 export type ContextMenuTarget =
-  | TaskRowTarget | ItemRowTarget | RailSourceTarget | RailPaneTarget | FileRowTarget | DocumentTabTarget
-  | AgentMessageTarget | AgentTurnTarget | ContentSelectionTarget
+  | TaskRowTarget
+  | ItemRowTarget
+  | RailSourceTarget
+  | RailPaneTarget
+  | FileRowTarget
+  | DocumentTabTarget
+  | AgentMessageTarget
+  | AgentTurnTarget
+  | ContentSelectionTarget
 
 /** The target one location hands its rows. */
 export type TargetAt<L extends ContextMenuLocation> = Extract<ContextMenuTarget, { location: L }>
@@ -200,7 +212,9 @@ const ownsRailTarget = (item: ContextMenuContribution, target: ContextMenuTarget
   const owner = contextMenuRegistry.ownerOf(item.id)
   if (!owner) return true // Host actions are registered without a plugin owner.
   if (item.surface !== target.id) return false
-  return (target.location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)) === owner
+  return (
+    (target.location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)) === owner
+  )
 }
 
 /** The rows this location offers for this target, in declared order. Ties break on id so two
@@ -210,7 +224,8 @@ export const contextMenuItems = <L extends ContextMenuLocation>(
   location: L,
   target: TargetAt<L>,
 ): ContextMenuContribution[] =>
-  contextMenuRegistry.entries()
+  contextMenuRegistry
+    .entries()
     .filter((item) => item.location === location && ownsRailTarget(item, target) && (item.when?.(target) ?? true))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
@@ -230,8 +245,15 @@ export function registerContextMenuItems<L extends ContextMenuLocation>(
 /** What the menu log calls a target: a file by its path, a message or turn by its own id, and a
  *  selection by its owner and kind, never its text. */
 const targetName = (target: ContextMenuTarget): string =>
-  target.location === 'content.selection' ? `${target.ownerId} ${target.contentKind}`
-    : 'path' in target ? target.path : 'itemId' in target ? target.itemId : 'id' in target ? target.id : target.turnId
+  target.location === 'content.selection'
+    ? `${target.ownerId} ${target.contentKind}`
+    : 'path' in target
+      ? target.path
+      : 'itemId' in target
+        ? target.itemId
+        : 'id' in target
+          ? target.id
+          : target.turnId
 
 /** Run one row's action. A contribution's `run` is other people's code (core's own closures today, a
  *  plugin's verb dispatch tomorrow), and a menu row that throws must not take the shell's click
@@ -254,7 +276,7 @@ export function runContextMenuItem<L extends ContextMenuLocation>(
 /** A declared `when` compiled into a predicate. Exported because it is the half of a plugin
  *  contribution that has no other observable effect: the chrome pass hands the result to the registry,
  *  where a test can only see whether a row appeared. */
-export const compileWhen = (
-  when: Readonly<Record<string, string | boolean>> | undefined,
-): ((target: ContextMenuTarget) => boolean) =>
-  (target) => matchesWhen(when, target as unknown as Record<string, unknown>)
+export const compileWhen =
+  (when: Readonly<Record<string, string | boolean>> | undefined): ((target: ContextMenuTarget) => boolean) =>
+  (target) =>
+    matchesWhen(when, target as unknown as Record<string, unknown>)

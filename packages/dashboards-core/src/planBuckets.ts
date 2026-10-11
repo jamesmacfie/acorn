@@ -20,24 +20,36 @@ function dateFormatter(zone: string): Intl.DateTimeFormat {
   return formatter
 }
 
-export function bucketValue(value: DataValue | undefined, bucket: 'value' | 'day' | 'week' | 'month', zone: string, weekStart: PanelPlan['time']['weekStart']): DataValue {
+export function bucketValue(
+  value: DataValue | undefined,
+  bucket: 'value' | 'day' | 'week' | 'month',
+  zone: string,
+  weekStart: PanelPlan['time']['weekStart'],
+): DataValue {
   if (bucket === 'value' || value == null) return value ?? null
   const date = instant(value)
   if (date === undefined) return null
   const parts = dateFormatter(zone).formatToParts(date)
-  const part = (name: string) => parts.find(item => item.type === name)?.value ?? ''
-  const day = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : `${part('year')}-${part('month')}-${part('day')}`
+  const part = (name: string) => parts.find((item) => item.type === name)?.value ?? ''
+  const day =
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+      ? value
+      : `${part('year')}-${part('month')}-${part('day')}`
   if (bucket === 'day') return day
   if (bucket === 'month') return day.slice(0, 7)
   const week = new Date(`${day}T12:00:00Z`)
   const first = { sunday: 0, monday: 1, saturday: 6 }[weekStart]
-  week.setUTCDate(week.getUTCDate() - (week.getUTCDay() - first + 7) % 7)
+  week.setUTCDate(week.getUTCDate() - ((week.getUTCDay() - first + 7) % 7))
   return week.toISOString().slice(0, 10)
 }
 
 /** Exact half-open bounds for a displayed calendar bucket, including zone offset changes. */
-export function bucketBounds(value: DataValue, bucket: 'day' | 'week' | 'month', zone: string,
-  precision: 'day' | 'instant'): { start: number | string; end: number | string } | undefined {
+export function bucketBounds(
+  value: DataValue,
+  bucket: 'day' | 'week' | 'month',
+  zone: string,
+  precision: 'day' | 'instant',
+): { start: number | string; end: number | string } | undefined {
   if (typeof value !== 'string') return undefined
   const firstDay = bucket === 'month' ? `${value}-01` : value
   if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDay)) return undefined

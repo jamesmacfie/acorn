@@ -36,11 +36,17 @@ export default function AgentStorageSection(props: { nodeId?: string | null }) {
     const timer = setInterval(() => void read(), POLL_MS)
     onCleanup(() => clearInterval(timer))
   })
-  createEffect(on(() => props.nodeId, () => {
-    setFootprint(null)
-    setStopped('')
-    void read()
-  }, { defer: true }))
+  createEffect(
+    on(
+      () => props.nodeId,
+      () => {
+        setFootprint(null)
+        setStopped('')
+        void read()
+      },
+      { defer: true },
+    ),
+  )
 
   const stopIdle = async () => {
     setStopping(true)
@@ -61,7 +67,9 @@ export default function AgentStorageSection(props: { nodeId?: string | null }) {
     { label: 'Idle', value: String(value.idle) },
     // Absent where the node cannot list processes, and with nothing running, where it would read as
     // a measurement of zero.
-    ...(value.memoryBytes == null || !value.live ? [] : [{ label: 'Memory', value: `about ${formatBytes(value.memoryBytes)}` }]),
+    ...(value.memoryBytes == null || !value.live
+      ? []
+      : [{ label: 'Memory', value: `about ${formatBytes(value.memoryBytes)}` }]),
     { label: 'Attachments', value: formatBytes(value.attachmentsBytes) },
     { label: 'Artifacts', value: formatBytes(value.artifactsBytes) },
   ]
@@ -84,15 +92,28 @@ export default function AgentStorageSection(props: { nodeId?: string | null }) {
         <Show when={error()}>
           <Alert>{error()}</Alert>
         </Show>
-        <Show when={footprint()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
+        <Show
+          when={footprint()}
+          fallback={
+            <EmptyState busy align="start" size="sm">
+              Loading…
+            </EmptyState>
+          }
+        >
           {(value) => <Facts grouping="rows" items={facts(value())} />}
         </Show>
         <Show when={stopped()}>
-          <Text emphasis="muted" wrap>{stopped()}</Text>
+          <Text emphasis="muted" wrap>
+            {stopped()}
+          </Text>
         </Show>
         {/* When idle agents stop on their own, and how long history is kept, live on that page. A
             button named after the page it opens, as every settings link to another page is. */}
-        <Button size="sm" variant="ghost" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-defaults#idle' })}>
+        <Button
+          size="sm"
+          variant="ghost"
+          onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-defaults#idle' })}
+        >
           Harnesses and defaults
         </Button>
       </Stack>

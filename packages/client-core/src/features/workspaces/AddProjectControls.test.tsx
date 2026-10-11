@@ -20,7 +20,7 @@ const state = vi.hoisted(() => ({
 vi.mock('./workspaceMutations', () => ({ createProject: state.create }))
 vi.mock('./addProject', () => ({ canAddProjectFromFolder: () => false }))
 vi.mock('../../infra/platform', async (original) => ({
-  ...await original<typeof import('../../infra/platform')>(),
+  ...(await original<typeof import('../../infra/platform')>()),
   canPickFolder: () => true,
 }))
 vi.mock('../../infra/node/activeNode', async () => {
@@ -31,18 +31,24 @@ vi.mock('../../infra/node/activeNode', async () => {
   return { activeNodeId: node }
 })
 vi.mock('../../host/registries/sources/projectImporters', () => ({
-  projectImporterContributions: () => [{
-    id: 'remote-safe', label: 'Remote importer', glyph: 'plus',
-    component: (props: { onImported: (ids?: readonly string[]) => void }) => {
-      state.imported = props.onImported
-      return <div>Importer open</div>
+  projectImporterContributions: () => [
+    {
+      id: 'remote-safe',
+      label: 'Remote importer',
+      glyph: 'plus',
+      component: (props: { onImported: (ids?: readonly string[]) => void }) => {
+        state.imported = props.onImported
+        return <div>Importer open</div>
+      },
     },
-  }],
+  ],
 }))
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -78,17 +84,37 @@ async function mount() {
       nodeId: state.activeNode,
       pathname,
       settingsOpen: () => false,
-      openProject: (id) => { source = 'home'; routes.push(projectPath(id)) },
+      openProject: (id) => {
+        source = 'home'
+        routes.push(projectPath(id))
+      },
     })
-    return <>
-      <Show when={noProjectsScreenVisible({ projectCount: projects.data?.length, projectsError: projects.isError, wizardVisible: false })}>
-        <NoProjects beginAdd={beginAdd} />
-      </Show>
-      <Show when={projects.data?.length}><div data-testid="project-view">Project loaded</div></Show>
-    </>
+    return (
+      <>
+        <Show
+          when={noProjectsScreenVisible({
+            projectCount: projects.data?.length,
+            projectsError: projects.isError,
+            wizardVisible: false,
+          })}
+        >
+          <NoProjects beginAdd={beginAdd} />
+        </Show>
+        <Show when={projects.data?.length}>
+          <div data-testid="project-view">Project loaded</div>
+        </Show>
+      </>
+    )
   }
 
-  dispose = render(() => <QueryClientProvider client={client}><Shell /></QueryClientProvider>, host)
+  dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <Shell />
+      </QueryClientProvider>
+    ),
+    host,
+  )
   await vi.waitFor(() => expect(host.querySelector('form.project-add-path')).not.toBeNull())
 }
 

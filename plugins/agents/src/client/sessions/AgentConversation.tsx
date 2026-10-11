@@ -10,7 +10,14 @@ import ManagedChildRows from './ManagedChildRows'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
-import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, managedChatsOnly, selectedManagedSubagent, toggleManagedChatsOnly } from './managedSelection'
+import {
+  clearFocusedManagedRequest,
+  clearManagedSubagent,
+  focusedManagedRequest,
+  managedChatsOnly,
+  selectedManagedSubagent,
+  toggleManagedChatsOnly,
+} from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
 import TerminalConversationShortcuts from './TerminalConversationShortcuts'
 import SessionGoal from './SessionGoal'
@@ -28,21 +35,30 @@ import SessionGoal from './SessionGoal'
 // ../../contract/conversation.ts. Everything it used to take from the Agent pane's model is a read of
 // the store or a pure function of the snapshot, so the two surfaces cannot disagree about a session.
 
-export default function AgentConversation(props: AgentConversationProps & {
-  /** Focus the composer on navigation. Only the Agent pane opts in, so other conversation surfaces
-   *  do not compete for focus. */
-  autoFocus?: boolean
-}) {
+export default function AgentConversation(
+  props: AgentConversationProps & {
+    /** Focus the composer on navigation. Only the Agent pane opts in, so other conversation surfaces
+     *  do not compete for focus. */
+    autoFocus?: boolean
+  },
+) {
   // The transcript, its effects and its local controls belong to one session. Keep that owner keyed
   // when a pane stays mounted and changes selection; otherwise Solid reuses the old conversation's
   // reactive subtree while its snapshot and cleanup effects are changing underneath it.
-  const sessionId = createMemo(() => props.sessionId
-    ?? (props.workflowStepId
-      ? managedAgentStore.sessions().find((item) => item.config.workflowStepId === props.workflowStepId)?.id
-      : undefined)
-    ?? '')
+  const sessionId = createMemo(
+    () =>
+      props.sessionId ??
+      (props.workflowStepId
+        ? managedAgentStore.sessions().find((item) => item.config.workflowStepId === props.workflowStepId)?.id
+        : undefined) ??
+      '',
+  )
   return (
-    <Show when={sessionId()} keyed fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
+    <Show
+      when={sessionId()}
+      keyed
+      fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}
+    >
       {(id) => <SessionConversation sessionId={id} conversation={props} />}
     </Show>
   )
@@ -77,41 +93,47 @@ function SessionConversation(input: {
   // turn. This second opt-in point starts when the chosen snapshot becomes renderable and adds only
   // counts already held by the store; it never walks the transcript DOM or copies its content.
   let measuredSnapshot = ''
-  createEffect(on(snapshot, (next) => {
-    if (!next || next.session.id === measuredSnapshot) return
-    measuredSnapshot = next.session.id
-    agentTelemetry.startRenderTransition('agents.snapshot.show', {
-      'snapshot.events': next.events.length,
-      'snapshot.turns': next.turns.length,
-      'snapshot.requests': next.requests.length,
-    })
-  }))
+  createEffect(
+    on(snapshot, (next) => {
+      if (!next || next.session.id === measuredSnapshot) return
+      measuredSnapshot = next.session.id
+      agentTelemetry.startRenderTransition('agents.snapshot.show', {
+        'snapshot.events': next.events.length,
+        'snapshot.turns': next.turns.length,
+        'snapshot.requests': next.requests.length,
+      })
+    }),
+  )
 
   const releaseSocket = managedAgentStore.activate()
   onCleanup(releaseSocket)
 
-  createEffect(on(sessionId, (id) => {
-    setError('')
-    if (!id) return
-    // Held while drawn, so the store's bound cannot drop the transcript from under the reader.
-    onCleanup(managedAgentStore.hold(id))
-    const view = claimAgentSelection(id)
-    onCleanup(view.dispose)
-    // Every mount reads, a return to a session the store already holds included. That read resumes
-    // where the held events end, so it brings the turns, the requests and whatever the socket missed,
-    // not the transcript again (./managedStore.ts § loadSnapshot).
-    void managedAgentStore.loadSnapshot(id).then(() => view.ready()).catch((caught: unknown) => {
-      view.fail()
-      if (sessionId() !== id) return
-      setError(caught instanceof Error ? caught.message : 'Unable to load the agent transcript.')
-    })
-    // A dropped socket loses frames and nothing replays them, so the session on screen reads on from
-    // its mark when the socket comes back. One that is not on screen does the same when it next mounts.
-    onCleanup(wsOnReconnect(() => void managedAgentStore.loadSnapshot(id).catch(() => undefined)))
-  }))
+  createEffect(
+    on(sessionId, (id) => {
+      setError('')
+      if (!id) return
+      // Held while drawn, so the store's bound cannot drop the transcript from under the reader.
+      onCleanup(managedAgentStore.hold(id))
+      const view = claimAgentSelection(id)
+      onCleanup(view.dispose)
+      // Every mount reads, a return to a session the store already holds included. That read resumes
+      // where the held events end, so it brings the turns, the requests and whatever the socket missed,
+      // not the transcript again (./managedStore.ts § loadSnapshot).
+      void managedAgentStore
+        .loadSnapshot(id)
+        .then(() => view.ready())
+        .catch((caught: unknown) => {
+          view.fail()
+          if (sessionId() !== id) return
+          setError(caught instanceof Error ? caught.message : 'Unable to load the agent transcript.')
+        })
+      // A dropped socket loses frames and nothing replays them, so the session on screen reads on from
+      // its mark when the socket comes back. One that is not on screen does the same when it next mounts.
+      onCleanup(wsOnReconnect(() => void managedAgentStore.loadSnapshot(id).catch(() => undefined)))
+    }),
+  )
 
-  const reload = (): void => void managedAgentStore.loadSnapshot(sessionId())
-    .catch(() => undefined)
+  const reload = (): void => void managedAgentStore.loadSnapshot(sessionId()).catch(() => undefined)
 
   // The request to reveal is a one-shot navigation command, like the composer focus. A notice or a
   // dashboard row that opened this pane named a request to scroll the reader to; read it once, hand it
@@ -122,7 +144,10 @@ function SessionConversation(input: {
   let focusFor = ''
   createEffect(() => {
     const id = sessionId()
-    if (id !== focusFor) { focusFor = id; setFocusRequest(undefined) }
+    if (id !== focusFor) {
+      focusFor = id
+      setFocusRequest(undefined)
+    }
     const requested = focusedManagedRequest(id)
     if (!requested) return
     setFocusRequest(requested)
@@ -142,11 +167,11 @@ function SessionConversation(input: {
       <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show
         when={snapshot()}
-        fallback={(
+        fallback={
           <EmptyState busy>
             {session() && agentSessionIsStarting(session()!) ? 'Connecting…' : 'Loading conversation…'}
           </EmptyState>
-        )}
+        }
       >
         {(narrowed) => (
           <>
@@ -181,7 +206,13 @@ function SessionConversation(input: {
       <Show when={!selectedManagedSubagent(sessionId()) ? session() : undefined}>
         {(current) => (
           <>
-            <Show when={props.note}>{(line) => <Text emphasis="muted" wrap>{line()}</Text>}</Show>
+            <Show when={props.note}>
+              {(line) => (
+                <Text emphasis="muted" wrap>
+                  {line()}
+                </Text>
+              )}
+            </Show>
             <ManagedChildRows parentSessionId={current().id} parentTaskId={current().taskId} />
             <SessionGoal session={current()} openToken={goalEditorTick()} onUpdate={managedAgentStore.upsertSession} />
             <Show when={mcpOpen()}>
@@ -191,14 +222,15 @@ function SessionConversation(input: {
               session={current()}
               onMcp={() => setMcpOpen(true)}
               onGoal={() => setGoalEditorTick((tick) => tick + 1)}
-              disabled={props.composerDisabled || current().controller !== 'acorn'
-                || current().runtimeState === 'archived'}
+              disabled={
+                props.composerDisabled || current().controller !== 'acorn' || current().runtimeState === 'archived'
+              }
               submitDisabled={agentSessionIsStarting(current())}
               autoFocus={props.autoFocus}
               previousAutomaticContext={previousAutomaticContext()}
               // The transcript view controls, on the composer's own top row so they line up with the
               // model and effort selects. They act on the sibling transcript; the composer only hosts them.
-              viewControls={(
+              viewControls={
                 <Only hosts={['dom']}>
                   <IconButton
                     icon="arrow-up-to-line"
@@ -226,7 +258,7 @@ function SessionConversation(input: {
                     onPress={() => setCollapseTick((tick) => tick + 1)}
                   />
                 </Only>
-              )}
+              }
               onSessionUpdated={managedAgentStore.upsertSession}
               onSent={reload}
             />

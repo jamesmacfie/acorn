@@ -4,7 +4,12 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { runProcess } from '../core/proc'
-import { MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES, MAX_PLUGIN_PACKAGE_DEPTH, MAX_PLUGIN_PACKAGE_ENTRIES } from './packageFiles'
+import {
+  MAX_PLUGIN_FILE_BYTES,
+  MAX_PLUGIN_PACKAGE_BYTES,
+  MAX_PLUGIN_PACKAGE_DEPTH,
+  MAX_PLUGIN_PACKAGE_ENTRIES,
+} from './packageFiles'
 
 export const PLUGIN_ARCHIVE_LIMITS = {
   expandedBytes: MAX_PLUGIN_PACKAGE_BYTES,
@@ -17,7 +22,11 @@ export const PLUGIN_ARCHIVE_LIMITS = {
   timeoutMs: 120_000,
 }
 
-export async function unpackPluginArchive(archive: string, into: string, limits = PLUGIN_ARCHIVE_LIMITS): Promise<void> {
+export async function unpackPluginArchive(
+  archive: string,
+  into: string,
+  limits = PLUGIN_ARCHIVE_LIMITS,
+): Promise<void> {
   const here = dirname(fileURLToPath(import.meta.url))
   const candidates = import.meta.url.endsWith('.ts')
     ? [join(here, 'archiveWorker.ts')]
@@ -37,7 +46,11 @@ export async function unpackPluginArchive(archive: string, into: string, limits 
   if (result.aborted || result.truncated) throw new Error('The plugin archive process returned an incomplete result.')
   if (result.spawnError) throw new Error('The plugin archive process could not start.')
   let response: { ok?: unknown; error?: unknown }
-  try { response = JSON.parse(result.stdout) } catch { throw new Error('The plugin archive process did not return a complete result.') }
+  try {
+    response = JSON.parse(result.stdout)
+  } catch {
+    throw new Error('The plugin archive process did not return a complete result.')
+  }
   if (result.code !== 0 || response.ok !== true) {
     throw new Error(typeof response.error === 'string' ? response.error : 'The plugin archive could not be unpacked.')
   }

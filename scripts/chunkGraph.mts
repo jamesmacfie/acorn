@@ -65,14 +65,17 @@ export function describeChunks(
       for (const imported of info?.dynamicallyImportedIds ?? []) {
         if (!bundled.has(imported) && !isAbsolute(imported) && !imported.startsWith('\0')) dynamicImports.add(imported)
       }
-      if (info?.code?.includes('createRequire')) for (const specifier of requiredSpecifiers(context.parse(info.code))) requires.add(specifier)
+      if (info?.code?.includes('createRequire'))
+        for (const specifier of requiredSpecifiers(context.parse(info.code))) requires.add(specifier)
     }
     chunks[output.fileName] = {
       imports: output.imports,
       dynamicImports: [...dynamicImports],
       requires: [...requires].sort(),
       // A virtual module such as `\0rolldown/runtime.js` keeps its own name.
-      modules: Object.keys(output.modules).map((id) => id.startsWith('\0') ? id.slice(1) : relative(repo, id.replace(/\?.*$/, ''))),
+      modules: Object.keys(output.modules).map((id) =>
+        id.startsWith('\0') ? id.slice(1) : relative(repo, id.replace(/\?.*$/, '')),
+      ),
       bytes: Buffer.byteLength(output.code),
     }
   }
@@ -101,31 +104,42 @@ const walk = (node: unknown, visit: (node: AstNode) => void): void => {
 export function requiredSpecifiers(program: unknown): string[] {
   const nodes: AstNode[] = []
   walk(program, (node) => nodes.push(node))
-  const makers = new Set(nodes
-    .filter((node) => node.type === 'ImportDeclaration' && ['node:module', 'module'].includes(node.source.value))
-    .flatMap((node) => node.specifiers)
-    .filter((specifier) => specifier.imported?.name === 'createRequire')
-    .map((specifier) => specifier.local.name))
-  const isMade = (node: AstNode | undefined) => node?.type === 'CallExpression' && node.callee.type === 'Identifier' && makers.has(node.callee.name)
-  const requires = new Set(nodes
-    .filter((node) => node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && isMade(node.init))
-    .map((node) => node.id.name))
+  const makers = new Set(
+    nodes
+      .filter((node) => node.type === 'ImportDeclaration' && ['node:module', 'module'].includes(node.source.value))
+      .flatMap((node) => node.specifiers)
+      .filter((specifier) => specifier.imported?.name === 'createRequire')
+      .map((specifier) => specifier.local.name),
+  )
+  const isMade = (node: AstNode | undefined) =>
+    node?.type === 'CallExpression' && node.callee.type === 'Identifier' && makers.has(node.callee.name)
+  const requires = new Set(
+    nodes
+      .filter((node) => node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && isMade(node.init))
+      .map((node) => node.id.name),
+  )
   const isRequire = (node: AstNode) => isMade(node) || (node.type === 'Identifier' && requires.has(node.name))
   return nodes.flatMap((node) => {
     if (node.type !== 'CallExpression') return []
-    const callee = node.callee.type === 'MemberExpression' && node.callee.property.name === 'resolve' ? node.callee.object : node.callee
+    const callee =
+      node.callee.type === 'MemberExpression' && node.callee.property.name === 'resolve'
+        ? node.callee.object
+        : node.callee
     const [argument] = node.arguments
-    return isRequire(callee) && argument?.type === 'Literal' && typeof argument.value === 'string' ? [argument.value] : []
+    return isRequire(callee) && argument?.type === 'Literal' && typeof argument.value === 'string'
+      ? [argument.value]
+      : []
   })
 }
 
 // Rolldown names a chunk edge by the chunk's file name and an external by its specifier.
 const namesChunkFile = (id: string) => id.startsWith('.') || id.endsWith('.js')
 const isJavaScript = (file: string) => /\.[cm]?js$/.test(file)
-const filesUnder = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-  const path = join(dir, entry.name)
-  return entry.isDirectory() ? filesUnder(path) : entry.isFile() ? [path] : []
-})
+const filesUnder = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(dir, entry.name)
+    return entry.isDirectory() ? filesUnder(path) : entry.isFile() ? [path] : []
+  })
 
 /**
  * The graph beside a built `dist`, checked against the files there. It is stale when it names a chunk
@@ -145,13 +159,15 @@ export function readChunkGraph(dist: string): ChunkGraph {
   for (const [file, chunk] of Object.entries(graph.chunks)) {
     const onDisk = join(dist, file)
     if (!existsSync(onDisk)) problems.push(`names missing ${file}`)
-    else if (statSync(onDisk).size !== chunk.bytes) problems.push(`records ${chunk.bytes} B for ${file}, which has ${statSync(onDisk).size} B`)
+    else if (statSync(onDisk).size !== chunk.bytes)
+      problems.push(`records ${chunk.bytes} B for ${file}, which has ${statSync(onDisk).size} B`)
     for (const next of [...chunk.imports, ...chunk.dynamicImports]) {
       if (namesChunkFile(next) && !named.has(next)) problems.push(`has ${file} import ${next} without naming it`)
     }
   }
   for (const file of filesUnder(dist).map((full) => relative(dist, full).split(sep).join('/'))) {
-    if (isJavaScript(file) && chunkFolders.has(dirname(file)) && !named.has(file)) problems.push(`does not name ${file}`)
+    if (isJavaScript(file) && chunkFolders.has(dirname(file)) && !named.has(file))
+      problems.push(`does not name ${file}`)
   }
   if (problems.length) throw new Error(`${path} is stale: ${problems.join(', ')}. Rebuild it.`)
   return graph
@@ -196,4 +212,7 @@ export function externalSpecifiers(graph: ChunkGraph, files: Iterable<string>) {
 
 /** `@scope/name/sub/path` -> `@scope/name`, `name/sub` -> `name`. */
 export const packageName = (specifier: string): string =>
-  specifier.split('/').slice(0, specifier.startsWith('@') ? 2 : 1).join('/')
+  specifier
+    .split('/')
+    .slice(0, specifier.startsWith('@') ? 2 : 1)
+    .join('/')

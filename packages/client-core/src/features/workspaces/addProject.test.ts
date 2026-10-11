@@ -11,8 +11,17 @@ import { addProjectFromFolder, canAddProjectFromFolder } from './addProject'
 const local: NodeRecord = { nodeId: 'local', label: 'Local', endpoint: 'https://127.0.0.1:9443', local: true }
 const remote: NodeRecord = { ...local, nodeId: 'remote', label: 'Remote', local: false }
 const project: Project = {
-  id: 'project', name: 'Repo', path: '/src/repo', workspaceId: 'work', sort: 0, hidden: false, color: null,
-  vcs: 'git', defaultBranch: 'main', remoteUrl: null, github: null,
+  id: 'project',
+  name: 'Repo',
+  path: '/src/repo',
+  workspaceId: 'work',
+  sort: 0,
+  hidden: false,
+  color: null,
+  vcs: 'git',
+  defaultBranch: 'main',
+  remoteUrl: null,
+  github: null,
 }
 const workspaces: Workspace[] = [
   { id: 'work', name: 'Work', isDefault: false, sort: 0, projects: [] },
@@ -29,12 +38,20 @@ beforeEach(async () => {
   returnedProject = project
   pick.mockReset().mockResolvedValue('/src/repo')
   fetch.mockReset().mockImplementation(async () => ({
-    status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify({ project: returnedProject })),
+    status: 200,
+    headers: {},
+    body: new TextEncoder().encode(JSON.stringify({ project: returnedProject })),
   }))
-  vi.stubGlobal('window', { acorn: {
-    folderPath: { pick }, nodeFetch: fetch,
-    fleetList: async () => ({ nodes: [local, remote], statuses: [local, remote].map(({ nodeId }) => ({ nodeId, state: 'online' })) }),
-  } })
+  vi.stubGlobal('window', {
+    acorn: {
+      folderPath: { pick },
+      nodeFetch: fetch,
+      fleetList: async () => ({
+        nodes: [local, remote],
+        statuses: [local, remote].map(({ nodeId }) => ({ nodeId, state: 'online' })),
+      }),
+    },
+  })
   await refreshFleet()
   setActiveNode(local.nodeId)
   queryClient = new QueryClient()
@@ -79,9 +96,12 @@ describe('adding a project from a folder', () => {
   it('names the owning workspace when the API reuses a project in another workspace', async () => {
     returnedProject = { ...project, workspaceId: 'other' }
     await addProjectFromFolder(queryClient, 'on', 'work')
-    expect(activeToasts()).toMatchObject([{
-      message: 'Repo is already in Personal. Move it in Settings → Overview.', tone: 'neutral',
-    }])
+    expect(activeToasts()).toMatchObject([
+      {
+        message: 'Repo is already in Personal. Move it in Settings → Overview.',
+        tone: 'neutral',
+      },
+    ])
     expect(fetch).toHaveBeenCalledOnce()
   })
 
@@ -108,12 +128,19 @@ describe('adding a project from a folder', () => {
 
   it('cancels when the active Node changes while the folder picker is open', async () => {
     let choose!: (path: string) => void
-    pick.mockImplementation(() => new Promise((resolve) => { choose = resolve }))
+    pick.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          choose = resolve
+        }),
+    )
     const adding = addProjectFromFolder(queryClient, 'on', 'work')
     setActiveNode(remote.nodeId)
     choose('/src/repo')
     await adding
     expect(fetch).not.toHaveBeenCalled()
-    expect(activeToasts()).toMatchObject([{ message: 'The active Node changed. Choose the folder again.', tone: 'danger' }])
+    expect(activeToasts()).toMatchObject([
+      { message: 'The active Node changed. Choose the folder again.', tone: 'danger' },
+    ])
   })
 })

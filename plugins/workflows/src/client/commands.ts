@@ -45,7 +45,9 @@ const problemItem = (error: { source: string; message: string }, at: number): Co
  *  session over another task cannot reach this map at all. */
 const loaded = new WeakMap<CommandExecutionContext, Promise<WorkflowDefSummary[]>>()
 
-const readDefs = (context: CommandExecutionContext): Promise<{ workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }> =>
+const readDefs = (
+  context: CommandExecutionContext,
+): Promise<{ workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }> =>
   workflowApi.defs(context.taskId ?? '')
 
 export const workflowsCommands: readonly ContributedCommand[] = [
@@ -65,7 +67,10 @@ export const workflowsCommands: readonly ContributedCommand[] = [
     placeholder: 'Find a workflow…',
     ...localSearch(async (context) => {
       const pending = readDefs(context)
-      loaded.set(context, pending.then((defs) => defs.workflows))
+      loaded.set(
+        context,
+        pending.then((defs) => defs.workflows),
+      )
       const defs = await pending.catch((error: unknown) => {
         loaded.delete(context)
         throw error
@@ -159,7 +164,10 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       if (!workspaceId || !projectId) return { effect: 'stay', status: 'Choose a project first.' }
       // The editor's modules load here rather than at startup: this command is registered before the
       // first draw, and the editor is where it goes next anyway.
-      const [{ emptyDefinition }, { defRefKey }] = await Promise.all([import('./editor/draft'), import('./editor/draftStore')])
+      const [{ emptyDefinition }, { defRefKey }] = await Promise.all([
+        import('./editor/draft'),
+        import('./editor/draftStore'),
+      ])
       const row = await workflowApi.createDef({ workspaceId, projectId, def: emptyDefinition() })
       navigate?.(workflowsSurfacePath(projectId, defRefKey({ source: 'database', id: row.id })))
       return COMMAND_CLOSED

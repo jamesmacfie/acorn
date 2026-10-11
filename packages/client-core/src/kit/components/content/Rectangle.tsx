@@ -79,7 +79,9 @@ export function Rectangle(props: {
       }}
       onPointerDown={() => setInside(true)}
     >
-      <Show when={props.mount} keyed>{(mount) => <div class="ui-rect-mount" ref={mount} />}</Show>
+      <Show when={props.mount} keyed>
+        {(mount) => <div class="ui-rect-mount" ref={mount} />}
+      </Show>
       {props.children}
     </div>
   )

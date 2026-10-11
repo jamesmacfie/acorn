@@ -12,7 +12,6 @@ import { mapLimited } from '../../mapLimited'
 // Telemetry and logging).
 const log = createLogger('github', 'github')
 
-
 // GraphQL's largest page. Every connection asks for it.
 const PAGE_SIZE = 100
 // Review threads, and the checks and comments inside them, fetch their later pages a few at a time.
@@ -25,8 +24,17 @@ export type Connection<T> = { pageInfo: PageInfo; nodes: T[] }
 
 type GqlActor = { login: string } | null
 export type GqlLabel = { name: string; color: string | null }
-export type GqlReview = { id: string; author: GqlActor; state: string; bodyHTML: string | null; submittedAt: string | null }
-export type GqlReviewRequest = { id: string; requestedReviewer: { login?: string; name?: string; slug?: string } | null }
+export type GqlReview = {
+  id: string
+  author: GqlActor
+  state: string
+  bodyHTML: string | null
+  submittedAt: string | null
+}
+export type GqlReviewRequest = {
+  id: string
+  requestedReviewer: { login?: string; name?: string; slug?: string } | null
+}
 export type GqlComment = { id: string; author: GqlActor; bodyHTML: string | null; createdAt: string | null }
 export type GqlCommit = {
   commit: {
@@ -36,8 +44,22 @@ export type GqlCommit = {
     author: { name: string | null; user: { login: string } | null } | null
   }
 }
-export type GqlThreadComment = { id: string; databaseId: number | null; author: GqlActor; bodyHTML: string | null; createdAt: string | null }
-type GqlThreadFields = { id: string; isResolved: boolean; isOutdated: boolean; path: string | null; line: number | null; originalLine: number | null; diffSide: string | null }
+export type GqlThreadComment = {
+  id: string
+  databaseId: number | null
+  author: GqlActor
+  bodyHTML: string | null
+  createdAt: string | null
+}
+type GqlThreadFields = {
+  id: string
+  isResolved: boolean
+  isOutdated: boolean
+  path: string | null
+  line: number | null
+  originalLine: number | null
+  diffSide: string | null
+}
 export type GqlThread = GqlThreadFields & { comments: GqlThreadComment[] }
 export type GqlContext =
   | {
@@ -119,7 +141,9 @@ query PR($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $number) {
       ${SCALARS}
-      ${Object.entries(PULL_CONNECTIONS).map(([alias, c]) => `${alias}: ${page(c.field, c.nodes, false)}`).join('\n      ')}
+      ${Object.entries(PULL_CONNECTIONS)
+        .map(([alias, c]) => `${alias}: ${page(c.field, c.nodes, false)}`)
+        .join('\n      ')}
       latestCommit: commits(last: 1) { nodes { commit { statusCheckRollup { id ${page('contexts', CONTEXT_NODES, false)} } } } }
     }
   }
@@ -131,8 +155,10 @@ const continuationQuery = (ownerType: string, field: string, nodes: string) =>
 
 type Token = string
 
-const failure = (error: string, detail: string): { ok: false; failure: RouteFailure } =>
-  ({ ok: false, failure: { error, status: 502, detail: [detail] } })
+const failure = (error: string, detail: string): { ok: false; failure: RouteFailure } => ({
+  ok: false,
+  failure: { error, status: 502, detail: [detail] },
+})
 
 async function graphql<T>(token: Token, query: string, variables: Record<string, unknown>): Promise<RouteResult<T>> {
   const result = await ghGraphQLResult<T>(await ghGraphQL(token, query, variables))
@@ -145,19 +171,26 @@ async function graphql<T>(token: Token, query: string, variables: Record<string,
   return { ok: false, failure: result.failure }
 }
 
-const nextPage = (token: Token, ownerType: string, field: string, nodes: string, id: string) =>
+const nextPage =
+  (token: Token, ownerType: string, field: string, nodes: string, id: string) =>
   async (after: string): Promise<RouteResult<unknown>> => {
-    const result = await graphql<{ node?: { page?: unknown } | null }>(token, continuationQuery(ownerType, field, nodes), { id, after })
+    const result = await graphql<{ node?: { page?: unknown } | null }>(
+      token,
+      continuationQuery(ownerType, field, nodes),
+      { id, after },
+    )
     return result.ok ? { ok: true, value: result.value?.node?.page } : result
   }
 
 const isConnection = (value: unknown): value is Connection<unknown> => {
   if (!value || typeof value !== 'object') return false
   const { nodes, pageInfo } = value as Partial<Connection<unknown>>
-  return Array.isArray(nodes)
-    && !!pageInfo
-    && typeof pageInfo.hasNextPage === 'boolean'
-    && (pageInfo.endCursor === null || typeof pageInfo.endCursor === 'string')
+  return (
+    Array.isArray(nodes) &&
+    !!pageInfo &&
+    typeof pageInfo.hasNextPage === 'boolean' &&
+    (pageInfo.endCursor === null || typeof pageInfo.endCursor === 'string')
+  )
 }
 
 /**
@@ -192,20 +225,35 @@ export async function walkConnection<T>(
   }
 }
 
-type FirstPull = PullScalars & Record<keyof typeof PULL_CONNECTIONS, unknown> & {
-  latestCommit?: { nodes?: { commit?: { statusCheckRollup?: { id: string; contexts: unknown } | null } }[] }
-}
+type FirstPull = PullScalars &
+  Record<keyof typeof PULL_CONNECTIONS, unknown> & {
+    latestCommit?: { nodes?: { commit?: { statusCheckRollup?: { id: string; contexts: unknown } | null } }[] }
+  }
 
 /** Fetch one pull request's detail with every connection exhausted. Nothing is written. */
-export async function fetchPullComposite(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<PullComposite>> {
-  const first = await graphql<{ repository?: { pullRequest?: FirstPull | null } | null }>(token, PULL_FIRST_QUERY, { owner, repo, number })
+export async function fetchPullComposite(
+  token: Token,
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<RouteResult<PullComposite>> {
+  const first = await graphql<{ repository?: { pullRequest?: FirstPull | null } | null }>(token, PULL_FIRST_QUERY, {
+    owner,
+    repo,
+    number,
+  })
   if (!first.ok) return first
   const pull = first.value?.repository?.pullRequest
   if (!pull) return { ok: false, failure: { error: 'pull_not_found', status: 404 } }
 
   const walk = <K extends keyof typeof PULL_CONNECTIONS>(key: K) => {
     const c = PULL_CONNECTIONS[key]
-    return walkConnection(key, pull[key], nextPage(token, 'PullRequest', c.field, c.nodes, pull.id), c.identity as (node: never) => unknown)
+    return walkConnection(
+      key,
+      pull[key],
+      nextPage(token, 'PullRequest', c.field, c.nodes, pull.id),
+      c.identity as (node: never) => unknown,
+    )
   }
   const rollup = pull.latestCommit?.nodes?.[0]?.commit?.statusCheckRollup
   const [labels, reviews, reviewRequests, comments, commits, threadPages, checks] = await Promise.all([
@@ -216,7 +264,12 @@ export async function fetchPullComposite(token: Token, owner: string, repo: stri
     walk('commits'),
     walk('reviewThreads'),
     rollup
-      ? walkConnection<GqlContext>('contexts', rollup.contexts, nextPage(token, 'StatusCheckRollup', 'contexts', CONTEXT_NODES, rollup.id), (n) => n.id)
+      ? walkConnection<GqlContext>(
+          'contexts',
+          rollup.contexts,
+          nextPage(token, 'StatusCheckRollup', 'contexts', CONTEXT_NODES, rollup.id),
+          (n) => n.id,
+        )
       : Promise.resolve({ ok: true as const, value: [] as GqlContext[] }),
   ])
   if (!labels.ok) return labels
@@ -228,21 +281,38 @@ export async function fetchPullComposite(token: Token, owner: string, repo: stri
   if (!checks.ok) return checks
 
   // Each thread's own comments, walked from the first page the thread arrived with.
-  const threadComments = await mapLimited(threadPages.value as (GqlThreadFields & { comments: unknown })[], CONTINUATION_CONCURRENCY, (thread) =>
-    walkConnection<GqlThreadComment>('threadComments', thread.comments, nextPage(token, 'PullRequestReviewThread', 'comments', THREAD_COMMENT_NODES, thread.id), (n) => n.id))
+  const threadComments = await mapLimited(
+    threadPages.value as (GqlThreadFields & { comments: unknown })[],
+    CONTINUATION_CONCURRENCY,
+    (thread) =>
+      walkConnection<GqlThreadComment>(
+        'threadComments',
+        thread.comments,
+        nextPage(token, 'PullRequestReviewThread', 'comments', THREAD_COMMENT_NODES, thread.id),
+        (n) => n.id,
+      ),
+  )
   const threads: GqlThread[] = []
   for (const [i, result] of threadComments.entries()) {
     if (!result.ok) return result
     threads.push({ ...(threadPages.value[i] as GqlThreadFields), comments: result.value })
   }
 
-  const verified = await graphql<{ repository?: { pullRequest?: PullScalars | null } | null }>(token,
+  const verified = await graphql<{ repository?: { pullRequest?: PullScalars | null } | null }>(
+    token,
     `query Revision($owner: String!, $repo: String!, $number: Int!) {
       repository(owner: $owner, name: $repo) { pullRequest(number: $number) { headRefOid baseRefOid updatedAt } }
-    }`, { owner, repo, number })
+    }`,
+    { owner, repo, number },
+  )
   if (!verified.ok) return verified
   const end = verified.value?.repository?.pullRequest
-  if (!end || pull.headRefOid !== end.headRefOid || pull.baseRefOid !== end.baseRefOid || pull.updatedAt !== end.updatedAt) {
+  if (
+    !end ||
+    pull.headRefOid !== end.headRefOid ||
+    pull.baseRefOid !== end.baseRefOid ||
+    pull.updatedAt !== end.updatedAt
+  ) {
     return failure('github_revision_changed', 'pull detail changed during pagination; refresh again')
   }
 
@@ -285,12 +355,15 @@ export type FilesFetch = { files: GitHubFile[]; completeness: PullTopologyComple
 const isGitHubFile = (value: unknown): value is GitHubFile => {
   if (!value || typeof value !== 'object') return false
   const f = value as Partial<GitHubFile>
-  return typeof f.filename === 'string' && !!f.filename
-    && typeof f.status === 'string'
-    && typeof f.additions === 'number'
-    && typeof f.deletions === 'number'
-    && (f.sha === null || typeof f.sha === 'string')
-    && (f.patch === undefined || typeof f.patch === 'string')
+  return (
+    typeof f.filename === 'string' &&
+    !!f.filename &&
+    typeof f.status === 'string' &&
+    typeof f.additions === 'number' &&
+    typeof f.deletions === 'number' &&
+    (f.sha === null || typeof f.sha === 'string') &&
+    (f.patch === undefined || typeof f.patch === 'string')
+  )
 }
 
 const hasNextLink = (link: string | null) => !!link && /rel="next"/.test(link)
@@ -301,15 +374,24 @@ const hasNextLink = (link: string | null) => !!link && /rel="next"/.test(link)
  * GitHub lists nothing, so there the pull's own `changed_files` decides whether the list is complete.
  * A duplicate path or a malformed page fails the whole fetch. Nothing is written.
  */
-async function fetchFilesPages(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<FilesFetch>> {
+async function fetchFilesPages(
+  token: Token,
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<RouteResult<FilesFetch>> {
   const files: GitHubFile[] = []
   const seen = new Set<string>()
   for (let pageNo = 1; pageNo <= FILES_MAX_PAGES; pageNo++) {
-    const res = await gh(token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=${FILES_PAGE_SIZE}&page=${pageNo}`)
+    const res = await gh(
+      token,
+      `/repos/${owner}/${repo}/pulls/${number}/files?per_page=${FILES_PAGE_SIZE}&page=${pageNo}`,
+    )
     const err = ghError(res)
     if (err) return { ok: false, failure: err }
     const body: unknown = await res.json().catch(() => null)
-    if (!Array.isArray(body) || body.length > FILES_PAGE_SIZE || !body.every(isGitHubFile)) return failure('github_malformed', 'files')
+    if (!Array.isArray(body) || body.length > FILES_PAGE_SIZE || !body.every(isGitHubFile))
+      return failure('github_malformed', 'files')
     for (const file of body) {
       if (seen.has(file.filename)) return failure('github_malformed', 'duplicate file')
       seen.add(file.filename)
@@ -326,12 +408,20 @@ async function fetchFilesPages(token: Token, owner: string, repo: string, number
   if (err) return { ok: false, failure: err }
   const pull = (await res.json().catch(() => null)) as { changed_files?: unknown } | null
   const reportedTotal = typeof pull?.changed_files === 'number' ? pull.changed_files : null
-  if (reportedTotal !== null && reportedTotal <= files.length) return { ok: true, value: { files, completeness: completePullTopology } }
+  if (reportedTotal !== null && reportedTotal <= files.length)
+    return { ok: true, value: { files, completeness: completePullTopology } }
   return {
     ok: true,
     value: {
       files,
-      completeness: { kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: files.length, reportedTotal, limit: FILES_UPSTREAM_LIMIT },
+      completeness: {
+        kind: 'incomplete',
+        cause: 'upstream-cap',
+        resource: 'files',
+        received: files.length,
+        reportedTotal,
+        limit: FILES_UPSTREAM_LIMIT,
+      },
     },
   }
 }
@@ -342,16 +432,26 @@ const pullRevision = (base: string | null | undefined, head: string | null | und
 
 type RestPullRevision = { base?: { sha?: string }; head?: { sha?: string }; updated_at?: string }
 
-async function fetchRevision(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<RestPullRevision>> {
+async function fetchRevision(
+  token: Token,
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<RouteResult<RestPullRevision>> {
   const res = await gh(token, `/repos/${owner}/${repo}/pulls/${number}`)
   const error = ghError(res)
   if (error) return { ok: false, failure: error }
-  const value = await res.json().catch(() => null) as RestPullRevision | null
+  const value = (await res.json().catch(() => null)) as RestPullRevision | null
   return value && typeof value === 'object' ? { ok: true, value } : failure('github_malformed', 'pull revision')
 }
 
 /** REST file pages are mutable. Bracket them with the comparison's identity before publishing. */
-export async function fetchFiles(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<FilesFetch>> {
+export async function fetchFiles(
+  token: Token,
+  owner: string,
+  repo: string,
+  number: number,
+): Promise<RouteResult<FilesFetch>> {
   const before = await fetchRevision(token, owner, repo, number)
   if (!before.ok) return before
   const files = await fetchFilesPages(token, owner, repo, number)

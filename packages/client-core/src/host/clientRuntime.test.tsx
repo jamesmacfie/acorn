@@ -17,14 +17,19 @@ vi.mock('../features/integrations/watchConnectionChanges', () => ({ watchConnect
 vi.mock('../features/projects/watchProjectChanges', () => ({ watchProjectChanges: piece('projects') }))
 vi.mock('../features/workspaces/watchWorkspaceChanges', () => ({ watchWorkspaceChanges: piece('workspaces') }))
 vi.mock('../infra/node/watchNodeEvents', () => ({ watchNodeEvents: piece('node events') }))
-vi.mock('../features/notifications/deliver', () => ({ initWorkflowNotices: piece('workflow notices'), initSystemNotices: piece('system notices') }))
+vi.mock('../features/notifications/deliver', () => ({
+  initWorkflowNotices: piece('workflow notices'),
+  initSystemNotices: piece('system notices'),
+}))
 vi.mock('./plugins/reload', () => ({ watchPluginChanges: piece('plugins') }))
 vi.mock('./registries/shell/schedules', () => ({
   clientScheduleRegistry: { register: () => ({ dispose: () => void stopped.push('task status') }) },
   startClientSchedules: piece('schedules'),
 }))
 vi.mock('../infra/node/activeNode', () => ({ nodeReady: ready }))
-vi.mock('../infra/persistence/deviceConfigSync', () => ({ startDeviceConfigSync: async () => piece('device config')() }))
+vi.mock('../infra/persistence/deviceConfigSync', () => ({
+  startDeviceConfigSync: async () => piece('device config')(),
+}))
 vi.mock('../infra/telemetry/emitter', () => ({ startClientTelemetry: () => void started.push('telemetry') }))
 vi.mock('../infra/telemetry/post', () => ({ postTelemetryBatch: () => async () => {} }))
 
@@ -35,8 +40,12 @@ describe('the shared client start', () => {
     let pluginsReady!: () => void
     const stop = await startClientRuntime({
       runtime: 'tui',
-      client: () => { throw new Error('unused') },
-      pluginsReady: new Promise<void>((resolve) => { pluginsReady = resolve }),
+      client: () => {
+        throw new Error('unused')
+      },
+      pluginsReady: new Promise<void>((resolve) => {
+        pluginsReady = resolve
+      }),
     })
     expect(started).not.toContain('plugins')
     expect(started).not.toContain('schedules')

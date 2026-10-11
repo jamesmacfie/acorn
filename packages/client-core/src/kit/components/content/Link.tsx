@@ -47,7 +47,15 @@ export function Link(props: {
             if (!props.onPress) return
             // Leave the browser its own answers: a new tab, a new window, a handler that already
             // claimed the event.
-            if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+            if (
+              event.defaultPrevented ||
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            )
+              return
             event.preventDefault()
             props.onPress()
           }}

@@ -28,15 +28,56 @@ describe('the task service workspace lookups', () => {
   beforeEach(async () => {
     t = makeTestDb()
     tasks = createTaskService(t.db)
-    await t.db.insert(schema.workspaces).values({ id: 'ws1', name: 'Workspace', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'ws1', name: 'Workspace', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-widget', name: 'widget', path: null, workspaceId: 'ws1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'acme', githubName: 'widget', githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-widget',
+      name: 'widget',
+      path: null,
+      workspaceId: 'ws1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'acme',
+      githubName: 'widget',
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await t.db.insert(schema.tasks).values([
-      { id: 'in-workspace', title: 'a', projectId: 'project-widget', branch: 'b1', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, origin: 'local', icon: null, createdAt: now, updatedAt: now },
-      { id: 'no-workspace', title: 'b', projectId: 'missing-project', branch: 'b2', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 1, origin: 'local', icon: null, createdAt: now, updatedAt: now },
+      {
+        id: 'in-workspace',
+        title: 'a',
+        projectId: 'project-widget',
+        branch: 'b1',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        origin: 'local',
+        icon: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'no-workspace',
+        title: 'b',
+        projectId: 'missing-project',
+        branch: 'b2',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 1,
+        origin: 'local',
+        icon: null,
+        createdAt: now,
+        updatedAt: now,
+      },
     ])
   })
   afterEach(() => t.cleanup())
@@ -47,12 +88,19 @@ describe('the task service workspace lookups', () => {
   })
 
   it('keeps an archived task branch claimed while archive teardown is unsettled', async () => {
-    t.db.update(schema.tasks).set({ status: 'archived', archivedAt: now }).where(eq(schema.tasks.id, 'in-workspace')).run()
+    t.db
+      .update(schema.tasks)
+      .set({ status: 'archived', archivedAt: now })
+      .where(eq(schema.tasks.id, 'in-workspace'))
+      .run()
     expect((await tasks.active()).map((task) => task.id)).not.toContain('in-workspace')
     expect((await tasks.branchClaims()).map((task) => task.id)).not.toContain('in-workspace')
     expect(beginTaskArchive('in-workspace')).toBe(true)
-    try { expect((await tasks.branchClaims()).map((task) => task.id)).toContain('in-workspace') }
-    finally { finishTaskArchive('in-workspace') }
+    try {
+      expect((await tasks.branchClaims()).map((task) => task.id)).toContain('in-workspace')
+    } finally {
+      finishTaskArchive('in-workspace')
+    }
   })
 
   it('answers null where the throwing form throws — unknown task, and a repo in no workspace', async () => {
@@ -85,45 +133,110 @@ describe('createChild project inheritance', () => {
     broadcasts.length = 0
   })
 
-  afterEach(() => { t.cleanup(); rmSync(gitProject, { recursive: true, force: true }) })
+  afterEach(() => {
+    t.cleanup()
+    rmSync(gitProject, { recursive: true, force: true })
+  })
 
   it('creates a branchless child for a non-Git project', async () => {
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-plain', name: 'Plain', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-plain', name: 'Plain', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-plain', name: 'notes', path: '/tmp/acorn-notes', workspaceId: 'workspace-plain', sort: 0, hidden: false,
-      vcs: null, defaultBranch: null, remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-plain',
+      name: 'notes',
+      path: '/tmp/acorn-notes',
+      workspaceId: 'workspace-plain',
+      sort: 0,
+      hidden: false,
+      vcs: null,
+      defaultBranch: null,
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({
-      id: 'plain-parent', title: 'Parent', origin: 'local', projectId: 'project-plain',
-      branch: null, worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now,
+      id: 'plain-parent',
+      title: 'Parent',
+      origin: 'local',
+      projectId: 'project-plain',
+      branch: null,
+      worktreePath: null,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
     })
 
-    const childId = await createTaskService(t.db).createChild('plain-parent', { title: 'Child', branch: 'child-feature' })
+    const childId = await createTaskService(t.db).createChild('plain-parent', {
+      title: 'Child',
+      branch: 'child-feature',
+    })
     const [child] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, childId))
 
     expect(child).toMatchObject({
-      projectId: 'project-plain', branch: null, parentId: 'plain-parent', status: 'active',
+      projectId: 'project-plain',
+      branch: null,
+      parentId: 'plain-parent',
+      status: 'active',
     })
   })
 
   it('replays a stable intended id without duplicating the row or changing its deduped branch', async () => {
     const at = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-git', name: 'Git', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-git', name: 'Git', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
     await t.db.insert(schema.projects).values({
-      id: 'project-git', name: 'app', path: gitProject, workspaceId: 'workspace-git', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: at, updatedAt: at,
+      id: 'project-git',
+      name: 'app',
+      path: gitProject,
+      workspaceId: 'workspace-git',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: at,
+      updatedAt: at,
     })
     await t.db.insert(schema.tasks).values([
       {
-        id: 'git-parent', title: 'Parent', origin: 'local', projectId: 'project-git', branch: 'parent',
-        worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: at, updatedAt: at,
+        id: 'git-parent',
+        title: 'Parent',
+        origin: 'local',
+        projectId: 'project-git',
+        branch: 'parent',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        createdAt: at,
+        updatedAt: at,
       },
       {
-        id: 'collision', title: 'Existing', origin: 'local', projectId: 'project-git', branch: 'inspect-tests',
-        worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 1, createdAt: at, updatedAt: at,
+        id: 'collision',
+        title: 'Existing',
+        origin: 'local',
+        projectId: 'project-git',
+        branch: 'inspect-tests',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 1,
+        createdAt: at,
+        updatedAt: at,
       },
     ])
     const tasks = createTaskService(t.db)
@@ -148,25 +261,67 @@ describe('createChild project inheritance', () => {
 
   it('rejects reuse of an intended id by another parent or seed', async () => {
     const at = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-conflict', name: 'Conflict', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-conflict', name: 'Conflict', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
     await t.db.insert(schema.projects).values({
-      id: 'project-conflict', name: 'app', path: gitProject, workspaceId: 'workspace-conflict', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: at, updatedAt: at,
+      id: 'project-conflict',
+      name: 'app',
+      path: gitProject,
+      workspaceId: 'workspace-conflict',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: at,
+      updatedAt: at,
     })
     await t.db.insert(schema.tasks).values([
-      { id: 'parent-a', title: 'A', origin: 'local', projectId: 'project-conflict', branch: 'a', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: at, updatedAt: at },
-      { id: 'parent-b', title: 'B', origin: 'local', projectId: 'project-conflict', branch: 'b', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 1, createdAt: at, updatedAt: at },
+      {
+        id: 'parent-a',
+        title: 'A',
+        origin: 'local',
+        projectId: 'project-conflict',
+        branch: 'a',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        createdAt: at,
+        updatedAt: at,
+      },
+      {
+        id: 'parent-b',
+        title: 'B',
+        origin: 'local',
+        projectId: 'project-conflict',
+        branch: 'b',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 1,
+        createdAt: at,
+        updatedAt: at,
+      },
     ])
     const tasks = createTaskService(t.db)
     await tasks.createChild('parent-a', { title: 'Child', branch: 'child' }, 'claimed-child')
 
-    await expect(tasks.createChild('parent-b', { title: 'Child', branch: 'child' }, 'claimed-child'))
-      .rejects.toThrow(/different parent or seed/)
-    await expect(tasks.createChild('parent-a', { title: 'Different', branch: 'different' }, 'claimed-child'))
-      .rejects.toThrow(/different parent or seed/)
-    await expect(tasks.createChild('parent-a', { title: 'Child', branch: 'child', origin: 'workflows:child' }, 'claimed-child'))
-      .rejects.toThrow(/different parent or seed/)
+    await expect(tasks.createChild('parent-b', { title: 'Child', branch: 'child' }, 'claimed-child')).rejects.toThrow(
+      /different parent or seed/,
+    )
+    await expect(
+      tasks.createChild('parent-a', { title: 'Different', branch: 'different' }, 'claimed-child'),
+    ).rejects.toThrow(/different parent or seed/)
+    await expect(
+      tasks.createChild('parent-a', { title: 'Child', branch: 'child', origin: 'workflows:child' }, 'claimed-child'),
+    ).rejects.toThrow(/different parent or seed/)
   })
 })
 
@@ -179,15 +334,31 @@ describe('createRoot replay identity', () => {
     gitProject = mkdtempSync(join(tmpdir(), 'acorn-root-project-'))
     execFileSync('git', ['init', '-q', gitProject])
     broadcasts.length = 0
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-root', name: 'Root', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-root', name: 'Root', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-root', name: 'app', path: gitProject, workspaceId: 'workspace-root', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
-      createdAt: now, updatedAt: now,
+      id: 'project-root',
+      name: 'app',
+      path: gitProject,
+      workspaceId: 'workspace-root',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: null,
+      githubName: null,
+      githubRepoId: null,
+      createdAt: now,
+      updatedAt: now,
     })
   })
 
-  afterEach(() => { t.cleanup(); rmSync(gitProject, { recursive: true, force: true }) })
+  afterEach(() => {
+    t.cleanup()
+    rmSync(gitProject, { recursive: true, force: true })
+  })
 
   it('replays the intended root once and rejects conflicting reuse', async () => {
     const tasks = createTaskService(t.db)
@@ -195,9 +366,10 @@ describe('createRoot replay identity', () => {
     expect(await tasks.createRoot('project-root', seed, 'intended-root')).toBe('intended-root')
     expect(await tasks.createRoot('project-root', seed, 'intended-root')).toBe('intended-root')
     expect(await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'intended-root'))).toHaveLength(1)
-    await expect(tasks.createRoot('project-root', { ...seed, title: 'Other' }, 'intended-root'))
-      .rejects.toThrow('different seed')
-    expect(broadcasts.filter(frame => frame.channel === 'tasks:changed')).toEqual([
+    await expect(tasks.createRoot('project-root', { ...seed, title: 'Other' }, 'intended-root')).rejects.toThrow(
+      'different seed',
+    )
+    expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
       { channel: 'tasks:changed', taskId: 'intended-root' },
     ])
   })
@@ -214,8 +386,20 @@ describe('archivedBefore', () => {
   it('names only tasks still archived, and only those archived before the cutoff', async () => {
     const day = 86_400_000
     const task = (id: string, status: string, archivedAt: number | null, sort: number) => ({
-      id, title: id, projectId: 'project', branch: id, worktreePath: null, pullNumber: null, status, parentId: null,
-      sort, origin: 'local', icon: null, createdAt: now, updatedAt: now, archivedAt,
+      id,
+      title: id,
+      projectId: 'project',
+      branch: id,
+      worktreePath: null,
+      pullNumber: null,
+      status,
+      parentId: null,
+      sort,
+      origin: 'local',
+      icon: null,
+      createdAt: now,
+      updatedAt: now,
+      archivedAt,
     })
     await t.db.insert(schema.tasks).values([
       task('old', 'archived', now - 100 * day, 0),
@@ -240,49 +424,124 @@ describe('adoptPullNumbers project matching', () => {
 
   afterEach(() => t.cleanup())
 
-  it.each([
-    { pullNumber: 99 },
-    { branch: 'different' },
-    { status: 'archived' as const },
-  ])('preserves a task changed between adoption lookup and write: %j', async (patch) => {
-    await t.db.insert(schema.workspaces).values({ id: 'workspace', name: 'Workspace', isDefault: true, sort: 0, createdAt: 1, updatedAt: 1 })
-    await t.db.insert(schema.projects).values({
-      id: 'project', name: 'widget', workspaceId: 'workspace', sort: 0, hidden: false,
-      githubOwner: 'acme', githubName: 'widget', createdAt: 1, updatedAt: 1,
-    })
-    await t.db.insert(schema.tasks).values({
-      id: 'task', title: 'Task', origin: 'local', projectId: 'project', branch: 'feature',
-      status: 'active', sort: 0, createdAt: 1, updatedAt: 1,
-    })
-    const batch = t.db.batch.bind(t.db)
-    vi.spyOn(t.db, 'batch').mockImplementationOnce(async (statements) => {
-      await t.db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, 'task'))
-      return batch(statements)
-    })
-    expect(await createTaskService(t.db).adoptPullNumbers('acme', 'widget', new Map([['feature', 42]]))).toBe(0)
-    const [task] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task'))
-    expect(task).toMatchObject({ ...patch, pullNumber: 'pullNumber' in patch ? patch.pullNumber : null })
-  })
+  it.each([{ pullNumber: 99 }, { branch: 'different' }, { status: 'archived' as const }])(
+    'preserves a task changed between adoption lookup and write: %j',
+    async (patch) => {
+      await t.db
+        .insert(schema.workspaces)
+        .values({ id: 'workspace', name: 'Workspace', isDefault: true, sort: 0, createdAt: 1, updatedAt: 1 })
+      await t.db.insert(schema.projects).values({
+        id: 'project',
+        name: 'widget',
+        workspaceId: 'workspace',
+        sort: 0,
+        hidden: false,
+        githubOwner: 'acme',
+        githubName: 'widget',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      await t.db.insert(schema.tasks).values({
+        id: 'task',
+        title: 'Task',
+        origin: 'local',
+        projectId: 'project',
+        branch: 'feature',
+        status: 'active',
+        sort: 0,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      const batch = t.db.batch.bind(t.db)
+      vi.spyOn(t.db, 'batch').mockImplementationOnce(async (statements) => {
+        await t.db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, 'task'))
+        return batch(statements)
+      })
+      expect(await createTaskService(t.db).adoptPullNumbers('acme', 'widget', new Map([['feature', 42]]))).toBe(0)
+      const [task] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task'))
+      expect(task).toMatchObject({ ...patch, pullNumber: 'pullNumber' in patch ? patch.pullNumber : null })
+    },
+  )
 
   it('adopts the same PR number across every matching project clone', async () => {
     const now = Date.now()
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-github', name: 'GitHub', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-github', name: 'GitHub', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values([
-      { id: 'project-one', name: 'one', path: '/tmp/one', workspaceId: 'workspace-github', sort: 0, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/widget.git', githubOwner: 'acme', githubName: 'widget', githubRepoId: 1, createdAt: now, updatedAt: now },
-      { id: 'project-two', name: 'two', path: '/tmp/two', workspaceId: 'workspace-github', sort: 1, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/widget.git', githubOwner: 'Acme', githubName: 'Widget', githubRepoId: 1, createdAt: now + 1, updatedAt: now + 1 },
+      {
+        id: 'project-one',
+        name: 'one',
+        path: '/tmp/one',
+        workspaceId: 'workspace-github',
+        sort: 0,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: 'https://github.com/acme/widget.git',
+        githubOwner: 'acme',
+        githubName: 'widget',
+        githubRepoId: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'project-two',
+        name: 'two',
+        path: '/tmp/two',
+        workspaceId: 'workspace-github',
+        sort: 1,
+        hidden: false,
+        vcs: 'git',
+        defaultBranch: 'main',
+        remoteUrl: 'https://github.com/acme/widget.git',
+        githubOwner: 'Acme',
+        githubName: 'Widget',
+        githubRepoId: 1,
+        createdAt: now + 1,
+        updatedAt: now + 1,
+      },
     ])
     await t.db.insert(schema.tasks).values([
-      { id: 'clone-one-task', title: 'one', origin: 'github-pr', projectId: 'project-one', branch: 'fix-one', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now },
-      { id: 'clone-two-task', title: 'two', origin: 'github-pr', projectId: 'project-two', branch: 'fix-one', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 1, createdAt: now, updatedAt: now },
+      {
+        id: 'clone-one-task',
+        title: 'one',
+        origin: 'github-pr',
+        projectId: 'project-one',
+        branch: 'fix-one',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 0,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'clone-two-task',
+        title: 'two',
+        origin: 'github-pr',
+        projectId: 'project-two',
+        branch: 'fix-one',
+        worktreePath: null,
+        pullNumber: null,
+        status: 'active',
+        parentId: null,
+        sort: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
     ])
 
     const adopted = await createTaskService(t.db).adoptPullNumbers('ACME', 'WIDGET', new Map([['fix-one', 42]]))
     expect(adopted).toBe(2)
     const rows = await t.db.select({ id: schema.tasks.id, pullNumber: schema.tasks.pullNumber }).from(schema.tasks)
-    expect(rows).toEqual(expect.arrayContaining([
-      { id: 'clone-one-task', pullNumber: 42 },
-      { id: 'clone-two-task', pullNumber: 42 },
-    ]))
+    expect(rows).toEqual(
+      expect.arrayContaining([
+        { id: 'clone-one-task', pullNumber: 42 },
+        { id: 'clone-two-task', pullNumber: 42 },
+      ]),
+    )
     expect(broadcasts).toContainEqual({ channel: 'tasks:changed', taskId: null })
   })
 })
@@ -293,15 +552,38 @@ describe('task pull attachments', () => {
   beforeEach(async () => {
     t = makeTestDb()
     broadcasts.length = 0
-    await t.db.insert(schema.workspaces).values({ id: 'workspace-pulls', name: 'Pulls', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-pulls', name: 'Pulls', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await t.db.insert(schema.projects).values({
-      id: 'project-pulls', name: 'widget', path: null, workspaceId: 'workspace-pulls', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: 'Acme', githubName: 'Widget', githubRepoId: 1,
-      createdAt: now, updatedAt: now,
+      id: 'project-pulls',
+      name: 'widget',
+      path: null,
+      workspaceId: 'workspace-pulls',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: null,
+      githubOwner: 'Acme',
+      githubName: 'Widget',
+      githubRepoId: 1,
+      createdAt: now,
+      updatedAt: now,
     })
     await t.db.insert(schema.tasks).values({
-      id: 'task-pulls', title: 'Pull task', origin: 'local', projectId: 'project-pulls', branch: 'feat/pulls',
-      worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: now, updatedAt: now,
+      id: 'task-pulls',
+      title: 'Pull task',
+      origin: 'local',
+      projectId: 'project-pulls',
+      branch: 'feat/pulls',
+      worktreePath: null,
+      pullNumber: null,
+      status: 'active',
+      parentId: null,
+      sort: 0,
+      createdAt: now,
+      updatedAt: now,
     })
   })
 
@@ -310,10 +592,17 @@ describe('task pull attachments', () => {
   it('claims one primary and records later agent-created pulls as related', async () => {
     const tasks = createTaskService(t.db)
     const first = await tasks.attachPull('task-pulls', {
-      repoOwner: 'ACME', repoName: 'WIDGET', pullNumber: 41, sessionId: 'session-one',
+      repoOwner: 'ACME',
+      repoName: 'WIDGET',
+      pullNumber: 41,
+      sessionId: 'session-one',
     })
     const second = await tasks.attachPull('task-pulls', {
-      repoOwner: 'acme', repoName: 'widget', pullNumber: 42, sessionId: 'session-two', requestId: 'request-two',
+      repoOwner: 'acme',
+      repoName: 'widget',
+      pullNumber: 42,
+      sessionId: 'session-two',
+      requestId: 'request-two',
     })
 
     expect(first.role).toBe('primary')
@@ -332,22 +621,29 @@ describe('task pull attachments', () => {
   it('is idempotent for the same task pull and rejects another repository', async () => {
     const tasks = createTaskService(t.db)
     const seed = { repoOwner: 'acme', repoName: 'widget', pullNumber: 41, sessionId: 'session-one' }
-    expect(await tasks.attachPull('task-pulls', seed)).toEqual(await tasks.attachPull('task-pulls', { ...seed, sessionId: 'later-session' }))
-    await expect(tasks.attachPull('task-pulls', {
-      repoOwner: 'acme', repoName: 'other', pullNumber: 9, sessionId: 'session-one',
-    })).rejects.toThrow(/does not match/)
+    expect(await tasks.attachPull('task-pulls', seed)).toEqual(
+      await tasks.attachPull('task-pulls', { ...seed, sessionId: 'later-session' }),
+    )
+    await expect(
+      tasks.attachPull('task-pulls', {
+        repoOwner: 'acme',
+        repoName: 'other',
+        pullNumber: 9,
+        sessionId: 'session-one',
+      }),
+    ).rejects.toThrow(/does not match/)
     expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
       { channel: 'tasks:changed', taskId: 'task-pulls' },
     ])
   })
 })
 
-
 describe('child task base branches', () => {
   let t: TestDb
   let dir: string
   let previousRoot: string
-  const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const git = (...args: string[]) =>
+    execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   beforeEach(async () => {
     t = makeTestDb()
     dir = mkdtempSync(join(tmpdir(), 'acorn-child-base-'))
@@ -359,9 +655,38 @@ describe('child task base branches', () => {
     git('-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'parent work')
     git('switch', '-q', 'main')
     const at = Date.now()
-    t.db.insert(schema.workspaces).values({ id: 'w', name: 'Git', isDefault: true, sort: 0, createdAt: at, updatedAt: at }).run()
-    t.db.insert(schema.projects).values({ id: 'p', name: 'p', path: dir, workspaceId: 'w', vcs: 'git', sort: 0, hidden: false, createdAt: at, updatedAt: at }).run()
-    t.db.insert(schema.tasks).values({ id: 'parent', title: 'Parent', origin: 'local', projectId: 'p', branch: null, status: 'active', sort: 0, createdAt: at, updatedAt: at }).run()
+    t.db
+      .insert(schema.workspaces)
+      .values({ id: 'w', name: 'Git', isDefault: true, sort: 0, createdAt: at, updatedAt: at })
+      .run()
+    t.db
+      .insert(schema.projects)
+      .values({
+        id: 'p',
+        name: 'p',
+        path: dir,
+        workspaceId: 'w',
+        vcs: 'git',
+        sort: 0,
+        hidden: false,
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run()
+    t.db
+      .insert(schema.tasks)
+      .values({
+        id: 'parent',
+        title: 'Parent',
+        origin: 'local',
+        projectId: 'p',
+        branch: null,
+        status: 'active',
+        sort: 0,
+        createdAt: at,
+        updatedAt: at,
+      })
+      .run()
   })
   afterEach(() => {
     t.cleanup()

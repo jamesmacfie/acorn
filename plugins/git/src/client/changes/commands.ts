@@ -81,11 +81,23 @@ export const changesCommands = (run: {
  */
 export const changesBindings = (editorFocused: () => boolean) => [
   {
-    id: COMMIT_COMMAND, command: COMMIT_COMMAND, description: 'Commit', category: 'Changes',
-    defaultChord: 'meta+enter', when: 'pane' as const, pane: GIT_PANE, active: editorFocused,
+    id: COMMIT_COMMAND,
+    command: COMMIT_COMMAND,
+    description: 'Commit',
+    category: 'Changes',
+    defaultChord: 'meta+enter',
+    when: 'pane' as const,
+    pane: GIT_PANE,
+    active: editorFocused,
   },
   {
-    id: AMEND_COMMAND, command: AMEND_COMMAND, description: 'Amend the last commit', category: 'Changes',
-    defaultChord: 'meta+alt+enter', when: 'pane' as const, pane: GIT_PANE, active: editorFocused,
+    id: AMEND_COMMAND,
+    command: AMEND_COMMAND,
+    description: 'Amend the last commit',
+    category: 'Changes',
+    defaultChord: 'meta+alt+enter',
+    when: 'pane' as const,
+    pane: GIT_PANE,
+    active: editorFocused,
   },
 ]

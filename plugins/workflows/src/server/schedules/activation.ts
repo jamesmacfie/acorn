@@ -22,17 +22,32 @@ export const workflowScheduleService = (
     describeSource: async (reference, scope, inputs) => {
       const userId = core.identity.active()
       if (!userId) throw new Error('Schedule review requires an active owner')
-      const invocation = { principal: { kind: 'internal' as const, scope: 'service' as const, userId }, signal: AbortSignal.timeout(60_000) }
+      const invocation = {
+        principal: { kind: 'internal' as const, scope: 'service' as const, userId },
+        signal: AbortSignal.timeout(60_000),
+      }
       // Resolution scopes also carry repo and user directories for workflow loading. The query
       // and source seams deliberately accept only their public scope fields, so do not leak the
       // wider workflow object across that validation boundary.
       const queryScope = { workspaceId: scope.workspaceId, projectId: scope.projectId }
-      const resolved = await ctx.dataSources.resolveQuery(queryScope, destinationQuery(reference, queryScope), { inputs }, invocation)
+      const resolved = await ctx.dataSources.resolveQuery(
+        queryScope,
+        destinationQuery(reference, queryScope),
+        { inputs },
+        invocation,
+      )
       const [description, catalog] = await Promise.all([
-        ctx.dataSources.invoke({ operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }, invocation),
+        ctx.dataSources.invoke(
+          { operation: 'describe', source: resolved.query.source, scope: resolved.query.scope },
+          invocation,
+        ),
         ctx.dataSources.list({ ...queryScope, parameters: {} }, invocation),
       ])
-      const source = catalog.sources.find(candidate => candidate.pluginId === resolved.query.source.pluginId && candidate.sourceId === resolved.query.source.sourceId)
+      const source = catalog.sources.find(
+        (candidate) =>
+          candidate.pluginId === resolved.query.source.pluginId &&
+          candidate.sourceId === resolved.query.source.sourceId,
+      )
       return {
         label: source?.plural ?? source?.name ?? resolved.query.source.sourceId,
         schema: description.schema,
@@ -45,44 +60,55 @@ export const workflowScheduleService = (
   return scheduleService
 }
 
-export const workflowScheduleTarget = (scheduleService: WorkflowScheduleService): Parameters<ScheduleContext['schedules']['registerTarget']>[0] => {
+export const workflowScheduleTarget = (
+  scheduleService: WorkflowScheduleService,
+): Parameters<ScheduleContext['schedules']['registerTarget']>[0] => {
   return {
     kind: 'workflow',
-    parse: raw => {
+    parse: (raw) => {
       const parsed = parseWorkflowScheduleTarget(raw)
       return parsed && scheduleService.get(parsed.scheduleId) ? parsed : null
     },
     risk: () => 'execute',
-    timezone: target => scheduleService.timezone((target as { scheduleId: string }).scheduleId),
-    run: (target, signal, _consent, context) => scheduleService.dispatch(
-      (target as { scheduleId: string }).scheduleId,
-      { reason: context.reason, dueAt: context.dueAt, requestKey: context.requestKey },
-    ).then(result => signal.aborted ? Promise.reject(signal.reason) : result),
-    remove: target => scheduleService.remove((target as { scheduleId: string }).scheduleId),
+    timezone: (target) => scheduleService.timezone((target as { scheduleId: string }).scheduleId),
+    run: (target, signal, _consent, context) =>
+      scheduleService
+        .dispatch((target as { scheduleId: string }).scheduleId, {
+          reason: context.reason,
+          dueAt: context.dueAt,
+          requestKey: context.requestKey,
+        })
+        .then((result) => (signal.aborted ? Promise.reject(signal.reason) : result)),
+    remove: (target) => scheduleService.remove((target as { scheduleId: string }).scheduleId),
   }
 }
 
 export const workflowScheduleBridge = (scheduleService: WorkflowScheduleService): WorkflowSchedulesBridge => {
   return {
     list: () => scheduleService.views(),
-    get: id => scheduleService.view(id),
+    get: (id) => scheduleService.view(id),
     defaults: () => ({ timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }),
-    prepare: input => scheduleService.prepare(input),
-    save: input => scheduleService.saveManaged(input),
+    prepare: (input) => scheduleService.prepare(input),
+    save: (input) => scheduleService.saveManaged(input),
     approve: async (id, firstCheck, freshEpoch) => {
       await scheduleService.approve(id, firstCheck, freshEpoch)
       return scheduleService.view(id)
     },
     pause: (id, paused) => scheduleService.pause(id, paused),
-    runNow: id => scheduleService.runNow(id),
-    remove: id => scheduleService.deleteManaged(id),
+    runNow: (id) => scheduleService.runNow(id),
+    remove: (id) => scheduleService.deleteManaged(id),
   }
 }
 
 /** A Node clock backs trigger sweeps, with GitHub changes as an early wakeup. */
-export const registerWorkflowTriggers = (ctx: Pick<PluginContext, 'events' | 'schedules' | 'log'>, runner: WorkflowRunner): void => {
+export const registerWorkflowTriggers = (
+  ctx: Pick<PluginContext, 'events' | 'schedules' | 'log'>,
+  runner: WorkflowRunner,
+): void => {
   ctx.events.on('plugin:github:checks-changed', () => {
-    void runner.pollTriggers().catch(error => ctx.log.warn(`trigger sweep after checks-changed failed: ${describeError(error).message}`))
+    void runner
+      .pollTriggers()
+      .catch((error) => ctx.log.warn(`trigger sweep after checks-changed failed: ${describeError(error).message}`))
   })
   ctx.schedules.register({
     scheduleId: 'triggers',

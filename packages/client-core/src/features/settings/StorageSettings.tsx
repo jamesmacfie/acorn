@@ -72,12 +72,18 @@ export default function StorageSettings(props: { nodeId: string | null }) {
     const timer = setInterval(() => void read(), POLL_MS)
     onCleanup(() => clearInterval(timer))
   })
-  createEffect(on(nodeId, () => {
-    setReport(null)
-    setSaved(undefined)
-    setCleared('')
-    void read()
-  }, { defer: true }))
+  createEffect(
+    on(
+      nodeId,
+      () => {
+        setReport(null)
+        setSaved(undefined)
+        setCleared('')
+        void read()
+      },
+      { defer: true },
+    ),
+  )
 
   const clear = async () => {
     setClearing(true)
@@ -97,7 +103,10 @@ export default function StorageSettings(props: { nodeId: string | null }) {
   // line below Node process › Memory.
   const diskFacts = (value: NodeStorageReport) => [
     { label: 'Core database', value: formatBytes(value.coreDatabaseBytes) },
-    ...value.pluginDatabases.map((entry) => ({ label: `${pluginLabel(entry.plugin)} plugin`, value: formatBytes(entry.bytes) })),
+    ...value.pluginDatabases.map((entry) => ({
+      label: `${pluginLabel(entry.plugin)} plugin`,
+      value: formatBytes(entry.bytes),
+    })),
     { label: 'Blob cache', value: formatBytes(value.blobCacheBytes) },
   ]
 
@@ -110,13 +119,29 @@ export default function StorageSettings(props: { nodeId: string | null }) {
       <Slot point={CORE_STORAGE_POINT} props={() => ({ nodeId: nodeId() })} />
 
       <SettingsSection id="process" label="Node process">
-        <Show when={report()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
-          {(value) => <Facts grouping="rows" items={[{ label: 'Memory', value: `about ${formatBytes(value().rssBytes)}` }]} />}
+        <Show
+          when={report()}
+          fallback={
+            <EmptyState busy align="start" size="sm">
+              Loading…
+            </EmptyState>
+          }
+        >
+          {(value) => (
+            <Facts grouping="rows" items={[{ label: 'Memory', value: `about ${formatBytes(value().rssBytes)}` }]} />
+          )}
         </Show>
       </SettingsSection>
 
       <SettingsSection id="disk" label="Disk" help="Worktrees aren't counted. Sizes update every 30 seconds.">
-        <Show when={report()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
+        <Show
+          when={report()}
+          fallback={
+            <EmptyState busy align="start" size="sm">
+              Loading…
+            </EmptyState>
+          }
+        >
           {(value) => <Facts grouping="rows" items={diskFacts(value())} />}
         </Show>
       </SettingsSection>
@@ -125,21 +150,30 @@ export default function StorageSettings(props: { nodeId: string | null }) {
         id="cache"
         label="Saved cache on this device"
         help="A copy of what this node last sent, so acorn opens without waiting for it. Clearing it makes acorn load everything again."
-        actions={<Button size="sm" busy={clearing()} onPress={() => void clear()}>Clear this node's copy</Button>}
+        actions={
+          <Button size="sm" busy={clearing()} onPress={() => void clear()}>
+            Clear this node's copy
+          </Button>
+        }
       >
         <Stack gap="row">
           <Show when={saved() !== undefined}>
             <Show when={saved()} fallback={<Text emphasis="muted">Nothing is saved for this node.</Text>}>
               {(value) => (
-                <Facts grouping="rows" items={[
-                  { label: 'Size', value: formatBytes(value().bytes) },
-                  { label: 'Entries', value: String(value().entries) },
-                ]} />
+                <Facts
+                  grouping="rows"
+                  items={[
+                    { label: 'Size', value: formatBytes(value().bytes) },
+                    { label: 'Entries', value: String(value().entries) },
+                  ]}
+                />
               )}
             </Show>
           </Show>
           <Show when={cleared()}>
-            <Text emphasis="muted" wrap>{cleared()}</Text>
+            <Text emphasis="muted" wrap>
+              {cleared()}
+            </Text>
           </Show>
         </Stack>
       </SettingsSection>

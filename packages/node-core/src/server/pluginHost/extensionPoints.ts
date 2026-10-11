@@ -46,11 +46,16 @@ const extensions = new Map<string, Extension<unknown>[]>()
 export function openExtensionPoint(ownerId: string, id: ExtensionPointId<unknown>, label: string): Disposable {
   const ref = parseExtensionPointRef(id)
   if (!ref) throw new Error(`Extension point '${id}' is not a '<pluginId>:<pointId>' id.`)
-  if (ref.owner !== ownerId) throw new Error(`Plugin '${ownerId}' may only open points under '${ownerId}:', not '${id}'.`)
+  if (ref.owner !== ownerId)
+    throw new Error(`Plugin '${ownerId}' may only open points under '${ownerId}:', not '${id}'.`)
   if (points.has(id)) throw new Error(`Extension point already open: ${id}`)
   const point = { id, ownerId, label }
   points.set(id, point)
-  return { dispose: () => { if (points.get(id) === point) points.delete(id) } }
+  return {
+    dispose: () => {
+      if (points.get(id) === point) points.delete(id)
+    },
+  }
 }
 
 /** Contribute one entry to somebody else's point (or your own). Registering before the point is open
@@ -69,7 +74,11 @@ export function contributeExtension<T>(
   return {
     dispose: () => {
       const current = extensions.get(point)
-      if (current) extensions.set(point, current.filter((existing) => existing !== contribution))
+      if (current)
+        extensions.set(
+          point,
+          current.filter((existing) => existing !== contribution),
+        )
     },
   }
 }
@@ -80,7 +89,9 @@ export function contributeExtension<T>(
  *  owner to hand it to. */
 export function extensionsFor<T>(point: ExtensionPointId<T>): Extension<T>[] {
   if (!points.has(point)) return []
-  return [...(extensions.get(point) ?? [])].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)) as Extension<T>[]
+  return [...(extensions.get(point) ?? [])].sort(
+    (a, b) => a.order - b.order || a.id.localeCompare(b.id),
+  ) as Extension<T>[]
 }
 
 /** Every point open on this node, for the disclosure surfaces and for tests. */

@@ -7,7 +7,13 @@ import type { PlanRecordItem } from './plan'
 export type DashboardDisplayFieldType = 'text' | 'number' | 'boolean' | 'datetime' | 'enum' | 'person' | 'link'
 export type DashboardDisplayFieldRole = 'title' | 'status' | 'assignee' | 'url' | 'updated'
 export type DashboardDisplayTone = 'ok' | 'warn' | 'bad' | 'muted' | 'accent'
-export type DashboardDisplayChoice = { id: string; label: string; tone?: DashboardDisplayTone; rank?: number; icon?: string }
+export type DashboardDisplayChoice = {
+  id: string
+  label: string
+  tone?: DashboardDisplayTone
+  rank?: number
+  icon?: string
+}
 export type DashboardDisplayField = {
   id: string
   name: string

@@ -1,4 +1,9 @@
-import type { RollbarItemMetadata, RollbarItemSummary, RollbarOccurrenceDetail, RollbarOccurrencesResponse } from '../shared/api'
+import type {
+  RollbarItemMetadata,
+  RollbarItemSummary,
+  RollbarOccurrenceDetail,
+  RollbarOccurrencesResponse,
+} from '../shared/api'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import {
   itemByCounterPath,
@@ -61,8 +66,11 @@ const rollbarProjectSource: ProviderProjectSource = {
 }
 
 const isSummary = (value: unknown): value is RollbarItemSummary =>
-  isRecord(value) && typeof value.integrationId === 'string' && typeof value.identifier === 'string' &&
-  typeof value.title === 'string' && (typeof value.url === 'string' || value.url === null)
+  isRecord(value) &&
+  typeof value.integrationId === 'string' &&
+  typeof value.identifier === 'string' &&
+  typeof value.title === 'string' &&
+  (typeof value.url === 'string' || value.url === null)
 const isMetadata = (value: unknown): value is RollbarItemMetadata =>
   isSummary(value) && isRecord(value) && 'resolvedInVersion' in value && 'assignedTo' in value && 'url' in value
 
@@ -102,7 +110,15 @@ const rollbarCodec: CachedItemCodec<RollbarItemSummary, RollbarItemMetadata, Rol
   parse: parseRollbar,
   // List refresh: new summary wins, existing detail + its freshness are preserved (docs/caching.md).
   mergeSummary(existing, ref, summary, fetchedAt) {
-    return { ref, summary, detail: existing?.detail, detailFetchedAt: existing?.detailFetchedAt, listFetchedAt: fetchedAt, truncated: existing?.truncated, schemaVersion: 4 }
+    return {
+      ref,
+      summary,
+      detail: existing?.detail,
+      detailFetchedAt: existing?.detailFetchedAt,
+      listFetchedAt: fetchedAt,
+      truncated: existing?.truncated,
+      schemaVersion: 4,
+    }
   },
   // Detail refresh sets its own detailFetchedAt; the caller re-applies the preserved listFetchedAt.
   withDetail(ref, summary, detail, fetchedAt) {
@@ -131,14 +147,23 @@ async function upsertIssue(context: RefreshCtx, summary: RollbarItemSummary, cac
 }
 
 function refForSummary(summary: RollbarItemSummary): ExternalRef {
-  return { providerId: 'rollbar', connectionId: summary.integrationId, displayId: summary.identifier, ...(summary.itemId ? { externalId: summary.itemId } : {}) }
+  return {
+    providerId: 'rollbar',
+    connectionId: summary.integrationId,
+    displayId: summary.identifier,
+    ...(summary.itemId ? { externalId: summary.itemId } : {}),
+  }
 }
 
 async function persistSummary(context: RefreshCtx, summary: RollbarItemSummary): Promise<void> {
   const ref = refForSummary(summary)
   const previous = await context.items.read(summary.integrationId, summary.identifier)
   const parsed = previous ? parseCached(rollbarCodec, previous.data, ref) : null
-  await upsertIssue(context, summary, rollbarCodec.mergeSummary(parsed?.ok ? parsed.value : null, ref, summary, context.now))
+  await upsertIssue(
+    context,
+    summary,
+    rollbarCodec.mergeSummary(parsed?.ok ? parsed.value : null, ref, summary, context.now),
+  )
 }
 
 async function persistDetail(context: RefreshCtx, detail: RollbarItemMetadata): Promise<void> {
@@ -169,7 +194,11 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
     if (input.kind === 'detail') {
       const row = await context.items.read(context.connection.id, input.identifier)
       if (!row) return null
-      const parsed = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: context.connection.id, displayId: input.identifier })
+      const parsed = parseCached(rollbarCodec, row.data, {
+        providerId: 'rollbar',
+        connectionId: context.connection.id,
+        displayId: input.identifier,
+      })
       // Only a real detail read counts as cached; its freshness is detailFetchedAt (never the list's).
       return parsed.ok && parsed.value.detail && parsed.value.detailFetchedAt != null
         ? { data: parsed.value.detail, fetchedAt: parsed.value.detailFetchedAt }
@@ -186,7 +215,11 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
     if (listAt == null) return null // never listed → cold, force a refresh
     // Current membership is exact: only rows stamped with this list's fetch time (docs/caching.md).
     const items = rows.flatMap((row) => {
-      const parsed = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: row.integrationId, displayId: row.identifier })
+      const parsed = parseCached(rollbarCodec, row.data, {
+        providerId: 'rollbar',
+        connectionId: row.integrationId,
+        displayId: row.identifier,
+      })
       return parsed.ok && parsed.value.listFetchedAt === listAt ? [parsed.value.summary] : []
     })
     return { data: { items, capped: items.length >= context.limits.maxPages * ROLLBAR_PER_PAGE }, fetchedAt: listAt }
@@ -198,12 +231,19 @@ const rollbarItemsResource: MirroredResourceContribution<RollbarResourceInput, R
         const row = await context.items.read(context.connection.id, input.identifier)
         const cachedItemId = row
           ? (() => {
-              const p = parseCached(rollbarCodec, row.data, { providerId: 'rollbar', connectionId: context.connection.id, displayId: input.identifier })
+              const p = parseCached(rollbarCodec, row.data, {
+                providerId: 'rollbar',
+                connectionId: context.connection.id,
+                displayId: input.identifier,
+              })
               return p.ok && p.value.summary.itemId ? p.value.summary.itemId : null
             })()
           : null
         // Prefer the known system id; fall back to counter resolution for legacy links.
-        const itemRes = await rollbarFetch(context.secret, cachedItemId ? itemByIdPath(cachedItemId) : itemByCounterPath(input.identifier))
+        const itemRes = await rollbarFetch(
+          context.secret,
+          cachedItemId ? itemByIdPath(cachedItemId) : itemByCounterPath(input.identifier),
+        )
         const failure = failFor(itemRes)
         if (failure) return { ok: false, failure }
         const apiItem = await rollbarData<RollbarApiItem>(itemRes)
@@ -240,7 +280,9 @@ async function cachedItemId(context: ProviderResourceContext, identifier: string
   const row = await context.items.read(context.connection.id, identifier)
   if (!row) return null
   const parsed = parseCached(rollbarCodec, row.data, {
-    providerId: 'rollbar', connectionId: context.connection.id, displayId: identifier,
+    providerId: 'rollbar',
+    connectionId: context.connection.id,
+    displayId: identifier,
   })
   return parsed.ok && parsed.value.summary.itemId ? parsed.value.summary.itemId : null
 }
@@ -258,23 +300,40 @@ const occurrenceResources = createRollbarOccurrenceResources({
 // The two occurrence reads stay soft. An item whose occurrences cannot be listed is still worth
 // handing over: an agent can act on the title, the level and the environment.
 const rollbarItemDetail: ProviderItemDetail = async (context, identifier) => {
-  const metadata = await context.resource<RollbarResourceInput, RollbarItemMetadata>(ROLLBAR_ITEMS_RESOURCE, { kind: 'detail', identifier })
+  const metadata = await context.resource<RollbarResourceInput, RollbarItemMetadata>(ROLLBAR_ITEMS_RESOURCE, {
+    kind: 'detail',
+    identifier,
+  })
   if (!metadata.ok) {
     if (metadata.failure.status === 404) return null
     throw new Error(metadata.failure.error)
   }
-  const occurrences = await context.resource<RollbarOccurrencesInput, RollbarOccurrencesResponse>(ROLLBAR_OCCURRENCES_RESOURCE, { identifier })
+  const occurrences = await context.resource<RollbarOccurrencesInput, RollbarOccurrencesResponse>(
+    ROLLBAR_OCCURRENCES_RESOURCE,
+    { identifier },
+  )
   const latest = occurrences.ok ? occurrences.value.occurrences[0] : undefined
   if (!latest) return composeItemDetail(metadata.value, null)
-  const occurrence = await context.resource<RollbarOccurrenceInput, RollbarOccurrenceDetail>(ROLLBAR_OCCURRENCE_RESOURCE, { identifier, occurrenceId: latest.id })
+  const occurrence = await context.resource<RollbarOccurrenceInput, RollbarOccurrenceDetail>(
+    ROLLBAR_OCCURRENCE_RESOURCE,
+    { identifier, occurrenceId: latest.id },
+  )
   return composeItemDetail(metadata.value, occurrence.ok ? occurrence.value : null)
 }
 
 const CONFORMANCE_SUMMARY: RollbarItemSummary = {
-  integrationId: 'rollbar-test', integrationLabel: 'Rollbar · acme', identifier: '142', itemId: '999',
+  integrationId: 'rollbar-test',
+  integrationLabel: 'Rollbar · acme',
+  identifier: '142',
+  itemId: '999',
   url: 'https://rollbar.com/item/999/',
-  title: 'TypeError updated', level: 'error', environment: 'prod', status: 'active', totalOccurrences: 4,
-  firstOccurrenceAt: 1, lastOccurrenceAt: 3,
+  title: 'TypeError updated',
+  level: 'error',
+  environment: 'prod',
+  status: 'active',
+  totalOccurrences: 4,
+  firstOccurrenceAt: 1,
+  lastOccurrenceAt: 3,
 }
 
 export const rollbarProvider = publicProvider({
@@ -286,16 +345,23 @@ export const rollbarProvider = publicProvider({
     authKind: 'api-key',
     connectable: true,
     disconnectable: true,
-    fields: [{
-      id: 'token', label: 'Project access token (read)', type: 'password', placeholder: 'read token…',
-      hint: 'Rollbar → project → Settings → Project Access Tokens (read scope). One connection per project.', required: true,
-    }],
+    fields: [
+      {
+        id: 'token',
+        label: 'Project access token (read)',
+        type: 'password',
+        placeholder: 'read token…',
+        hint: 'Rollbar → project → Settings → Project Access Tokens (read scope). One connection per project.',
+        required: true,
+      },
+    ],
     async validate(credentials): Promise<RollbarValidated> {
       const secret = credentials.token?.trim()
       if (!secret) throw new ProviderOperationError('provider_bad_config', 400)
       try {
         const response = await rollbarFetch(secret, projectPath)
-        if (response.status === 401 || response.status === 403) throw new ProviderOperationError('provider_needs_auth', 401)
+        if (response.status === 401 || response.status === 403)
+          throw new ProviderOperationError('provider_needs_auth', 401)
         if (!response.ok) throw new ProviderOperationError('provider_unavailable', 502)
         return { project: await rollbarData<RollbarProject>(response), secret }
       } catch (error) {
@@ -311,7 +377,12 @@ export const rollbarProvider = publicProvider({
         account: { id: projectId, label: validated.project.name, type: 'project' },
         scopes: ['read'],
         config: { projectId },
-        capabilities: { browse: 'available', linkExisting: 'available', promoteToTask: 'available', contextFormat: 'available' },
+        capabilities: {
+          browse: 'available',
+          linkExisting: 'available',
+          promoteToTask: 'available',
+          contextFormat: 'available',
+        },
       }
     },
     async test(secret) {
@@ -328,7 +399,12 @@ export const rollbarProvider = publicProvider({
   },
   externalIds: externalIdsFor('rollbar'),
   capabilities: {
-    browse: true, linkExisting: true, promoteToTask: true, comments: 'none', repoAffinity: 'none', contextFormat: true,
+    browse: true,
+    linkExisting: true,
+    promoteToTask: true,
+    comments: 'none',
+    repoAffinity: 'none',
+    contextFormat: true,
   },
   resources: [rollbarItemsResource, occurrenceResources.occurrences, occurrenceResources.occurrence],
   projects: rollbarProjectSource,
@@ -341,7 +417,9 @@ export const rollbarProvider = publicProvider({
         id: `rollbar:${ref.connectionId}:${ref.displayId}`,
         kind: 'Rollbar',
         label: data ? `#${ref.displayId} — ${data.title}` : `#${ref.displayId}`,
-        details: [data ? `${data.level} · ${data.status}` : '', state === 'fresh' ? '' : `Cache: ${state}`].filter(Boolean),
+        details: [data ? `${data.level} · ${data.status}` : '', state === 'fresh' ? '' : `Cache: ${state}`].filter(
+          Boolean,
+        ),
         jump: { pane: 'rollbar', itemId: ref.displayId, ref },
       }
     },
@@ -364,7 +442,9 @@ export const rollbarProvider = publicProvider({
     } satisfies RollbarCached,
     summary: CONFORMANCE_SUMMARY,
     detail: {
-      ...CONFORMANCE_SUMMARY, resolvedInVersion: null, assignedTo: null,
+      ...CONFORMANCE_SUMMARY,
+      resolvedInVersion: null,
+      assignedTo: null,
     } satisfies RollbarItemMetadata,
   },
 })

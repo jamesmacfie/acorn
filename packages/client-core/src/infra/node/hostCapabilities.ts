@@ -37,11 +37,7 @@ import { nodePlugins } from './nodePlugins'
 // wrong both for anything whose implementation is an HTTP route and for anything a shell can ship
 // without — the desktop's own preview views are optional, so the preview pane asks `{ seam: 'preview' }`
 // rather than "am I the desktop" (docs/frontend/registries.md § Gates).
-export type HostRequirement =
-  | 'desktop'
-  | { plugin: string }
-  | { loadedPlugin: string }
-  | { seam: SeamGroup }
+export type HostRequirement = 'desktop' | { plugin: string } | { loadedPlugin: string } | { seam: SeamGroup }
 
 // `requires` on a contribution, and the rule for where that field belongs: EVERY contribution the host
 // filters before drawing takes it, because the question is the host's and the answer is the same
@@ -66,11 +62,11 @@ const meets = (requirement: HostRequirement): boolean => {
   }
   // Browser-origin clients have no device custody or fleet id. The active-node roster remains their
   // compiled capability source, using the same conservative runtime adapter as fleet distribution.
-  return (nodePlugins()?.plugins ?? []).some((row) =>
-    row.name === requirement.plugin && (
-      runtimeIdentityForRow(row)?.activation === 'node' ||
-      compiledServiceActive(row)
-    ))
+  return (nodePlugins()?.plugins ?? []).some(
+    (row) =>
+      row.name === requirement.plugin &&
+      (runtimeIdentityForRow(row)?.activation === 'node' || compiledServiceActive(row)),
+  )
 }
 
 /** Whether `meets` has a roster to answer a plugin requirement from yet. Before it does, every plugin

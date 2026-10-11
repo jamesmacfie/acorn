@@ -32,7 +32,11 @@ export type MeasureSeries = DashboardHistoryResponse
 export async function appendSample(
   db: AppDatabase,
   sample: {
-    panelId: string; signature: string; bucket: number; value: number; recordedAt: number
+    panelId: string
+    signature: string
+    bucket: number
+    value: number
+    recordedAt: number
     /** A series written under this older signature is relabelled rather than reset. */
     adopt?: string
   },
@@ -45,7 +49,9 @@ export async function appendSample(
     .limit(1)
   const previous = existing[0]?.signature
   if (previous !== undefined && previous !== input.signature && previous === adopt) {
-    await db.update(schema.dashboardMeasureSamples).set({ signature: input.signature })
+    await db
+      .update(schema.dashboardMeasureSamples)
+      .set({ signature: input.signature })
       .where(eq(schema.dashboardMeasureSamples.panelId, input.panelId))
   }
   const reset = previous !== undefined && previous !== input.signature && previous !== adopt
@@ -75,7 +81,10 @@ export async function readSeries(db: AppDatabase, panelId: string, since?: numbe
     .where(
       since === undefined
         ? eq(schema.dashboardMeasureSamples.panelId, panelId)
-        : and(eq(schema.dashboardMeasureSamples.panelId, panelId), sql`${schema.dashboardMeasureSamples.bucket} >= ${since}`),
+        : and(
+            eq(schema.dashboardMeasureSamples.panelId, panelId),
+            sql`${schema.dashboardMeasureSamples.bucket} >= ${since}`,
+          ),
     )
     .orderBy(asc(schema.dashboardMeasureSamples.bucket))
   return {
@@ -138,13 +147,15 @@ export async function compactHistory(
   }
   for (const [panelId, days] of keepPerPanel) {
     const keep = [...days.values()]
-    const result = await db.delete(schema.dashboardMeasureSamples).where(
-      and(
-        eq(schema.dashboardMeasureSamples.panelId, panelId),
-        lt(schema.dashboardMeasureSamples.bucket, hourlyFloor),
-        notInArray(schema.dashboardMeasureSamples.bucket, keep),
-      ),
-    )
+    const result = await db
+      .delete(schema.dashboardMeasureSamples)
+      .where(
+        and(
+          eq(schema.dashboardMeasureSamples.panelId, panelId),
+          lt(schema.dashboardMeasureSamples.bucket, hourlyFloor),
+          notInArray(schema.dashboardMeasureSamples.bucket, keep),
+        ),
+      )
     collapsed += Number(result.changes ?? 0)
   }
 
@@ -166,7 +177,10 @@ export async function compactHistory(
     const over = await db.delete(schema.dashboardMeasureSamples).where(
       and(
         eq(schema.dashboardMeasureSamples.panelId, panelId),
-        notInArray(schema.dashboardMeasureSamples.bucket, rows.map((row) => row.bucket)),
+        notInArray(
+          schema.dashboardMeasureSamples.bucket,
+          rows.map((row) => row.bucket),
+        ),
       ),
     )
     dropped += Number(over.changes ?? 0)

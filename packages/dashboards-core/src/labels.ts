@@ -11,68 +11,127 @@ type Stage = PanelPlan['stages'][number]
 type Measure = Extract<Stage, { op: 'summarize' }>['measures'][number]
 
 export const SOURCE_ROLE_LABELS: Record<PanelPlan['sources'][number]['role'], string> = {
-  primary: 'Adds rows', lookup: 'Adds columns to each row', children: 'Adds a list to each row',
+  primary: 'Adds rows',
+  lookup: 'Adds columns to each row',
+  children: 'Adds a list to each row',
 }
 
 export const COLUMN_TYPE_LABELS: Record<NonNullable<Column['type']>, string> = {
-  text: 'Text', number: 'Number', boolean: 'Yes or no', datetime: 'Date and time', enum: 'Choice', person: 'Person', link: 'Link',
+  text: 'Text',
+  number: 'Number',
+  boolean: 'Yes or no',
+  datetime: 'Date and time',
+  enum: 'Choice',
+  person: 'Person',
+  link: 'Link',
 }
 
 export const OPERATOR_LABELS: Record<DataOperator, string> = {
-  eq: 'is', ne: 'is not', lt: 'is less than', lte: 'is at most', gt: 'is more than', gte: 'is at least',
-  contains: 'contains', in: 'is one of', missing: 'is empty', present: 'has a value',
+  eq: 'is',
+  ne: 'is not',
+  lt: 'is less than',
+  lte: 'is at most',
+  gt: 'is more than',
+  gte: 'is at least',
+  contains: 'contains',
+  in: 'is one of',
+  missing: 'is empty',
+  present: 'has a value',
 }
 
 /** A comparison's words, which read differently on a date column. */
-export const operatorLabel = (operator: DataOperator, type?: Column['type']): string => type === 'datetime'
-  ? { lt: 'is before', gt: 'is after' }[operator as 'lt' | 'gt'] ?? OPERATOR_LABELS[operator]
-  : OPERATOR_LABELS[operator]
+export const operatorLabel = (operator: DataOperator, type?: Column['type']): string =>
+  type === 'datetime'
+    ? ({ lt: 'is before', gt: 'is after' }[operator as 'lt' | 'gt'] ?? OPERATOR_LABELS[operator])
+    : OPERATOR_LABELS[operator]
 
 export const TONE_LABELS: Record<NonNullable<NonNullable<Column['choices']>[number]['tone']>, string> = {
-  ok: 'Green', warn: 'Amber', bad: 'Red', muted: 'Grey', accent: 'Accent',
+  ok: 'Green',
+  warn: 'Amber',
+  bad: 'Red',
+  muted: 'Grey',
+  accent: 'Accent',
 }
 
 export const SORT_DIRECTION_LABELS: Record<NonNullable<PanelPlan['sort']>[number]['direction'], string> = {
-  asc: 'Lowest or oldest first', desc: 'Highest or newest first',
+  asc: 'Lowest or oldest first',
+  desc: 'Highest or newest first',
 }
 
 export const REQUIREMENT_STATUS_LABELS: Record<NonNullable<PanelPlan['requirements']>[number]['status'], string> = {
-  covered: 'Covered', partial: 'Partly covered', choice: 'Needs a choice', unavailable: 'Unavailable',
+  covered: 'Covered',
+  partial: 'Partly covered',
+  choice: 'Needs a choice',
+  unavailable: 'Unavailable',
 }
 
 export const TIME_MODE_LABELS: Record<PanelPlan['time']['mode'], string> = {
-  fixed: 'Always this time zone', viewer: "Each viewer's time zone",
+  fixed: 'Always this time zone',
+  viewer: "Each viewer's time zone",
 }
 
 export const WEEK_START_LABELS: Record<PanelPlan['time']['weekStart'], string> = {
-  monday: 'Monday', sunday: 'Sunday', saturday: 'Saturday',
+  monday: 'Monday',
+  sunday: 'Sunday',
+  saturday: 'Saturday',
 }
 
 export const EXPRESSION_LABELS: Record<PlanExpression['kind'], string> = {
-  column: 'A column', literal: 'A fixed value', clock: 'The current time', arithmetic: 'Arithmetic', duration: 'Time between',
-  coalesce: 'First value that exists', choice: 'By choice', min: 'Smallest of', max: 'Largest of',
+  column: 'A column',
+  literal: 'A fixed value',
+  clock: 'The current time',
+  arithmetic: 'Arithmetic',
+  duration: 'Time between',
+  coalesce: 'First value that exists',
+  choice: 'By choice',
+  min: 'Smallest of',
+  max: 'Largest of',
 }
 
 export const ARITHMETIC_LABELS: Record<Extract<PlanExpression, { kind: 'arithmetic' }>['operator'], string> = {
-  add: 'Plus', subtract: 'Minus', multiply: 'Times', divide: 'Divided by',
+  add: 'Plus',
+  subtract: 'Minus',
+  multiply: 'Times',
+  divide: 'Divided by',
 }
 
 export const DURATION_UNIT_LABELS: Record<Extract<PlanExpression, { kind: 'duration' }>['unit'], string> = {
-  ms: 'Milliseconds', s: 'Seconds', minutes: 'Minutes', hours: 'Hours', days: 'Days',
+  ms: 'Milliseconds',
+  s: 'Seconds',
+  minutes: 'Minutes',
+  hours: 'Hours',
+  days: 'Days',
 }
 
 export const MEASURE_LABELS: Record<Measure['kind'], string> = {
-  count: 'Count', 'count-where': 'Count matching', sum: 'Total', average: 'Average', minimum: 'Smallest', maximum: 'Largest',
-  median: 'Median', percentile: 'Percentile', 'distinct-count': 'Count of different values', 'distinct-list': 'List of different values',
-  earliest: 'Earliest', latest: 'Latest',
+  count: 'Count',
+  'count-where': 'Count matching',
+  sum: 'Total',
+  average: 'Average',
+  minimum: 'Smallest',
+  maximum: 'Largest',
+  median: 'Median',
+  percentile: 'Percentile',
+  'distinct-count': 'Count of different values',
+  'distinct-list': 'List of different values',
+  earliest: 'Earliest',
+  latest: 'Latest',
 }
 
 export const BUCKET_LABELS: Record<NonNullable<NonNullable<PanelPlan['group']>[number]['bucket']>, string> = {
-  value: 'Each value', day: 'Day', week: 'Week', month: 'Month', relative: 'How long ago',
+  value: 'Each value',
+  day: 'Day',
+  week: 'Week',
+  month: 'Month',
+  relative: 'How long ago',
 }
 
 export const VIEW_LABELS: Record<PanelPlan['view']['kind'], string> = {
-  stat: 'Number', list: 'List', table: 'Table', board: 'Board', chart: 'Chart',
+  stat: 'Number',
+  list: 'List',
+  table: 'Table',
+  board: 'Board',
+  chart: 'Chart',
 }
 
 /** What each view is good for, under its name where a person picks one. */
@@ -95,36 +154,71 @@ export const OPERATION_HELP: Record<Stage['op'], string> = {
 }
 
 export const AGGREGATE_LABELS: Record<NonNullable<PanelPlan['view']['aggregate']>, string> = {
-  count: 'Count', sum: 'Total', avg: 'Average', min: 'Smallest', max: 'Largest',
+  count: 'Count',
+  sum: 'Total',
+  avg: 'Average',
+  min: 'Smallest',
+  max: 'Largest',
 }
 
 export const CHART_SHAPE_LABELS: Record<NonNullable<PanelPlan['view']['shape']>, string> = { bar: 'Bars', line: 'Line' }
 
-export const TREND_LABELS: Record<NonNullable<PanelPlan['view']['trend']>, string> = { history: 'Saved history', activity: 'Recent activity' }
+export const TREND_LABELS: Record<NonNullable<PanelPlan['view']['trend']>, string> = {
+  history: 'Saved history',
+  activity: 'Recent activity',
+}
 
-export const COMPARE_LABELS: Record<NonNullable<PanelPlan['view']['compare']>, string> = { day: 'Yesterday', week: 'Last week' }
+export const COMPARE_LABELS: Record<NonNullable<PanelPlan['view']['compare']>, string> = {
+  day: 'Yesterday',
+  week: 'Last week',
+}
 
 export const GOOD_DIRECTION_LABELS: Record<NonNullable<PanelPlan['view']['good']>, string> = { up: 'Up', down: 'Down' }
 
 export const GROUP_ORDER_LABELS: Record<NonNullable<NonNullable<PanelPlan['group']>[number]['order']>, string> = {
-  declared: "The column's order", label: 'Name', count: 'Size', explicit: 'A custom order',
+  declared: "The column's order",
+  label: 'Name',
+  count: 'Size',
+  explicit: 'A custom order',
 }
 
-export const EMPTY_SORT_LABELS: Record<NonNullable<NonNullable<PanelPlan['sort']>[number]['empty']>, string> = { first: 'First', last: 'Last' }
+export const EMPTY_SORT_LABELS: Record<NonNullable<NonNullable<PanelPlan['sort']>[number]['empty']>, string> = {
+  first: 'First',
+  last: 'Last',
+}
 
-export const PRECISION_LABELS: Record<NonNullable<Column['precision']>, string> = { instant: 'A date and time', day: 'A calendar day' }
+export const PRECISION_LABELS: Record<NonNullable<Column['precision']>, string> = {
+  instant: 'A date and time',
+  day: 'A calendar day',
+}
 
-export const UNMATCHED_LABELS: Record<NonNullable<Column['unmatched']>, string> = { 'catch-all': 'Show them under Other', hidden: 'Hide them' }
+export const UNMATCHED_LABELS: Record<NonNullable<Column['unmatched']>, string> = {
+  'catch-all': 'Show them under Other',
+  hidden: 'Hide them',
+}
 
-export const PREVIOUS_CHANGE_LABELS: Record<NonNullable<Measure['previous']>, string> = { amount: 'As an amount', ratio: 'As a percentage' }
+export const PREVIOUS_CHANGE_LABELS: Record<NonNullable<Measure['previous']>, string> = {
+  amount: 'As an amount',
+  ratio: 'As a percentage',
+}
 
 /** The fixed units a number column offers. Any other unit is a three-letter currency code. */
-export const UNIT_LABELS: Record<string, string> = { percent: 'Percent', ms: 'Milliseconds', s: 'Seconds', bytes: 'Bytes' }
+export const UNIT_LABELS: Record<string, string> = {
+  percent: 'Percent',
+  ms: 'Milliseconds',
+  s: 'Seconds',
+  bytes: 'Bytes',
+}
 
 /** Relative date offsets a filter offers, as the signed ISO 8601 durations the schema stores. */
 export const RELATIVE_OFFSET_LABELS: Record<string, string> = {
-  '-P1D': '1 day ago', '-P7D': '7 days ago', '-P14D': '14 days ago', '-P30D': '30 days ago', '-P90D': '90 days ago',
-  '+P1D': '1 day from now', '+P7D': '7 days from now',
+  '-P1D': '1 day ago',
+  '-P7D': '7 days ago',
+  '-P14D': '14 days ago',
+  '-P30D': '30 days ago',
+  '-P90D': '90 days ago',
+  '+P1D': '1 day from now',
+  '+P7D': '7 days from now',
 }
 
 /** "7 days ago" or "1 week from now" for any offset a filter stores, not only the ones it offers. */
@@ -139,21 +233,35 @@ export function offsetLabel(offset: string): string {
 const CALENDAR_UNITS = { startOfDay: 'day', startOfWeek: 'week', startOfMonth: 'month' } as const
 
 /** "the start of this week", or "the start of the week 1 week ago" with an offset. */
-export const calendarLabel = (boundary: keyof typeof CALENDAR_UNITS, offset?: string): string => offset
-  ? `the start of the ${CALENDAR_UNITS[boundary]} ${offsetLabel(offset)}`
-  : `the start of this ${CALENDAR_UNITS[boundary]}`
+export const calendarLabel = (boundary: keyof typeof CALENDAR_UNITS, offset?: string): string =>
+  offset
+    ? `the start of the ${CALENDAR_UNITS[boundary]} ${offsetLabel(offset)}`
+    : `the start of this ${CALENDAR_UNITS[boundary]}`
 
 type Press = NonNullable<NonNullable<PanelPlan['actions']>['press']>
 
 /** Where an opened row lands, read as "opens it in …". */
 export const PRESENTATION_LABELS: Record<Press['prefer'], string> = {
-  route: 'a full page', refPanel: 'a side panel', pane: 'a task pane', overlay: 'an overlay', external: 'the browser',
+  route: 'a full page',
+  refPanel: 'a side panel',
+  pane: 'a task pane',
+  overlay: 'an overlay',
+  external: 'the browser',
 }
 
 /** A sort direction's words, which read differently on a date or a number column. */
-export const sortDirectionLabel = (direction: NonNullable<PanelPlan['sort']>[number]['direction'], type?: Column['type']): string =>
-  type === 'datetime' ? direction === 'desc' ? 'newest first' : 'oldest first'
-    : type === 'number' ? direction === 'desc' ? 'highest first' : 'lowest first'
+export const sortDirectionLabel = (
+  direction: NonNullable<PanelPlan['sort']>[number]['direction'],
+  type?: Column['type'],
+): string =>
+  type === 'datetime'
+    ? direction === 'desc'
+      ? 'newest first'
+      : 'oldest first'
+    : type === 'number'
+      ? direction === 'desc'
+        ? 'highest first'
+        : 'lowest first'
       : SORT_DIRECTION_LABELS[direction].toLowerCase()
 
 /** A label map as `Select` options, in the map's order. */
@@ -177,4 +285,5 @@ export function planPartLabel(plan: PanelPlan, path: string): string {
 }
 
 /** "Keep matching rows" for a step's operation. */
-export const operationLabel = (op: Stage['op']): string => PANEL_CAPABILITIES.operations.find(operation => operation.id === op)?.label ?? op
+export const operationLabel = (op: Stage['op']): string =>
+  PANEL_CAPABILITIES.operations.find((operation) => operation.id === op)?.label ?? op

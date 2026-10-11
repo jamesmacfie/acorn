@@ -120,7 +120,8 @@ export type SourceContribution<Item = unknown> = {
 
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')
 
-const sourceOrder = (a: SourceContribution, b: SourceContribution): number => a.order - b.order || a.id.localeCompare(b.id)
+const sourceOrder = (a: SourceContribution, b: SourceContribution): number =>
+  a.order - b.order || a.id.localeCompare(b.id)
 
 /** Does the source currently on screen read the routed project? Every affordance that changes the
  *  project asks this one question, so the topbar picker and a command that does the same job can
@@ -137,10 +138,11 @@ export const defaultSource = (): SourceContribution | undefined => {
 
 export const defaultSourceId = (): string | undefined => defaultSource()?.id
 
-export const sourceRouteContributions = (): SourceRouteContribution[] => sourceRegistry
-  .entries()
-  .flatMap((source) => source.routes ?? [])
-  .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
+export const sourceRouteContributions = (): SourceRouteContribution[] =>
+  sourceRegistry
+    .entries()
+    .flatMap((source) => source.routes ?? [])
+    .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
 // Which rail source owns a path, by the routes it declared.
 //
@@ -208,12 +210,17 @@ export function defaultPaneForTask(task: Task): string | undefined {
 
 /** Does this task already track this external reference? Host link matching first, then each
  *  source's own second spelling (docs/plugins/client-half.md § Loaded plugins: the client half). */
-export function taskTracksRef(task: Task, ref: { providerId?: string; displayId: string; connectionId?: string }): boolean {
+export function taskTracksRef(
+  task: Task,
+  ref: { providerId?: string; displayId: string; connectionId?: string },
+): boolean {
   // A link names a connection and a panel target usually does not. A PR body says `ENG-42`, not which
   // connected Linear owns it, so the connection is compared only when both sides have one.
-  const linked = task.links.some((link) =>
-    link.providerId === ref.providerId
-    && link.identifier === ref.displayId
-    && (!ref.connectionId || link.connectionId === ref.connectionId))
+  const linked = task.links.some(
+    (link) =>
+      link.providerId === ref.providerId &&
+      link.identifier === ref.displayId &&
+      (!ref.connectionId || link.connectionId === ref.connectionId),
+  )
   return linked || sourceRegistry.entries().some((source) => source.tracksRef?.(task, ref) === true)
 }

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { _resetSurfaceHealth, registerSurfaceHealth, type SurfaceHealthSnapshot } from '../../kit/lib/telemetry/surfaceHealth'
+import {
+  _resetSurfaceHealth,
+  registerSurfaceHealth,
+  type SurfaceHealthSnapshot,
+} from '../../kit/lib/telemetry/surfaceHealth'
 import { answerSurfaceHealthRequests, SURFACE_HEALTH_MARK, SURFACE_HEALTH_REQUEST } from './surfaceHealth'
 
 afterEach(() => {
@@ -24,6 +28,9 @@ describe('answering a health request', () => {
 
     stop()
     target.dispatchEvent(new Event(SURFACE_HEALTH_REQUEST))
-    expect(((performance.getEntriesByName(SURFACE_HEALTH_MARK)[0] as PerformanceMark).detail as SurfaceHealthSnapshot).surfaces[0]?.mounted.fixedRows).toBe(50)
+    expect(
+      ((performance.getEntriesByName(SURFACE_HEALTH_MARK)[0] as PerformanceMark).detail as SurfaceHealthSnapshot)
+        .surfaces[0]?.mounted.fixedRows,
+    ).toBe(50)
   })
 })

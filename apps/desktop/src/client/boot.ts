@@ -1,4 +1,10 @@
-import { emitSpan, newSpanId, newTraceId, setSpansOnTimeline, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
+import {
+  emitSpan,
+  newSpanId,
+  newTraceId,
+  setSpansOnTimeline,
+  telemetryEnabled,
+} from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { answerSurfaceHealthRequests, createLogger } from '@acorn/client-core/infra/telemetry'
 
 // The renderer's half of a cold-start timeline, and the two readers it has.

@@ -35,7 +35,6 @@ export type DocumentHandle = {
   flush(): Promise<void>
 }
 
-
 // The only two parameters the host substitutes, because they are the two values it holds about the
 // pane it is drawing. Anything else in a path is left alone and the route 404s honestly.
 const SUBSTITUTIONS = ['taskId', 'projectId'] as const

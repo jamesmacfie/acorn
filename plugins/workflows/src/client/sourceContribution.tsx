@@ -12,8 +12,12 @@ import { WORKFLOWS_SOURCE_ID, WORKFLOWS_SURFACE_ID, WORKFLOWS_SURFACE_PATH } fro
 // every rail. `projectScoped`, because a definition is saved against a project and the editor's URL
 // carries one, which is what makes the shell offer the project picker here.
 
-const WorkflowsBrowseList = lazy(() => import('./WorkflowsBrowse').then((module) => ({ default: module.WorkflowsBrowseList })))
-const WorkflowsBrowseDetail = lazy(() => import('./WorkflowsBrowse').then((module) => ({ default: module.WorkflowsBrowseDetail })))
+const WorkflowsBrowseList = lazy(() =>
+  import('./WorkflowsBrowse').then((module) => ({ default: module.WorkflowsBrowseList })),
+)
+const WorkflowsBrowseDetail = lazy(() =>
+  import('./WorkflowsBrowse').then((module) => ({ default: module.WorkflowsBrowseDetail })),
+)
 const WorkflowEditor = lazy(() => import('./editor/WorkflowEditor'))
 
 export { WORKFLOWS_SOURCE_ID, WORKFLOWS_SURFACE_ID, WORKFLOWS_SURFACE_PATH, workflowsSurfacePath } from './surfacePath'

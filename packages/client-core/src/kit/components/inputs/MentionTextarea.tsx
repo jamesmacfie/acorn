@@ -79,17 +79,24 @@ export type MentionTextareaProps = {
 }
 
 export default function MentionTextarea(props: MentionTextareaProps) {
-  const sources = createMemo<readonly MentionSource[]>(() => props.sources ?? (props.mentions
-    ? [{
-        sigil: '@',
-        label: 'Mentions',
-        emptyText: 'No matching names.',
-        suggest: (query: string) => (props.mentions ?? [])
-          .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
-          .slice(0, 8)
-          .map((name) => ({ value: `@${name}`, label: name })),
-      }]
-    : []))
+  const sources = createMemo<readonly MentionSource[]>(
+    () =>
+      props.sources ??
+      (props.mentions
+        ? [
+            {
+              sigil: '@',
+              label: 'Mentions',
+              emptyText: 'No matching names.',
+              suggest: (query: string) =>
+                (props.mentions ?? [])
+                  .filter((name) => name.toLowerCase().includes(query.toLowerCase()))
+                  .slice(0, 8)
+                  .map((name) => ({ value: `@${name}`, label: name })),
+            },
+          ]
+        : []),
+  )
   const sigils = createMemo(() => sources().map((source) => source.sigil))
 
   const [mention, setMention] = createSignal<ActiveMention | null>(null)
@@ -154,7 +161,9 @@ export default function MentionTextarea(props: MentionTextareaProps) {
 
   return (
     <div class="ui-mentionfield" data-mirrored={segments() ? '' : undefined} data-tone={props.tone}>
-      <Show when={overlay()}><div class="ui-mentionfield-overlay">{overlay()}</div></Show>
+      <Show when={overlay()}>
+        <div class="ui-mentionfield-overlay">{overlay()}</div>
+      </Show>
       <Show when={segments()}>
         {(runs) => (
           // Hidden from the accessibility tree: the textarea already carries this text, and a screen
@@ -288,10 +297,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
         <div class="ui-mentionfield-list" role="listbox" aria-label={source()?.label}>
           <Show when={!source()?.loading} fallback={<p class="repo-picker-empty">Loading…</p>}>
             <Show when={!source()?.error} fallback={<Alert>{source()?.error}</Alert>}>
-              <Show
-                when={suggestions().length}
-                fallback={<p class="repo-picker-empty">{source()?.emptyText}</p>}
-              >
+              <Show when={suggestions().length} fallback={<p class="repo-picker-empty">{source()?.emptyText}</p>}>
                 <ul ref={list} class="repo-picker-list">
                   <For each={suggestions()}>
                     {(suggestion, index) => (

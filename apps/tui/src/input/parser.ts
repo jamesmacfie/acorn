@@ -7,9 +7,7 @@ import {
   type MouseButton,
   type WheelDirection,
 } from './events'
-import {
-  CONTROL_KEYS, KITTY_KEYS, KITTY_TEXT, LETTER_KEYS, SS3_ONLY, SS3_TEXT, TILDE_KEYS,
-} from './names'
+import { CONTROL_KEYS, KITTY_KEYS, KITTY_TEXT, LETTER_KEYS, SS3_ONLY, SS3_TEXT, TILDE_KEYS } from './names'
 
 // Bytes from a terminal, as events.
 //
@@ -108,10 +106,7 @@ function actionOf(param: number | undefined): KeyAction {
 const BUTTONS: readonly MouseButton[] = ['left', 'middle', 'right', 'none']
 const WHEEL: readonly WheelDirection[] = ['up', 'down', 'left', 'right']
 
-export function createParser(
-  emit: (event: InputEvent) => void,
-  options: ParserOptions = {},
-): Parser {
+export function createParser(emit: (event: InputEvent) => void, options: ParserOptions = {}): Parser {
   const timeoutMs = options.timeoutMs ?? ESC_TIMEOUT_MS
   let pending: number[] = []
   // Where the sequence being read starts, and how far into it we have got. Both survive a chunk
@@ -176,10 +171,12 @@ export function createParser(
    *  on `:`, every one a number or undefined. Kitty puts the event type in a sub-field of the
    *  modifier field, which is the only reason the second level exists. */
   function fields(body: string): number[][] {
-    return body.split(';').map((field) => field.split(':').map((part) => {
-      const value = Number.parseInt(part, 10)
-      return Number.isNaN(value) ? -1 : value
-    }))
+    return body.split(';').map((field) =>
+      field.split(':').map((part) => {
+        const value = Number.parseInt(part, 10)
+        return Number.isNaN(value) ? -1 : value
+      }),
+    )
   }
 
   const at = (parsed: number[][], field: number, sub = 0): number | undefined => {
@@ -246,9 +243,7 @@ export function createParser(
     }
     // Motion, with or without a button held. Which button is dragging is the hit test's business in
     // phase 3, and it knows because it saw the press.
-    const action: MouseAction = (code & 32) !== 0
-      ? 'move'
-      : (final === 'M' ? 'press' : 'release')
+    const action: MouseAction = (code & 32) !== 0 ? 'move' : final === 'M' ? 'press' : 'release'
     // A low field of 3 means "no button", which is the old encoding's release and a bare move here.
     const button = action === 'move' && low === 3 ? 'none' : (BUTTONS[low] ?? 'none')
     emit({ type: 'mouse', x, y, button, action, ...modifiers })

@@ -147,7 +147,10 @@ describe('Idempotency-Key on /v1', () => {
     const key = randomUUID()
     // Both are in flight before either resolves, which is the window the in-process map exists for:
     // the store has nothing yet, so a second execution is the only other possible outcome.
-    const [a, b] = await Promise.all([post('/v1/core/things', key, { name: 'once' }), post('/v1/core/things', key, { name: 'once' })])
+    const [a, b] = await Promise.all([
+      post('/v1/core/things', key, { name: 'once' }),
+      post('/v1/core/things', key, { name: 'once' }),
+    ])
     expect(executions).toBe(1)
     expect(await a.json()).toEqual({ execution: 1, name: 'once' })
     expect(await b.json()).toEqual({ execution: 1, name: 'once' })
@@ -173,7 +176,9 @@ describe('Idempotency-Key on /v1', () => {
     await post('/v1/core/things', undefined, { name: 'widget' })
     await post('/v1/core/things', undefined, { name: 'widget' })
     expect(executions).toBe(2)
-    expect(await harness.db.select().from((await import('@acorn/node-core/server/db/index.ts')).schema.idempotency)).toEqual([])
+    expect(
+      await harness.db.select().from((await import('@acorn/node-core/server/db/index.ts')).schema.idempotency),
+    ).toEqual([])
   })
 
   // An internal-token principal has no device identity to scope a key to, so the header is ignored
@@ -220,7 +225,10 @@ describe('Idempotency-Key on /v1', () => {
     const key = randomUUID()
     const del = (target = app) =>
       target.fetch(
-        new Request(`${ORIGIN}/v1/core/things/t1`, { method: 'DELETE', headers: { 'content-type': 'application/json', 'idempotency-key': key } }),
+        new Request(`${ORIGIN}/v1/core/things/t1`, {
+          method: 'DELETE',
+          headers: { 'content-type': 'application/json', 'idempotency-key': key },
+        }),
         env,
       )
     expect((await del()).status).toBe(204)

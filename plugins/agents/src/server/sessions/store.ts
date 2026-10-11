@@ -1,5 +1,22 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, getTableColumns, gt, inArray, isNotNull, isNull, like, lt, ne, notExists, notInArray, or, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  getTableColumns,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  ne,
+  notExists,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm'
 import type { CoreServices, PluginDatabase, SearchHit } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type {
@@ -22,7 +39,13 @@ import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../../share
 import type { CheckResults } from '../../shared/delegationSchemas'
 import { sessionCursor, type SessionListFilter } from '../../shared/sessionList'
 import type { RemovedArtifactObject } from './artifactStore'
-import { persistedAttendance, resolveAttendance, sessionAttendance, type TurnAttendanceContext, type WorkflowPosture } from './attendance'
+import {
+  persistedAttendance,
+  resolveAttendance,
+  sessionAttendance,
+  type TurnAttendanceContext,
+  type WorkflowPosture,
+} from './attendance'
 import { continuesStream, isAppendDelta } from './durableEventBuffer'
 import { readExecutionCapture } from './executionCapture'
 import { LedgerFold } from './ledgerFold'
@@ -32,7 +55,13 @@ import type { AgentSearchProjection } from './searchProjection'
 import type { HistoryHit, HistoryPage, HistoryRole } from './sessionHistory'
 import type { SessionSearchFilter } from './sessionSearch'
 import { DEFAULT_SESSION_TITLE, deterministicSessionTitle, normalizeStoredSessionTitle } from './sessionTitle'
-import { eventSubagentId, foldSubagentRoster, isActiveSubagent, projectAgentEvent, touchSubagentRoster } from './stateMachine'
+import {
+  eventSubagentId,
+  foldSubagentRoster,
+  isActiveSubagent,
+  projectAgentEvent,
+  touchSubagentRoster,
+} from './stateMachine'
 import { effectiveTurnPolicy } from './turnPolicy'
 import { readWaitFacts } from './waitFacts'
 
@@ -49,7 +78,7 @@ const parseSubagents = (value: string | null): AgentSubagent[] => {
   if (!value) return []
   try {
     const parsed = JSON.parse(value) as unknown
-    return Array.isArray(parsed) ? parsed as AgentSubagent[] : []
+    return Array.isArray(parsed) ? (parsed as AgentSubagent[]) : []
   } catch {
     return []
   }
@@ -117,20 +146,32 @@ export class AgentStore {
 
   async recordEvent(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentEventRecord> {
     await this.ensureSearchProjection()
-    const commands = event.type === 'tool' && event.tool.kind === 'execute' && turnId === null
-      ? await import('./commandLifecycle') : null
+    const commands =
+      event.type === 'tool' && event.tool.kind === 'execute' && turnId === null
+        ? await import('./commandLifecycle')
+        : null
     const timestamp = now()
     const eventId = randomUUID()
     const committed = this.db.transaction((tx) => {
       if (event.type === 'tool' && event.tool.kind === 'execute' && turnId === null) {
         turnId = commands!.commandTurn(tx, sessionId, event.tool)
       }
-      const turn = turnId ? tx.select({ status: schema.agentTurns.status }).from(schema.agentTurns)
-        .where(eq(schema.agentTurns.id, turnId)).get() : undefined
+      const turn = turnId
+        ? tx
+            .select({ status: schema.agentTurns.status })
+            .from(schema.agentTurns)
+            .where(eq(schema.agentTurns.id, turnId))
+            .get()
+        : undefined
       // Attribution keeps a late update on its card; only an active turn can claim parent work.
-      const lifecycleEnding = event.type === 'tool' && ['interrupted', 'cancelled', 'unknown'].includes(event.tool.status ?? '')
-      const projection = lifecycleEnding ? {} : projectAgentEvent(event,
-        turn && ['dispatching', 'active'].includes(turn.status) && !eventSubagentId(event) ? turnId : null)
+      const lifecycleEnding =
+        event.type === 'tool' && ['interrupted', 'cancelled', 'unknown'].includes(event.tool.status ?? '')
+      const projection = lifecycleEnding
+        ? {}
+        : projectAgentEvent(
+            event,
+            turn && ['dispatching', 'active'].includes(turn.status) && !eventSubagentId(event) ? turnId : null,
+          )
       const current = tx
         .select({
           lastEventSeq: schema.agentSessions.lastEventSeq,
@@ -146,18 +187,20 @@ export class AgentStore {
       // A workflow's session answers to its run, not to the owner. A finished or failed step is the
       // run's news, told once by the workflows plugin as run-done or run-failed, so only a request the
       // agent is waiting on reaches the owner from here.
-      const attention = current.kind === 'workflow' && (projection.attention === 'completed' || projection.attention === 'error')
-        ? 'none'
-        : projection.attention
+      const attention =
+        current.kind === 'workflow' && (projection.attention === 'completed' || projection.attention === 'error')
+          ? 'none'
+          : projection.attention
       const seq = current.lastEventSeq + 1
-      const configJson = event.type === 'session_metadata'
-        ? JSON.stringify({
-            ...JSON.parse(current.configJson) as Record<string, unknown>,
-            ...(event.configOptions ? { configOptions: event.configOptions } : {}),
-            ...(event.commands ? { commands: event.commands } : {}),
-            ...(event.skills ? { skills: event.skills } : {}),
-          })
-        : projection.configJson
+      const configJson =
+        event.type === 'session_metadata'
+          ? JSON.stringify({
+              ...(JSON.parse(current.configJson) as Record<string, unknown>),
+              ...(event.configOptions ? { configOptions: event.configOptions } : {}),
+              ...(event.commands ? { commands: event.commands } : {}),
+              ...(event.skills ? { skills: event.skills } : {}),
+            })
+          : projection.configJson
       // The subagent roster projected onto the row in the same transaction as the event insert, so a
       // reader can never see a roster that disagrees with the ledger it was folded from. It is on the
       // row rather than in a table of its own because runtimeEngine.record() broadcasts the row
@@ -167,14 +210,16 @@ export class AgentStore {
       // backgrounded row honest: its own updates stop at the launch receipt, so without this the only
       // clock the roster has is one that stopped ticking minutes ago.
       const touchedId = event.type === 'subagent' || lifecycleEnding ? undefined : eventSubagentId(event)
-      const roster = event.type === 'subagent'
-        ? foldSubagentRoster(parseSubagents(current.subagentsJson), event.subagent, turnId, timestamp)
-        : []
-      const subagentsJson = event.type === 'subagent'
-        ? JSON.stringify(roster)
-        : touchedId
-          ? jsonOrUndefined(touchSubagentRoster(parseSubagents(current.subagentsJson), touchedId, timestamp))
-          : undefined
+      const roster =
+        event.type === 'subagent'
+          ? foldSubagentRoster(parseSubagents(current.subagentsJson), event.subagent, turnId, timestamp)
+          : []
+      const subagentsJson =
+        event.type === 'subagent'
+          ? JSON.stringify(roster)
+          : touchedId
+            ? jsonOrUndefined(touchSubagentRoster(parseSubagents(current.subagentsJson), touchedId, timestamp))
+            : undefined
       tx.update(schema.agentSessions)
         .set({
           lastEventSeq: seq,
@@ -207,7 +252,8 @@ export class AgentStore {
       }
       tx.insert(schema.agentEvents).values(values).run()
       if (fold?.head) {
-        if (fold.superseded.length) tx.delete(schema.agentEvents).where(inArray(schema.agentEvents.id, fold.superseded)).run()
+        if (fold.superseded.length)
+          tx.delete(schema.agentEvents).where(inArray(schema.agentEvents.id, fold.superseded)).run()
         tx.update(schema.agentEvents)
           .set({ searchText: null })
           .where(and(eq(schema.agentEvents.id, fold.head), isNotNull(schema.agentEvents.searchText)))
@@ -217,7 +263,12 @@ export class AgentStore {
       return {
         // What the socket and the node's listeners get: the update as the provider reported it, so a
         // frame stays the size of the change. The stored row folds to the same card (./ledgerFold.ts).
-        row: { ...values, eventJson: JSON.stringify(event), turnId: values.turnId ?? null, searchText: values.searchText ?? null },
+        row: {
+          ...values,
+          eventJson: JSON.stringify(event),
+          turnId: values.turnId ?? null,
+          searchText: values.searchText ?? null,
+        },
         fold,
         stored,
         roster,
@@ -238,7 +289,9 @@ export class AgentStore {
 
   private ensureSearchProjection(): Promise<AgentSearchProjection> {
     if (!this.searchProjectionPromise) {
-      const pending = import('./searchProjection').then(({ AgentSearchProjection }) => new AgentSearchProjection(this.db))
+      const pending = import('./searchProjection').then(
+        ({ AgentSearchProjection }) => new AgentSearchProjection(this.db),
+      )
       this.searchProjectionPromise = pending
       void pending.catch(() => {
         if (this.searchProjectionPromise === pending) this.searchProjectionPromise = undefined
@@ -278,7 +331,8 @@ export class AgentStore {
     timestamp: number,
   ): { turnChanged: boolean; requestChanged: boolean } {
     if (event.type === 'request') {
-      const result = tx.insert(schema.agentRequests)
+      const result = tx
+        .insert(schema.agentRequests)
         .values({
           id: randomUUID(),
           sessionId,
@@ -288,7 +342,9 @@ export class AgentStore {
           // A policy plugin's refusal is already the answer, so the row is never pending: nothing
           // notifies, badges, or wakes a delegated parent over it.
           status: event.blocked ? 'resolved' : 'pending',
-          ...(event.blocked ? { resolutionJson: JSON.stringify({ blocked: event.blocked }), resolvedAt: timestamp } : {}),
+          ...(event.blocked
+            ? { resolutionJson: JSON.stringify({ blocked: event.blocked }), resolvedAt: timestamp }
+            : {}),
           title: event.title,
           detail: event.detail ?? null,
           // Additive: a row written before `approval` existed reads as the plain consent it was.
@@ -306,15 +362,22 @@ export class AgentStore {
       const current = tx
         .select({ status: schema.agentRequests.status })
         .from(schema.agentRequests)
-        .where(and(eq(schema.agentRequests.sessionId, sessionId), eq(schema.agentRequests.providerRequestId, event.requestId)))
+        .where(
+          and(
+            eq(schema.agentRequests.sessionId, sessionId),
+            eq(schema.agentRequests.providerRequestId, event.requestId),
+          ),
+        )
         .get()
       tx.update(schema.agentRequests)
         .set({ status: 'resolved', resolutionJson: JSON.stringify(event.resolution), resolvedAt: timestamp })
-        .where(and(
-          eq(schema.agentRequests.sessionId, sessionId),
-          eq(schema.agentRequests.providerRequestId, event.requestId),
-          inArray(schema.agentRequests.status, ['pending', 'resolving']),
-        ))
+        .where(
+          and(
+            eq(schema.agentRequests.sessionId, sessionId),
+            eq(schema.agentRequests.providerRequestId, event.requestId),
+            inArray(schema.agentRequests.status, ['pending', 'resolving']),
+          ),
+        )
         .run()
       return {
         turnChanged: false,
@@ -334,10 +397,7 @@ export class AgentStore {
           stopReason: event.stopReason ?? null,
           completedAt: timestamp,
         })
-        .where(and(
-          eq(schema.agentTurns.id, turnId),
-          inArray(schema.agentTurns.status, ['dispatching', 'active']),
-        ))
+        .where(and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['dispatching', 'active'])))
         .run()
       return {
         turnChanged: current?.status === 'dispatching' || current?.status === 'active',
@@ -362,10 +422,7 @@ export class AgentStore {
           errorJson: JSON.stringify({ code: event.code, message: event.message }),
           completedAt: timestamp,
         })
-        .where(and(
-          eq(schema.agentTurns.id, turnId),
-          inArray(schema.agentTurns.status, ['dispatching', 'active']),
-        ))
+        .where(and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['dispatching', 'active'])))
         .run()
       return {
         turnChanged: current?.status === 'dispatching' || current?.status === 'active',
@@ -385,10 +442,12 @@ export class AgentStore {
       const request = tx
         .select()
         .from(schema.agentRequests)
-        .where(and(
-          eq(schema.agentRequests.sessionId, sessionId),
-          eq(schema.agentRequests.providerRequestId, providerRequestId),
-        ))
+        .where(
+          and(
+            eq(schema.agentRequests.sessionId, sessionId),
+            eq(schema.agentRequests.providerRequestId, providerRequestId),
+          ),
+        )
         .get()
       if (!request) throw new Error('Agent request not found.')
       if (request.status === 'resolved' || request.status === 'expired') {
@@ -408,11 +467,7 @@ export class AgentStore {
         })
         .where(and(eq(schema.agentRequests.id, request.id), eq(schema.agentRequests.status, 'pending')))
         .run()
-      const claimed = tx
-        .select()
-        .from(schema.agentRequests)
-        .where(eq(schema.agentRequests.id, request.id))
-        .get()
+      const claimed = tx.select().from(schema.agentRequests).where(eq(schema.agentRequests.id, request.id)).get()
       if (!claimed) throw new Error('Claimed agent request disappeared.')
       return { request: mapAgentRequest(claimed), claimed: true }
     })
@@ -424,10 +479,12 @@ export class AgentStore {
     const [request] = await this.db
       .select()
       .from(schema.agentRequests)
-      .where(and(
-        eq(schema.agentRequests.sessionId, sessionId),
-        eq(schema.agentRequests.providerRequestId, providerRequestId),
-      ))
+      .where(
+        and(
+          eq(schema.agentRequests.sessionId, sessionId),
+          eq(schema.agentRequests.providerRequestId, providerRequestId),
+        ),
+      )
       .limit(1)
     return request ? mapAgentRequest(request) : null
   }
@@ -438,11 +495,13 @@ export class AgentStore {
     await this.db
       .update(schema.agentRequests)
       .set({ status: 'expired', resolvedAt: now() })
-      .where(and(
-        eq(schema.agentRequests.sessionId, sessionId),
-        eq(schema.agentRequests.providerRequestId, providerRequestId),
-        eq(schema.agentRequests.status, 'resolving'),
-      ))
+      .where(
+        and(
+          eq(schema.agentRequests.sessionId, sessionId),
+          eq(schema.agentRequests.providerRequestId, providerRequestId),
+          eq(schema.agentRequests.status, 'resolving'),
+        ),
+      )
     await this.lifecycle.announceRequest(sessionId, providerRequestId)
   }
 
@@ -458,10 +517,7 @@ export class AgentStore {
       .from(schema.agentRequests)
       .where(open)
     if (!requests.length) return
-    await this.db
-      .update(schema.agentRequests)
-      .set({ status: 'expired', resolvedAt: now() })
-      .where(open)
+    await this.db.update(schema.agentRequests).set({ status: 'expired', resolvedAt: now() }).where(open)
     for (const request of requests) await this.lifecycle.announceRequest(sessionId, request.providerRequestId)
   }
 
@@ -478,10 +534,14 @@ export class AgentStore {
     sessionId: string,
     input: { title: string; expectedTitle?: string; source: SessionRenameSource },
   ): Promise<{ session: AgentSession; changed: boolean }> {
-    return this.mutateSession(sessionId, { title: input.title }, {
-      expectedTitle: input.expectedTitle,
-      renameSource: input.source,
-    })
+    return this.mutateSession(
+      sessionId,
+      { title: input.title },
+      {
+        expectedTitle: input.expectedTitle,
+        renameSource: input.source,
+      },
+    )
   }
 
   private async mutateSession(
@@ -495,8 +555,7 @@ export class AgentStore {
     }
     const title = patch.title !== undefined ? normalizeStoredSessionTitle(patch.title) : undefined
     const renamed = title !== undefined && title !== before.title
-    const archiveChanged = patch.archived !== undefined
-      && patch.archived !== (before.archivedAt != null)
+    const archiveChanged = patch.archived !== undefined && patch.archived !== (before.archivedAt != null)
     const hasOtherWrite = patch.lastReadSeq !== undefined || patch.config !== undefined
     if (!renamed && !archiveChanged && !hasOtherWrite) return { session: before, changed: false }
 
@@ -520,15 +579,17 @@ export class AgentStore {
           : {}),
         ...(patch.config ? { configJson: JSON.stringify(patch.config) } : {}),
       })
-      .where(and(
-        eq(schema.agentSessions.id, sessionId),
-        options.expectedTitle !== undefined
-          ? and(
-              eq(schema.agentSessions.title, options.expectedTitle),
-              title !== undefined ? ne(schema.agentSessions.title, title) : undefined,
-            )
-          : undefined,
-      ))
+      .where(
+        and(
+          eq(schema.agentSessions.id, sessionId),
+          options.expectedTitle !== undefined
+            ? and(
+                eq(schema.agentSessions.title, options.expectedTitle),
+                title !== undefined ? ne(schema.agentSessions.title, title) : undefined,
+              )
+            : undefined,
+        ),
+      )
       .run()
     if (Number(write.changes ?? 0) === 0) {
       return { session: await this.requireSession(sessionId), changed: false }
@@ -537,7 +598,7 @@ export class AgentStore {
     const session = await this.requireSession(sessionId)
     const changes: AgentSessionChange[] = [
       ...(renamed ? ['renamed' as const] : []),
-      ...(archiveChanged ? [patch.archived ? 'archived' as const : 'restored' as const] : []),
+      ...(archiveChanged ? [patch.archived ? ('archived' as const) : ('restored' as const)] : []),
     ]
     this.lifecycle.announceSession(session, changes, options.renameSource)
     return { session, changed: renamed || archiveChanged || hasOtherWrite }
@@ -551,10 +612,7 @@ export class AgentStore {
     return this.requireSession(sessionId)
   }
 
-  async setProviderSessionReference(
-    sessionId: string,
-    providerSessionRef: string | null,
-  ): Promise<AgentSession> {
+  async setProviderSessionReference(sessionId: string, providerSessionRef: string | null): Promise<AgentSession> {
     await this.db
       .update(schema.agentSessions)
       .set({ providerSessionRef, updatedAt: now() })
@@ -628,22 +686,28 @@ export class AgentStore {
     const running = this.db
       .select({ id: schema.agentTurns.id })
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.sessionId, schema.agentSessions.id),
-        inArray(schema.agentTurns.status, ['dispatching', 'active']),
-      ))
-    return this.db
-      .select({ id: schema.agentSessions.id })
-      .from(schema.agentSessions)
-      .where(and(
-        inArray(schema.agentSessions.taskId, [...taskIds]),
-        withHistory ? isNull(schema.agentSessions.historyRemovedAt) : undefined,
-        notExists(running),
-        live.size ? notInArray(schema.agentSessions.id, [...live]) : undefined,
-      ))
-      .orderBy(asc(schema.agentSessions.createdAt))
-      .limit(1)
-      .get()?.id ?? null
+      .where(
+        and(
+          eq(schema.agentTurns.sessionId, schema.agentSessions.id),
+          inArray(schema.agentTurns.status, ['dispatching', 'active']),
+        ),
+      )
+    return (
+      this.db
+        .select({ id: schema.agentSessions.id })
+        .from(schema.agentSessions)
+        .where(
+          and(
+            inArray(schema.agentSessions.taskId, [...taskIds]),
+            withHistory ? isNull(schema.agentSessions.historyRemovedAt) : undefined,
+            notExists(running),
+            live.size ? notInArray(schema.agentSessions.id, [...live]) : undefined,
+          ),
+        )
+        .orderBy(asc(schema.agentSessions.createdAt))
+        .limit(1)
+        .get()?.id ?? null
+    )
   }
 
   /** Deletes up to `limit` of a session's oldest events in one transaction. Returns how many went. The
@@ -669,15 +733,24 @@ export class AgentStore {
    * roster, queue count and unread state are cleared, because each was read off the rows just deleted.
    * Returns null when the session is gone or already marked, which makes a second run a no-op.
    */
-  async finishHistoryRemoval(sessionId: string, message: string): Promise<(RemovedSessionObjects & {
-    session: AgentSession
-    event: AgentEventRecord
-  }) | null> {
+  async finishHistoryRemoval(
+    sessionId: string,
+    message: string,
+  ): Promise<
+    | (RemovedSessionObjects & {
+        session: AgentSession
+        event: AgentEventRecord
+      })
+    | null
+  > {
     const timestamp = now()
     const event: AgentNormalizedEvent = { type: 'diagnostic', level: 'info', message }
     const committed = this.db.transaction((tx) => {
       const current = tx
-        .select({ lastEventSeq: schema.agentSessions.lastEventSeq, historyRemovedAt: schema.agentSessions.historyRemovedAt })
+        .select({
+          lastEventSeq: schema.agentSessions.lastEventSeq,
+          historyRemovedAt: schema.agentSessions.historyRemovedAt,
+        })
         .from(schema.agentSessions)
         .where(eq(schema.agentSessions.id, sessionId))
         .get()
@@ -723,7 +796,9 @@ export class AgentStore {
 
   async searchSessions(query: string, filter: SessionSearchFilter = {}): Promise<AgentSession[]> {
     const [taskIds, projection, { searchSessions }] = await Promise.all([
-      this.workspaceTaskIds(filter.workspaceId), this.ensureSearchProjection(), import('./sessionSearch'),
+      this.workspaceTaskIds(filter.workspaceId),
+      this.ensureSearchProjection(),
+      import('./sessionSearch'),
     ])
     return this.db.transaction((tx) => {
       projection.catchUp(tx)
@@ -732,7 +807,10 @@ export class AgentStore {
   }
 
   async searchTaskSessions(query: string, taskIds: readonly string[], limit: number): Promise<SearchHit[]> {
-    const [projection, { searchTaskSessions }] = await Promise.all([this.ensureSearchProjection(), import('./sessionSearch')])
+    const [projection, { searchTaskSessions }] = await Promise.all([
+      this.ensureSearchProjection(),
+      import('./sessionSearch'),
+    ])
     return this.db.transaction((tx) => {
       projection.catchUp(tx)
       return searchTaskSessions(tx, query, taskIds, limit)
@@ -759,7 +837,9 @@ export class AgentStore {
     const [row] = await this.db
       .select()
       .from(schema.agentTurns)
-      .where(and(eq(schema.agentTurns.sessionId, sessionId), inArray(schema.agentTurns.status, ['dispatching', 'active'])))
+      .where(
+        and(eq(schema.agentTurns.sessionId, sessionId), inArray(schema.agentTurns.status, ['dispatching', 'active'])),
+      )
       .limit(1)
     return row ? mapAgentTurn(row) : null
   }
@@ -804,50 +884,70 @@ export class AgentStore {
   async enqueueAfterLatestTurn(
     sessionId: string,
     idempotencyKey: string,
-    decide: (session: AgentSession, latest: { turn: AgentTurn; events: AgentEventRecord[] } | null) => {
+    decide: (
+      session: AgentSession,
+      latest: { turn: AgentTurn; events: AgentEventRecord[] } | null,
+    ) => {
       config: Record<string, unknown>
       input: AgentTurn['input']
       policy: Record<string, unknown>
     },
   ): Promise<{ turn: AgentTurn; inserted: boolean }> {
     const result = this.db.transaction((tx) => {
-      const sessionRow = tx.select().from(schema.agentSessions)
-        .where(eq(schema.agentSessions.id, sessionId)).get()
+      const sessionRow = tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()
       if (!sessionRow) throw new Error(`Managed agent session not found: ${sessionId}`)
-      const existing = tx.select().from(schema.agentTurns)
-        .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, idempotencyKey))).get()
+      const existing = tx
+        .select()
+        .from(schema.agentTurns)
+        .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, idempotencyKey)))
+        .get()
       if (existing) return { turn: mapAgentTurn(existing), inserted: false }
-      const lastRow = tx.select().from(schema.agentTurns)
+      const lastRow = tx
+        .select()
+        .from(schema.agentTurns)
         .where(eq(schema.agentTurns.sessionId, sessionId))
-        .orderBy(desc(schema.agentTurns.ordinal)).limit(1).get()
-      const latest = lastRow ? {
-        turn: mapAgentTurn(lastRow),
-        events: tx.select().from(schema.agentEvents)
-          .where(and(eq(schema.agentEvents.sessionId, sessionId), eq(schema.agentEvents.turnId, lastRow.id)))
-          .orderBy(asc(schema.agentEvents.seq)).all().map(mapAgentEvent),
-      } : null
+        .orderBy(desc(schema.agentTurns.ordinal))
+        .limit(1)
+        .get()
+      const latest = lastRow
+        ? {
+            turn: mapAgentTurn(lastRow),
+            events: tx
+              .select()
+              .from(schema.agentEvents)
+              .where(and(eq(schema.agentEvents.sessionId, sessionId), eq(schema.agentEvents.turnId, lastRow.id)))
+              .orderBy(asc(schema.agentEvents.seq))
+              .all()
+              .map(mapAgentEvent),
+          }
+        : null
       const session = mapAgentSession(sessionRow)
       const { config, input, policy } = decide(session, latest)
       const timestamp = now()
       const turnId = randomUUID()
-      tx.update(schema.agentSessions).set({
-        configJson: JSON.stringify(config),
-        queuedTurns: sessionRow.queuedTurns + 1,
-        updatedAt: timestamp,
-      }).where(eq(schema.agentSessions.id, sessionId)).run()
-      tx.insert(schema.agentTurns).values({
-        id: turnId,
-        sessionId,
-        ordinal: (lastRow?.ordinal ?? -1) + 1,
-        source: 'interactive',
-        status: 'queued',
-        inputJson: JSON.stringify(input),
-        effectivePolicyJson: JSON.stringify(effectiveTurnPolicy(
-          { ...session, config }, policy, resolveAttendance(session, 'interactive'), timestamp,
-        )),
-        idempotencyKey,
-        createdAt: timestamp,
-      }).run()
+      tx.update(schema.agentSessions)
+        .set({
+          configJson: JSON.stringify(config),
+          queuedTurns: sessionRow.queuedTurns + 1,
+          updatedAt: timestamp,
+        })
+        .where(eq(schema.agentSessions.id, sessionId))
+        .run()
+      tx.insert(schema.agentTurns)
+        .values({
+          id: turnId,
+          sessionId,
+          ordinal: (lastRow?.ordinal ?? -1) + 1,
+          source: 'interactive',
+          status: 'queued',
+          inputJson: JSON.stringify(input),
+          effectivePolicyJson: JSON.stringify(
+            effectiveTurnPolicy({ ...session, config }, policy, resolveAttendance(session, 'interactive'), timestamp),
+          ),
+          idempotencyKey,
+          createdAt: timestamp,
+        })
+        .run()
       const turnRow = tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).get()!
       return { turn: mapAgentTurn(turnRow), inserted: true }
     })
@@ -855,7 +955,11 @@ export class AgentStore {
     return { ...result, turn: await this.restoreTurnAttendance(result.turn.id) }
   }
 
-  async createSession(input: CreateAgentSessionInput, provider: AgentProviderDescriptor, posture?: WorkflowPosture): Promise<AgentSession> {
+  async createSession(
+    input: CreateAgentSessionInput,
+    provider: AgentProviderDescriptor,
+    posture?: WorkflowPosture,
+  ): Promise<AgentSession> {
     const timestamp = now()
     const id = randomUUID()
     await this.db.insert(schema.agentSessions).values({
@@ -873,7 +977,10 @@ export class AgentStore {
       attention: 'none',
       statusAuthority: provider.statusAuthority,
       title: input.title ?? DEFAULT_SESSION_TITLE,
-      configJson: JSON.stringify({ ...input.config, initialAttendance: resolveAttendance(input, 'interactive', posture) }),
+      configJson: JSON.stringify({
+        ...input.config,
+        initialAttendance: resolveAttendance(input, 'interactive', posture),
+      }),
       parentSessionId: input.parentSessionId ?? null,
       parentTurnId: input.parentTurnId ?? null,
       createdAt: timestamp,
@@ -888,10 +995,7 @@ export class AgentStore {
    * spawn ledger or operation record was updated. The spawn id is server-authored configuration;
    * this scan is startup-only and deliberately does not become an authorization lookup. */
   async delegatedSessionForSpawn(spawnId: string): Promise<AgentSession | null> {
-    const rows = await this.db
-      .select()
-      .from(schema.agentSessions)
-      .where(eq(schema.agentSessions.kind, 'delegated'))
+    const rows = await this.db.select().from(schema.agentSessions).where(eq(schema.agentSessions.kind, 'delegated'))
     for (const row of rows) {
       const session = mapAgentSession(row)
       if (session.config.delegationSpawnId === spawnId) return session
@@ -903,10 +1007,7 @@ export class AgentStore {
     const [row] = await this.db
       .select()
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.sessionId, sessionId),
-        eq(schema.agentTurns.idempotencyKey, idempotencyKey),
-      ))
+      .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, idempotencyKey)))
       .limit(1)
     return row ? mapAgentTurn(row) : null
   }
@@ -915,10 +1016,9 @@ export class AgentStore {
     const [row] = await this.db
       .select()
       .from(schema.agentOperations)
-      .where(and(
-        eq(schema.agentOperations.idempotencyKey, idempotencyKey),
-        eq(schema.agentOperations.command, command),
-      ))
+      .where(
+        and(eq(schema.agentOperations.idempotencyKey, idempotencyKey), eq(schema.agentOperations.command, command)),
+      )
       .limit(1)
     if (!row) return null
     try {
@@ -928,12 +1028,7 @@ export class AgentStore {
     }
   }
 
-  async saveOperation(
-    idempotencyKey: string,
-    command: string,
-    result: unknown,
-    resourceId?: string,
-  ): Promise<void> {
+  async saveOperation(idempotencyKey: string, command: string, result: unknown, resourceId?: string): Promise<void> {
     await this.db
       .insert(schema.agentOperations)
       .values({
@@ -970,9 +1065,14 @@ export class AgentStore {
         ? or(isNotNull(schema.agentSessions.archivedAt), retiredTask || undefined)
         : and(isNull(schema.agentSessions.archivedAt), liveTask || undefined),
       filter.attention ? sql`${schema.agentSessions.attention} NOT IN ('none', 'unread')` : undefined,
-      cursor == null ? undefined : typeof cursor === 'number'
-        ? lt(schema.agentSessions.updatedAt, cursor)
-        : or(lt(schema.agentSessions.updatedAt, cursor.updatedAt), and(eq(schema.agentSessions.updatedAt, cursor.updatedAt), lt(schema.agentSessions.id, cursor.id))),
+      cursor == null
+        ? undefined
+        : typeof cursor === 'number'
+          ? lt(schema.agentSessions.updatedAt, cursor)
+          : or(
+              lt(schema.agentSessions.updatedAt, cursor.updatedAt),
+              and(eq(schema.agentSessions.updatedAt, cursor.updatedAt), lt(schema.agentSessions.id, cursor.id)),
+            ),
       filter.search ? like(schema.agentSessions.title, `%${filter.search.replace(/[%_]/g, '\\$&')}%`) : undefined,
     ].filter((item): item is Exclude<typeof item, undefined> => item != null)
 
@@ -985,9 +1085,16 @@ export class AgentStore {
     const hasMore = rows.length > limit
     const page = rows.slice(0, limit).map(mapAgentSession)
     const last = page.at(-1)
-    return { sessions: page, delegations: [], nextCursor: hasMore && last
-      ? filter.cursorFormat === 'tuple-v1' ? `v1:${last.updatedAt}:${last.id}` : String(last.updatedAt)
-      : null }
+    return {
+      sessions: page,
+      delegations: [],
+      nextCursor:
+        hasMore && last
+          ? filter.cursorFormat === 'tuple-v1'
+            ? `v1:${last.updatedAt}:${last.id}`
+            : String(last.updatedAt)
+          : null,
+    }
   }
 
   async snapshot(sessionId: string, afterSeq = 0, eventLimit = 500): Promise<AgentSessionSnapshot> {
@@ -1020,34 +1127,69 @@ export class AgentStore {
     return this.readSnapshot(sessionId, 0, undefined, false)
   }
 
-  private async readSnapshot(sessionId: string, afterSeq: number, limit: number | undefined, client: boolean, until?: AgentWaitCondition): Promise<AgentSessionSnapshot> {
+  private async readSnapshot(
+    sessionId: string,
+    afterSeq: number,
+    limit: number | undefined,
+    client: boolean,
+    until?: AgentWaitCondition,
+  ): Promise<AgentSessionSnapshot> {
     const projection = client ? null : await this.ensureSearchProjection()
     const commands = client ? await import('./commandLifecycle') : null
     return this.db.transaction((tx) => {
       projection?.catchUp(tx, sessionId)
       const session = tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()
       if (!session) throw new Error(`Managed agent session not found: ${sessionId}`)
-      const events = tx.select(eventReadColumns(client)).from(schema.agentEvents)
+      const events = tx
+        .select(eventReadColumns(client))
+        .from(schema.agentEvents)
         .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
         .orderBy(asc(schema.agentEvents.seq))
       const rows = limit === undefined ? events.all() : events.limit(limit).all()
       const mappedSession = mapAgentSession(session)
-      const turns = tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
-        .orderBy(asc(schema.agentTurns.ordinal)).all().map(mapAgentTurn)
+      const turns = tx
+        .select()
+        .from(schema.agentTurns)
+        .where(eq(schema.agentTurns.sessionId, sessionId))
+        .orderBy(asc(schema.agentTurns.ordinal))
+        .all()
+        .map(mapAgentTurn)
       return {
         session: mappedSession,
         turns,
-        events: client ? commands!.projectCommandEvents(rows.map((row) => clientEventRecord(mapAgentEvent(row))), mappedSession, turns)
+        events: client
+          ? commands!.projectCommandEvents(
+              rows.map((row) => clientEventRecord(mapAgentEvent(row))),
+              mappedSession,
+              turns,
+            )
           : rows.map(mapAgentEvent),
-        requests: tx.select().from(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId))
-          .orderBy(asc(schema.agentRequests.createdAt)).all().map(mapAgentRequest),
-        ...(until ? { wait: {
-          ...readWaitFacts(tx, sessionId, afterSeq, until, mappedSession),
-          eventsThroughSeq: session.lastEventSeq,
-          eventsComplete: !tx.select({ seq: schema.agentEvents.seq }).from(schema.agentEvents)
-            .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, rows.at(-1)?.seq ?? afterSeq)))
-            .limit(1).get(),
-        } } : {}),
+        requests: tx
+          .select()
+          .from(schema.agentRequests)
+          .where(eq(schema.agentRequests.sessionId, sessionId))
+          .orderBy(asc(schema.agentRequests.createdAt))
+          .all()
+          .map(mapAgentRequest),
+        ...(until
+          ? {
+              wait: {
+                ...readWaitFacts(tx, sessionId, afterSeq, until, mappedSession),
+                eventsThroughSeq: session.lastEventSeq,
+                eventsComplete: !tx
+                  .select({ seq: schema.agentEvents.seq })
+                  .from(schema.agentEvents)
+                  .where(
+                    and(
+                      eq(schema.agentEvents.sessionId, sessionId),
+                      gt(schema.agentEvents.seq, rows.at(-1)?.seq ?? afterSeq),
+                    ),
+                  )
+                  .limit(1)
+                  .get(),
+              },
+            }
+          : {}),
       }
     })
   }
@@ -1055,12 +1197,21 @@ export class AgentStore {
   async eventsForTurn(turnId: string, limit = 2_000): Promise<AgentEventRecord[]> {
     const projection = await this.ensureSearchProjection()
     return this.db.transaction((tx) => {
-      const turn = tx.select({ sessionId: schema.agentTurns.sessionId }).from(schema.agentTurns)
-        .where(eq(schema.agentTurns.id, turnId)).get()
+      const turn = tx
+        .select({ sessionId: schema.agentTurns.sessionId })
+        .from(schema.agentTurns)
+        .where(eq(schema.agentTurns.id, turnId))
+        .get()
       if (turn) projection.catchUp(tx, turn.sessionId)
       else projection.catchUp(tx)
-      return tx.select().from(schema.agentEvents).where(eq(schema.agentEvents.turnId, turnId))
-        .orderBy(asc(schema.agentEvents.seq)).limit(Math.min(Math.max(limit, 1), 10_000)).all().map(mapAgentEvent)
+      return tx
+        .select()
+        .from(schema.agentEvents)
+        .where(eq(schema.agentEvents.turnId, turnId))
+        .orderBy(asc(schema.agentEvents.seq))
+        .limit(Math.min(Math.max(limit, 1), 10_000))
+        .all()
+        .map(mapAgentEvent)
     })
   }
 
@@ -1072,20 +1223,37 @@ export class AgentStore {
     return this.readEventPage(sessionId, afterSeq, limit, true)
   }
 
-  private async readEventPage(sessionId: string, afterSeq: number, limit: number, client: boolean): Promise<AgentEventPage> {
+  private async readEventPage(
+    sessionId: string,
+    afterSeq: number,
+    limit: number,
+    client: boolean,
+  ): Promise<AgentEventPage> {
     const projection = client ? null : await this.ensureSearchProjection()
     const commands = client ? await import('./commandLifecycle') : null
     return this.db.transaction((tx) => {
       projection?.catchUp(tx, sessionId)
       const bounded = Math.min(Math.max(limit, 1), 2_000)
-      const rows = tx.select(eventReadColumns(client)).from(schema.agentEvents)
+      const rows = tx
+        .select(eventReadColumns(client))
+        .from(schema.agentEvents)
         .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
-        .orderBy(asc(schema.agentEvents.seq)).limit(bounded + 1).all()
-      const page = rows.slice(0, bounded).map((row) => client ? clientEventRecord(mapAgentEvent(row)) : mapAgentEvent(row))
-      const session = client ? tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get() : null
-      const turns = session ? tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).all().map(mapAgentTurn) : []
-      return { events: session ? commands!.projectCommandEvents(page, mapAgentSession(session), turns) : page,
-        nextCursor: rows.length > bounded ? page.at(-1)?.seq ?? null : null }
+        .orderBy(asc(schema.agentEvents.seq))
+        .limit(bounded + 1)
+        .all()
+      const page = rows
+        .slice(0, bounded)
+        .map((row) => (client ? clientEventRecord(mapAgentEvent(row)) : mapAgentEvent(row)))
+      const session = client
+        ? tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()
+        : null
+      const turns = session
+        ? tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).all().map(mapAgentTurn)
+        : []
+      return {
+        events: session ? commands!.projectCommandEvents(page, mapAgentSession(session), turns) : page,
+        nextCursor: rows.length > bounded ? (page.at(-1)?.seq ?? null) : null,
+      }
     })
   }
 
@@ -1108,11 +1276,17 @@ export class AgentStore {
       .where(eq(schema.agentSessions.id, sessionId))
   }
 
-  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput, context: TurnAttendanceContext = {}): Promise<EnqueueTurnOutcome> {
+  async enqueueTurn(
+    sessionId: string,
+    input: EnqueueAgentTurnInput,
+    context: TurnAttendanceContext = {},
+  ): Promise<EnqueueTurnOutcome> {
     const [existing] = await this.db
       .select()
       .from(schema.agentTurns)
-      .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, input.idempotencyKey)))
+      .where(
+        and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, input.idempotencyKey)),
+      )
       .limit(1)
     if (existing) {
       return {
@@ -1124,9 +1298,9 @@ export class AgentStore {
     }
 
     const session = await this.requireSession(sessionId)
-    const posture = context.posture ?? (session.kind === 'workflow'
-      ? sessionAttendance(session) === 'autonomous' ? 'autonomous' : 'gated'
-      : undefined)
+    const posture =
+      context.posture ??
+      (session.kind === 'workflow' ? (sessionAttendance(session) === 'autonomous' ? 'autonomous' : 'gated') : undefined)
     const resolved = resolveAttendance(session, input.source, posture)
     if (session.config.initialAttendance !== undefined && sessionAttendance(session) !== resolved) {
       throw new Error('Turn attendance does not match the session bootstrap policy.')
@@ -1142,9 +1316,8 @@ export class AgentStore {
     if (attendance !== resolved) throw new Error('The continuation origin has a different attendance policy.')
 
     const attachmentParts = input.input.flatMap((part, position) =>
-      part.type === 'attachment' || part.type === 'image'
-        ? [{ id: part.attachmentId, position }]
-        : [])
+      part.type === 'attachment' || part.type === 'image' ? [{ id: part.attachmentId, position }] : [],
+    )
     const uniqueAttachmentIds = [...new Set(attachmentParts.map((part) => part.id))]
     let attachmentRows: Array<typeof schema.agentAttachments.$inferSelect> = []
     if (uniqueAttachmentIds.length > 8) throw new Error('A turn can include at most eight attachments.')
@@ -1158,11 +1331,13 @@ export class AgentStore {
       attachmentRows = await this.db
         .select()
         .from(schema.agentAttachments)
-        .where(and(
-          inArray(schema.agentAttachments.id, uniqueAttachmentIds),
-          eq(schema.agentAttachments.taskId, session.taskId),
-          isNull(schema.agentAttachments.deletedAt),
-        ))
+        .where(
+          and(
+            inArray(schema.agentAttachments.id, uniqueAttachmentIds),
+            eq(schema.agentAttachments.taskId, session.taskId),
+            isNull(schema.agentAttachments.deletedAt),
+          ),
+        )
       if (attachmentRows.length !== uniqueAttachmentIds.length) {
         throw new Error('One or more attachments are missing or belong to another task.')
       }
@@ -1188,11 +1363,13 @@ export class AgentStore {
       createdAt: timestamp,
     })
     if (uniqueAttachmentIds.length) {
-      await this.db.insert(schema.agentAttachmentRefs).values(uniqueAttachmentIds.map((attachmentId) => ({
-        attachmentId,
-        turnId: id,
-        position: attachmentParts.find((part) => part.id === attachmentId)?.position ?? 0,
-      })))
+      await this.db.insert(schema.agentAttachmentRefs).values(
+        uniqueAttachmentIds.map((attachmentId) => ({
+          attachmentId,
+          turnId: id,
+          position: attachmentParts.find((part) => part.id === attachmentId)?.position ?? 0,
+        })),
+      )
     }
     let firstTurnFallback: string | null = null
     let sessionAfterRename: AgentSession | null = null
@@ -1306,9 +1483,8 @@ export class AgentStore {
     let attachmentParts: Array<{ id: string; position: number }> | null = null
     if (patch.input) {
       attachmentParts = patch.input.flatMap((part, position) =>
-        part.type === 'attachment' || part.type === 'image'
-          ? [{ id: part.attachmentId, position }]
-          : [])
+        part.type === 'attachment' || part.type === 'image' ? [{ id: part.attachmentId, position }] : [],
+      )
       const ids = [...new Set(attachmentParts.map((part) => part.id))]
       if (ids.length > 8) throw new Error('A turn can include at most eight attachments.')
       if (ids.length) {
@@ -1321,11 +1497,13 @@ export class AgentStore {
           ? await this.db
               .select()
               .from(schema.agentAttachments)
-              .where(and(
-                inArray(schema.agentAttachments.id, ids),
-                eq(schema.agentAttachments.taskId, session.taskId),
-                isNull(schema.agentAttachments.deletedAt),
-              ))
+              .where(
+                and(
+                  inArray(schema.agentAttachments.id, ids),
+                  eq(schema.agentAttachments.taskId, session.taskId),
+                  isNull(schema.agentAttachments.deletedAt),
+                ),
+              )
           : []
         if (attachments.length !== ids.length) {
           throw new Error('One or more attachments are missing or belong to another task.')
@@ -1341,11 +1519,15 @@ export class AgentStore {
         tx.delete(schema.agentAttachmentRefs).where(eq(schema.agentAttachmentRefs.turnId, turnId)).run()
         const unique = [...new Set(attachmentParts.map((part) => part.id))]
         if (unique.length) {
-          tx.insert(schema.agentAttachmentRefs).values(unique.map((attachmentId) => ({
-            attachmentId,
-            turnId,
-            position: attachmentParts!.find((part) => part.id === attachmentId)?.position ?? 0,
-          }))).run()
+          tx.insert(schema.agentAttachmentRefs)
+            .values(
+              unique.map((attachmentId) => ({
+                attachmentId,
+                turnId,
+                position: attachmentParts!.find((part) => part.id === attachmentId)?.position ?? 0,
+              })),
+            )
+            .run()
         }
         tx.update(schema.agentTurns)
           .set({ inputJson: JSON.stringify(patch.input) })
@@ -1371,10 +1553,7 @@ export class AgentStore {
               .run()
           })
           ordered.forEach((row, index) => {
-            tx.update(schema.agentTurns)
-              .set({ ordinal: slots[index]! })
-              .where(eq(schema.agentTurns.id, row.id))
-              .run()
+            tx.update(schema.agentTurns).set({ ordinal: slots[index]! }).where(eq(schema.agentTurns.id, row.id)).run()
           })
         }
       }
@@ -1419,10 +1598,7 @@ export class AgentStore {
             }
           : {}),
       })
-      .where(and(
-        eq(schema.agentTurns.id, turnId),
-        eq(schema.agentTurns.status, before.status),
-      ))
+      .where(and(eq(schema.agentTurns.id, turnId), eq(schema.agentTurns.status, before.status)))
     if (before.status === 'queued') await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
     if (after?.status === 'active') await this.lifecycle.announceTurn(turnId)
@@ -1456,8 +1632,7 @@ export class AgentStore {
     const before = await this.turn(turnId)
     if (!before || !['dispatching', 'active'].includes(before.status)) return null
     this.db.transaction((tx) => {
-      tx
-        .update(schema.agentTurns)
+      tx.update(schema.agentTurns)
         .set({
           status: 'queued',
           continuationInputJson: JSON.stringify(continuationInput),
@@ -1468,18 +1643,14 @@ export class AgentStore {
           completedAt: null,
           errorJson: null,
         })
-        .where(and(
-          eq(schema.agentTurns.id, turnId),
-          inArray(schema.agentTurns.status, ['dispatching', 'active']),
-        ))
+        .where(and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['dispatching', 'active'])))
         .run()
       const queued = tx
         .select({ count: sql<number>`count(*)` })
         .from(schema.agentTurns)
         .where(and(eq(schema.agentTurns.sessionId, before.sessionId), eq(schema.agentTurns.status, 'queued')))
         .get()
-      tx
-        .update(schema.agentSessions)
+      tx.update(schema.agentSessions)
         .set({
           queuedTurns: Number(queued?.count ?? 0),
           runtimeState: 'ready',
@@ -1495,10 +1666,7 @@ export class AgentStore {
   }
 
   async setTurnProviderRef(turnId: string, providerTurnRef: string): Promise<void> {
-    await this.db
-      .update(schema.agentTurns)
-      .set({ providerTurnRef })
-      .where(eq(schema.agentTurns.id, turnId))
+    await this.db.update(schema.agentTurns).set({ providerTurnRef }).where(eq(schema.agentTurns.id, turnId))
   }
 
   async cancelTurn(turnId: string): Promise<void> {
@@ -1507,7 +1675,9 @@ export class AgentStore {
     await this.db
       .update(schema.agentTurns)
       .set({ status: 'cancelled', continuationInputJson: null, notBefore: null, completedAt: now() })
-      .where(and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['queued', 'dispatching', 'active'])))
+      .where(
+        and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['queued', 'dispatching', 'active'])),
+      )
     if (before.status === 'queued') await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
     if (after?.status === 'cancelled') await this.lifecycle.announceTurn(turnId)
@@ -1517,10 +1687,9 @@ export class AgentStore {
     const before = await this.db
       .select({ id: schema.agentTurns.id })
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.sessionId, sessionId),
-        inArray(schema.agentTurns.status, ['dispatching', 'active']),
-      ))
+      .where(
+        and(eq(schema.agentTurns.sessionId, sessionId), inArray(schema.agentTurns.status, ['dispatching', 'active'])),
+      )
     if (!before.length) return
     await this.db
       .update(schema.agentTurns)
@@ -1531,22 +1700,29 @@ export class AgentStore {
         errorJson: JSON.stringify({ code: 'provider_disconnected', message }),
         completedAt: now(),
       })
-      .where(and(
-        eq(schema.agentTurns.sessionId, sessionId),
-        inArray(schema.agentTurns.status, ['dispatching', 'active']),
-      ))
+      .where(
+        and(eq(schema.agentTurns.sessionId, sessionId), inArray(schema.agentTurns.status, ['dispatching', 'active'])),
+      )
     for (const turn of before) await this.lifecycle.announceTurn(turn.id)
   }
 
   async queuedHeads(): Promise<Array<{ session: AgentSession; turn: AgentTurn }>> {
-    const heads = this.db.select({
-      sessionId: schema.agentTurns.sessionId,
-      ordinal: sql<number>`min(${schema.agentTurns.ordinal})`.as('head_ordinal'),
-    }).from(schema.agentTurns).where(eq(schema.agentTurns.status, 'queued'))
-      .groupBy(schema.agentTurns.sessionId).as('heads')
-    const rows = await this.db.select({ session: schema.agentSessions, turn: schema.agentTurns })
+    const heads = this.db
+      .select({
+        sessionId: schema.agentTurns.sessionId,
+        ordinal: sql<number>`min(${schema.agentTurns.ordinal})`.as('head_ordinal'),
+      })
+      .from(schema.agentTurns)
+      .where(eq(schema.agentTurns.status, 'queued'))
+      .groupBy(schema.agentTurns.sessionId)
+      .as('heads')
+    const rows = await this.db
+      .select({ session: schema.agentSessions, turn: schema.agentTurns })
       .from(heads)
-      .innerJoin(schema.agentTurns, and(eq(schema.agentTurns.sessionId, heads.sessionId), eq(schema.agentTurns.ordinal, heads.ordinal)))
+      .innerJoin(
+        schema.agentTurns,
+        and(eq(schema.agentTurns.sessionId, heads.sessionId), eq(schema.agentTurns.ordinal, heads.ordinal)),
+      )
       .innerJoin(schema.agentSessions, eq(schema.agentSessions.id, heads.sessionId))
       .where(and(isNull(schema.agentSessions.archivedAt), eq(schema.agentSessions.controller, 'acorn')))
     return rows.map(({ session, turn }) => ({ session: mapAgentSession(session), turn: mapAgentTurn(turn) }))
@@ -1556,13 +1732,15 @@ export class AgentStore {
     const [row] = await this.db
       .select({ id: schema.agentTurns.id })
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.sessionId, sessionId),
-        or(
-          isNotNull(schema.agentTurns.providerTurnRef),
-          inArray(schema.agentTurns.status, ['dispatching', 'active', 'completed', 'failed', 'interrupted']),
+      .where(
+        and(
+          eq(schema.agentTurns.sessionId, sessionId),
+          or(
+            isNotNull(schema.agentTurns.providerTurnRef),
+            inArray(schema.agentTurns.status, ['dispatching', 'active', 'completed', 'failed', 'interrupted']),
+          ),
         ),
-      ))
+      )
       .limit(1)
     return row != null
   }
@@ -1581,17 +1759,19 @@ export class AgentStore {
   async unsettledSessions(): Promise<AgentSession[]> {
     const [runtimeRows, turnRows, requestRows] = await Promise.all([
       this.db
-      .select()
-      .from(schema.agentSessions)
-      .where(inArray(schema.agentSessions.runtimeState, [
-        'creating',
-        'connecting',
-        'replaying',
-        'working',
-        'waiting',
-        'cancelling',
-        'reconnecting',
-      ])),
+        .select()
+        .from(schema.agentSessions)
+        .where(
+          inArray(schema.agentSessions.runtimeState, [
+            'creating',
+            'connecting',
+            'replaying',
+            'working',
+            'waiting',
+            'cancelling',
+            'reconnecting',
+          ]),
+        ),
       this.db
         .selectDistinct({ sessionId: schema.agentTurns.sessionId })
         .from(schema.agentTurns)
@@ -1602,15 +1782,11 @@ export class AgentStore {
         .where(inArray(schema.agentRequests.status, ['pending', 'resolving'])),
     ])
     const known = new Map(runtimeRows.map((row) => [row.id, row]))
-    const missingIds = [...new Set([
-      ...turnRows.map((row) => row.sessionId),
-      ...requestRows.map((row) => row.sessionId),
-    ])].filter((id) => !known.has(id))
+    const missingIds = [
+      ...new Set([...turnRows.map((row) => row.sessionId), ...requestRows.map((row) => row.sessionId)]),
+    ].filter((id) => !known.has(id))
     if (missingIds.length) {
-      const rows = await this.db
-        .select()
-        .from(schema.agentSessions)
-        .where(inArray(schema.agentSessions.id, missingIds))
+      const rows = await this.db.select().from(schema.agentSessions).where(inArray(schema.agentSessions.id, missingIds))
       for (const row of rows) known.set(row.id, row)
     }
     return [...known.values()].map(mapAgentSession)
@@ -1639,11 +1815,13 @@ export class AgentStore {
     const [row] = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.sessionId, sessionId),
-        eq(schema.agentTurns.source, 'plugin'),
-        sql`json_extract(${schema.agentTurns.effectivePolicyJson}, '$.sentBy.pluginId') = ${pluginId}`,
-      ))
+      .where(
+        and(
+          eq(schema.agentTurns.sessionId, sessionId),
+          eq(schema.agentTurns.source, 'plugin'),
+          sql`json_extract(${schema.agentTurns.effectivePolicyJson}, '$.sentBy.pluginId') = ${pluginId}`,
+        ),
+      )
     return Number(row?.count ?? 0)
   }
 
@@ -1652,11 +1830,13 @@ export class AgentStore {
     const rows = await this.db
       .select()
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.sessionId, sessionId),
-        eq(schema.agentTurns.source, 'plugin'),
-        sql`json_extract(${schema.agentTurns.effectivePolicyJson}, '$.followUpOf') = ${originTurnId}`,
-      ))
+      .where(
+        and(
+          eq(schema.agentTurns.sessionId, sessionId),
+          eq(schema.agentTurns.source, 'plugin'),
+          sql`json_extract(${schema.agentTurns.effectivePolicyJson}, '$.followUpOf') = ${originTurnId}`,
+        ),
+      )
       .orderBy(asc(schema.agentTurns.ordinal))
     return rows.map(mapAgentTurn)
   }
@@ -1668,11 +1848,13 @@ export class AgentStore {
       .select({ id: schema.agentTurns.id })
       .from(schema.agentTurns)
       .innerJoin(schema.agentSessions, eq(schema.agentSessions.id, schema.agentTurns.sessionId))
-      .where(and(
-        eq(schema.agentSessions.kind, 'workflow'),
-        eq(schema.agentTurns.source, 'plugin'),
-        eq(schema.agentTurns.status, 'queued'),
-      ))
+      .where(
+        and(
+          eq(schema.agentSessions.kind, 'workflow'),
+          eq(schema.agentTurns.source, 'plugin'),
+          eq(schema.agentTurns.status, 'queued'),
+        ),
+      )
     for (const row of rows) await this.cancelTurn(row.id)
   }
 
@@ -1682,11 +1864,13 @@ export class AgentStore {
     const rows = await this.db
       .select()
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.source, 'delegation'),
-        inArray(schema.agentTurns.status, ['completed', 'failed', 'cancelled', 'interrupted']),
-        like(schema.agentTurns.effectivePolicyJson, '%"reportTo":%'),
-      ))
+      .where(
+        and(
+          eq(schema.agentTurns.source, 'delegation'),
+          inArray(schema.agentTurns.status, ['completed', 'failed', 'cancelled', 'interrupted']),
+          like(schema.agentTurns.effectivePolicyJson, '%"reportTo":%'),
+        ),
+      )
     return rows.map(mapAgentTurn)
   }
 
@@ -1695,12 +1879,14 @@ export class AgentStore {
     const rows = await this.db
       .select()
       .from(schema.agentTurns)
-      .where(and(
-        eq(schema.agentTurns.source, 'delegation'),
-        inArray(schema.agentTurns.status, ['completed', 'failed', 'cancelled', 'interrupted']),
-        sql`json_type(${schema.agentTurns.effectivePolicyJson}, '$.checks') = 'array'`,
-        sql`json_type(${schema.agentTurns.effectivePolicyJson}, '$.checkResults') IS NULL`,
-      ))
+      .where(
+        and(
+          eq(schema.agentTurns.source, 'delegation'),
+          inArray(schema.agentTurns.status, ['completed', 'failed', 'cancelled', 'interrupted']),
+          sql`json_type(${schema.agentTurns.effectivePolicyJson}, '$.checks') = 'array'`,
+          sql`json_type(${schema.agentTurns.effectivePolicyJson}, '$.checkResults') IS NULL`,
+        ),
+      )
     return rows.map(mapAgentTurn)
   }
 }

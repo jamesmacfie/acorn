@@ -1,8 +1,4 @@
-import type {
-  AgentNormalizedEvent,
-  AgentPermissionOption,
-  AgentQuestion,
-} from '../../contract/wire.ts'
+import type { AgentNormalizedEvent, AgentPermissionOption, AgentQuestion } from '../../contract/wire.ts'
 
 export type FormElicitationRequest = {
   message: string
@@ -57,13 +53,15 @@ const formOptions = (property: FormProperty): AgentQuestion['options'] => {
   }
   const bare = property.type === 'array' ? property.items?.enum : property.enum
   if (bare?.length) return bare.map((value) => ({ id: value, label: value }))
-  if (property.type === 'boolean') return [{ id: 'true', label: 'Yes' }, { id: 'false', label: 'No' }]
+  if (property.type === 'boolean')
+    return [
+      { id: 'true', label: 'Yes' },
+      { id: 'false', label: 'No' },
+    ]
   return undefined
 }
 
-const skipOption: AgentPermissionOption[] = [
-  { id: 'decline', label: 'Skip', kind: 'reject_once' },
-]
+const skipOption: AgentPermissionOption[] = [{ id: 'decline', label: 'Skip', kind: 'reject_once' }]
 
 const consentOptions: AgentPermissionOption[] = [
   { id: 'accept', label: 'Allow', kind: 'allow_once' },
@@ -72,10 +70,7 @@ const consentOptions: AgentPermissionOption[] = [
 
 // MCP form elicitation covers two shapes. Properties ask for structured input; an empty schema asks
 // only for consent. Both ACP and Codex carry the same schema and expect the same action response.
-export function normalizeFormElicitation(
-  requestId: string,
-  request: FormElicitationRequest,
-): AgentNormalizedEvent {
+export function normalizeFormElicitation(requestId: string, request: FormElicitationRequest): AgentNormalizedEvent {
   const questions = questionsFor(request)
   return {
     type: 'request',
@@ -92,10 +87,7 @@ export function normalizeFormElicitation(
 const formValue = (property: FormProperty, label: string): string =>
   formOptions(property)?.find((option) => option.label === label)?.id ?? label
 
-export function formElicitationResponse(
-  request: FormElicitationRequest,
-  resolution: unknown,
-): FormElicitationResponse {
+export function formElicitationResponse(request: FormElicitationRequest, resolution: unknown): FormElicitationResponse {
   if (typeof resolution !== 'object' || resolution == null) return { action: 'cancel' }
   const row = resolution as Record<string, unknown>
   if (typeof row.optionId === 'string') {

@@ -31,7 +31,7 @@ export const shouldPersistQueryKey = (key: QueryKey): boolean => {
 // A query that sets `meta: { persist: false }` stays in memory only. Search answers do: restoring one
 // after a relaunch would show an old provider answer as though it had just arrived.
 export const shouldPersistQuery = (query: Query): boolean =>
-  defaultShouldDehydrateQuery(query)
-  && query.meta?.persist !== false
-  && shouldPersistQueryKey(query.queryKey)
-  && query.state.dataUpdatedAt >= Date.now() - PERSISTED_QUERY_MAX_AGE_MS
+  defaultShouldDehydrateQuery(query) &&
+  query.meta?.persist !== false &&
+  shouldPersistQueryKey(query.queryKey) &&
+  query.state.dataUpdatedAt >= Date.now() - PERSISTED_QUERY_MAX_AGE_MS

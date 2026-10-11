@@ -1,4 +1,15 @@
-import { createComponent, createMemo, createRenderEffect, lazy, onCleanup, onMount, Suspense, type Accessor, type Component, type JSX } from 'solid-js'
+import {
+  createComponent,
+  createMemo,
+  createRenderEffect,
+  lazy,
+  onCleanup,
+  onMount,
+  Suspense,
+  type Accessor,
+  type Component,
+  type JSX,
+} from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import { isPaneLayout, regionProblem, type PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import type { Region } from '../../layouts'
@@ -187,7 +198,9 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
   // bare-Node test suites, and the repo's vitest configs have no Solid transform, so a static import
   // of a `.tsx` file would make it unimportable there. The `??` short-circuits, so a host that
   // supplied a table never reaches for the DOM one at all.
-  const Draw = lazy(async () => ({ default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout] }))
+  const Draw = lazy(async () => ({
+    default: suppliedLayout(layout) ?? (await import('../../layouts')).LAYOUTS[layout],
+  }))
   return {
     ...entry,
     // A region that is not a `lazy()` has nothing to load. A failed load is the region boundary's to
@@ -202,10 +215,19 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       const regions: Record<string, Region> = {}
       // A getter, so the model is looked up when a region renders rather than when the pane is built,
       // and a pane that switches task hands its regions the new task's model without remounting them.
-      const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => {
-        const taskId = props.task.id
-        return entry.model!(props.task, { shown: createMemo(() => paneDrawn(entry.id, taskId, scope)) })
-      }, owner ?? 'core', scope) : undefined)
+      const model = () =>
+        entry.model
+          ? paneModel(
+              entry.id,
+              props.task.id,
+              () => {
+                const taskId = props.task.id
+                return entry.model!(props.task, { shown: createMemo(() => paneDrawn(entry.id, taskId, scope)) })
+              },
+              owner ?? 'core',
+              scope,
+            )
+          : undefined
       // For as long as this pane draws this task, which is what the model's `shown` reads.
       createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id, scope)))
       for (const [name, Region] of Object.entries(entry.regions)) {
@@ -231,15 +253,21 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
             attrs: { seam: 'pane.region', 'pane.id': entry.id, 'pane.region': name },
           })
           return createComponent(Suspense, {
-            get fallback() { return loadingPlaceholder(entry.label) },
+            get fallback() {
+              return loadingPlaceholder(entry.label)
+            },
             get children() {
               return createComponent(MeasuredRegion, {
                 paneId: entry.id,
                 span,
                 get children() {
                   return createComponent(Region, {
-                    get task() { return props.task },
-                    get model() { return model() },
+                    get task() {
+                      return props.task
+                    },
+                    get model() {
+                      return model()
+                    },
                   })
                 },
               })
@@ -249,18 +277,29 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
       }
       // The layout is a `lazy` too, and a pending one renders as an empty string for the same
       // reason a region does, so it gets the same boundary and placeholder.
-      return createComponent(Suspense, { get fallback() { return loadingPlaceholder(entry.label) }, get children() { return createComponent(Draw, {
-        stateKey: entry.id,
-        label: entry.label,
-        regions,
-        ...(entry.tabs ? { tabs: entry.tabs } : {}),
-        // A getter, so a pane that hides a region on a signal re-renders the layout rather than the
-        // pane. Collapsing a library must not remount the note being edited.
-        get hidden() { return entry.hidden?.(props.task) },
-      collapsible: entry.collapsible === true,
-      collapseContent: entry.collapseContent ?? 'rows',
-      get scrollScope() { return props.task.id },
-      }) } })
+      return createComponent(Suspense, {
+        get fallback() {
+          return loadingPlaceholder(entry.label)
+        },
+        get children() {
+          return createComponent(Draw, {
+            stateKey: entry.id,
+            label: entry.label,
+            regions,
+            ...(entry.tabs ? { tabs: entry.tabs } : {}),
+            // A getter, so a pane that hides a region on a signal re-renders the layout rather than the
+            // pane. Collapsing a library must not remount the note being edited.
+            get hidden() {
+              return entry.hidden?.(props.task)
+            },
+            collapsible: entry.collapsible === true,
+            collapseContent: entry.collapseContent ?? 'rows',
+            get scrollScope() {
+              return props.task.id
+            },
+          })
+        },
+      })
     },
   }
 }
@@ -281,9 +320,9 @@ export const paneContribution = (id: PaneId): PaneContribution | undefined => pa
 export const paneIds = (): PaneId[] => paneContributions().map((pane) => pane.id)
 export const paneLabel = (id: PaneId): string => paneContribution(id)?.label ?? id
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
-  hasHostCapability(pane.requires)
-  && (!task || task.status !== 'archived' || pane.readsArchived === true)
-  && (!task || !pane.when || pane.when(task))
+  hasHostCapability(pane.requires) &&
+  (!task || task.status !== 'archived' || pane.readsArchived === true) &&
+  (!task || !pane.when || pane.when(task))
 
 /** A hover shorter than this is the pointer crossing the rail, not a reader looking at a row. */
 export const PANE_PREFETCH_HOVER_MS = 150
@@ -307,7 +346,11 @@ export const prefetchPanes = (task: Task, queryClient: QueryClient): void => {
  * rail past twenty rows fetches nothing. It also starts loading the code of `shown`, the panes the task
  * opens with, so a first opening doesn't wait on its chunks. Only those: the rest load when opened.
  */
-export const schedulePanePrefetch = (task: Task, queryClient: QueryClient, shown: readonly PaneId[] = []): { cancel: () => void } => {
+export const schedulePanePrefetch = (
+  task: Task,
+  queryClient: QueryClient,
+  shown: readonly PaneId[] = [],
+): { cancel: () => void } => {
   const timer = setTimeout(() => {
     prefetchPanes(task, queryClient)
     for (const id of shown) {

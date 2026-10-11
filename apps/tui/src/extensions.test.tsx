@@ -19,8 +19,11 @@ afterEach(() => {
 })
 
 /** Every run drawn in the focused form, as ./controls.test.tsx reads them. */
-const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: number; g: number; b: number }; attributes: number }[][]> }): Promise<string[]> =>
-  (await screen.spans()).flat()
+const litRuns = async (screen: {
+  spans: () => Promise<{ text: string; fg: { r: number; g: number; b: number }; attributes: number }[][]>
+}): Promise<string[]> =>
+  (await screen.spans())
+    .flat()
     .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
     .map((run) => run.text)
 

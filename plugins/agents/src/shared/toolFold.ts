@@ -23,12 +23,10 @@ export const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): Age
   kind: next.kind ?? previous.kind,
   status: next.status ?? previous.status,
   input: next.input ?? previous.input,
-  output: next.outputAppend
-    ? (previous.output ?? '') + (next.output ?? '')
-    : next.output ?? previous.output,
+  output: next.outputAppend ? (previous.output ?? '') + (next.output ?? '') : (next.output ?? previous.output),
   paths: next.paths ?? previous.paths,
   subagentId: next.subagentId ?? previous.subagentId,
-  web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : next.web ?? previous.web,
+  web: next.web && previous.web ? mergeWebActivity(previous.web, next.web) : (next.web ?? previous.web),
 })
 
 // Same convention, one level down. A provider reports the request and the sources on different

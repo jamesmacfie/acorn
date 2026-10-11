@@ -11,11 +11,22 @@ import { isRailMenuLocation } from '@acorn/protocol/contextMenus.ts'
 import { refPanelRegistry, type RefPanelContribution } from '../panes/refPanels'
 import { clientScheduleRegistry, type ClientScheduleContribution } from '../shell/schedules'
 import { contentLinkRegistry, type ContentLinkContribution } from '../panes/contentLinks'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution, type ExtensionPointContribution } from './extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+  type ExtensionPointContribution,
+} from './extensionPoints'
 import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { brandMarkRegistry, type BrandMark } from '../../../kit/tokens/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from '../rail/railMarkerFeed'
-import { clientCapability, clientCapabilityIds, provideClientCapability, requireClientCapability, type ClientCapabilityId } from '../../../infra/node/clientCapabilities'
+import {
+  clientCapability,
+  clientCapabilityIds,
+  provideClientCapability,
+  requireClientCapability,
+  type ClientCapabilityId,
+} from '../../../infra/node/clientCapabilities'
 import type { Disposable, Registry } from '../../../kit/lib/state/registry'
 import { pluginSettingsPlacementProblem, settingsRegistry, type SettingsContribution } from '../shell/settings'
 import { sourceRegistry, type SourceContribution } from '../sources/sources'
@@ -36,14 +47,14 @@ export type ClientContributionPoint<T> = {
 
 /** What a compiled plugin declares when it opens a point. The two fields the host owns are missing:
  *  `id` here is the bare point id, and `ownerId` is stamped from the plugin doing the registering. */
-export type CompiledExtensionPoint =
-  Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
+export type CompiledExtensionPoint = Omit<ExtensionPointContribution, 'ownerId' | 'max'> & { max?: number }
 
 /** What a compiled plugin declares when it fills somebody else's point. `pluginId` and `carrier` are
  *  the host's; `component` is the only carrier a plugin in this process can bring. */
-export type CompiledExtension =
-  Omit<ExtensionContribution, 'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'>
-  & { component: NonNullable<ExtensionContribution['component']> }
+export type CompiledExtension = Omit<
+  ExtensionContribution,
+  'pluginId' | 'carrier' | 'component' | 'entry' | 'hash' | 'frame' | 'fetch' | 'marks' | 'run'
+> & { component: NonNullable<ExtensionContribution['component']> }
 
 // What a plugin loaded from disk would be handed, if one were ever handed this object. It is not: a
 // loaded plugin's client half is a manifest plus a tree or a frame, and the descriptor pass turns those
@@ -161,17 +172,18 @@ const contributed = new Map<string, Disposable[]>()
 // disabled and again when the node answers, and that answer is almost always "nothing disabled" as
 // well. Re-running for it took every contribution back, notified every registry twice and ran every
 // `activate` a second time, which primed the agent roster twice per launch.
-let lastPass: { plugins: readonly ClientPlugin[]; skipped: readonly string[]; result: ClientPluginHostResult } | null = null
+let lastPass: { plugins: readonly ClientPlugin[]; skipped: readonly string[]; result: ClientPluginHostResult } | null =
+  null
 
 // The same plugin objects in the same order, with the same ones switched off. Nothing else is an input
 // to a pass. Which node a contribution talks to and whether it draws are both read when they are
 // asked, not at `init`, and a plugin whose side effects follow the active node keys them on it itself
 // (the agent roster prime, the terminal session list). Loaded plugins arrive through their own pass.
 const samePass = (plugins: readonly ClientPlugin[], skipped: readonly string[]): boolean =>
-  lastPass !== null
-  && lastPass.plugins.length === plugins.length
-  && lastPass.plugins.every((plugin, index) => plugin === plugins[index])
-  && lastPass.skipped.join('\n') === skipped.join('\n')
+  lastPass !== null &&
+  lastPass.plugins.length === plugins.length &&
+  lastPass.plugins.every((plugin, index) => plugin === plugins[index]) &&
+  lastPass.skipped.join('\n') === skipped.join('\n')
 
 // A contribution that names a provider must name its own plugin. Contribution ids stay un-namespaced,
 // because `pr`, `changes` and `terminal.drawer` are persisted layout keys and chord targets, so
@@ -187,7 +199,9 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // The plugin name goes to `register` as the owner, so each registry's side-map can answer who
   // contributed an entry and the seams that build a telemetry record can name it
   // (kit/lib/state/registry.ts § the owner side-map).
-  const own = <T extends { id: string }>(registry: { register: (entry: T, owner?: string) => Disposable }): ClientContributionPoint<T> => ({
+  const own = <T extends { id: string }>(registry: {
+    register: (entry: T, owner?: string) => Disposable
+  }): ClientContributionPoint<T> => ({
     register: (entry: T) => {
       const provider = declaredProvider(entry)
       if (provider !== undefined && provider !== name) {
@@ -200,7 +214,8 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   const contentLinks: ClientContributionPoint<ContentLinkContribution> = {
     register: (entry) => {
       const provider = declaredProvider(entry)
-      if (provider !== undefined && provider !== name) throw new Error(`Plugin '${name}' registered '${entry.id}' under provider '${provider}'`)
+      if (provider !== undefined && provider !== name)
+        throw new Error(`Plugin '${name}' registered '${entry.id}' under provider '${provider}'`)
       const id = entry.id.startsWith(`${name}.`) ? entry.id : `${name}.${entry.id}`
       record(contentLinkRegistry.register({ ...entry, id, ...(entry.target ? { providerId: name } : {}) }, name))
     },
@@ -225,12 +240,17 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // (plugins/chrome/extensionPoints.ts).
   const ownExtensionPoint: ClientContributionPoint<CompiledExtensionPoint> = {
     register: (entry) => {
-      record(extensionPointRegistry.register({
-        ...entry,
-        id: qualifiedExtensionPointId(name, entry.id),
-        ownerId: name,
-        max: entry.max ?? 1,
-      }, name))
+      record(
+        extensionPointRegistry.register(
+          {
+            ...entry,
+            id: qualifiedExtensionPointId(name, entry.id),
+            ownerId: name,
+            max: entry.max ?? 1,
+          },
+          name,
+        ),
+      )
     },
   }
   // `own`, plus the placement check. Core fills three of the nine settings groups itself, and a page
@@ -258,14 +278,21 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     sources: { register: <Item>(entry: SourceContribution<Item>) => sources.register(entry) },
     commands: ownCommand,
     keybindings,
-    contextMenus: { register: (entry) => {
-      if (isRailMenuLocation(entry.location) && !entry.surface) throw new Error(`Plugin '${name}' must name a rail menu surface`)
-      if (isRailMenuLocation(entry.location) &&
-        (entry.location === 'rail.source' ? sourceRegistry.ownerOf(entry.surface!) : paneRegistry.ownerOf(entry.surface!)) !== name) {
-        throw new Error(`Plugin '${name}' cannot add a menu to '${entry.surface}'`)
-      }
-      record(contextMenuRegistry.register(entry, name))
-    } },
+    contextMenus: {
+      register: (entry) => {
+        if (isRailMenuLocation(entry.location) && !entry.surface)
+          throw new Error(`Plugin '${name}' must name a rail menu surface`)
+        if (
+          isRailMenuLocation(entry.location) &&
+          (entry.location === 'rail.source'
+            ? sourceRegistry.ownerOf(entry.surface!)
+            : paneRegistry.ownerOf(entry.surface!)) !== name
+        ) {
+          throw new Error(`Plugin '${name}' cannot add a menu to '${entry.surface}'`)
+        }
+        record(contextMenuRegistry.register(entry, name))
+      },
+    },
     integrationFlows: ownIntegrationFlow,
     projectImporters: own(projectImporterRegistry),
     settingsPages: ownSettingsPage,
@@ -299,13 +326,18 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
 // source is not refused for the order the author wrote them in.
 function railSwitchProblem(pluginId: string): string | undefined {
   return untrack(() => {
-    const own = sourceRegistry.entries().map((source) => source.id).filter((id) => sourceRegistry.ownerOf(id) === pluginId)
+    const own = sourceRegistry
+      .entries()
+      .map((source) => source.id)
+      .filter((id) => sourceRegistry.ownerOf(id) === pluginId)
     for (const page of settingsRegistry.entries()) {
       const ids = page.railSourceVisibility
       if (!ids || settingsRegistry.ownerOf(page.id) !== pluginId) continue
-      if (ids.length > RAIL_SOURCE_VISIBILITY_MAX) return `settings page '${page.id}' with more than ${RAIL_SOURCE_VISIBILITY_MAX} railSourceVisibility ids`
+      if (ids.length > RAIL_SOURCE_VISIBILITY_MAX)
+        return `settings page '${page.id}' with more than ${RAIL_SOURCE_VISIBILITY_MAX} railSourceVisibility ids`
       const foreign = foreignRailSources(ids, own)[0]
-      if (foreign) return `settings page '${page.id}' with a railSourceVisibility id '${foreign}' that is not one of its sources`
+      if (foreign)
+        return `settings page '${page.id}' with a railSourceVisibility id '${foreign}' that is not one of its sources`
     }
     return undefined
   })
@@ -322,7 +354,13 @@ export function initClientPlugins(
   }
   const disabled = new Set(options.disabled ?? [])
   const isSkipped = (plugin: ClientPlugin): boolean => disabled.has(plugin.name) && !plugin.required
-  if (samePass(plugins, plugins.filter(isSkipped).map((plugin) => plugin.name))) return lastPass!.result
+  if (
+    samePass(
+      plugins,
+      plugins.filter(isSkipped).map((plugin) => plugin.name),
+    )
+  )
+    return lastPass!.result
   // Forgotten until this pass finishes, so one that throws part-way is never mistaken for done.
   lastPass = null
   const enabled: string[] = []

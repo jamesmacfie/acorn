@@ -36,8 +36,7 @@ export function createAgentUsageStore(
     if (force) {
       setRefreshing(true)
       setRefreshingProviderId(providerId ?? null)
-    }
-    else if (!snapshot()) setLoading(true)
+    } else if (!snapshot()) setLoading(true)
     setError('')
     try {
       const result = await (providerId ? client.refreshProvider(providerId) : force ? client.refresh() : client.read())

@@ -121,18 +121,27 @@ export function openRenderer(options: {
   // needs: it listens on `keypress` alone, and a release delivered there would type every character
   // twice (./keys/keymapHost.ts § tuiKeymapHost, ./input/terminal.ts § KITTY_FLAGS).
   const route = (event: Parameters<InputListener>[0]): void => {
-    if (event.type === 'resize') { screen.resize(event.cols, event.rows); return }
+    if (event.type === 'resize') {
+      screen.resize(event.cols, event.rows)
+      return
+    }
     if (event.type === 'key') {
       keyInput.emit(event.action === 'release' ? 'keyrelease' : 'keypress', keyPressed(event))
       return
     }
     // A paste is one event rather than a run of Returns, and the dispatcher hands it to whatever has
     // the keys (./keys/install.ts § pasteInto).
-    if (event.type === 'paste') { keyInput.emit('paste', event); return }
+    if (event.type === 'paste') {
+      keyInput.emit('paste', event)
+      return
+    }
     // Whether this terminal is the window the reader is looking at, under the two names OpenTUI's
     // renderer raised it by, because `./main.tsx` subscribes to those and it is the same fact
     // (./main.tsx § setHostFocused).
-    if (event.type === 'focus') { events.emit(event.state === 'in' ? 'focus' : 'blur'); return }
+    if (event.type === 'focus') {
+      events.emit(event.state === 'in' ? 'focus' : 'blur')
+      return
+    }
     // And the pointer, which is two gestures and no more: a wheel moves the viewport under it, and a
     // left press moves the keys.
     if (event.action === 'wheel' && (event.wheel === 'up' || event.wheel === 'down')) {
@@ -147,12 +156,24 @@ export function openRenderer(options: {
     screen,
     root: screen.root,
     keyInput,
-    get isDestroyed() { return destroyed },
-    on: (event, listener) => { events.on(event, listener as (...args: unknown[]) => void) },
-    off: (event, listener) => { events.off(event, listener as (...args: unknown[]) => void) },
-    once: (event, listener) => { events.once(event, listener as (...args: unknown[]) => void) },
-    mouseScroll: (x, y, direction) => { wheelAt(screen.root, x, y, direction) },
-    mousePress: (x, y) => { pressAt(screen.root, x, y) },
+    get isDestroyed() {
+      return destroyed
+    },
+    on: (event, listener) => {
+      events.on(event, listener as (...args: unknown[]) => void)
+    },
+    off: (event, listener) => {
+      events.off(event, listener as (...args: unknown[]) => void)
+    },
+    once: (event, listener) => {
+      events.once(event, listener as (...args: unknown[]) => void)
+    },
+    mouseScroll: (x, y, direction) => {
+      wheelAt(screen.root, x, y, direction)
+    },
+    mousePress: (x, y) => {
+      pressAt(screen.root, x, y)
+    },
     frame,
     destroy: () => {
       if (destroyed) return

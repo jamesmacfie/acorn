@@ -34,14 +34,16 @@ type JsonRpcProcessOptions = {
 }
 
 const asObject = (value: unknown): JsonObject | null =>
-  typeof value === 'object' && value != null && !Array.isArray(value) ? value as JsonObject : null
+  typeof value === 'object' && value != null && !Array.isArray(value) ? (value as JsonObject) : null
 
-const jsonRpcMessageSchema = z.object({
-  id: z.union([z.string(), z.number()]).optional(),
-  method: z.string().optional(),
-  params: z.record(z.string(), z.unknown()).optional(),
-  error: z.record(z.string(), z.unknown()).optional(),
-}).passthrough()
+const jsonRpcMessageSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]).optional(),
+    method: z.string().optional(),
+    params: z.record(z.string(), z.unknown()).optional(),
+    error: z.record(z.string(), z.unknown()).optional(),
+  })
+  .passthrough()
 
 export class JsonRpcProcess {
   readonly #child: ChildProcessWithoutNullStreams
@@ -80,7 +82,9 @@ export class JsonRpcProcess {
     this.#child.on('exit', (code, signal) => {
       const error = this.#closed
         ? undefined
-        : new Error(`Agent protocol process exited${code == null ? '' : ` with code ${code}`}${signal ? ` (${signal})` : ''}.`)
+        : new Error(
+            `Agent protocol process exited${code == null ? '' : ` with code ${code}`}${signal ? ` (${signal})` : ''}.`,
+          )
       this.#close(error)
     })
   }
@@ -126,10 +130,12 @@ export class JsonRpcProcess {
 
   stop(polite?: () => Promise<unknown>): Promise<void> {
     if (!polite) this.#close(new Error('Agent protocol process stopped.'), false)
-    return this.#stop ??= this.#owner.stop(async () => {
-      if (polite && !this.#closed) await polite()
-      this.#child.stdin.end()
-    }).finally(() => this.#close(new Error('Agent protocol process stopped.'), false))
+    return (this.#stop ??= this.#owner
+      .stop(async () => {
+        if (polite && !this.#closed) await polite()
+        this.#child.stdin.end()
+      })
+      .finally(() => this.#close(new Error('Agent protocol process stopped.'), false)))
   }
 
   #write(message: JsonObject): void {
@@ -184,7 +190,8 @@ export class JsonRpcProcess {
       this.#pending.delete(id)
       clearTimeout(pending.timer)
       const error = asObject(message.error)
-      if (error) pending.reject(new Error(typeof error.message === 'string' ? error.message : 'Agent protocol request failed.'))
+      if (error)
+        pending.reject(new Error(typeof error.message === 'string' ? error.message : 'Agent protocol request failed.'))
       else pending.resolve(message.result)
       return
     }

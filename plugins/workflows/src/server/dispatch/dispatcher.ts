@@ -68,14 +68,16 @@ export type WorkflowReprocessDispatchRequest = {
 type WorkflowDispatchRow = typeof schema.workflowDispatches.$inferSelect
 export type WorkflowTransaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
 
-type WorkflowStarter = Pick<WorkflowRunner, 'start'> & Partial<Pick<WorkflowRunner, 'waitForRun'>> & Partial<Pick<WorkflowRunner, 'cancelRun'>>
+type WorkflowStarter = Pick<WorkflowRunner, 'start'> &
+  Partial<Pick<WorkflowRunner, 'waitForRun'>> &
+  Partial<Pick<WorkflowRunner, 'cancelRun'>>
 type ChildTaskCreator = Pick<CoreServices['tasks'], 'createChild'>
 
 type WorkflowDispatchAuthority = {
   authorizeRepoConfig?(taskId: string): Promise<void>
 }
 
-const message = (error: unknown): string => error instanceof Error ? error.message : 'Workflow dispatch failed.'
+const message = (error: unknown): string => (error instanceof Error ? error.message : 'Workflow dispatch failed.')
 
 /**
  * Moves one child dispatch across the workflow and core database boundary. Each cross-database
@@ -98,7 +100,10 @@ export class WorkflowDispatcher {
   }
 
   /** Reserves the complete roster before creating tasks, then admits it in declaration order. */
-  async dispatchMany(requests: readonly WorkflowDispatchRequest[], signal?: AbortSignal): Promise<WorkflowDispatchResult[]> {
+  async dispatchMany(
+    requests: readonly WorkflowDispatchRequest[],
+    signal?: AbortSignal,
+  ): Promise<WorkflowDispatchResult[]> {
     const rows = this.reserveMany(requests)
     return this.resumeMany(rows, signal)
   }
@@ -108,17 +113,37 @@ export class WorkflowDispatcher {
     for (const [index, row] of rows.entries()) {
       const result = await this.resume(row, signal)
       results.push(result)
-      const hasRun = row.taskMode === 'parent' && this.db.select({ id: schema.workflowRuns.id })
-        .from(schema.workflowRuns).where(eq(schema.workflowRuns.id, row.runId)).get() != null
+      const hasRun =
+        row.taskMode === 'parent' &&
+        this.db
+          .select({ id: schema.workflowRuns.id })
+          .from(schema.workflowRuns)
+          .where(eq(schema.workflowRuns.id, row.runId))
+          .get() != null
       if (row.taskMode === 'parent' && (result.state !== 'terminal' || hasRun)) {
         if (!this.runner.waitForRun) throw new Error('Agent loop completion tracking is unavailable.')
         const outcome = await this.runner.waitForRun(row.parentRunId, row.runId, signal ?? new AbortController().signal)
         const payload = JSON.parse(row.payloadJson) as WorkflowDispatchPayload
         const interrupted = 'error' in outcome && outcome.error?.includes(AGENT_MAP_INTERRUPTED)
-        if (outcome.status === 'cancelled' || interrupted || (payload.onFailure === 'stop' && outcome.status !== 'done')) {
+        if (
+          outcome.status === 'cancelled' ||
+          interrupted ||
+          (payload.onFailure === 'stop' && outcome.status !== 'done')
+        ) {
           for (const pending of rows.slice(index + 1)) {
-            await this.db.update(schema.workflowDispatches).set({ state: 'terminal', error: 'Not started because the preceding agent stopped.', updatedAt: Date.now() })
-              .where(and(eq(schema.workflowDispatches.id, pending.id), inArray(schema.workflowDispatches.state, ['reserved', 'task-created'])))
+            await this.db
+              .update(schema.workflowDispatches)
+              .set({
+                state: 'terminal',
+                error: 'Not started because the preceding agent stopped.',
+                updatedAt: Date.now(),
+              })
+              .where(
+                and(
+                  eq(schema.workflowDispatches.id, pending.id),
+                  inArray(schema.workflowDispatches.state, ['reserved', 'task-created']),
+                ),
+              )
             results.push({ taskId: pending.taskId, runId: pending.runId, state: 'terminal' })
           }
           break
@@ -154,14 +179,23 @@ export class WorkflowDispatcher {
     const reserve = (tx: WorkflowTransaction) => {
       const batchAt = Date.now()
       return requests.map((request, index) => {
-        const parent = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, request.parentRunId)).get()
+        const parent = tx
+          .select()
+          .from(schema.workflowRuns)
+          .where(eq(schema.workflowRuns.id, request.parentRunId))
+          .get()
         if (!parent) throw new Error(`Parent workflow run '${request.parentRunId}' was not found.`)
-        const parentStep = tx.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, request.parentStepId)).get()
+        const parentStep = tx
+          .select()
+          .from(schema.workflowSteps)
+          .where(eq(schema.workflowSteps.id, request.parentStepId))
+          .get()
         if (!parentStep || parentStep.runId !== parent.id) {
           throw new Error(`Parent workflow step '${request.parentStepId}' does not belong to run '${parent.id}'.`)
         }
 
-        if (parent.depth >= MAX_CHILD_WORKFLOW_DEPTH) throw new WorkflowSafetyRailError(`Workflow depth exceeds ${MAX_CHILD_WORKFLOW_DEPTH} child levels.`)
+        if (parent.depth >= MAX_CHILD_WORKFLOW_DEPTH)
+          throw new WorkflowSafetyRailError(`Workflow depth exceeds ${MAX_CHILD_WORKFLOW_DEPTH} child levels.`)
         let parentDefinition: WorkflowDef
         try {
           parentDefinition = JSON.parse(parent.defJson) as WorkflowDef
@@ -169,9 +203,11 @@ export class WorkflowDispatcher {
           throw new Error('Parent workflow definition is unavailable for child authority calculation.')
         }
         const dispatchDefinition = parentDefinition.steps[parentStep.idx]
-        if (!dispatchDefinition) throw new Error(`Parent workflow step '${parentStep.name}' is missing from its frozen definition.`)
+        if (!dispatchDefinition)
+          throw new Error(`Parent workflow step '${parentStep.name}' is missing from its frozen definition.`)
         const graph = parent.resolvedGraphJson
-          ? childWorkflowGraph(JSON.parse(parent.resolvedGraphJson), stepIdentity(dispatchDefinition)) : undefined
+          ? childWorkflowGraph(JSON.parse(parent.resolvedGraphJson), stepIdentity(dispatchDefinition))
+          : undefined
         if (graph && workflowContentFingerprint(graph.root) !== workflowContentFingerprint(request.workflow)) {
           throw new Error('Child workflow does not match the frozen execution graph.')
         }
@@ -184,7 +220,9 @@ export class WorkflowDispatcher {
         const envelope = childSafetyEnvelope(parent, dispatchDefinition, request.workflow, reservationAt)
 
         const payload: WorkflowDispatchPayload = {
-          ...(dispatchDefinition.agent ? { taskMode: 'parent', onFailure: dispatchDefinition.agent.onFailure ?? 'continue' } : {}),
+          ...(dispatchDefinition.agent
+            ? { taskMode: 'parent', onFailure: dispatchDefinition.agent.onFailure ?? 'continue' }
+            : {}),
           parentTaskId: parent.taskId,
           rootRunId: parent.rootRunId ?? parent.id,
           depth: parent.depth + 1,
@@ -215,10 +253,14 @@ export class WorkflowDispatcher {
         }
         resolveWorkflowInputs(request.workflow, request.inputs)
 
-        const descendants = tx.select({ id: schema.workflowDispatches.id }).from(schema.workflowDispatches)
-          .where(eq(schema.workflowDispatches.rootRunId, parent.rootRunId ?? parent.id)).all()
+        const descendants = tx
+          .select({ id: schema.workflowDispatches.id })
+          .from(schema.workflowDispatches)
+          .where(eq(schema.workflowDispatches.rootRunId, parent.rootRunId ?? parent.id))
+          .all()
         const root = tx.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, payload.rootRunId)).get()
-        if (!root || !['running', 'gated'].includes(root.status)) throw new Error('Root workflow is no longer admitting children.')
+        if (!root || !['running', 'gated'].includes(root.status))
+          throw new Error('Root workflow is no longer admitting children.')
         const limit = descendantLimit(JSON.parse(root.defJson))
         if (descendants.length >= limit) {
           throw new WorkflowSafetyRailError(`Safety rail: workflow tree reached the ${limit}-task descendant limit.`)
@@ -258,8 +300,11 @@ export class WorkflowDispatcher {
   reserveReprocess(request: WorkflowReprocessDispatchRequest, transaction?: WorkflowTransaction): WorkflowDispatchRow {
     if (!request.callerKey.trim()) throw new Error('A workflow reprocess caller key is required.')
     const reserve = (tx: WorkflowTransaction) => {
-      const existing = tx.select().from(schema.workflowDispatches)
-        .where(eq(schema.workflowDispatches.callerKey, request.callerKey)).get()
+      const existing = tx
+        .select()
+        .from(schema.workflowDispatches)
+        .where(eq(schema.workflowDispatches.callerKey, request.callerKey))
+        .get()
       const payloadBase = {
         rootReprocess: true as const,
         reprocessSource: {
@@ -331,7 +376,12 @@ export class WorkflowDispatcher {
         await this.assertAdmission(row, signal)
         await this.assertAuthority(row, payload)
         if (row.state === 'reserved') {
-          if (row.taskMode !== 'parent') await this.tasks.createChild(row.parentTaskId, { ...payload.task, origin: payload.task.origin ?? 'workflows:child' }, row.taskId)
+          if (row.taskMode !== 'parent')
+            await this.tasks.createChild(
+              row.parentTaskId,
+              { ...payload.task, origin: payload.task.origin ?? 'workflows:child' },
+              row.taskId,
+            )
           await this.assertAdmission(row, signal)
           await this.assertAuthority(row, payload)
           row = await this.advance(row, 'task-created')
@@ -349,7 +399,11 @@ export class WorkflowDispatcher {
             parentStepId: payload.rootReprocess ? null : row.parentStepId,
             depth: payload.rootReprocess ? 0 : payload.depth,
           },
-          ...(row.taskMode === 'parent' ? { trigger: 'agent-map' } : payload.rootReprocess ? { trigger: 'reprocess' } : {}),
+          ...(row.taskMode === 'parent'
+            ? { trigger: 'agent-map' }
+            : payload.rootReprocess
+              ? { trigger: 'reprocess' }
+              : {}),
           effectiveTools: payload.effectiveTools,
           effectiveBudget: payload.effectiveBudget,
           deadlineAt: payload.deadlineAt,
@@ -361,9 +415,19 @@ export class WorkflowDispatcher {
       return { taskId: row.taskId, runId: row.runId, state: row.state as WorkflowDispatchState }
     } catch (error) {
       const payload = JSON.parse(row.payloadJson) as WorkflowDispatchPayload
-      const [parent] = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, row.parentRunId))
+      const [parent] = await this.db
+        .select()
+        .from(schema.workflowRuns)
+        .where(eq(schema.workflowRuns.id, row.parentRunId))
       const [root] = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.id, row.rootRunId))
-      if (signal?.aborted || (!payload.rootReprocess && (!parent || !root || !['running', 'gated'].includes(parent.status) || !['running', 'gated'].includes(root.status)))) {
+      if (
+        signal?.aborted ||
+        (!payload.rootReprocess &&
+          (!parent ||
+            !root ||
+            !['running', 'gated'].includes(parent.status) ||
+            !['running', 'gated'].includes(root.status)))
+      ) {
         // Cancellation can race the run-start call after the parent's first descendant sweep. If
         // the reserved run committed in that window, settle it here before returning to the parent.
         // Keep the child task as workflow history; cancellation never archives or hides it.
@@ -387,7 +451,10 @@ export class WorkflowDispatcher {
   }
 
   private async assertAdmission(row: WorkflowDispatchRow, signal?: AbortSignal): Promise<void> {
-    const [current] = await this.db.select().from(schema.workflowDispatches).where(eq(schema.workflowDispatches.id, row.id))
+    const [current] = await this.db
+      .select()
+      .from(schema.workflowDispatches)
+      .where(eq(schema.workflowDispatches.id, row.id))
     const payload = JSON.parse(row.payloadJson) as WorkflowDispatchPayload
     if (payload.rootReprocess) {
       if (signal?.aborted || !current || current.state === 'cancelling' || current.state === 'terminal') {
@@ -395,17 +462,30 @@ export class WorkflowDispatcher {
       }
       return
     }
-    const runs = await this.db.select().from(schema.workflowRuns).where(eq(schema.workflowRuns.rootRunId, row.rootRunId))
-    let parent = runs.find(run => run.id === row.parentRunId)
+    const runs = await this.db
+      .select()
+      .from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.rootRunId, row.rootRunId))
+    let parent = runs.find((run) => run.id === row.parentRunId)
     const seen = new Set<string>()
     let stopped = false
     while (parent && !seen.has(parent.id)) {
       seen.add(parent.id)
-      if (!['running', 'gated'].includes(parent.status) || (parent.deadlineAt != null && parent.deadlineAt <= Date.now())) stopped = true
-      parent = runs.find(run => run.id === parent!.parentRunId)
+      if (
+        !['running', 'gated'].includes(parent.status) ||
+        (parent.deadlineAt != null && parent.deadlineAt <= Date.now())
+      )
+        stopped = true
+      parent = runs.find((run) => run.id === parent!.parentRunId)
     }
-    if (signal?.aborted || !current || current.state === 'cancelling' || current.state === 'terminal'
-      || stopped || !seen.has(row.rootRunId)) {
+    if (
+      signal?.aborted ||
+      !current ||
+      current.state === 'cancelling' ||
+      current.state === 'terminal' ||
+      stopped ||
+      !seen.has(row.rootRunId)
+    ) {
       throw new Error('Workflow dispatch admission stopped because its parent is no longer running.')
     }
   }
@@ -415,7 +495,10 @@ export class WorkflowDispatcher {
       .update(schema.workflowDispatches)
       .set({ state, error: null, updatedAt: Date.now() })
       .where(and(eq(schema.workflowDispatches.id, row.id), eq(schema.workflowDispatches.state, row.state)))
-    const [current] = await this.db.select().from(schema.workflowDispatches).where(eq(schema.workflowDispatches.id, row.id))
+    const [current] = await this.db
+      .select()
+      .from(schema.workflowDispatches)
+      .where(eq(schema.workflowDispatches.id, row.id))
     if (!current) throw new Error(`Workflow dispatch '${row.callerKey}' disappeared during reconciliation.`)
     return current
   }

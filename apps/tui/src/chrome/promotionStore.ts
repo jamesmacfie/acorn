@@ -18,4 +18,6 @@ export function closePromotion(): void {
 }
 
 /** The fixture builds more than one shell in one process. */
-export function resetPromotion(): void { setRequest(null) }
+export function resetPromotion(): void {
+  setRequest(null)
+}

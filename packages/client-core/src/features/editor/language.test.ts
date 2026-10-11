@@ -35,7 +35,8 @@ describe('the language map', () => {
     // A grammar named on a static `import … from` line puts the whole language pack in whichever
     // chunk holds this module, which is one chunk per pane rather than one per file opened.
     const eager = specifiers.filter((specifier) =>
-      new RegExp(`^\\s*import[^\\n]*from '${specifier.replace(/[/+]/g, '\\$&')}'`, 'm').test(SOURCE))
+      new RegExp(`^\\s*import[^\\n]*from '${specifier.replace(/[/+]/g, '\\$&')}'`, 'm').test(SOURCE),
+    )
     expect(eager, 'these grammars are imported statically and must be dynamic').toEqual([])
   })
 

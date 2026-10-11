@@ -42,34 +42,56 @@ describe('containerMatchesTask', () => {
 
   it('honours [docker] overrides: compose_project, match_labels, match_name=false', () => {
     const task = { worktreePath: null, branch: 'fix/activejob-error' }
-    expect(containerMatchesTask(container({ composeProject: 'runn' }), task, { ...defaultOverrides, composeProject: 'runn' })).toBe(true)
-    expect(containerMatchesTask(
-      container({ labels: { 'acorn.task': 'fix-activejob-error' } }),
-      task,
-      { ...defaultOverrides, matchLabels: ['acorn.task'] },
-    )).toBe(true)
-    expect(containerMatchesTask(
-      container({ name: 'runn-fix-activejob-error-web-1' }),
-      task,
-      { ...defaultOverrides, matchName: false },
-    )).toBe(false)
+    expect(
+      containerMatchesTask(container({ composeProject: 'runn' }), task, {
+        ...defaultOverrides,
+        composeProject: 'runn',
+      }),
+    ).toBe(true)
+    expect(
+      containerMatchesTask(container({ labels: { 'acorn.task': 'fix-activejob-error' } }), task, {
+        ...defaultOverrides,
+        matchLabels: ['acorn.task'],
+      }),
+    ).toBe(true)
+    expect(
+      containerMatchesTask(container({ name: 'runn-fix-activejob-error-web-1' }), task, {
+        ...defaultOverrides,
+        matchName: false,
+      }),
+    ).toBe(false)
   })
 
   it('refuses foreign or invalid explicit working dirs despite every matching display hint', () => {
     const task = { worktreePath: WT, branch: 'fix/activejob-error' }
     for (const dir of ['/foreign', `${WT}-other`, '', 'relative', `${WT}/../foreign`]) {
-      const c = container({ composeWorkingDir: dir, composeProject: 'configured', name: 'fix-activejob-error', labels: { task: 'fix-activejob-error' } })
-      expect(containerMatchesTask(c, task, { composeProject: 'configured', matchLabels: ['task'], matchName: true }), dir).toBe(false)
+      const c = container({
+        composeWorkingDir: dir,
+        composeProject: 'configured',
+        name: 'fix-activejob-error',
+        labels: { task: 'fix-activejob-error' },
+      })
+      expect(
+        containerMatchesTask(c, task, { composeProject: 'configured', matchLabels: ['task'], matchName: true }),
+        dir,
+      ).toBe(false)
     }
   })
 })
 
 describe('containerBelongsToTask', () => {
   it.each([
-    [WT, WT, true], [WT, `${WT}/./services/`, true], [WT, `${WT}-other`, false],
-    [WT, `${WT}/nested/../../foreign`, false], [WT, 'relative/path', false],
-    [WT, null, false], [null, WT, false], ['', WT, false], ['relative', 'relative/sub', false],
-    ['/', '/foreign', false], [WT, `${WT}\0/child`, false],
+    [WT, WT, true],
+    [WT, `${WT}/./services/`, true],
+    [WT, `${WT}-other`, false],
+    [WT, `${WT}/nested/../../foreign`, false],
+    [WT, 'relative/path', false],
+    [WT, null, false],
+    [null, WT, false],
+    ['', WT, false],
+    ['relative', 'relative/sub', false],
+    ['/', '/foreign', false],
+    [WT, `${WT}\0/child`, false],
     ['C:\\Worktrees\\Task', 'c:/worktrees/task/service/', true],
     ['C:\\Worktrees\\Task', 'C:\\Worktrees\\Task-other', false],
     ['C:\\Worktrees\\Task', 'C:\\Worktrees\\Task\\..\\foreign', false],
@@ -83,11 +105,17 @@ describe('containerBelongsToTask', () => {
     ['\\\\host\\share\\task', '//other/share/task', false],
     ['\\\\host\\share\\task', '//host/share/task/../foreign', false],
   ])('root %s and daemon path %s => %s', (worktreePath, composeWorkingDir, expected) => {
-    expect(containerBelongsToTask(container({ composeWorkingDir }), { worktreePath, branch: 'matching-branch' })).toBe(expected)
+    expect(containerBelongsToTask(container({ composeWorkingDir }), { worktreePath, branch: 'matching-branch' })).toBe(
+      expected,
+    )
   })
 
   it('does not grant authority to missing-metadata display hints', () => {
-    const c = container({ name: 'matching-branch', composeProject: 'matching-branch', labels: { task: 'matching-branch' } })
+    const c = container({
+      name: 'matching-branch',
+      composeProject: 'matching-branch',
+      labels: { task: 'matching-branch' },
+    })
     expect(containerMatchesTask(c, { worktreePath: WT, branch: 'matching-branch' })).toBe(true)
     expect(containerBelongsToTask(c, { worktreePath: WT, branch: 'matching-branch' })).toBe(false)
   })

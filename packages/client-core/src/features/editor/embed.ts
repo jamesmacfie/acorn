@@ -27,13 +27,16 @@ export type EmbeddedEditor = {
   destroy: () => void
 }
 
-export function mountEmbeddedEditor(element: HTMLElement, options: {
-  /** The text to start with. Later changes from outside go through `write`. */
-  doc: string
-  languageId: LanguageId
-  readOnly?: boolean
-  onChange?: (text: string) => void
-}): EmbeddedEditor {
+export function mountEmbeddedEditor(
+  element: HTMLElement,
+  options: {
+    /** The text to start with. Later changes from outside go through `write`. */
+    doc: string
+    languageId: LanguageId
+    readOnly?: boolean
+    onChange?: (text: string) => void
+  },
+): EmbeddedEditor {
   const view = new EditorView({
     parent: element,
     state: EditorState.create({
@@ -54,7 +57,9 @@ export function mountEmbeddedEditor(element: HTMLElement, options: {
   // A box that highlights a moment late beats a box that is blank until it can (./language.ts).
   let gone = false
   void languageFor(options.languageId)
-    .then((grammar) => { if (!gone) view.dispatch({ effects: StateEffect.appendConfig.of(grammar) }) })
+    .then((grammar) => {
+      if (!gone) view.dispatch({ effects: StateEffect.appendConfig.of(grammar) })
+    })
     .catch(() => {})
   return {
     read: () => view.state.doc.toString(),

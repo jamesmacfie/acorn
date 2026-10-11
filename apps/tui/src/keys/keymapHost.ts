@@ -30,9 +30,14 @@ import { focusedRenderable, onFocusMove } from './regions'
 // node that left the tree. And there is no raw-input pipe to prepend to: bytes reach
 // `../input/parser.ts` and arrive here as events.
 
-const PLATFORM = process.platform === 'darwin' ? 'macos'
-  : process.platform === 'win32' ? 'windows'
-    : process.platform === 'linux' ? 'linux' : 'unknown'
+const PLATFORM =
+  process.platform === 'darwin'
+    ? 'macos'
+    : process.platform === 'win32'
+      ? 'windows'
+      : process.platform === 'linux'
+        ? 'linux'
+        : 'unknown'
 
 /** What the engine is told about the keyboard it is reading. The same answers OpenTUI's adapter gives
  *  for the same host, kitty included, because `../input/terminal.ts` asks for the protocol in its
@@ -50,16 +55,22 @@ const OWN_METADATA: HostMetadata = {
 }
 
 export function tuiKeymapHost(renderer: Renderer): KeymapHost<Renderable, KeyEvent> {
-  const listen = (event: 'keypress' | 'keyrelease') => (listener: (key: KeyEvent) => void): (() => void) => {
-    // Prepended for the reason the OpenTUI adapter prepends: dispatch has to have had its say before
-    // anything else on the stream reads the key, which is how a binding claims one (§ typeInto).
-    renderer.keyInput.prependListener(event, listener as (...args: unknown[]) => void)
-    return () => { renderer.keyInput.off(event, listener as (...args: unknown[]) => void) }
-  }
+  const listen =
+    (event: 'keypress' | 'keyrelease') =>
+    (listener: (key: KeyEvent) => void): (() => void) => {
+      // Prepended for the reason the OpenTUI adapter prepends: dispatch has to have had its say before
+      // anything else on the stream reads the key, which is how a binding claims one (§ typeInto).
+      renderer.keyInput.prependListener(event, listener as (...args: unknown[]) => void)
+      return () => {
+        renderer.keyInput.off(event, listener as (...args: unknown[]) => void)
+      }
+    }
   return {
     metadata: OWN_METADATA,
     rootTarget: renderer.root,
-    get isDestroyed() { return renderer.isDestroyed },
+    get isDestroyed() {
+      return renderer.isDestroyed
+    },
     getFocusedTarget: () => focusedRenderable(),
     getParentTarget: (target) => target.parent,
     isTargetDestroyed: () => false,
@@ -68,7 +79,9 @@ export function tuiKeymapHost(renderer: Renderer): KeymapHost<Renderable, KeyEve
     onFocusChange: (listener) => onFocusMove(listener),
     onDestroy: (listener) => {
       renderer.once('destroy', listener)
-      return () => { renderer.off('destroy', listener) }
+      return () => {
+        renderer.off('destroy', listener)
+      }
     },
     onTargetDestroy: () => () => {},
     createCommandEvent: () => keyEvent('command') as unknown as KeyEvent,

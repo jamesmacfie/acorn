@@ -22,6 +22,26 @@ describe('registered ws channel prefixes', () => {
     // one letter from `plugins` and deliberately distinct — is the namespace core claims for every
     // loaded plugin's own live channel (client-core/host/plugins/pluginChannel.ts). docker, editor and agent are
     // their plugins'. `editor` is the editor pane's `$EDITOR`-in-a-PTY handoff.
-    expect(wsChannelPrefixes()).toEqual(['agent', 'agent-session', 'connection', 'docker', 'editor', 'head', 'plugin', 'plugins', 'project', 'run', 'tasks', 'term', 'terminal', 'workflow', 'workspace', 'workspace-projects', 'workspaces-mode', 'worktree', 'ws'])
+    expect(wsChannelPrefixes()).toEqual([
+      'agent',
+      'agent-session',
+      'connection',
+      'docker',
+      'editor',
+      'head',
+      'plugin',
+      'plugins',
+      'project',
+      'run',
+      'tasks',
+      'term',
+      'terminal',
+      'workflow',
+      'workspace',
+      'workspace-projects',
+      'workspaces-mode',
+      'worktree',
+      'ws',
+    ])
   })
 })

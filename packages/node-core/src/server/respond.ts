@@ -3,9 +3,23 @@ import type { Context } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { HTTPException } from 'hono/http-exception'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
-import { codeForStatus, requestIdSchema, statusIsRetryable, type ApiError, type ErrorCodeOrDomain } from '@acorn/protocol/errors.ts'
+import {
+  codeForStatus,
+  requestIdSchema,
+  statusIsRetryable,
+  type ApiError,
+  type ErrorCodeOrDomain,
+} from '@acorn/protocol/errors.ts'
 import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
-import { emitError, emitSpan, newSpanId, newTraceId, runWithTelemetry, telemetryEnabled, PERF } from './telemetry/collector'
+import {
+  emitError,
+  emitSpan,
+  newSpanId,
+  newTraceId,
+  runWithTelemetry,
+  telemetryEnabled,
+  PERF,
+} from './telemetry/collector'
 import { createLogger, perfLine } from './telemetry/logger'
 import type { AppEnv } from './middleware/auth'
 

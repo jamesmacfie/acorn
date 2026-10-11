@@ -2,13 +2,13 @@ import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/pro
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import type {
-  AgentProviderUsageReading,
-  AgentUsageCost,
-  AgentUsageQuota,
-} from '../../shared/usage'
+import type { AgentProviderUsageReading, AgentUsageCost, AgentUsageQuota } from '../../shared/usage'
 import {
-  clampRemaining, SESSION_WINDOW_SECONDS, usageHealth, WEEKLY_WINDOW_SECONDS, worstUsageHealth,
+  clampRemaining,
+  SESSION_WINDOW_SECONDS,
+  usageHealth,
+  WEEKLY_WINDOW_SECONDS,
+  worstUsageHealth,
 } from '../../shared/usage'
 import type { AgentPricingPreferences } from '../../shared/pricing'
 import { analyzeClaudeDailyUsage } from './claudeDailyUsage'
@@ -41,7 +41,9 @@ const PROMPT_RESPONSES = [
 ]
 
 function asObject(value: unknown): Record<string, unknown> | null {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null
 }
 
 function claudePaths(): { configFile: string; claudeDir: string } {
@@ -69,9 +71,11 @@ export async function trustClaudeProbeDirectory(configFile: string, probeDir: st
   let root: Record<string, unknown>
   try {
     metadata = await stat(configFile)
-    root = asObject(JSON.parse(await readFile(configFile, 'utf8'))) ?? (() => {
-      throw new Error('Claude config must be a JSON object.')
-    })()
+    root =
+      asObject(JSON.parse(await readFile(configFile, 'utf8'))) ??
+      (() => {
+        throw new Error('Claude config must be a JSON object.')
+      })()
   } catch {
     return false
   }
@@ -108,8 +112,15 @@ function classifyClaudeOutput(text: string): 'trust' | 'cost' | UsageProcessErro
     return 'trust'
   }
   if (lower.includes('/usage is only available for subscription plans')) return 'cost'
-  if (lower.includes('token_expired') || lower.includes('token has expired') || lower.includes('authentication_error')) {
-    return new UsageProcessError('authentication_required', 'Claude authentication has expired. Run `claude` and sign in again.')
+  if (
+    lower.includes('token_expired') ||
+    lower.includes('token has expired') ||
+    lower.includes('authentication_error')
+  ) {
+    return new UsageProcessError(
+      'authentication_required',
+      'Claude authentication has expired. Run `claude` and sign in again.',
+    )
   }
   if (lower.includes('not logged in') || lower.includes('please log in')) {
     return new UsageProcessError('authentication_required', 'Claude is not logged in. Run `claude` and sign in.')
@@ -132,7 +143,10 @@ function resetTextFrom(lines: readonly string[]): string | null {
     if (!/\breset/i.test(line)) continue
     const resets = [...line.matchAll(/resets/gi)]
     const start = resets.at(-1)?.index ?? 0
-    const text = line.slice(start).replace(/\s+\d{1,3}(?:\.\d+)?%\s*(?:used|left)\s*$/i, '').trim()
+    const text = line
+      .slice(start)
+      .replace(/\s+\d{1,3}(?:\.\d+)?%\s*(?:used|left)\s*$/i, '')
+      .trim()
     if (text) return /^resets?/i.test(text) ? text : `Resets ${text}`
   }
   return null
@@ -200,14 +214,20 @@ function quotaFromSection(
   if (percent == null) return null
   const ownResetText = resetTextFrom(lines)
   const resetText = ownResetText ?? fallbackReset?.text ?? null
-  const resetsAt = ownResetText ? parseClaudeReset(ownResetText, now) : fallbackReset?.at ?? null
+  const resetsAt = ownResetText ? parseClaudeReset(ownResetText, now) : (fallbackReset?.at ?? null)
   return { id, label, percentRemaining: percent, resetsAt, resetText, windowSeconds, health: usageHealth(percent) }
 }
 
 function modelName(label: string): string | null {
   const match = label.match(/current week\s*\(([^)]+)\)/i)
   if (!match || /all models/i.test(match[1])) return null
-  return match[1].replace(/\bonly\b/gi, '').trim().split(/\s+/)[0]?.toLowerCase() ?? null
+  return (
+    match[1]
+      .replace(/\bonly\b/gi, '')
+      .trim()
+      .split(/\s+/)[0]
+      ?.toLowerCase() ?? null
+  )
 }
 
 function detectPlan(text: string): string | null {
@@ -273,20 +293,31 @@ export function parseClaudeUsageOutput(
   account: ClaudeAccount = null,
 ): AgentProviderUsageReading {
   const classified = classifyClaudeOutput(text)
-  if (classified === 'trust') throw new UsageProcessError('trust_failure', 'Claude requires trust for the usage probe directory.')
-  if (classified === 'cost') throw new UsageProcessError('parse_failure', 'Claude account requires the `/cost` fallback.')
+  if (classified === 'trust')
+    throw new UsageProcessError('trust_failure', 'Claude requires trust for the usage probe directory.')
+  if (classified === 'cost')
+    throw new UsageProcessError('parse_failure', 'Claude account requires the `/cost` fallback.')
   if (classified) throw classified
 
   const lines = text.split(/\r?\n/)
   const sessionIndex = lines.findIndex((line) => /current session/i.test(line))
-  if (sessionIndex < 0) throw new UsageProcessError('parse_failure', 'Claude usage output did not contain a current session.')
-  const session = quotaFromSection('session', 'Session', section(lines, sessionIndex), capturedAt, SESSION_WINDOW_SECONDS)
-  if (!session) throw new UsageProcessError('parse_failure', 'Claude usage output did not contain a session percentage.')
+  if (sessionIndex < 0)
+    throw new UsageProcessError('parse_failure', 'Claude usage output did not contain a current session.')
+  const session = quotaFromSection(
+    'session',
+    'Session',
+    section(lines, sessionIndex),
+    capturedAt,
+    SESSION_WINDOW_SECONDS,
+  )
+  if (!session)
+    throw new UsageProcessError('parse_failure', 'Claude usage output did not contain a session percentage.')
 
   const weeklyIndex = lines.findIndex((line) => /current week\s*\(all models\)/i.test(line))
-  const weekly = weeklyIndex >= 0
-    ? quotaFromSection('weekly', 'Weekly', section(lines, weeklyIndex), capturedAt, WEEKLY_WINDOW_SECONDS)
-    : null
+  const weekly =
+    weeklyIndex >= 0
+      ? quotaFromSection('weekly', 'Weekly', section(lines, weeklyIndex), capturedAt, WEEKLY_WINDOW_SECONDS)
+      : null
   const weeklyReset = weekly ? { text: weekly.resetText, at: weekly.resetsAt } : null
   const models: AgentUsageQuota[] = []
   for (const [index, line] of lines.entries()) {
@@ -294,8 +325,12 @@ export function parseClaudeUsageOutput(
     if (!name) continue
     // A per-model cap rides the weekly reset, which is why it takes the weekly window too.
     const quota = quotaFromSection(
-      `model:${name}`, name[0].toUpperCase() + name.slice(1), section(lines, index), capturedAt,
-      WEEKLY_WINDOW_SECONDS, weeklyReset,
+      `model:${name}`,
+      name[0].toUpperCase() + name.slice(1),
+      section(lines, index),
+      capturedAt,
+      WEEKLY_WINDOW_SECONDS,
+      weeklyReset,
     )
     if (quota && !models.some((existing) => existing.id === quota.id)) models.push(quota)
   }

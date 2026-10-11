@@ -23,7 +23,9 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
   const importerRun = latestSignal()
   const importer = () => projectImporterContributions().find((entry) => entry.id === activeImporter())
   let mounted = true
-  onCleanup(() => { mounted = false })
+  onCleanup(() => {
+    mounted = false
+  })
   const node = () => activeNodeId()
 
   createEffect(() => {
@@ -40,11 +42,12 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
     setError('That importer was turned off or removed.')
   })
 
-  const refresh = () => Promise.all([
-    qc.invalidateQueries({ queryKey: projectsKey }),
-    qc.invalidateQueries({ queryKey: workspacesKey }),
-    qc.invalidateQueries({ queryKey: tasksKey }),
-  ])
+  const refresh = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: projectsKey }),
+      qc.invalidateQueries({ queryKey: workspacesKey }),
+      qc.invalidateQueries({ queryKey: tasksKey }),
+    ])
 
   async function addFolder(folder: string, nodeId: string | null, complete?: (id: string) => void) {
     setBusy(true)
@@ -72,7 +75,12 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
     await addFolder(folder, nodeId, complete)
   }
 
-  async function imported(run: AbortSignal, nodeId: string | null, complete: ((id: string) => void) | undefined, ids: readonly string[] = []) {
+  async function imported(
+    run: AbortSignal,
+    nodeId: string | null,
+    complete: ((id: string) => void) | undefined,
+    ids: readonly string[] = [],
+  ) {
     if (run.aborted || node() !== nodeId) return
     if (mounted) setError('')
     try {
@@ -84,7 +92,8 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
       if (selected) complete(selected)
       else if (mounted) setError('The importer did not report a project on this Node.')
     } catch (cause) {
-      if (mounted && node() === nodeId && !run.aborted) setError(cause instanceof Error ? cause.message : "Couldn't refresh projects.")
+      if (mounted && node() === nodeId && !run.aborted)
+        setError(cause instanceof Error ? cause.message : "Couldn't refresh projects.")
     }
   }
 
@@ -92,32 +101,65 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
     <div class="project-add-controls">
       <div class="project-add-actions">
         <Show when={canAddProjectFromFolder()}>
-          <Button disabled={busy()} onPress={() => void chooseFolder()}>Add folder…</Button>
+          <Button disabled={busy()} onPress={() => void chooseFolder()}>
+            Add folder…
+          </Button>
         </Show>
         {/* The native picker returns a path on this client. For a remote Node, enter a path that
             exists on the Node instead; no client path crosses the API boundary. */}
         <Show when={!canAddProjectFromFolder()}>
-          <form class="project-add-path" onSubmit={(event) => {
-            event.preventDefault()
-            if (path().trim()) void addFolder(path().trim(), node(), props.beginAdd?.())
-          }}>
-            <Input label="Folder path on this Node" value={path()} onInput={setPath} placeholder="/absolute/path/on/node" />
-            <Button submit disabled={busy() || !path().trim()}>Add project</Button>
+          <form
+            class="project-add-path"
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (path().trim()) void addFolder(path().trim(), node(), props.beginAdd?.())
+            }}
+          >
+            <Input
+              label="Folder path on this Node"
+              value={path()}
+              onInput={setPath}
+              placeholder="/absolute/path/on/node"
+            />
+            <Button submit disabled={busy() || !path().trim()}>
+              Add project
+            </Button>
           </form>
         </Show>
         <For each={projectImporterContributions()}>
-          {(entry) => <Button disabled={busy()} onPress={() => { importerRun.next(); setActiveImporter(entry.id) }}><Icon name={entry.glyph} /> {entry.label}</Button>}
+          {(entry) => (
+            <Button
+              disabled={busy()}
+              onPress={() => {
+                importerRun.next()
+                setActiveImporter(entry.id)
+              }}
+            >
+              <Icon name={entry.glyph} /> {entry.label}
+            </Button>
+          )}
         </For>
       </div>
-      <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={error()}>
+        <Alert>{error()}</Alert>
+      </Show>
       <Show keyed when={importer()}>
         {(entry) => {
           const run = importerRun.signal
           const nodeId = node()
           const complete = props.beginAdd?.()
-          return <section class="project-importer" aria-label={entry.label}>
-            <Dynamic component={entry.component} onClose={() => { importerRun.next(); setActiveImporter(null) }} onImported={(ids?: readonly string[]) => void imported(run, nodeId, complete, ids)} />
-          </section>
+          return (
+            <section class="project-importer" aria-label={entry.label}>
+              <Dynamic
+                component={entry.component}
+                onClose={() => {
+                  importerRun.next()
+                  setActiveImporter(null)
+                }}
+                onImported={(ids?: readonly string[]) => void imported(run, nodeId, complete, ids)}
+              />
+            </section>
+          )
         }}
       </Show>
     </div>

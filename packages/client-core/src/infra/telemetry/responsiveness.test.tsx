@@ -3,7 +3,13 @@ import { _resetClientTelemetry, setTelemetryEnabled, startClientTelemetry, start
 import { startResponsivenessMonitor } from './responsiveness'
 
 let dispose: (() => void) | undefined
-afterEach(() => { dispose?.(); dispose = undefined; _resetClientTelemetry(); vi.restoreAllMocks(); vi.useRealTimers() })
+afterEach(() => {
+  dispose?.()
+  dispose = undefined
+  _resetClientTelemetry()
+  vi.restoreAllMocks()
+  vi.useRealTimers()
+})
 it('sends operation context synchronously and disarms on blur and consent revocation', () => {
   vi.useFakeTimers()
   vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
@@ -14,7 +20,10 @@ it('sends operation context synchronously and disarms on blur and consent revoca
   expect(send).not.toHaveBeenCalled()
   setTelemetryEnabled(true)
   const span = startInteraction('agents', { name: 'agents.session.open' })
-  expect(send).toHaveBeenLastCalledWith({ active: true, activity: { owner: 'agents', operation: 'agents.session.open', traceId: span.traceId, spanId: span.spanId } })
+  expect(send).toHaveBeenLastCalledWith({
+    active: true,
+    activity: { owner: 'agents', operation: 'agents.session.open', traceId: span.traceId, spanId: span.spanId },
+  })
   focused.mockReturnValue(false)
   window.dispatchEvent(new Event('blur'))
   expect(send).toHaveBeenLastCalledWith({ active: false, activity: null })
@@ -31,6 +40,10 @@ it('a broken diagnostic transport cannot prevent an interaction', () => {
   vi.spyOn(document, 'hasFocus').mockReturnValue(true)
   startClientTelemetry({ runtime: 'renderer', post: async () => {} })
   setTelemetryEnabled(true)
-  expect(() => { dispose = startResponsivenessMonitor(() => { throw new Error('closed socket') }) }).not.toThrow()
+  expect(() => {
+    dispose = startResponsivenessMonitor(() => {
+      throw new Error('closed socket')
+    })
+  }).not.toThrow()
   expect(() => startInteraction('agents', { name: 'agents.session.open' })).not.toThrow()
 })

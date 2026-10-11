@@ -26,7 +26,9 @@ const STORED = JSON.stringify([
 
 const mount = (repoTargets: { id: string; command: string }[] = []) => {
   const [stored, setStored] = createSignal<string | null>(STORED)
-  const save = vi.fn(async (json: string) => { setStored(json || null) })
+  const save = vi.fn(async (json: string) => {
+    setStored(json || null)
+  })
   dispose = render(() => <RunTargetsTable stored={stored()} repoTargets={repoTargets} save={save} />, host)
   return { save, written: () => JSON.parse(save.mock.lastCall![0]) as unknown[] }
 }
@@ -38,7 +40,8 @@ const type = (label: string, value: string) => {
   field.value = value
   field.dispatchEvent(new InputEvent('input', { bubbles: true }))
 }
-const rowOf = (name: string) => [...host.querySelectorAll('tbody tr, table > tr')].find((row) => row.querySelector('th')?.textContent === name)!
+const rowOf = (name: string) =>
+  [...host.querySelectorAll('tbody tr, table > tr')].find((row) => row.querySelector('th')?.textContent === name)!
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('RunTargetsTable', () => {
@@ -84,14 +87,16 @@ describe('RunTargetsTable', () => {
     expect(written().map((target) => (target as { id: string }).id)).toEqual(['dev', 'lint'])
   })
 
-  it('lists the repo\'s targets read-only and keeps the machine target they replace', () => {
+  it("lists the repo's targets read-only and keeps the machine target they replace", () => {
     mount([{ id: 'dev', command: './scripts/dev.sh' }])
     const repoRow = host.querySelector('[data-from]')!
     expect(repoRow.textContent).toContain('From .acorn/config.toml')
     expect(repoRow.textContent).toContain('./scripts/dev.sh')
     expect(button('Edit', repoRow)).toEqual([])
     // This machine's `dev` is still listed, and says why it does nothing while the repo declares one.
-    const machineDev = [...host.querySelectorAll('tr')].filter((row) => row.querySelector('th')?.textContent === 'dev').at(-1)!
+    const machineDev = [...host.querySelectorAll('tr')]
+      .filter((row) => row.querySelector('th')?.textContent === 'dev')
+      .at(-1)!
     expect(machineDev.textContent).toContain('pnpm dev')
     expect(machineDev.textContent).toContain('Replaced by the repo')
     expect(button('Edit', machineDev)).toEqual([])

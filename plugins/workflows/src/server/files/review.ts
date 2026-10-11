@@ -6,10 +6,16 @@ import { fileHash, readWorkflowFile, type WorkflowFileRoot } from './writes'
 import type { WorkflowValidationCatalog } from '../validation/definition'
 
 /** File publication checks the same confined child references that admission will resolve. */
-export async function reviewFileDependencies(db: PluginDatabase, def: WorkflowDef, target: WorkflowFileTarget,
-  scope: WorkflowResolutionScope, files: WorkflowFileRoot, catalog: WorkflowValidationCatalog) {
+export async function reviewFileDependencies(
+  db: PluginDatabase,
+  def: WorkflowDef,
+  target: WorkflowFileTarget,
+  scope: WorkflowResolutionScope,
+  files: WorkflowFileRoot,
+  catalog: WorkflowValidationCatalog,
+) {
   const reused = new Map<string, string>()
-  const key = (ref: WorkflowDefinitionRef) => ref.source === 'repo' ? `repo:${ref.path}` : `${ref.source}:${ref.id}`
+  const key = (ref: WorkflowDefinitionRef) => (ref.source === 'repo' ? `repo:${ref.path}` : `${ref.source}:${ref.id}`)
   const walk = async (definition: WorkflowDef, chain: string[]): Promise<void> => {
     if (chain.length > 5) throw new Error('Workflow nesting exceeds four levels')
     for (const step of definition.steps) {
@@ -18,7 +24,9 @@ export async function reviewFileDependencies(db: PluginDatabase, def: WorkflowDe
       if (chain.includes(key(ref))) throw new Error('Cannot publish a cyclic workflow graph')
       const child = await resolveScopedWorkflowDefinition(db, ref, scope, catalog)
       const bindings = step.childWorkflow.inputs ?? {}
-      for (const input of child.definition.inputs ?? []) if (input.required && input.default === undefined && !bindings[input.name]) throw new Error(`Bind child input ${input.name} in ${step.name} before publishing`)
+      for (const input of child.definition.inputs ?? [])
+        if (input.required && input.default === undefined && !bindings[input.name])
+          throw new Error(`Bind child input ${input.name} in ${step.name} before publishing`)
       if (ref.source === target.source) {
         const path = ref.source === 'repo' ? ref.path : ref.source === 'user' ? `.acorn/workflows/${ref.id}.toml` : ''
         const text = readWorkflowFile(files, path)
@@ -28,6 +36,8 @@ export async function reviewFileDependencies(db: PluginDatabase, def: WorkflowDe
       await walk(child.definition, [...chain, key(ref)])
     }
   }
-  await walk(def, [target.source === 'repo' ? `repo:${target.path}` : `user:${target.path.split('/').at(-1)!.slice(0, -5)}`])
+  await walk(def, [
+    target.source === 'repo' ? `repo:${target.path}` : `user:${target.path.split('/').at(-1)!.slice(0, -5)}`,
+  ])
   return [...reused].map(([path, hash]) => ({ path, hash }))
 }

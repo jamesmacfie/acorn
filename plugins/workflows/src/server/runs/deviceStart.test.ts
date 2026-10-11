@@ -4,22 +4,31 @@ import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { persistWorkflowStart, type WorkflowStartOptions } from './start'
 
-const definition: WorkflowDef = { baseline: 'acorn-1', formatVersion: 1, name: 'Review',
+const definition: WorkflowDef = {
+  baseline: 'acorn-1',
+  formatVersion: 1,
+  name: 'Review',
   inputs: [{ name: 'reason', schema: { type: 'string' }, required: true }],
-  steps: [{ id: 'approve', name: 'Approve', kind: 'gate-human' }] }
+  steps: [{ id: 'approve', name: 'Approve', kind: 'gate-human' }],
+}
 vi.mock('../definitions/resolution', async (load) => ({
   ...(await load<Record<string, unknown>>()),
   resolveScopedWorkflowDefinition: async () => ({ definition, provenance: { source: 'database' } }),
   resolveWorkflowGraph: async (_db: unknown, _def: unknown, options: { inputs: { reason: string } }) => ({
     root: { ...definition, inputs: definition.inputs?.map((input) => ({ ...input, default: options.inputs.reason })) },
-    nodes: [], fingerprint: 'graph', requiresRepoTrust: false,
+    nodes: [],
+    fingerprint: 'graph',
+    requiresRepoTrust: false,
   }),
 }))
 
 import { WorkflowStartService } from './admission'
 
 let cleanup = () => {}
-afterEach(() => { cleanup(); cleanup = () => {} })
+afterEach(() => {
+  cleanup()
+  cleanup = () => {}
+})
 
 function setup() {
   const ctx = makeTestNodeContext({ plugin: { name: 'workflows' } })
@@ -34,10 +43,18 @@ function setup() {
       return result.runId
     },
   }
-  const service = new WorkflowStartService(db, runner as never, {
-    reconciled: Promise.resolve(), taskScope: async () => ({ projectId: 'project' }) as never,
-    project: async () => null, authorizeRepoConfig: async () => {}, onTrustRequired: () => {},
-  }, '/tmp')
+  const service = new WorkflowStartService(
+    db,
+    runner as never,
+    {
+      reconciled: Promise.resolve(),
+      taskScope: async () => ({ projectId: 'project' }) as never,
+      project: async () => null,
+      authorizeRepoConfig: async () => {},
+      onTrustRequired: () => {},
+    },
+    '/tmp',
+  )
   return { service, created }
 }
 
@@ -49,8 +66,12 @@ it('returns the persisted run after a lost device response and rejects conflicti
   const replay = await service.startById('task-1', 'review', { reason: 'Because' }, true, launchId)
   expect(replay).toEqual(first)
   expect(created).toHaveLength(1)
-  expect((await service.startById('task-1', 'review', { reason: 'Changed' }, true, launchId)).error).toContain('different')
-  expect((await service.startById('task-2', 'review', { reason: 'Because' }, true, launchId)).error).toContain('different')
+  expect((await service.startById('task-1', 'review', { reason: 'Changed' }, true, launchId)).error).toContain(
+    'different',
+  )
+  expect((await service.startById('task-2', 'review', { reason: 'Because' }, true, launchId)).error).toContain(
+    'different',
+  )
   expect(created).toHaveLength(1)
 })
 

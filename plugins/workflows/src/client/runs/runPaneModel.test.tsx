@@ -25,7 +25,7 @@ vi.mock('../workflowsClient', () => ({
     steps: async (runId: string) => {
       stepsCalls(runId)
       const snapshot = stepRows.filter((step) => step.runId === runId)
-      if (holdSteps) await new Promise<void>(resolve => stepReleases.push(resolve))
+      if (holdSteps) await new Promise<void>((resolve) => stepReleases.push(resolve))
       return snapshot
     },
     gate: async () => ({ ok: true }),
@@ -48,11 +48,15 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   wsOnWorkflowStepChanged: (cb: StepChanged) => {
     onStepChanged = cb
-    return () => { onStepChanged = undefined }
+    return () => {
+      onStepChanged = undefined
+    }
   },
   wsOnWorkflowStepEvent: (cb: StepEvent) => {
     onStepEvent = cb
-    return () => { onStepEvent = undefined }
+    return () => {
+      onStepEvent = undefined
+    }
   },
   onPluginFrame: (_plugin: string, channel: string, cb: (payload: unknown) => void) => {
     if (channel.endsWith(':run-changed')) onRunChanged = cb
@@ -64,7 +68,9 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   },
   wsOnReconnect: (cb: () => void) => {
     onReconnect = cb
-    return () => { if (onReconnect === cb) onReconnect = undefined }
+    return () => {
+      if (onReconnect === cb) onReconnect = undefined
+    }
   },
 }))
 
@@ -72,19 +78,55 @@ const { openPane } = await import('@acorn/plugin-api/client')
 const { createRunPaneModel } = await import('./runPaneModel')
 
 const run = (over: Partial<WorkflowRunProjection>): WorkflowRunProjection => ({
-  id: 'run-1', taskId: 'task-1', name: 'Investigate an issue', status: 'running', posture: 'gated',
-  error: null, createdAt: 200, updatedAt: 200,
-  rootRunId: 'run-1', parentRunId: null, parentStepId: null, rootTaskId: 'task-1',
-  rootRunName: 'Investigate an issue', parentTaskId: null, parentRunName: null, depth: 0, usage: null,
-  defJson: JSON.stringify({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Investigate an issue', steps: [{ name: 'reproduce', after: [] }, { name: 'synthesise', after: ['reproduce'] }] }),
+  id: 'run-1',
+  taskId: 'task-1',
+  name: 'Investigate an issue',
+  status: 'running',
+  posture: 'gated',
+  error: null,
+  createdAt: 200,
+  updatedAt: 200,
+  rootRunId: 'run-1',
+  parentRunId: null,
+  parentStepId: null,
+  rootTaskId: 'task-1',
+  rootRunName: 'Investigate an issue',
+  parentTaskId: null,
+  parentRunName: null,
+  depth: 0,
+  usage: null,
+  defJson: JSON.stringify({
+    baseline: 'acorn-1' as const,
+    formatVersion: 1 as const,
+    name: 'Investigate an issue',
+    steps: [
+      { name: 'reproduce', after: [] },
+      { name: 'synthesise', after: ['reproduce'] },
+    ],
+  }),
   ...over,
 })
 
 const step = (over: Partial<WorkflowStepRow>): WorkflowStepRow => ({
-  id: 'st1', runId: 'run-1', idx: 0, name: 'reproduce', kind: 'agent', mode: 'headless',
-  profileId: 'claude-code', model: null, status: 'running', resultJson: null, structuredJson: null,
-  sessionId: null, agentSessionId: null, costUsd: null, iteration: 0, error: null,
-  createdAt: 10, updatedAt: 20, ...over,
+  id: 'st1',
+  runId: 'run-1',
+  idx: 0,
+  name: 'reproduce',
+  kind: 'agent',
+  mode: 'headless',
+  profileId: 'claude-code',
+  model: null,
+  status: 'running',
+  resultJson: null,
+  structuredJson: null,
+  sessionId: null,
+  agentSessionId: null,
+  costUsd: null,
+  iteration: 0,
+  error: null,
+  createdAt: 10,
+  updatedAt: 20,
+  ...over,
 })
 
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -95,10 +137,13 @@ const mount = async () => {
   let model!: ReturnType<typeof createRunPaneModel>
   createRoot((disposeRoot) => {
     dispose = disposeRoot
-    createComponent(QueryClientProvider, { client: new QueryClient(), get children() {
-      model = createRunPaneModel({ id: 'task-1' } as never)
-      return null
-    } })
+    createComponent(QueryClientProvider, {
+      client: new QueryClient(),
+      get children() {
+        model = createRunPaneModel({ id: 'task-1' } as never)
+        return null
+      },
+    })
   })
   await settle()
   return model
@@ -122,7 +167,10 @@ describe('the run pane model', () => {
   it('lands on the newest run and orders its nodes the way the editor does', async () => {
     const model = await mount()
     expect(model.selectedRunId()).toBe('run-1')
-    expect(model.nodes().map((node) => [node.name, node.depth])).toEqual([['reproduce', 0], ['synthesise', 0]])
+    expect(model.nodes().map((node) => [node.name, node.depth])).toEqual([
+      ['reproduce', 0],
+      ['synthesise', 0],
+    ])
     // The blocked-then-running rule: nothing is gated, so the running node is what opens.
     expect(model.selectedStepId()).toBe('st1')
   })
@@ -130,12 +178,24 @@ describe('the run pane model', () => {
   // A step's id is what edges and selection key on; a person reads its name. Rows printed the id
   // once steps gained one, and a step that has not run has only the definition to name it.
   it('names each step by its name, not its id, including one not yet run', async () => {
-    runRows = [run({ defJson: JSON.stringify({ baseline: 'acorn-1', formatVersion: 1, name: 'Release', steps: [
-      { id: 'c25f-1', name: 'Build the release' },
-      { id: 'c25f-2', name: 'Approve the release', after: ['c25f-1'] },
-      { id: 'c25f-3', name: 'Tag it', after: ['c25f-1', 'c25f-2'] },
-    ] }) })]
-    stepRows = [step({ name: 'Build the release' }), step({ id: 'st2', idx: 1, name: 'Approve the release', status: 'waiting-gate' })]
+    runRows = [
+      run({
+        defJson: JSON.stringify({
+          baseline: 'acorn-1',
+          formatVersion: 1,
+          name: 'Release',
+          steps: [
+            { id: 'c25f-1', name: 'Build the release' },
+            { id: 'c25f-2', name: 'Approve the release', after: ['c25f-1'] },
+            { id: 'c25f-3', name: 'Tag it', after: ['c25f-1', 'c25f-2'] },
+          ],
+        }),
+      }),
+    ]
+    stepRows = [
+      step({ name: 'Build the release' }),
+      step({ id: 'st2', idx: 1, name: 'Approve the release', status: 'waiting-gate' }),
+    ]
     const model = await mount()
     expect(model.nodes().map((node) => node.label)).toEqual(['Build the release', 'Approve the release', 'Tag it'])
     expect(model.nodes().at(-1)?.parentLabels).toEqual(['Build the release', 'Approve the release'])
@@ -193,7 +253,8 @@ describe('the run pane model', () => {
 
   it('keeps only the last few kilobytes of a command tail', async () => {
     const model = await mount()
-    for (let at = 0; at < 20; at++) onStepEvent?.({ runId: 'run-1', stepId: 'st1', event: { type: 'stdout', text: 'x'.repeat(500) } })
+    for (let at = 0; at < 20; at++)
+      onStepEvent?.({ runId: 'run-1', stepId: 'st1', event: { type: 'stdout', text: 'x'.repeat(500) } })
     const tail = model.tailFor('st1').join('\n')
     expect(tail.length).toBe(4000)
     // Stream chunks have only one disposable representation.
@@ -238,7 +299,6 @@ describe('the run pane model', () => {
   })
 })
 
-
 it('joins 30 child edges and preserves a status edge arriving after the snapshot', async () => {
   const model = await mount()
   holdSteps = true
@@ -246,13 +306,17 @@ it('joins 30 child edges and preserves a status edge arriving after the snapshot
   for (let i = 0; i < 30; i++) onChildChanged?.({ ownerTaskId: 'task-1' })
   expect(stepsCalls.mock.calls.length - before).toBe(1)
   onStepChanged?.({ runId: 'run-1', stepId: 'st1', status: 'done' })
-  stepReleases.shift()!(); await settle()
+  stepReleases.shift()!()
+  await settle()
   expect(model.steps()[0].status).toBe('done')
   expect(stepsCalls.mock.calls.length - before).toBe(2)
   onChildChanged?.({ ownerTaskId: 'task-1' })
-  stepReleases.shift()!(); await settle()
+  stepReleases.shift()!()
+  await settle()
   expect(stepsCalls.mock.calls.length - before).toBe(3)
-  holdSteps = false; stepReleases.shift()!(); await settle()
+  holdSteps = false
+  stepReleases.shift()!()
+  await settle()
 })
 
 it('stops obsolete follow-ups after selecting another run or disposing', async () => {
@@ -262,17 +326,22 @@ it('stops obsolete follow-ups after selecting another run or disposing', async (
   holdSteps = true
   onChildChanged?.({ ownerTaskId: 'task-1' })
   onChildChanged?.({ ownerTaskId: 'task-1' })
-  model.selectRun('run-0'); await settle()
+  model.selectRun('run-0')
+  await settle()
   expect(stepReleases.length).toBe(2)
-  stepReleases.shift()!(); await settle()
+  stepReleases.shift()!()
+  await settle()
   expect(model.steps()).toEqual([])
-  stepReleases.shift()!(); await settle()
+  stepReleases.shift()!()
+  await settle()
   expect(model.steps()[0].id).toBe('old-step')
   onChildChanged?.({ ownerTaskId: 'task-1' })
   onChildChanged?.({ ownerTaskId: 'task-1' })
   const before = stepsCalls.mock.calls.length
-  dispose!(); dispose = undefined
-  stepReleases.shift()!(); await settle()
+  dispose!()
+  dispose = undefined
+  stepReleases.shift()!()
+  await settle()
   expect(stepsCalls.mock.calls.length).toBe(before)
 })
 
@@ -281,13 +350,18 @@ it('waits for a post-command authoritative refresh after a pending stale wave', 
   holdSteps = true
   onChildChanged?.({ ownerTaskId: 'task-1' })
   let completed = false
-  const command = model.cancel().then(() => { completed = true })
+  const command = model.cancel().then(() => {
+    completed = true
+  })
   await settle()
   stepRows = [step({ status: 'done' })]
-  stepReleases.shift()!(); await settle()
+  stepReleases.shift()!()
+  await settle()
   expect(completed).toBe(false)
   expect(stepReleases.length).toBe(1)
-  holdSteps = false; stepReleases.shift()!(); await command
+  holdSteps = false
+  stepReleases.shift()!()
+  await command
   expect(model.steps()[0].status).toBe('done')
   expect(completed).toBe(true)
 })
@@ -305,10 +379,12 @@ it('retires live dictionaries on selection and restores full durable output on r
   expect(model.tailFor('st1').join('')).toBe(output.slice(-4000))
   expect(model.eventsFor('st2')).toHaveLength(200)
   expect(model.droppedEventsFor('st2')).toBe(5)
-  model.selectRun('run-0'); await settle()
+  model.selectRun('run-0')
+  await settle()
   expect(model.eventsFor('st1')).toEqual([])
   expect(model.tailFor('st1')).toEqual([])
-  model.selectRun('run-1'); await settle()
+  model.selectRun('run-1')
+  await settle()
   expect(JSON.parse(model.steps()[0].resultJson!).stdout).toBe(output)
   expect(model.droppedEventsFor('st2')).toBe(0)
   expect(model.gateDraft('st1')).toEqual({ answer: 'unsent form' })

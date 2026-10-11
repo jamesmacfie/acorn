@@ -2,7 +2,18 @@ import { createEffect, createRoot, createSignal } from 'solid-js'
 import type { TerminalSession } from '../contract/wire'
 import { terminalApi } from './terminalClient'
 import { onTerminalSessionCreated } from '../contract/sessionsClient'
-import { activeNodeId, forgetAttentionSource, hasHostCapability, latestSignal, nodeState, onScopeEvicted, registerWsChannel, replaceAttentionSource, requestTerminalFocusIntent, wsOnReconnect } from '@acorn/plugin-api/client'
+import {
+  activeNodeId,
+  forgetAttentionSource,
+  hasHostCapability,
+  latestSignal,
+  nodeState,
+  onScopeEvicted,
+  registerWsChannel,
+  replaceAttentionSource,
+  requestTerminalFocusIntent,
+  wsOnReconnect,
+} from '@acorn/plugin-api/client'
 import { fromTerminalSession } from './attention'
 import { releaseAllTerminals, releaseGoneTerminals } from './heldTerminals'
 
@@ -23,14 +34,24 @@ export async function refreshSessions(): Promise<void> {
   setSessionNode(requestedNode)
   setSessions(rows)
   // After the write, so a drawer showing a session that has gone has already let its xterm go.
-  releaseGoneTerminals(requestedNode, rows.map((session) => session.id))
-  replaceAttentionSource('terminal', requestedNode, rows.flatMap((session) => fromTerminalSession(session, requestedNode) ?? []))
+  releaseGoneTerminals(
+    requestedNode,
+    rows.map((session) => session.id),
+  )
+  replaceAttentionSource(
+    'terminal',
+    requestedNode,
+    rows.flatMap((session) => fromTerminalSession(session, requestedNode) ?? []),
+  )
 }
 
 export function addSession(session: TerminalSession, createdNode = node()): void {
   if (createdNode !== node()) return
-  if (sessionNode() !== node()) { setSessionNode(node()); setSessions([]) }
-  setSessions((rows) => rows.some((row) => row.id === session.id) ? rows : [...rows, session])
+  if (sessionNode() !== node()) {
+    setSessionNode(node())
+    setSessions([])
+  }
+  setSessions((rows) => (rows.some((row) => row.id === session.id) ? rows : [...rows, session]))
 }
 
 export function clearSessions(): void {
@@ -45,12 +66,17 @@ export function clearSessions(): void {
 
 const activeByTask = new Map<string, string>()
 export const activeTerminal = (taskId: string): string | undefined => activeByTask.get(taskId)
-export const rememberActiveTerminal = (taskId: string, sessionId: string): void => { activeByTask.set(taskId, sessionId) }
-export const requestTerminalFocus = (taskId: string, sessionId: string): void => requestTerminalFocusIntent(taskId, sessionId)
+export const rememberActiveTerminal = (taskId: string, sessionId: string): void => {
+  activeByTask.set(taskId, sessionId)
+}
+export const requestTerminalFocus = (taskId: string, sessionId: string): void =>
+  requestTerminalFocusIntent(taskId, sessionId)
 
 export function initSessions(): () => void {
   const created = onTerminalSessionCreated(addSession)
-  const pull = (): void => { void refreshSessions().catch(() => {}) }
+  const pull = (): void => {
+    void refreshSessions().catch(() => {})
+  }
   // Once per node, when that node can answer, rather than at activation. Activation runs once, before
   // the window has heard from any node, so a read fired then can meet a node that is still starting,
   // and nothing would ask again until a session changed. The agent roster primes the same way
@@ -77,5 +103,12 @@ export function initSessions(): () => void {
     // local node before the broker had adopted it.
     if (event.scope === 'node-switched') clearSessions()
   })
-  return () => { stopPrime(); created(); scope(); channel.dispose(); reconnect(); clearSessions() }
+  return () => {
+    stopPrime()
+    created()
+    scope()
+    channel.dispose()
+    reconnect()
+    clearSessions()
+  }
 }

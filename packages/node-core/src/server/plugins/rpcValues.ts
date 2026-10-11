@@ -1,9 +1,43 @@
-export type WireRequest = { __acornRpc: 'call'; callId: number; functionId: number; args: unknown[]; argumentScope?: number }
+export type WireRequest = {
+  __acornRpc: 'call'
+  callId: number
+  functionId: number
+  args: unknown[]
+  argumentScope?: number
+}
 export type WireResponse = { __acornRpc: 'result'; callId: number; ok: boolean; value: unknown }
-export type WireSyncRequest = { __acornRpc: 'sync-call'; functionId: number; args: unknown[]; reply: SharedArrayBuffer; argumentScope?: number }
-export type WireError = { __acornRpc: 'error'; name: string; message: string; stack?: string; code?: unknown; status?: unknown; permission?: unknown; resource?: unknown }
-export type WireRequestValue = { __acornRpc: 'request'; url: string; method: string; headers: [string, string][]; body: Uint8Array | null; signal: unknown }
-export type WireResponseValue = { __acornRpc: 'response'; status: number; statusText: string; headers: [string, string][]; body: Uint8Array }
+export type WireSyncRequest = {
+  __acornRpc: 'sync-call'
+  functionId: number
+  args: unknown[]
+  reply: SharedArrayBuffer
+  argumentScope?: number
+}
+export type WireError = {
+  __acornRpc: 'error'
+  name: string
+  message: string
+  stack?: string
+  code?: unknown
+  status?: unknown
+  permission?: unknown
+  resource?: unknown
+}
+export type WireRequestValue = {
+  __acornRpc: 'request'
+  url: string
+  method: string
+  headers: [string, string][]
+  body: Uint8Array | null
+  signal: unknown
+}
+export type WireResponseValue = {
+  __acornRpc: 'response'
+  status: number
+  statusText: string
+  headers: [string, string][]
+  body: Uint8Array
+}
 export type WireAbortSignal = { __acornRpc: 'abort-signal'; id?: number; aborted: boolean; reason?: unknown }
 export type WireAbort = { __acornRpc: 'abort'; id: number; reason: unknown }
 

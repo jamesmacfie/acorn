@@ -1,9 +1,4 @@
-import type {
-  AgentProviderUsage,
-  AgentUsageHealth,
-  AgentUsageQuota,
-  AgentUsageSnapshot,
-} from '../../shared/usage'
+import type { AgentProviderUsage, AgentUsageHealth, AgentUsageQuota, AgentUsageSnapshot } from '../../shared/usage'
 import { clampRemaining, sessionQuota } from '../../shared/usage'
 
 /** The bar under a quota row: how much is left, and where a steady spend would have left it by now.
@@ -31,7 +26,11 @@ export function formatTokens(value: number): string {
   if (value < 10_000) return new Intl.NumberFormat().format(value)
   // One decimal always, so a column of compact counts lines up: 1,038,000 formatted as "1M" next to
   // "132.4M" read like a rounder number than it is.
-  return new Intl.NumberFormat(undefined, { notation: 'compact', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value)
+  return new Intl.NumberFormat(undefined, {
+    notation: 'compact',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value)
 }
 
 export function formatDuration(seconds: number): string {
@@ -39,7 +38,11 @@ export function formatDuration(seconds: number): string {
   const hours = Math.floor(rounded / 3_600)
   const minutes = Math.floor((rounded % 3_600) / 60)
   const remainder = rounded % 60
-  return [hours ? `${hours}h` : '', minutes ? `${minutes}m` : '', !hours && remainder ? `${remainder}s` : ''].filter(Boolean).join(' ') || '0s'
+  return (
+    [hours ? `${hours}h` : '', minutes ? `${minutes}m` : '', !hours && remainder ? `${remainder}s` : '']
+      .filter(Boolean)
+      .join(' ') || '0s'
+  )
 }
 
 export function formatReset(resetsAt: number | null, resetText: string | null, now = Date.now()): string | null {
@@ -69,7 +72,8 @@ export function formatUpdated(capturedAt: number | null, now = Date.now()): stri
 // reports a name already ("Claude Max"), which falls through to the sentence case below.
 const PLAN_NAMES: Record<string, string> = { prolite: 'Pro Lite', team: 'Team', max: 'Max', pro: 'Pro', plus: 'Plus' }
 
-export const planName = (plan: string): string => PLAN_NAMES[plan.toLowerCase()] ?? plan[0].toUpperCase() + plan.slice(1)
+export const planName = (plan: string): string =>
+  PLAN_NAMES[plan.toLowerCase()] ?? plan[0].toUpperCase() + plan.slice(1)
 
 // Whose account it is and how fresh the reading is, as one line. The harness's own name is not in it:
 // the block that draws this is already headed by the name.
@@ -153,9 +157,15 @@ export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()
       rows.push({ label: 'Unpriced models', value: daily.unpricedModels.join(', ') })
     }
     rows.push({ label: 'Tokens today', value: formatTokens(daily.totalNonCacheTokens) })
-    rows.push({ label: 'Input / output', value: `${formatTokens(daily.inputTokens)} / ${formatTokens(daily.outputTokens)}` })
+    rows.push({
+      label: 'Input / output',
+      value: `${formatTokens(daily.inputTokens)} / ${formatTokens(daily.outputTokens)}`,
+    })
     if (daily.cacheWriteTokens || daily.cacheReadTokens) {
-      rows.push({ label: 'Cache write / read', value: `${formatTokens(daily.cacheWriteTokens)} / ${formatTokens(daily.cacheReadTokens)}` })
+      rows.push({
+        label: 'Cache write / read',
+        value: `${formatTokens(daily.cacheWriteTokens)} / ${formatTokens(daily.cacheReadTokens)}`,
+      })
     }
     rows.push({ label: 'Working time', value: formatDuration(daily.workingSeconds) })
     rows.push({ label: 'Sessions', value: String(daily.sessionCount) })

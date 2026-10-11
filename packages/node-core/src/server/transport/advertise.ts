@@ -25,12 +25,17 @@ export function lanCandidates(): LanCandidate[] {
 // from another machine).
 export function advertisedHosts(root: Pick<DataRoot, 'advertiseHost'>): string[] {
   const raw = process.env[ENV_VAR]?.trim() || root.advertiseHost || ''
-  return raw.split(',').map((host) => host.trim()).filter(Boolean)
+  return raw
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean)
 }
 
 // Ask once, on first boot, when there is someone at a terminal to answer
 // (docs/node-distribution.md § Reaching a node from another machine).
-export async function confirmAdvertiseHost(root: Pick<DataRoot, 'advertiseHost' | 'recordAdvertiseHost'>): Promise<void> {
+export async function confirmAdvertiseHost(
+  root: Pick<DataRoot, 'advertiseHost' | 'recordAdvertiseHost'>,
+): Promise<void> {
   if (root.advertiseHost !== undefined) return
   if (process.env[ENV_VAR]?.trim()) return
   if (!process.stdin.isTTY || !process.stdout.isTTY) return
@@ -40,7 +45,9 @@ export async function confirmAdvertiseHost(root: Pick<DataRoot, 'advertiseHost' 
 
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   try {
-    process.stdout.write('\nThis node is reachable from this machine only. Which address should it advertise\nso acorn on another machine can connect to it?\n\n')
+    process.stdout.write(
+      '\nThis node is reachable from this machine only. Which address should it advertise\nso acorn on another machine can connect to it?\n\n',
+    )
     candidates.forEach((candidate, index) => {
       process.stdout.write(`  ${index + 1}) ${candidate.address.padEnd(18)}${candidate.iface}\n`)
     })
@@ -49,7 +56,8 @@ export async function confirmAdvertiseHost(root: Pick<DataRoot, 'advertiseHost' 
     // Enter means "none" (docs/node-distribution.md § Reaching a node from another machine).
     const answer = (await rl.question('Choice [n]: ')).trim()
     const picked = Number.parseInt(answer, 10)
-    const chosen = Number.isInteger(picked) && picked >= 1 && picked <= candidates.length ? candidates[picked - 1]!.address : ''
+    const chosen =
+      Number.isInteger(picked) && picked >= 1 && picked <= candidates.length ? candidates[picked - 1]!.address : ''
     root.recordAdvertiseHost(chosen)
     process.stdout.write(
       chosen

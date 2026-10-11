@@ -25,7 +25,11 @@ export function createBridgeTelemetry(port: MessagePort): Pick<AcornBridge, 'tel
 
   // Collection is opt-in, so an author also sees log lines in the frame's own console.
   const line = (level: 'debug' | 'info' | 'warn' | 'error', message: string, attrs?: PluginTelemetryAttrs): void => {
-    const text = attrs ? `${message} ${Object.entries(attrs).map(([key, value]) => `${key}=${String(value)}`).join(' ')}` : message
+    const text = attrs
+      ? `${message} ${Object.entries(attrs)
+          .map(([key, value]) => `${key}=${String(value)}`)
+          .join(' ')}`
+      : message
     if (level === 'error') console.error(text)
     else if (level === 'warn') console.warn(text)
     else console.log(text)
@@ -37,8 +41,14 @@ export function createBridgeTelemetry(port: MessagePort): Pick<AcornBridge, 'tel
       event: (name, attrs) => emit({ type: 'event', name, ...(attrs ? { attrs } : {}) }),
       count: (name, value = 1, attrs) => emit({ type: 'count', name, value, ...(attrs ? { attrs } : {}) }),
       gauge: (name, value, attrs) => emit({ type: 'gauge', name, value, ...(attrs ? { attrs } : {}) }),
-      error: (error) => emit({ type: 'error', name: error.name, ...(error.message === undefined ? {} : { message: error.message }), ...(error.attrs ? { attrs: error.attrs } : {}) }),
-      measure: <T,>(name: string, run: () => T, attrs?: PluginTelemetryAttrs): T => {
+      error: (error) =>
+        emit({
+          type: 'error',
+          name: error.name,
+          ...(error.message === undefined ? {} : { message: error.message }),
+          ...(error.attrs ? { attrs: error.attrs } : {}),
+        }),
+      measure: <T>(name: string, run: () => T, attrs?: PluginTelemetryAttrs): T => {
         const timing = span(name, attrs)
         let result: T
         try {

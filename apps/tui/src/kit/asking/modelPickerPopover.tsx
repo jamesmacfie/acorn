@@ -22,8 +22,15 @@ export function ModelPickerPopover(props: {
       role="dialog"
       ariaLabel={label()}
       trigger={({ open, toggle }) => (
-        <Button variant="bare" size="sm" label={label()} title={props.title}
-          opens="dialog" expanded={open()} onPress={toggle} />
+        <Button
+          variant="bare"
+          size="sm"
+          label={label()}
+          title={props.title}
+          opens="dialog"
+          expanded={open()}
+          onPress={toggle}
+        />
       )}
     >
       <Stack gap="row">

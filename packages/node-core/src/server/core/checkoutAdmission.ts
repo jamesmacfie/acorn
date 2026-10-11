@@ -10,7 +10,9 @@ import { BridgeError } from '../bridge'
 export type CheckoutActivity = { taskId: string; description: string }
 export type CheckoutActivityReader = (taskIds: readonly string[]) => Promise<CheckoutActivity[]>
 const byDatabase = new WeakMap<AppDatabase, CheckoutAdmission>()
-export const registerCheckoutAdmission = (db: AppDatabase, admission: CheckoutAdmission) => { byDatabase.set(db, admission) }
+export const registerCheckoutAdmission = (db: AppDatabase, admission: CheckoutAdmission) => {
+  byDatabase.set(db, admission)
+}
 export const checkoutAdmissionFor = (db: AppDatabase): CheckoutAdmission | undefined => byDatabase.get(db)
 export const admitCheckout = <T>(db: AppDatabase, taskId: string, action: () => Promise<T>): Promise<T> => {
   const admission = byDatabase.get(db)
@@ -45,21 +47,29 @@ export function createCheckoutAdmission(
     if (!mappedPath) return `task:${taskId}`
     if (git) {
       try {
-        const common = await git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: mappedPath, maxOutputBytes: 8192 })
+        const common = await git.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+          cwd: mappedPath,
+          maxOutputBytes: 8192,
+        })
         if (common.code === 0) return canonical(common.stdout.trim())
-      } catch { /* A missing project checkout still uses its mapped path as the admission key. */ }
+      } catch {
+        /* A missing project checkout still uses its mapped path as the admission key. */
+      }
     }
     return canonical(mappedPath)
   }
   const withKey = async <T>(key: string, operation: () => Promise<T>): Promise<T> => {
     const before = tails.get(key) ?? Promise.resolve()
     let release!: () => void
-    const settled = new Promise<void>((resolve) => { release = resolve })
+    const settled = new Promise<void>((resolve) => {
+      release = resolve
+    })
     const tail = before.then(() => settled)
     tails.set(key, tail)
     await before
-    try { return await operation() }
-    finally {
+    try {
+      return await operation()
+    } finally {
       release()
       if (tails.get(key) === tail) tails.delete(key)
     }
@@ -70,29 +80,44 @@ export function createCheckoutAdmission(
     for (const task of active) {
       const project = await projects.byId(task.projectId)
       const path = task.worktreePath ?? project?.path
-      if (path && await canonical(path) === key) matches.push(task.id)
+      if (path && (await canonical(path)) === key) matches.push(task.id)
     }
     return matches
   }
   const activityOn = async (checkoutKey: string) => {
     if (!['turns', 'runs', 'setup'].every((owner) => readers.has(owner))) {
-      throw new BridgeError(503, 'checkout_activity_unavailable', 'Checkout activity is unavailable. Reconnect the work owners before writing.')
+      throw new BridgeError(
+        503,
+        'checkout_activity_unavailable',
+        'Checkout activity is unavailable. Reconnect the work owners before writing.',
+      )
     }
     const taskIds = await owners(checkoutKey)
-    const activity = await Promise.all(['turns', 'runs', 'setup'].map((owner) => readers.get(owner)!(taskIds)))
-      .then((rows) => rows.flat(), () => { throw new BridgeError(503, 'checkout_activity_unavailable', 'Cannot verify owner activity for this checkout.') })
+    const activity = await Promise.all(['turns', 'runs', 'setup'].map((owner) => readers.get(owner)!(taskIds))).then(
+      (rows) => rows.flat(),
+      () => {
+        throw new BridgeError(503, 'checkout_activity_unavailable', 'Cannot verify owner activity for this checkout.')
+      },
+    )
     return { taskIds, activity }
   }
   return {
     registerOwner(owner: string, reader: CheckoutActivityReader) {
       if (readers.has(owner)) throw new Error(`${owner} checkout activity is already registered.`)
       readers.set(owner, reader)
-      return () => { if (readers.get(owner) === reader) readers.delete(owner) }
+      return () => {
+        if (readers.get(owner) === reader) readers.delete(owner)
+      }
     },
     async admitWork<T>(taskId: string, action: () => Promise<T>): Promise<T> {
       const key = await lockKey(taskId)
       return withKey(key, async () => {
-        if (await lockKey(taskId) !== key) throw new BridgeError(409, 'checkout_moved', 'Task checkout moved during admission. Retry from its current location.')
+        if ((await lockKey(taskId)) !== key)
+          throw new BridgeError(
+            409,
+            'checkout_moved',
+            'Task checkout moved during admission. Retry from its current location.',
+          )
         return action()
       })
     },
@@ -104,19 +129,26 @@ export function createCheckoutAdmission(
       const checkoutKey = await identity(taskId)
       const repositoryKey = await lockKey(taskId)
       return withKey(repositoryKey, async () => {
-        if (await lockKey(taskId) !== repositoryKey || await identity(taskId) !== checkoutKey) {
+        if ((await lockKey(taskId)) !== repositoryKey || (await identity(taskId)) !== checkoutKey) {
           throw new BridgeError(409, 'checkout_moved', 'Target checkout or repository moved. Refresh and try again.')
         }
         const { taskIds, activity } = await activityOn(checkoutKey)
         if (!taskIds.includes(taskId) || !(await tasks.active()).some((task) => task.id === taskId)) {
           throw new BridgeError(409, 'task_inactive', 'Target task is no longer active.')
         }
-        if (taskIds.some(isTaskArchiving)) throw new BridgeError(409, 'task_archiving', 'Task archive is in progress for this checkout.')
-        if (activity.length) throw new BridgeError(409, 'checkout_busy', `Checkout is busy: ${activity.map((item) => `${item.taskId} ${item.description}`).join(', ')}.`)
+        if (taskIds.some(isTaskArchiving))
+          throw new BridgeError(409, 'task_archiving', 'Task archive is in progress for this checkout.')
+        if (activity.length)
+          throw new BridgeError(
+            409,
+            'checkout_busy',
+            `Checkout is busy: ${activity.map((item) => `${item.taskId} ${item.description}`).join(', ')}.`,
+          )
         const task = await tasks.load(taskId)
         if (!task) throw new BridgeError(409, 'task_inactive', 'Target task is no longer active.')
         const checkout = await identity(taskId)
-        if (checkout !== checkoutKey) throw new BridgeError(409, 'checkout_moved', 'Target checkout moved. Refresh and try again.')
+        if (checkout !== checkoutKey)
+          throw new BridgeError(409, 'checkout_moved', 'Target checkout moved. Refresh and try again.')
         return action(checkout)
       })
     },

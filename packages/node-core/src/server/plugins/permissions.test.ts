@@ -12,7 +12,9 @@ import type { AppDatabase } from '../db'
 // A stand-in CoreServices: this module only picks properties off the object, so identity is all the
 // assertions need and building a real one would drag a database in for nothing.
 const marker = (name: string) => ({ marker: name }) as never
-const externalProjects = vi.fn(async (): Promise<{ connectionId: string; externalId: string; projectId: string }[]> => [])
+const externalProjects = vi.fn(
+  async (): Promise<{ connectionId: string; externalId: string; projectId: string }[]> => [],
+)
 const CORE = {
   fs: marker('fs'),
   git: marker('git'),
@@ -28,19 +30,33 @@ const CORE = {
   agentToolProvenance: marker('agentToolProvenance'),
   telemetry: marker('telemetry'),
   projects: {
-    byId: marker('byId'), byGithub: marker('byGithub'), byWorkspace: marker('byWorkspace'), checkouts: marker('checkouts'), externalProjects,
-    config: marker('config'), assertConfigTrusted: marker('assertConfigTrusted'), setup: marker('setup'),
-    create: marker('create'), update: marker('update'),
+    byId: marker('byId'),
+    byGithub: marker('byGithub'),
+    byWorkspace: marker('byWorkspace'),
+    checkouts: marker('checkouts'),
+    externalProjects,
+    config: marker('config'),
+    assertConfigTrusted: marker('assertConfigTrusted'),
+    setup: marker('setup'),
+    create: marker('create'),
+    update: marker('update'),
   },
 } as unknown as CoreServices
 
 // Through the schema rather than hand-built, so the defaults under test are the ones a real manifest
 // would produce.
 const permissions = (node: Record<string, unknown> = {}): NodePermissions =>
-  pluginManifestSchema.parse({ id: 'demo', name: 'demo', version: '1', baseline: 'acorn-1', apiVersion: '1', permissions: { node } }).permissions.node
+  pluginManifestSchema.parse({
+    id: 'demo',
+    name: 'demo',
+    version: '1',
+    baseline: 'acorn-1',
+    apiVersion: '1',
+    permissions: { node },
+  }).permissions.node
 
 const scoped = (node: Record<string, unknown> = {}, core: CoreServices = CORE): CoreServices =>
-  scopeCore(core, permissions(node), 'demo', { idsForOwner: (owner) => owner === 'demo' ? ['demo-provider'] : [] })
+  scopeCore(core, permissions(node), 'demo', { idsForOwner: (owner) => (owner === 'demo' ? ['demo-provider'] : []) })
 
 // The facets not reachable through `core: [...]`, whatever a manifest writes there.
 const keys = (services: CoreServices) => Object.keys(services).sort()
@@ -66,8 +82,30 @@ describe('scopeCore', () => {
   })
 
   it('covers every simple facet name', () => {
-    const all = ['fs', 'git', 'tasks', 'context', 'models', 'data:query', 'prefs', 'identity', 'telemetry', 'agent-tool-provenance']
-    expect(keys(scoped({ core: all }))).toEqual(['agentToolProvenance', 'context', 'data', 'fs', 'git', 'identity', 'models', 'prefs', 'tasks', 'telemetry'])
+    const all = [
+      'fs',
+      'git',
+      'tasks',
+      'context',
+      'models',
+      'data:query',
+      'prefs',
+      'identity',
+      'telemetry',
+      'agent-tool-provenance',
+    ]
+    expect(keys(scoped({ core: all }))).toEqual([
+      'agentToolProvenance',
+      'context',
+      'data',
+      'fs',
+      'git',
+      'identity',
+      'models',
+      'prefs',
+      'tasks',
+      'telemetry',
+    ])
   })
 
   it('binds the models facet to the plugin holding the context, never the shared service', () => {
@@ -80,15 +118,22 @@ describe('scopeCore', () => {
     const read = scoped({ core: ['data:query'] }, { ...CORE, data } as CoreServices)
     const write = scoped({ core: ['data:write'] }, { ...CORE, data } as CoreServices)
 
-    await expect(read.data.query('task-1', 'update things set done = true', { readOnly: false }))
-      .rejects.toThrow(/data:write/)
+    await expect(read.data.query('task-1', 'update things set done = true', { readOnly: false })).rejects.toThrow(
+      /data:write/,
+    )
     await write.data.query('task-1', 'update things set done = true', { readOnly: false })
     expect(query).toHaveBeenCalledWith('task-1', 'update things set done = true', { readOnly: false })
   })
 
   it('keeps intended root creation and archive dates on the compiled seam', () => {
-    const tasks = { byId: marker('byId'), createChild: marker('createChild'), createRoot: marker('createRoot'), archivedBefore: marker('archivedBefore') }
-    const granted = scoped({ core: ['tasks'] }, { ...CORE, tasks } as unknown as CoreServices).tasks as unknown as Record<string, unknown>
+    const tasks = {
+      byId: marker('byId'),
+      createChild: marker('createChild'),
+      createRoot: marker('createRoot'),
+      archivedBefore: marker('archivedBefore'),
+    }
+    const granted = scoped({ core: ['tasks'] }, { ...CORE, tasks } as unknown as CoreServices)
+      .tasks as unknown as Record<string, unknown>
     expect(Object.keys(granted).sort()).toEqual(['byId', 'createChild'])
     expect(granted.createRoot).toBeUndefined()
     expect(granted.archivedBefore).toBeUndefined()
@@ -151,14 +196,29 @@ describe('scopeCore', () => {
 
   it('makes the config grant imply identity reads and include the whole config surface', () => {
     const config = scoped({ core: ['projects:config'] }).projects
-    expect(Object.keys(config).sort()).toEqual(
-      ['assertConfigTrusted', 'byGithub', 'byId', 'byWorkspace', 'checkouts', 'config', 'externalProjects', 'setup'],
-    )
+    expect(Object.keys(config).sort()).toEqual([
+      'assertConfigTrusted',
+      'byGithub',
+      'byId',
+      'byWorkspace',
+      'checkouts',
+      'config',
+      'externalProjects',
+      'setup',
+    ])
   })
 
   it('lets write imply read without silently implying config access', () => {
     const write = scoped({ core: ['projects:write'] }).projects
-    expect(Object.keys(write).sort()).toEqual(['byGithub', 'byId', 'byWorkspace', 'checkouts', 'create', 'externalProjects', 'update'])
+    expect(Object.keys(write).sort()).toEqual([
+      'byGithub',
+      'byId',
+      'byWorkspace',
+      'checkouts',
+      'create',
+      'externalProjects',
+      'update',
+    ])
     expect((write as { config?: unknown }).config).toBeUndefined()
   })
 
@@ -170,7 +230,7 @@ describe('scopeCore', () => {
   })
 
   it('scopes prefs to the loaded plugin namespace shared with its frame', async () => {
-    const read = vi.fn(async (_userId: string, key: string) => key === 'plugin:demo:columns' ? '[1,2]' : null)
+    const read = vi.fn(async (_userId: string, key: string) => (key === 'plugin:demo:columns' ? '[1,2]' : null))
     const write = vi.fn(async () => {})
     const services = scoped({ core: ['prefs'] }, { ...CORE, prefs: { read, write } } as CoreServices)
 
@@ -185,11 +245,13 @@ describe('scopeCore', () => {
 
   it('applies the shared frame-state quota to node-half preference writes', async () => {
     const write = vi.fn(async () => {})
-    const services = scoped(
-      { core: ['prefs'] },
-      { ...CORE, prefs: { read: vi.fn(async () => null), write } } as CoreServices,
+    const services = scoped({ core: ['prefs'] }, {
+      ...CORE,
+      prefs: { read: vi.fn(async () => null), write },
+    } as CoreServices)
+    await expect(services.prefs.write('user-1', 'big', 'x'.repeat(MAX_PLUGIN_STATE_BYTES + 1))).rejects.toThrow(
+      /capped/,
     )
-    await expect(services.prefs.write('user-1', 'big', 'x'.repeat(MAX_PLUGIN_STATE_BYTES + 1))).rejects.toThrow(/capped/)
     expect(write).not.toHaveBeenCalled()
   })
 })
@@ -228,7 +290,7 @@ describe('scopeCapabilities', () => {
     expect(real.get(mine)?.()).toBe('mine')
   })
 
-  it('refuses a capability id outside the plugin\'s own namespace', () => {
+  it("refuses a capability id outside the plugin's own namespace", () => {
     // The squat this closes: a package called anything at all providing `github.mirror` while the real
     // github plugin is disabled, and the composition root resolving the impostor.
     const real = registry()

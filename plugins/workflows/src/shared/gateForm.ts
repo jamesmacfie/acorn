@@ -44,7 +44,10 @@ export function declaredOutputSchema(step: WorkflowStepDef, kindSchema: object |
 
 /** One problem per field, keyed by field name, for a set of values a person means to approve. An
  *  empty object means the values can be approved. */
-export function gateFormProblems(form: WorkflowGateForm, values: Readonly<Record<string, unknown>>): Record<string, string> {
+export function gateFormProblems(
+  form: WorkflowGateForm,
+  values: Readonly<Record<string, unknown>>,
+): Record<string, string> {
   const problems: Record<string, string> = {}
   const declared = new Map(form.fields.map((field) => [field.name, field]))
   for (const name of Object.keys(values)) {
@@ -66,7 +69,11 @@ export function gateFormProblems(form: WorkflowGateForm, values: Readonly<Record
 }
 
 /** The fields whose approved value differs from the proposal, in field order. */
-export function gateFormEdited(form: WorkflowGateForm, proposal: Readonly<Record<string, DataValue>>, approved: Readonly<Record<string, DataValue>>): string[] {
-  const encode = (value: DataValue | undefined) => value === undefined ? undefined : canonicalDataEncoding(value)
+export function gateFormEdited(
+  form: WorkflowGateForm,
+  proposal: Readonly<Record<string, DataValue>>,
+  approved: Readonly<Record<string, DataValue>>,
+): string[] {
+  const encode = (value: DataValue | undefined) => (value === undefined ? undefined : canonicalDataEncoding(value))
   return form.fields.map((field) => field.name).filter((name) => encode(proposal[name]) !== encode(approved[name]))
 }

@@ -1,5 +1,9 @@
 import type { CoreServices } from '@acorn/plugin-api/node'
-import { changedLineRanges, isEditorRelativePath, type EditorLineMarkerProvider } from '@acorn/plugin-editor/contract/lineMarkers.ts'
+import {
+  changedLineRanges,
+  isEditorRelativePath,
+  type EditorLineMarkerProvider,
+} from '@acorn/plugin-editor/contract/lineMarkers.ts'
 
 type MarkerCore = Pick<CoreServices, 'tasks' | 'git'>
 
@@ -15,17 +19,23 @@ const diff = async (core: MarkerCore, root: string, path: string): Promise<strin
   // An untracked file, or every file in an unborn repository, is an addition from an empty document.
   // `--no-index` returns 1 when it found the expected difference, so its exit code is data.
   if (tracked.code !== 0 || hasHead.code !== 0) {
-    const result = await core.git.git(['diff', '--no-ext-diff', '--no-textconv', '--no-index', '--unified=0', '--', '/dev/null', path], {
-      cwd: root,
-      timeoutMs: 15_000,
-    })
+    const result = await core.git.git(
+      ['diff', '--no-ext-diff', '--no-textconv', '--no-index', '--unified=0', '--', '/dev/null', path],
+      {
+        cwd: root,
+        timeoutMs: 15_000,
+      },
+    )
     if (result.truncated || (result.code !== 0 && result.code !== 1)) throw new Error('Marker comparison unavailable')
     return result.stdout
   }
-  const result = await core.git.git(['diff', '--no-ext-diff', '--no-textconv', '--unified=0', 'HEAD', '--', `:(literal)${path}`], {
-    cwd: root,
-    timeoutMs: 15_000,
-  })
+  const result = await core.git.git(
+    ['diff', '--no-ext-diff', '--no-textconv', '--unified=0', 'HEAD', '--', `:(literal)${path}`],
+    {
+      cwd: root,
+      timeoutMs: 15_000,
+    },
+  )
   if (result.truncated || result.code !== 0) throw new Error('Marker comparison unavailable')
   return result.stdout
 }

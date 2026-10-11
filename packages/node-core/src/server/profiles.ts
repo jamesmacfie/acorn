@@ -7,10 +7,12 @@ import { agentProfileRegistry, type AgentProfileContribution } from './agentProf
 export type ProfileDef = AgentProfileContribution
 export const listProfileDefs = (): ProfileDef[] => agentProfileRegistry.list()
 
-export const getProfile = (id: string | undefined): ProfileDef => agentProfileRegistry.get(id ?? 'shell') ?? agentProfileRegistry.require('shell')
+export const getProfile = (id: string | undefined): ProfileDef =>
+  agentProfileRegistry.get(id ?? 'shell') ?? agentProfileRegistry.require('shell')
 export const requireProfile = (id: string): ProfileDef => agentProfileRegistry.require(id)
 
-export const resolveCommand = (p: ProfileDef): string => (p.command === '$SHELL' ? process.env.SHELL || '/bin/zsh' : p.command)
+export const resolveCommand = (p: ProfileDef): string =>
+  p.command === '$SHELL' ? process.env.SHELL || '/bin/zsh' : p.command
 
 export function onPath(command: string): boolean {
   try {
@@ -35,13 +37,21 @@ export const interactiveProfile = (p: ProfileDef): boolean => p.interactive !== 
 // `tmuxMissing` means the profile prefers the durable tmux backend but tmux is not on PATH, so
 // sessions degrade to node-pty and do not survive an app restart. The profile menu shows it as a
 // hint.
-export const listProfiles = (): { id: string; label: string; kind: 'shell' | 'agent'; available: boolean; tmuxMissing?: boolean }[] => {
+export const listProfiles = (): {
+  id: string
+  label: string
+  kind: 'shell' | 'agent'
+  available: boolean
+  tmuxMissing?: boolean
+}[] => {
   const tmux = tmuxAvailable()
-  return listProfileDefs().filter(interactiveProfile).map((p) => ({
-    id: p.id,
-    label: p.label,
-    kind: p.kind,
-    available: profileAvailable(p),
-    tmuxMissing: p.backendPreference === 'tmux' && !tmux ? true : undefined,
-  }))
+  return listProfileDefs()
+    .filter(interactiveProfile)
+    .map((p) => ({
+      id: p.id,
+      label: p.label,
+      kind: p.kind,
+      available: profileAvailable(p),
+      tmuxMissing: p.backendPreference === 'tmux' && !tmux ? true : undefined,
+    }))
 }

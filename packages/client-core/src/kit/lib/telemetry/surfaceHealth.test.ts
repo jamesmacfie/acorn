@@ -58,11 +58,16 @@ describe('the surface health registry', () => {
     probe.checkpoint('ready')
     probe.dispose()
     probe.checkpoint('ready')
-    expect(seen).toEqual([['diff', 'ready'], ['diff', 'teardown']])
+    expect(seen).toEqual([
+      ['diff', 'ready'],
+      ['diff', 'teardown'],
+    ])
   })
 
   it('reads a surface whose reader throws as empty rather than failing the snapshot', () => {
-    registerSurfaceHealth('diff', () => { throw new Error('reader failed') })
+    registerSurfaceHealth('diff', () => {
+      throw new Error('reader failed')
+    })
     const [entry] = surfaceHealthSnapshot().surfaces
     expect(entry?.mounted.fixedRows).toBe(0)
     expect(entry?.topology.ready).toBe(false)
@@ -84,7 +89,16 @@ describe('privacy', () => {
     expect(entry.topology.files).toBe(0)
     expect(entry.topology.ready).toBe(false)
     expect(JSON.stringify(entry)).not.toContain('CANARY')
-    expect(Object.keys(entry)).toEqual(['kind', 'topology', 'mounted', 'work', 'measurement', 'correction', 'resident', 'window'])
+    expect(Object.keys(entry)).toEqual([
+      'kind',
+      'topology',
+      'mounted',
+      'work',
+      'measurement',
+      'correction',
+      'resident',
+      'window',
+    ])
   })
 
   it('serializes to numbers, booleans, and the fixed kind labels only', () => {

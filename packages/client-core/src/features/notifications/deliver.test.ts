@@ -8,13 +8,25 @@ let onNotice: ((notice: WorkflowNotice) => void) | undefined
 vi.mock('../../infra/node/wsClient', () => ({
   wsOnNotice: (cb: (notice: WorkflowNotice) => void) => {
     onNotice = cb
-    return () => { onNotice = undefined }
+    return () => {
+      onNotice = undefined
+    }
   },
 }))
 
 import {
-  HOLD_MS, defaultDeliveryContext, deliverNotice, forgetAttentionSource, initWorkflowNotices, observeAttention, replaceAttentionSource,
-  registerNoticeSink, resetDelivery, setHostFocused, systemSink, type DeliveryContext,
+  HOLD_MS,
+  defaultDeliveryContext,
+  deliverNotice,
+  forgetAttentionSource,
+  initWorkflowNotices,
+  observeAttention,
+  replaceAttentionSource,
+  registerNoticeSink,
+  resetDelivery,
+  setHostFocused,
+  systemSink,
+  type DeliveryContext,
   type NoticeSink,
 } from './deliver'
 import { noticeKindContributions } from './kindContributions'
@@ -24,8 +36,17 @@ import { DEFAULT_NOTIFICATION_SETTINGS, type NotificationSettings } from './sett
 import type { AttentionState, Snapshot } from './attention'
 import { _resetNotices, notices, type Notice } from './notifications'
 
-const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot =>
-  ({ nodeId: 'n1', sessionId: 's1', taskId: 't1', title: 'claude', state, sourceId: 'agents', notifyOnFinish: true, target: { kind: 'managed-agent', resourceId: 's1' }, ...over })
+const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot => ({
+  nodeId: 'n1',
+  sessionId: 's1',
+  taskId: 't1',
+  title: 'claude',
+  state,
+  sourceId: 'agents',
+  notifyOnFinish: true,
+  target: { kind: 'managed-agent', resourceId: 's1' },
+  ...over,
+})
 
 let focused = false
 let settings: NotificationSettings = DEFAULT_NOTIFICATION_SETTINGS
@@ -138,7 +159,7 @@ describe('the seen rule', () => {
   // it hears DEC 1004 focus reports from the renderer and installs the answer here
   // (apps/tui/src/main.tsx). Unknown still counts as focused, which is what a host that never
   // installs one falls back to.
-  it('takes a host\'s own answer about whether it is on screen', () => {
+  it("takes a host's own answer about whether it is on screen", () => {
     expect(defaultDeliveryContext.focused()).toBe(true)
     let onScreen = false
     setHostFocused(() => onScreen)
@@ -182,10 +203,34 @@ it('a disabled event produces no row and no channel', () => {
 })
 
 it('points a PTY row at the terminal session and a managed row at the agent pane', () => {
-  observeAttention([snap('working'), snap('working', { sessionId: 's2', sourceId: 'terminal', target: { kind: 'terminal-session', resourceId: 's2' } })], context)
-  observeAttention([snap('blocked'), snap('blocked', { sessionId: 's2', sourceId: 'terminal', target: { kind: 'terminal-session', resourceId: 's2' } })], context)
+  observeAttention(
+    [
+      snap('working'),
+      snap('working', {
+        sessionId: 's2',
+        sourceId: 'terminal',
+        target: { kind: 'terminal-session', resourceId: 's2' },
+      }),
+    ],
+    context,
+  )
+  observeAttention(
+    [
+      snap('blocked'),
+      snap('blocked', {
+        sessionId: 's2',
+        sourceId: 'terminal',
+        target: { kind: 'terminal-session', resourceId: 's2' },
+      }),
+    ],
+    context,
+  )
   settle()
-  expect(notices().map((n) => n.target?.kind).sort()).toEqual(['managed-agent', 'terminal-session'])
+  expect(
+    notices()
+      .map((n) => n.target?.kind)
+      .sort(),
+  ).toEqual(['managed-agent', 'terminal-session'])
 })
 
 // The sinks read the device store directly rather than the gate's context, because they run after
@@ -194,7 +239,12 @@ it('points a PTY row at the terminal session and a managed row at the agent pane
 const device = vi.hoisted(() => ({ system: true }))
 vi.mock('./settings', async (original) => ({
   ...(await original<object>()),
-  readNotificationSettings: () => ({ sound: true, system: device.system, badge: true, events: { blocked: true, finished: true, error: true } }),
+  readNotificationSettings: () => ({
+    sound: true,
+    system: device.system,
+    badge: true,
+    events: { blocked: true, finished: true, error: true },
+  }),
 }))
 
 describe('the system channel', () => {
@@ -203,7 +253,16 @@ describe('the system channel', () => {
     device.system = true
     shown.length = 0
     vi.stubGlobal('window', {
-      acorn: { notify: { show: async (r: { title: string; body?: string; tag: string }) => { shown.push(r); return true }, onActivate: () => () => {}, setBadge: () => {} } },
+      acorn: {
+        notify: {
+          show: async (r: { title: string; body?: string; tag: string }) => {
+            shown.push(r)
+            return true
+          },
+          onActivate: () => () => {},
+          setBadge: () => {},
+        },
+      },
     })
   })
   afterEach(() => vi.unstubAllGlobals())
@@ -235,7 +294,10 @@ describe('the system channel', () => {
   // a file the agent is asking about, and it is the row's, not the banner's body.
   it('sends the detail as the body and never the title', () => {
     const drop = registerNoticeSink(systemSink)
-    deliverNotice({ taskId: 't1', kind: 'agent-needs-input', title: 'edit /etc/hosts?', at: 1, detail: 'Review & trust' }, context)
+    deliverNotice(
+      { taskId: 't1', kind: 'agent-needs-input', title: 'edit /etc/hosts?', at: 1, detail: 'Review & trust' },
+      context,
+    )
     deliverNotice({ taskId: 't1', kind: 'agent-needs-input', title: 'edit /etc/hosts?', at: 2 }, context)
     drop()
     expect(shown.map((r) => r.body)).toEqual(['Review & trust', undefined])
@@ -266,8 +328,12 @@ describe('the system channel', () => {
 // A workflow notice names the run it came from, and that is what gives the bell row somewhere to go
 // (docs/notifications/rows-and-targets.md § What a row points at).
 describe('workflow notices', () => {
-  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice =>
-    ({ taskId: 't1', kind: 'gate', title: 'a gate', ...over })
+  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice => ({
+    taskId: 't1',
+    kind: 'gate',
+    title: 'a gate',
+    ...over,
+  })
 
   it('turns a run and a step into a workflow-run target', () => {
     const stop = initWorkflowNotices()
@@ -296,8 +362,7 @@ describe('workflow notices', () => {
 // proposal gate is why — it borrowed workflows' notice channel, which could only name a run, so its
 // row swallowed every click (docs/notifications/rows-and-targets.md § What a row points at).
 describe('a plugin notice', () => {
-  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice =>
-    ({ title: 'something happened', ...over })
+  const frame = (over: Partial<WorkflowNotice>): WorkflowNotice => ({ title: 'something happened', ...over })
 
   it('carries the target its raiser named', () => {
     const stop = initWorkflowNotices()

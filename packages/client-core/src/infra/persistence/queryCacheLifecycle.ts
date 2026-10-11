@@ -53,22 +53,24 @@ export function queryCacheLifecycle(options: {
     writes = next
     return next
   }
-  const remove = (retiring = false) => enqueue(async () => {
-    await (retiring && options.beforeRetire ? options.beforeRetire() : beforeAccess())
-    await storage.removeItem(key)
-  })
+  const remove = (retiring = false) =>
+    enqueue(async () => {
+      await (retiring && options.beforeRetire ? options.beforeRetire() : beforeAccess())
+      await storage.removeItem(key)
+    })
   const persister: Persister = {
-    persistClient: (snapshot) => enqueue(async () => {
-      await beforeAccess()
-      if (retired) return
-      const text = measure('core', 'cache.serialize', () => {
-        recordSample('core', 'cache.entries', snapshot.clientState.queries.length)
-        const value = JSON.stringify(snapshot)
-        recordSample('core', 'cache.characters', value.length)
-        return value
-      })
-      await measure('core', 'cache.write', () => storage.setItem(key, text))
-    }),
+    persistClient: (snapshot) =>
+      enqueue(async () => {
+        await beforeAccess()
+        if (retired) return
+        const text = measure('core', 'cache.serialize', () => {
+          recordSample('core', 'cache.entries', snapshot.clientState.queries.length)
+          const value = JSON.stringify(snapshot)
+          recordSample('core', 'cache.characters', value.length)
+          return value
+        })
+        await measure('core', 'cache.write', () => storage.setItem(key, text))
+      }),
     restoreClient: async () => {
       await beforeAccess()
       if (retired) return undefined
@@ -78,12 +80,12 @@ export function queryCacheLifecycle(options: {
       if (retired || !text) return undefined
       return measure('core', 'cache.deserialize', () => JSON.parse(text) as PersistedClient)
     },
-    removeClient: () => retired ? Promise.resolve() : remove(),
+    removeClient: () => (retired ? Promise.resolve() : remove()),
   }
   const flush = (): Promise<void> => {
     if (timer !== undefined) clearTimeout(timer)
     timer = undefined
-    if (capturing) return capturing.then(() => dirty && !retired ? flush() : undefined)
+    if (capturing) return capturing.then(() => (dirty && !retired ? flush() : undefined))
     capturing = (async () => {
       await restoring
       if (timer !== undefined) clearTimeout(timer)
@@ -92,25 +94,30 @@ export function queryCacheLifecycle(options: {
         dirty = false
         try {
           recordSample('core', 'cache.dehydrate.count', 1)
-          const clientState = measure('core', 'cache.dehydrate', () => dehydrate(client, {
-            ...options.dehydrateOptions,
-            shouldDehydrateQuery: options.dehydrateOptions?.shouldDehydrateQuery ?? shouldPersistQuery,
-          }))
+          const clientState = measure('core', 'cache.dehydrate', () =>
+            dehydrate(client, {
+              ...options.dehydrateOptions,
+              shouldDehydrateQuery: options.dehydrateOptions?.shouldDehydrateQuery ?? shouldPersistQuery,
+            }),
+          )
           await persister.persistClient({ buster: '', timestamp: Date.now(), clientState })
         } catch (error) {
           if (!retired) dirty = true
           throw error
         }
       } else await writes
-    })().finally(() => { capturing = undefined })
+    })().finally(() => {
+      capturing = undefined
+    })
     return capturing
   }
   const markDirty = () => {
     if (retired) return
     dirty = true
-    if (timer === undefined) timer = setTimeout(() => {
-      void flush().catch(options.onError)
-    }, options.captureWindowMs ?? 5_000)
+    if (timer === undefined)
+      timer = setTimeout(() => {
+        void flush().catch(options.onError)
+      }, options.captureWindowMs ?? 5_000)
   }
   const subscribe = () => {
     if (retired || !leases || unsubscribe) return
@@ -119,7 +126,10 @@ export function queryCacheLifecycle(options: {
     }
     const queryOff = client.getQueryCache().subscribe(onEvent)
     const mutationOff = client.getMutationCache().subscribe(onEvent)
-    unsubscribe = () => { queryOff(); mutationOff() }
+    unsubscribe = () => {
+      queryOff()
+      mutationOff()
+    }
   }
   return {
     persister,
@@ -130,7 +140,10 @@ export function queryCacheLifecycle(options: {
       // captures read only the remaining active queries and follow deletion on the same queue.
       await restoring
       await capturing?.catch(() => {})
-      if (retired) { await retirement; return }
+      if (retired) {
+        await retirement
+        return
+      }
       client.removeQueries({ type: 'inactive' })
       await remove()
     },
@@ -150,24 +163,29 @@ export function queryCacheLifecycle(options: {
             options.onError(error)
             throw error
           })
-          .finally(() => { restoring = undefined })
+          .finally(() => {
+            restoring = undefined
+          })
       }
       const restored = restoring
       let released = false
-      return { restored, release: () => {
-        if (released) return
-        released = true
-        leases--
-        if (leases) return
-        // Child cleanup can write synchronously after the provider releases. Keep the listener until
-        // that cleanup turn finishes, then retain one bounded final capture without idle subscriptions.
-        queueMicrotask(() => {
-          if (leases || retired) return
-          unsubscribe?.()
-          unsubscribe = undefined
-          if (dirty && timer === undefined) markDirty()
-        })
-      } }
+      return {
+        restored,
+        release: () => {
+          if (released) return
+          released = true
+          leases--
+          if (leases) return
+          // Child cleanup can write synchronously after the provider releases. Keep the listener until
+          // that cleanup turn finishes, then retain one bounded final capture without idle subscriptions.
+          queueMicrotask(() => {
+            if (leases || retired) return
+            unsubscribe?.()
+            unsubscribe = undefined
+            if (dirty && timer === undefined) markDirty()
+          })
+        },
+      }
     },
     retire: () => {
       if (retirement && !retirementFailed) return retirement
@@ -179,7 +197,10 @@ export function queryCacheLifecycle(options: {
       if (timer !== undefined) clearTimeout(timer)
       timer = undefined
       retirementFailed = false
-      retirement = remove(true).catch((error) => { retirementFailed = true; throw error })
+      retirement = remove(true).catch((error) => {
+        retirementFailed = true
+        throw error
+      })
       return retirement
     },
   }

@@ -29,7 +29,10 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/tasks', reviewNotesRoutes(plugin.db, { tasks: createTaskService(t.db) }, (frame) => frames.push(frame)))
+    app.route(
+      '/api/tasks',
+      reviewNotesRoutes(plugin.db, { tasks: createTaskService(t.db) }, (frame) => frames.push(frame)),
+    )
     const now = Date.now()
     await t.db.insert(schema.tasks).values({
       id: 'task1',
@@ -52,7 +55,8 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     t.cleanup()
   })
 
-  const list = async (): Promise<ReviewNote[]> => (await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'GET'), {} as Env)).json()
+  const list = async (): Promise<ReviewNote[]> =>
+    (await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'GET'), {} as Env)).json()
 
   const create = async (over: Record<string, unknown> = {}): Promise<ReviewNote> => {
     const res = await app.fetch(
@@ -87,7 +91,10 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
     let all = await list()
     expect(all.every((n) => n.sentAt != null)).toBe(true)
 
-    await app.fetch(jsonReq(`/api/tasks/task1/review-notes/${a.id}`, 'PATCH', { body: 'Edited — resend me.' }), {} as Env)
+    await app.fetch(
+      jsonReq(`/api/tasks/task1/review-notes/${a.id}`, 'PATCH', { body: 'Edited — resend me.' }),
+      {} as Env,
+    )
     all = await list()
     expect(all.find((n) => n.id === a.id)?.sentAt).toBeNull()
     expect(all.find((n) => n.id === a.id)?.body).toBe('Edited — resend me.')
@@ -95,9 +102,42 @@ describe('review notes CRUD + sentAt lifecycle (docs/panes.md)', () => {
   })
 
   it('validates the anchor + body; unknown task 404s', async () => {
-    expect((await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'left', startLine: 1, body: 'x' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'additions', startLine: 5, endLine: 3, body: 'x' }), {} as Env)).status).toBe(400)
-    expect((await app.fetch(jsonReq('/api/tasks/nope/review-notes', 'POST', { path: 'a.ts', side: 'additions', startLine: 1, endLine: 1, body: 'x' }), {} as Env)).status).toBe(404)
+    expect(
+      (
+        await app.fetch(
+          jsonReq('/api/tasks/task1/review-notes', 'POST', { path: 'a.ts', side: 'left', startLine: 1, body: 'x' }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(400)
+    expect(
+      (
+        await app.fetch(
+          jsonReq('/api/tasks/task1/review-notes', 'POST', {
+            path: 'a.ts',
+            side: 'additions',
+            startLine: 5,
+            endLine: 3,
+            body: 'x',
+          }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(400)
+    expect(
+      (
+        await app.fetch(
+          jsonReq('/api/tasks/nope/review-notes', 'POST', {
+            path: 'a.ts',
+            side: 'additions',
+            startLine: 1,
+            endLine: 1,
+            body: 'x',
+          }),
+          {} as Env,
+        )
+      ).status,
+    ).toBe(404)
   })
 
   it('announces current counts only after real create, delivery, edit, and delete writes', async () => {

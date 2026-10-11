@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_COMMAND_SEARCH_ITEMS } from '@acorn/protocol/commands.ts'
-import { importedRequestName, savedRequestSearchItems, savedRequestSearchScore, type SavedRequestSummary } from './paletteSearch'
+import {
+  importedRequestName,
+  savedRequestSearchItems,
+  savedRequestSearchScore,
+  type SavedRequestSummary,
+} from './paletteSearch'
 
 // The ranking and the import's name, as pure functions. The route beside them is scope and ownership;
 // this is what a typed word means and what an unnamed command line is called.
@@ -44,11 +49,10 @@ describe('the rows a search answers with', () => {
   })
 
   it('sorts by tier and keeps the incoming order inside one, which is the rail’s own order', () => {
-    const items = savedRequestSearchItems([
-      row({ id: 'a', name: 'Alpha items' }),
-      row({ id: 'b', name: 'items' }),
-      row({ id: 'c', name: 'Beta items' }),
-    ], 'items')
+    const items = savedRequestSearchItems(
+      [row({ id: 'a', name: 'Alpha items' }), row({ id: 'b', name: 'items' }), row({ id: 'c', name: 'Beta items' })],
+      'items',
+    )
     expect(items.map((item) => item.id)).toEqual(['b', 'a', 'c'])
   })
 

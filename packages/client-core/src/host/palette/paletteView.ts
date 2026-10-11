@@ -34,11 +34,13 @@ export type CommandPaletteView = {
  * (docs/command-palette-and-shortcuts/shortcuts.md § Plugin shortcuts, on binding ids as persistence keys).
  * Changing it would silently unbind everybody's ⌘K.
  */
-export function createCommandPaletteView(options: CommandSessionOptions & {
-  id: string
-  title: string
-  toggleChord: string
-}): CommandPaletteView {
+export function createCommandPaletteView(
+  options: CommandSessionOptions & {
+    id: string
+    title: string
+    toggleChord: string
+  },
+): CommandPaletteView {
   // Declared before the session and reading it lazily: `createOverlayFocus` wants the close it should
   // call when another overlay takes over, and the session wants the focus hooks. One of the two has to
   // be named before it exists, and a closure is the honest way to do it.
@@ -76,7 +78,11 @@ export function createCommandPaletteView(options: CommandSessionOptions & {
     // renderer keymap. The native menu catches Cmd/Ctrl+K and reaches the same toggle as the
     // registered command used by the renderer shortcut.
     const offNative = desktopExtras()?.onCommandPalette(toggle)
-    onCleanup(() => { offNative?.(); binding.dispose(); command.dispose() })
+    onCleanup(() => {
+      offNative?.()
+      binding.dispose()
+      command.dispose()
+    })
   })
 
   const view: PaletteView = {

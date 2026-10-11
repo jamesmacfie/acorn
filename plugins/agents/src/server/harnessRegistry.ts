@@ -9,7 +9,15 @@
 //   the driver          always, because a harness with no driver is a menu entry that cannot run.
 //   the usage collector only with `probes.usage`. Without it the pane shows no usage section.
 //   the terminal profile only with `terminal`. Without it the harness is Agent-pane only.
-import { agentProfileRegistry, lineDelimitedJsonAdapter, textAdapter, type AgentProfileContribution, type Disposable, type HarnessRegistry, type ManifestHarness } from '@acorn/plugin-api/node'
+import {
+  agentProfileRegistry,
+  lineDelimitedJsonAdapter,
+  textAdapter,
+  type AgentProfileContribution,
+  type Disposable,
+  type HarnessRegistry,
+  type ManifestHarness,
+} from '@acorn/plugin-api/node'
 import { harnessAuthProbeSchema, harnessUsageProbeSchema } from '../shared/harnessProbes'
 import { usageHealth, worstUsageHealth, type AgentProviderUsageReading, type AgentUsageQuota } from '../shared/usage'
 import { agentDriverRegistry, type AgentDriverRegistry } from './drivers/registry'
@@ -30,26 +38,29 @@ const launchSpec = (harness: ManifestHarness): HarnessLaunchSpec => {
     profileId: harness.id,
     label: harness.label,
     ...(harness.glyph ? { glyph: harness.glyph } : {}),
-    spawn: 'command' in spawn
-      ? { command: spawn.command, args: spawn.args }
-      : {
-        // A constant, not a lookup: the host already resolved and confined this path inside the
-        // plugin's package.
-        entry: () => spawn.entry,
-        args: spawn.args,
-        ...(spawn.requires ? { requires: spawn.requires } : {}),
-      },
+    spawn:
+      'command' in spawn
+        ? { command: spawn.command, args: spawn.args }
+        : {
+            // A constant, not a lookup: the host already resolved and confined this path inside the
+            // plugin's package.
+            entry: () => spawn.entry,
+            args: spawn.args,
+            ...(spawn.requires ? { requires: spawn.requires } : {}),
+          },
     envPassthrough: harness.envPassthrough,
     quirks: harness.quirks,
     ...(harness.probeAuth
       ? {
-        probeAuth: async () => {
-          const answer = harnessAuthProbeSchema.safeParse(await harness.probeAuth!(AbortSignal.timeout(PROBE_TIMEOUT_MS)))
-          // An unparseable answer means "cannot tell", the same as a harness with no probe. Never
-          // `false`, which would send the owner to re-authenticate an account that was fine.
-          return answer.success ? answer.data.authenticated ?? null : null
-        },
-      }
+          probeAuth: async () => {
+            const answer = harnessAuthProbeSchema.safeParse(
+              await harness.probeAuth!(AbortSignal.timeout(PROBE_TIMEOUT_MS)),
+            )
+            // An unparseable answer means "cannot tell", the same as a harness with no probe. Never
+            // `false`, which would send the owner to re-authenticate an account that was fine.
+            return answer.success ? (answer.data.authenticated ?? null) : null
+          },
+        }
       : {}),
   }
 }
@@ -119,31 +130,33 @@ const harnessProfile = (harness: ManifestHarness): AgentProfileContribution => {
     // placeholder syntax. See docs/plugin-authoring/harnesses.md § Harnesses.
     ...(oneShot
       ? {
-        aiArgv: (command, opts) => ({
-          file: command,
-          args: [
-            ...oneShot.args,
-            // Both halves of the condition matter. A caller may name a model the harness has no flag
-            // for, and passing the value with no flag would hand the CLI a second positional argument
-            // where it expects one.
-            ...(opts.model && oneShot.modelFlag ? [oneShot.modelFlag, opts.model] : []),
-            // The same join codex uses, and for the same reason: a manifest has no way to declare a
-            // system-prompt flag either, so the two texts arrive as one prompt with a blank line
-            // between them. `opts.schema` is dropped, because there is no flag to carry it.
-            opts.system ? `${opts.system}\n\n${opts.prompt}` : opts.prompt,
-          ],
-        }),
-        streamJson: oneShot.output === 'json-lines' ? lineDelimitedJsonAdapter : textAdapter,
-      }
+          aiArgv: (command, opts) => ({
+            file: command,
+            args: [
+              ...oneShot.args,
+              // Both halves of the condition matter. A caller may name a model the harness has no flag
+              // for, and passing the value with no flag would hand the CLI a second positional argument
+              // where it expects one.
+              ...(opts.model && oneShot.modelFlag ? [oneShot.modelFlag, opts.model] : []),
+              // The same join codex uses, and for the same reason: a manifest has no way to declare a
+              // system-prompt flag either, so the two texts arrive as one prompt with a blank line
+              // between them. `opts.schema` is dropped, because there is no flag to carry it.
+              opts.system ? `${opts.system}\n\n${opts.prompt}` : opts.prompt,
+            ],
+          }),
+          streamJson: oneShot.output === 'json-lines' ? lineDelimitedJsonAdapter : textAdapter,
+        }
       : {}),
   }
 }
 
-export function createHarnessRegistry(deps: {
-  drivers?: AgentDriverRegistry
-  collectors?: AgentUsageCollectorRegistry
-  profiles?: Pick<typeof agentProfileRegistry, 'register'>
-} = {}): HarnessRegistry {
+export function createHarnessRegistry(
+  deps: {
+    drivers?: AgentDriverRegistry
+    collectors?: AgentUsageCollectorRegistry
+    profiles?: Pick<typeof agentProfileRegistry, 'register'>
+  } = {},
+): HarnessRegistry {
   const drivers = deps.drivers ?? agentDriverRegistry
   const collectors = deps.collectors ?? agentUsageCollectors
   const profiles = deps.profiles ?? agentProfileRegistry
@@ -151,12 +164,14 @@ export function createHarnessRegistry(deps: {
     register: (harness): Disposable => {
       const undo = [drivers.register(launchSpec(harness))]
       if (harness.probeUsage) {
-        undo.push(collectors.register({
-          provider: harness.id,
-          label: harness.label,
-          ...(harness.glyph ? { glyph: harness.glyph } : {}),
-          collect: usageReading(harness),
-        }))
+        undo.push(
+          collectors.register({
+            provider: harness.id,
+            label: harness.label,
+            ...(harness.glyph ? { glyph: harness.glyph } : {}),
+            collect: usageReading(harness),
+          }),
+        )
       }
       if (harness.terminal || harness.oneShot) undo.push(profiles.register(harnessProfile(harness)))
       let disposed = false

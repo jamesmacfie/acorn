@@ -8,10 +8,16 @@ import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { createWorkspacesMode } from '@acorn/client-core/features/workspaces'
 import { settingsCategoryLabel } from '@acorn/client-core/features/settings'
 import {
-  createSettingsDetails, createUnsavedChanges, SettingsDetailContext, UnsavedChangesContext,
+  createSettingsDetails,
+  createUnsavedChanges,
+  SettingsDetailContext,
+  UnsavedChangesContext,
 } from '@acorn/client-core/features/settings'
 import {
-  settingsCategoryOf, settingsScopeOf, type SettingsCategory, type SettingsContribution,
+  settingsCategoryOf,
+  settingsScopeOf,
+  type SettingsCategory,
+  type SettingsContribution,
   type SettingsPageContext,
 } from '@acorn/client-core/host/registries/shell'
 import { Line } from '../kit/cells'
@@ -76,7 +82,9 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
       goes: 'This page has changes that are not saved yet. Leaving drops them.',
       stays: 'Everything already saved stays as it is.',
       danger: true,
-    }).then((discard) => { if (discard) go() })
+    }).then((discard) => {
+      if (discard) go()
+    })
   }
   const back = () => {
     const detail = details.current()
@@ -89,12 +97,13 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
 
   const context: SettingsPageContext = {
     scope: { nodeId: props.nodeId },
-    navigate: (target, opened) => leave(() => {
-      const next = placeFor(target)
-      if (!next) return
-      setSettingsPlace(next)
-      opened?.()
-    }),
+    navigate: (target, opened) =>
+      leave(() => {
+        const next = placeFor(target)
+        if (!next) return
+        setSettingsPlace(next)
+        opened?.()
+      }),
     onWorkspaceDeleted: () => {},
   }
 
@@ -104,8 +113,12 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
     const at = category()
     const open = page()
     const title = details.current()?.title()
-    return ['Settings', ...(at ? [label(at)] : []), ...(open ? [open.title ?? open.label] : []), ...(title ? [title] : [])]
-      .join(' > ')
+    return [
+      'Settings',
+      ...(at ? [label(at)] : []),
+      ...(open ? [open.title ?? open.label] : []),
+      ...(title ? [title] : []),
+    ].join(' > ')
   }
 
   return (
@@ -117,10 +130,15 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
       title="Settings"
       paddingLeft={1}
       paddingRight={1}
-      ref={(element: Renderable) => { root = element; onCleanup(pushScope(element)) }}
+      ref={(element: Renderable) => {
+        root = element
+        onCleanup(pushScope(element))
+      }}
     >
       <Line role="muted">{crumbs()}</Line>
-      <Show when={settingsMissing()}><Alert tone="warn">{settingsMissing()}</Alert></Show>
+      <Show when={settingsMissing()}>
+        <Alert tone="warn">{settingsMissing()}</Alert>
+      </Show>
       <Switch fallback={<Groups count={(id) => inGroup(id).length} label={label} />}>
         <Match when={page()} keyed>
           {(open) => (
@@ -145,11 +163,19 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
 function Groups(props: { count: (id: SettingsCategory) => number; label: (id: SettingsCategory) => string }) {
   const items = () => SETTINGS_CATEGORIES.map((id) => ({ key: id, label: props.label(id) }))
   return (
-    <Rows id="settings.groups" ariaLabel="Settings groups" items={items()}
-      onActivate={(key) => setSettingsPlace({ category: key as SettingsCategory })}>
+    <Rows
+      id="settings.groups"
+      ariaLabel="Settings groups"
+      items={items()}
+      onActivate={(key) => setSettingsPlace({ category: key as SettingsCategory })}
+    >
       {(entry, item) => {
         const count = () => props.count(entry.key)
-        return <Row item={item} meta={count() === 1 ? '1 page' : `${count()} pages`}>{entry.label}</Row>
+        return (
+          <Row item={item} meta={count() === 1 ? '1 page' : `${count()} pages`}>
+            {entry.label}
+          </Row>
+        )
       }}
     </Rows>
   )
@@ -157,14 +183,31 @@ function Groups(props: { count: (id: SettingsCategory) => number; label: (id: Se
 
 /** One group's pages, each marked with what it affects and, when this host does not draw it, that it
  *  opens in the desktop app. Listed either way, so the route is the whole map of settings. */
-function Pages(props: { category: SettingsCategory; pages: readonly SettingsContribution[]; nodeId: string; label: string; mode?: WorkspacesMode }) {
+function Pages(props: {
+  category: SettingsCategory
+  pages: readonly SettingsContribution[]
+  nodeId: string
+  label: string
+  mode?: WorkspacesMode
+}) {
   const items = () => props.pages.map((page) => ({ key: page.id, label: page.title ?? page.label, page }))
   return (
     <Show when={items().length} fallback={<Line role="muted">No pages in this group on this node.</Line>}>
-      <Rows id={`settings.pages.${props.category}`} ariaLabel={props.label} items={items()}
-        onActivate={(key) => setSettingsPlace({ category: props.category, pageId: key })}>
+      <Rows
+        id={`settings.pages.${props.category}`}
+        ariaLabel={props.label}
+        items={items()}
+        onActivate={(key) => setSettingsPlace({ category: props.category, pageId: key })}
+      >
         {(entry, item) => (
-          <Row item={item} meta={drawnElsewhere(entry.page, props.mode) ? `${scopeText(entry.page, props.nodeId)} · desktop app` : scopeText(entry.page, props.nodeId)}>
+          <Row
+            item={item}
+            meta={
+              drawnElsewhere(entry.page, props.mode)
+                ? `${scopeText(entry.page, props.nodeId)} · desktop app`
+                : scopeText(entry.page, props.nodeId)
+            }
+          >
             {entry.label}
           </Row>
         )}
@@ -201,12 +244,19 @@ function PageView(props: {
 function Elsewhere(props: { info: DrawnElsewhere; mode?: WorkspacesMode; onSetup: () => void }) {
   return (
     <box flexDirection="column" rowGap={1} flexShrink={0}>
-      <Line role="strong" wrap>This page opens in the desktop app.</Line>
+      <Line role="strong" wrap>
+        This page opens in the desktop app.
+      </Line>
       <Line wrap>{props.info.why}</Line>
       <Line wrap>{props.info.where}</Line>
-      <Show when={props.info.file}>{(file) => <Line role="muted" wrap>{`This terminal reads the same settings from ${file()}.`}</Line>}</Show>
+      <Show when={props.info.file}>
+        {(file) => <Line role="muted" wrap>{`This terminal reads the same settings from ${file()}.`}</Line>}
+      </Show>
       <Show when={props.info.setup}>
-        <Line wrap>Set up acorn adds {props.mode === 'off' ? 'a project or task' : 'a workspace, project, or task'} from this terminal.</Line>
+        <Line wrap>
+          Set up acorn adds {props.mode === 'off' ? 'a project or task' : 'a workspace, project, or task'} from this
+          terminal.
+        </Line>
         <Button onPress={props.onSetup}>Set up acorn</Button>
       </Show>
     </box>

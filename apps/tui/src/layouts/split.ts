@@ -47,9 +47,14 @@ export function createKeySplit(options: {
   const [less, more] = options.axis === 'x' ? ['left', 'right'] : ['up', 'down']
   return {
     size,
-    attach: (box) => bindKeys(box, [
-      { key: `ctrl+shift+${less}`, cmd: () => nudge(-STEP) },
-      { key: `ctrl+shift+${more}`, cmd: () => nudge(STEP) },
-    ], PANE),
+    attach: (box) =>
+      bindKeys(
+        box,
+        [
+          { key: `ctrl+shift+${less}`, cmd: () => nudge(-STEP) },
+          { key: `ctrl+shift+${more}`, cmd: () => nudge(STEP) },
+        ],
+        PANE,
+      ),
   }
 }

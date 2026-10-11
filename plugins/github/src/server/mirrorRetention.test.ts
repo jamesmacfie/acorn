@@ -78,7 +78,7 @@ describe('GitHub mirror retention repair', () => {
     })
 
     const statements = deleteRepoMirrorStatements(testDb.db, USER, [99])
-    await testDb.db.batch(statements as [typeof statements[number], ...typeof statements[number][]])
+    await testDb.db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]])
 
     expect(await testDb.db.select().from(pullRequests)).toEqual([])
     expect(await testDb.db.select().from(prFiles)).toEqual([])

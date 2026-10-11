@@ -8,9 +8,7 @@ const MAX_GENERATED_ARTIFACT_BYTES = 16 * 1024 * 1024
 
 const boundedMediaType = (value: string): string => {
   const mediaType = value.trim().slice(0, 200)
-  return /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i.test(mediaType)
-    ? mediaType
-    : 'application/octet-stream'
+  return /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i.test(mediaType) ? mediaType : 'application/octet-stream'
 }
 
 /**
@@ -38,13 +36,16 @@ export class ProviderEventMaterializer {
     const { acornTurnId: _turnId, ...providerEvent } = attributedEvent
     if (providerEvent.type === 'generated_artifact') {
       if (providerEvent.bytes.byteLength === 0 || providerEvent.bytes.byteLength > MAX_GENERATED_ARTIFACT_BYTES) {
-        return [{
-          type: 'diagnostic',
-          level: 'warning',
-          message: providerEvent.bytes.byteLength === 0
-            ? 'The provider returned an empty generated artifact.'
-            : 'The provider returned a generated artifact larger than 16 MiB.',
-        }]
+        return [
+          {
+            type: 'diagnostic',
+            level: 'warning',
+            message:
+              providerEvent.bytes.byteLength === 0
+                ? 'The provider returned an empty generated artifact.'
+                : 'The provider returned a generated artifact larger than 16 MiB.',
+          },
+        ]
       }
       const artifact = await this.artifacts.putBytes({
         sessionId,
@@ -54,18 +55,22 @@ export class ProviderEventMaterializer {
         bytes: providerEvent.bytes,
         mediaType: boundedMediaType(providerEvent.mediaType),
       })
-      return [{
-        type: 'artifact',
-        artifactId: artifact.id,
-        kind: artifact.kind,
-        title: artifact.title,
-        mediaType: artifact.mediaType ?? undefined,
-        byteSize: artifact.byteSize ?? undefined,
-      }]
+      return [
+        {
+          type: 'artifact',
+          artifactId: artifact.id,
+          kind: artifact.kind,
+          title: artifact.title,
+          mediaType: artifact.mediaType ?? undefined,
+          byteSize: artifact.byteSize ?? undefined,
+        },
+      ]
     }
     // The subject and the parked-request handles stay in the driver's event; only the request is kept.
     const event = boundProviderEvent(
-      providerEvent.type === 'permission_request' || providerEvent.type === 'input_request' ? providerEvent.request : providerEvent,
+      providerEvent.type === 'permission_request' || providerEvent.type === 'input_request'
+        ? providerEvent.request
+        : providerEvent,
       this.secretValues,
     )
     if (event.type === 'tool') {
@@ -76,24 +81,28 @@ export class ProviderEventMaterializer {
         this.#toolOutputBytes.set(key, used + bytes)
         if (used >= MAX_INLINE_TOOL_BYTES) return []
         if (used + bytes > MAX_INLINE_TOOL_BYTES) {
-          return [{
-            ...event,
-            tool: {
-              ...event.tool,
-              output: Buffer.from(event.tool.output)
-                .subarray(0, MAX_INLINE_TOOL_BYTES - used)
-                .toString('utf8'),
+          return [
+            {
+              ...event,
+              tool: {
+                ...event.tool,
+                output: Buffer.from(event.tool.output)
+                  .subarray(0, MAX_INLINE_TOOL_BYTES - used)
+                  .toString('utf8'),
+              },
             },
-          }]
+          ]
         }
         return [event]
       }
       this.#toolOutputBytes.delete(key)
       const oversizedField = [
-        event.tool.output != null ? ['output', event.tool.output] as const : null,
-        event.tool.input != null ? ['input', event.tool.input] as const : null,
-      ].find((item): item is readonly ['output' | 'input', string] =>
-        item != null && Buffer.byteLength(item[1], 'utf8') > MAX_INLINE_TOOL_BYTES)
+        event.tool.output != null ? (['output', event.tool.output] as const) : null,
+        event.tool.input != null ? (['input', event.tool.input] as const) : null,
+      ].find(
+        (item): item is readonly ['output' | 'input', string] =>
+          item != null && Buffer.byteLength(item[1], 'utf8') > MAX_INLINE_TOOL_BYTES,
+      )
       if (!oversizedField) return [event]
       const [field, text] = oversizedField
       const artifact = await this.artifacts.putText({
@@ -122,8 +131,7 @@ export class ProviderEventMaterializer {
         },
       ]
     }
-    if (event.type === 'file_change' && event.patch
-      && Buffer.byteLength(event.patch, 'utf8') > MAX_INLINE_TOOL_BYTES) {
+    if (event.type === 'file_change' && event.patch && Buffer.byteLength(event.patch, 'utf8') > MAX_INLINE_TOOL_BYTES) {
       const artifact = await this.artifacts.putText({
         sessionId,
         turnId,
@@ -134,7 +142,12 @@ export class ProviderEventMaterializer {
         metadata: { path: event.path },
       })
       return [
-        { ...event, patch: undefined, patchArtifactId: artifact.id, summary: event.summary ?? 'Large patch stored as an artifact.' },
+        {
+          ...event,
+          patch: undefined,
+          patchArtifactId: artifact.id,
+          summary: event.summary ?? 'Large patch stored as an artifact.',
+        },
         {
           type: 'artifact',
           artifactId: artifact.id,

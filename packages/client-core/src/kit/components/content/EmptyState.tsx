@@ -27,12 +27,25 @@ export function EmptyState(props: {
       data-size={props.size ?? 'md'}
       data-busy={props.busy ? '' : undefined}
     >
-      <Show when={props.busy} fallback={<Show when={icon()}><span class="ui-empty-icon">{icon()}</span></Show>}>
+      <Show
+        when={props.busy}
+        fallback={
+          <Show when={icon()}>
+            <span class="ui-empty-icon">{icon()}</span>
+          </Show>
+        }
+      >
         <Spinner size="md" />
       </Show>
-      <Show when={props.title}><p class="ui-empty-title">{props.title}</p></Show>
-      <Show when={text()}><p class="ui-empty-text">{text()}</p></Show>
-      <Show when={action()}><span class="ui-empty-action">{action()}</span></Show>
+      <Show when={props.title}>
+        <p class="ui-empty-title">{props.title}</p>
+      </Show>
+      <Show when={text()}>
+        <p class="ui-empty-text">{text()}</p>
+      </Show>
+      <Show when={action()}>
+        <span class="ui-empty-action">{action()}</span>
+      </Show>
     </div>
   )
 }

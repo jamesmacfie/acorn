@@ -43,7 +43,13 @@ export default function PluginWebview(props: PluginWebviewProps) {
     placed = next
     native.setBounds(key(), rect)
   }
-  const acceptState = (state: { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => {
+  const acceptState = (state: {
+    key: string
+    url: string
+    loading: boolean
+    canGoBack: boolean
+    canGoForward: boolean
+  }) => {
     if (state.key !== key()) return
     const previousUrl = url()
     setUrl(state.url)
@@ -58,7 +64,10 @@ export default function PluginWebview(props: PluginWebviewProps) {
     const stopPage = observeNativePage(host, (rect, covered) => {
       setSuppressed(covered)
       const next = elementRectKey(rect)
-      if (next !== placed) { placed = next; native.setBounds(key(), rect) }
+      if (next !== placed) {
+        placed = next
+        native.setBounds(key(), rect)
+      }
     })
     const offEvent = native.onEvent(acceptState)
     const offBlocked = native.onBlocked((state) => {
@@ -98,18 +107,21 @@ export default function PluginWebview(props: PluginWebviewProps) {
     setFailed(false)
     if (covered) native.hide(nextKey)
     else syncRect()
-    void native.ensure(nextKey, homeUrl, props.surface.hosts ?? []).then((ready) => {
-      if (ensured.aborted) return
-      if (!ready) {
-        setFailed(true)
-        return
-      }
-      placed = ''
-      syncRect()
-      if (!suppressed()) native.show(nextKey)
-    }).catch(() => {
-      if (!ensured.aborted) setFailed(true)
-    })
+    void native
+      .ensure(nextKey, homeUrl, props.surface.hosts ?? [])
+      .then((ready) => {
+        if (ensured.aborted) return
+        if (!ready) {
+          setFailed(true)
+          return
+        }
+        placed = ''
+        syncRect()
+        if (!suppressed()) native.show(nextKey)
+      })
+      .catch(() => {
+        if (!ensured.aborted) setFailed(true)
+      })
   })
 
   const controller = {
@@ -118,12 +130,13 @@ export default function PluginWebview(props: PluginWebviewProps) {
     subscribe(listener: (channel: 'webview:navigated' | 'webview:blocked', payload: unknown) => void): () => void {
       if (!native) return () => undefined
       const offEvent = native.onEvent((state) => {
-        if (state.key === key()) listener('webview:navigated', {
-          url: state.url,
-          loading: state.loading,
-          canGoBack: state.canGoBack,
-          canGoForward: state.canGoForward,
-        })
+        if (state.key === key())
+          listener('webview:navigated', {
+            url: state.url,
+            loading: state.loading,
+            canGoBack: state.canGoBack,
+            canGoForward: state.canGoForward,
+          })
       })
       const offBlocked = native.onBlocked((state) => {
         if (state.key === key()) listener('webview:blocked', { url: state.url, host: state.host })
@@ -138,23 +151,45 @@ export default function PluginWebview(props: PluginWebviewProps) {
   return (
     <section class="pane workspace-preview plugin-webview" style={{ 'grid-column': '1 / 3' }}>
       <div class="preview-chrome plugin-webview-chrome">
-        <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => void native?.command(key(), 'back')}>‹</Button>
-        <Button variant="bare" title="Forward" disabled={!canForward()} onPress={() => void native?.command(key(), 'forward')}>›</Button>
-        <Button variant="bare" title="Reload" onPress={() => void native?.command(key(), 'reload')}>↻</Button>
-        <span class="plugin-webview-hostname" title={url() || home() || ''}>{displayHost(url() || home() || '') || 'No page loaded'}</span>
-        <Show when={blocked()}><Alert tone="warn">Blocked navigation to {blocked()}</Alert></Show>
-        <Show when={failed()}><Alert tone="warn">Could not open the plugin page.</Alert></Show>
+        <Button variant="bare" title="Back" disabled={!canBack()} onPress={() => void native?.command(key(), 'back')}>
+          ‹
+        </Button>
+        <Button
+          variant="bare"
+          title="Forward"
+          disabled={!canForward()}
+          onPress={() => void native?.command(key(), 'forward')}
+        >
+          ›
+        </Button>
+        <Button variant="bare" title="Reload" onPress={() => void native?.command(key(), 'reload')}>
+          ↻
+        </Button>
+        <span class="plugin-webview-hostname" title={url() || home() || ''}>
+          {displayHost(url() || home() || '') || 'No page loaded'}
+        </span>
+        <Show when={blocked()}>
+          <Alert tone="warn">Blocked navigation to {blocked()}</Alert>
+        </Show>
+        <Show when={failed()}>
+          <Alert tone="warn">Could not open the plugin page.</Alert>
+        </Show>
         {/* Was a literal ◐ glyph with no accessible name. */}
-        <Show when={loading()}><Spinner label="Loading page" /></Show>
+        <Show when={loading()}>
+          <Spinner label="Loading page" />
+        </Show>
       </div>
-      <Show when={native} fallback={
-        <EmptyState>Plugin web pages need the desktop app.</EmptyState>
-      }>
-        <Show when={!home.loading && home()} fallback={
-          <EmptyState>
-            {home.error ? 'The plugin could not resolve its page URL.' : 'No web page is available yet.'}
-          </EmptyState>
-        }><></></Show>
+      <Show when={native} fallback={<EmptyState>Plugin web pages need the desktop app.</EmptyState>}>
+        <Show
+          when={!home.loading && home()}
+          fallback={
+            <EmptyState>
+              {home.error ? 'The plugin could not resolve its page URL.' : 'No web page is available yet.'}
+            </EmptyState>
+          }
+        >
+          <></>
+        </Show>
       </Show>
       <div class="workspace-preview-host" ref={host} />
       <PluginFrame binding={props.binding} hash={props.hash} controllerOnly webview={controller} />

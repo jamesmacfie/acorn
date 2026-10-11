@@ -49,10 +49,12 @@ export function markPageChange(owner: string, attrs: TelemetryAttrs): void {
   const render = startRenderTransition(owner, 'navigation', attrs)
   const change = { span, render, attrs: { seam: 'nav.change', ...attrs } }
   open = change
-  nextFrame(() => nextFrame(() => {
-    open = null
-    change.span.end('ok', change.attrs)
-  }))
+  nextFrame(() =>
+    nextFrame(() => {
+      open = null
+      change.span.end('ok', change.attrs)
+    }),
+  )
 }
 
 /** Test seam: forget a change that is still waiting for its second frame. */

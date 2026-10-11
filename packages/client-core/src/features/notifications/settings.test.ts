@@ -18,7 +18,9 @@ describe('parseNotificationSettings', () => {
 
   it('turns off only what the blob says false', () => {
     expect(parseNotificationSettings('{"sound":false,"events":{"finished":false}}')).toEqual({
-      sound: false, system: true, badge: true,
+      sound: false,
+      system: true,
+      badge: true,
       events: { blocked: true, finished: false, error: true },
     })
   })

@@ -75,7 +75,12 @@ export type CachedItemCodec<TSummary = unknown, TDetail = unknown, TPublic = unk
     summary: TSummary,
     fetchedAt: number,
   ): CachedExternalItem<TSummary, TDetail>
-  withDetail(ref: ExternalRef, summary: TSummary, detail: TDetail, fetchedAt: number): CachedExternalItem<TSummary, TDetail>
+  withDetail(
+    ref: ExternalRef,
+    summary: TSummary,
+    detail: TDetail,
+    fetchedAt: number,
+  ): CachedExternalItem<TSummary, TDetail>
   toPublic(item: CachedExternalItem<TSummary, TDetail>): TPublic
   summary(item: CachedExternalItem<TSummary, TDetail>): TSummary
 }
@@ -267,7 +272,9 @@ export class ProviderOperationError extends Error {
 export const isProviderOperationError = (error: unknown): error is ProviderOperationError => {
   if (!(error instanceof Error)) return false
   const failure = error as Partial<ProviderOperationError>
-  return typeof failure.status === 'number'
-    && typeof failure.code === 'string'
-    && (PROVIDER_ERROR_CODES as readonly string[]).includes(failure.code)
+  return (
+    typeof failure.status === 'number' &&
+    typeof failure.code === 'string' &&
+    (PROVIDER_ERROR_CODES as readonly string[]).includes(failure.code)
+  )
 }

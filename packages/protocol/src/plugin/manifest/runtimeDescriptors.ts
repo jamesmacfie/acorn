@@ -45,7 +45,11 @@ export const taskCheckDescriptor = z.object({
 // it did not declare.
 export const auditActionDescriptor = z.object({
   // Dots, not colons: the colon is the host's separator. `run.finished`, not `workflows:run.finished`.
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9.-]*$/, 'audit action id must be lower-case alphanumeric with dots and dashes'),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9.-]*$/, 'audit action id must be lower-case alphanumeric with dots and dashes'),
   // What the settings row calls it. The raw verb is honest but unreadable, and a plugin knows its own
   // wording better than a lookup table in the shell does.
   label: z.string().min(1).max(80),
@@ -59,10 +63,11 @@ export const auditActionDescriptor = z.object({
 
 // A variable name, or a `PREFIX_*` glob. A bare `*` is refused here and in `brokerEnv`: it would copy
 // the node's whole environment into the agent and defeat the allowlist.
-const envName = z.string().min(1).max(64).regex(
-  /^[A-Za-z_][A-Za-z0-9_]*\*?$/,
-  'env passthrough must be a variable name or a PREFIX_* glob',
-)
+const envName = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*\*?$/, 'env passthrough must be a variable name or a PREFIX_* glob')
 
 // Exactly one of `command` and `entry`, checked in node-core/server/plugins/manifest.ts because a
 // refinement here cannot name the field path inside the containing descriptor.
@@ -76,10 +81,16 @@ const harnessSpawn = z.object({
   args: z.array(z.string().min(1).max(256)).max(16).default([]),
   // `entry` only: the CLI the adapter drives. Its resolved absolute path reaches the child as the named
   // variable.
-  requires: z.object({
-    command: z.string().min(1).max(128),
-    env: z.string().min(1).max(64).regex(/^[A-Z][A-Z0-9_]*$/, 'env must be an upper-case variable name'),
-  }).optional(),
+  requires: z
+    .object({
+      command: z.string().min(1).max(128),
+      env: z
+        .string()
+        .min(1)
+        .max(64)
+        .regex(/^[A-Z][A-Z0-9_]*$/, 'env must be an upper-case variable name'),
+    })
+    .optional(),
 })
 
 // What ACP does not carry, declared per harness rather than hardcoded as an id list inside acorn.
@@ -155,10 +166,12 @@ export const harnessDescriptor = z.object({
   // Routes on this plugin's own node half, confined to its own namespace at parse time. `usage` answers
   // the plan-usage snapshot for the Agent pane, `auth` whether the harness's account is signed in.
   // Absent means the matching surface shows less.
-  probes: z.object({
-    usage: pluginRoute.optional(),
-    auth: pluginRoute.optional(),
-  }).optional(),
+  probes: z
+    .object({
+      usage: pluginRoute.optional(),
+      auth: pluginRoute.optional(),
+    })
+    .optional(),
   terminal: harnessTerminal.optional(),
   // One contained text turn. Independent of `terminal`: a harness may offer both, either, or neither.
   oneShot: harnessOneShot.optional(),
@@ -171,7 +184,11 @@ export const harnessDescriptor = z.object({
 // because the rules are about bytes a parser of this file never sees.
 export const skillDescriptor = z.object({
   // Namespaced by the host into `<pluginId>:<id>`, the name the agent and the settings page see.
-  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'skill id must be lower-case letters, digits and dashes'),
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[a-z0-9][a-z0-9-]*$/, 'skill id must be lower-case letters, digits and dashes'),
   // The skill's folder, inside the package. Its `SKILL.md` and supporting files stay under it.
   path: entry,
 })

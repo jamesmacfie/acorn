@@ -71,12 +71,15 @@ const NAMED: Readonly<Record<string, string>> = {
  *  (./input/parser.ts § A key name is lower case). The character itself goes in `sequence`, which is
  *  what a field types: with the case in the modifier there is nowhere else for a capital to live, and
  *  `space` as a name is a word rather than a character (./kit/field.ts § typedBy). */
-export function pressedKey(key: string, modifiers: {
-  shift?: boolean
-  ctrl?: boolean
-  meta?: boolean
-  super?: boolean
-} = {}): KeyEvent {
+export function pressedKey(
+  key: string,
+  modifiers: {
+    shift?: boolean
+    ctrl?: boolean
+    meta?: boolean
+    super?: boolean
+  } = {},
+): KeyEvent {
   const named = NAMED[key]
   // A named key types nothing at all, which is the same thing our parser says by leaving `text`
   // empty: what a Return does inside a field is the edit model's decision from the name, not a
@@ -87,12 +90,16 @@ export function pressedKey(key: string, modifiers: {
   return keyEvent(key.toLowerCase(), upper ? { ...modifiers, shift: true } : modifiers, key)
 }
 
-export const keyEvent = (name: string, modifiers: {
-  shift?: boolean
-  ctrl?: boolean
-  meta?: boolean
-  super?: boolean
-} = {}, typed?: string): KeyEvent => {
+export const keyEvent = (
+  name: string,
+  modifiers: {
+    shift?: boolean
+    ctrl?: boolean
+    meta?: boolean
+    super?: boolean
+  } = {},
+  typed?: string,
+): KeyEvent => {
   const event: KeyEvent = {
     name,
     ctrl: modifiers.ctrl ?? false,
@@ -110,8 +117,12 @@ export const keyEvent = (name: string, modifiers: {
     source: 'raw',
     defaultPrevented: false,
     propagationStopped: false,
-    preventDefault: () => { event.defaultPrevented = true },
-    stopPropagation: () => { event.propagationStopped = true },
+    preventDefault: () => {
+      event.defaultPrevented = true
+    },
+    stopPropagation: () => {
+      event.propagationStopped = true
+    },
   }
   return event
 }
@@ -129,12 +140,16 @@ export const keyEvent = (name: string, modifiers: {
  * (./kit/field.ts § typedBy, ./kit/ptyKeys.ts).
  */
 export function keyPressed(key: ParsedKey): KeyEvent {
-  const event = keyEvent(key.name, {
-    ctrl: key.ctrl,
-    meta: key.alt,
-    shift: key.shift,
-    super: key.super,
-  }, key.text)
+  const event = keyEvent(
+    key.name,
+    {
+      ctrl: key.ctrl,
+      meta: key.alt,
+      shift: key.shift,
+      super: key.super,
+    },
+    key.text,
+  )
   event.eventType = key.action
   return event
 }

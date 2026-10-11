@@ -10,13 +10,20 @@ describe('provider HTML host', () => {
     const host = document.createElement('div')
     document.body.append(host)
     const onText = vi.fn()
-    cleanups.push(render(() => (
-      <ProviderHtml
-        html={'<p onclick="run()">ABC-123 <a href="javascript:run()">bad</a> <a href="https://example.test/ABC-456">ABC-456</a><img src="https://attacker.test/pixel"></p>'}
-        refs={new Map([['ABC', 'linear']])}
-        onText={onText}
-      />
-    ), host))
+    cleanups.push(
+      render(
+        () => (
+          <ProviderHtml
+            html={
+              '<p onclick="run()">ABC-123 <a href="javascript:run()">bad</a> <a href="https://example.test/ABC-456">ABC-456</a><img src="https://attacker.test/pixel"></p>'
+            }
+            refs={new Map([['ABC', 'linear']])}
+            onText={onText}
+          />
+        ),
+        host,
+      ),
+    )
     cleanups.push(() => host.remove())
 
     const root = host.querySelector('.ui-markdown')

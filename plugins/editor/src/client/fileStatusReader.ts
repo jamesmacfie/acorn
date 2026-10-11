@@ -17,23 +17,33 @@ export function createFileStatusReader(api: Pick<EditorApi, 'fileStatus'>, taskI
   const refresh = () => {
     if (stopped) return
     const signal = latest.next()
-    if (running) { pending = true; return }
+    if (running) {
+      pending = true
+      return
+    }
     running = true
-    void api.fileStatus(taskId).then((next) => {
-      if (!stopped && isCurrent() && !signal.aborted) {
-        setSnapshot(next.kind === 'ready' ? next : null)
-        setStale(false)
-      }
-    }).catch((cause: unknown) => {
-      if (stopped || !isCurrent() || signal.aborted) return
-      if (typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 404) {
-        setSnapshot(null)
-        setStale(false)
-      } else setStale(true)
-    }).finally(() => {
-      running = false
-      if (pending && !stopped) { pending = false; refresh() }
-    })
+    void api
+      .fileStatus(taskId)
+      .then((next) => {
+        if (!stopped && isCurrent() && !signal.aborted) {
+          setSnapshot(next.kind === 'ready' ? next : null)
+          setStale(false)
+        }
+      })
+      .catch((cause: unknown) => {
+        if (stopped || !isCurrent() || signal.aborted) return
+        if (typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 404) {
+          setSnapshot(null)
+          setStale(false)
+        } else setStale(true)
+      })
+      .finally(() => {
+        running = false
+        if (pending && !stopped) {
+          pending = false
+          refresh()
+        }
+      })
   }
   return {
     projection,
@@ -46,6 +56,10 @@ export function createFileStatusReader(api: Pick<EditorApi, 'fileStatus'>, taskI
       setStale(false)
       refresh()
     },
-    stop: () => { stopped = true; latest.abort(); pending = false },
+    stop: () => {
+      stopped = true
+      latest.abort()
+      pending = false
+    },
   }
 }

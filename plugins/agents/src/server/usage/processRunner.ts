@@ -93,10 +93,12 @@ export function resolveUsageCommand(command: string, env: NodeJS.ProcessEnv = pr
 }
 
 function hasMeaningfulOutput(chunk: string): boolean {
-  return chunk
-    .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')
-    .replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
-    .trim().length > 0
+  return (
+    chunk
+      .replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g, '')
+      .replace(/\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
+      .trim().length > 0
+  )
 }
 
 function matches(pattern: RegExp, text: string): boolean {
@@ -154,7 +156,12 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
         env,
       })
     } catch (error) {
-      reject(new UsageProcessError('execution_failure', error instanceof Error ? error.message : `Failed to start ${options.command}.`))
+      reject(
+        new UsageProcessError(
+          'execution_failure',
+          error instanceof Error ? error.message : `Failed to start ${options.command}.`,
+        ),
+      )
       return
     }
 
@@ -167,13 +174,18 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
 
     let exitCode: number | null = null
     let exitDisposable: { dispose(): void }
-    const owner = new OwnedProcess(process.pid, (done) => {
-      exitDisposable = process.onExit((event) => {
-        exitCode = event.exitCode
-        done()
-        finish(exitCode)
-      })
-    }, (signal) => process.kill(signal), killEscalationMs)
+    const owner = new OwnedProcess(
+      process.pid,
+      (done) => {
+        exitDisposable = process.onExit((event) => {
+          exitCode = event.exitCode
+          done()
+          finish(exitCode)
+        })
+      },
+      (signal) => process.kill(signal),
+      killEscalationMs,
+    )
 
     const cleanup = () => {
       clearTimeout(timeoutTimer)
@@ -191,24 +203,45 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
         // observer through escalation, including when the parent exits before a group member.
         await owner.stop(undefined, 'SIGHUP')
         if (error) throw error
-        const output = await renderTerminalCapture(raw, { cols, rows, scrollback: options.scrollback }).catch((error: unknown) => {
-          throw new UsageProcessError('parse_failure', error instanceof Error ? error.message : 'Could not render terminal output.')
-        })
+        const output = await renderTerminalCapture(raw, { cols, rows, scrollback: options.scrollback }).catch(
+          (error: unknown) => {
+            throw new UsageProcessError(
+              'parse_failure',
+              error instanceof Error ? error.message : 'Could not render terminal output.',
+            )
+          },
+        )
         resolve({ output, exitCode: code })
       } catch (failure) {
-        reject(failure instanceof UsageProcessError ? failure : new UsageProcessError(
-          'execution_failure', failure instanceof Error ? failure.message : 'Could not retire usage process.',
-        ))
+        reject(
+          failure instanceof UsageProcessError
+            ? failure
+            : new UsageProcessError(
+                'execution_failure',
+                failure instanceof Error ? failure.message : 'Could not retire usage process.',
+              ),
+        )
       } finally {
         exitDisposable.dispose()
       }
     }
-    const fail = (error: UsageProcessError) => { void complete(null, error) }
-    const finish = (code: number | null) => { void complete(code) }
+    const fail = (error: UsageProcessError) => {
+      void complete(null, error)
+    }
+    const finish = (code: number | null) => {
+      void complete(code)
+    }
     const write = (input: string) => {
       if (settled) return
-      try { process.write(input) } catch (error) {
-        fail(new UsageProcessError('execution_failure', error instanceof Error ? error.message : 'Usage process write failed.'))
+      try {
+        process.write(input)
+      } catch (error) {
+        fail(
+          new UsageProcessError(
+            'execution_failure',
+            error instanceof Error ? error.message : 'Usage process write failed.',
+          ),
+        )
       }
     }
 

@@ -31,7 +31,8 @@ export default function ChartView(props: PanelViewProps) {
     observer.observe(svg)
   }
   const plot = createMemo(() =>
-    buildChart(props.rows, props.schema, props.view, props.groupBy ? { groupBy: props.groupBy } : {}, tickFont()))
+    buildChart(props.rows, props.schema, props.view, props.groupBy ? { groupBy: props.groupBy } : {}, tickFont()),
+  )
 
   // Every coordinate comes off the plot's own frame, never a module constant, because the left
   // gutter is as wide as this chart's y axis labels need. `CHART_FRAME` is only the stand-in for
@@ -57,13 +58,20 @@ export default function ChartView(props: PanelViewProps) {
   return (
     <Show
       when={plot()}
-      fallback={(
+      fallback={
         <EmptyState align="start" size="sm" title="Can't chart this source">
           It has no status, category, or date field to chart by.
         </EmptyState>
-      )}
+      }
     >
-      <Show when={props.rows.length} fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}>
+      <Show
+        when={props.rows.length}
+        fallback={
+          <EmptyState align="start" size="sm">
+            Nothing to show.
+          </EmptyState>
+        }
+      >
         <div class="dash-chart-wrap">
           {/* One row above the plot, wrapping rather than truncating. Identity lives in the swatch,
               never in coloured text, so the legend reads the same to someone who cannot tell the
@@ -78,7 +86,7 @@ export default function ChartView(props: PanelViewProps) {
                       <svg class="dash-chart-swatch" viewBox="0 0 12 12" aria-hidden="true">
                         <Show
                           when={plot()?.shape === 'line'}
-                          fallback={(
+                          fallback={
                             <rect
                               class="dash-chart-bar"
                               data-tone={key.tone}
@@ -88,7 +96,7 @@ export default function ChartView(props: PanelViewProps) {
                               width="8"
                               height="8"
                             />
-                          )}
+                          }
                         >
                           <line
                             class="dash-chart-line"

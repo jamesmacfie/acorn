@@ -110,7 +110,10 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
         },
       },
       (res) => {
-        void readBoundedResponse(res, Math.min(options.maxResponseBytes ?? MAX_NODE_RESPONSE_BYTES, MAX_NODE_RESPONSE_BYTES)).then((body) => {
+        void readBoundedResponse(
+          res,
+          Math.min(options.maxResponseBytes ?? MAX_NODE_RESPONSE_BYTES, MAX_NODE_RESPONSE_BYTES),
+        ).then((body) => {
           const headers: Record<string, string> = {}
           for (const [key, value] of Object.entries(res.headers)) {
             if (value === undefined) continue
@@ -118,7 +121,11 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
             // joining rather than dropping keeps it honest.
             headers[key] = Array.isArray(value) ? value.join(', ') : value
           }
-          resolve({ status: res.statusCode ?? 0, headers, body: new Uint8Array(body.buffer, body.byteOffset, body.byteLength) })
+          resolve({
+            status: res.statusCode ?? 0,
+            headers,
+            body: new Uint8Array(body.buffer, body.byteOffset, body.byteLength),
+          })
         }, reject)
       },
     )

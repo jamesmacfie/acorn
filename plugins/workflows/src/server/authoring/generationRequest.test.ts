@@ -19,16 +19,19 @@ const catalog: WorkflowCatalog = {
   ],
   policies: [{ id: 'checks-green', pluginId: null }],
   profiles: [{ id: DEFAULT_PROFILE_ID, label: 'Claude Code', managed: true, structured: true }],
-  workflows: [{
-    ref: { source: 'database', id: 'approved-target' },
-    name: 'Review ticket',
-    inputs: [{ name: 'ticket', required: true }],
-  }],
+  workflows: [
+    {
+      ref: { source: 'database', id: 'approved-target' },
+      name: 'Review ticket',
+      inputs: [{ name: 'ticket', required: true }],
+    },
+  ],
 }
 
 const validation: WorkflowValidationCatalog = {
   ...catalogValidation(catalog),
-  validateStepKind: (kind, step, context) => BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
+  validateStepKind: (kind, step, context) =>
+    BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
 }
 
 const clean: WorkflowDef = {
@@ -49,26 +52,45 @@ const reply = (def: WorkflowDef) => JSON.stringify(def)
 
 const answers = (...texts: string[]) => {
   let call = 0
-  return vi.fn<GenerateWorkflowText>(async () => ({ text: texts[Math.min(call++, texts.length - 1)]!, providerId: 'anthropic', modelId: 'claude' }))
+  return vi.fn<GenerateWorkflowText>(async () => ({
+    text: texts[Math.min(call++, texts.length - 1)]!,
+    providerId: 'anthropic',
+    modelId: 'claude',
+  }))
 }
 
 const run = (generateText: ReturnType<typeof answers>, over: Partial<{ description: string; modelId: string }> = {}) =>
   generateWorkflowRequest({
-    request: { mode: 'overwrite', backendId: 'c1', modelId: 'claude-opus', description: 'two agents and a synthesiser', workspaceId: 'w1', ...over },
+    request: {
+      mode: 'overwrite',
+      backendId: 'c1',
+      modelId: 'claude-opus',
+      description: 'two agents and a synthesiser',
+      workspaceId: 'w1',
+      ...over,
+    },
     catalog,
     validation,
     generateText,
   })
 
-const promptOf = (generateText: ReturnType<typeof answers>, call: number) => generateText.mock.calls[call]![0].input.prompt
-const systemOf = (generateText: ReturnType<typeof answers>, call: number) => generateText.mock.calls[call]![0].input.system
+const promptOf = (generateText: ReturnType<typeof answers>, call: number) =>
+  generateText.mock.calls[call]![0].input.prompt
+const systemOf = (generateText: ReturnType<typeof answers>, call: number) =>
+  generateText.mock.calls[call]![0].input.system
 
 describe('generateWorkflowRequest', () => {
   it('makes one call when the first answer passes the checker', async () => {
     const generateText = answers(reply(clean))
     const result = await run(generateText)
     expect(generateText).toHaveBeenCalledTimes(1)
-    expect(result).toMatchObject({ repaired: false, problems: [], notes: [], providerId: 'anthropic', modelId: 'claude' })
+    expect(result).toMatchObject({
+      repaired: false,
+      problems: [],
+      notes: [],
+      providerId: 'anthropic',
+      modelId: 'claude',
+    })
     expect((result as { def: WorkflowDef }).def).toEqual(clean)
   })
 
@@ -82,20 +104,30 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('asks for an edit with the current graph and restores protected settings in the answer', async () => {
-    const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const current: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Investigate',
       trigger: 'schedule:nightly',
       tools: { maxRisk: 'execute', allow: ['pnpm test'] },
       steps: [{ ...clean.steps[0]!, model: 'private-model', configOptions: { reasoning: 'high' } }, clean.steps[1]!],
     }
-    const changed: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const changed: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Investigate',
       tools: { maxRisk: 'read' },
       steps: [{ ...clean.steps[0]!, prompt: 'Inspect the issue from two angles.' }, clean.steps[1]!],
     }
     const generateText = answers(reply(changed))
     const result = await generateWorkflowRequest({
-      request: { mode: 'edit', backendId: 'c1', description: 'Strengthen the investigation prompt.', workspaceId: 'w1', currentDef: current },
+      request: {
+        mode: 'edit',
+        backendId: 'c1',
+        description: 'Strengthen the investigation prompt.',
+        workspaceId: 'w1',
+        currentDef: current,
+      },
       catalog,
       validation,
       generateText,
@@ -107,7 +139,14 @@ describe('generateWorkflowRequest', () => {
       def: {
         trigger: 'schedule:nightly',
         tools: { maxRisk: 'read', allow: ['pnpm test'] },
-        steps: [{ prompt: 'Inspect the issue from two angles.', model: 'private-model', configOptions: { reasoning: 'high' } }, clean.steps[1]],
+        steps: [
+          {
+            prompt: 'Inspect the issue from two angles.',
+            model: 'private-model',
+            configOptions: { reasoning: 'high' },
+          },
+          clean.steps[1],
+        ],
       },
     })
   })
@@ -156,15 +195,17 @@ describe('generateWorkflowRequest', () => {
     }
     const fixed: WorkflowDef = {
       ...missing,
-      steps: missing.steps.map((step) => step.name === 'review'
-        ? {
-            ...step,
-            childWorkflow: {
-              ref: { source: 'database', id: 'approved-target' },
-              inputs: { ticket: { address: { from: 'input', name: 'ticket', pointer: '' } } },
-            },
-          }
-        : step),
+      steps: missing.steps.map((step) =>
+        step.name === 'review'
+          ? {
+              ...step,
+              childWorkflow: {
+                ref: { source: 'database', id: 'approved-target' },
+                inputs: { ticket: { address: { from: 'input', name: 'ticket', pointer: '' } } },
+              },
+            }
+          : step,
+      ),
     }
     const generateText = answers(reply(missing), reply(fixed))
     const result = await run(generateText)
@@ -178,39 +219,55 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('does not silently restore a changed child target during an AI edit', async () => {
-    const current: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const current: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
       inputs: [{ name: 'ticket', required: true }],
-      steps: [{
-        name: 'review',
-        kind: 'workflow',
-        childWorkflow: {
-          ref: { source: 'database', id: 'approved-target' },
-          inputs: { ticket: { from: 'input', name: 'ticket' } },
+      steps: [
+        {
+          name: 'review',
+          kind: 'workflow',
+          childWorkflow: {
+            ref: { source: 'database', id: 'approved-target' },
+            inputs: { ticket: { from: 'input', name: 'ticket' } },
+          },
         },
-      }],
+      ],
     }
-    const broken: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
+    const broken: WorkflowDef = {
+      baseline: 'acorn-1' as const,
+      formatVersion: 1 as const,
       name: 'Dispatch',
       inputs: current.inputs,
-      steps: [{
-        name: 'review',
-        kind: 'workflow',
-        childWorkflow: { ref: { source: 'database', id: 'invented-target' } },
-      }],
+      steps: [
+        {
+          name: 'review',
+          kind: 'workflow',
+          childWorkflow: { ref: { source: 'database', id: 'invented-target' } },
+        },
+      ],
     }
     const repaired: WorkflowDef = {
       ...broken,
-      steps: [{
-        ...broken.steps[0]!,
-        childWorkflow: {
-          ref: { source: 'database', id: 'another-invented-target' },
-          inputs: { ticket: { from: 'input', name: 'ticket' } },
+      steps: [
+        {
+          ...broken.steps[0]!,
+          childWorkflow: {
+            ref: { source: 'database', id: 'another-invented-target' },
+            inputs: { ticket: { from: 'input', name: 'ticket' } },
+          },
         },
-      }],
+      ],
     }
     const result = await generateWorkflowRequest({
-      request: { mode: 'edit', backendId: 'c1', description: 'Keep the dispatch and fix its binding.', workspaceId: 'w1', currentDef: current },
+      request: {
+        mode: 'edit',
+        backendId: 'c1',
+        description: 'Keep the dispatch and fix its binding.',
+        workspaceId: 'w1',
+        currentDef: current,
+      },
       catalog,
       validation,
       generateText: answers(reply(broken), reply(repaired)),
@@ -221,7 +278,10 @@ describe('generateWorkflowRequest', () => {
 
   it('repairs once, on the same system prompt, carrying the description, the definition, the notes and every problem', async () => {
     // A step kind nothing has, so grounding writes a note and the checker still has the duplicate.
-    const invented: WorkflowDef = { ...duplicated, steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!] }
+    const invented: WorkflowDef = {
+      ...duplicated,
+      steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!],
+    }
     const generateText = answers(reply(invented), reply(clean))
     const result = await run(generateText)
     expect(generateText).toHaveBeenCalledTimes(2)
@@ -259,7 +319,10 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('keeps the first answer when the repair is not JSON, or has no steps', async () => {
-    for (const bad of ['I could not do that.', reply({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Empty', steps: [] })]) {
+    for (const bad of [
+      'I could not do that.',
+      reply({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Empty', steps: [] }),
+    ]) {
       const generateText = answers(reply(duplicated), bad)
       const result = await run(generateText)
       expect(generateText).toHaveBeenCalledTimes(2)
@@ -268,16 +331,25 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('reports only what changed in the answer it kept', async () => {
-    const first: WorkflowDef = { ...duplicated, steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!] }
-    const second: WorkflowDef = { ...duplicated, steps: [duplicated.steps[0]!, { ...duplicated.steps[1]!, policy: 'ships-green' }] }
+    const first: WorkflowDef = {
+      ...duplicated,
+      steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!],
+    }
+    const second: WorkflowDef = {
+      ...duplicated,
+      steps: [duplicated.steps[0]!, { ...duplicated.steps[1]!, policy: 'ships-green' }],
+    }
     const result = await run(answers(reply(first), reply(second)))
     // The invented kind was in the draft that was thrown away, so saying it was dropped would be a
     // note about a definition nobody sees.
     expect((result as { notes: { code: string }[] }).notes.map((note) => note.code)).toEqual(['unknown-policy'])
   })
 
-  it('keeps the first pass\'s notes when the first answer is the one applied', async () => {
-    const first: WorkflowDef = { ...duplicated, steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!] }
+  it("keeps the first pass's notes when the first answer is the one applied", async () => {
+    const first: WorkflowDef = {
+      ...duplicated,
+      steps: [{ ...duplicated.steps[0]!, kind: 'code-review' }, duplicated.steps[1]!],
+    }
     const result = await run(answers(reply(first), 'I could not do that.'))
     expect(result).toMatchObject({ repaired: false })
     expect((result as { notes: { code: string }[] }).notes.map((note) => note.code)).toEqual(['unknown-kind'])
@@ -290,7 +362,9 @@ describe('generateWorkflowRequest', () => {
   })
 
   it('lets a provider failure on the first call through untouched', async () => {
-    const generateText = vi.fn<GenerateWorkflowText>(async () => { throw new ProviderOperationError('provider_needs_auth', 401) })
+    const generateText = vi.fn<GenerateWorkflowText>(async () => {
+      throw new ProviderOperationError('provider_needs_auth', 401)
+    })
     await expect(run(generateText as never)).rejects.toBeInstanceOf(ProviderOperationError)
     expect(generateText).toHaveBeenCalledTimes(1)
   })
@@ -298,7 +372,16 @@ describe('generateWorkflowRequest', () => {
   // The one budget promise this makes to a person waiting on it, so it is a property over every
   // shape of reply rather than one case.
   it('never calls a third time, whatever comes back', async () => {
-    const replies = ['', 'sorry', '{}', '[]', reply({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Empty', steps: [] }), reply(clean), reply(duplicated), `\`\`\`json\n${reply(duplicated)}\n\`\`\``]
+    const replies = [
+      '',
+      'sorry',
+      '{}',
+      '[]',
+      reply({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Empty', steps: [] }),
+      reply(clean),
+      reply(duplicated),
+      `\`\`\`json\n${reply(duplicated)}\n\`\`\``,
+    ]
     for (const first of replies) {
       for (const second of replies) {
         const generateText = answers(first, second)

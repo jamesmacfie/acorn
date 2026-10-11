@@ -61,7 +61,10 @@ const CHANNEL_DESCRIPTIONS = {
   // id and a status, so a plugin granted this learns which of their accounts stopped working and when
   // one is reconnected. That is worth a sentence of its own, because it is more than the other four
   // give away.
-  'connection:changed': { text: 'See which of this node’s connected accounts change status or are removed', icon: 'radio' },
+  'connection:changed': {
+    text: 'See which of this node’s connected accounts change status or are removed',
+    icon: 'radio',
+  },
   // Each sentence names what the payload gives away, since that is what the owner is consenting to.
   'head:changed': { text: 'See when a task’s branch gets a new commit, and which commit', icon: 'radio' },
   'run:changed': { text: 'See when a task’s dev processes start or stop', icon: 'radio' },

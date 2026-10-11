@@ -139,7 +139,9 @@ describe('when a sink is subscribed and the preference is on', () => {
     const sink = await enable()
     for (const value of [1, 2, 3, 4, 100]) recordDuration('core', 'git.status', value)
     flushTelemetry()
-    const metric = sink.records().find((record) => record.kind === 'metric' && record.name === 'git.status') as TelemetryMetric
+    const metric = sink
+      .records()
+      .find((record) => record.kind === 'metric' && record.name === 'git.status') as TelemetryMetric
     expect(metric.type).toBe('histogram')
     expect(metric.value).toEqual({ count: 5, sum: 110, min: 1, max: 100, p50: 3, p95: 100 })
     expect(metric.attrs.owner).toBe('core')
@@ -150,18 +152,26 @@ describe('when a sink is subscribed and the preference is on', () => {
     recordDuration('core', 'git.status', 5)
     recordDuration('github', 'git.status', 50)
     flushTelemetry()
-    const owners = sink.records().filter((record) => record.kind === 'metric').map((record) => record.attrs.owner)
+    const owners = sink
+      .records()
+      .filter((record) => record.kind === 'metric')
+      .map((record) => record.attrs.owner)
     expect(owners.sort()).toEqual(['core', 'github'])
   })
 
   it('times a promise to settlement and still returns what it wrapped', async () => {
     const sink = await enable()
     await expect(measure('core', 'git.status', async () => 'value')).resolves.toBe('value')
-    await expect(measure('core', 'git.fetch', async () => {
-      throw new Error('boom')
-    })).rejects.toThrow('boom')
+    await expect(
+      measure('core', 'git.fetch', async () => {
+        throw new Error('boom')
+      }),
+    ).rejects.toThrow('boom')
     flushTelemetry()
-    const names = sink.records().filter((record) => record.kind === 'metric').map((record) => record.name)
+    const names = sink
+      .records()
+      .filter((record) => record.kind === 'metric')
+      .map((record) => record.name)
     // A rejection is still counted: `finally`, not `then`.
     expect(names.sort()).toEqual(['git.fetch', 'git.status'])
   })
@@ -236,7 +246,14 @@ describe('when a sink is subscribed and the preference is on', () => {
 describe('a second start', () => {
   it('resets the ring and re-reads the preference', async () => {
     const sink = await enable()
-    emitSpan('core', { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), name: 'http.request', start: 1, durationMs: 1, status: 'ok' })
+    emitSpan('core', {
+      traceId: 'a'.repeat(32),
+      spanId: 'b'.repeat(16),
+      name: 'http.request',
+      start: 1,
+      durationMs: 1,
+      status: 'ok',
+    })
     // A boot in a process that already booted: the previous ring is not this node's business.
     startTelemetry({ node: 'node-2', version: '10', readPref: async () => '1' })
     await settle()
@@ -247,7 +264,6 @@ describe('a second start', () => {
     expect(sink.batches.at(-1)).toMatchObject({ node: 'node-2', version: '10' })
   })
 })
-
 
 it('reads revoked consent before handing a buffered window to sinks', async () => {
   let pref = '1'
@@ -266,28 +282,53 @@ it('reads revoked consent before handing a buffered window to sinks', async () =
 
 // Cardinality applies to names as well as labels. Admitted samples retain their exact identity.
 describe('total histogram admission', () => {
-  it.each(['unlabelled', 'labelled', 'mixed'] as const)('bounds %s series and keeps hot admitted aggregates exact', async mode => {
-    const sink = await enable()
-    for (let i = 0; i < 1_000; i++) {
-      recordDuration(mode === 'mixed' ? `owner-${i % 2}` : 'core', `operation-${i}`, 1, mode === 'unlabelled' ? undefined : { phase: `phase-${i}` })
-    }
-    recordDuration(mode === 'mixed' ? 'owner-0' : 'core', 'operation-0', 3, mode === 'unlabelled' ? undefined : { phase: 'phase-0' })
-    flushTelemetry()
-    const rows = sink.records().filter(row => row.kind === 'metric')
-    expect(rows.filter(row => row.type === 'histogram')).toHaveLength(200)
-    expect(rows.find(row => row.name === 'operation-0')?.value).toEqual({ count: 2, sum: 4, min: 1, max: 3, p50: 3, p95: 3 })
-    expect(rows.find(row => row.name === 'telemetry.histogram.refused')?.value).toBe(800)
-    recordDuration('core', 'next-window', 7)
-    flushTelemetry()
-    expect(sink.batches.at(-1)?.records).toHaveLength(1)
-    expect(sink.batches.at(-1)?.records[0]).toMatchObject({ name: 'next-window', unit: 'ms', value: { count: 1, sum: 7 } })
-  })
+  it.each(['unlabelled', 'labelled', 'mixed'] as const)(
+    'bounds %s series and keeps hot admitted aggregates exact',
+    async (mode) => {
+      const sink = await enable()
+      for (let i = 0; i < 1_000; i++) {
+        recordDuration(
+          mode === 'mixed' ? `owner-${i % 2}` : 'core',
+          `operation-${i}`,
+          1,
+          mode === 'unlabelled' ? undefined : { phase: `phase-${i}` },
+        )
+      }
+      recordDuration(
+        mode === 'mixed' ? 'owner-0' : 'core',
+        'operation-0',
+        3,
+        mode === 'unlabelled' ? undefined : { phase: 'phase-0' },
+      )
+      flushTelemetry()
+      const rows = sink.records().filter((row) => row.kind === 'metric')
+      expect(rows.filter((row) => row.type === 'histogram')).toHaveLength(200)
+      expect(rows.find((row) => row.name === 'operation-0')?.value).toEqual({
+        count: 2,
+        sum: 4,
+        min: 1,
+        max: 3,
+        p50: 3,
+        p95: 3,
+      })
+      expect(rows.find((row) => row.name === 'telemetry.histogram.refused')?.value).toBe(800)
+      recordDuration('core', 'next-window', 7)
+      flushTelemetry()
+      expect(sink.batches.at(-1)?.records).toHaveLength(1)
+      expect(sink.batches.at(-1)?.records[0]).toMatchObject({
+        name: 'next-window',
+        unit: 'ms',
+        value: { count: 1, sum: 7 },
+      })
+    },
+  )
 
   it('keeps scalar types and delimiter-containing labels distinct', async () => {
     const sink = await enable()
-    for (const attrs of [{ label: 1 }, { label: '1' }, { 'a=b': 'c' }, { a: 'b=c' }] as TelemetryAttrs[]) recordDuration('core', 'operation', 1, attrs)
+    for (const attrs of [{ label: 1 }, { label: '1' }, { 'a=b': 'c' }, { a: 'b=c' }] as TelemetryAttrs[])
+      recordDuration('core', 'operation', 1, attrs)
     flushTelemetry()
-    expect(sink.records().filter(row => row.kind === 'metric' && row.type === 'histogram')).toHaveLength(4)
+    expect(sink.records().filter((row) => row.kind === 'metric' && row.type === 'histogram')).toHaveLength(4)
   })
 
   it('discards refused samples with their consent window', async () => {
@@ -303,23 +344,38 @@ describe('total histogram admission', () => {
 })
 
 describe('preference read ownership', () => {
-  it.each(['restart', 'stop', 'last sink', 'explicit consent'] as const)('ignores an initial answer after %s', async transition => {
-    let resolve!: (value: string) => void
-    startTelemetry({ node: 'A', version: '1', readPref: () => new Promise(done => { resolve = done }) })
-    const sink = collect()
-    if (transition === 'restart') startTelemetry({ node: 'B', version: '1', readPref: async () => '0' })
-    if (transition === 'stop') stopTelemetry()
-    if (transition === 'last sink') sink.handle.dispose()
-    if (transition === 'explicit consent') setTelemetryPref(false)
-    resolve('1')
-    await settle()
-    expect(telemetryEnabled()).toBe(false)
-    expect(telemetrySummary().enabled).toBe(false)
-  })
+  it.each(['restart', 'stop', 'last sink', 'explicit consent'] as const)(
+    'ignores an initial answer after %s',
+    async (transition) => {
+      let resolve!: (value: string) => void
+      startTelemetry({
+        node: 'A',
+        version: '1',
+        readPref: () =>
+          new Promise((done) => {
+            resolve = done
+          }),
+      })
+      const sink = collect()
+      if (transition === 'restart') startTelemetry({ node: 'B', version: '1', readPref: async () => '0' })
+      if (transition === 'stop') stopTelemetry()
+      if (transition === 'last sink') sink.handle.dispose()
+      if (transition === 'explicit consent') setTelemetryPref(false)
+      resolve('1')
+      await settle()
+      expect(telemetryEnabled()).toBe(false)
+      expect(telemetrySummary().enabled).toBe(false)
+    },
+  )
 
   it('joins overlapping ticks and preserves a surviving sink', async () => {
     let resolve!: (value: string) => void
-    const readPref = vi.fn(() => new Promise<string>(done => { resolve = done }))
+    const readPref = vi.fn(
+      () =>
+        new Promise<string>((done) => {
+          resolve = done
+        }),
+    )
     startTelemetry({ node: 'A', version: '1', readPref })
     const departed = collect()
     const survivor = collect()
@@ -337,7 +393,16 @@ describe('preference read ownership', () => {
   it('ignores a held tick answer after stop', async () => {
     let resolve!: (value: string) => void
     let held = false
-    startTelemetry({ node: 'A', version: '1', readPref: () => held ? new Promise(done => { resolve = done }) : Promise.resolve('1') })
+    startTelemetry({
+      node: 'A',
+      version: '1',
+      readPref: () =>
+        held
+          ? new Promise((done) => {
+              resolve = done
+            })
+          : Promise.resolve('1'),
+    })
     const sink = collect()
     await settle()
     held = true

@@ -32,9 +32,18 @@ describe('the folder picker is a desktop extra, not a feature gate', () => {
     setHost(undefined)
     // In a browser-origin client the running Node roster, rather than a native picker, proves the
     // terminal service exists. Unknown rosters must remain unavailable.
-    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ plugins: [
-      { name: 'terminal', required: false, disabled: false, running: true, state: 'active', active: null },
-    ] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(
+          JSON.stringify({
+            plugins: [
+              { name: 'terminal', required: false, disabled: false, running: true, state: 'active', active: null },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    )
     await refreshNodePlugins()
     expect(canPickFolder()).toBe(false)
     expect(hasHostCapability('desktop')).toBe(false)
@@ -46,7 +55,12 @@ describe('the folder picker is a desktop extra, not a feature gate', () => {
 
   it('routes the picker through the host, not HTTP', async () => {
     let picked = 0
-    setHost({ pick: async () => { picked += 1; return '/repo' } })
+    setHost({
+      pick: async () => {
+        picked += 1
+        return '/repo'
+      },
+    })
     expect(canPickFolder()).toBe(true)
     await expect(pickFolder()).resolves.toBe('/repo')
     expect(picked).toBe(1)

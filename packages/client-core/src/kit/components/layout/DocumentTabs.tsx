@@ -69,11 +69,17 @@ export function DocumentTabs(props: {
   // if the tab is still there; the menu's own dismissal would focus its ⋯ button instead.
   const [menuTab, setMenuTab] = createSignal<string | null>(null)
   let openedByTab: string | null = null
-  const openFromTab = (id: string) => { openedByTab = id; setMenuTab(id) }
+  const openFromTab = (id: string) => {
+    openedByTab = id
+    setMenuTab(id)
+  }
   const menuControl = (id: string) => ({
     open: () => menuTab() === id,
     onOpenChange: (open: boolean) => {
-      if (open) { setMenuTab(id); return }
+      if (open) {
+        setMenuTab(id)
+        return
+      }
       if (menuTab() === id) setMenuTab(null)
       if (openedByTab !== id) return
       openedByTab = null
@@ -84,79 +90,112 @@ export function DocumentTabs(props: {
   return (
     <div class="ui-doctabs" data-level={props.level}>
       <div
-        ref={(element) => { stripRef = element; trackTabOverflow(element) }}
+        ref={(element) => {
+          stripRef = element
+          trackTabOverflow(element)
+        }}
         class="ui-tab-scroll ui-doctabs-strip"
         role="tablist"
         aria-label={props.ariaLabel}
         onKeyDown={(event) => {
-          if (event.key === 'ArrowRight') { event.preventDefault(); move(1) }
-          else if (event.key === 'ArrowLeft') { event.preventDefault(); move(-1) }
-          else if (event.key === 'Delete' && props.onClose) { event.preventDefault(); props.onClose(props.active) }
+          if (event.key === 'ArrowRight') {
+            event.preventDefault()
+            move(1)
+          } else if (event.key === 'ArrowLeft') {
+            event.preventDefault()
+            move(-1)
+          } else if (event.key === 'Delete' && props.onClose) {
+            event.preventDefault()
+            props.onClose(props.active)
+          }
         }}
       >
-        <For each={props.tabs}>{(tab) => (
-          <div
-            class="ui-doctab"
-            data-active={props.active === tab.id ? '' : undefined}
-            data-ephemeral={tab.ephemeral ? '' : undefined}
-          >
-            <button
-              id={`${props.idPrefix}-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              class="ui-doctab-label"
-              aria-label={`${tab.label}${tab.fileStatus ? `, ${tab.fileStatus.label}` : ''}${(tab.marks ?? []).map((mark) => `, ${mark.label}`).join('')}${tab.dirty ? ', Unsaved changes' : ''}`}
-              aria-selected={props.active === tab.id}
-              aria-controls={`${props.idPrefix}-panel-${tab.id}`}
-              tabindex={props.active === tab.id ? 0 : -1}
-              // The browser's tooltip only for a name the strip cut short; anything more is the app's tip.
-              title={tab.title ? undefined : tab.label}
-              data-tip={tab.title}
-              onClick={() => props.onActivate(tab.id)}
-              // A right press would focus the tab and blur the document under it before the menu
-              // could hold its writes, so it doesn't move focus at all.
-              onMouseDown={(event) => { if (event.button === 2 && props.menu) event.preventDefault() }}
-              onContextMenu={props.menu ? (event) => { event.preventDefault(); openFromTab(tab.id) } : undefined}
-              onKeyDown={(event) => {
-                if (!props.menu || event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return
-                event.preventDefault()
-                event.stopPropagation()
-                openFromTab(tab.id)
-              }}
-              onDblClick={() => props.onPromote?.(tab.id)}
-              // Middle-click closes, which is the convention every editor has and none of these had.
-              onAuxClick={(event) => {
-                if (event.button === 1 && props.onClose) {
-                  event.preventDefault()
-                  props.onClose(tab.id)
-                }
-              }}
+        <For each={props.tabs}>
+          {(tab) => (
+            <div
+              class="ui-doctab"
+              data-active={props.active === tab.id ? '' : undefined}
+              data-ephemeral={tab.ephemeral ? '' : undefined}
             >
-              <Show when={tab.status || tab.pending}>
-                <StatusDot tone={tab.status ?? 'ok'} pulse={tab.pending} />
+              <button
+                id={`${props.idPrefix}-tab-${tab.id}`}
+                type="button"
+                role="tab"
+                class="ui-doctab-label"
+                aria-label={`${tab.label}${tab.fileStatus ? `, ${tab.fileStatus.label}` : ''}${(tab.marks ?? []).map((mark) => `, ${mark.label}`).join('')}${tab.dirty ? ', Unsaved changes' : ''}`}
+                aria-selected={props.active === tab.id}
+                aria-controls={`${props.idPrefix}-panel-${tab.id}`}
+                tabindex={props.active === tab.id ? 0 : -1}
+                // The browser's tooltip only for a name the strip cut short; anything more is the app's tip.
+                title={tab.title ? undefined : tab.label}
+                data-tip={tab.title}
+                onClick={() => props.onActivate(tab.id)}
+                // A right press would focus the tab and blur the document under it before the menu
+                // could hold its writes, so it doesn't move focus at all.
+                onMouseDown={(event) => {
+                  if (event.button === 2 && props.menu) event.preventDefault()
+                }}
+                onContextMenu={
+                  props.menu
+                    ? (event) => {
+                        event.preventDefault()
+                        openFromTab(tab.id)
+                      }
+                    : undefined
+                }
+                onKeyDown={(event) => {
+                  if (!props.menu || (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey))) return
+                  event.preventDefault()
+                  event.stopPropagation()
+                  openFromTab(tab.id)
+                }}
+                onDblClick={() => props.onPromote?.(tab.id)}
+                // Middle-click closes, which is the convention every editor has and none of these had.
+                onAuxClick={(event) => {
+                  if (event.button === 1 && props.onClose) {
+                    event.preventDefault()
+                    props.onClose(tab.id)
+                  }
+                }}
+              >
+                <Show when={tab.status || tab.pending}>
+                  <StatusDot tone={tab.status ?? 'ok'} pulse={tab.pending} />
+                </Show>
+                <span class="ui-doctab-text" data-file-status-tone={tab.fileStatus?.tone}>
+                  {tab.label}
+                </span>
+                <Show when={tab.fileStatus}>
+                  <span
+                    class="ui-doctab-file-status"
+                    data-tone={tab.fileStatus!.tone}
+                    title={tab.fileStatus!.label}
+                    aria-label={tab.fileStatus!.label}
+                  >
+                    {tab.fileStatus!.letter}
+                  </span>
+                </Show>
+                <For each={tab.marks?.slice(0, MAX_TAB_MARK_GLYPHS)}>
+                  {(mark) => (
+                    <Show when={mark.icon} fallback={<StatusDot tone={mark.tone} />}>
+                      {(name) => <Icon name={name()} tone={mark.tone} />}
+                    </Show>
+                  )}
+                </For>
+                <Show when={tab.dirty}>
+                  <StatusDot tone="accent" label="Unsaved changes" />
+                </Show>
+              </button>
+              <Show when={props.onClose}>
+                <IconButton icon="x" label={`Close ${tab.label}`} onPress={() => props.onClose?.(tab.id)} />
               </Show>
-              <span class="ui-doctab-text" data-file-status-tone={tab.fileStatus?.tone}>{tab.label}</span>
-              <Show when={tab.fileStatus}><span class="ui-doctab-file-status" data-tone={tab.fileStatus!.tone} title={tab.fileStatus!.label}
-                aria-label={tab.fileStatus!.label}>{tab.fileStatus!.letter}</span></Show>
-              <For each={tab.marks?.slice(0, MAX_TAB_MARK_GLYPHS)}>{(mark) => (
-                <Show when={mark.icon} fallback={<StatusDot tone={mark.tone} />}>{(name) => <Icon name={name()} tone={mark.tone} />}</Show>
-              )}</For>
-              <Show when={tab.dirty}>
-                <StatusDot tone="accent" label="Unsaved changes" />
-              </Show>
-            </button>
-            <Show when={props.onClose}>
-              <IconButton
-                icon="x"
-                label={`Close ${tab.label}`}
-                onPress={() => props.onClose?.(tab.id)}
-              />
-            </Show>
-            <Show when={props.menu}>{props.menu?.(tab.id, menuControl(tab.id))}</Show>
-          </div>
-        )}</For>
+              <Show when={props.menu}>{props.menu?.(tab.id, menuControl(tab.id))}</Show>
+            </div>
+          )}
+        </For>
       </div>
-      <Show when={props.actions}><span class="ui-doctabs-actions">{props.actions}</span></Show>
+      <Show when={props.actions}>
+        <span class="ui-doctabs-actions">{props.actions}</span>
+      </Show>
     </div>
   )
 }

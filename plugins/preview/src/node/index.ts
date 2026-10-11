@@ -13,9 +13,7 @@ export const previewPlugin = (): NodePlugin => {
   return {
     name: 'preview',
     label: 'Preview',
-    emits: [
-      { verb: 'url-changed', description: 'A task’s resolved preview home URL changed' },
-    ],
+    emits: [{ verb: 'url-changed', description: 'A task’s resolved preview home URL changed' }],
     init: (ctx) => {
       urls = createPreviewUrlRuntime(ctx.core, () => ctx.capabilities.get(TERMINAL_RUN_TARGETS), ctx.events.send)
       ctx.capabilities.provide(PREVIEW_RULES, { forTask: (taskId) => previewRulesForTask(ctx.core, taskId) })
@@ -38,7 +36,7 @@ export const previewPlugin = (): NodePlugin => {
           return Response.json(await urls!.forTask(taskId))
         }
         if (match[2] === 'recipe-url' && request.method === 'POST') {
-          const body = await request.json().catch(() => null) as { url?: unknown } | null
+          const body = (await request.json().catch(() => null)) as { url?: unknown } | null
           if (typeof body?.url !== 'string' || !body.url.trim()) {
             return Response.json({ error: 'bad_request' }, { status: 400 })
           }
@@ -47,18 +45,33 @@ export const previewPlugin = (): NodePlugin => {
         }
         return new Response(null, { status: 405 })
       }
-      ctx.routes.fetch(serveUrl, { prefix: '', note: '/tasks/:taskId/url — resolved preview home; /configured — which tasks have one' })
+      ctx.routes.fetch(serveUrl, {
+        prefix: '',
+        note: '/tasks/:taskId/url — resolved preview home; /configured — which tasks have one',
+      })
 
       ctx.events.on('run:changed', (event) => {
         if (typeof event.taskId !== 'string') return
-        void urls?.refresh(event.taskId).catch((error: unknown) => ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`))
+        void urls
+          ?.refresh(event.taskId)
+          .catch((error: unknown) =>
+            ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`),
+          )
       })
       ctx.events.on('tasks:changed', (event) => {
-        void urls?.refreshTasks(typeof event.taskId === 'string' ? event.taskId : null).catch((error: unknown) => ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`))
+        void urls
+          ?.refreshTasks(typeof event.taskId === 'string' ? event.taskId : null)
+          .catch((error: unknown) =>
+            ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`),
+          )
       })
       ctx.events.on('project:changed', (event) => {
         if (typeof event.projectId !== 'string') return
-        void urls?.refreshProject(event.projectId).catch((error: unknown) => ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`))
+        void urls
+          ?.refreshProject(event.projectId)
+          .catch((error: unknown) =>
+            ctx.log.warn(`preview URL refresh failed: ${error instanceof Error ? error.message : String(error)}`),
+          )
       })
     },
     dispose: () => {

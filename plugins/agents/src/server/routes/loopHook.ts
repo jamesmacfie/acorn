@@ -8,7 +8,12 @@ import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { z } from 'zod'
 import { type AppEnv, requireDevice, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
-import { LOOP_HOOK_VERSION, type AgentLoopCoverage, type AgentLoopHookReply, type AgentLoopHookRequest } from '../../contract/loopHook.ts'
+import {
+  LOOP_HOOK_VERSION,
+  type AgentLoopCoverage,
+  type AgentLoopHookReply,
+  type AgentLoopHookRequest,
+} from '../../contract/loopHook.ts'
 
 export type AgentLoopHooksBridge = {
   answer(caller: { taskId: string; sessionId: string }, request: AgentLoopHookRequest): Promise<AgentLoopHookReply>
@@ -39,9 +44,11 @@ export const agentLoopHooks = new Hono<AppEnv>()
     const parsed = requestSchema.safeParse(await c.req.json().catch(() => null))
     // Only a task token bound to one session. A device, the service, or a token with no session has
     // no tool call of its own to answer for.
-    if (!parsed.success || principal?.scope !== 'task' || !principal.taskId || !principal.sessionId) return c.json(NO_DECISION)
+    if (!parsed.success || principal?.scope !== 'task' || !principal.taskId || !principal.sessionId)
+      return c.json(NO_DECISION)
     const caller = { taskId: principal.taskId, sessionId: principal.sessionId }
     return viaBridge(c, AGENT_LOOP_HOOKS, (bridge) => bridge.answer(caller, parsed.data as AgentLoopHookRequest))
   })
   .get('/loop-coverage/:pluginId', requireDevice, (c) =>
-    viaBridge(c, AGENT_LOOP_HOOKS, (bridge) => bridge.coverage(c.req.param('pluginId'))))
+    viaBridge(c, AGENT_LOOP_HOOKS, (bridge) => bridge.coverage(c.req.param('pluginId'))),
+  )

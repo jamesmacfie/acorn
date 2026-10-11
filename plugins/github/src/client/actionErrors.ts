@@ -48,7 +48,7 @@ export function readFailure(cause: unknown): string | undefined {
 }
 
 /** A write wrapped so a failure with no prose says what failed, rather than the route's code. */
-export const sayOnFailure = <T,>(work: Promise<T>, sentence: string): Promise<T> =>
+export const sayOnFailure = <T>(work: Promise<T>, sentence: string): Promise<T> =>
   work.catch((cause: unknown) => {
     const text = message(cause)
     throw new Error(isBare(text, codeOf(cause)) ? sentence : text)

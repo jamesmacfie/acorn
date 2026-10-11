@@ -6,9 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { toast } from '@acorn/client-core/features/notifications'
 import { renderFixture } from '../harness'
 import { focusedRegion } from './regions'
-import {
-  COLLECTION, COMMAND, LIST, OVERLAY_OWN, PANE, PARENT, RECTANGLE, REGION, STOP, TRAP, TYPING,
-} from './tiers'
+import { COLLECTION, COMMAND, LIST, OVERLAY_OWN, PANE, PARENT, RECTANGLE, REGION, STOP, TRAP, TYPING } from './tiers'
 
 // The tier table, as the two things that can actually be checked.
 //
@@ -33,9 +31,9 @@ import {
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 const filesIn = (dir: string): string[] =>
-  readdirSync(dir, { withFileTypes: true }).flatMap((entry) => (
-    entry.isDirectory() ? filesIn(join(dir, entry.name)) : [join(dir, entry.name)]
-  )).filter((file) => /\.tsx?$/.test(file))
+  readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) => (entry.isDirectory() ? filesIn(join(dir, entry.name)) : [join(dir, entry.name)]))
+    .filter((file) => /\.tsx?$/.test(file))
 
 /** A priority as an object field: `{ priority: 40 }`, which is how a layer and an intercept take one. */
 const AS_A_FIELD = /priority:\s*\d/

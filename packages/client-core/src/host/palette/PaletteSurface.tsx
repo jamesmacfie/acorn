@@ -78,7 +78,8 @@ export function PaletteSurface<T>(props: {
     // `sel()` is -1 when nothing in the list is selectable, which is what a search frame showing only
     // its loading line or its error is. Naming `row--1` would point a screen reader at an element that
     // does not exist.
-    const active = props.palette.sel() >= 0 && props.palette.sel() < props.items.length ? rowId(props.palette.sel()) : ''
+    const active =
+      props.palette.sel() >= 0 && props.palette.sel() < props.items.length ? rowId(props.palette.sel()) : ''
     if (active) field.setAttribute('aria-activedescendant', active)
     else field.removeAttribute('aria-activedescendant')
   })
@@ -106,81 +107,96 @@ export function PaletteSurface<T>(props: {
 
   return (
     <Portal>
-    <Show when={props.palette.open()}>
-      <div class="overlay-backdrop" onClick={props.palette.close}>
-        <div
-          class="overlay palette"
-          role="dialog"
-          aria-modal="true"
-          aria-label={props.ariaLabel}
-          aria-busy={props.busy ? 'true' : undefined}
-          onKeyDown={props.palette.onKeyDown}
-          onMouseDown={props.palette.onDialogMouseDown}
-          onClick={(event) => event.stopPropagation()}
-        >
-          <Show when={props.breadcrumb?.length}>
-            <div class="palette-crumbs muted">
-              <Index each={props.breadcrumb}>
-                {(label, index) => {
-                  const action = () => props.crumbAction?.(index)
-                  return (
-                    <>
-                      <Show when={index > 0}><span aria-hidden="true"> › </span></Show>
-                      <Show when={action()} fallback={<span>{label()}</span>}>
-                        {(go) => (
-                          <Button variant="bare" size="sm" onPress={() => { go()(); input()?.focus() }}>{label()}</Button>
-                        )}
-                      </Show>
-                    </>
-                  )
-                }}
-              </Index>
-            </div>
-          </Show>
-          <Input
-            ref={(el) => {
-              setInput(el)
-              props.palette.setInputRef(el)
-            }}
-            kind="bare"
-            placeholder={props.placeholder}
-            value={props.palette.query()}
-            onInput={(value) => props.palette.setQuery(value)}
-          />
-          <Show when={status()}>{status()}</Show>
-          {/* Announced rather than drawn: the row count and the error already have a visible form,
+      <Show when={props.palette.open()}>
+        <div class="overlay-backdrop" onClick={props.palette.close}>
+          <div
+            class="overlay palette"
+            role="dialog"
+            aria-modal="true"
+            aria-label={props.ariaLabel}
+            aria-busy={props.busy ? 'true' : undefined}
+            onKeyDown={props.palette.onKeyDown}
+            onMouseDown={props.palette.onDialogMouseDown}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Show when={props.breadcrumb?.length}>
+              <div class="palette-crumbs muted">
+                <Index each={props.breadcrumb}>
+                  {(label, index) => {
+                    const action = () => props.crumbAction?.(index)
+                    return (
+                      <>
+                        <Show when={index > 0}>
+                          <span aria-hidden="true"> › </span>
+                        </Show>
+                        <Show when={action()} fallback={<span>{label()}</span>}>
+                          {(go) => (
+                            <Button
+                              variant="bare"
+                              size="sm"
+                              onPress={() => {
+                                go()()
+                                input()?.focus()
+                              }}
+                            >
+                              {label()}
+                            </Button>
+                          )}
+                        </Show>
+                      </>
+                    )
+                  }}
+                </Index>
+              </div>
+            </Show>
+            <Input
+              ref={(el) => {
+                setInput(el)
+                props.palette.setInputRef(el)
+              }}
+              kind="bare"
+              placeholder={props.placeholder}
+              value={props.palette.query()}
+              onInput={(value) => props.palette.setQuery(value)}
+            />
+            <Show when={status()}>{status()}</Show>
+            {/* Announced rather than drawn: the row count and the error already have a visible form,
               and a live region is how somebody not looking at the list hears them change. */}
-          <div class="sr-only" role="status" aria-live="polite">{props.announce ?? ''}</div>
-          <ul class="palette-list" id={listId} role="listbox" aria-label={props.ariaLabel}>
-            {/* A cursor change can rebuild the item objects. Keep buttons mounted through hover and click. */}
-            <Index each={props.items} fallback={<li class="palette-empty muted">{props.emptyText}</li>}>
-              {(item, index) => (
-                <li role="presentation">
-                  <button
-                    type="button"
-                    id={rowId(index)}
-                    role="option"
-                    aria-selected={index === props.palette.sel()}
-                    // Not a tab stop: the field keeps focus and names the active row, which is what
-                    // `aria-activedescendant` is for.
-                    tabIndex={-1}
-                    class="palette-row"
-                    classList={{ selected: index === props.palette.sel(), ...props.rowClassList?.(item()) }}
-                    // Hover moves the cursor without touching the query, so mouse and keyboard share one
-                    // selection rather than fighting over two.
-                    onMouseEnter={() => props.palette.setSel(index)}
-                    onClick={() => props.onPick(item(), index)}
-                  >
-                    {props.row(item(), index === props.palette.sel())}
-                  </button>
-                </li>
-              )}
-            </Index>
-          </ul>
-          <Show when={footer()}><div class="palette-foot muted">{footer()}</div></Show>
+            <div class="sr-only" role="status" aria-live="polite">
+              {props.announce ?? ''}
+            </div>
+            <ul class="palette-list" id={listId} role="listbox" aria-label={props.ariaLabel}>
+              {/* A cursor change can rebuild the item objects. Keep buttons mounted through hover and click. */}
+              <Index each={props.items} fallback={<li class="palette-empty muted">{props.emptyText}</li>}>
+                {(item, index) => (
+                  <li role="presentation">
+                    <button
+                      type="button"
+                      id={rowId(index)}
+                      role="option"
+                      aria-selected={index === props.palette.sel()}
+                      // Not a tab stop: the field keeps focus and names the active row, which is what
+                      // `aria-activedescendant` is for.
+                      tabIndex={-1}
+                      class="palette-row"
+                      classList={{ selected: index === props.palette.sel(), ...props.rowClassList?.(item()) }}
+                      // Hover moves the cursor without touching the query, so mouse and keyboard share one
+                      // selection rather than fighting over two.
+                      onMouseEnter={() => props.palette.setSel(index)}
+                      onClick={() => props.onPick(item(), index)}
+                    >
+                      {props.row(item(), index === props.palette.sel())}
+                    </button>
+                  </li>
+                )}
+              </Index>
+            </ul>
+            <Show when={footer()}>
+              <div class="palette-foot muted">{footer()}</div>
+            </Show>
+          </div>
         </div>
-      </div>
-    </Show>
+      </Show>
     </Portal>
   )
 }

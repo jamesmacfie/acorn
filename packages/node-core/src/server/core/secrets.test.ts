@@ -72,9 +72,11 @@ describe('non-disclosure through the failure path', () => {
       }
     }
     const ref = await sealed()
-    const failure = await service.use(ref, 'github', () => {
-      throw new ProviderError(403)
-    }).catch((e: unknown) => e)
+    const failure = await service
+      .use(ref, 'github', () => {
+        throw new ProviderError(403)
+      })
+      .catch((e: unknown) => e)
     expect(failure).toBeInstanceOf(ProviderError)
     expect((failure as ProviderError).status).toBe(403)
     expect((failure as ProviderError).message).not.toContain(TOKEN)
@@ -82,9 +84,11 @@ describe('non-disclosure through the failure path', () => {
 
   it('scrubs a thrown string', async () => {
     const ref = await sealed()
-    const failure = await service.use(ref, 'github', () => {
-      throw `raw ${TOKEN}`
-    }).catch((e: unknown) => e)
+    const failure = await service
+      .use(ref, 'github', () => {
+        throw `raw ${TOKEN}`
+      })
+      .catch((e: unknown) => e)
     expect(String(failure)).not.toContain(TOKEN)
   })
 })

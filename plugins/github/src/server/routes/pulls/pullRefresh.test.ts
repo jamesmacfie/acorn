@@ -40,7 +40,7 @@ const composite: PullComposite = {
   threads: [],
   checks: [],
 }
-const lastPage = <T,>(nodes: T[]) => ({ nodes, pageInfo: { endCursor: null, hasNextPage: false } })
+const lastPage = <T>(nodes: T[]) => ({ nodes, pageInfo: { endCursor: null, hasNextPage: false } })
 const gqlPull = {
   ...scalars,
   labels: lastPage([{ name: 'bug', color: 'ff0000' }]),
@@ -71,11 +71,24 @@ describe('shared pull refresh operations', () => {
     tasks = createTaskService(core.db)
     blobs = new Map()
     const now = Date.now()
-    await core.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await core.db
+      .insert(schema.workspaces)
+      .values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
     await core.db.insert(schema.projects).values({
-      id: 'project-web', name: 'web', path: null, workspaceId: 'workspace-1', sort: 0, hidden: false,
-      vcs: 'git', defaultBranch: 'main', remoteUrl: 'https://github.com/acme/web.git', githubOwner: 'acme', githubName: 'web', githubRepoId: REPO_ID,
-      createdAt: now, updatedAt: now,
+      id: 'project-web',
+      name: 'web',
+      path: null,
+      workspaceId: 'workspace-1',
+      sort: 0,
+      hidden: false,
+      vcs: 'git',
+      defaultBranch: 'main',
+      remoteUrl: 'https://github.com/acme/web.git',
+      githubOwner: 'acme',
+      githubName: 'web',
+      githubRepoId: REPO_ID,
+      createdAt: now,
+      updatedAt: now,
     })
   })
   afterEach(() => {
@@ -131,7 +144,19 @@ describe('shared pull refresh operations', () => {
     })
     const fetcher = vi.fn(async () =>
       json(
-        [{ number: 5, node_id: 'PR_5', state: 'open', draft: false, title: 'Fresh', head: { ref: 'feature' }, base: { ref: 'main' }, user: { login: USER }, updated_at: '2026-07-11T00:00:00Z' }],
+        [
+          {
+            number: 5,
+            node_id: 'PR_5',
+            state: 'open',
+            draft: false,
+            title: 'Fresh',
+            head: { ref: 'feature' },
+            base: { ref: 'main' },
+            user: { login: USER },
+            updated_at: '2026-07-11T00:00:00Z',
+          },
+        ],
         { headers: { etag: '"open-v2"' } },
       ),
     )
@@ -145,7 +170,14 @@ describe('shared pull refresh operations', () => {
     // Flow B, in core's file. This proves the outcome, not that the two writes share a transaction:
     // two SQLite files cannot. The ordering test below covers what replaced that guarantee.
     expect((await core.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task-1')))[0].pullNumber).toBe(5)
-    expect((await plugin.db.select().from(syncState).where(eq(syncState.resource, pullsResource(REPO_ID, 'open'))))[0].etag).toBe('"open-v2"')
+    expect(
+      (
+        await plugin.db
+          .select()
+          .from(syncState)
+          .where(eq(syncState.resource, pullsResource(REPO_ID, 'open')))
+      )[0].etag,
+    ).toBe('"open-v2"')
   })
 
   // `checks-changed` is the verb a consumer alerts on, so it must track the checks rows and not the
@@ -153,7 +185,17 @@ describe('shared pull refresh operations', () => {
   it('reports a checks change only when the mirrored check rows differ', async () => {
     const withCheck = (status: string): PullComposite => ({
       ...composite,
-      checks: [{ __typename: 'CheckRun', id: 'check-ci', name: 'ci', status: 'COMPLETED', conclusion: status, detailsUrl: null, checkSuite: null }],
+      checks: [
+        {
+          __typename: 'CheckRun',
+          id: 'check-ci',
+          name: 'ci',
+          status: 'COMPLETED',
+          conclusion: status,
+          detailsUrl: null,
+          checkSuite: null,
+        },
+      ],
     })
     const prKey = { userId: USER, repoId: REPO_ID, number: 5 }
     expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 1)).toEqual({ checksChanged: true })
@@ -197,13 +239,53 @@ describe('shared pull refresh operations', () => {
   // has one, or from a branch nobody is on.
   it('re-adopting is idempotent and never overwrites a task that already has a PR', async () => {
     await core.db.insert(schema.tasks).values([
-      { id: 'task-adopt', title: 'Adopt me', origin: 'local', projectId: 'project-web', branch: 'feature', status: 'active', createdAt: 1, updatedAt: 1 },
-      { id: 'task-taken', title: 'Already has one', origin: 'local', projectId: 'project-web', branch: 'feature', pullNumber: 99, status: 'active', createdAt: 1, updatedAt: 1 },
-      { id: 'task-other', title: 'Different branch', origin: 'local', projectId: 'project-web', branch: 'other', status: 'active', createdAt: 1, updatedAt: 1 },
+      {
+        id: 'task-adopt',
+        title: 'Adopt me',
+        origin: 'local',
+        projectId: 'project-web',
+        branch: 'feature',
+        status: 'active',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'task-taken',
+        title: 'Already has one',
+        origin: 'local',
+        projectId: 'project-web',
+        branch: 'feature',
+        pullNumber: 99,
+        status: 'active',
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: 'task-other',
+        title: 'Different branch',
+        origin: 'local',
+        projectId: 'project-web',
+        branch: 'other',
+        status: 'active',
+        createdAt: 1,
+        updatedAt: 1,
+      },
     ])
     const fetcher = vi.fn(async () =>
       json(
-        [{ number: 5, node_id: 'PR_5', state: 'open', draft: false, title: 'Fresh', head: { ref: 'feature' }, base: { ref: 'main' }, user: { login: USER }, updated_at: '2026-07-11T00:00:00Z' }],
+        [
+          {
+            number: 5,
+            node_id: 'PR_5',
+            state: 'open',
+            draft: false,
+            title: 'Fresh',
+            head: { ref: 'feature' },
+            base: { ref: 'main' },
+            user: { login: USER },
+            updated_at: '2026-07-11T00:00:00Z',
+          },
+        ],
         { headers: { etag: '"open-v2"' } },
       ),
     )
@@ -218,34 +300,62 @@ describe('shared pull refresh operations', () => {
   })
 
   it('refreshes one PR composite and changed files, including patch blobs', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const url = String(input)
-      if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: gqlPull } } })
-      if (url.includes('/pulls/5/files')) {
-        return json([{ filename: 'src/app.ts', status: 'modified', additions: 2, deletions: 1, sha: 'file-sha', patch: '@@ patch' }])
-      }
-      if (url.endsWith('/pulls/5')) return json({ base: { sha: 'base-sha' }, head: { sha: gqlPull.headRefOid }, updated_at: gqlPull.updatedAt })
-      throw new Error(`Unexpected URL ${url}`)
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input)
+        if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: gqlPull } } })
+        if (url.includes('/pulls/5/files')) {
+          return json([
+            {
+              filename: 'src/app.ts',
+              status: 'modified',
+              additions: 2,
+              deletions: 1,
+              sha: 'file-sha',
+              patch: '@@ patch',
+            },
+          ])
+        }
+        if (url.endsWith('/pulls/5'))
+          return json({ base: { sha: 'base-sha' }, head: { sha: gqlPull.headRefOid }, updated_at: gqlPull.updatedAt })
+        throw new Error(`Unexpected URL ${url}`)
+      }),
+    )
     const store = {
       get: async (blobKey: string) => blobs.get(blobKey) ?? null,
-      put: async (blobKey: string, value: string) => { blobs.set(blobKey, value) },
+      put: async (blobKey: string, value: string) => {
+        blobs.set(blobKey, value)
+      },
     }
 
     expect(await refreshPullWithFiles('token', plugin.db, store, { ...key, number: 5 })).toEqual({ ok: true })
-    expect((await plugin.db.select().from(pullRequests))[0]).toMatchObject({ number: 5, title: 'Fresh title', headRef: 'feature' })
-    expect((await plugin.db.select().from(prFiles))[0]).toMatchObject({ path: 'src/app.ts', sha: 'file-sha', position: 0, patchState: 'available', patchKey: patchDigest('@@ patch') })
+    expect((await plugin.db.select().from(pullRequests))[0]).toMatchObject({
+      number: 5,
+      title: 'Fresh title',
+      headRef: 'feature',
+    })
+    expect((await plugin.db.select().from(prFiles))[0]).toMatchObject({
+      path: 'src/app.ts',
+      sha: 'file-sha',
+      position: 0,
+      patchState: 'available',
+      patchKey: patchDigest('@@ patch'),
+    })
     expect(blobs.get(patchBlobKey(patchDigest('@@ patch')))).toBe('@@ patch')
     const resources = (await plugin.db.select().from(syncState)).map((row) => row.resource)
     expect(resources).toEqual(expect.arrayContaining([prResource(REPO_ID, 5), filesResource(REPO_ID, 5)]))
   })
 
   it('does not write either mirror when the files fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const url = String(input)
-      if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: gqlPull } } })
-      return new Response('unavailable', { status: 500 })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input)
+        if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: gqlPull } } })
+        return new Response('unavailable', { status: 500 })
+      }),
+    )
     const result = await refreshPullWithFiles(
       'token',
       plugin.db,
@@ -258,11 +368,14 @@ describe('shared pull refresh operations', () => {
   })
 
   it('returns not found when GitHub has no such pull request', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
-      const url = String(input)
-      if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: null } } })
-      return json([])
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input)
+        if (url.endsWith('/graphql')) return json({ data: { repository: { pullRequest: null } } })
+        return json([])
+      }),
+    )
     const result = await refreshPullWithFiles(
       'token',
       plugin.db,

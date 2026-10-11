@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { decodeToolCeiling, encodeToolCeiling, intersectToolCeilings, isToolWithinCeiling, narrowsToolCeiling } from './tools'
+import {
+  decodeToolCeiling,
+  encodeToolCeiling,
+  intersectToolCeilings,
+  isToolWithinCeiling,
+  narrowsToolCeiling,
+} from './tools'
 
 describe('workflow tool ceilings', () => {
   it('intersects allowlists and risk tiers without permitting a child to widen its parent', () => {
-    expect(intersectToolCeilings({ allow: ['read', 'write'], maxRisk: 'write' }, { allow: ['write', 'exec'], maxRisk: 'read' })).toEqual({
+    expect(
+      intersectToolCeilings(
+        { allow: ['read', 'write'], maxRisk: 'write' },
+        { allow: ['write', 'exec'], maxRisk: 'read' },
+      ),
+    ).toEqual({
       allow: ['write'],
       maxRisk: 'read',
     })
@@ -19,4 +30,3 @@ describe('workflow tool ceilings', () => {
     expect(decodeToolCeiling('not-base64')).toBeUndefined()
   })
 })
-

@@ -6,5 +6,6 @@ import { readJson, writeJson } from '../../infra/node/apiClient'
 
 export const mcpApi = {
   inspect: (projectId: string) => readJson<ProjectMcpFile[]>(projectMcpRoute(projectId)),
-  createStarter: (projectId: string) => writeJson<{ ok: boolean; reason?: string }>(projectMcpStarterRoute(projectId), { method: 'POST' }),
+  createStarter: (projectId: string) =>
+    writeJson<{ ok: boolean; reason?: string }>(projectMcpStarterRoute(projectId), { method: 'POST' }),
 }

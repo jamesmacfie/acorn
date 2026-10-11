@@ -31,7 +31,12 @@ export async function initCompiledPlugins(): Promise<{ dispose(): Promise<void> 
     }),
     {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
+      core: createCoreServices({
+        secrets: new SecretService('0'.repeat(64)),
+        db: core.db,
+        activeIdentity: memoryIdentityStore(),
+        ...testCoreSeams(),
+      }),
       dataDir,
     },
   )

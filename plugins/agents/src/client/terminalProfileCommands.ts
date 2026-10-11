@@ -5,7 +5,10 @@
 // The shell keeps `task.terminal.toggle` and `task.terminal.new-shell`: a drawer and a plain shell
 // are the terminal's, not any harness's.
 import {
-  activeTaskId, requestTerminalFocusIntent, setTerminalOpen, type CommandContribution,
+  activeTaskId,
+  requestTerminalFocusIntent,
+  setTerminalOpen,
+  type CommandContribution,
 } from '@acorn/plugin-api/client'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 
@@ -32,6 +35,11 @@ const command = (id: string, title: string, hint: string, profileId: string): Co
 })
 
 export const harnessTerminalCommands: readonly CommandContribution[] = [
-  command('task.terminal.new-claude', 'New Claude Code terminal', 'run Claude Code in this task’s folder', 'claude-code'),
+  command(
+    'task.terminal.new-claude',
+    'New Claude Code terminal',
+    'run Claude Code in this task’s folder',
+    'claude-code',
+  ),
   command('task.terminal.new-codex', 'New Codex terminal', 'run Codex in this task’s folder', 'codex'),
 ]

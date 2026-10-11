@@ -31,7 +31,9 @@ const fakeStdin = (): TerminalInput & EventEmitter => {
 
 /** And a stdout that keeps what was written, so the enter and leave sequences can be read back. */
 const fakeStdout = (written: string[]): TerminalOutput => ({
-  write: (text) => { written.push(text) },
+  write: (text) => {
+    written.push(text)
+  },
   columns: 80,
   rows: 24,
 })
@@ -74,9 +76,23 @@ describe('the terminal, wired to the dispatcher', () => {
     let intents = 0
     let presses = 0
     let releases = 0
-    renderer.keyInput.on('keypress', (() => { presses += 1 }) as () => void)
-    renderer.keyInput.on('keyrelease', (() => { releases += 1 }) as () => void)
-    const stop = engine.registerLayer({ bindings: [{ key: 'j', cmd: () => { intents += 1; return true } }] })
+    renderer.keyInput.on('keypress', (() => {
+      presses += 1
+    }) as () => void)
+    renderer.keyInput.on('keyrelease', (() => {
+      releases += 1
+    }) as () => void)
+    const stop = engine.registerLayer({
+      bindings: [
+        {
+          key: 'j',
+          cmd: () => {
+            intents += 1
+            return true
+          },
+        },
+      ],
+    })
     try {
       // A kitty terminal with event reporting on, saying `j` down and then `j` up: the code point,
       // no modifiers, and the event type after the colon (./input/parser.test.ts § reads press,
@@ -100,9 +116,15 @@ describe('the terminal, wired to the dispatcher', () => {
     const { stdin, renderer, close } = wire()
     const pastes: string[] = []
     const focus: string[] = []
-    renderer.keyInput.on('paste', ((event: { text: string }) => { pastes.push(event.text) }) as () => void)
-    renderer.on('focus', (() => { focus.push('in') }) as () => void)
-    renderer.on('blur', (() => { focus.push('out') }) as () => void)
+    renderer.keyInput.on('paste', ((event: { text: string }) => {
+      pastes.push(event.text)
+    }) as () => void)
+    renderer.on('focus', (() => {
+      focus.push('in')
+    }) as () => void)
+    renderer.on('blur', (() => {
+      focus.push('out')
+    }) as () => void)
     try {
       // Bracketed, so a hundred lines are one event rather than a hundred Returns
       // (./input/events.ts § PasteEvent).

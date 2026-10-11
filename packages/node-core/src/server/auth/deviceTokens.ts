@@ -62,7 +62,11 @@ export type DeviceService = {
 // revoked). Shared by the two things that boot a node: the desktop supervisor, which passes the token
 // back from the OS keychain (apps/node/src/composition/runtime.ts), and the standalone entry, which
 // takes it from ACORN_DEVICE_TOKEN. Without the reuse each launch would add a device row.
-export async function resolveDeviceToken(devices: DeviceService, remembered: string | undefined, name: string): Promise<string> {
+export async function resolveDeviceToken(
+  devices: DeviceService,
+  remembered: string | undefined,
+  name: string,
+): Promise<string> {
   if (remembered && (await devices.authenticate(remembered))) return remembered
   const { token } = await devices.issue(name)
   return token
@@ -95,7 +99,9 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
       const id = randomUUID()
       const secret = randomBytes(32).toString('base64url') // 43 chars, unpadded
       const createdAt = now()
-      await db.insert(schema.devices).values({ id, name, secretHash: sha256(secret), createdAt, lastSeenAt: null, revokedAt: null })
+      await db
+        .insert(schema.devices)
+        .values({ id, name, secretHash: sha256(secret), createdAt, lastSeenAt: null, revokedAt: null })
       // The actor is 'system': whoever holds the pairing code is by definition not yet a device, and the
       // bundled local node pairs with no code at all because the client spawned it. The name is the only
       // thing the owner will have to recognise this row by, so it goes in the details.
@@ -153,7 +159,11 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
     },
 
     async revoke(id, actor = { actor: 'system' as const }) {
-      const [row] = await db.select({ id: schema.devices.id, revokedAt: schema.devices.revokedAt }).from(schema.devices).where(eq(schema.devices.id, id)).limit(1)
+      const [row] = await db
+        .select({ id: schema.devices.id, revokedAt: schema.devices.revokedAt })
+        .from(schema.devices)
+        .where(eq(schema.devices.id, id))
+        .limit(1)
       if (!row) return false
       if (row.revokedAt === null) {
         await db.update(schema.devices).set({ revokedAt: now() }).where(eq(schema.devices.id, id))
@@ -176,7 +186,11 @@ export function deviceService(db: AppDatabase, now: () => number = () => Date.no
     },
 
     async isActive(id) {
-      const [row] = await db.select({ revokedAt: schema.devices.revokedAt }).from(schema.devices).where(eq(schema.devices.id, id)).limit(1)
+      const [row] = await db
+        .select({ revokedAt: schema.devices.revokedAt })
+        .from(schema.devices)
+        .where(eq(schema.devices.id, id))
+        .limit(1)
       return Boolean(row) && row.revokedAt === null
     },
   }

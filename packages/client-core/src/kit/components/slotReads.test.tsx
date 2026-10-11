@@ -36,7 +36,11 @@ it('builds a chip’s leading mark once', () => {
 })
 
 it('builds an empty state’s icon, text, and action once', () => {
-  const host = draw(() => <EmptyState icon={<Mark />} action={<Mark />}><Mark /></EmptyState>)
+  const host = draw(() => (
+    <EmptyState icon={<Mark />} action={<Mark />}>
+      <Mark />
+    </EmptyState>
+  ))
   expect(host.querySelectorAll('b')).toHaveLength(3)
   expect(built).toBe(3)
 })
@@ -50,7 +54,9 @@ it('builds no icon while an empty state is busy', () => {
 it('builds a section’s actions and children once', () => {
   const host = draw(() => (
     <>
-      <Section label="Changes" actions={<Mark />}><Mark /></Section>
+      <Section label="Changes" actions={<Mark />}>
+        <Mark />
+      </Section>
       <SectionHeader actions={<Mark />}>Files</SectionHeader>
     </>
   ))

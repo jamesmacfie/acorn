@@ -5,7 +5,9 @@ const key = randomBytes(32)
 export type AgentToolProvenance = { taskId: string; sessionId: string; tool: string; proof: string }
 
 export function issueAgentToolProvenance(taskId: string, sessionId: string, tool: string): string {
-  return createHmac('sha256', key).update(JSON.stringify([taskId, sessionId, tool])).digest('hex')
+  return createHmac('sha256', key)
+    .update(JSON.stringify([taskId, sessionId, tool]))
+    .digest('hex')
 }
 
 export function verifyAgentToolProvenance(input: AgentToolProvenance): boolean {

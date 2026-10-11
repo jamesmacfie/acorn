@@ -46,11 +46,16 @@ export default function BranchesField(props: {
                 label={`Step for ${row()[0]}`}
                 disabled={props.disabled}
                 value={row()[1]}
-                options={[{ value: '', label: 'Not set' }, ...props.targets.map((step) => ({ value: step, label: step }))]}
+                options={[
+                  { value: '', label: 'Not set' },
+                  ...props.targets.map((step) => ({ value: step, label: step })),
+                ]}
                 onChange={(next) => set(row()[0], next)}
               />
               <Show when={!props.disabled}>
-                <Button size="sm" variant="ghost" onPress={() => remove(row()[0])}>Remove</Button>
+                <Button size="sm" variant="ghost" onPress={() => remove(row()[0])}>
+                  Remove
+                </Button>
               </Show>
             </Inline>
           )}
@@ -66,11 +71,15 @@ export default function BranchesField(props: {
               onInput={setVerdict}
               onSubmit={add}
             />
-            <Button size="sm" onPress={add} disabled={!verdict().trim()}><Icon name="plus" /> Add branch</Button>
+            <Button size="sm" onPress={add} disabled={!verdict().trim()}>
+              <Icon name="plus" /> Add branch
+            </Button>
           </Inline>
         </Show>
         <Show when={!props.targets.length}>
-          <Text emphasis="muted" wrap>Add a step after this one to give a branch somewhere to go.</Text>
+          <Text emphasis="muted" wrap>
+            Add a step after this one to give a branch somewhere to go.
+          </Text>
         </Show>
       </Stack>
     </Field>

@@ -4,8 +4,14 @@ import { createCollection } from '../../keys/collection'
 import { bindIntents } from '../../keys/keymapHost'
 import type { Tone } from '../../tokens/tokens'
 import {
-  GRAPH_CARD_H, GRAPH_CARD_W, GRAPH_ZOOM_MAX, GRAPH_ZOOM_MIN, layoutGraph, snapToGrid,
-  type GraphEdgeRef, type GraphPoint,
+  GRAPH_CARD_H,
+  GRAPH_CARD_W,
+  GRAPH_ZOOM_MAX,
+  GRAPH_ZOOM_MIN,
+  layoutGraph,
+  snapToGrid,
+  type GraphEdgeRef,
+  type GraphPoint,
 } from '../../lib/layout/graphLayout'
 
 /* Graph: a picture of a graph — cards on a grid, edges as curves, one card selected.
@@ -84,8 +90,10 @@ export function Graph(props: {
   const cards = createMemo<readonly GraphCard[]>(() => {
     const next = props.nodes.map((node) => {
       const held = cache.get(node.id)
-      const same = held && Object.keys(node).length === Object.keys(held).length
-        && Object.entries(node).every(([field, value]) => (held as Record<string, unknown>)[field] === value)
+      const same =
+        held &&
+        Object.keys(node).length === Object.keys(held).length &&
+        Object.entries(node).every(([field, value]) => (held as Record<string, unknown>)[field] === value)
       if (!same) cache.set(node.id, node)
       return same ? held : node
     })
@@ -96,7 +104,11 @@ export function Graph(props: {
   const layout = createMemo(() => {
     const moving = drag()
     const put = moving ? { ...props.positions, [moving.id]: { x: moving.x, y: moving.y } } : props.positions
-    return layoutGraph(props.nodes.map((node) => node.id), props.edges, put)
+    return layoutGraph(
+      props.nodes.map((node) => node.id),
+      props.edges,
+      put,
+    )
   })
 
   const collection = createCollection({
@@ -122,7 +134,15 @@ export function Graph(props: {
   const count = createMemo(() => props.nodes.length)
   // Edges carry ids, which a screen reader would read out as hashes.
   const labelOf = (id: string): string => props.nodes.find((node) => node.id === id)?.label ?? id
-  createEffect(on(count, () => { if (!held()) fit() }, { defer: true }))
+  createEffect(
+    on(
+      count,
+      () => {
+        if (!held()) fit()
+      },
+      { defer: true },
+    ),
+  )
 
   /** A pointer event in content coordinates. */
   const toContent = (event: PointerEvent): GraphPoint => {
@@ -269,9 +289,7 @@ export function Graph(props: {
           width={Math.max(1, layout().width)}
           height={Math.max(1, layout().height)}
         >
-          <Index each={layout().edges}>
-            {(edge) => <path class="ui-graph-wire" d={edge().path} />}
-          </Index>
+          <Index each={layout().edges}>{(edge) => <path class="ui-graph-wire" d={edge().path} />}</Index>
           <Show when={pending()}>{(path) => <path class="ui-graph-wire" data-pending="" d={path()} />}</Show>
         </svg>
 
@@ -334,10 +352,7 @@ export function Graph(props: {
                   class="ui-graph-port"
                   tabindex="-1"
                   style={{
-                    transform: place(
-                      (card()?.x ?? 0) + GRAPH_CARD_W / 2 - DOT,
-                      (card()?.y ?? 0) + GRAPH_CARD_H - DOT,
-                    ),
+                    transform: place((card()?.x ?? 0) + GRAPH_CARD_W / 2 - DOT, (card()?.y ?? 0) + GRAPH_CARD_H - DOT),
                   }}
                   aria-label={`Draw an edge out of ${node.label}`}
                   onPointerDown={(event) => startWire(node.id, event)}

@@ -17,7 +17,16 @@ const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
 const GH_REPO_RE = /^https?:\/\/github\.com\/([^/?#]+)\/([^/?#]+)\/?(?:[?#].*)?$/i
 // github.com/<name> single-segment paths that are not repos (user/org profiles are one segment and
 // already won't match GH_REPO_RE, but these two-ish reserved roots could look like an owner).
-const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'marketplace', 'explore', 'topics', 'about'])
+const GH_RESERVED = new Set([
+  'orgs',
+  'sponsors',
+  'settings',
+  'notifications',
+  'marketplace',
+  'explore',
+  'topics',
+  'about',
+])
 
 // Registered from client/index.ts through ctx.contribute.
 //
@@ -28,14 +37,25 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
   {
     id: 'github.pull-request',
     providerId: 'github',
-    target: item => { const ref = parsePullRef(item); return ref ? { kind: 'github.pull-request', item, ...ref } : null },
+    target: (item) => {
+      const ref = parsePullRef(item)
+      return ref ? { kind: 'github.pull-request', item, ...ref } : null
+    },
     presentations: ['route', 'refPanel', 'pane', 'external'],
     parse: (href) => {
       const match = GH_PR_RE.exec(href)
       // `item` is what makes the panel reachable (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit).
       // Spelled `owner/repo#number`, the same identity the pull-request source gives its rows, so a row,
       // a URL, and the panel name the same thing.
-      return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3], item: formatPullRef(match[1], match[2], match[3]) } : null
+      return match
+        ? {
+            kind: 'pr',
+            owner: match[1],
+            repo: match[2],
+            number: match[3],
+            item: formatPullRef(match[1], match[2], match[3]),
+          }
+        : null
     },
     path: (target) => {
       const projectId = projectIdFor(target)
@@ -46,7 +66,9 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
     id: 'github.repository',
     parse: (href) => {
       const match = GH_REPO_RE.exec(href)
-      return match && !GH_RESERVED.has(match[1].toLowerCase()) ? { kind: 'repo', owner: match[1], repo: match[2] } : null
+      return match && !GH_RESERVED.has(match[1].toLowerCase())
+        ? { kind: 'repo', owner: match[1], repo: match[2] }
+        : null
     },
     path: (target) => {
       const projectId = projectIdFor(target)
@@ -65,7 +87,8 @@ const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 const eq = (a: unknown, b: unknown): boolean => str(a).toLowerCase() === str(b).toLowerCase()
 
 const projectIdFor = (target: InAppTarget): string | null =>
-  allProjects().find((project) => eq(project.github?.owner, target.owner) && eq(project.github?.name, target.repo))?.id ?? null
+  allProjects().find((project) => eq(project.github?.owner, target.owner) && eq(project.github?.name, target.repo))
+    ?.id ?? null
 
 // A delegated click handler for a PR content container, wrapping the host's
 // `handlePluginContentLinkClick` (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit). A null from
@@ -76,7 +99,15 @@ const projectIdFor = (target: InAppTarget): string | null =>
 // still gets its pane or route.
 export function makeContentLinkHandler(navigate: (to: string) => void, options?: { taskId?: string }) {
   return (e: MouseEvent) => {
-    if (options?.taskId && !e.defaultPrevented && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+    if (
+      options?.taskId &&
+      !e.defaultPrevented &&
+      e.button === 0 &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.shiftKey &&
+      !e.altKey
+    ) {
       const anchor = (e.target as Element | null)?.closest?.('a')
       const href = anchor?.getAttribute('href')
       const target = href ? parseInAppTarget(href) : null

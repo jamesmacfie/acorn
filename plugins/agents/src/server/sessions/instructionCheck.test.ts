@@ -25,9 +25,15 @@ it('finds hidden characters outside real emoji, including payloads after an emoj
 })
 
 it('names the first location and counts the rest', () => {
-  const found = [1, 2, 3].map((line) => ({ file: '.claude/skills/deploy/references/release-notes.md', line, codePoint: 'U+E0041' }))
+  const found = [1, 2, 3].map((line) => ({
+    file: '.claude/skills/deploy/references/release-notes.md',
+    line,
+    codePoint: 'U+E0041',
+  }))
   const reason = hiddenCharacterReason(found)
-  expect(reason).toBe('Hidden character U+E0041 in .claude/skills/deploy/references/release-notes.md line 1, and 2 more. Remove it, or turn off this check in Settings > Security and backup.')
+  expect(reason).toBe(
+    'Hidden character U+E0041 in .claude/skills/deploy/references/release-notes.md line 1, and 2 more. Remove it, or turn off this check in Settings > Security and backup.',
+  )
   expect(reason.length).toBeLessThanOrEqual(200)
 })
 

@@ -34,7 +34,13 @@ export type PluginEventChannel = `plugin:${string}:${string}`
 import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
 import type { ExternalItemStore } from '../integrations/itemStore'
-import type { DataSourceDescription, DataSourceIdentity, DataSourceOptions, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
+import type {
+  DataSourceDescription,
+  DataSourceIdentity,
+  DataSourceOptions,
+  DataSourceQuery,
+  DataSourceResult,
+} from '@acorn/protocol/dataSources.ts'
 
 export type PluginRouteOptions = {
   // Path inside this plugin's namespace: '' for a router owning the whole namespace, '/tasks' for
@@ -70,8 +76,17 @@ export type DataSourceInputHandle = {
   options(request: DataSourceInputOptionsRequest): Promise<DataSourceOptions>
 }
 // The host fills in the source, the bound scope, the mode, and the evaluation time.
-export type DataSourceInputQuery = Partial<Pick<DataSourceQuery, 'predicate' | 'sort' | 'take'>> & { cursor?: string; pageSize?: number }
-export type DataSourceInputOptionsRequest = { target: 'field' | 'parameter'; pointer: string; search?: string; cursor?: string; pageSize?: number }
+export type DataSourceInputQuery = Partial<Pick<DataSourceQuery, 'predicate' | 'sort' | 'take'>> & {
+  cursor?: string
+  pageSize?: number
+}
+export type DataSourceInputOptionsRequest = {
+  target: 'field' | 'parameter'
+  pointer: string
+  search?: string
+  cursor?: string
+  pageSize?: number
+}
 
 export type PluginProviderResourceRequest<TInput> = {
   providerId: string
@@ -285,7 +300,10 @@ export type PluginAuditRegistry = {
   // Fire-and-forget, like core's own writes: an audit row is evidence, and a failed insert must never
   // fail the thing it describes. `details` takes allowlisted scalars decided at the call site — never a
   // request body, a credential, or a file's contents.
-  record(action: string, entry?: { subject?: string | null; details?: Record<string, string | number | boolean | null> }): void
+  record(
+    action: string,
+    entry?: { subject?: string | null; details?: Record<string, string | number | boolean | null> },
+  ): void
 }
 
 export type PluginContextSectionRegistry = {
@@ -420,12 +438,35 @@ export type NodePluginContext = {
   dataSources: {
     register(source: import('@acorn/protocol/dataSources.ts').DataSourceRegistration): void
     discover(discovery: import('@acorn/protocol/dataSources.ts').DataSourceDiscovery): void
-    list(scope: import('@acorn/protocol/dataSources.ts').DataSourceScope, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceCatalog>
-    discoverAvailable(request: import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryRequest, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryPage>
-    invoke<R extends import('@acorn/protocol/dataSources.ts').DataSourceRequest>(request: R, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataSources.ts').DataSourceResponse<R>>
-    resolveQuery(scope: import('@acorn/protocol/dataQueries.ts').QueryScope, reference: import('@acorn/protocol/dataQueries.ts').QueryReference, context: import('@acorn/protocol/dataQueries.ts').QueryBindingContext, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/dataQueries.ts').ResolvedQuery>
-    setQueryConsumer(scope: import('@acorn/protocol/dataQueries.ts').QueryScope, queryId: string, consumer: Omit<import('@acorn/protocol/dataQueries.ts').QueryConsumer, 'pluginId'>, invocation: import('../dataSources/authority').DataSourceInvocation, remove?: boolean): Promise<void>
-    queryPublication(request: import('@acorn/protocol/queryPublication.ts').QueryPublicationRequest, invocation: import('../dataSources/authority').DataSourceInvocation): Promise<import('@acorn/protocol/queryPublication.ts').QueryPublicationResult>
+    list(
+      scope: import('@acorn/protocol/dataSources.ts').DataSourceScope,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataSources.ts').DataSourceCatalog>
+    discoverAvailable(
+      request: import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryRequest,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataSources.ts').DataSourceDiscoveryPage>
+    invoke<R extends import('@acorn/protocol/dataSources.ts').DataSourceRequest>(
+      request: R,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataSources.ts').DataSourceResponse<R>>
+    resolveQuery(
+      scope: import('@acorn/protocol/dataQueries.ts').QueryScope,
+      reference: import('@acorn/protocol/dataQueries.ts').QueryReference,
+      context: import('@acorn/protocol/dataQueries.ts').QueryBindingContext,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/dataQueries.ts').ResolvedQuery>
+    setQueryConsumer(
+      scope: import('@acorn/protocol/dataQueries.ts').QueryScope,
+      queryId: string,
+      consumer: Omit<import('@acorn/protocol/dataQueries.ts').QueryConsumer, 'pluginId'>,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+      remove?: boolean,
+    ): Promise<void>
+    queryPublication(
+      request: import('@acorn/protocol/queryPublication.ts').QueryPublicationRequest,
+      invocation: import('../dataSources/authority').DataSourceInvocation,
+    ): Promise<import('@acorn/protocol/queryPublication.ts').QueryPublicationResult>
   }
   // Both tiers. A loaded plugin declares `taskChecks` in its manifest and the host synthesises the
   // registration through this seam.

@@ -41,9 +41,10 @@ export class RepeatedToolCalls {
     const key = `${tool.kind ?? ''}\0${tool.name ?? ''}\0${tool.input}`
     const stream = tool.subagentId ?? ''
     const previous = calls.streaks.get(stream)
-    const streak = previous?.key === key
-      ? { key, count: previous.count + 1, title: tool.title || previous.title }
-      : { key, count: 1, title: tool.title }
+    const streak =
+      previous?.key === key
+        ? { key, count: previous.count + 1, title: tool.title || previous.title }
+        : { key, count: 1, title: tool.title }
     calls.streaks.set(stream, streak)
     return { count: streak.count, title: streak.title }
   }
@@ -55,7 +56,9 @@ export class RepeatedToolCalls {
 }
 
 // The smallest streak any choice warns at, so a shorter one doesn't read the setting.
-const MIN_WARNING = Math.min(...AGENT_REPEATED_TOOL_CALL_CHOICES.flatMap((choice) => choice.calls ? [choice.calls] : []))
+const MIN_WARNING = Math.min(
+  ...AGENT_REPEATED_TOOL_CALL_CHOICES.flatMap((choice) => (choice.calls ? [choice.calls] : [])),
+)
 
 export type RepeatedToolCallPorts = {
   /** The owner's "Warn when an agent repeats a tool call", where 0 is off. */

@@ -1,7 +1,11 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Slot } from './Slot'
-import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
+import {
+  extensionPointRegistry,
+  extensionRegistry,
+  type ExtensionContribution,
+} from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 
 // A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins/cooperative-extension-points.md §
@@ -14,42 +18,55 @@ import type { Disposable } from '../../kit/lib/state/registry'
 vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 // What the user picked in Settings → Plugins. When the query is created is ./slotChoice.test.tsx's.
 const prefs = vi.hoisted(() => ({ data: {} as Record<string, string> }))
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ get data() { return prefs.data } }) }))
+vi.mock('@tanstack/solid-query', () => ({
+  createQuery: () => ({
+    get data() {
+      return prefs.data
+    },
+  }),
+}))
 vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
 
 // The tree itself is the worker path, tested in TreeHost/workerHost. Here it only has to be
 // identifiable on screen.
 vi.mock('./RemoteTree', () => ({
   RemoteTree: (props: { contribution: { pluginId: string }; scope?: () => { taskId?: string } }) => (
-    <span>tree:{props.contribution.pluginId}{props.scope?.().taskId ? ` in ${props.scope!().taskId}` : ''}</span>
+    <span>
+      tree:{props.contribution.pluginId}
+      {props.scope?.().taskId ? ` in ${props.scope!().taskId}` : ''}
+    </span>
   ),
 }))
 
 const registered: Disposable[] = []
 
 const point = (over: { id?: string; mode?: 'stack' | 'replace'; max?: number; actions?: string[] } = {}) =>
-  registered.push(extensionPointRegistry.register({
-    id: over.id ?? 'agents:attachment',
-    ownerId: 'agents',
-    label: 'Attachment',
-    kind: 'remote',
-    mode: over.mode ?? 'replace',
-    max: over.max ?? 4,
-    ...(over.actions ? { actions: over.actions } : {}),
-  }))
+  registered.push(
+    extensionPointRegistry.register({
+      id: over.id ?? 'agents:attachment',
+      ownerId: 'agents',
+      label: 'Attachment',
+      kind: 'remote',
+      mode: over.mode ?? 'replace',
+      max: over.max ?? 4,
+      ...(over.actions ? { actions: over.actions } : {}),
+    }),
+  )
 
 const contributor = (pluginId: string, pointId: string, matches?: string[]) =>
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:draw`,
-    pluginId,
-    point: pointId,
-    label: `${pluginId} viewer`,
-    order: 500,
-    carrier: 'remote',
-    entry: 'draw',
-    hash: 'abc',
-    ...(matches ? { matches } : {}),
-  } as ExtensionContribution))
+  registered.push(
+    extensionRegistry.register({
+      id: `plugin:${pluginId}:draw`,
+      pluginId,
+      point: pointId,
+      label: `${pluginId} viewer`,
+      order: 500,
+      carrier: 'remote',
+      entry: 'draw',
+      hash: 'abc',
+      ...(matches ? { matches } : {}),
+    } as ExtensionContribution),
+  )
 
 const draw = (element: () => Parameters<typeof render>[0]) => {
   const host = document.createElement('div')
@@ -69,26 +86,50 @@ afterEach(() => {
 
 describe('Slot', () => {
   it('draws the owner’s default when the point is not declared here', () => {
-    expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('default')
+    expect(
+      draw(() => () => (
+        <Slot point="agents:attachment" key="image/png">
+          default
+        </Slot>
+      )),
+    ).toBe('default')
   })
 
   it('draws the owner’s default when nobody matches the key', () => {
     point()
     contributor('images', 'agents:attachment', ['image/*'])
-    expect(draw(() => () => <Slot point="agents:attachment" key="text/csv">default</Slot>)).toBe('default')
+    expect(
+      draw(() => () => (
+        <Slot point="agents:attachment" key="text/csv">
+          default
+        </Slot>
+      )),
+    ).toBe('default')
   })
 
   it('grafts the one contributor that matches', () => {
     point()
     contributor('images', 'agents:attachment', ['image/*'])
-    expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('tree:images')
+    expect(
+      draw(() => () => (
+        <Slot point="agents:attachment" key="image/png">
+          default
+        </Slot>
+      )),
+    ).toBe('tree:images')
   })
 
   it('draws the owner’s default while two contributors are tied and nobody has picked', () => {
     point()
     contributor('images', 'agents:attachment', ['image/*'])
     contributor('thumbs', 'agents:attachment', ['image/png'])
-    expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('default')
+    expect(
+      draw(() => () => (
+        <Slot point="agents:attachment" key="image/png">
+          default
+        </Slot>
+      )),
+    ).toBe('default')
   })
 
   it('draws the contributor the user picked to settle a tie', () => {
@@ -96,7 +137,13 @@ describe('Slot', () => {
     contributor('images', 'agents:attachment', ['image/*'])
     contributor('thumbs', 'agents:attachment', ['image/png'])
     prefs.data = { remote_slots: JSON.stringify({ 'agents:attachment': 'thumbs' }) }
-    expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('tree:thumbs')
+    expect(
+      draw(() => () => (
+        <Slot point="agents:attachment" key="image/png">
+          default
+        </Slot>
+      )),
+    ).toBe('tree:thumbs')
   })
 
   it('stacks up to the owner’s ceiling and discloses the rest as a count', () => {
@@ -117,10 +164,21 @@ describe('Slot', () => {
     // selected in the rail behind them.
     point()
     contributor('images', 'agents:attachment', ['image/png'])
-    expect(draw(() => () => <Slot point="agents:attachment" key="image/png" taskId="t-42">default</Slot>))
-      .toBe('tree:images in t-42')
+    expect(
+      draw(() => () => (
+        <Slot point="agents:attachment" key="image/png" taskId="t-42">
+          default
+        </Slot>
+      )),
+    ).toBe('tree:images in t-42')
     // And an owner with no task to give says so rather than inventing one.
-    expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('tree:images')
+    expect(
+      draw(() => () => (
+        <Slot point="agents:attachment" key="image/png">
+          default
+        </Slot>
+      )),
+    ).toBe('tree:images')
   })
 
   it('resolves a slot in the owner’s default without nesting a contributor', () => {
@@ -132,7 +190,9 @@ describe('Slot', () => {
     contributor('cards', 'agents:tool-card', ['bash'])
     const text = draw(() => () => (
       <Slot point="agents:attachment" key="text/csv">
-        <Slot point="agents:tool-card" key="bash">inner</Slot>
+        <Slot point="agents:tool-card" key="bash">
+          inner
+        </Slot>
       </Slot>
     ))
     expect(text).toBe('tree:cards')
@@ -143,13 +203,20 @@ describe('a compiled contributor at a point with owner actions', () => {
   type Host = { invoke(name: string, payload?: unknown): Promise<unknown> }
   const hosts: (Host | undefined)[] = []
   const compiled = (pluginId: string, pointId: string) =>
-    registered.push(extensionRegistry.register({
-      id: `plugin:${pluginId}:button`, pluginId, point: pointId, label: pluginId, order: 500, carrier: 'component',
-      component: (props: { host?: Host }) => {
-        hosts.push(props.host)
-        return <button type="button">{pluginId}</button>
-      },
-    } as ExtensionContribution))
+    registered.push(
+      extensionRegistry.register({
+        id: `plugin:${pluginId}:button`,
+        pluginId,
+        point: pointId,
+        label: pluginId,
+        order: 500,
+        carrier: 'component',
+        component: (props: { host?: Host }) => {
+          hosts.push(props.host)
+          return <button type="button">{pluginId}</button>
+        },
+      } as ExtensionContribution),
+    )
 
   let dispose = (): void => {}
   let host: HTMLDivElement
@@ -159,8 +226,17 @@ describe('a compiled contributor at a point with owner actions', () => {
     // jsdom dispatches only untrusted events, so the trusted press is the real capturing listener the
     // slot registered, called with the browser's bit, as RemoteTree.grants.test.tsx does.
     const listen = vi.spyOn(HTMLElement.prototype, 'addEventListener')
-    dispose = render(() => <Slot point="preview:toolbar-actions" actions={actions}><button type="button">owner</button></Slot>, host)
-    const presses = listen.mock.calls.filter(([type]) => type === 'pointerdown').map(([, listener]) => listener as EventListener)
+    dispose = render(
+      () => (
+        <Slot point="preview:toolbar-actions" actions={actions}>
+          <button type="button">owner</button>
+        </Slot>
+      ),
+      host,
+    )
+    const presses = listen.mock.calls
+      .filter(([type]) => type === 'pointerdown')
+      .map(([, listener]) => listener as EventListener)
     listen.mockRestore()
     return { press: (index: number) => presses[index]!({ isTrusted: true } as Event) }
   }
@@ -176,7 +252,12 @@ describe('a compiled contributor at a point with owner actions', () => {
     compiled('first', 'preview:toolbar-actions')
     compiled('second', 'preview:toolbar-actions')
     const seen: boolean[] = []
-    const { press } = mount({ reload: (_payload, invocation) => { seen.push(invocation.byPerson); return 'done' } })
+    const { press } = mount({
+      reload: (_payload, invocation) => {
+        seen.push(invocation.byPerson)
+        return 'done'
+      },
+    })
 
     await expect(hosts[0]!.invoke('reload', {})).resolves.toBe('done')
     // A synthetic event proves nothing.
@@ -195,7 +276,9 @@ describe('a compiled contributor at a point with owner actions', () => {
     compiled('first', 'preview:toolbar-actions')
     const load = vi.fn()
     mount({ reload: () => null, load })
-    await expect(hosts[0]!.invoke('load', { url: 'https://example.com' })).rejects.toMatchObject({ code: 'unknown_action' })
+    await expect(hosts[0]!.invoke('load', { url: 'https://example.com' })).rejects.toMatchObject({
+      code: 'unknown_action',
+    })
     expect(load).not.toHaveBeenCalled()
   })
 

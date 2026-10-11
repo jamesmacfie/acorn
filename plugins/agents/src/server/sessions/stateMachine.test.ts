@@ -14,27 +14,38 @@ import {
 describe('managed agent state machine', () => {
   it('dispatches only from protocol-ready state', () => {
     const initial = initialAgentMachineState()
-    expect(decideAgentCommand(initial, { type: 'dispatch_turn', turnId: 't1' })).toMatchObject({ ok: false, code: 'not_ready' })
+    expect(decideAgentCommand(initial, { type: 'dispatch_turn', turnId: 't1' })).toMatchObject({
+      ok: false,
+      code: 'not_ready',
+    })
     const ready = evolveAgentState(initial, { type: 'session_state', state: 'ready' }, null)
     expect(decideAgentCommand(ready, { type: 'dispatch_turn', turnId: 't1' })).toEqual({ ok: true })
   })
 
   it('keeps request identity and clears it exactly once', () => {
     const ready = evolveAgentState(initialAgentMachineState(), { type: 'session_state', state: 'ready' }, null)
-    const waiting = evolveAgentState(ready, {
-      type: 'request',
-      requestId: 'permission-1',
-      kind: 'permission',
-      title: 'Run command?',
-    }, 'turn-1')
+    const waiting = evolveAgentState(
+      ready,
+      {
+        type: 'request',
+        requestId: 'permission-1',
+        kind: 'permission',
+        title: 'Run command?',
+      },
+      'turn-1',
+    )
     expect(waiting).toMatchObject({ runtimeState: 'waiting', attention: 'permission' })
     expect(decideAgentCommand(waiting, { type: 'resolve_request', requestId: 'permission-1' })).toEqual({ ok: true })
 
-    const working = evolveAgentState(waiting, {
-      type: 'request_resolved',
-      requestId: 'permission-1',
-      resolution: { optionId: 'allow_once' },
-    }, 'turn-1')
+    const working = evolveAgentState(
+      waiting,
+      {
+        type: 'request_resolved',
+        requestId: 'permission-1',
+        resolution: { optionId: 'allow_once' },
+      },
+      'turn-1',
+    )
     expect(working).toMatchObject({ runtimeState: 'working', attention: 'none', pendingRequestIds: [] })
     expect(decideAgentCommand(working, { type: 'resolve_request', requestId: 'permission-1' })).toMatchObject({
       ok: false,
@@ -59,7 +70,13 @@ describe('subagent roster projection', () => {
   it('creates a row and then only fills what a later update carries', () => {
     const started = fold([], { id: 's1', title: 'Read alpha', status: 'running' })
     expect(started).toHaveLength(1)
-    expect(started[0]).toMatchObject({ id: 's1', title: 'Read alpha', status: 'running', turnId: 'turn-1', startedAt: 1_000 })
+    expect(started[0]).toMatchObject({
+      id: 's1',
+      title: 'Read alpha',
+      status: 'running',
+      turnId: 'turn-1',
+      startedAt: 1_000,
+    })
 
     const summarised = fold(started, { id: 's1', status: 'completed', model: 'opus', durationMs: 1_538 }, 2_000)
     // The title survives an update that never mentions it, which is the whole point of the convention:
@@ -113,8 +130,9 @@ describe('subagent roster projection', () => {
     // out of ready, and Codex allows exactly that ordering.
     expect(projectAgentEvent({ type: 'subagent', subagent: { id: 's1', status: 'running' } }, 'turn-1')).toEqual({})
     const ready = evolveAgentState(initialAgentMachineState(), { type: 'turn_completed' }, 'turn-1')
-    expect(evolveAgentState(ready, { type: 'subagent', subagent: { id: 's1', status: 'idle' } }, null))
-      .toMatchObject({ runtimeState: 'ready' })
+    expect(evolveAgentState(ready, { type: 'subagent', subagent: { id: 's1', status: 'idle' } }, null)).toMatchObject({
+      runtimeState: 'ready',
+    })
   })
 
   it('keeps a turnless stream event out of the session’s runtime state', () => {
@@ -152,9 +170,25 @@ describe('subagent roster projection', () => {
 
   it('quiets only a background child that has gone silent', () => {
     const roster: AgentSubagent[] = [
-      { id: 'bg-quiet', turnId: null, title: 'quiet', status: 'running', background: true, startedAt: 0, updatedAt: 100 },
+      {
+        id: 'bg-quiet',
+        turnId: null,
+        title: 'quiet',
+        status: 'running',
+        background: true,
+        startedAt: 0,
+        updatedAt: 100,
+      },
       { id: 'bg-live', turnId: null, title: 'live', status: 'running', background: true, startedAt: 0, updatedAt: 900 },
-      { id: 'bg-done', turnId: null, title: 'done', status: 'completed', background: true, startedAt: 0, updatedAt: 100 },
+      {
+        id: 'bg-done',
+        turnId: null,
+        title: 'done',
+        status: 'completed',
+        background: true,
+        startedAt: 0,
+        updatedAt: 100,
+      },
       // Foreground: its spawning call always returns a real result, so silence here means the harness
       // is thinking rather than that the child is gone.
       { id: 'fg', turnId: null, title: 'fg', status: 'running', startedAt: 0, updatedAt: 100 },

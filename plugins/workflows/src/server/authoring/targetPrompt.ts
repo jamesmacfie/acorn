@@ -1,9 +1,5 @@
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import type {
-  WorkflowCatalog,
-  WorkflowDef,
-  WorkflowValueBinding,
-} from '../../shared/workflowContracts'
+import type { WorkflowCatalog, WorkflowDef, WorkflowValueBinding } from '../../shared/workflowContracts'
 
 const MAX_WORKFLOW_CATALOG_CHARS = 16_000
 
@@ -18,23 +14,25 @@ const workflowTargetBlock = (
   if (!target.inputs.length) lines.push('', 'Inputs: none.')
   else {
     lines.push('', 'Inputs:')
-    lines.push(...target.inputs.map((input) => {
-      const requirement = input.required && !input.hasDefault ? 'required' : input.hasDefault ? 'has a saved default' : 'optional'
-      return `- \`${input.name}\`, ${requirement}.${input.description ? ` ${input.description}` : ''}${input.schema ? ` Schema: ${JSON.stringify(input.schema)}` : ''}`
-    }))
+    lines.push(
+      ...target.inputs.map((input) => {
+        const requirement =
+          input.required && !input.hasDefault ? 'required' : input.hasDefault ? 'has a saved default' : 'optional'
+        return `- \`${input.name}\`, ${requirement}.${input.description ? ` ${input.description}` : ''}${input.schema ? ` Schema: ${JSON.stringify(input.schema)}` : ''}`
+      }),
+    )
   }
   if (includeSchemas && target.outputs?.length) {
     lines.push('', 'Terminal structured outputs:')
-    lines.push(...target.outputs.map((output) => `- \`${output.name ?? output.step}\`: ${JSON.stringify(output.schema)}`))
+    lines.push(
+      ...target.outputs.map((output) => `- \`${output.name ?? output.step}\`: ${JSON.stringify(output.schema)}`),
+    )
   }
   return lines.join('\n')
 }
 
 /** Describes the exact child workflow targets that grounding accepts. */
-export function renderWorkflowTargets(
-  catalog: WorkflowCatalog,
-  budget = MAX_WORKFLOW_CATALOG_CHARS,
-): string {
+export function renderWorkflowTargets(catalog: WorkflowCatalog, budget = MAX_WORKFLOW_CATALOG_CHARS): string {
   const targets = catalog.workflows ?? []
   const lines = [
     '## 6. Saved child workflows',
@@ -56,38 +54,47 @@ export function renderWorkflowTargets(
     'that declares structured output.',
   ]
   if (!targets.length) {
-    lines.push('', 'This project has no saved child workflows. Use `workflow-map` with `agent` for separate sessions in the parent task. Do not write a saved-child `workflow` step.')
+    lines.push(
+      '',
+      'This project has no saved child workflows. Use `workflow-map` with `agent` for separate sessions in the parent task. Do not write a saved-child `workflow` step.',
+    )
     return lines.join('\n')
   }
 
   const first = targets[0]!
   const requiredInputs = first.inputs.filter((input) => input.required && !input.hasDefault)
-  const singleBindings: Record<string, WorkflowValueBinding> = Object.fromEntries(requiredInputs.map((input) => [
-    input.name,
-    { address: { from: 'input', name: input.name, pointer: '' } },
-  ]))
-  const mapBindings: Record<string, WorkflowValueBinding> = Object.fromEntries(requiredInputs.map((input) => [
-    input.name,
-    { address: { from: 'item', pointer: `/${input.name}` } },
-  ]))
+  const singleBindings: Record<string, WorkflowValueBinding> = Object.fromEntries(
+    requiredInputs.map((input) => [input.name, { address: { from: 'input', name: input.name, pointer: '' } }]),
+  )
+  const mapBindings: Record<string, WorkflowValueBinding> = Object.fromEntries(
+    requiredInputs.map((input) => [input.name, { address: { from: 'item', pointer: `/${input.name}` } }]),
+  )
   const titleName = requiredInputs[0]?.name ?? 'id'
   const singleExample: WorkflowDef = {
     baseline: ACORN_BASELINE,
     formatVersion: 1,
     name: `Run ${first.name}`,
-    ...(requiredInputs.length ? {
-      inputs: requiredInputs.map((input) => ({ name: input.name, required: true, schema: input.schema ?? { type: 'string' } })),
-    } : {}),
-    steps: [{
-      id: 'run-child',
-      name: 'run-child',
-      kind: 'workflow',
-      after: [],
-      childWorkflow: {
-        ref: first.ref,
-        ...(requiredInputs.length ? { inputs: singleBindings } : {}),
+    ...(requiredInputs.length
+      ? {
+          inputs: requiredInputs.map((input) => ({
+            name: input.name,
+            required: true,
+            schema: input.schema ?? { type: 'string' },
+          })),
+        }
+      : {}),
+    steps: [
+      {
+        id: 'run-child',
+        name: 'run-child',
+        kind: 'workflow',
+        after: [],
+        childWorkflow: {
+          ref: first.ref,
+          ...(requiredInputs.length ? { inputs: singleBindings } : {}),
+        },
       },
-    }],
+    ],
   }
   const mapExample: WorkflowDef = {
     baseline: ACORN_BASELINE,
@@ -108,7 +115,9 @@ export function renderWorkflowTargets(
                 type: 'object',
                 properties: Object.fromEntries([
                   ['id', { type: 'string' }],
-                  ...requiredInputs.filter((input) => input.name !== 'id').map((input) => [input.name, { type: 'string' }]),
+                  ...requiredInputs
+                    .filter((input) => input.name !== 'id')
+                    .map((input) => [input.name, { type: 'string' }]),
                 ]),
               },
             },

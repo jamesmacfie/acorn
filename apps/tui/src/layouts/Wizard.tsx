@@ -26,26 +26,35 @@ export function Wizard(props: LayoutProps) {
   return (
     <box flexDirection="column" flexGrow={1}>
       <Show when={steps().length}>
-        <Line role="eyebrow">
-          {`Step ${at() + 1} of ${steps().length} · ${steps()[at()]?.label ?? ''}`}
-        </Line>
+        <Line role="eyebrow">{`Step ${at() + 1} of ${steps().length} · ${steps()[at()]?.label ?? ''}`}</Line>
       </Show>
       <Panel grow scroll title={props.label} onBox={regionFocus({ paneId: props.stateKey, regionId: 'step' }, 0)}>
         {props.regions.step?.()}
       </Panel>
       <box flexDirection="row" gap={1}>
         <Show when={props.onSkip && !last()}>
-          <Button variant="ghost" onPress={() => props.onSkip?.()}>{props.skipLabel ?? 'Skip'}</Button>
+          <Button variant="ghost" onPress={() => props.onSkip?.()}>
+            {props.skipLabel ?? 'Skip'}
+          </Button>
         </Show>
         <box flexGrow={1} />
-        <Show when={at() > 0}><Button variant="ghost" onPress={() => step(-1)}>Back</Button></Show>
+        <Show when={at() > 0}>
+          <Button variant="ghost" onPress={() => step(-1)}>
+            Back
+          </Button>
+        </Show>
         <Show when={at() >= 0 && !last()}>
           <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => step(1)}>
             {props.nextLabel ?? 'Next'}
           </Button>
         </Show>
         <Show when={last() && props.onFinish}>
-          <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => props.onFinish?.()}>
+          <Button
+            variant="solid"
+            tone="accent"
+            disabled={props.canAdvance === false}
+            onPress={() => props.onFinish?.()}
+          >
             {props.finishLabel ?? 'Finish'}
           </Button>
         </Show>

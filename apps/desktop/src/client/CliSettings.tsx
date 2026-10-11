@@ -49,24 +49,54 @@ export default function CliSettings() {
       description="Run acorn from your terminal."
       help="Adds an acorn command to a folder on your shell's PATH. It runs with this app, so it stays in step when the app updates."
     >
-      <Show when={installer} fallback={<EmptyState align="start" size="sm">Command installation is available in the desktop app.</EmptyState>}>
+      <Show
+        when={installer}
+        fallback={
+          <EmptyState align="start" size="sm">
+            Command installation is available in the desktop app.
+          </EmptyState>
+        }
+      >
         <Show
           when={status()}
           fallback={
-            <Show when={error()} fallback={<EmptyState align="start" size="sm" busy>Checking…</EmptyState>}>
-              {(message) => <Text tone="danger" wrap>{message()}</Text>}
+            <Show
+              when={error()}
+              fallback={
+                <EmptyState align="start" size="sm" busy>
+                  Checking…
+                </EmptyState>
+              }
+            >
+              {(message) => (
+                <Text tone="danger" wrap>
+                  {message()}
+                </Text>
+              )}
             </Show>
           }
         >
           {(current) => (
             <SettingRow label="Location" layout="stacked" error={error() || undefined}>
-              <Show when={current().location}>{(location) => <Text emphasis="mono" wrap>{location()}</Text>}</Show>
+              <Show when={current().location}>
+                {(location) => (
+                  <Text emphasis="mono" wrap>
+                    {location()}
+                  </Text>
+                )}
+              </Show>
               {/* A status rather than the row's description, so a screen reader hears it change
                   after an install. */}
-              <div role="status"><Text emphasis="muted" wrap>{current().message}</Text></div>
+              <div role="status">
+                <Text emphasis="muted" wrap>
+                  {current().message}
+                </Text>
+              </div>
               <Show when={actionLabel(current())}>
                 {(label) => (
-                  <Button onPress={() => void install()} disabled={current().installed} busy={busy()}>{label()}</Button>
+                  <Button onPress={() => void install()} disabled={current().installed} busy={busy()}>
+                    {label()}
+                  </Button>
                 )}
               </Show>
             </SettingRow>
