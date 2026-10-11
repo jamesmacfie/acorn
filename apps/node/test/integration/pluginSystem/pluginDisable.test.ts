@@ -9,7 +9,7 @@ import { connectionProviderRegistry } from '@acorn/node-core/server/integrations
 import { integrationProviderRegistry } from '@acorn/node-core/server/integrations'
 import { modelProviderRegistry } from '@acorn/node-core/server/modelProviders'
 import type { PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { SecretService } from '@acorn/node-core/server/core/index.ts'
@@ -121,7 +121,7 @@ describe('disabling a node plugin', () => {
     capabilities.provide(SCHEDULER, new Scheduler(coreDb.db))
     const result = await initPlugins(buildPlugins(dataDir), {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db, activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: coreDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
         // The host opens every plugin database under this root, which is what the `databases`
         // snapshot below reads back.
       dataDir,

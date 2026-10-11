@@ -256,12 +256,11 @@ export async function collectSecurityDiagnostics(
   }
 
   try {
-    const snapshot = ports.core.pluginSecurity ? await bounded(() => ports.core.pluginSecurity!.snapshot()) : null
-    add('plugins.grants', 'core', snapshot ? 'observed' : 'unknown', snapshot?.pendingReview || snapshot?.skillsUnapproved ? 'warning' : 'info',
-      'core plugin host state', snapshot
-        ? `${snapshot.packages} installed packages; ${snapshot.executableGrants} active executable grants; ${snapshot.developmentEnabled} development modes enabled; ${snapshot.skillsApproved} enabled approved skills, ${snapshot.skillsUnapproved} enabled unapproved skills; ${snapshot.pendingReview} pending changed packages.`
-        : 'Passive plugin host facts are unavailable.',
-      'Counts omit package names, declarations and grant contents. Host access and plugins outside Acorn remain outside this view.', 'Settings > Plugins.', snapshot ? {
+    const snapshot = await bounded(() => ports.core.pluginSecurity.snapshot())
+    add('plugins.grants', 'core', 'observed', snapshot.pendingReview || snapshot.skillsUnapproved ? 'warning' : 'info',
+      'core plugin host state',
+      `${snapshot.packages} installed packages; ${snapshot.executableGrants} active executable grants; ${snapshot.developmentEnabled} development modes enabled; ${snapshot.skillsApproved} enabled approved skills, ${snapshot.skillsUnapproved} enabled unapproved skills; ${snapshot.pendingReview} pending changed packages.`,
+      'Counts omit package names, declarations and grant contents. Host access and plugins outside Acorn remain outside this view.', 'Settings > Plugins.', {
         description: snapshot.pendingReview || snapshot.skillsUnapproved
           ? 'Some plugin changes or skills are waiting for your review.'
           : 'These are the plugins and permissions recorded by Acorn. Review individual plugins before trusting their code.',
@@ -272,35 +271,33 @@ export async function collectSecurityDiagnostics(
           { label: 'Skills awaiting approval', value: String(snapshot.skillsUnapproved) },
           { label: 'Changed plugins awaiting review', value: String(snapshot.pendingReview) },
         ],
-      } : {})
+      })
   } catch {
     add('plugins.grants', 'core', 'failed', 'attention', 'core plugin host state', 'Plugin host facts could not be read.',
       'A failed read does not mean grants are absent.', 'Settings > Plugins.')
   }
 
-  const keys = ports.core.nodeKeys?.snapshot()
-  if (keys) {
-    const sealed = keys.delivery === 'desktop'
-    const exposed = !sealed || keys.plainFiles.length > 0
-    add('host.keys', 'core', 'observed', exposed ? 'warning' : 'info', 'core key custody',
-      sealed
-        ? `The desktop app delivered this Node's keys in its start message. Plain key files in the data root: ${keys.plainFiles.join(', ') || 'none'}. Session key check: ${keys.keyCheck}.`
-        : `This Node reads its signing and encryption keys from files in its data root (${keys.plainFiles.join(', ') || 'not yet written'}) or from SESSION_ENC_KEY in its environment. Session key check: ${keys.keyCheck}.`,
-      "Agents run as the same OS user as the Node and can read the rest of the data root, including other sessions' token files and the task database. Sealed keys are only as safe as the desktop's data key, which a dev build keeps in a plain data.key file.",
-      !sealed ? 'Run untrusted work on a Node the desktop app starts.'
-        : keys.plainFiles.length ? 'Restart Acorn. If a file stays, Settings > Audit log says why.' : 'No action needed.', {
-        title: "This Node's keys",
-        description: !sealed
-          ? 'Agents on this Node can read the keys that sign its internal tokens and decrypt its stored credentials.'
-          : keys.plainFiles.length
-            ? 'The keys are sealed, but a plain copy is still in the data root, where agents can read it.'
-            : 'The keys are sealed under the desktop app\'s keychain key. No plain copy is in the data root.',
-        facts: [
-          { label: 'Keys from', value: sealed ? 'Desktop app, sealed' : 'Files or environment' },
-          { label: 'Plain key files', value: keys.plainFiles.join(', ') || 'None' },
-        ],
-      })
-  }
+  const keys = ports.core.nodeKeys.snapshot()
+  const sealed = keys.delivery === 'desktop'
+  const exposed = !sealed || keys.plainFiles.length > 0
+  add('host.keys', 'core', 'observed', exposed ? 'warning' : 'info', 'core key custody',
+    sealed
+      ? `The desktop app delivered this Node's keys in its start message. Plain key files in the data root: ${keys.plainFiles.join(', ') || 'none'}. Session key check: ${keys.keyCheck}.`
+      : `This Node reads its signing and encryption keys from files in its data root (${keys.plainFiles.join(', ') || 'not yet written'}) or from SESSION_ENC_KEY in its environment. Session key check: ${keys.keyCheck}.`,
+    "Agents run as the same OS user as the Node and can read the rest of the data root, including other sessions' token files and the task database. Sealed keys are only as safe as the desktop's data key, which a dev build keeps in a plain data.key file.",
+    !sealed ? 'Run untrusted work on a Node the desktop app starts.'
+      : keys.plainFiles.length ? 'Restart Acorn. If a file stays, Settings > Audit log says why.' : 'No action needed.', {
+      title: "This Node's keys",
+      description: !sealed
+        ? 'Agents on this Node can read the keys that sign its internal tokens and decrypt its stored credentials.'
+        : keys.plainFiles.length
+          ? 'The keys are sealed, but a plain copy is still in the data root, where agents can read it.'
+          : 'The keys are sealed under the desktop app\'s keychain key. No plain copy is in the data root.',
+      facts: [
+        { label: 'Keys from', value: sealed ? 'Desktop app, sealed' : 'Files or environment' },
+        { label: 'Plain key files', value: keys.plainFiles.join(', ') || 'None' },
+      ],
+    })
 
   try {
     const raw = await bounded(() => ports.core.prefs.read(userId, AGENT_TOOLS_PERMS_PREF_KEY))

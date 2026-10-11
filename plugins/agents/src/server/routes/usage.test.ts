@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
-import { requireUser } from '@acorn/plugin-api/testkit'
+import { requireUser, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { SecretService } from '@acorn/plugin-api/testkit'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices } from '@acorn/plugin-api/testkit'
@@ -163,7 +163,7 @@ describe('agent usage routes', () => {
   it('reads, validates, and persists plugin-owned pricing preferences', async () => {
     const testDb = makeTestDb()
     try {
-      const core = createCoreServices({ secrets: new SecretService('33'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({ secrets: new SecretService('33'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,
@@ -200,7 +200,7 @@ describe('agent usage routes', () => {
   it('reads, validates, and persists the dispatch concurrency limits', async () => {
     const testDb = makeTestDb()
     try {
-      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,
@@ -232,7 +232,7 @@ describe('agent usage routes', () => {
   it('merges a new-session defaults write onto the values the runtime maintains', async () => {
     const testDb = makeTestDb()
     try {
-      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({ secrets: new SecretService('44'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,
@@ -316,7 +316,7 @@ describe('custom agent routes', () => {
       source: { kind: 'plugin', pluginId: 'lint' },
     })
     try {
-      const core = createCoreServices({ secrets: new SecretService('45'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore() })
+      const core = createCoreServices({ secrets: new SecretService('45'.repeat(32)), db: testDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
       setAgentUsageBridge({
         ...unusedSettings,
         read: async () => snapshot,

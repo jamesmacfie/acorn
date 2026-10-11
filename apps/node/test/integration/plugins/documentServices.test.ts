@@ -9,7 +9,7 @@ import { createApp } from '@acorn/node-core/server/index.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins, type LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
 import { loadExternalPlugins, pluginDir, type LoadedPlugin } from '@acorn/node-core/server/plugins'
-import { makeTestDb, testEnv, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, testEnv, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // The loaded file-language provider from docs/editor/document-surface.md § Language smarts, installed
@@ -59,7 +59,7 @@ describe('a loaded JSON diagnostics provider', () => {
       loaded = result.loaded[0]!
       running = await initPlugins([loaded.plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore('james') }),
+        core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore('james'), ...testCoreSeams() }),
         dataDir: dataRoot,
         env,
         loaded: new Map([[loaded.manifest.id, binding(loaded)]]),

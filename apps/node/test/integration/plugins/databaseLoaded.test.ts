@@ -12,7 +12,7 @@ import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilit
 import { SCHEDULER, Scheduler } from '@acorn/node-core/server/schedules/index.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -69,6 +69,7 @@ describe('database as a host-mediated loaded plugin', () => {
         secrets: core.secrets,
         db: core.db,
         activeIdentity: memoryIdentityStore('owner-1'),
+        ...testCoreSeams(),
       }),
       dataDir: dataRoot,
       loaded: new Map([['database', {

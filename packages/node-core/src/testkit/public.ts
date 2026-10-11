@@ -1,7 +1,7 @@
 export { testGate } from './auth.ts'
 export { startControlPlaneStub } from './controlPlaneStub.ts'
 export type { ControlPlaneStub } from './controlPlaneStub.ts'
-export { EveryCredentialActive, makeTestCoreServices, makeTestDb, makeTestPluginDb, testEnv, testSecretEnv } from './db.ts'
+export { EveryCredentialActive, makeTestCoreServices, makeTestDb, makeTestPluginDb, testCoreSeams, testEnv, testSecretEnv } from './db.ts'
 export { beginTaskArchive, finishTaskArchive } from '../server/worktrees/archiveGate.ts'
 export type { TestDb, TestPluginDb } from './db.ts'
 export { seedProviderConnection } from './integration.ts'

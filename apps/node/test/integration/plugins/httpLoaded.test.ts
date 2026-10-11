@@ -15,7 +15,7 @@ import { SCHEDULER, Scheduler } from '@acorn/node-core/server/schedules/index.ts
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
 import { openSqlite } from '@acorn/node-core/server/storage'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 
 // http is the first plugin to ship loaded with tables of its own, so this is the suite the storage
@@ -36,7 +36,7 @@ describe('http as a loaded plugin with its own tables', () => {
   let running: Awaited<ReturnType<typeof initPlugins>> | null = null
 
   const coreServices = () =>
-    createCoreServices({ secrets: secrets(), db: core.db, activeIdentity: memoryIdentityStore() })
+    createCoreServices({ secrets: secrets(), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
   // A scheduler that never starts, for the deleted-task purge the plugin registers at init.
   const capabilities = () => {
     const registry = new CapabilityRegistry()

@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService, type GenerateTextRequest } from '../core'
 import type { NodePermissions } from './manifest'
-import { makeTestDb } from '../../testkit/db'
+import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import { testGate } from '../../testkit/auth'
 import type { Env } from '../bindings'
 import { agentToolContributions } from '../agentTools/registry'
@@ -40,7 +40,7 @@ const binding = { permissions: NO_PERMISSIONS, storage }
 const shared = makeTestDb()
 const hostOptions = () => ({
   capabilities: new CapabilityRegistry(),
-  core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: shared.db, activeIdentity: memoryIdentityStore() }),
+  core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: shared.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
   dataDir: '',
   loaded: new Map([[PLUGIN, binding]]),
 })
@@ -307,7 +307,7 @@ describe('a folder plugin’s hook handler through the loader and the host', () 
       writeFileSync(join(source, 'dist', 'node.js'), 'export default { name: "hook-fixture", init(ctx) { ctx.routes.fetch(async (request) => Response.json({ ok: false, reason: `no ${(await request.json()).command}` })) } }\n')
       await installPlugin(root, { path: source })
       const { loaded } = await loadExternalPlugins(root, { builtins: [] })
-      const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: shared.db, activeIdentity: memoryIdentityStore('owner') })
+      const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: shared.db, activeIdentity: memoryIdentityStore('owner'), ...testCoreSeams() })
       const host = await initPlugins(loaded.map((entry) => entry.plugin), {
         ...hostOptions(), core, dataDir: root, env: testEnv({ ACTIVE_IDENTITY: memoryIdentityStore('owner') }),
         loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
@@ -465,7 +465,7 @@ describe('a folder plugin’s granted model call through the loader and the host
       },
     }
     const options = hostOptions()
-    const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: db.db, activeIdentity: identity })
+    const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: db.db, activeIdentity: identity, ...testCoreSeams() })
     core.models = { ...models, forPlugin: (id) => pluginModelService(db.db, models, core.identity, id) }
     const review = { available: true, input: { userText: [{ text: 'é'.repeat(8_000), provenance: { kind: 'context', source: 'plugin:x', label: 'Issue' }, truncated: true }] } }
     const provided = options.capabilities.provide(capabilityId('agents.reviewInput.v1'), { read: async () => review })

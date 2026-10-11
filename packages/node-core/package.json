@@ -40,7 +40,6 @@
     "./server/modelProviders": "./src/server/modelProviders/public.ts",
     "./server/nodeProviders/registry.ts": "./src/server/nodeProviders/registry.ts",
     "./server/pluginHost": "./src/server/pluginHost/public.ts",
-    "./server/pluginHost/pluginSecurity.ts": "./src/server/pluginHost/pluginSecurity.ts",
     "./server/pluginHost/capabilities.ts": "./src/server/pluginHost/capabilities.ts",
     "./server/pluginHost/host.ts": "./src/server/pluginHost/host.ts",
     "./server/plugins": "./src/server/plugins/public.ts",

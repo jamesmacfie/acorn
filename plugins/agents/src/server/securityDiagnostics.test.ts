@@ -22,6 +22,8 @@ const ports = (overrides: Partial<SecurityDiagnosticPorts> = {}): SecurityDiagno
     fs: { resolveInRoot: (base: string, name: string) => resolve(base, name) },
     prefs: { read: async () => null },
     agentTools: { catalog: async () => [{ name: 'task_current', risk: 'read' }, { name: 'run_start', risk: 'execute' }] },
+    pluginSecurity: { snapshot: async () => ({ packages: 0, executableGrants: 0, developmentEnabled: 0, skillsApproved: 0, skillsUnapproved: 0, pendingReview: 0 }) },
+    nodeKeys: { snapshot: () => ({ delivery: 'desktop', keyCheck: 'ok', plainFiles: [] }) },
   } as never,
   defaults: async () => defaultAgentSessionDefaults(),
   session: async () => null,
@@ -147,7 +149,6 @@ it('warns when the Node read its keys from files, or a plain key file is still i
   expect(await keyFinding({ delivery: 'desktop', keyCheck: 'ok', plainFiles: [] })).toMatchObject({ state: 'observed', severity: 'info' })
   expect(await keyFinding({ delivery: 'desktop', keyCheck: 'failed', plainFiles: ['session.key'] })).toMatchObject({ severity: 'warning', repair: expect.stringContaining('Audit log') })
   expect(await keyFinding({ delivery: 'files', keyCheck: 'none', plainFiles: ['session.key', 'internal-token'] })).toMatchObject({ severity: 'warning' })
-  expect((await collectSecurityDiagnostics(ports(), 'node-1', 'owner', {}, new AbortController().signal)).findings.some((finding) => finding.id === 'host.keys')).toBe(false)
 })
 
 it("says whether agents are kept out of Acorn's data folder, and whether the selected one is", async () => {

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { schema } from '../db'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
-import { makeTestDb, testEnv } from '../../testkit/db'
+import { makeTestDb, testEnv, testCoreSeams } from '../../testkit/db'
 import { publicConnectionProvider, defaultBudgets } from '../integrations/providerShared'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
 import { clearRegistrations, initPlugins } from '../pluginHost/host'
@@ -43,7 +43,7 @@ it('binds provider callbacks to exactly one owned connection and refuses deletio
           return Response.json({ records: [{ recordId: '1', data: 'ok' }], revision: '1', readTime: 1, completeness: { kind: 'complete' } })
         }, { prefix: '/source' })
       },
-    }], { env, dataDir: '', capabilities: new CapabilityRegistry(), core: createCoreServices({ db: db.db, secrets, activeIdentity: identity }) })
+    }], { env, dataDir: '', capabilities: new CapabilityRegistry(), core: createCoreServices({ db: db.db, secrets, activeIdentity: identity, ...testCoreSeams() }) })
     for (const [id, userId, providerId] of [['selected', 'owner', provider.id], ['other', 'owner', provider.id], ['foreign-user', 'stranger', provider.id], ['foreign-provider', 'owner', 'another']]) {
       await db.db.insert(schema.integrations).values({ id: id!, userId: userId!, provider: providerId!, label: 'Tracker', encryptedCredentials: await secrets.seal(`${id}-token`), authKind: 'api-key', status: 'connected', createdAt: 1, updatedAt: 1 })
     }

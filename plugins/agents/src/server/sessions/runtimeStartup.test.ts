@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createCoreServices, makeTestDb, makeTestPluginDb, memoryIdentityStore, SecretService } from '@acorn/plugin-api/testkit'
+import { createCoreServices, makeTestDb, makeTestPluginDb, memoryIdentityStore, SecretService, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { ManagedAgentRuntime } from './runtime'
 import { FakeAgentDriver } from '../drivers/fake'
 import { AgentDriverRegistry } from '../drivers/registry'
@@ -36,7 +36,7 @@ describe('managed startup generations', () => {
   beforeEach(async () => {
     db = makeTestDb()
     plugin = makeTestPluginDb('agents')
-    core = createCoreServices({ db: db.db, secrets: new SecretService('11'.repeat(32)), activeIdentity: memoryIdentityStore() })
+    core = createCoreServices({ db: db.db, secrets: new SecretService('11'.repeat(32)), activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
     vi.spyOn(core.tasks, 'requireRoot').mockResolvedValue(plugin.dataDir)
     vi.spyOn(core.tasks, 'workspaceId').mockResolvedValue('workspace')
     starts = []

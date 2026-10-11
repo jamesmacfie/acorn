@@ -57,6 +57,9 @@ imports one. `makeTestNodeContext` and `makeTestRequestContext` build a real hos
 - `testSecretEnv()` and `TEST_ENCRYPTION_KEY` mint the session key and the `SecretService` that seals
   with it, as a pair. A test that sets only one compiles, then fails at its first credential read.
   Every test uses the same 64-hex key, so a test can seal a credential with the key its `Env` uses.
+- `testCoreSeams()` supplies the two `createCoreServices` inputs a Node takes from its boot: a key
+  custody report that says the keys are sealed, and an empty capability registry. A test that reads
+  `pluginSecurity` passes its own registry with `PLUGIN_STATE` provided.
 - `workspacePluginMigrations()` and `makeTestPluginDb()` resolve a plugin's Drizzle migration chain
   from its id, as `<checkout>/plugins/<id>/migrations`. This works only from a source checkout, so a
   plugin developed elsewhere passes its migrations folder explicitly. The path names the `plugins/<id>/`

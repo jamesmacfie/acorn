@@ -7,7 +7,7 @@ import { memoryIdentityStore } from '../activeIdentity'
 import { wsBroadcast } from '../transport/wsHub'
 import { createCoreServices, SecretService } from '../core'
 import { openPluginDb, type PluginDatabase } from '../plugins/storage'
-import { makeTestDb } from '../../testkit/db'
+import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry, capabilityId } from './capabilities'
 import { Hono } from 'hono'
 import { z } from 'zod'
@@ -100,7 +100,7 @@ describe('plugin host', () => {
   const host = (plugins: readonly NodePlugin[], disabled?: readonly string[]) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
       dataDir: '',
       disabled,
     })
@@ -113,7 +113,7 @@ describe('plugin host', () => {
     }
     const result = await initPlugins([plugin('widget', { dispose: () => void (previousDisposed = true) })], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
       dataDir: '',
       loaded: new Map([['widget', binding]]),
     })
@@ -260,7 +260,7 @@ describe('plugin host', () => {
         plugin('neighbour', { ready: () => void (neighbourReady = true) }),
       ], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
         dataDir: '',
         loaded: new Map([['widget', binding]]),
       })
@@ -341,7 +341,7 @@ describe('plugin host', () => {
         })],
         {
           capabilities: new CapabilityRegistry(),
-          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
           dataDir: dir,
         },
       )
@@ -385,7 +385,7 @@ describe('plugin host', () => {
         })],
         {
           capabilities: new CapabilityRegistry(),
-          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+          core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
           dataDir: dir,
           // The binding as the loader builds it, with the chain already resolved from the manifest. That
           // is why this tier never consults the plugin object's own `migrationsModule`.
@@ -487,7 +487,7 @@ describe('loaded plugins', () => {
   ) =>
     initPlugins(plugins, {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
       dataDir: '',
       loaded: new Map(
         Object.entries(loaded).map(([name, node]) => [
@@ -667,7 +667,7 @@ describe('loaded plugins', () => {
 
   it('leaves a built-in with the full context', async () => {
     let captured!: CompiledNodePluginContext
-    const core = createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() })
+    const core = createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
     await initPlugins([plugin('terminal', { init: (ctx) => void (captured = ctx) })], {
       capabilities: new CapabilityRegistry(),
       core,
@@ -750,7 +750,7 @@ describe('delivering a manifest-declared harness', () => {
       plugin('opencode'),
     ], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
       dataDir: '',
       loaded: new Map([['opencode', {
         permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
@@ -834,7 +834,7 @@ describe('delivering a manifest-declared harness', () => {
     // disabled" into "this node does not boot".
     const result = await initPlugins([plugin('opencode')], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
       dataDir: '',
       loaded: new Map([['opencode', {
         permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
@@ -909,7 +909,7 @@ describe('order independence', () => {
       order.map((index) => roster[index]),
       {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
         dataDir: '',
         loaded: new Map([['opencode', {
           permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
@@ -967,7 +967,7 @@ describe('order independence', () => {
       ],
       {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
         dataDir: '',
         loaded: new Map([loaded('before'), loaded('broken'), loaded('after')]),
       },
@@ -1003,7 +1003,7 @@ describe('delivering a manifest-declared custom agent', () => {
       { name: 'reviews', init: () => {} },
     ], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
       dataDir: '',
       loaded: new Map([['reviews', {
         permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },

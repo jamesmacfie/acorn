@@ -16,7 +16,7 @@ import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { nodeProviders } from '@acorn/node-core/server/nodeProviders/registry.ts'
-import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, testSecretEnv, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // The node-provider seam end to end, against the reference provider loaded off disk
@@ -54,7 +54,7 @@ describe('a loaded plugin that contributes a node provider', () => {
       if (!entry) throw new Error('the nodes-file package did not load')
       running = await initPlugins([entry.plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService(ENC_KEY), db: core.db, activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({ secrets: new SecretService(ENC_KEY), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
         dataDir: dataRoot,
         loaded: new Map([['nodes-file', { permissions: entry.manifest.permissions.node, storage: entry.storage }]]),
       })

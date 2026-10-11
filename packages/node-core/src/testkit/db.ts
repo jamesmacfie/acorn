@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { openDb, type Env } from '../server/bindings'
 import { memoryIdentityStore } from '../server/activeIdentity'
 import { createCoreServices } from '../server/core'
+import { CapabilityRegistry } from '../server/pluginHost/capabilities'
 import { SecretService } from '../server/core/secrets'
 import { ActiveCredentials } from '../server/auth/activeCredentials'
 import { openPluginDb, type PluginDatabase } from '../server/plugins/storage'
@@ -46,7 +47,18 @@ export function makeTestCoreServices(testDb: TestDb, userId: string | null = nul
     db: testDb.db,
     secrets: testDb.secrets,
     activeIdentity: memoryIdentityStore(userId),
+    ...testCoreSeams(),
   })
+}
+
+// The two createCoreServices inputs a Node takes from its boot: the key custody report from the
+// session key check, and the capability registry. The report says the keys are sealed. The registry is
+// empty, so `pluginSecurity` rejects until a test passes its own registry with PLUGIN_STATE provided.
+export function testCoreSeams() {
+  return {
+    nodeKeys: { snapshot: () => ({ delivery: 'desktop' as const, keyCheck: 'ok' as const, plainFiles: [] }) },
+    capabilities: new CapabilityRegistry(),
+  }
 }
 
 // The secret-bearing half of a test `Env`: the raw key and the SecretService binding every

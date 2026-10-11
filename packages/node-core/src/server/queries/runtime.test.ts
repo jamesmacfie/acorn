@@ -7,7 +7,7 @@ import { queryContentSchema, type QueryConsumer } from '@acorn/protocol/dataQuer
 import { dataSourceRequestSchema } from '@acorn/protocol/dataSources.ts'
 import { memoryIdentityStore } from '../activeIdentity'
 import { openDb } from '../bindings'
-import { testEnv } from '../../testkit/db'
+import { testEnv, testCoreSeams } from '../../testkit/db'
 import { schema } from '../db'
 import { createCoreServices, SecretService } from '../core'
 import { initPlugins, clearRegistrations } from '../pluginHost/host'
@@ -71,7 +71,7 @@ async function world() {
         throw new Error('Publication must not query records')
       }, { prefix: '/source' })
     },
-  }], { env, dataDir: directory, capabilities: new CapabilityRegistry(), core: createCoreServices({ db, activeIdentity: identity, secrets: new SecretService('0'.repeat(64)) }) })
+  }], { env, dataDir: directory, capabilities: new CapabilityRegistry(), core: createCoreServices({ db, activeIdentity: identity, secrets: new SecretService('0'.repeat(64)), ...testCoreSeams() }) })
   const app = (principal: Principal = invocation().principal) => new Hono<AppEnv>()
     .use('*', async (c, next) => { c.set('principal', principal); await next() }).route('/queries', queries)
   const post = async (operation: string, body: object, principal?: Principal) => app(principal).request(`/queries/${operation}`, {

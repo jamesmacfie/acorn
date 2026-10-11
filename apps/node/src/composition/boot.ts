@@ -187,7 +187,13 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     // The plugin composition seam (docs/plugins/collaboration.md § Collaboration rules). Owned by this
     // boot rather than by the module, so a process that boots more than once (the tests do) gets a
     // clean graph each time instead of "capability already provided".
-    const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
+    const core = createCoreServices({
+      secrets: runtime.SECRETS,
+      db,
+      activeIdentity: runtime.ACTIVE_IDENTITY,
+      nodeKeys: nodeKeyCustody(dataDir, options.keys ? 'desktop' : 'files', keyCheck),
+      capabilities,
+    })
     // Open task script waits are aborted, and a pending setup attempt is recorded as interrupted by
     // `shutdown` rather than by `restart` on the next boot.
     drain.listener = async () => core.taskScripts.close()
@@ -233,8 +239,6 @@ export async function bootNode(options: BootNodeOptions): Promise<BootedNode> {
     })
     const providedPluginState = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
     drain.pluginState = async () => { providedPluginState.dispose(); pluginStateBridge.dispose() }
-    core.nodeKeys = nodeKeyCustody(dataDir, options.keys ? 'desktop' : 'files', keyCheck)
-    core.pluginSecurity = { snapshot: async () => (await import('@acorn/node-core/server/pluginHost/pluginSecurity.ts')).pluginSecuritySnapshot(pluginStateBridge) }
 
     // Core's own agent tools and the config-trust bridge. Both are pure functions over the database.
     wireAgentTools({ db, secrets: runtime.SECRETS, env: runtime })

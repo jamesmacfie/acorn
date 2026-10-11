@@ -7,7 +7,7 @@ import { createCoreServices, SecretService } from '@acorn/node-core/server/core/
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { Scheduler, SCHEDULER } from '@acorn/node-core/server/schedules/index.ts'
-import { makeTestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, testCoreSeams } from '@acorn/node-core/testkit'
 
 // Initializes every compiled plugin into the process-wide registries, so createApp() mounts their
 // routes. For suites that read the assembled mount table. The deps are inert: nothing here starts a
@@ -31,7 +31,7 @@ export async function initCompiledPlugins(): Promise<{ dispose(): Promise<void> 
     }),
     {
       capabilities,
-      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
+      core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
       dataDir,
     },
   )

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { dataSourceRequestSchema, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
-import { makeTestDb, testEnv } from '../../testkit/db'
+import { makeTestDb, testEnv, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
 import { clearRegistrations, initPlugins } from '../pluginHost/host'
 import type { NodePlugin, PluginFetchHandler, PluginStorage } from '../pluginHost/types'
@@ -45,7 +45,7 @@ async function world(loaded = true, handler = fixtureModule.fetchSource) {
   }
   const host = await initPlugins([plugin], {
     env, dataDir: '', capabilities: new CapabilityRegistry(),
-    core: createCoreServices({ db: db.db, activeIdentity: identity, secrets: new SecretService('c'.repeat(64)) }),
+    core: createCoreServices({ db: db.db, activeIdentity: identity, secrets: new SecretService('c'.repeat(64)), ...testCoreSeams() }),
     ...(loaded ? { loaded: new Map([[pluginId, binding]]) } : {}),
   })
   const app = new Hono<AppEnv>().use('*', async (c, next) => { c.set('principal', invocation().principal); await next() }).route('/v1/core/data-sources', dataSources)

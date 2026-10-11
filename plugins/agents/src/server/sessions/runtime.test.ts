@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { SecretService } from '@acorn/plugin-api/testkit'
+import { SecretService, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -445,7 +445,7 @@ describe('managed agent runtime conformance', () => {
   beforeEach(async () => {
     testDb = makeTestDb()
     pluginDb = makeTestPluginDb('agents')
-    core = createCoreServices({ secrets: SECRETS, db: testDb.db, activeIdentity: memoryIdentityStore() })
+    core = createCoreServices({ secrets: SECRETS, db: testDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() })
     dataDir = await mkdtemp(join(tmpdir(), 'acorn-managed-runtime-'))
     runtime = null
     disposeProfile = null

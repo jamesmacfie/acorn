@@ -15,7 +15,7 @@ import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilit
 import { initPlugins, type LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
 import { loadExternalPlugins, type LoadedPlugin } from '@acorn/node-core/server/plugins'
 import { pluginDir } from '@acorn/node-core/server/plugins'
-import { makeTestDb, testEnv, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, testEnv, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // The package is copied under the OS temp directory before loading. Its node.js has no imports and
@@ -87,7 +87,7 @@ describe('independently installed runtime contributions', () => {
       const entry = loaded.loaded[0]!
       running = await initPlugins([entry.plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore(USER) }),
+        core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore(USER), ...testCoreSeams() }),
         dataDir: dataRoot,
         env,
         loaded: new Map([[entry.manifest.id, binding(entry)]]),
@@ -211,7 +211,7 @@ describe('independently installed runtime contributions', () => {
     const disabledEntry = disabledLoad.loaded[0]!
     const disabled = await initPlugins([disabledEntry.plugin], {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore(USER) }),
+      core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore(USER), ...testCoreSeams() }),
       dataDir: dataRoot,
       env,
       disabled: ['runtime-fixture'],

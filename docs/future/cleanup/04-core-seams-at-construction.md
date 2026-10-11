@@ -1,5 +1,43 @@
 # 04: Core seams at construction
 
+> **Completion note, October 11, 2026.** No core service is assigned after construction.
+> `git grep -n "core\.nodeKeys =\|core\.pluginSecurity ="` returns nothing. `pnpm lint`, the arch
+> tests, and the `@acorn/node-core`, `@acorn/node`, `@acorn/plugin-agents`, `@acorn/plugin-http`, and
+> `@acorn/plugin-api` suites pass on Node 26.8.1. In `pnpm dev:agent`, **Check this node** showed
+> plugin permissions (7 installed plugins, 1 allowed to run code) and the key custody finding (keys
+> sealed by the desktop app, no plain key files).
+>
+> What landed:
+>
+> - `createCoreServices` takes two more required inputs: `nodeKeys`, the key custody report built
+>   from the session key check, and `capabilities`, the boot's capability registry. `bootNode()` in
+>   `apps/node/src/composition/boot.ts` passes both. The key check already ran before core services
+>   were built, so no step moved.
+> - `core.pluginSecurity.snapshot()` reads `PLUGIN_STATE` from the registry each time it runs, with
+>   `require`. Before the plugins start, it rejects, and the diagnostic reports the read as failed.
+>   Both the state module and the snapshot module load on first call, so the boot graph doesn't grow.
+>   A test in `pluginHost/state.test.ts` provides the bridge after core is built and reads the count.
+> - Both fields are required in `CompiledCoreServices`.
+> - `withOwnedTelemetry` in `pluginHost/context.ts` is a plain spread again. `context.test.ts` held
+>   only the late-assignment test, so the file is deleted.
+> - `securityDiagnostics.ts` drops the optional checks. The "Passive plugin host facts are
+>   unavailable" branch is gone, because a snapshot either arrives or throws. `host.keys` always
+>   appears. The test that expected no `host.keys` finding without a custody report is deleted.
+> - The `./server/pluginHost/pluginSecurity.ts` export in `packages/node-core/package.json` served
+>   only the old boot assignment, so it's removed.
+>
+> Decisions:
+>
+> - **Core reads the registry. No new capability.** Core can reach the registry, so requirement 2's
+>   fallback wasn't needed.
+> - **A testkit helper for the two inputs.** About 45 test call sites build core services directly.
+>   Each one spreads `testCoreSeams()` from `@acorn/node-core/testkit`, which `@acorn/plugin-api/testkit`
+>   re-exports. It returns a sealed key report and an empty registry. The plugin-api surface snapshot
+>   gains that one name, and `docs/testing/layers.md` § The testkit describes it. `makeTestCoreServices`
+>   and `makeTestNodeContext` use it too.
+>
+> For later phases: nothing in this phase changes plugin teardown or the agents runtime.
+
 This proposal stops the Node from assigning core services after plugins have started. Each seam
 arrives when core services are built, or a plugin reads it through the capability registry.
 

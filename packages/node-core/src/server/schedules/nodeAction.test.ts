@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
 import type { NodePermissions, PluginCommandDescriptor } from '../plugins/manifest'
-import { makeTestDb, testEnv } from '../../testkit/db'
+import { makeTestDb, testEnv, testCoreSeams } from '../../testkit/db'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
 import { clearRegistrations, initPlugins } from '../pluginHost/host'
 import type { HostPluginContext, NodePlugin, PluginStorage } from '../pluginHost/types'
@@ -78,7 +78,7 @@ async function world(
   }
   await initPlugins([plugin], {
     capabilities,
-    core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1') }),
+    core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
     env,
     dataDir: '',
   })
@@ -119,7 +119,7 @@ describe('what the picker may offer', () => {
     try {
       await initPlugins([{ name: PLUGIN, init: (ctx) => void ctx.routes.fetch(() => new Response(null, { status: 204 }), { prefix: '/actions' }) }], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1') }),
+        core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
         env: testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore('owner-1') }),
         dataDir: '',
         loaded: new Map([[PLUGIN, { permissions: NO_PERMISSIONS, storage, commands }]]),
@@ -185,7 +185,7 @@ describe('creating and running one', () => {
     let fired = 0
     const options = {
       capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1') }),
+      core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
       env,
       dataDir: '',
     }

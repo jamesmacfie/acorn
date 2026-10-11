@@ -22,7 +22,7 @@ import { clearRegistrations } from '../server/pluginHost/host'
 import { flushTelemetry, onTelemetryBatch, setTelemetryPref } from '../server/telemetry/collector'
 import { pluginRequestContext } from '../server/pluginHost/requestContext'
 import type { CompiledNodePluginContext, NodePlugin, PluginProviderRuntime, PluginRequestContext, PluginStorage } from '../server/pluginHost/types'
-import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations } from './db'
+import { makeTestDb, testEnv, TEST_ENCRYPTION_KEY, workspacePluginMigrations, testCoreSeams } from './db'
 
 // Nothing granted. A loaded plugin's manifest block is all-defaulted (protocol/plugin/contract.ts), so
 // this is what `permissions: {}` means in a config, and a test opts into each grant by name.
@@ -85,7 +85,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   const dataDir = options.dataDir ?? mkdtempSync(join(tmpdir(), `acorn-testkit-${name}-`))
   const permissions = options.permissions ? { ...NO_PERMISSIONS, ...options.permissions } : undefined
   const secrets = new SecretService(TEST_ENCRYPTION_KEY)
-  const services: CompiledCoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore(options.userId ?? null) })
+  const services: CompiledCoreServices = createCoreServices({ secrets, db: core.db, activeIdentity: memoryIdentityStore(options.userId ?? null), ...testCoreSeams() })
 
   // The same lazy, one-handle-per-boot shape the host builds for both tiers (server/pluginHost/host.ts): one
   // file named for the plugin id under the data root, migrated with the plugin's own chain on first open.

@@ -5,7 +5,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, makeTestPluginDb, schema } from '@acorn/plugin-api/testkit'
+import { makeTestDb, makeTestPluginDb, schema, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices } from '@acorn/plugin-api/testkit'
 import type { HttpSendInput } from '../shared/model'
@@ -42,7 +42,7 @@ function fixture(): Fixture {
   const coreDb = makeTestDb()
   const pluginDb = makeTestPluginDb('http')
   return {
-    core: createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore() }),
+    core: createCoreServices({ secrets: SECRETS, db: coreDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
     db: pluginDb.db,
     coreDb: coreDb.db,
     cleanup: () => {

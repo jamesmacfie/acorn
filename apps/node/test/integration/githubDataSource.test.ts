@@ -13,7 +13,7 @@ import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilit
 import { clearRegistrations, initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { invokeDataSource } from '@acorn/node-core/server/dataSources'
 import '@acorn/node-core/server/index.ts'
-import { makeTestDb, testEnv, runDashboard } from '@acorn/node-core/testkit'
+import { makeTestDb, testEnv, runDashboard, testCoreSeams } from '@acorn/node-core/testkit'
 
 afterEach(() => { clearRegistrations('github'); vi.unstubAllGlobals() })
 
@@ -26,7 +26,7 @@ it('executes the GitHub source with exact connection provenance and a stable bou
       ctx.providers.integration(githubProvider)
       ctx.routes.fetch(createPullSourceHandler(), { prefix: '/data/pulls' })
       ctx.dataSources.register(pullSource)
-    } }], { env, dataDir: '', capabilities: new CapabilityRegistry(), core: createCoreServices({ db: db.db, secrets: db.secrets, activeIdentity: identity }) })
+    } }], { env, dataDir: '', capabilities: new CapabilityRegistry(), core: createCoreServices({ db: db.db, secrets: db.secrets, activeIdentity: identity, ...testCoreSeams() }) })
     await db.db.insert(schema.integrations).values({ id: 'selected', userId: 'owner', provider: 'github', label: 'GitHub',
       encryptedCredentials: await db.secrets.seal('selected-token'), authKind: 'oauth', status: 'connected', createdAt: 1, updatedAt: 1 })
     const fetch = vi.fn(async (_url: string, init: RequestInit) => {
@@ -102,7 +102,7 @@ it('joins actual local branch and pull sources by account and fork head, retaini
       ctx.routes.fetch(createBranchSourceHandler(ctx.dataSources.invoke), { prefix: '/data/branches' })
       ctx.dataSources.register(branchSource)
     } }], { env, dataDir: '', capabilities: new CapabilityRegistry(),
-      core: createCoreServices({ db: world.db, secrets: world.secrets, activeIdentity: identity }) })
+      core: createCoreServices({ db: world.db, secrets: world.secrets, activeIdentity: identity, ...testCoreSeams() }) })
     for (const id of ['relation-account', 'other-account']) {
       await world.db.insert(schema.integrations).values({ id, userId: 'owner', provider: 'github', label: id,
         encryptedCredentials: await world.secrets.seal(`${id}-token`), authKind: 'oauth', status: 'connected', createdAt: now, updatedAt: now })

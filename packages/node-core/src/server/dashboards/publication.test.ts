@@ -10,7 +10,7 @@ import { createCoreServices, SecretService } from '../core'
 import { schema } from '../db'
 import { initPlugins, clearRegistrations } from '../pluginHost/host'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
-import { testEnv } from '../../testkit/db'
+import { testEnv, testCoreSeams } from '../../testkit/db'
 import { queryStore } from '../queries/store'
 import { publishQuery } from '../queries/runtime'
 import { dashboardStore } from './store'
@@ -45,7 +45,7 @@ async function world() {
         })
       }, { prefix: '/source' })
     },
-  }], { env, dataDir: directory, capabilities: new CapabilityRegistry(), core: createCoreServices({ db, activeIdentity: identity, secrets: new SecretService('0'.repeat(64)) }) })
+  }], { env, dataDir: directory, capabilities: new CapabilityRegistry(), core: createCoreServices({ db, activeIdentity: identity, secrets: new SecretService('0'.repeat(64)), ...testCoreSeams() }) })
   return { db, env }
 }
 

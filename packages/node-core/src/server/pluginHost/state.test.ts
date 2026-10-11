@@ -2,8 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { clearDataSources, registerDataSource } from '../dataSources/registry'
 import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { PluginRosterEntry } from './host'
-import { pluginState, type PluginsBridge } from './state'
+import { PLUGIN_STATE, pluginState, type PluginsBridge } from './state'
 import { pluginSecuritySnapshot } from './pluginSecurity'
+import { CapabilityRegistry } from './capabilities'
+import { memoryIdentityStore } from '../activeIdentity'
+import { createCoreServices } from '../core'
+import { makeTestDb, testCoreSeams } from '../../testkit/db'
 import type { InputGrant } from '../plugins/inputGrants'
 import type { PluginDevelopmentState } from '../plugins/development'
 
@@ -91,6 +95,21 @@ it('projects bounded plugin security counts without package supplied text', () =
     ...activeSnapshot(executable.id, executable.version).identity, permissions: executable.permissions,
   } }]
   expect(pluginSecuritySnapshot(running).executableGrants).toBe(1)
+})
+
+// The bridge exists only once the plugins have started, after core services are built, so core reads
+// it from the capability registry each time it's asked.
+it('reads the plugin state bridge when called, so one provided after core is built still counts', async () => {
+  const db = makeTestDb()
+  try {
+    const capabilities = new CapabilityRegistry()
+    const core = createCoreServices({ secrets: db.secrets, db: db.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams(), capabilities })
+    await expect(core.pluginSecurity.snapshot()).rejects.toThrow('Required capability not provided')
+    capabilities.provide(PLUGIN_STATE, bridge({ installed: [installed('one')] }))
+    expect((await core.pluginSecurity.snapshot()).packages).toBe(1)
+  } finally {
+    db.cleanup()
+  }
 })
 
 describe('pluginState', () => {

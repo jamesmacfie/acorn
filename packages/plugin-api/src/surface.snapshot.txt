@@ -727,6 +727,7 @@ testkit: testAgentToolDescriptor
 testkit: testCliCommandDescriptor
 testkit: testConnection
 testkit: testContextSectionDescriptor
+testkit: testCoreSeams
 testkit: testEnv
 testkit: testGate
 testkit: testSecretEnv

@@ -7,7 +7,7 @@ import { dataSourceRequestSchema, type DataSourceRegistration, type DataSourceSc
 import { schema } from '../db'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
-import { makeTestDb, testEnv } from '../../testkit/db'
+import { makeTestDb, testEnv, testCoreSeams } from '../../testkit/db'
 import { publicConnectionProvider, defaultBudgets } from '../integrations/providerShared'
 import { CapabilityRegistry } from '../pluginHost/capabilities'
 import { clearRegistrations, initPlugins } from '../pluginHost/host'
@@ -97,7 +97,7 @@ async function world(options: { derived?: PluginFetchHandler; loaded?: PluginFet
   const loadedBinding = { permissions: fixture.permissions.node, storage: { open: () => { throw new Error('No database') } },
     dataSources: [derivedSource('derived-loaded', { records: { source: 'upstream-test:records', label: 'Records' } })] }
   await initPlugins(list, { env, dataDir: '', capabilities: new CapabilityRegistry(),
-    core: createCoreServices({ db: db.db, secrets, activeIdentity: identity }),
+    core: createCoreServices({ db: db.db, secrets, activeIdentity: identity, ...testCoreSeams() }),
     loaded: new Map([['derived-loaded', loadedBinding]]) })
   for (const [id, providerId, status] of [['selected', provider.id, 'connected'], ['off', provider.id, 'disabled'], ['foreign', 'another', 'connected']] as const) {
     await db.db.insert(schema.integrations).values({ id, userId: 'owner', provider: providerId, label: 'Tracker',

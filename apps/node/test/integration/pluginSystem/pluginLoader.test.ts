@@ -15,7 +15,7 @@ import { integrationProviderRegistry } from '@acorn/node-core/server/integration
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginState } from '@acorn/node-core/server/pluginHost'
-import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, type TestDb, testCoreSeams } from '@acorn/node-core/testkit'
 import { schema, type AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import { assembleNodeGraph } from '../../../src/composition/composition'
 import { buildPluginStateBridge } from '../../../src/composition/pluginState'
@@ -83,7 +83,7 @@ describe('loading rollbar from disk', () => {
 
       plugins = await initPlugins([loaded[0].plugin], {
         capabilities: new CapabilityRegistry(),
-        core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore() }),
+        core: createCoreServices({ secrets: new SecretService('0'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
         dataDir: dataRoot,
         loaded: new Map([['rollbar', {
           permissions: loaded[0].manifest.permissions.node,

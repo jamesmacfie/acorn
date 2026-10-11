@@ -18,6 +18,8 @@ import { verifyAgentToolProvenance } from '../agentTools/provenance'
 import type { SecretPublicationGate } from '../secretChecks/gate'
 import { createCheckoutAdmission, registerCheckoutAdmission, type CheckoutAdmission } from './checkoutAdmission'
 import { getProject } from '../projects'
+import type { CapabilityRegistry } from '../pluginHost/capabilities'
+import type { NodeKeyCustody } from '../sessionKey'
 import { realpathSync } from 'node:fs'
 
 // The three module-shaped facets, named rather than left as `typeof <module>`.
@@ -93,10 +95,10 @@ export type CoreServices = {
 export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects' | 'models'> & {
   /** Registered names and risk tiers for diagnostics, bounded by owner preferences and session policy. */
   agentTools?: { catalog(): Promise<Array<{ name: string; risk: import('@acorn/protocol/api.ts').ToolRisk }>> }
-  /** Bounded passive plugin facts; supplied by the composition root after the host starts. */
-  pluginSecurity?: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
-  /** Where this Node's keys came from and whether plain copies remain; supplied by the composition root. */
-  nodeKeys?: { snapshot(): import('../sessionKey').NodeKeyCustody }
+  /** Bounded passive plugin facts, read from the plugin state bridge when called. */
+  pluginSecurity: { snapshot(): Promise<import('../pluginHost/pluginSecurity').PluginSecuritySnapshot> }
+  /** Where this Node's keys came from and whether plain copies remain. */
+  nodeKeys: { snapshot(): NodeKeyCustody }
   /** The optional secret publication gate. Loaded plugins receive no grant for it. */
   secretPublication?: SecretPublicationGate
   checkoutAdmission: CheckoutAdmission
@@ -115,6 +117,11 @@ export function createCoreServices(options: {
   // The persisted binding. Required rather than defaulted, so a composition root cannot end up with
   // a process-local identity by omission. Tests pass memoryIdentityStore() from server/activeIdentity.ts.
   activeIdentity: ActiveIdentityStore
+  // From the session key check, which runs before core services are built.
+  nodeKeys: { snapshot(): NodeKeyCustody }
+  // The boot's capability registry. Core reads the plugin state bridge from it at call time, because
+  // the bridge only exists once the plugins have started.
+  capabilities: CapabilityRegistry
 }): CompiledCoreServices {
   const rawTasks = createTaskService(options.db)
   const projects = createProjectService(options.db, options.activeIdentity)
@@ -183,6 +190,15 @@ export function createCoreServices(options: {
     identity,
     projects,
     telemetry: createTelemetryService(),
+    nodeKeys: options.nodeKeys,
+    // Loaded on first use, so the snapshot's code stays out of the boot graph.
+    pluginSecurity: {
+      snapshot: async () => {
+        const { PLUGIN_STATE } = await import('../pluginHost/state')
+        const { pluginSecuritySnapshot } = await import('../pluginHost/pluginSecurity')
+        return pluginSecuritySnapshot(options.capabilities.require(PLUGIN_STATE))
+      },
+    },
   }
 }
 

@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
 import type { NodePermissions, PluginScheduleDescriptor } from '../plugins/manifest'
-import { makeTestDb, testEnv } from '../../testkit/db'
+import { makeTestDb, testEnv, testCoreSeams } from '../../testkit/db'
 import { schema } from '../db'
 import { type Clock, Scheduler } from '../schedules/scheduler'
 import { SCHEDULER } from '../schedules'
@@ -79,7 +79,7 @@ describe('plugin schedules', () => {
       scheduler,
       options: {
         capabilities,
-        core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1') }),
+        core: createCoreServices({ secrets: new SecretService('c'.repeat(64)), db: core.db, activeIdentity: memoryIdentityStore('owner-1'), ...testCoreSeams() }),
         env: testEnv({ DB: core.db, ACTIVE_IDENTITY: memoryIdentityStore('owner-1') }),
         dataDir: '',
       },

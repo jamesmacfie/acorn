@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promise
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { SecretService } from '@acorn/plugin-api/testkit'
+import { SecretService, testCoreSeams } from '@acorn/plugin-api/testkit'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
@@ -34,7 +34,7 @@ beforeEach(async () => {
   store = new AgentAttachmentStore(
     pluginDb.db,
     dataDir,
-    createCoreServices({ secrets: new SecretService('11'.repeat(32)), db: coreDb.db, activeIdentity: memoryIdentityStore() }),
+    createCoreServices({ secrets: new SecretService('11'.repeat(32)), db: coreDb.db, activeIdentity: memoryIdentityStore(), ...testCoreSeams() }),
   )
 })
 
