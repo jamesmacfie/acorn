@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
-import { formatRelativeTime, onPluginFrame, pluginLabel, type Task } from '@acorn/plugin-api/client'
+import { formatRelativeTime, latestSignal, onPluginFrame, pluginLabel, type Task } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Fold, Heading, Icon, Inline,
   Row, Rows, SectionHeader, SegmentedControl, Stack, Text,
@@ -35,14 +35,15 @@ export function RunRecords(props: {
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [prepared, setPrepared] = createSignal<{ recordId: string; digest: string; title: string } | null>(null)
-  let generation = 0
+  // A page read or a refresh of the loaded rows. The newest one wins.
+  const recordsRead = latestSignal()
 
   const selected = createMemo(() => records().find(row => row.id === selectedId()))
   const source = createMemo(() => page()?.provenance?.source)
   const sourceLabel = () => source() ? `${pluginLabel(source()!.pluginId)} · ${source()!.sourceId}` : 'Records'
 
   const readPage = async (append: boolean): Promise<void> => {
-    const current = ++generation
+    const signal = recordsRead.next()
     setBusy(true)
     setError('')
     try {
@@ -53,7 +54,7 @@ export function RunRecords(props: {
         limit: 100,
         filter: filter(),
       })
-      if (current !== generation) return
+      if (signal.aborted) return
       const loaded = [...result.records]
       // A return link may target any of the 500 retained rows. Walk bounded summary pages until that
       // row is present; record bodies and outputs still stay behind the selected-record request.
@@ -66,10 +67,10 @@ export function RunRecords(props: {
           limit: 100,
           filter: filter(),
         })
-        if (current !== generation) return
+        if (signal.aborted) return
         loaded.push(...result.records)
       }
-      if (current !== generation) return
+      if (signal.aborted) return
       const nextRecords = append ? [...records(), ...loaded] : loaded
       setPage(result)
       setRecords(nextRecords)
@@ -79,14 +80,14 @@ export function RunRecords(props: {
         return nextRecords[0]?.id ?? null
       })
     } catch (caught) {
-      if (current === generation) setError(caught instanceof Error ? caught.message : 'Record history could not be refreshed.')
+      if (!signal.aborted) setError(caught instanceof Error ? caught.message : 'Record history could not be refreshed.')
     } finally {
-      if (current === generation) setBusy(false)
+      if (!signal.aborted) setBusy(false)
     }
   }
 
   const refreshLoaded = async (): Promise<void> => {
-    const current = ++generation
+    const signal = recordsRead.next()
     const target = Math.max(100, records().length)
     setBusy(true)
     setError('')
@@ -107,14 +108,14 @@ export function RunRecords(props: {
         loaded.push(...latest.records)
         cursor = latest.next ?? undefined
       } while (cursor !== undefined && loaded.length < target)
-      if (current !== generation || !latest) return
+      if (signal.aborted || !latest) return
       setPage(latest)
       setRecords(loaded)
       setSelectedId(previous => previous && loaded.some(row => row.id === previous) ? previous : loaded[0]?.id ?? null)
     } catch (caught) {
-      if (current === generation) setError(caught instanceof Error ? caught.message : 'Record history could not be refreshed.')
+      if (!signal.aborted) setError(caught instanceof Error ? caught.message : 'Record history could not be refreshed.')
     } finally {
-      if (current === generation) setBusy(false)
+      if (!signal.aborted) setBusy(false)
     }
   }
 

@@ -54,7 +54,8 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
   const [postError, setPostError] = createSignal('')
   // The linked issues' titles, for the task pane's list, keyed by identifier.
   const [titles, setTitles] = createSignal<Record<string, string>>({})
-  let load = 0
+  // The issue read. A newer one aborts it.
+  let issueRead = new AbortController()
 
   const activeIdentifier = () => override() ?? target()?.identifier ?? ''
 
@@ -62,7 +63,9 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
   // has selected another, and a comment typed in that gap has no composer to land in. A refresh
   // (`keep`) leaves the issue on screen and reports a failure above it, as rollbar's `keepView` does.
   const fetchIssue = async (identifier: string, connectionId?: string, keep = false): Promise<void> => {
-    const request = ++load
+    issueRead.abort()
+    issueRead = new AbortController()
+    const request = issueRead.signal
     setRefreshError('')
     if (!keep) {
       setIssue(null)
@@ -70,10 +73,10 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
     }
     try {
       const detail = await props.bridge.api.get<LinearIssueDetail>(linearIssueRoute(identifier, connectionId))
-      if (request !== load) return
+      if (request.aborted) return
       setIssue(detail)
     } catch (error) {
-      if (request !== load) return
+      if (request.aborted) return
       if (keep && issue()) {
         setRefreshError(failureReason(error))
         return

@@ -9,7 +9,7 @@ import { useQueryClient, type QueryClient } from '@tanstack/solid-query'
 import { defRefKey, parseDefRef, workflowDraftAddress, type DefRef, type WorkflowDraftAddress as Address } from './draftAddress'
 export { defRefKey, parseDefRef, SOURCE_GLYPH, type DefRef } from './draftAddress'
 import { workflowDraftCustody } from './draftCustody'
-import { activeNodeId, queryOwner, debounce, deviceStorage, wsOnPluginsChanged } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, debounce, deviceStorage, latestSignal, wsOnPluginsChanged } from '@acorn/plugin-api/client'
 import { mergeWorkflow, type WorkflowMergeConflict } from '../../shared/workflowMerge'
 import type { WorkflowPublication } from '../../shared/workflowPublication'
 import type { WorkflowFileOperation } from '../../shared/workflowFileAuthoring'
@@ -72,10 +72,10 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   const [conflicts, setConflicts] = createSignal<WorkflowMergeConflict[]>([])
   let mergeBase: { base: WorkflowDef; local: WorkflowDef; external: WorkflowDef; choices: Record<string, 'local' | 'external'> } | undefined
   let baseDef = emptyDefinition()
-  let generation = 0
+  const addressing = latestSignal()
   const entities = new Map<string, ReturnType<typeof workflowDraftCustody>>()
   let owner: { address: Address; custody: ReturnType<typeof workflowDraftCustody> } | undefined
-  const isCurrent = (address: Address) => !disposed && owner?.address === address && address.generation === generation && (nodeId === null || activeNodeId() === nodeId)
+  const isCurrent = (address: Address) => !disposed && owner?.address === address && !address.signal.aborted && (nodeId === null || activeNodeId() === nodeId)
   const capture = () => {
     loaded()
     return !loaded.loading && owner && isCurrent(owner.address) ? owner.address : undefined
@@ -89,10 +89,10 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
       const current = ref()
       if (owner?.custody.dirty() && !owner.custody.state.conflicts.length) untrack(() => { void owner!.custody.save() })
       for (const [id, custody] of entities) { if (!custody.busy && !custody.dirty()) entities.delete(id) }
-      generation += 1
+      const signal = addressing.next()
       if (!current) return null
       const projectId = input.projectId()
-      return workflowDraftAddress(current, projectId, generation)
+      return workflowDraftAddress(current, projectId, signal)
     },
     async (query: Address) => {
       const row = query.source === 'database'
@@ -108,7 +108,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   )
 
   createEffect(on(loaded, (row) => {
-    if (!row || disposed || row.address.generation !== generation || (nodeId !== null && activeNodeId() !== nodeId)) return
+    if (!row || disposed || row.address.signal.aborted || (nodeId !== null && activeNodeId() !== nodeId)) return
     const address = row.address
     const def = row.def as WorkflowDef
     const retained = entities.get(address.entityId)
@@ -232,12 +232,12 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   }
 
   const [problems, setProblems] = createSignal<string[]>([])
-  let validation = 0
+  const validation = latestSignal()
   const validate = debounce((def: WorkflowDef, projectId: string, address: Address | undefined) => {
-    const request = ++validation
+    const request = validation.next()
     void workflowApi
       .validateDef(def, projectId || undefined)
-      .then((answer) => { if (current(address) && request === validation && toJson(draft().def) === toJson(def)) setProblems(answer.problems) })
+      .then((answer) => { if (current(address) && !request.aborted && toJson(draft().def) === toJson(def)) setProblems(answer.problems) })
       // A node that cannot answer is not a definition that is wrong. The footer keeps its last word.
       .catch(() => undefined)
   }, VALIDATE_DELAY_MS)

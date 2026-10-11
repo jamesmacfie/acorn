@@ -1,7 +1,7 @@
 import { createEffect, createSignal, onCleanup, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activateTaskSignals, activeNodeId, pathForTask, tasksOptions, toast, type Task } from '@acorn/plugin-api/client'
+import { activateTaskSignals, activeNodeId, latestSignal, pathForTask, tasksOptions, toast, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, Facts, Modal, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import type { OperationKind } from '../shared/api'
 import { operationActions, operationKey, operationLabel, operationOptions } from './operationClient'
@@ -30,27 +30,27 @@ export function OperationDialog(props: OperationRequest & { projectId: string; t
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [stopped, setStopped] = createSignal<string | null>(null)
-  let generation = 0
-  onCleanup(() => { generation++ })
+  const operationStart = latestSignal()
+  onCleanup(() => operationStart.abort())
   const label = operationLabel[props.operation]
   const submit = async () => {
     if (activeNodeId() !== nodeId) { setError('The Node changed. Close and reopen this action.'); return }
     const state = observed()
     if (!state?.head) { setError('Target checkout state is unavailable. Refresh and try again.'); return }
-    const own = ++generation, queryKey = operationKey(state.taskId)
+    const signal = operationStart.next(), queryKey = operationKey(state.taskId)
     setBusy(true); setError(''); setStopped(null)
     try {
       const result = await operationActions.start(state.taskId, { expectedPath: state.checkout, expectedHead: state.head, operation: props.operation, source: props.source.id })
       if (result.state) cache.setQueryData(queryKey, result.state)
       else void cache.invalidateQueries({ queryKey })
-      if (own !== generation) return
+      if (signal.aborted) return
       if (result.ok) { toast(`${label} finished.`, { tone: 'success' }); props.onClose(); return }
       setError(result.error ?? 'Git refused the operation.')
       if (result.state?.operation || result.state?.conflicts.length) setStopped(state.taskId)
     } catch (cause) {
       void cache.invalidateQueries({ queryKey })
-      if (own === generation) setError(cause instanceof Error ? cause.message : String(cause))
-    } finally { if (own === generation) setBusy(false) }
+      if (!signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
+    } finally { if (!signal.aborted) setBusy(false) }
   }
   const openTask = (id: string) => {
     const task = (tasks.data ?? []).find((item) => item.id === id)

@@ -21,7 +21,7 @@ export default function GitLaunchDialog(props: { request: WorkflowGitLaunchReque
   const location = useLocation()
   const openedAt = location.pathname
   const current = () => activeNodeId() === props.request.nodeId && location.pathname === openedAt
-    && (props.request.generation === undefined || workflowGitLaunchRequest() === props.request)
+    && (!props.request.tracked || workflowGitLaunchRequest() === props.request)
   const [target, { refetch }] = createResource(async () => {
     const [projects, workspaces] = await Promise.all([
       readJson<ProjectsResponse>(projectsRoute, { nodeId: props.request.nodeId }),

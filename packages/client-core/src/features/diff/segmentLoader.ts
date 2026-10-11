@@ -5,6 +5,7 @@ import { recordSample } from '../../infra/telemetry/emitter'
 import { diffRowsFromPlain, type DiffRow } from '../../kit/diff/diffModel'
 import type { SegmentRef } from './documentView'
 import { residentKey, type SegmentCache } from './segmentCache'
+import { latestSignal } from '../../kit/lib/state/latestSignal'
 
 // Loads and colours the segments near the reader, and nothing else (docs/diff-rendering/loading.md § Parsing
 // and highlighting).
@@ -61,7 +62,8 @@ export function createSegmentLoader(options: {
   const inFlight = new Map<AbortController, string[]>()
   const loading = new Set<string>()
   let enriching: string | null = null
-  let generation = 0
+  // The document this loader serves. A reset to a different document aborts it.
+  const serving = latestSignal()
   let disposed = false
   // This pane's own accesses, for its health reading: segments it came near that the cache had, and
   // ones it had to ask for. Counted once each time a segment enters the range, not per draw.
@@ -123,10 +125,10 @@ export function createSegmentLoader(options: {
       // manifests, have the same content key and are still two segments to answer.
       const byContent = new Map(refs.map((ref) => [`${ref.file.path}\u0000${ref.contentKey}`, ref]))
       const requests = refs.map((ref): DiffSegmentRequest => ({ path: ref.file.path, patchKey: ref.file.patchKey!, ordinal: ref.ordinal }))
-      const at = generation
+      const served = serving.signal
       void options.load(requests, controller.signal).then(
         (payloads) => {
-          if (at !== generation || controller.signal.aborted) return
+          if (served.aborted || controller.signal.aborted) return
           const started = performance.now()
           const answered = new Set<string>()
           const inserted: { key: string; path: string; patchKey: string; plain: DiffRow[] }[] = []
@@ -151,13 +153,13 @@ export function createSegmentLoader(options: {
           options.prepared?.(performance.now() - started)
         },
         () => {
-          if (at !== generation || controller.signal.aborted) return
+          if (served.aborted || controller.signal.aborted) return
           batch(() => { for (const key of keys) setStatuses(key, 'error') })
         },
       ).finally(() => {
         // Every way a request ends comes through here, so its pins always go.
         if (inFlight.delete(controller)) for (const key of keys) loading.delete(key)
-        if (disposed || at !== generation) return
+        if (disposed || served.aborted) return
         pin()
         pump()
         enrichNext()
@@ -175,9 +177,9 @@ export function createSegmentLoader(options: {
     const from = cache.peek(key)!.plain
     enriching = key
     pin()
-    const at = generation
+    const served = serving.signal
     void enrich(from).then(({ rows, provisional }) => {
-      if (disposed || at !== generation) return
+      if (disposed || served.aborted) return
       enriching = null
       const started = performance.now()
       if (provisional) fellBack.add(key)
@@ -262,7 +264,7 @@ export function createSegmentLoader(options: {
      *  keyed by its content and one that survives into the new revision is still right; the next
      *  demand replaces the claim. */
     reset: () => {
-      generation++
+      serving.next()
       enriching = null
       for (const controller of inFlight.keys()) controller.abort()
       inFlight.clear()
@@ -288,7 +290,7 @@ export function createSegmentLoader(options: {
     },
     dispose: () => {
       disposed = true
-      generation++
+      serving.abort()
       for (const controller of inFlight.keys()) controller.abort()
       inFlight.clear()
       loading.clear()

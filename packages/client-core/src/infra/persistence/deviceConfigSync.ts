@@ -5,6 +5,7 @@ import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { deviceConfigBridge, type DeviceConfigState } from '../platform'
 import { deviceConfigPrefs } from './deviceConfigPrefs'
 import { savePref } from '../../features/settings/savePref'
+import { latestSignal } from '../../kit/lib/state/latestSignal'
 import { pushBackgroundError } from '../../features/notifications/notifications'
 
 export type ConfigPluginRequest = { id: string; source: PluginInstallSource }
@@ -20,23 +21,24 @@ export async function startDeviceConfigSync(
 ): Promise<() => void> {
   const bridge = deviceConfigBridge()
   if (!bridge) return () => {}
-  let generation = 0
+  // Applying one version of the file. A newer version, or stopping, aborts it.
+  const applying = latestSignal()
   const apply = async (state: DeviceConfigState): Promise<void> => {
-    const own = ++generation
+    const signal = applying.next()
     if (state.error) {
       pushBackgroundError('', 'Could not read acorn.json', `${state.error.message} (line ${state.error.line}, column ${state.error.column}).`)
       return
     }
     onApplied?.(state.config)
     for (const [key, value] of Object.entries(deviceConfigPrefs(state.config))) {
-      if (own !== generation) return
+      if (signal.aborted) return
       await savePref(client(), key, value, { skipConfigWrite: true })
     }
-    if (own === generation) setRequested((state.config.plugins ?? []) as ConfigPluginRequest[])
+    if (!signal.aborted) setRequested((state.config.plugins ?? []) as ConfigPluginRequest[])
   }
   await apply(await bridge.read())
   const off = bridge.onChange((state) => void apply(state))
-  const stop = () => { generation++; off(); if (stopped === stop) stopped = undefined }
+  const stop = () => { applying.abort(); off(); if (stopped === stop) stopped = undefined }
   stopped?.()
   stopped = stop
   return stop

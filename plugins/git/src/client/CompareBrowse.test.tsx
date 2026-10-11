@@ -14,7 +14,8 @@ vi.mock('@solidjs/router', () => ({
   useNavigate: () => navigate,
 }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: { refs: [] } }) }))
-vi.mock('@acorn/plugin-api/client', () => ({ onScopeEvicted: () => () => {}, activeNodeId: node, writeJson }))
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal, onScopeEvicted: () => () => {}, activeNodeId: node, writeJson }))
 vi.mock('./refsClient', () => ({ refsOptions: () => ({ queryKey: ['refs'] }) }))
 
 const { CompareSourceList } = await import('./CompareBrowse')

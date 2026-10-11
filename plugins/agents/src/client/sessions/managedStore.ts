@@ -1,6 +1,6 @@
 import { agentTelemetry } from './agentTelemetry'
 import { batch, createEffect, createRoot, createSignal, untrack, type Signal } from 'solid-js'
-import { activeNodeId, createLogger, describeError, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
+import { activeNodeId, createLogger, describeError, latestSignal, nodeState, observeAttention, onScopeEvicted } from '@acorn/plugin-api/client'
 import { fromManagedSession } from '../../contract/attention'
 import { wsOnAgentFrame } from './wsChannel'
 import type {
@@ -32,13 +32,15 @@ const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapsh
 // only when that task's rows change, so rows for other tasks don't run at all. A slice is made on
 // first read and kept, because a reader may still hold it. There is one per task anyone asked about.
 const taskSlices = new Map<string, Signal<readonly AgentSession[]>>()
-let generation = 0
+// The store's contents since the last `clear()`. A clear aborts it, so reads and holds from before
+// the clear stop writing.
+const storeContents = latestSignal()
 
 /** Captures the authority of a read, including clears while staying on the same Node. */
 function captureRead(sessionId?: string) {
   const nodeId = activeNodeId()
-  const started = generation
-  const current = () => started === generation && nodeId === activeNodeId()
+  const contents = storeContents.signal
+  const current = () => !contents.aborted && nodeId === activeNodeId()
     && (!sessionId || !deletedSessionIds.has(sessionId))
   return { nodeId, current, check() {
     if (!current()) throw new Error('This managed agent read no longer owns the active store.')
@@ -666,13 +668,13 @@ export const managedAgentStore = {
    * drop the transcript from under it. Holding reads nothing: `loadSnapshot` still does that.
    */
   hold(sessionId: string): () => void {
-    const started = generation
+    const contents = storeContents.signal
     holds.set(sessionId, (holds.get(sessionId) ?? 0) + 1)
     let released = false
     return () => {
       if (released) return
       released = true
-      if (started !== generation) return
+      if (contents.aborted) return
       const count = (holds.get(sessionId) ?? 1) - 1
       if (count > 0) return void holds.set(sessionId, count)
       holds.delete(sessionId)
@@ -695,7 +697,7 @@ export const managedAgentStore = {
   // attention gate clears itself on the same event (client-core deliver.ts).
   captureRead,
   clear(): void {
-    generation++
+    storeContents.next()
     holds.clear()
     setRoster(() => [])
     setDelegations({})

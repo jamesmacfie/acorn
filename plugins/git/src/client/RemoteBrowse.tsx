@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId } from '@acorn/plugin-api/client'
+import { activeNodeId, latestSignal } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, EmptyState, Facts, IconButton, Input, Modal, Row, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
 import type { GitRemote, RemoteChange } from '../shared/api'
 import { sameGitActionScope } from './launchWorkflow'
@@ -40,14 +40,14 @@ export function RemoteDetail(props: { projectId: string; selected: string | null
   const [error, setError] = createSignal('')
   const [feedback, setFeedback] = createSignal('')
   const [captured, setCaptured] = createSignal<{ nodeId: string | null; projectId: string; remote: GitRemote | null } | null>(null)
-  let generation = 0
+  const remoteChange = latestSignal()
   const open = (next: Action) => {
-    generation++
+    remoteChange.abort()
     setBusy(false)
     setCaptured({ nodeId: activeNodeId(), projectId: props.projectId, remote: remote() })
     setAction(next); setName(remote()?.name ?? ''); setUrl(remote()?.fetchUrl ?? ''); setError(''); setFeedback('')
   }
-  const close = () => { generation++; setAction(null); setBusy(false) }
+  const close = () => { remoteChange.abort(); setAction(null); setBusy(false) }
   const submit = async () => {
     const target = captured(), kind = action()
     if (!target || !kind) return
@@ -58,8 +58,8 @@ export function RemoteDetail(props: { projectId: string; selected: string | null
       : kind === 'fetch' && target.remote ? { action: kind, name: target.remote.name, expectedUrl: target.remote.fetchUrl } : null
     if (!request) return
     const queryKey = remotesKey(target.projectId)
-    const own = ++generation
-    const current = () => own === generation && target.nodeId === activeNodeId() && target.projectId === props.projectId && action() === kind
+    const signal = remoteChange.next()
+    const current = () => !signal.aborted && target.nodeId === activeNodeId() && target.projectId === props.projectId && action() === kind
     setBusy(true); setError('')
     try {
       const result = await changeRemote(target.projectId, request)
@@ -71,7 +71,7 @@ export function RemoteDetail(props: { projectId: string; selected: string | null
     finally { if (current()) setBusy(false) }
   }
   createEffect(on(() => `${activeNodeId()}:${props.projectId}:${props.selected}`, () => { close(); setFeedback('') }, { defer: true }))
-  onCleanup(() => { generation++ })
+  onCleanup(() => remoteChange.abort())
   return <Stack gap="section">
     <SectionHeader>Repository remotes</SectionHeader>
     <Button onPress={() => open('add')}>Add remote</Button>

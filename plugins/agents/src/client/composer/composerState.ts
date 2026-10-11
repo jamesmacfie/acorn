@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { activeNodeId } from '@acorn/plugin-api/client'
+import { activeNodeId, latestSignal } from '@acorn/plugin-api/client'
 import type { AgentAttachment } from '../../contract/wire.ts'
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { composerDraftKey, deleteComposerPayload, readComposerPayload, writeComposerPayload } from './composerDraftStorage'
@@ -23,7 +23,8 @@ function createDraft(nodeId: string | null, sessionId: string) {
   let textRevision = 0
   let attachmentRevision = 0
   let contextRevision = 0
-  let captureRevision = 0
+  // A context capture. Starting another aborts it.
+  const capture = latestSignal()
   let valid = true
   let holders = 0
   let preserveHydration = false
@@ -38,8 +39,8 @@ function createDraft(nodeId: string | null, sessionId: string) {
     nodeId, sessionId, key, text, attachments, contexts, error, sending, uploading, replacing, capturing,
     valid: () => valid,
     revisions: () => [textRevision, attachmentRevision, contextRevision] as const,
-    captureRevision: () => ++captureRevision,
-    captureCurrent: (revision: number) => valid && revision === captureRevision,
+    startCapture: () => capture.next(),
+    captureCurrent: (started: AbortSignal) => valid && !started.aborted,
     attachmentIds: () => attachmentIds,
     setText(next: string) { if (!valid) return; textRevision++; setText(next); persist('text') },
     setAttachments(next: Update<AgentAttachment[]>) {

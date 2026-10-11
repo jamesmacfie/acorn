@@ -3,7 +3,7 @@ import type { QueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
-import { activeNodeId, activeTaskId, createLogger, debounce, documentSelection, featureUsable, formatFileReference, paneModel, queryOwner, resolveDocumentServices, sendReferenceToAgent, slotFills, telemetryFor, toast, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect, type ContentSelectionTarget, type Task } from '@acorn/plugin-api/client'
+import { activeNodeId, activeTaskId, createLogger, debounce, documentSelection, featureUsable, formatFileReference, latestSignal, paneModel, queryOwner, resolveDocumentServices, sendReferenceToAgent, slotFills, telemetryFor, toast, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect, type ContentSelectionTarget, type Task } from '@acorn/plugin-api/client'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, languageServices, refreshEditorTheme, refreshLanguageServices, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { EDITOR_DOCUMENT_POINT, type EditorDocumentProps } from '@acorn/protocol/extensionPoints.ts'
@@ -31,20 +31,6 @@ type EditorEngine = typeof import('./editorEngine')
 export type DiskState = 'changed' | 'deleted' | 'read-failed' | 'unknown' | 'recovered'
 export type EditorReveal = { path: string; line: number; column?: number }
 
-/** One async job at a time: taking the next signal aborts the one handed out before it. */
-function latestSignal() {
-  let controller = new AbortController()
-  return {
-    get signal(): AbortSignal { return controller.signal },
-    next(): AbortSignal {
-      controller.abort()
-      controller = new AbortController()
-      return controller.signal
-    },
-    abort(): void { controller.abort() },
-  }
-}
-
 export type EditorControllerInput = {
   task: Pick<Task, 'id' | 'projectId'>
   api: EditorApi
@@ -59,7 +45,8 @@ export type EditorController = ReturnType<typeof createEditorController>
 // from the pane's body or from a test's `createRoot`. Its effects and cleanups belong to the
 // caller's owner, so it lives as long as the pane does.
 //
-// Each async job that a newer one can make stale holds an AbortSignal from its own `latestSignal`.
+// Each async job that a newer one can make stale holds an AbortSignal from its own `latestSignal`
+// (docs/conventions.md § Solid and state).
 // The job checks its signal after every await.
 export function createEditorController(input: EditorControllerInput) {
   const { api, queryClient, prefs } = input
@@ -320,7 +307,7 @@ export function createEditorController(input: EditorControllerInput) {
     }
     if (custody.state) state = custody.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(relPath, activeLanguage, indentation)) }).state
     custody.state = state
-    const entry: PooledFile = { state, custody, release: custody.retain(), language: activeLanguage, indentation, mount: mountToken, markersReadAt: 0, markersGeneration: 0 }
+    const entry: PooledFile = { state, custody, release: custody.retain(), language: activeLanguage, indentation, mount: mountToken, markersReadAt: 0, markersRead: latestSignal() }
     saved.set(relPath, custody.acknowledged)
     pool.files.set(relPath, entry)
     watchCustody(relPath, entry)
@@ -376,14 +363,14 @@ export function createEditorController(input: EditorControllerInput) {
     const entry = pool.files.get(relPath)
     if (!api || !entry || entry.custody.dirty || entry.custody.writing) return
     entry.markersReadAt = Date.now()
-    const generation = ++entry.markersGeneration
+    const markersRead = entry.markersRead.next()
     const doc = entry.custody.current
     const revision = entry.custody.revision
     const bodyRevision = await markerRevision(doc.toString()).catch(() => null)
-    if (!bodyRevision || !live() || generation !== entry.markersGeneration || entry.custody.revision !== revision) return
+    if (!bodyRevision || !live() || markersRead.aborted || entry.custody.revision !== revision) return
     const response = await api.lineMarkers(taskId, relPath, bodyRevision).catch(() => null)
     if (!response || response.revision !== bodyRevision || !live() || pool.files.get(relPath) !== entry || entry.custody.dirty || entry.custody.writing
-      || generation !== entry.markersGeneration || entry.custody.revision !== revision || !entry.custody.current.eq(doc)) return
+      || markersRead.aborted || entry.custody.revision !== revision || !entry.custody.current.eq(doc)) return
     const markers = response.markers
     if (view && currentPath === relPath) {
       view.dispatch({ effects: engine!.lineMarkerEffect(markers) })

@@ -1,6 +1,7 @@
 import { EditorState } from '@codemirror/state'
 import { afterEach, expect, it, vi } from 'vitest'
 import { documentCustody, fileDocumentCustodies } from '@acorn/plugin-api/ui/editor'
+import { latestSignal } from '@acorn/plugin-api/client'
 import { setActiveNode } from '@acorn/plugin-api/testkit/client'
 import type { EditorApi } from './editorClient'
 import type { FileTarget } from '../contract/api'
@@ -40,7 +41,7 @@ it('holds old writers through a delayed folder rename, menu dismissal, and pane 
   custody.flushRecovery()
   const owner = pool()
   const release = custody.retain()
-  owner.files.set('dir/a.ts', { custody, state: custody.state, release, language: [], indentation: { mode: 'spaces', width: 2 }, mount: {}, markersReadAt: 0, markersGeneration: 0 })
+  owner.files.set('dir/a.ts', { custody, state: custody.state, release, language: [], indentation: { mode: 'spaces', width: 2 }, mount: {}, markersReadAt: 0, markersRead: latestSignal() })
   editorOpen(taskId, 'dir/a.ts', true)
   editorSetDirty(taskId, 'dir/a.ts', true)
   editorOpen(taskId, 'dir/preview.ts', true)

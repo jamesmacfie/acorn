@@ -1,7 +1,7 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
-import { activeNodeId, writeJson } from '@acorn/plugin-api/client'
+import { activeNodeId, latestSignal, writeJson } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, Facts, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { comparisonRoute, type Comparison, type ComparisonMode } from '../shared/api'
 import { refsOptions } from './refsClient'
@@ -23,13 +23,13 @@ export function CompareSourceList() {
   const [mode, setMode] = createGitViewSignal<ComparisonMode>(() => params.projectId, () => 'compare:mode', () => 'direct')
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
-  let generation = 0
+  const pinning = latestSignal()
   const scope = () => JSON.stringify([activeNodeId(), params.projectId])
   const choices = () => [{ value: '', label: 'Choose a ref' }, ...(refs.data?.refs.filter((ref) => !!ref.commitId).map((ref) => ({ value: `${ref.kind}:${ref.name}`, label: `${ref.kind} · ${ref.name} · ${ref.commitId!.slice(0, 8)}` })) ?? [])]
   const pin = async () => {
     const nodeId = activeNodeId(), projectId = params.projectId
-    const own = ++generation
-    const current = () => own === generation && nodeId === activeNodeId() && projectId === params.projectId
+    const signal = pinning.next()
+    const current = () => !signal.aborted && nodeId === activeNodeId() && projectId === params.projectId
     setBusy(true); setError('')
     try {
       const result = await writeJson<Comparison>(comparisonRoute(projectId), { method: 'POST', headers: { 'content-type': 'application/json' },
@@ -39,12 +39,12 @@ export function CompareSourceList() {
     finally { if (current()) setBusy(false) }
   }
   createEffect(on(scope, (current, previous) => {
-    generation++; setError(''); setBusy(false)
+    pinning.abort(); setError(''); setBusy(false)
     const [, oldProject] = previous ? JSON.parse(previous) as [string | null, string | null] : [null, null]
     const [, nextProject] = JSON.parse(current) as [string | null, string | null]
     if (oldProject && nextProject && current !== previous && pinned()) navigate(base(nextProject))
   }, { defer: true }))
-  onCleanup(() => { generation++ })
+  onCleanup(() => pinning.abort())
   return <Stack gap="row">
     <Select label="Source ref" value={source()} options={choices().map((choice) => ({ ...choice, label: choice.value ? `Source: ${choice.label}` : 'Source: choose ref' }))} onChange={setSource} />
     <Select label="Destination ref" value={destination()} options={choices().map((choice) => ({ ...choice, label: choice.value ? `Destination: ${choice.label}` : 'Destination: choose ref' }))} onChange={setDestination} />

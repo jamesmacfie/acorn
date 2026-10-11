@@ -1,4 +1,5 @@
 import { createMemo, createSignal } from 'solid-js'
+import { latestSignal } from '@acorn/plugin-api/client'
 import type { EditorApi } from './editorClient'
 import type { EditorFileStatusSnapshot } from '../contract/fileStatus'
 import { projectFileStatus } from './fileStatusModel'
@@ -8,23 +9,23 @@ export function createFileStatusReader(api: Pick<EditorApi, 'fileStatus'>, taskI
   const [snapshot, setSnapshot] = createSignal<EditorFileStatusSnapshot | null>(null)
   const [stale, setStale] = createSignal(false)
   const projection = createMemo(() => projectFileStatus(snapshot()))
-  let revision = 0
+  // A newer request aborts the commit of the read in flight, which then runs once more.
+  const latest = latestSignal()
   let running = false
   let pending = false
   let stopped = false
   const refresh = () => {
     if (stopped) return
-    const requested = ++revision
+    const signal = latest.next()
     if (running) { pending = true; return }
     running = true
-    const current = requested
     void api.fileStatus(taskId).then((next) => {
-      if (!stopped && isCurrent() && current === revision) {
+      if (!stopped && isCurrent() && !signal.aborted) {
         setSnapshot(next.kind === 'ready' ? next : null)
         setStale(false)
       }
     }).catch((cause: unknown) => {
-      if (stopped || !isCurrent() || current !== revision) return
+      if (stopped || !isCurrent() || signal.aborted) return
       if (typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 404) {
         setSnapshot(null)
         setStale(false)
@@ -40,11 +41,11 @@ export function createFileStatusReader(api: Pick<EditorApi, 'fileStatus'>, taskI
     refresh,
     providerChanged: () => {
       if (stopped) return
-      revision++
+      latest.abort()
       setSnapshot(null)
       setStale(false)
       refresh()
     },
-    stop: () => { stopped = true; revision++; pending = false },
+    stop: () => { stopped = true; latest.abort(); pending = false },
   }
 }

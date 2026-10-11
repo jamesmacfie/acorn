@@ -38,6 +38,7 @@ import { setScrollPlaceHandler } from '../../kit/lib/telemetry/scrollPlace'
 import { setSurfaceHealthHandler, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
 import { beginInteractionWork, clearInteractionWork, recordInteractionWork, takeInteractionWork } from './interactionWork'
 import { telemetryQueue, type TelemetryQueue } from './queue'
+import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSignal'
 
 /** Same numbers as the node's collector, for the same reasons: enough that a burst survives one
  *  window, small enough that a flush is one modest request. */
@@ -88,7 +89,9 @@ type EmitterState = {
   trace: { traceId: string; spanId: string } | null
   truncated: number
   refused: number
-  generation: number
+  // One stretch of collection. Turning collection on or off, or a reset, ends it, so a span, a
+  // measure, or a failed post from before can't report into the next one.
+  collection: LatestSignal
 }
 
 const state: EmitterState = {
@@ -102,7 +105,7 @@ const state: EmitterState = {
   trace: null,
   truncated: 0,
   refused: 0,
-  generation: 0,
+  collection: latestSignal(),
 }
 
 /** The one boolean read every verb below starts with. Off means no record is built at all. */
@@ -118,7 +121,7 @@ export const telemetryEnabled = (): boolean => state.enabled
  */
 export function setTelemetryEnabled(on: boolean): void {
   if (state.enabled === on) return
-  state.generation += 1
+  state.collection.next()
   slowSamples = 0
   if (!on) { activity = null; clearInteractionWork(); renderBatches.clear() }
   state.enabled = on
@@ -342,7 +345,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
   const spanId = newSpanId()
   const started = Date.now()
   const from = performance.now()
-  const generation = state.generation
+  const collection = state.collection.signal
   let ended = false
   return {
     traceId,
@@ -350,7 +353,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
     end: (status = 'ok', attrs) => {
       if (ended) return
       ended = true
-      if (generation !== state.generation) return
+      if (collection.aborted) return
       emitSpan(owner, {
         traceId,
         spanId,
@@ -535,9 +538,9 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
   const from = performance.now()
   const started = Date.now()
   const trace = currentTrace()
-  const generation = state.generation
+  const collection = state.collection.signal
   const finish = (status: 'ok' | 'error' = 'ok') => {
-    if (generation !== state.generation) return
+    if (collection.aborted) return
     const durationMs = performance.now() - from
     recordDuration(owner, seam, durationMs, attrs)
     // Detailed exemplars are bounded; the histogram still counts every call, including fast ones.
@@ -615,7 +618,7 @@ export async function flushTelemetry(): Promise<void> {
   }
   const post = state.post
   if (!post || state.queue.size() === 0) return
-  const generation = state.generation
+  const collection = state.collection.signal
   const records = state.queue.take()
   state.posting = true
   try {
@@ -623,7 +626,7 @@ export async function flushTelemetry(): Promise<void> {
   } catch {
     // The node is offline, restarting, or refusing. Keep the records: the queue's cap is what stops
     // an unreachable node turning into an unbounded buffer.
-    if (state.enabled && generation === state.generation) state.queue.putBack(records)
+    if (state.enabled && !collection.aborted) state.queue.putBack(records)
   } finally {
     state.posting = false
   }
@@ -719,7 +722,7 @@ export function _resetClientTelemetry(): void {
   setScrollPlaceHandler(null)
   setSurfaceHealthHandler(null)
   disarm()
-  state.generation += 1
+  state.collection.next()
   state.enabled = false
   state.post = null
   state.posting = false

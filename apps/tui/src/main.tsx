@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util'
 import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { latestSignal } from '@acorn/client-core/kit/lib/latestSignal'
 import { bootMark, heldLines, holdLine, printBootMarks } from './boot'
 import { render } from './tree/renderer'
 import { installPlatform } from './platform'
@@ -237,12 +238,12 @@ async function fillIn(): Promise<void> {
   // is when those are worth asking again. The desktop's composition root holds the same effect for the
   // same reason (apps/desktop/src/client/index.tsx).
   createRoot(() => {
-    let refresh = 0
+    const refresh = latestSignal()
     createEffect(() => {
-      const current = ++refresh
+      const current = refresh.next()
       if (nodeState(opened.nodeId) === 'offline') return
       void refreshNodeQueries(client).then(() => {
-        if (current === refresh && nodeState(opened.nodeId) === 'online') markNodeRecovered(opened.nodeId)
+        if (!current.aborted && nodeState(opened.nodeId) === 'online') markNodeRecovered(opened.nodeId)
       })
     })
   })

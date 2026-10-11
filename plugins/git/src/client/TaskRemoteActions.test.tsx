@@ -8,7 +8,8 @@ vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: [
   { id: 'task-a', title: 'First task', projectId: 'project', status: 'active' },
   { id: 'task-b', title: 'Second task', projectId: 'project', status: 'active' },
 ] }) }))
-vi.mock('@acorn/plugin-api/client', () => ({ activeNodeId: node, tasksOptions: () => ({ queryKey: ['tasks'] }), writeJson }))
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal, activeNodeId: node, tasksOptions: () => ({ queryKey: ['tasks'] }), writeJson }))
 vi.mock('./launchWorkflow', () => ({ sameGitActionScope: (captured: string, projectId: string, current: string) => captured === node() && projectId === current }))
 
 const { TaskRemoteActions } = await import('./TaskRemoteActions')

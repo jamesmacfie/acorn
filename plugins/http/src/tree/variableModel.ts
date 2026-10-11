@@ -21,15 +21,19 @@ export function createVariableModel(client: () => HttpClient, projectId: () => s
   const [rows, setRows] = createSignal<VariableRow[]>([])
   const [error, setError] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal<string[]>([])
-  let entries: Entry[] = [], generation = 0, disposed = false
+  let entries: Entry[] = [], disposed = false
+  // The variables of one Node and project. A change of either, or unmounting, aborts it.
+  let scopeLifetime = new AbortController()
   const operations = new Set<AbortController>()
   const publish = () => setRows(entries.map((entry) => entry.row))
   const retire = () => { for (const controller of operations) controller.abort(); operations.clear(); setBusy([]) }
-  onCleanup(() => { disposed = true; generation++; retire() })
+  onCleanup(() => { disposed = true; scopeLifetime.abort(); retire() })
   createEffect(() => {
     const origin = client(), project = projectId(), scope = variableScope(origin, project)
     retire()
-    const selectedGeneration = ++generation
+    scopeLifetime.abort()
+    scopeLifetime = new AbortController()
+    const selected = scopeLifetime.signal
     entries = subjects.get(scope) ?? []
     subjects.set(scope, entries)
     setError(null)
@@ -37,7 +41,7 @@ export function createVariableModel(client: () => HttpClient, projectId: () => s
     const controller = new AbortController()
     operations.add(controller)
     void withAbort(controller.signal, () => origin.listVariables(project, controller.signal)).then((saved) => {
-      if (disposed || generation !== selectedGeneration) return
+      if (disposed || selected.aborted) return
       // Reconcile by identity. A held load cannot erase edits made before it returned.
       const dirty = entries.filter((entry) => entry.dirty || entry.write)
       const dirtyIds = new Set(dirty.map((entry) => entry.row.id))
@@ -45,7 +49,7 @@ export function createVariableModel(client: () => HttpClient, projectId: () => s
       subjects.set(scope, entries)
       publish()
     }).catch((err) => {
-      if (!disposed && generation === selectedGeneration && !controller.signal.aborted)
+      if (!disposed && !selected.aborted && !controller.signal.aborted)
         setError(err instanceof Error ? err.message : 'Could not refresh variables')
     }).finally(() => operations.delete(controller))
   })
@@ -66,13 +70,13 @@ export function createVariableModel(client: () => HttpClient, projectId: () => s
     const entry = entries[index]
     if (disposed || !entry) return
     const origin = client(), project = projectId(), ownerEntries = entries
-    const selectedGeneration = generation, revision = entry.revision, submitted = { ...entry.row }
+    const selected = scopeLifetime.signal, revision = entry.revision, submitted = { ...entry.row }
     if (!remove && !submitted.name.trim()) return setError('A variable needs a name.')
     const controller = new AbortController(), previous = entry.write
     operations.add(controller)
     setBusy((keys) => [...keys, submitted.key])
     setError(null)
-    const current = () => !disposed && generation === selectedGeneration
+    const current = () => !disposed && !selected.aborted
     const operation = (async () => {
       try {
         if (previous) await withAbort(controller.signal, () => previous)

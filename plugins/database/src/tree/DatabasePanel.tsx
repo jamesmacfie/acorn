@@ -43,14 +43,20 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   } = workspaceModel
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
-  const [generating, setGenerating] = createSignal<{ expectedText: string; generation: number }>()
+  const [generating, setGenerating] = createSignal<{ expectedText: string; selection: AbortSignal }>()
   const [saving, setSaving] = createSignal<string | null>(null) // the SQL being saved (null = modal closed)
 
   const [restoredState, setRestoredState] = createSignal(!!restored)
   let userChanged = false
   let disposed = false
-  let selectionGeneration = 0
-  onCleanup(() => { disposed = true; selectionGeneration++ })
+  // The query selection. Each new one aborts the one before, and so does unmounting.
+  let selection = new AbortController()
+  const nextSelection = (): AbortSignal => {
+    selection.abort()
+    selection = new AbortController()
+    return selection.signal
+  }
+  onCleanup(() => { disposed = true; selection.abort() })
 
   const fail = (e: unknown) => { if (!disposed) setError(e instanceof Error ? e.message : String(e)) }
 
@@ -92,7 +98,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   // The shared document, written through the host.
   const writeSql = (sql: string) => {
-    selectionGeneration++
+    nextSelection()
     return props.bridge.document.write(sql)
   }
 
@@ -120,12 +126,12 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   async function openTable(t: DbTable) {
     if (busy() || disposed || status() !== 'connected') return
     userChanged = true
-    const generation = ++selectionGeneration
+    const chosen = nextSelection()
     setBusy(true)
     try {
       // Browsing rows remains available even when the sibling document is in recovery.
       const expectedText = await props.bridge.document.read().catch((cause: unknown) => { fail(cause); return undefined })
-      if (disposed || generation !== selectionGeneration) return
+      if (disposed || chosen.aborted) return
       batch(() => {
         setSelected(t)
         setActiveRow(null)
@@ -133,10 +139,10 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         setInserting(false)
       })
       const cols = await listColumns(props.taskId, t.schema, t.name)
-      if (disposed || generation !== selectionGeneration) return
+      if (disposed || chosen.aborted) return
       setColumns('error' in cols ? [] : cols.columns)
       const rows = await listRows(props.taskId, t.schema, t.name)
-      if (disposed || generation !== selectionGeneration) return
+      if (disposed || chosen.aborted) return
       if ('error' in rows) return setError(rows.error)
       batch(() => {
         setResult({ columns: rows.columns, rows: rows.rows, rowCount: rows.rowCount, command: rows.command })
@@ -144,7 +150,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         setFooter(`${count(rows.rows.length)} of ${rows.total == null ? '?' : count(rows.total)} rows`)
         setError('')
       })
-      if (expectedText !== undefined && !disposed && generation === selectionGeneration) {
+      if (expectedText !== undefined && !disposed && !chosen.aborted) {
         await props.bridge.document.write(`SELECT * FROM ${quoteIdentifier(t.schema)}.${quoteIdentifier(t.name)} LIMIT 500;`, { expectedText })
       }
     } catch (e) {
@@ -243,7 +249,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     // The selection that opened this pane rides in `context`; every later one is a message
     // (docs/plugins/tree-contract.md § The tree contract). Both land in the same signal.
     setRequested(props.bridge.context.item)
-    onCleanup(props.bridge.onSelect((item) => { selectionGeneration++; setRequested(item) }))
+    onCleanup(props.bridge.onSelect((item) => { nextSelection(); setRequested(item) }))
     void (async () => { if (!restored) await restore(); if (!disposed) await connect() })()
   })
   onCleanup(() => {
@@ -258,8 +264,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const loadSaved = (q: DbSavedQuery) => {
     userChanged = true
     const write = writeSql(q.sql)
-    const generation = selectionGeneration
-    void write.then(() => { if (!disposed && generation === selectionGeneration) setLoadedName(q.name) }).catch(fail)
+    const chosen = selection.signal
+    void write.then(() => { if (!disposed && !chosen.aborted) setLoadedName(q.name) }).catch(fail)
   }
 
   createEffect(() => {
@@ -269,13 +275,13 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       setRequested(undefined)
       // Read the row, not the editor: this runs because the node wrote SQL the editor has not seen.
       // Loading a generated query is not running it, exactly as picking a saved one is not.
-      const generation = ++selectionGeneration
+      const chosen = nextSelection()
       void (async () => {
         const expectedText = await props.bridge.document.read()
         const sql = await readScratch(props.taskId)
-        if (disposed || generation !== selectionGeneration) return
+        if (disposed || chosen.aborted) return
         await props.bridge.document.write(sql, { expectedText })
-      })().catch((cause: unknown) => { if (!disposed && generation === selectionGeneration) fail(cause) })
+      })().catch((cause: unknown) => { if (!disposed && !chosen.aborted) fail(cause) })
       return
     }
     const q = savedList().find((candidate) => candidate.id === id)
@@ -333,9 +339,9 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         </Button>
         <Show when={backends().length}>
           <Button size="sm" disabled={busy() || !connected()} onPress={() => {
-            const generation = ++selectionGeneration
+            const chosen = nextSelection()
             void props.bridge.document.read().then((expectedText) => {
-              if (!disposed && generation === selectionGeneration) setGenerating({ expectedText, generation })
+              if (!disposed && !chosen.aborted) setGenerating({ expectedText, selection: chosen })
             }, fail)
           }}>Generate</Button>
         </Show>
@@ -487,7 +493,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               onDismiss={() => setGenerating(undefined)}
               onGenerated={(sql) => {
                 const loading = generating()
-                if (disposed || !loading || loading.generation !== selectionGeneration) throw new Error('The query selection changed while generating. Generate again.')
+                if (disposed || !loading || loading.selection.aborted) throw new Error('The query selection changed while generating. Generate again.')
                 return props.bridge.document.write(sql, { expectedText: loading.expectedText })
               }}
             />

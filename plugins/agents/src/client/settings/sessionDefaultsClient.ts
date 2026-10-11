@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import { readJson, writeJson } from '@acorn/plugin-api/client'
+import { latestSignal, readJson, writeJson } from '@acorn/plugin-api/client'
 import {
   agentSessionDefaultsRoute,
   type AgentSessionDefaults,
@@ -35,20 +35,20 @@ export const saveAgentSessionDefaults = (patch: Partial<AgentSessionDefaults>) =
  * rethrown, because the two callers report it differently — the page has an alert and the palette
  * keeps the frame open with the message on it.
  */
-let latestWrite = 0
+const latestWrite = latestSignal()
 export async function writeAgentSessionDefaults(
   queryClient: QueryClient,
   current: AgentSessionDefaults,
   patch: Partial<AgentSessionDefaults>,
 ): Promise<AgentSessionDefaults> {
-  const attempt = ++latestWrite
+  const write = latestWrite.next()
   queryClient.setQueryData(agentSessionDefaultsQueryKey, { ...current, ...patch })
   try {
     const saved = await saveAgentSessionDefaults(patch)
     queryClient.setQueryData(agentSessionDefaultsQueryKey, saved)
     return saved
   } catch (cause) {
-    if (attempt === latestWrite) queryClient.setQueryData(agentSessionDefaultsQueryKey, current)
+    if (!write.aborted) queryClient.setQueryData(agentSessionDefaultsQueryKey, current)
     void queryClient.invalidateQueries({ queryKey: agentSessionDefaultsQueryKey })
     throw cause
   }

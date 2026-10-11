@@ -12,7 +12,8 @@ vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ data: firstPage }),
   useQueryClient: () => ({ invalidateQueries }),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({ onScopeEvicted: () => () => {},
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal, onScopeEvicted: () => () => {},
   activeNodeId: nodeId,
   wsOnNodeEvent: () => () => {},
   wsOnReconnect: () => () => {},

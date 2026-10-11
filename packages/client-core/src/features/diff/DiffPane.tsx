@@ -6,6 +6,7 @@ import { segmentContentKey, type DiffDocumentTopology, type DiffSearchMatch } fr
 import { highlightDocument, tokenizeDocument, type TokenizeDocument } from '../../infra/highlight/worker'
 import { diffWordsDocument } from '../../infra/highlight/wordDiffWorker'
 import { readDraft, writeDraft } from '../../kit/lib/state/draftState'
+import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSignal'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { prefsOptions } from '../../infra/queries'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
@@ -107,11 +108,17 @@ export function DiffPane(props: {
   const canComment = () => source().canComment()
   const invalidate = createMemo(() => { const origin = source(); return () => origin.invalidate() })
   let ownerLive = true
-  let composerEpoch = 0
-  let gapEpoch = 0
-  const gapFileEpochs = new Map<string, number>()
-  let gapFileSequence = 0
-  onCleanup(() => { ownerLive = false; gapEpoch++; composerEpoch++ })
+  // The line composer slot, and every gap read. A new source, scope, or file set ends both.
+  const composerSlot = latestSignal()
+  const gapReads = latestSignal()
+  // Each file's gap reads. A file whose patch moved, or that left the diff, aborts its own.
+  const gapFileReads = new Map<string, LatestSignal>()
+  const gapFileRead = (path: string): LatestSignal => {
+    let read = gapFileReads.get(path)
+    if (!read) gapFileReads.set(path, read = latestSignal())
+    return read
+  }
+  onCleanup(() => { ownerLive = false; gapReads.abort(); composerSlot.abort() })
   let lastTarget = ''
 
   const viewMode = (): ViewMode => (prefs.data?.[PrefKeys.diffView] === 'split' ? 'split' : 'unified')
@@ -286,9 +293,9 @@ export function DiffPane(props: {
   })
 
   createEffect(on(() => [source(), scopeKey()] as const, () => {
-    composerEpoch++
-    gapEpoch++
-    gapFileEpochs.clear()
+    composerSlot.next()
+    gapReads.next()
+    gapFileReads.clear()
     setLineComposer(null)
     setOverlays(new Map())
   }))
@@ -296,9 +303,9 @@ export function DiffPane(props: {
   // A different set of files: nothing about the old view survives.
   createEffect(on(signature, (next, previous) => {
     lastTarget = ''
-    composerEpoch++
-    gapEpoch++
-    gapFileEpochs.clear()
+    composerSlot.next()
+    gapReads.next()
+    gapFileReads.clear()
     health.reset()
     loader.reset()
     layout.reset()
@@ -326,14 +333,13 @@ export function DiffPane(props: {
       const now = new Map(next.files.map((file) => [file.path, file.patchKey]))
       for (const file of shown.topology.files) {
         if (file.patchKey && now.get(file.path) !== file.patchKey) {
-          gapFileEpochs.set(file.path, ++gapFileSequence)
+          gapFileRead(file.path).next()
           if (now.has(file.path)) loader.supersede(file.path, file.patchKey)
         }
       }
     }
     const currentPaths = new Set(next?.files.map((file) => file.path) ?? [])
-    for (const path of gapFileEpochs.keys()) if (!currentPaths.has(path)) gapFileEpochs.delete(path)
-    for (const path of currentPaths) if (!gapFileEpochs.has(path)) gapFileEpochs.set(path, ++gapFileSequence)
+    for (const [path, read] of gapFileReads) if (!currentPaths.has(path)) { read.abort(); gapFileReads.delete(path) }
     shown = next ? { signature: signature(), topology: next } : null
   }))
   createEffect(() => {
@@ -405,8 +411,8 @@ export function DiffPane(props: {
   // gap sat at the edge of. A source with no fileText renders the gap inert.
   const handleExpand = async (gap: GapRow) => {
     const origin = source()
-    const epoch = gapEpoch
-    const fileEpoch = gapFileEpochs.get(gap.path) ?? 0
+    const gapsCurrent = gapReads.signal
+    const fileCurrent = gapFileRead(gap.path).signal
     const scope = scopeKey()
     const fileSet = signature()
     const fileText = origin.fileText
@@ -414,7 +420,7 @@ export function DiffPane(props: {
     if (gap.sha == null || !fileText || !file?.patchKey) return
     const at = gapPosition(gap)
     if (!at) return
-    const current = () => ownerLive && source() === origin && gapEpoch === epoch && (gapFileEpochs.get(gap.path) ?? 0) === fileEpoch && scopeKey() === scope
+    const current = () => ownerLive && source() === origin && !gapsCurrent.aborted && !fileCurrent.aborted && scopeKey() === scope
       && signature() === fileSet && view.fileByPath().get(gap.path)?.patchKey === file.patchKey
       && !!loader.rows(at.segment)
     try {
@@ -617,8 +623,8 @@ export function DiffPane(props: {
   const composerFor = (key: string): LineComposerController => {
     const draftKey = lineDraftKey(key)
     const origin = props.source
-    const epoch = composerEpoch
-    const ownsVisibleSlot = () => ownerLive && props.source === origin && composerEpoch === epoch
+    const slot = composerSlot.signal
+    const ownsVisibleSlot = () => ownerLive && props.source === origin && !slot.aborted
     return {
       isOpen: () => ownsVisibleSlot() && lineComposer()?.key === key,
       body: () => {

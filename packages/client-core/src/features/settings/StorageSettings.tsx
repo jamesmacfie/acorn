@@ -6,6 +6,7 @@ import { nodeStorageReport } from '../../infra/node/nodeStorage'
 import { extensionPointRegistry } from '../../host/registries/extensionPoints/extensionPoints'
 import { Slot } from '../../host/tree/Slot'
 import { formatBytes } from '../../kit/lib/rendering/formatSize'
+import { latestSignal } from '../../kit/lib/state/latestSignal'
 import { Facts } from '../../kit/components/content/Facts'
 import { Text } from '../../kit/components/content/Text'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
@@ -49,20 +50,20 @@ export default function StorageSettings(props: { nodeId: string | null }) {
   const [cleared, setCleared] = createSignal('')
 
   // Only the newest read lands, so a slow answer from the previous node cannot overwrite this one's.
-  let generation = 0
+  const storageRead = latestSignal()
   const read = async () => {
-    const mine = ++generation
+    const signal = storageRead.next()
     try {
       const [next, snapshot] = await Promise.all([
         nodeStorageReport(nodeId() ?? undefined),
         persistedCacheSize(cacheId()),
       ])
-      if (mine !== generation) return
+      if (signal.aborted) return
       setReport(next)
       setSaved(snapshot)
       setError('')
     } catch (failure) {
-      if (mine === generation) setError(failure instanceof Error ? failure.message : String(failure))
+      if (!signal.aborted) setError(failure instanceof Error ? failure.message : String(failure))
     }
   }
 

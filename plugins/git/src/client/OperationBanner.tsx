@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, type Task } from '@acorn/plugin-api/client'
+import { activeNodeId, latestSignal, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, Row, Rows, Stack, Text } from '@acorn/plugin-api/ui'
 import type { OperationControlAction } from '../shared/api'
 import { operationActions, operationKey, operationLabel, operationOptions, stageNames } from './operationClient'
@@ -15,8 +15,8 @@ export function OperationBanner(props: { task: Task; onResolve: (path: string, c
   watchWorktreeInventory(() => void cache.invalidateQueries({ queryKey: operationKey(props.task.id) }))
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  let generation = 0
-  createEffect(on(() => `${activeNodeId()}:${props.task.id}`, () => { generation++; setBusy(false); setError('') }, { defer: true }))
+  const control = latestSignal()
+  createEffect(on(() => `${activeNodeId()}:${props.task.id}`, () => { control.abort(); setBusy(false); setError('') }, { defer: true }))
   const current = () => {
     const data = state.data
     return data?.taskId === props.task.id && (data.operation || data.conflicts.length) ? data : null
@@ -24,17 +24,17 @@ export function OperationBanner(props: { task: Task; onResolve: (path: string, c
   const run = async (action: OperationControlAction) => {
     const observed = current()
     if (!observed?.operation) return
-    const own = ++generation, queryKey = operationKey(observed.taskId)
+    const signal = control.next(), queryKey = operationKey(observed.taskId)
     setBusy(true); setError('')
     try {
       const result = await operationActions.control(observed.taskId, action, { expectedPath: observed.checkout, operation: observed.operation })
       if (result.state) cache.setQueryData(queryKey, result.state)
       else void cache.invalidateQueries({ queryKey })
-      if (own === generation) setError(result.ok ? '' : result.error ?? 'Git refused the operation.')
+      if (!signal.aborted) setError(result.ok ? '' : result.error ?? 'Git refused the operation.')
     } catch (cause) {
       void cache.invalidateQueries({ queryKey })
-      if (own === generation) setError(cause instanceof Error ? cause.message : String(cause))
-    } finally { if (own === generation) setBusy(false) }
+      if (!signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
+    } finally { if (!signal.aborted) setBusy(false) }
   }
   const resolve = (path: string) => { const observed = current(); if (observed) props.onResolve(path, observed.checkout) }
   return <Show when={current()}>{(observed) => {

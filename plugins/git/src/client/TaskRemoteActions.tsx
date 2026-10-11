@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { activeNodeId, tasksOptions, writeJson } from '@acorn/plugin-api/client'
+import { activeNodeId, latestSignal, tasksOptions, writeJson } from '@acorn/plugin-api/client'
 import { localActionRoute } from '../shared/changes/api'
 import { Alert, Button, SectionHeader, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { sameGitActionScope } from './launchWorkflow'
@@ -11,17 +11,17 @@ export function TaskRemoteActions(props: { projectId: string }) {
   const [taskId, setTaskId] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [feedback, setFeedback] = createSignal('')
-  let generation = 0
-  const selectTask = (id: string) => { generation++; setTaskId(id); setBusy(false); setFeedback('') }
+  const remoteAction = latestSignal()
+  const selectTask = (id: string) => { remoteAction.abort(); setTaskId(id); setBusy(false); setFeedback('') }
   createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => selectTask(''), { defer: true }))
-  onCleanup(() => { generation++ })
+  onCleanup(() => remoteAction.abort())
   const choices = () => (tasks.data ?? []).filter((task) => task.projectId === props.projectId && task.status === 'active')
   const selected = () => choices().find((task) => task.id === taskId())
   const run = async (action: 'pull' | 'push', rebase?: boolean) => {
     const nodeId = activeNodeId(), projectId = props.projectId, task = selected()
     if (!task || !sameGitActionScope(nodeId, projectId, props.projectId) || busy()) return
-    const own = ++generation
-    const current = () => own === generation && nodeId === activeNodeId() && projectId === props.projectId && task.id === taskId()
+    const signal = remoteAction.next()
+    const current = () => !signal.aborted && nodeId === activeNodeId() && projectId === props.projectId && task.id === taskId()
     setBusy(true); setFeedback('')
     try {
       const result = await writeJson<{ ok: boolean; reason?: string }>(localActionRoute(task.id, action), {

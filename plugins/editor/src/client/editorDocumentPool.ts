@@ -1,5 +1,6 @@
 import { onCleanup } from 'solid-js'
 import type { EditorState, Extension, Text } from '@codemirror/state'
+import type { LatestSignal } from '@acorn/plugin-api/client'
 import type { DocumentCustody } from '@acorn/plugin-api/ui/editor'
 import type { EditorApi } from './editorClient'
 import type { EditorReadResult } from '../contract/api'
@@ -13,7 +14,8 @@ export type PooledFile = {
   indentation: Indentation
   mount: object
   markersReadAt: number
-  markersGeneration: number
+  // A newer line marker read for this file aborts an older one.
+  markersRead: LatestSignal
   stale?: boolean
   disk?: EditorReadResult
 }

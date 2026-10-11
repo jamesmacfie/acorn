@@ -14,7 +14,8 @@ vi.mock('@tanstack/solid-query', () => ({
   }),
   useQueryClient: () => ({}),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal,
   activeNodeId: node, nodeReady: () => true,
   modelBackendsOptions: () => ({ queryKey: ['model-backends'] }), prefsOptions: () => ({ queryKey: ['prefs'] }),
   readGeneratePick: () => null, saveGeneratePick: async () => true,

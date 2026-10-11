@@ -11,7 +11,8 @@ const pages = new Set<Page>()
 const ids = new WeakMap<Element, number>()
 const clips = new Map<HTMLElement, { clip: string; display: string; height: string }>()
 let nextId = 0
-let generation = 0
+// Sent as `generation` with every update, so the native layer can drop one that arrives out of order.
+let presentationGeneration = 0
 let frame = 0
 let stop: (() => void) | undefined
 let nativeFailed = false
@@ -108,18 +109,18 @@ function reconcile() {
   const key = JSON.stringify(presentation)
   if (key === last) return
   last = key
-  const version = ++generation
+  const version = ++presentationGeneration
   void layer.update({ ...presentation, generation: version }).then((ready) => {
-    if (ready || version !== generation || !pages.size) return
+    if (ready || version !== presentationGeneration || !pages.size) return
     nativeFailed = true
-    void layer.update({ generation: ++generation, pages: [], surfaces: [] }).catch(() => {})
+    void layer.update({ generation: ++presentationGeneration, pages: [], surfaces: [] }).catch(() => {})
     // Geometry-only diagnostics: never page URLs, form values or plugin content.
     log.warn('composition unavailable backend=appkit stage=update; using page suppression')
     schedule()
   }).catch(() => {
-    if (version !== generation || !pages.size) return
+    if (version !== presentationGeneration || !pages.size) return
     nativeFailed = true
-    void layer.update({ generation: ++generation, pages: [], surfaces: [] }).catch(() => {})
+    void layer.update({ generation: ++presentationGeneration, pages: [], surfaces: [] }).catch(() => {})
     log.warn('composition failed backend=appkit stage=update; using page suppression')
     schedule()
   })
@@ -152,7 +153,7 @@ function listen() {
     restoreClips()
     releaseModalIsolation()
     last = ''
-    void rendererLayer()?.update({ generation: ++generation, pages: [], surfaces: [] })
+    void rendererLayer()?.update({ generation: ++presentationGeneration, pages: [], surfaces: [] })
   }
 }
 

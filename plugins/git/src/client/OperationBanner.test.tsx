@@ -12,7 +12,8 @@ vi.mock('@tanstack/solid-query', () => ({
   createQuery: () => ({ get data() { return state() }, error: null }),
   useQueryClient: () => ({ setQueryData, invalidateQueries: vi.fn() }),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({ activeNodeId: () => 'node', nodeReady: () => true, openPane, readJson: vi.fn(), writeJson,
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal, activeNodeId: () => 'node', nodeReady: () => true, openPane, readJson: vi.fn(), writeJson,
   clientEvents: { on: () => () => {} }, wsOnNodeEvent: () => () => {}, wsOnReconnect: () => () => {} }))
 
 const { OperationBanner } = await import('./OperationBanner')

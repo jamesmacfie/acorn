@@ -9,6 +9,7 @@ import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../../infra/persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../../infra/persistence/persistedState'
 import { createLogger } from '../../infra/telemetry/logger'
+import { latestSignal, type LatestSignal } from '../../kit/lib/state/latestSignal'
 
 const log = createLogger('prefs')
 
@@ -28,7 +29,7 @@ type PrefWriteState = {
   tail: Promise<void>
   confirmed: string | undefined
   hadConfirmedValue: boolean
-  latestAttempt: number
+  latestAttempt: LatestSignal
 }
 const writes = new WeakMap<QueryClient, Map<string, PrefWriteState>>()
 
@@ -109,9 +110,9 @@ export async function savePref(
     tail: Promise.resolve(),
     confirmed: previous?.[key],
     hadConfirmedValue: !!previous && key in previous,
-    latestAttempt: 0,
+    latestAttempt: latestSignal(),
   }
-  const attempt = ++state.latestAttempt
+  const attempt = state.latestAttempt.next()
   const request = state.tail.catch(() => {}).then(async () => {
     await setPref(key, value, nodeId)
     state.confirmed = value
@@ -125,7 +126,7 @@ export async function savePref(
   } catch (error) {
     // Equal values aren't equal attempts: dark -> light -> dark can have three requests in flight. Only
     // the latest attempt owns the optimistic cache value and may roll it back.
-    if (state.latestAttempt === attempt) {
+    if (!attempt.aborted) {
       const current = qc.getQueryData<Record<string, string>>(prefsKey)
       qc.setQueryData<Record<string, string>>(prefsKey, () => {
         const next = { ...current }

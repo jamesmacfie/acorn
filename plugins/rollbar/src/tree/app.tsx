@@ -42,17 +42,22 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   const [latest, setLatest] = createSignal<OccurrenceState>({ kind: 'empty' })
   const [refreshing, setRefreshing] = createSignal(false)
   const [refreshError, setRefreshError] = createSignal('')
-  let itemLoad = 0
-  let occurrenceLoad = 0
+  // The item read, and the occurrence read inside it. A newer read aborts its own kind, and a new
+  // item aborts the occurrence read too.
+  let itemRead = new AbortController()
+  let occurrenceRead = new AbortController()
 
   const load = async (target: RollbarRailTarget, refresh = false): Promise<void> => {
     if (refresh && refreshing()) return
-    const request = ++itemLoad
+    itemRead.abort()
+    itemRead = new AbortController()
+    const request = itemRead.signal
     const keepView = refresh && view() !== null && targetKey(view()!.target) === targetKey(target)
     setRefreshError('')
     if (keepView) setRefreshing(true)
     else {
-      occurrenceLoad += 1
+      occurrenceRead.abort()
+      occurrenceRead = new AbortController()
       setRefreshing(false)
       setView(null)
       setOccurrence({ kind: 'empty' })
@@ -69,7 +74,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
           rollbarOccurrencesRoute(target.integrationId, target.identifier, refresh),
         ),
       ])
-      if (request !== itemLoad) return
+      if (request.aborted) return
       const currentOccurrence = occurrence()
       if (!keepView || currentOccurrence.kind !== 'ready' || !occurrences.occurrences.some((entry) => entry.id === currentOccurrence.detail.id)) {
         setOccurrence({ kind: 'empty' })
@@ -79,40 +84,42 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
       if (newest) void loadLatest(target, newest.id, request, keepView)
       else setLatest({ kind: 'empty' })
     } catch (error) {
-      if (request !== itemLoad) return
+      if (request.aborted) return
       if (keepView) setRefreshError(failureReason(error))
       else setPage({ kind: 'error', title: "Couldn't load this error", detail: failureReason(error), retry: () => void load(target) })
     } finally {
-      if (request === itemLoad) setRefreshing(false)
+      if (!request.aborted) setRefreshing(false)
     }
   }
 
   // The same cached occurrence route the Occurrences tab reads, so Overview adds no new request shape.
   // A refresh keeps the old one on screen until the new one lands.
-  const loadLatest = async (target: RollbarRailTarget, id: string, request: number, keep: boolean): Promise<void> => {
+  const loadLatest = async (target: RollbarRailTarget, id: string, request: AbortSignal, keep: boolean): Promise<void> => {
     if (!keep) setLatest({ kind: 'loading', id })
     try {
       const detail = await props.bridge.api.get<RollbarOccurrenceDetail>(
         rollbarOccurrenceRoute(target.integrationId, target.identifier, id),
       )
-      if (request === itemLoad) setLatest({ kind: 'ready', detail })
+      if (!request.aborted) setLatest({ kind: 'ready', detail })
     } catch (error) {
-      if (request === itemLoad && !keep) setLatest({ kind: 'error', id, detail: failureReason(error) })
+      if (!request.aborted && !keep) setLatest({ kind: 'error', id, detail: failureReason(error) })
     }
   }
 
   const loadOccurrence = async (id: string): Promise<void> => {
     const current = view()
     if (!current) return
-    const request = ++occurrenceLoad
+    occurrenceRead.abort()
+    occurrenceRead = new AbortController()
+    const request = occurrenceRead.signal
     setOccurrence({ kind: 'loading', id })
     try {
       const detail = await props.bridge.api.get<RollbarOccurrenceDetail>(
         rollbarOccurrenceRoute(current.target.integrationId, current.target.identifier, id),
       )
-      if (request === occurrenceLoad && view() === current) setOccurrence({ kind: 'ready', detail })
+      if (!request.aborted && view() === current) setOccurrence({ kind: 'ready', detail })
     } catch (error) {
-      if (request === occurrenceLoad && view() === current) {
+      if (!request.aborted && view() === current) {
         setOccurrence({ kind: 'error', id, detail: failureReason(error) })
       }
     }

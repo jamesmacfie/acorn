@@ -8,6 +8,7 @@ import { canAddProjectFromFolder } from './addProject'
 import { createProject } from './workspaceMutations'
 import { projectImporterContributions } from '../../host/registries/sources/projectImporters'
 import { Alert, Button, Input } from '../../kit/components/primitives'
+import { latestSignal } from '../../kit/lib/state/latestSignal'
 import Icon from '../../kit/components/content/Icon'
 import './projects.css'
 
@@ -18,7 +19,8 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
   const [error, setError] = createSignal('')
   const [path, setPath] = createSignal('')
   const [activeImporter, setActiveImporter] = createSignal<string | null>(null)
-  let importerRun = 0
+  // One importer's run. Switching Node or importer, or closing it, aborts it.
+  const importerRun = latestSignal()
   const importer = () => projectImporterContributions().find((entry) => entry.id === activeImporter())
   let mounted = true
   onCleanup(() => { mounted = false })
@@ -26,14 +28,14 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
 
   createEffect(() => {
     node()
-    importerRun++
+    importerRun.next()
     setActiveImporter(null)
     setError('')
     setBusy(false)
   })
   createEffect(() => {
     if (!activeImporter() || importer()) return
-    importerRun++
+    importerRun.next()
     setActiveImporter(null)
     setError('That importer was turned off or removed.')
   })
@@ -70,19 +72,19 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
     await addFolder(folder, nodeId, complete)
   }
 
-  async function imported(run: number, nodeId: string | null, complete: ((id: string) => void) | undefined, ids: readonly string[] = []) {
-    if (run !== importerRun || node() !== nodeId) return
+  async function imported(run: AbortSignal, nodeId: string | null, complete: ((id: string) => void) | undefined, ids: readonly string[] = []) {
+    if (run.aborted || node() !== nodeId) return
     if (mounted) setError('')
     try {
       await refresh()
-      if (node() !== nodeId || run !== importerRun) return
+      if (node() !== nodeId || run.aborted) return
       if (!complete) return
       const projects = qc.getQueryData<Project[]>(projectsKey) ?? []
       const selected = ids.find((id) => projects.some((project) => project.id === id))
       if (selected) complete(selected)
       else if (mounted) setError('The importer did not report a project on this Node.')
     } catch (cause) {
-      if (mounted && node() === nodeId && run === importerRun) setError(cause instanceof Error ? cause.message : "Couldn't refresh projects.")
+      if (mounted && node() === nodeId && !run.aborted) setError(cause instanceof Error ? cause.message : "Couldn't refresh projects.")
     }
   }
 
@@ -104,17 +106,17 @@ export default function AddProjectControls(props: { beginAdd?: () => (id: string
           </form>
         </Show>
         <For each={projectImporterContributions()}>
-          {(entry) => <Button disabled={busy()} onPress={() => { importerRun++; setActiveImporter(entry.id) }}><Icon name={entry.glyph} /> {entry.label}</Button>}
+          {(entry) => <Button disabled={busy()} onPress={() => { importerRun.next(); setActiveImporter(entry.id) }}><Icon name={entry.glyph} /> {entry.label}</Button>}
         </For>
       </div>
       <Show when={error()}><Alert>{error()}</Alert></Show>
       <Show keyed when={importer()}>
         {(entry) => {
-          const run = importerRun
+          const run = importerRun.signal
           const nodeId = node()
           const complete = props.beginAdd?.()
           return <section class="project-importer" aria-label={entry.label}>
-            <Dynamic component={entry.component} onClose={() => { importerRun++; setActiveImporter(null) }} onImported={(ids?: readonly string[]) => void imported(run, nodeId, complete, ids)} />
+            <Dynamic component={entry.component} onClose={() => { importerRun.next(); setActiveImporter(null) }} onImported={(ids?: readonly string[]) => void imported(run, nodeId, complete, ids)} />
           </section>
         }}
       </Show>

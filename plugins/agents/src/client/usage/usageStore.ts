@@ -1,4 +1,5 @@
 import { createSignal, type Accessor } from 'solid-js'
+import { latestSignal } from '@acorn/plugin-api/client'
 import type { AgentUsageSnapshot } from '../../shared/usage'
 import { agentUsageClient, type AgentUsageClient } from './usageClient'
 
@@ -27,11 +28,11 @@ export function createAgentUsageStore(
   const [error, setError] = createSignal('')
   let consumers = 0
   let poll: ReturnType<typeof setInterval> | undefined
-  let generation = 0
+  const usageRead = latestSignal()
 
   const load = async (force: boolean, providerId?: string): Promise<void> => {
     if (force && refreshing()) return
-    const mine = ++generation
+    const signal = usageRead.next()
     if (force) {
       setRefreshing(true)
       setRefreshingProviderId(providerId ?? null)
@@ -40,15 +41,15 @@ export function createAgentUsageStore(
     setError('')
     try {
       const result = await (providerId ? client.refreshProvider(providerId) : force ? client.refresh() : client.read())
-      if (mine === generation) setSnapshot(result)
+      if (!signal.aborted) setSnapshot(result)
     } catch (cause) {
-      if (mine === generation) setError(cause instanceof Error ? cause.message : 'Agent usage could not be loaded.')
+      if (!signal.aborted) setError(cause instanceof Error ? cause.message : 'Agent usage could not be loaded.')
     } finally {
       if (force) {
         setRefreshing(false)
         setRefreshingProviderId(null)
       }
-      if (mine === generation) {
+      if (!signal.aborted) {
         setLoading(false)
       }
     }

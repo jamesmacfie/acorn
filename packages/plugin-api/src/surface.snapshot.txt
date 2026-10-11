@@ -65,6 +65,7 @@ client: InputCommand
 client: IntegrationFlowContribution
 client: ItemRowTarget
 client: LANGUAGE_REQUEST_TOO_LARGE
+client: LatestSignal
 client: Logger
 client: MISSING
 client: ModelPick
@@ -223,6 +224,7 @@ client: isPaneId
 client: isTerminalMax
 client: languageRequestTooLarge
 client: latestOnly
+client: latestSignal
 client: learnRefPrefixes
 client: linkifyRefs
 client: localSearch

@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { activeNodeId, prefsOptions, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activeNodeId, latestSignal, prefsOptions, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, copyText, Field, IconButton, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
 import { editorApi, type EditorEntry } from './editorClient'
@@ -58,42 +58,45 @@ export default function FileTree(props: {
   const [destinationFolder, setDestinationFolder] = createSignal('')
   const [actionError, setActionError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
-  const loading = new Map<string, { generation: number; run: Promise<boolean> }>()
-  const ignoreReads = new Map<string, number>()
-  let ignoreReadId = 0
-  let generation = 0
+  // The tree's listings. A refresh, a task change, collapsing everything, or unmounting aborts them.
+  const listing = latestSignal()
+  const loading = new Map<string, { listing: AbortSignal; run: Promise<boolean> }>()
+  // Each directory's newest Git ignore read.
+  const ignoreReads = new Map<string, AbortController>()
   let disposed = false
   let taskId = props.taskId
-  const live = (revision: number, task: string) => !disposed && revision === generation && taskId === task && activeNodeId() === nodeId
+  const live = (listed: AbortSignal, task: string) => !disposed && !listed.aborted && taskId === task && activeNodeId() === nodeId
 
   const load = (dir: string, refresh = false): Promise<boolean> => {
     const running = loading.get(dir)
-    if (running?.generation === generation) return running.run
+    if (running && !running.listing.aborted) return running.run
     if (!refresh && listings().has(dir)) return Promise.resolve(true)
-    const revision = generation
+    const listed = listing.signal
     const task = taskId
-    let entry: { generation: number; run: Promise<boolean> }
+    let entry: { listing: AbortSignal; run: Promise<boolean> }
     const run = Promise.resolve().then(() => api.list(task, dir)).then((entries) => {
-      if (!live(revision, task)) return false
+      if (!live(listed, task)) return false
       setErrors((current) => { const next = new Map(current); next.delete(dir); return next })
       setListings((current) => new Map(current).set(dir, entries))
-      const read = ++ignoreReadId
+      ignoreReads.get(dir)?.abort()
+      const read = new AbortController()
       ignoreReads.set(dir, read)
       // A fresh listing has no verified ignore classification yet. Show its entries until Git
       // answers, so a stale hidden set never suppresses names added or changed by this listing.
       setIgnoreByDir((current) => { const next = new Map(current); next.delete(dir); return next })
       void Promise.resolve().then(() => api.ignored(task, dir, entries.map((entry) => entry.name))).then((result) => {
-        if (!live(revision, task) || ignoreReads.get(dir) !== read) return
+        if (!live(listed, task) || read.signal.aborted) return
         setIgnoreByDir((current) => new Map(current).set(dir, result.available
           ? { ignored: new Set(result.ignored) } : { ignored: new Set(), error: result.reason }))
       }).catch((cause: unknown) => {
-        if (live(revision, task) && ignoreReads.get(dir) === read) setIgnoreByDir((current) => new Map(current).set(dir, {
+        if (live(listed, task) && !read.signal.aborted) setIgnoreByDir((current) => new Map(current).set(dir, {
           ignored: new Set(), error: cause instanceof Error ? cause.message : 'Git ignore rules are unavailable.',
         }))
       })
       return true
     }).catch((cause: unknown) => {
-      if (live(revision, task)) {
+      if (live(listed, task)) {
+        ignoreReads.get(dir)?.abort()
         ignoreReads.delete(dir)
         setIgnoreByDir((current) => new Map(current).set(dir, { ignored: new Set(), error: 'Ignore filtering unavailable while the directory listing is stale.' }))
         setErrors((current) => new Map(current).set(dir, cause instanceof Error ? cause.message : 'Unable to read directory.'))
@@ -102,7 +105,7 @@ export default function FileTree(props: {
     }).finally(() => {
       if (loading.get(dir) === entry) loading.delete(dir)
     })
-    entry = { generation: revision, run }
+    entry = { listing: listed, run }
     loading.set(dir, entry)
     return run
   }
@@ -110,13 +113,13 @@ export default function FileTree(props: {
   // No path is carried by the worktree event. Refresh loaded directories in parent order;
   // unopened directories stay lazy, and previous successful listings survive failed reads.
   const refresh = async () => {
-    const revision = ++generation
+    const listed = listing.next()
     const task = taskId
-    void api.entry(task, '').then((entry) => { if (live(revision, task)) setRootEntry(entry) }).catch(() => {})
+    void api.entry(task, '').then((entry) => { if (live(listed, task)) setRootEntry(entry) }).catch(() => {})
     const dirs = [...new Set(['', ...listings().keys(), ...loading.keys(), ...errors().keys()])]
       .sort((a, b) => a.split('/').length - b.split('/').length)
     for (const dir of dirs) {
-      if (!live(revision, task)) return
+      if (!live(listed, task)) return
       if (dir) {
         const split = dir.lastIndexOf('/')
         const parent = split < 0 ? '' : dir.slice(0, split)
@@ -134,7 +137,7 @@ export default function FileTree(props: {
     if (next === taskId) return
     release()
     taskId = next
-    generation++
+    listing.next()
     loading.clear()
     ignoreReads.clear()
     setErrors(new Map())
@@ -159,7 +162,7 @@ export default function FileTree(props: {
     onCleanup(() => {
       disposed = true
       release()
-      generation++
+      listing.abort()
       ignoreReads.clear()
       offWorktree()
       offReconnect()
@@ -282,7 +285,7 @@ export default function FileTree(props: {
   // Another plugin's row runs only while the menu still holds the entry it opened on, and only while
   // that entry is still a visible row: a trash, rename or refresh that removed it ends the action.
   const runContributed = (target: FileTarget, run: () => void) => {
-    if (armed()?.target !== target || !items().some((item) => item.key === target.path) || !live(generation, taskId)) return
+    if (armed()?.target !== target || !items().some((item) => item.key === target.path) || !live(listing.signal, taskId)) return
     run()
   }
   const setOpen = (path: string, open: boolean) => {
@@ -290,7 +293,7 @@ export default function FileTree(props: {
     if (open) void load(path)
   }
   const collapseAll = () => {
-    generation++
+    listing.next()
     loading.clear()
     ignoreReads.clear()
     collapseEditorTreeDirectories(taskId, nodeId)
@@ -354,8 +357,8 @@ export default function FileTree(props: {
   createEffect(on(() => [props.taskId, props.reveal] as const, ([, request]) => {
     if (!request) return
     const task = taskId
-    const revision = generation
-    const current = () => live(revision, task) && props.reveal === request
+    const listed = listing.signal
+    const current = () => live(listed, task) && props.reveal === request
     if (!current()) return
     setTemporaryReveal(request.path)
     void (async () => {

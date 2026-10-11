@@ -2,7 +2,7 @@ import { createEffect, createRoot, createSignal } from 'solid-js'
 import type { TerminalSession } from '../contract/wire'
 import { terminalApi } from './terminalClient'
 import { onTerminalSessionCreated } from '../contract/sessionsClient'
-import { activeNodeId, forgetAttentionSource, hasHostCapability, nodeState, onScopeEvicted, registerWsChannel, replaceAttentionSource, requestTerminalFocusIntent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activeNodeId, forgetAttentionSource, hasHostCapability, latestSignal, nodeState, onScopeEvicted, registerWsChannel, replaceAttentionSource, requestTerminalFocusIntent, wsOnReconnect } from '@acorn/plugin-api/client'
 import { fromTerminalSession } from './attention'
 import { releaseAllTerminals, releaseGoneTerminals } from './heldTerminals'
 
@@ -11,14 +11,15 @@ const [sessions, setSessions] = createSignal<TerminalSession[]>([])
 export { sessions }
 const [sessionNode, setSessionNode] = createSignal<string | null>(null)
 export { sessionNode }
-let generation = 0
+// The session list read. A newer read, or clearing the list, aborts it.
+const listRead = latestSignal()
 
 export async function refreshSessions(): Promise<void> {
   const requestedNode = node()
-  const request = ++generation
+  const signal = listRead.next()
   // A failed read rejects without replacing authoritative rows, attention or warm xterms.
   const rows = hasHostCapability({ plugin: 'terminal' }) ? await terminalApi(activeNodeId()).list() : []
-  if (request !== generation || requestedNode !== node()) return
+  if (signal.aborted || requestedNode !== node()) return
   setSessionNode(requestedNode)
   setSessions(rows)
   // After the write, so a drawer showing a session that has gone has already let its xterm go.
@@ -34,7 +35,7 @@ export function addSession(session: TerminalSession, createdNode = node()): void
 
 export function clearSessions(): void {
   const previousNode = sessionNode()
-  generation++
+  listRead.abort()
   setSessionNode(null)
   setSessions([])
   releaseAllTerminals()

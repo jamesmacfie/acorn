@@ -15,11 +15,13 @@
 // frame is owed and cannot yet ask for one holds instead, and `frameRequested` stays true until it
 // lets go (../kit/rectangle.tsx § write, ../harness.tsx § flush).
 
+import { latestSignal } from '@acorn/client-core/kit/lib/latestSignal'
+
 let pending = false
 let held = 0
 // A release belongs to the surface that took its hold. Replacing the painter discards its holds,
 // but callbacks from a disposed rectangle may still arrive on a later turn.
-let surface = 0
+const surface = latestSignal()
 let draw: (() => void) | null = null
 const holdWaiters = new Set<() => void>()
 
@@ -34,7 +36,7 @@ const notifyReleased = (): void => {
  *  The holds go with it: a surface being replaced is a new screen, and a hold left over from the last
  *  one would leave every later `frameRequested` answering yes forever. */
 export const onFrame = (fn: (() => void) | null): void => {
-  surface += 1
+  surface.next()
   draw = fn
   held = 0
   notifyReleased()
@@ -48,13 +50,13 @@ export const onFrame = (fn: (() => void) | null): void => {
  * one twice must not take the count below nought.
  */
 export const holdFrame = (): (() => void) => {
-  const owner = surface
+  const owner = surface.signal
   held += 1
   let gone = false
   return () => {
     if (gone) return
     gone = true
-    if (owner !== surface) return
+    if (owner.aborted) return
     held -= 1
     requestFrame()
     notifyReleased()

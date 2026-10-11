@@ -42,11 +42,12 @@ export type WorkflowDraftAddress = {
   source: DefRef['source']
   entityId: string
   target: WorkflowFileTarget
-  generation: number
+  // Aborted once a newer address replaces this one, so a late load for it is dropped.
+  signal: AbortSignal
 }
 
-export function workflowDraftAddress(ref: DefRef, projectId: string, generation: number): WorkflowDraftAddress {
+export function workflowDraftAddress(ref: DefRef, projectId: string, signal: AbortSignal): WorkflowDraftAddress {
   return { key: defRefKey(ref), route: routeId(ref), projectId, source: ref.source,
     entityId: ref.source === 'database' ? ref.id : `${projectId}:${routeId(ref)}`,
-    target: { projectId, source: ref.source as 'repo' | 'user', path: `.acorn/workflows/${ref.id}.toml` }, generation }
+    target: { projectId, source: ref.source as 'repo' | 'user', path: `.acorn/workflows/${ref.id}.toml` }, signal }
 }

@@ -1,4 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
+import { latestSignal } from '@acorn/plugin-api/client'
 import { EmptyState, Stack } from '@acorn/plugin-api/ui'
 import { imageTypeForPath } from '../contract/imagePreview'
 import { editorApi } from './editorClient'
@@ -9,13 +10,13 @@ export default function ImagePreview(props: { taskId: string; path: string }) {
   const [error, setError] = createSignal(false)
   let currentUrl: string | null = null
   let disposed = false
-  let request = 0
+  const imageRead = latestSignal()
 
   const load = async () => {
-    const run = ++request
+    const signal = imageRead.next()
     try {
       const image = await editorApi().readImage(props.taskId, props.path)
-      if (disposed || run !== request) return
+      if (disposed || signal.aborted) return
       if (image.type.split(';', 1)[0]?.toLowerCase() !== imageTypeForPath(props.path)) throw new Error('Unexpected image type')
       const nextUrl = URL.createObjectURL(new Blob([image.bytes as BlobPart], { type: image.type }))
       const previous = currentUrl
@@ -24,7 +25,7 @@ export default function ImagePreview(props: { taskId: string; path: string }) {
       setError(false)
       if (previous) URL.revokeObjectURL(previous)
     } catch {
-      if (disposed || run !== request) return
+      if (disposed || signal.aborted) return
       showError()
     }
   }
@@ -41,7 +42,7 @@ export default function ImagePreview(props: { taskId: string; path: string }) {
     window.addEventListener('focus', load)
     onCleanup(() => {
       disposed = true
-      request += 1
+      imageRead.abort()
       window.removeEventListener('focus', load)
       if (currentUrl) URL.revokeObjectURL(currentUrl)
     })

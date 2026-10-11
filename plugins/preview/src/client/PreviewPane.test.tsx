@@ -22,7 +22,8 @@ const node = vi.hoisted(() => ({ id: 'node-a' as string | null }))
 
 const coverPage = (covered: boolean) => page.update?.({ x: 0, y: 0, width: 300, height: 200 }, covered)
 
-vi.mock('@acorn/plugin-api/client', () => ({
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal,
   activeNodeId: () => node.id,
   elementRectKey: () => '0:0:300:200',
   previewViews: () => views,

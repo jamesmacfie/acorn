@@ -310,7 +310,9 @@ export { formatRelativeTime } from '@acorn/client-core/kit/lib'
 // A shortcut as the app writes it everywhere: `meta+shift+n` reads ⇧⌘N.
 export { formatChord } from '@acorn/client-core/kit/lib'
 export { bytesOf, formatBytes, formatSize } from '@acorn/client-core/kit/lib'
-export { latestOnly } from '@acorn/client-core/kit/lib'
+// Staleness guards: `latestOnly` for one load and one commit, `latestSignal` for a flow with several awaits.
+export { latestOnly, latestSignal } from '@acorn/client-core/kit/lib'
+export type { LatestSignal } from '@acorn/client-core/kit/lib'
 export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys'
 
 // Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component

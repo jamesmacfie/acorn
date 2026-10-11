@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, createSettingSave, PrefKeys, prefsOptions, projectsOptions, savePref, useUnsavedChanges, readJson, writeJson } from '@acorn/plugin-api/client'
+import { activeNodeId, createSettingSave, latestSignal, PrefKeys, prefsOptions, projectsOptions, savePref, useUnsavedChanges, readJson, writeJson } from '@acorn/plugin-api/client'
 import { Alert, Button, Checkbox, Input, Select, SettingRow, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui'
 import { gitSettingsRoute, type GitSettings, type IdentityWriteResult } from '../shared/api'
 
@@ -18,7 +18,7 @@ export default function GitSettingsPage() {
   const [draft, setDraft] = createSignal<IdentityDraft | null>(null)
   const [identityError, setIdentityError] = createSignal('')
   const [writing, setWriting] = createSignal(false)
-  let generation = 0
+  const identityWrite = latestSignal()
   let draftVersion = 0
   const pullSave = createSettingSave()
   const fetchSave = createSettingSave()
@@ -30,16 +30,16 @@ export default function GitSettingsPage() {
   useUnsavedChanges(dirty)
   const edit = (field: 'name' | 'email', value: string) => { draftVersion++; setDraft({ ...form(), [field]: value }) }
   const formScope = () => JSON.stringify([activeNodeId(), projectId(), scope()])
-  createEffect(on(formScope, () => { generation++; setWriting(false) }, { defer: true }))
-  onCleanup(() => { generation++ })
+  createEffect(on(formScope, () => { identityWrite.abort(); setWriting(false) }, { defer: true }))
+  onCleanup(() => identityWrite.abort())
   const save = async () => {
     const value = form()
     if (!value.projectId || value.nodeId !== activeNodeId() || value.projectId !== projectId() || value.scope !== scope()) {
       setIdentityError('Node, project, or scope changed. Cancel this draft and reopen Git settings.'); return
     }
     const queryKey = key(value.projectId), submittedScope = formScope(), submittedVersion = draftVersion
-    const own = ++generation
-    const current = () => own === generation && submittedScope === formScope()
+    const signal = identityWrite.next()
+    const current = () => !signal.aborted && submittedScope === formScope()
     setWriting(true); setIdentityError('')
     try {
       const result = await writeJson<IdentityWriteResult>(`${gitSettingsRoute(value.projectId)}/identity`, {
@@ -65,19 +65,19 @@ export default function GitSettingsPage() {
   return <>
     <SettingsSection id="identity" label="Git identity">
       <SettingRow label="Repository" description="Select a Git project on this Node.">
-          <Select label="Repository" value={projectId()} disabled={dirty()} options={(projects.data ?? []).filter((project) => project.vcs === 'git' && !!project.path).map((project) => ({ value: project.id, label: project.name }))} onChange={(value) => { generation++; draftVersion++; setDraft(null); setSelectedProject(value) }} />
+          <Select label="Repository" value={projectId()} disabled={dirty()} options={(projects.data ?? []).filter((project) => project.vcs === 'git' && !!project.path).map((project) => ({ value: project.id, label: project.name }))} onChange={(value) => { identityWrite.abort(); draftVersion++; setDraft(null); setSelectedProject(value) }} />
       </SettingRow>
       <Show when={settings.error}><Alert tone="warn">{String(settings.error)}</Alert></Show>
       <Show when={settings.data}>
         <SettingRow label="Write scope" description="Local writes this repository; global writes the user account on this Node.">
-          <Select label="Write scope" value={scope()} disabled={dirty()} options={[{ value: 'local', label: 'Repository local' }, { value: 'global', label: 'Node user global' }]} onChange={(value) => { generation++; draftVersion++; setDraft(null); setScope(value as 'local' | 'global') }} />
+          <Select label="Write scope" value={scope()} disabled={dirty()} options={[{ value: 'local', label: 'Repository local' }, { value: 'global', label: 'Node user global' }]} onChange={(value) => { identityWrite.abort(); draftVersion++; setDraft(null); setScope(value as 'local' | 'global') }} />
         </SettingRow>
         <SettingRow label="Effective author" description={`${settings.data?.name.value ?? 'Unset'} · ${settings.data?.name.scope ?? 'unset'} · ${settings.data?.name.origin ?? 'no origin'}`} />
         <SettingRow label="Effective email" description={`${settings.data?.email.value ?? 'Unset'} · ${settings.data?.email.scope ?? 'unset'} · ${settings.data?.email.origin ?? 'no origin'}`} />
         <SettingRow label="Author name"><Input label="Author name" value={form().name} onInput={(value) => edit('name', value)} /></SettingRow>
         <SettingRow label="Author email"><Input label="Author email" value={form().email} onInput={(value) => edit('email', value)} /></SettingRow>
         <Show when={identityError()}><Alert tone="warn">{identityError()}</Alert></Show>
-      <Show when={dirty()}><Stack gap="row"><Button busy={writing()} onPress={() => void save()}>Save identity</Button><Button variant="ghost" onPress={() => { generation++; draftVersion++; setWriting(false); setDraft(null); setIdentityError('') }}>Cancel</Button></Stack></Show>
+      <Show when={dirty()}><Stack gap="row"><Button busy={writing()} onPress={() => void save()}>Save identity</Button><Button variant="ghost" onPress={() => { identityWrite.abort(); draftVersion++; setWriting(false); setDraft(null); setIdentityError('') }}>Cancel</Button></Stack></Show>
       </Show>
     </SettingsSection>
     <SettingsSection id="behavior" label="Git behavior">

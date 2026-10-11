@@ -7,6 +7,7 @@ import { displayHost, pluginWebviewKey, resolvePluginWebviewUrl } from './webvie
 import { Alert, Button, EmptyState, Spinner } from '../../kit/components/primitives'
 import { observeNativePage } from '../../infra/platform/nativePages'
 import { elementRectKey, visibleElementRect } from '../../infra/platform/webviewGeometry'
+import { latestSignal } from '../../kit/lib/state/latestSignal'
 
 export type PluginWebviewProps = {
   pluginId: string
@@ -30,7 +31,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
   const [blocked, setBlocked] = createSignal('')
   const [failed, setFailed] = createSignal(false)
   const [suppressed, setSuppressed] = createSignal(false)
-  let ensureVersion = 0
+  const ensuring = latestSignal()
   let placed = ''
   let ensuredKey = ''
 
@@ -64,7 +65,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
       if (state.key === key()) setBlocked(state.host || state.url)
     })
     onCleanup(() => {
-      ensureVersion += 1
+      ensuring.abort()
       stopPage()
       offEvent()
       offBlocked()
@@ -78,7 +79,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
   createEffect(() => {
     const homeUrl = home()
     const covered = suppressed()
-    const version = ++ensureVersion
+    const ensured = ensuring.next()
     const nextKey = key()
     if (native && ensuredKey && ensuredKey !== nextKey) {
       native.hide(ensuredKey)
@@ -98,7 +99,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
     if (covered) native.hide(nextKey)
     else syncRect()
     void native.ensure(nextKey, homeUrl, props.surface.hosts ?? []).then((ready) => {
-      if (version !== ensureVersion) return
+      if (ensured.aborted) return
       if (!ready) {
         setFailed(true)
         return
@@ -107,7 +108,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
       syncRect()
       if (!suppressed()) native.show(nextKey)
     }).catch(() => {
-      if (version === ensureVersion) setFailed(true)
+      if (!ensured.aborted) setFailed(true)
     })
   })
 

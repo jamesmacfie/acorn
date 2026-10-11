@@ -5,6 +5,7 @@ import { createScrollAuthor } from '../../lib/timeline/scrollAuthor'
 import { reportScrollPlace } from '../../lib/telemetry/scrollPlace'
 import { registerSurfaceHealth } from '../../lib/telemetry/surfaceHealth'
 import { TIMELINE_PAGE } from '../../lib/timeline/timelineWindow'
+import { latestSignal } from '../../lib/state/latestSignal'
 import { Button } from '../inputs/Button'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
@@ -235,9 +236,9 @@ export function Timeline(props: {
   // the corrections below are aimed at.
   let place: ReadingPlace = LIVE
   let opened = false
-  // Bumped when the caller hands over a different place, so a frame the outgoing list scheduled cannot
+  // Aborted when the caller hands over a different place, so a frame the outgoing list scheduled cannot
   // move the incoming one.
-  let generation = 0
+  const placeShown = latestSignal()
   let frame = 0
   let corrections = 0
   // Our own writes, marked until the frame after them, and when the reader last touched this
@@ -349,10 +350,10 @@ export function Timeline(props: {
 
   const schedule = () => {
     if (frame || !scroller) return
-    const era = generation
+    const shown = placeShown.signal
     frame = requestAnimationFrame(() => {
       frame = 0
-      if (era === generation) correct()
+      if (!shown.aborted) correct()
     })
   }
 
@@ -571,7 +572,7 @@ export function Timeline(props: {
   createEffect(on(() => props.place?.() ?? LIVE, (next) => {
     if (opened && next.at !== 'live' && samePlace(next, place)) return
     opened = true
-    generation += 1
+    placeShown.next()
     corrections = 0
     // The click that changed the view armed this on the way out of the old one. Left armed, it is
     // spent on the first scroll event the new view produces. Whose input it was does not survive the

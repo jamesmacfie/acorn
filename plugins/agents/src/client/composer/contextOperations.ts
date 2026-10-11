@@ -25,9 +25,9 @@ export function refreshAutomaticContext(
     const contribution = agentContextContributions().find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
     if (!contribution) return before
     const revision = state.revisions()[2]
-    const captureVersion = state.captureRevision()
+    const started = state.startCapture()
     const captured = (await contribution.capture({ taskId: session.taskId }))[0]
-    if (!captured || activeNodeId() !== owner.nodeId || !state.captureCurrent(captureVersion)
+    if (!captured || activeNodeId() !== owner.nodeId || !state.captureCurrent(started)
       || state.revisions()[2] !== revision) return before
     const automatic = automaticTaskContextFor(captured, previous)
     const next = before.filter((context) => context.source !== AUTOMATIC_TASK_CONTEXT_SOURCE)
@@ -49,12 +49,12 @@ export async function captureContext(
   const { state, session } = owner
   if (!contribution || state.capturing()) return
   const revision = state.revisions()[2]
-  const operation = state.captureRevision()
+  const started = state.startCapture()
   state.setCapturing(contributionId)
   state.setError('')
   try {
     const captured = await contribution.capture({ taskId: session.taskId, sessionId: session.id }, optionIds)
-    if (!state.captureCurrent(operation) || activeNodeId() !== owner.nodeId || state.revisions()[2] !== revision) return
+    if (!state.captureCurrent(started) || activeNodeId() !== owner.nodeId || state.revisions()[2] !== revision) return
     state.setContexts((current) => [...current.filter((item) => !contextBelongsTo(item, contribution)), ...captured])
     if (owner.visible()) closePicker()
   } catch (caught) {

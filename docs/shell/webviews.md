@@ -52,13 +52,13 @@ browser actions.
 
 The bridge registers its state listener before calling `ensure`. Each successful reconciliation
 replays the URL, loading state, and history cursor to the mounted toolbar. Operations are ordered per
-native key. Eviction advances the key's generation at once, drops queued work, and retires the old
-view before any replacement. Retired callbacks read a denied policy and stop reporting.
+native key. Eviction aborts the key's owner signal at once, which drops queued work, and retires the
+old view before any replacement. Retired callbacks read a denied policy and stop reporting.
 
 Pane cleanup removes observers and hides only its task's view. Overlay changes don't call `ensure`. A
 pending configuration read or an absent URL hides without evicting. A resolution error or native
 refusal offers **Retry preview**. A Node switch retires the whole preview family, including records
-from before a renderer reload, and a family generation rejects stale commands. Task archive, owner
+from before a renderer reload, and the family's owner signal rejects stale commands. Task archive, owner
 removal, window close, and shutdown release resources. Loaded plugin pages are evicted on unmount and
 on policy replacement.
 

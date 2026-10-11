@@ -1,13 +1,14 @@
-import { activeNodeId, clientEvents, createLogger } from '@acorn/plugin-api/client'
+import { activeNodeId, clientEvents, createLogger, latestSignal } from '@acorn/plugin-api/client'
 
 export type DockerScopeOwner = { nodeId: string | null; current(): boolean }
 const log = createLogger('docker-scope')
-let generation = 0
+// The Docker client's lifetime on one Node. Retiring the client aborts it.
+const clientLifetime = latestSignal()
 const retirements = new Set<() => void>()
 
 export function captureDockerScope(nodeId = activeNodeId()): DockerScopeOwner {
-  const captured = generation
-  return { nodeId, current: () => captured === generation && nodeId === activeNodeId() }
+  const lifetime = clientLifetime.signal
+  return { nodeId, current: () => !lifetime.aborted && nodeId === activeNodeId() }
 }
 
 export const dockerScopeKey = (...ids: (string | null | undefined)[]): string =>
@@ -19,7 +20,7 @@ export function onDockerRetired(retire: () => void): () => void {
 }
 
 export function retireDockerClient(): void {
-  generation++
+  clientLifetime.next()
   for (const retire of retirements) {
     try { retire() } catch (error) { log.error('Docker retirement failed', error) }
   }

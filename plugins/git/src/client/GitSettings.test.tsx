@@ -21,7 +21,8 @@ vi.mock('@tanstack/solid-query', () => ({
   }),
   useQueryClient: () => ({ setQueryData, invalidateQueries }),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal,
   activeNodeId: node, projectsOptions: () => ({ queryKey: ['projects'] }), prefsOptions: () => ({ queryKey: ['prefs'] }),
   createSettingSave: () => ({ error: () => '', savedAt: () => null, run: (action: () => Promise<unknown>) => action() }),
   useUnsavedChanges: () => {}, savePref: async () => {}, PrefKeys: { gitGraphVisible: 'graph', diffView: 'diff' }, writeJson,

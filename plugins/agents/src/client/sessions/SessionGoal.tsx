@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { Alert, Button, Field, Inline, Input, Modal, Stack, Text } from '@acorn/plugin-api/ui'
-import { activeNodeId } from '@acorn/plugin-api/client'
+import { activeNodeId, latestSignal } from '@acorn/plugin-api/client'
 import type { AgentSession } from '../../contract/wire.ts'
 import { managedAgentApi } from './managedClient'
 import { managedAgentStore } from './managedStore'
@@ -12,10 +12,10 @@ export default function SessionGoal(props: { session: AgentSession; openToken: n
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   let mounted = true
-  let actionVersion = 0
-  onCleanup(() => { mounted = false; actionVersion++ })
+  const goalAction = latestSignal()
+  onCleanup(() => { mounted = false; goalAction.abort() })
   createEffect(on(() => [activeNodeId(), props.session.id] as const, () => {
-    actionVersion++
+    goalAction.abort()
     setOpen(false)
     setBusy(false)
     setError('')
@@ -35,8 +35,8 @@ export default function SessionGoal(props: { session: AgentSession; openToken: n
   const update = async (action: 'set' | 'clear' | 'resume') => {
     const sessionId = props.session.id
     const owner = managedAgentStore.captureRead(sessionId)
-    const version = ++actionVersion
-    const ownsView = () => mounted && version === actionVersion && props.session.id === sessionId && owner.current()
+    const signal = goalAction.next()
+    const ownsView = () => mounted && !signal.aborted && props.session.id === sessionId && owner.current()
     setBusy(true)
     setError('')
     try {

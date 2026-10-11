@@ -20,7 +20,8 @@ vi.mock('@tanstack/solid-query', () => ({
   }),
   useQueryClient: () => ({ setQueryData, invalidateQueries }),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({ activeNodeId: node, requestTaskLaunch: vi.fn() }))
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal, activeNodeId: node, requestTaskLaunch: vi.fn() }))
 vi.mock('./launchWorkflow', () => ({ sameGitActionScope: (captured: string, projectId: string, current: string) => captured === node() && projectId === current,
   launchWorkflowAtCommit: vi.fn() }))
 vi.mock('./refsClient', () => ({ refsKey: (id: string) => ['git-refs', node(), id], refsOptions: (id: string) => ({ queryKey: ['git-refs', node(), id] }), changeRef }))

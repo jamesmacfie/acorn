@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
-import { activeNodeId, queryOwner, debounce } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, debounce, latestSignal } from '@acorn/plugin-api/client'
 import { Alert, CopyButton, EmptyState, IconButton, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, FilterBar, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
@@ -66,8 +66,8 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   createEffect(on(() => state().opts.folder, (folder) => pushFolder(folder), { defer: true }))
   const [loading, setLoading] = createSignal(false)
   let disposed = false
-  let generation = 0
-  let controller: AbortController | undefined
+  // The search in flight. A changed request, or unmounting, aborts it.
+  const search = latestSignal()
   const requestKey = createMemo(() => JSON.stringify([activeNodeId(), props.taskId, state().query, debounced(), debouncedFolder(), state().opts,
     filterRevision(), debouncedFilterRevision(), state().scopeChanged]))
   createEffect(on(requestKey, () => {
@@ -76,9 +76,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     const q = debounced().trim()
     const opts = state().opts
     const scopeChanged = state().scopeChanged
-    const revision = ++generation
-    controller?.abort()
-    controller = undefined
+    const signal = search.next()
     setLoading(false)
     if (activeNodeId() !== nodeId) return
     if (scopeChanged) return
@@ -88,25 +86,22 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     if (!q || input.trim() !== q) {
       return
     }
-    const owned = new AbortController()
-    controller = owned
     setLoading(true)
-    void findInFiles(taskId, q, opts, { nodeId, signal: owned.signal }).then((result) => {
-      if (!disposed && revision === generation) change((old) => ({ ...old, results: result, error: '' }))
+    void findInFiles(taskId, q, opts, { nodeId, signal }).then((result) => {
+      if (!disposed && !signal.aborted) change((old) => ({ ...old, results: result, error: '' }))
     }).catch((cause: unknown) => {
-      if (!disposed && revision === generation && !owned.signal.aborted)
+      if (!disposed && !signal.aborted)
         change((old) => ({ ...old, results: undefined, error: cause instanceof Error ? cause.message : 'Search failed.' }))
     }).finally(() => {
-      if (!disposed && revision === generation) setLoading(false)
+      if (!disposed && !signal.aborted) setLoading(false)
     })
   }))
   onCleanup(() => {
     disposed = true
-    generation++
+    search.abort()
     pushDebounced.cancel()
     pushFolder.cancel()
     pushFilters.cancel()
-    controller?.abort()
   })
 
   const files = () => state().results?.files ?? []

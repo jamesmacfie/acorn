@@ -1,5 +1,5 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
-import { clientEvents, formatBytes } from '@acorn/plugin-api/client'
+import { clientEvents, formatBytes, latestSignal } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, Facts, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui'
 import type { AgentFootprint } from '../../contract/wire.ts'
 import { managedAgentApi } from '../sessions/managedClient'
@@ -18,16 +18,16 @@ export default function AgentStorageSection(props: { nodeId?: string | null }) {
   const [stopped, setStopped] = createSignal('')
   const at = () => (props.nodeId ? { nodeId: props.nodeId } : {})
 
-  let generation = 0
+  const footprintRead = latestSignal()
   const read = async () => {
-    const mine = ++generation
+    const signal = footprintRead.next()
     try {
       const next = await managedAgentApi.footprint(at())
-      if (mine !== generation) return
+      if (signal.aborted) return
       setFootprint(next)
       setError('')
     } catch (failure) {
-      if (mine === generation) setError(failure instanceof Error ? failure.message : String(failure))
+      if (!signal.aborted) setError(failure instanceof Error ? failure.message : String(failure))
     }
   }
 

@@ -3,7 +3,8 @@ import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ reads: vi.fn(), writes: vi.fn() }))
-vi.mock('@acorn/plugin-api/client', () => ({ readJson: mocks.reads, writeJson: mocks.writes }))
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal, readJson: mocks.reads, writeJson: mocks.writes }))
 const { default: InstructionReviewPanel } = await import('./InstructionReviewPanel')
 const hosts: Array<() => void> = []
 const settle = async () => { for (let i = 0; i < 8; i++) await Promise.resolve() }

@@ -59,7 +59,8 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
   let active: DraftEntry = recovery.entries.get(recovery.selected ?? '') ?? createDraftEntry(blank())
   recovery.entries.set(active.key, active)
   recovery.selected = active.key
-  let generation = 0
+  // The selected request. Selecting another aborts the work started for this one.
+  let selectionLifetime = new AbortController()
   const [selection, publishSelection] = createSignal<Selection>(active.id ? { kind: 'saved', id: active.id } : { kind: 'new' })
   const [draft, publishDraft] = createSignal<Draft>(snapshotDraft(active.draft))
   const [recoveryVersion, bumpRecovery] = createSignal(0)
@@ -79,7 +80,8 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
   const writes = new Map<DraftEntry, number>()
   const settleSaving = () => setSaving((writes.get(active) ?? 0) > 0)
   const setSelection = (next: Selection) => {
-    generation++
+    selectionLifetime.abort()
+    selectionLifetime = new AbortController()
     sendingController?.abort()
     sendingController = null
     setSending(false)
@@ -184,7 +186,7 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
 
   async function persist(d: Draft, origin = bridge()) {
     if (!d.name.trim()) return setError('Give the request a name before saving.')
-    const entry = active, selectedGeneration = generation, revision = entry.revision
+    const entry = active, selected = selectionLifetime.signal, revision = entry.revision
     const submitted = snapshotDraft(d)
     const controller = admit(origin)
     const previous = entry.write
@@ -205,7 +207,7 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
         entry.baseline = toDraft(next)
         entry.failed = false
         if (entry.revision === revision) entry.draft = toDraft(next)
-        if (!disposed && hasBridge(origin) && active === entry && generation === selectedGeneration) {
+        if (!disposed && hasBridge(origin) && active === entry && !selected.aborted) {
           publishSelection({ kind: 'saved', id: next.id })
           publishDraft(snapshotDraft(entry.draft))
           setSaveOpen(false)
@@ -213,7 +215,7 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
         if (!disposed && hasBridge(origin)) refresh()
       } catch (err) {
         entry.failed = true
-        if (!disposed && hasBridge(origin) && active === entry && generation === selectedGeneration)
+        if (!disposed && hasBridge(origin) && active === entry && !selected.aborted)
           setError(err instanceof Error ? err.message : 'Could not save the request')
       } finally {
         operations.delete(controller)
@@ -227,7 +229,7 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
   }
 
   async function remove(row: HttpRequest, origin = bridge()) {
-    const selectedGeneration = generation
+    const selected = selectionLifetime.signal
     const controller = admit(origin)
     let entry = [...recovery.entries.values()].find((candidate) => candidate.id === row.id)
     if (!entry) { entry = createDraftEntry(toDraft(row), row.id); recovery.entries.set(entry.key, entry) }
@@ -242,17 +244,17 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
         target.id = undefined
         if (target.revision === revision && target.write === operation) {
           recovery.entries.delete(target.key)
-          if (active === target && generation === selectedGeneration) startNew()
+          if (active === target && !selected.aborted) startNew()
         } else {
           // Text entered during deletion becomes an unsaved recovery; it is never written back automatically.
           target.id = undefined
           target.failed = true
-          if (active === target && generation === selectedGeneration) publishSelection({ kind: 'new' })
+          if (active === target && !selected.aborted) publishSelection({ kind: 'new' })
         }
         changed()
         refresh()
       } catch (err) {
-        if (!disposed && hasBridge(origin) && generation === selectedGeneration)
+        if (!disposed && hasBridge(origin) && !selected.aborted)
           setError(err instanceof Error ? err.message : 'Could not delete the request')
       } finally { operations.delete(controller) }
     })()
@@ -266,12 +268,12 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
     sendingController?.abort()
     const controller = admit(origin)
     sendingController = controller
-    const entry = active, selectedGeneration = generation, revision = entry.revision
+    const entry = active, selected = selectionLifetime.signal, revision = entry.revision
     const submitted = toSendInput(snapshotDraft(draft()), taskId ?? null)
     setSending(true)
     setError(null)
     setResult(null)
-    const publish = () => !disposed && hasBridge(origin) && active === entry && generation === selectedGeneration && entry.revision === revision && sendingController === controller
+    const publish = () => !disposed && hasBridge(origin) && active === entry && !selected.aborted && entry.revision === revision && sendingController === controller
     try {
       const response = await withAbort(controller.signal, () => createHttpClient(origin.api).sendRequest(projectId, submitted, controller.signal))
       if (publish()) setResult(response)

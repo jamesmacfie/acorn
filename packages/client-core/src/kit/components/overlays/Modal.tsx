@@ -2,6 +2,7 @@ import { createRenderEffect, createUniqueId, on, onCleanup, onMount, Show, type 
 import { Portal } from 'solid-js/web'
 import { focusableIn, restoreFocusOnCleanup } from '../../keys/trap'
 import { createDismissable } from '../../lib/controls/dismissable'
+import { latestSignal } from '../../lib/state/latestSignal'
 import { IconButton } from '../inputs/IconButton'
 
 // Modal chrome. Behaviour comes from createDismissable. See docs/ui-design/overlays.md § Chrome and
@@ -62,17 +63,17 @@ export function Modal(props: {
 }) {
   let dialog!: HTMLDivElement
   let sizeAnimation: Animation | undefined
-  let resizeRevision = 0
+  const resize = latestSignal()
   // Read the old box before the size attribute and children update, then animate to the final box.
   // This follows the layout rather than scaling text, and applies to any dialog that changes size.
   createRenderEffect(on(() => props.size, () => {
     if (!dialog?.isConnected || !dialog.animate || document.visibilityState === 'hidden'
       || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-    const revision = ++resizeRevision
+    const resizing = resize.next()
     const before = dialog.getBoundingClientRect()
     sizeAnimation?.cancel()
     queueMicrotask(() => {
-      if (!dialog.isConnected || revision !== resizeRevision || document.visibilityState === 'hidden') return
+      if (!dialog.isConnected || resizing.aborted || document.visibilityState === 'hidden') return
       const after = dialog.getBoundingClientRect()
       sizeAnimation = dialog.animate([
         { width: `${before.width}px`, height: `${before.height}px` },
@@ -84,7 +85,7 @@ export function Modal(props: {
   const settleHiddenResize = () => { if (document.visibilityState === 'hidden') sizeAnimation?.cancel() }
   document.addEventListener('visibilitychange', settleHiddenResize)
   onCleanup(() => {
-    resizeRevision++
+    resize.abort()
     sizeAnimation?.cancel()
     document.removeEventListener('visibilitychange', settleHiddenResize)
   })

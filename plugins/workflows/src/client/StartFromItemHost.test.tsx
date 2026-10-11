@@ -19,7 +19,8 @@ vi.mock('@tanstack/solid-query', () => ({
   }),
   useQueryClient: () => ({ invalidateQueries: calls.invalidate }),
 }))
-vi.mock('@acorn/plugin-api/client', () => ({
+vi.mock('@acorn/plugin-api/client', async (original) => ({
+  latestSignal: (await original<typeof import('@acorn/plugin-api/client')>()).latestSignal,
   createWorkspaceWords: () => () => ({ singular: 'workspace' }),
   activeNodeId: () => null,
   activateTaskSignals: calls.activate,

@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { activeNodeId, elementRectKey, observeNativePage, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
+import { activeNodeId, elementRectKey, latestSignal, observeNativePage, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
 import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { PREVIEW_TOOLBAR_ACTIONS_POINT, type PreviewReloadPayload, type PreviewToolbarProps, type PreviewToolbarResult } from '../contract/toolbarActions'
@@ -28,10 +28,11 @@ export default function PreviewPane(props: {
   const [ready, setReady] = createSignal(false)
   const [failed, setFailed] = createSignal(false)
   const [retry, setRetry] = createSignal(0)
-  type Request = { taskId: string; url: string; version: number }
+  type Request = { taskId: string; url: string; signal: AbortSignal }
   const [requested, setRequested] = createSignal<Request | null>(null)
   let attempted: Request | undefined
-  let ensureVersion = 0
+  // The page request. A newer one, or unmounting, aborts it.
+  const ensuring = latestSignal()
 
   // Geometry changes cross the seam only when the visible rectangle changes.
   let placed = ''
@@ -62,7 +63,7 @@ export default function PreviewPane(props: {
       setCanFwd(s.canGoForward)
     })
     onCleanup(() => {
-      ensureVersion += 1 // invalidate any in-flight ensure before it can re-show this disposed pane
+      ensuring.abort() // invalidate any in-flight ensure before it can re-show this disposed pane
       stopPage()
       offEvent()
     })
@@ -97,7 +98,7 @@ export default function PreviewPane(props: {
     const resolving = props.resolving
     const resolutionFailed = props.resolutionFailed
     retry()
-    const version = ++ensureVersion
+    const signal = ensuring.next()
     setRequested(null)
     setReady(false)
     setFailed(false)
@@ -108,20 +109,20 @@ export default function PreviewPane(props: {
     }
     // A configuration read is not an instruction to reset a retained page.
     if (!url || resolving || resolutionFailed) return
-    setRequested({ taskId, url, version })
+    setRequested({ taskId, url, signal })
   })
 
   createEffect(() => {
     const request = requested()
     if (!preview || !request || suppressed() || attempted === request) return
     attempted = request
-    const { taskId, url, version } = request
+    const { taskId, url, signal } = request
     void preview.ensure(taskId, url).then((accepted) => {
-      if (version !== ensureVersion) return
+      if (signal.aborted) return
       setFailed(!accepted)
       setReady(accepted)
     }).catch(() => {
-      if (version === ensureVersion) setFailed(true)
+      if (!signal.aborted) setFailed(true)
     })
   })
 

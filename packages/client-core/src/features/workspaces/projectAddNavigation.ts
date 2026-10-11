@@ -1,4 +1,5 @@
 import { createEffect, onCleanup, type Accessor } from 'solid-js'
+import { latestSignal } from '../../kit/lib/state/latestSignal'
 
 /** An add can finish after its empty-screen component is replaced by the project's view. */
 export function createProjectAddNavigation(input: {
@@ -7,23 +8,24 @@ export function createProjectAddNavigation(input: {
   settingsOpen: Accessor<boolean>
   openProject: (id: string) => void
 }): () => (id: string) => void {
-  let revision = 0
+  // Where the reader is. Moving aborts an add begun from the old place.
+  const place = latestSignal()
   let disposed = false
   createEffect(() => {
     input.nodeId()
     input.pathname()
     input.settingsOpen()
-    revision++
+    place.next()
   })
   onCleanup(() => { disposed = true })
 
   return () => {
-    const startedAt = revision
+    const startedAt = place.signal
     const nodeId = input.nodeId()
     const pathname = input.pathname()
     const settingsOpen = input.settingsOpen()
     return (id) => {
-      if (disposed || revision !== startedAt || input.nodeId() !== nodeId || input.pathname() !== pathname || input.settingsOpen() !== settingsOpen) return
+      if (disposed || startedAt.aborted || input.nodeId() !== nodeId || input.pathname() !== pathname || input.settingsOpen() !== settingsOpen) return
       input.openProject(id)
     }
   }

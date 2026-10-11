@@ -10,7 +10,7 @@
 // one would mean a count query per task.
 import { createSignal } from 'solid-js'
 import {
-  activateTaskSignals, activeNodeId, clientEvents, onPluginFrame, openPane, pathForTask, wsOnReconnect,
+  activateTaskSignals, activeNodeId, clientEvents, latestSignal, onPluginFrame, openPane, pathForTask, wsOnReconnect,
   type ClientScheduleContribution, type Task,
 } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
@@ -26,12 +26,13 @@ let cacheNodeId = activeNodeId()
 export const taskHasWorkflowRuns = (taskId: string): boolean => cacheNodeId === activeNodeId() && (runCounts()[taskId] ?? 0) > 0
 
 // A confirmed start or run link proves that this task has a run. Make its pane available before
-// navigation; a later node read replaces the hint with authoritative counts.
-let hintRevision = 0
+// navigation; a later node read replaces the hint with authoritative counts. Each hint aborts the
+// counts of reads sent before it.
+const sinceLastHint = latestSignal()
 export const rememberWorkflowRun = (taskId: string): void => {
   if (cacheNodeId !== activeNodeId()) { cacheNodeId = activeNodeId(); setRunCounts({}); setTaskGroups({}) }
   if (runCounts()[taskId]) return
-  hintRevision += 1
+  sinceLastHint.next()
   setRunCounts((current) => ({ ...current, [taskId]: 1 }))
 }
 
@@ -50,10 +51,11 @@ const same = (a: Record<string, number>, b: Record<string, number>): boolean => 
   return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key])
 }
 
-let epoch = 0
+// The reader's lifetime. A node switch, or the first subscriber arriving or the last leaving, ends it.
+const readerLifetime = latestSignal()
 let subscribers = 0
 let everSubscribed = false
-let reader: { nodeId: string | null; epoch: number; queue: ReturnType<typeof workflowRefreshQueue> } | undefined
+let reader: { nodeId: string | null; lifetime: AbortSignal; queue: ReturnType<typeof workflowRefreshQueue> } | undefined
 
 export const workflowRunCountsSchedule: ClientScheduleContribution = {
   id: 'workflows.task-runs',
@@ -61,20 +63,20 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
   requires: { plugin: 'workflows' },
   run: () => {
     const nodeId = activeNodeId()
-    if (!reader || reader.nodeId !== nodeId || reader.epoch !== epoch) {
+    if (!reader || reader.nodeId !== nodeId || reader.lifetime.aborted) {
       reader?.queue.stop()
-      const readEpoch = epoch
+      const lifetime = readerLifetime.signal
       const api = createWorkflowApi()
-      reader = { nodeId, epoch, queue: workflowRefreshQueue(async () => {
-        const readRevision = hintRevision
+      reader = { nodeId, lifetime, queue: workflowRefreshQueue(async () => {
+        const counts = sinceLastHint.signal
         const [runList, navigation] = await Promise.all([
           api.allRuns().catch(() => null),
           api.taskNavigation().catch(() => null),
         ])
-        if (activeNodeId() !== nodeId || epoch !== readEpoch || (everSubscribed && !subscribers)) return
+        if (activeNodeId() !== nodeId || lifetime.aborted || (everSubscribed && !subscribers)) return
         if (cacheNodeId !== nodeId) { cacheNodeId = nodeId; setRunCounts({}); setTaskGroups({}) }
         // A read sent before a start cannot erase the confirmed run when its older answer arrives later.
-        if (runList && readRevision === hintRevision) {
+        if (runList && !counts.aborted) {
           const next: Record<string, number> = {}
           for (const run of runList.runs) if (run.taskId) next[run.taskId] = (next[run.taskId] ?? 0) + 1
           // Same counts, same object: `when` is read on every pane-strip render, and a fresh object every
@@ -90,11 +92,11 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
     return reader.queue.refresh()
   },
   subscribe: (refresh) => {
-    if (!subscribers) epoch += 1
+    if (!subscribers) readerLifetime.next()
     subscribers += 1
     everSubscribed = true
     const offNode = clientEvents.on('runtime:node-switched', () => {
-      epoch += 1
+      readerLifetime.next()
       reader?.queue.stop()
       cacheNodeId = activeNodeId()
       setRunCounts({})
@@ -108,7 +110,7 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
       if (stopped) return
       stopped = true
       subscribers -= 1
-      if (!subscribers) { epoch += 1; reader?.queue.stop() }
+      if (!subscribers) { readerLifetime.next(); reader?.queue.stop() }
       offNode()
       offReconnect()
       offChild()
