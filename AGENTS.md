@@ -54,7 +54,8 @@ separately when it falls outside the task's scope.
 | Command | What it does |
 | --- | --- |
 | `pnpm install --frozen-lockfile` | Installs dependencies. A fresh worktree needs this first. |
-| `pnpm lint` | Runs oxlint, then `tsc --noEmit` in every package. |
+| `pnpm lint` | Runs oxlint, then the formatter check, then `tsc --noEmit` in every package. |
+| `pnpm format [<file>...]` | Formats the given TypeScript files, or every one when you name none. |
 | `pnpm test:focus <package> <file> [-t <name>]` | Runs one file or test. Use it while you iterate. |
 | `pnpm test --filter=<package>` | Runs one package's full suite through Turborepo. |
 | `pnpm --filter @acorn/arch-tests test` | Runs the repo-wide architecture rules, including doc links. |
@@ -98,3 +99,7 @@ For details, see [local development](./docs/local-development.md).
 
 The oxlint config only checks dead code and the `node:` import prefix. It stays narrow on purpose,
 because a linter that argues about style gets ignored.
+
+oxfmt sets the layout of every TypeScript file, configured in `.oxfmtrc.json`. `pnpm lint` fails on
+a file it would change. Run `pnpm format <file>` to fix one file, or `pnpm format` for the whole tree.
+Don't hand-format around it, and don't reformat files your change doesn't touch.

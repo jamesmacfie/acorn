@@ -14,6 +14,7 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 | [Agent drivers](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client from the command line, native control, and the large-surface flow. |
 | [Profiling](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [Packaged stacks](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
+| [Formatting](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, making `git blame` skip formatting commits with `blame.ignoreRevsFile`, and carrying a branch across one. |
 
 <a id="agent-driven-desktop-development"></a>
 <a id="native-control-of-a-session"></a>

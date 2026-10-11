@@ -82,7 +82,8 @@ pnpm dev:node                              # standalone Node, no desktop window
 pnpm dev:agent -- --session <name>         # isolated desktop session you can drive
 pnpm dev:plugin <id>                       # rebuild one loaded plugin's package on every save
 pnpm --filter @acorn/cli build             # headless CLI bundle for node apps/cli/bin/acorn.mjs
-pnpm lint                                  # oxlint, then TypeScript checks
+pnpm lint                                  # oxlint, the formatter check, then TypeScript checks
+pnpm format                                # format every TypeScript file with oxfmt
 pnpm test                                  # native rebuild, then every Vitest suite
 pnpm db:check                              # replay every SQLite migration chain
 pnpm dist                                  # build and package the desktop app

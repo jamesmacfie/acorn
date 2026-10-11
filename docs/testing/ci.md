@@ -62,8 +62,10 @@ The suite launches Git, PTYs, Docker probes, provider fakes, and Node children, 
 sensitive to load. Before you change a production timeout, run the failing package on its own. Don't
 weaken a runtime limit to suit a saturated test runner.
 
-The root `lint` script is `oxlint && turbo run lint`. If oxlint fails, `tsc --noEmit` never runs.
-Check which half failed before you assume the types are fine, or run `pnpm lint:types` on its own.
+The root `lint` script is `oxlint && oxfmt --check && turbo run lint --continue`. If oxlint or the
+formatter check fails, `tsc --noEmit` never runs. Check which part failed before you assume the types
+are fine, or run `pnpm lint:types` on its own. A formatter failure lists the files. Run
+`pnpm format` and commit the result.
 
 ## Historical failures
 

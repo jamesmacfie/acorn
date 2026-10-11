@@ -1,0 +1,6 @@
+# Commits that only change layout. `git blame` skips them once you run:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# docs/local-development/formatting.md explains when to add one.
+
+# Phase 13: Apply the formatter
+477f40f1f31b6019776c45aae25831729b913d98

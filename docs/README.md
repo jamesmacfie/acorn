@@ -137,6 +137,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
 | [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
 | [local-development/packaged-stacks.md](./local-development/packaged-stacks.md) | Finding the source line behind a stack from a minified, packaged build. |
+| [local-development/formatting.md](./local-development/formatting.md) | The oxfmt formatter, `pnpm format`, the `git blame` ignore file, and carrying a branch across a formatting commit. |
 | [testing.md](./testing.md) | The way into the tests: the commands, focused runs, and the topic pages. |
 | [testing/commands.md](./testing/commands.md) | Every test command, concurrency limits, caching, timeouts, and coverage measurement. |
 | [testing/layers.md](./testing/layers.md) | What each runtime's suites cover, composition-root tests, and the testkit. |
