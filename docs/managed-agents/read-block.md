@@ -15,8 +15,8 @@ Claude Code's settings. The switch is the `blockDataRootReads` field of the
 
 Only Claude Code. It runs shell commands inside its own sandbox, which can refuse reads of a path.
 Codex and contributed harnesses can't block a path, so their agents can read the whole data folder
-whether the switch is on or not. **Check this node** says which harnesses support the block and
-whether a selected session runs with it ([security diagnostics](../security/security-diagnostics.md)).
+whether the switch is on or not. **Check this node** says whether the switch is on and which harnesses
+support it ([security diagnostics](../security/security-diagnostics.md)).
 
 ## What a blocked session can reach
 

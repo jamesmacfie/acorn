@@ -442,15 +442,9 @@ export class ManagedAgentEngine {
     return this.withAdvertisedOptions(await this.probeProviders(force))
   }
 
-  /** Last already observed descriptor. Diagnostics must never trigger a provider probe. */
   /** Harnesses that turn the person's read block into their own sandbox (../drivers/readBlock.ts). */
   readBlockProviders(): string[] {
     return this.registry.providers().filter((id) => this.registry.create(id)?.readBlock === true)
-  }
-
-  observedProvider(id: string): AgentProviderDescriptor | null {
-    return this.providerCache?.generation === this.registry.generation
-      ? this.providerCache.descriptors.find((provider) => provider.id === id) ?? null : null
   }
 
   /** Probes discover availability; connected sessions advertise the actual model and effort values.

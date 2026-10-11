@@ -27,23 +27,6 @@ const checks: Record<string, CheckDescription> = {
     title: 'Acorn tool access', description: 'Review which Acorn tools agents can use to read information, make changes, or run commands.',
     action: { label: 'Review tool permissions', tab: 'agent-tools' },
   },
-  'agent-tools.ceiling': {
-    title: 'Extra limits for this agent', description: 'No additional Acorn tool limits were recorded. Check the agent’s settings for its full permissions.',
-  },
-  'harness.identity': {
-    title: 'Running agent', description: 'Choose a running agent to include the settings it is using.',
-  },
-  'harness.permission-profile': {
-    title: 'Running agent permissions', description: 'The agent did not report its permission mode. Review its settings before working with unfamiliar code.',
-    action: { label: 'Review agent defaults', tab: 'agent-defaults' },
-  },
-  'harness.next-default': {
-    title: 'Defaults for new agents', description: 'No saved permission mode was found for this agent. Its own default mode may apply.',
-    action: { label: 'Review agent defaults', tab: 'agent-defaults' },
-  },
-  'session.selection': {
-    title: 'Running agent unavailable', description: 'The selected agent may have stopped. Choose another running agent, or check the Node without one.',
-  },
   'mcp.managed': {
     title: 'MCP servers', description: 'Acorn could not read the settings for your MCP servers. No server was started.',
     action: { label: 'Review MCP servers', tab: 'agent-mcp-servers' },
@@ -65,16 +48,14 @@ function checkDescription(finding: SecurityFinding): CheckDescription {
 }
 
 function findingGroup(finding: SecurityFinding): FindingGroup {
-  if (['host.limit', 'mcp.unmanaged', 'harness.restrictions', 'harness.loop'].includes(finding.id)) return 'limits'
+  if (['host.limit', 'mcp.unmanaged'].includes(finding.id)) return 'limits'
   if (finding.state === 'failed') return 'attention'
   if (finding.state === 'unknown' || finding.state === 'unsupported') return 'unchecked'
   return finding.severity === 'warning' ? 'attention' : 'settings'
 }
 
 function includedInCards(finding: SecurityFinding, report: SecurityDiagnostics): boolean {
-  if (!report.sessionId && (finding.id.startsWith('harness.') || finding.id === 'agent-tools.ceiling')) return false
-  if (!report.projectId && finding.id === 'project.package-policy') return false
-  return true
+  return report.projectId !== null || finding.id !== 'project.package-policy'
 }
 
 function ResultCard(props: { finding: SecurityFinding }) {
@@ -130,7 +111,6 @@ export default function SecurityDiagnosticsResults(props: { report: SecurityDiag
       <Show when={grouped().unchecked.length}><Text emphasis="muted">{grouped().unchecked.length} {grouped().unchecked.length === 1 ? 'check could' : 'checks could'} not be verified. Expand Not verified below for next steps.</Text></Show>
       <Text emphasis="muted" wrap>
         Checked at {new Date(props.report.checkedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. Results are kept for five minutes.
-        {!props.report.sessionId ? ' No running agent was included.' : ''}
         {!props.report.projectId ? ' No project was included.' : ''}
       </Text>
     </Stack>
@@ -158,7 +138,7 @@ export default function SecurityDiagnosticsResults(props: { report: SecurityDiag
       <Stack gap="row">
         <Text wrap>This check reads Acorn’s records. It does not run your agents, test their restrictions, or inspect all of their personal configuration.</Text>
         <Text wrap>You and programs running as you still have access to your computer. Review unfamiliar code before running it.</Text>
-        <For each={grouped().limits}>{(finding) => <Fold label={finding.id === 'mcp.unmanaged' ? 'Servers outside Acorn' : finding.id === 'host.limit' ? 'Access to your computer' : 'Agent integration details'} defaultOpen={false}>
+        <For each={grouped().limits}>{(finding) => <Fold label={finding.id === 'mcp.unmanaged' ? 'Servers outside Acorn' : 'Access to your computer'} defaultOpen={false}>
           <Text wrap>{finding.summary}</Text><Text emphasis="muted" wrap>{finding.limits}</Text>
         </Fold>}</For>
       </Stack>

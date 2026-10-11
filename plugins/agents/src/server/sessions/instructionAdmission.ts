@@ -13,9 +13,7 @@ export class InstructionAdmission {
   private readonly observations = new Map<string, InstructionAdmissionObservation>()
   constructor(private readonly core: CoreServices, private readonly dataDir: string, readonly store: InstructionReviewStore) {}
 
-  latest(projectId: string | null, taskId: string | null): InstructionAdmissionObservation | null {
-    if (taskId) return this.observations.get(taskId) ?? null
-    if (!projectId) return null
+  latest(projectId: string): InstructionAdmissionObservation | null {
     return [...this.observations.values()].reverse().find((entry) => entry.projectId === projectId) ?? null
   }
 

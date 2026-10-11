@@ -10,13 +10,13 @@ vi.mock('@acorn/plugin-api/client', async (original) => ({
 const cleanup: Array<() => void> = []
 afterEach(() => { for (const dispose of cleanup.splice(0)) dispose(); events.emit.mockReset() })
 const finding = (id: string, patch: Partial<SecurityFinding> = {}): SecurityFinding => ({
-  id, owner: 'agents', nodeId: 'node-1', projectId: null, sessionId: null, checkedAt: 1,
+  id, owner: 'agents', nodeId: 'node-1', projectId: null, checkedAt: 1,
   state: 'configured_only', severity: 'info', summary: 'Technical evidence: fixture.raw', source: 'internal.fixture',
   limits: 'Evidence is limited.', repair: 'Review settings.', ...patch,
 })
 function mount(findings: SecurityFinding[], patch: Partial<SecurityDiagnostics> = {}) {
   const host = document.createElement('div'); document.body.append(host)
-  const report: SecurityDiagnostics = { nodeId: 'node-1', projectId: null, sessionId: null, checkedAt: 1, expiresAt: 300_001, findings, ...patch }
+  const report: SecurityDiagnostics = { nodeId: 'node-1', projectId: null, checkedAt: 1, expiresAt: 300_001, findings, ...patch }
   const dispose = render(() => <SecurityDiagnosticsResults report={report} />, host)
   cleanup.push(() => { dispose(); host.remove() })
   return host
@@ -43,21 +43,15 @@ it('puts actionable warnings first and keeps technical evidence closed until req
   expect(host.textContent).toContain('fixture.raw')
 })
 
-it('omits repeated unselected agent checks and never calls unknown results safe', () => {
+it('omits the unselected project check and never calls unknown results safe', () => {
   const host = mount([
-    finding('harness.identity', { state: 'unknown' }),
-    finding('harness.permission-profile', { state: 'unknown' }),
-    finding('harness.next-default', { state: 'unknown' }),
-    finding('agent-tools.ceiling', { state: 'unknown' }),
     finding('project.package-policy', { state: 'unknown' }),
     finding('plugins.grants', { state: 'unknown' }),
   ])
-  expect(host.textContent).toContain('No running agent was included')
   expect(host.textContent).toContain('No project was included')
   expect(host.textContent).toContain('No settings could be verified')
   expect(host.textContent).not.toContain('No warnings were reported')
-  expect(host.textContent).not.toContain('Running agent permissions')
-  expect(host.textContent).not.toContain('Defaults for new agents')
+  expect(host.textContent).not.toContain('Package installation rules')
   expect(host.querySelectorAll('.ui-card')).toHaveLength(0)
 })
 

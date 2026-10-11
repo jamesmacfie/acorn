@@ -20,8 +20,8 @@ afterEach(() => setAgentSecurityDiagnosticsBridge(null))
 it('keeps reports and scope choices device only, including reads', async () => {
   const calls: string[] = []
   setAgentSecurityDiagnosticsBridge({
-    scopes: async () => { calls.push('scopes'); return { projects: [], sessions: [] } },
-    check: async () => { calls.push('check'); return { nodeId: 'node-1', projectId: null, sessionId: null, checkedAt: 0, expiresAt: 1, findings: [] } },
+    scopes: async () => { calls.push('scopes'); return { projects: [] } },
+    check: async () => { calls.push('check'); return { nodeId: 'node-1', projectId: null, checkedAt: 0, expiresAt: 1, findings: [] } },
   })
   for (const kind of ['task', 'service'] as const) {
     expect((await app(kind).fetch(get('/security-diagnostics/scopes'), env)).status).toBe(403)
@@ -38,7 +38,7 @@ it('keeps reports and scope choices device only, including reads', async () => {
 it('rejects malformed scope before a collector runs', async () => {
   const calls: string[] = []
   setAgentSecurityDiagnosticsBridge({
-    scopes: async () => ({ projects: [], sessions: [] }),
+    scopes: async () => ({ projects: [] }),
     check: async () => { calls.push('check'); throw new Error('unexpected') },
   })
   expect((await app('device').fetch(get('/security-diagnostics?projectId=../other'), env)).status).toBe(400)

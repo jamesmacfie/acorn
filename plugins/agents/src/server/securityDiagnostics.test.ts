@@ -3,7 +3,6 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { AgentSession } from '../contract/wire.ts'
 import type { AgentMcpServer } from '../shared/mcpServers'
 import { defaultAgentSessionDefaults } from '../shared/sessionDefaults'
 import { collectSecurityDiagnostics, readBoundedFile, securityScopeChoices, type SecurityDiagnosticPorts } from './securityDiagnostics'
@@ -11,10 +10,6 @@ import { collectSecurityDiagnostics, readBoundedFile, securityScopeChoices, type
 let root = ''
 afterEach(async () => { if (root) await rm(root, { recursive: true, force: true }); root = ''; vi.useRealTimers() })
 
-const session = (config: Record<string, unknown>): AgentSession => ({
-  id: 'session-1', taskId: 'task-1', providerId: 'codex', profileId: 'codex', driverKind: 'codex-app-server',
-  driverVersion: '1', runtimeState: 'ready', archivedAt: null, config,
-} as AgentSession)
 const ports = (overrides: Partial<SecurityDiagnosticPorts> = {}): SecurityDiagnosticPorts => ({
   core: {
     projects: { byId: async () => ({ id: 'project-1', path: root, name: 'project', workspaceId: 'workspace', github: null }) },
@@ -24,12 +19,11 @@ const ports = (overrides: Partial<SecurityDiagnosticPorts> = {}): SecurityDiagno
     agentTools: { catalog: async () => [{ name: 'task_current', risk: 'read' }, { name: 'run_start', risk: 'execute' }] },
   } as never,
   defaults: async () => defaultAgentSessionDefaults(),
-  session: async () => null,
   managedMcp: async () => [],
   ...overrides,
 })
 
-it('names projects and running agents from their saved records', async () => {
+it('names projects from their saved records', async () => {
   const projects = [
     { id: 'project-1', name: 'Acorn', path: '/projects/acorn' },
     { id: 'project-2', name: 'Runn', path: '/projects/runn' },
@@ -39,31 +33,13 @@ it('names projects and running agents from their saved records', async () => {
       checkouts: async () => [...projects, { id: 'removed', path: '/projects/removed' }],
       byId: async (id: string) => projects.find((project) => project.id === id) ?? null,
     },
-    tasks: { active: async () => [{ id: 'task-1', title: 'Security review', projectId: 'project-1' }] },
   } as unknown as SecurityDiagnosticPorts['core']
-  const choices = await securityScopeChoices(core, async () => [
-    { ...session({}), title: 'Review permissions' },
-    { ...session({}), id: 'untitled', title: '' },
-    { ...session({}), id: 'stopped', title: 'Stopped agent', runtimeState: 'stopped' },
-  ])
-  expect(choices.projects).toEqual([{ id: 'project-1', name: 'Acorn' }, { id: 'project-2', name: 'Runn' }])
-  expect(choices.sessions).toEqual([
-    { id: 'session-1', projectId: 'project-1', label: 'Review permissions' },
-    { id: 'untitled', projectId: 'project-1', label: 'Security review' },
-  ])
+  expect(await securityScopeChoices(core)).toEqual({ projects: [{ id: 'project-1', name: 'Acorn' }, { id: 'project-2', name: 'Runn' }] })
 })
 
-it('uses the live permission profile and narrower ceiling while describing defaults separately', async () => {
-  const current = session({ configOptions: [{ id: 'permissions', category: 'permission', currentValue: 'workspace-write' }], toolCeiling: { maxRisk: 'read' } })
-  const report = await collectSecurityDiagnostics(ports({
-    defaults: async () => ({ ...defaultAgentSessionDefaults(), followLastSession: false, checkInstructionFiles: true,
-      pinned: { codex: { permissions: 'danger-full-access' } } }),
-    session: async () => current,
-  }), 'node-1', 'owner', { sessionId: current.id }, new AbortController().signal)
-  expect(report.findings.find((finding) => finding.id === 'harness.permission-profile')).toMatchObject({ state: 'observed', summary: 'Current session permission profile: workspace-write.' })
-  expect(report.findings.find((finding) => finding.id === 'harness.next-default')?.summary).toContain('danger-full-access')
+it('reports effective tool grants from saved preferences', async () => {
+  const report = await collectSecurityDiagnostics(ports(), 'node-1', 'owner', {}, new AbortController().signal)
   expect(report.findings.find((finding) => finding.id === 'agent-tools.grants')?.summary).toContain('run_start denied')
-  expect(report.findings.find((finding) => finding.id === 'agent-tools.ceiling')?.summary).toContain('read')
   expect(report.findings.find((finding) => finding.id === 'agent-tools.grants')?.facts).toContainEqual({ label: 'Default: run commands', value: 'Blocked' })
   expect(report.findings.find((finding) => finding.id === 'agent-tools.grants')?.description).toContain('1 are allowed and 1 are blocked')
 })
@@ -95,35 +71,13 @@ it('refuses a policy file symlink outside the canonical project root', async () 
   } finally { await rm(outside, { recursive: true, force: true }) }
 })
 
-it('reports missing metadata as unknown and timed-out reads as failed', async () => {
-  const noSession = await collectSecurityDiagnostics(ports(), 'node-1', 'owner', {}, new AbortController().signal)
-  expect(noSession.findings.find((finding) => finding.id === 'harness.identity')?.state).toBe('unknown')
+it('reports timed-out reads as failed', async () => {
   vi.useFakeTimers()
   const pending = collectSecurityDiagnostics(ports({ defaults: async () => new Promise(() => undefined) }),
     'node-1', 'owner', {}, new AbortController().signal)
   await vi.advanceTimersByTimeAsync(4_001)
   const timedOut = await pending
   expect(timedOut.findings.find((finding) => finding.id === 'instructions.checks')?.state).toBe('failed')
-})
-
-it.each([
-  { id: 'claude', capabilities: ['loop_before_tool', 'loop_after_tool'], state: 'observed', phrase: 'every call' },
-  { id: 'codex', capabilities: ['permissions'], state: 'observed', phrase: 'requests only' },
-  { id: 'claude-custom', capabilities: [], state: 'unsupported', phrase: 'No before-tool' },
-])('uses observed $id capabilities for loop coverage', async ({ id, capabilities, state, phrase }) => {
-  const current = { ...session({}), providerId: id }
-  const report = await collectSecurityDiagnostics(ports({ session: async () => current,
-    observedProvider: () => ({ id, installed: true, capabilities } as never) }),
-  'node-1', 'owner', { sessionId: current.id }, new AbortController().signal)
-  expect(report.findings.find((finding) => finding.id === 'harness.loop')).toMatchObject({ state })
-  expect(report.findings.find((finding) => finding.id === 'harness.loop')?.summary).toContain(phrase)
-})
-
-it('keeps loop coverage unknown without a passive descriptor, even for a known name', async () => {
-  const current = session({})
-  const report = await collectSecurityDiagnostics(ports({ session: async () => current }),
-    'node-1', 'owner', { sessionId: current.id }, new AbortController().signal)
-  expect(report.findings.find((finding) => finding.id === 'harness.loop')?.state).toBe('unknown')
 })
 
 it('reports bounded plugin counts and observed admission without external text', async () => {
@@ -150,16 +104,13 @@ it('warns when the Node read its keys from files, or a plain key file is still i
   expect((await collectSecurityDiagnostics(ports(), 'node-1', 'owner', {}, new AbortController().signal)).findings.some((finding) => finding.id === 'host.keys')).toBe(false)
 })
 
-it("says whether agents are kept out of Acorn's data folder, and whether the selected one is", async () => {
-  const finding = async (block: boolean, providerId?: string) => (await collectSecurityDiagnostics(ports({
+it("says whether agents are kept out of Acorn's data folder", async () => {
+  const finding = async (block: boolean) => (await collectSecurityDiagnostics(ports({
     defaults: async () => ({ ...defaultAgentSessionDefaults(), blockDataRootReads: block }),
     readBlockProviders: () => ['claude'],
-    ...(providerId ? { session: async () => ({ ...session({}), providerId }) } : {}),
-  }), 'node-1', 'owner', providerId ? { sessionId: 'session-1' } : {}, new AbortController().signal)).findings.find((item) => item.id === 'agents.read-block')
+  }), 'node-1', 'owner', {}, new AbortController().signal)).findings.find((item) => item.id === 'agents.read-block')
   expect(await finding(false)).toMatchObject({ severity: 'attention', summary: expect.stringContaining('disabled') })
   expect(await finding(true)).toMatchObject({ severity: 'info', summary: expect.stringContaining('harnesses that support it: claude') })
-  expect(await finding(true, 'claude')).toMatchObject({ severity: 'info', summary: expect.stringContaining('starts blocked') })
-  expect(await finding(true, 'codex')).toMatchObject({ severity: 'warning', summary: expect.stringContaining('is not blocked') })
 })
 
 it('does not inspect encrypted approval bodies during a passive project check', async () => {

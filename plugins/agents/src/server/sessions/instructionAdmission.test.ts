@@ -32,10 +32,10 @@ it('does no scan when disabled; enabled checks stop on hidden input and incomple
   await expect(admission.admit('task')).resolves.toBeUndefined()
   preference = JSON.stringify({ checkInstructionFiles: true })
   await expect(admission.admit('task')).rejects.toThrow(/scan incomplete/)
-  expect(admission.latest('project', null)?.outcome).toBe('incomplete')
+  expect(admission.latest('project')?.outcome).toBe('incomplete')
   writeFileSync(join(dir, 'AGENTS.md'), `hidden${String.fromCodePoint(0x200b)}`)
   await expect(admission.admit('task')).rejects.toThrow(/Hidden character U\+200B/)
-  expect(admission.latest('project', null)?.outcome).toBe('blocked')
+  expect(admission.latest('project')?.outcome).toBe('blocked')
 })
 
 it('requires a first baseline, rejects drift, and restores an approved digest', async () => {
@@ -48,7 +48,7 @@ it('requires a first baseline, rejects drift, and restores an approved digest', 
   const second = await admission.review('task')
   await admission.approve('task', second.id!)
   await expect(admission.admit('task')).resolves.toBeUndefined()
-  expect(admission.latest('project', null)).toMatchObject({ taskId: 'task', outcome: 'passed' })
+  expect(admission.latest('project')).toMatchObject({ taskId: 'task', outcome: 'passed' })
   writeFileSync(join(dir, 'AGENTS.md'), 'Third instruction.\n')
   await expect(admission.admit('task')).rejects.toThrow(/review required/)
 })

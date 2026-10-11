@@ -372,10 +372,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           return collectSecurityDiagnostics({
             core,
             defaults: (owner) => readAgentSessionDefaults(core.prefs, owner),
-            session: (id) => runtime!.store.requireSession(id).catch(() => null),
             managedMcp: () => runtime!.mcpServers.list(),
-            instructionObservation: async (projectId, taskId) => (await runtime!.observedInstructionAdmission())?.latest(projectId, taskId) ?? null,
-            observedProvider: (id) => runtime!.observedProvider(id),
+            instructionObservation: async (projectId) => (await runtime!.observedInstructionAdmission())?.latest(projectId) ?? null,
             readBlockProviders: () => runtime!.readBlockProviders(),
             staticDependencyPolicy: async (root, signal) => {
               const policy = ctx.capabilities.get(STATIC_DEPENDENCY_POLICY)
@@ -385,7 +383,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         },
         scopes: async () => {
           const { securityScopeChoices } = await import('../server/securityDiagnostics')
-          return securityScopeChoices(core, async () => (await runtime!.store.listSessions({ limit: 100 })).sessions)
+          return securityScopeChoices(core)
         },
       })
       projectChanged = ctx.events.on('project:changed', (event) => {

@@ -131,7 +131,6 @@ export class ManagedAgentRuntime {
   diskFootprint = (now?: number) => this.engine.diskFootprint(now)
   instructionAdmission = () => this.engine.instructionAdmission()
   observedInstructionAdmission = () => this.engine.observedInstructionAdmission()
-  observedProvider = (id: string) => this.engine.observedProvider(id)
   readBlockProviders = () => this.engine.readBlockProviders()
   pendingMcpReviews = () => this.engine.pendingMcpReviews()
   approveMcpCatalogue = (name: string, sessionId: string, revision: string, digest: string) =>
