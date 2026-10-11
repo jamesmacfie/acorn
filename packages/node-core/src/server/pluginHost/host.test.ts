@@ -22,6 +22,7 @@ import type { CompiledNodePluginContext, NodePlugin } from './types'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providerShared'
 import { integrationProviderRegistry } from '../integrations/registry'
 import { hookPoints } from './hooks'
+import { telemetrySummary } from '../telemetry/collector'
 
 const noop = (): void => {}
 
@@ -239,6 +240,9 @@ describe('plugin host', () => {
     await result.dispose()
     expect(() => context!.routes.fetch(() => new Response('late'))).toThrow(/previous load/)
     expect(pluginRouteContributions().some(({ plugin: owner }) => owner === 'held-context')).toBe(false)
+    // Including the telemetry read facet, whose sink would otherwise outlive every undo list.
+    expect(() => context!.core.telemetry.onBatch(() => {})).toThrow(/previous load/)
+    expect(telemetrySummary().sinks).not.toContain('held-context')
   })
 
   it('rejects a duplicate plugin name before running any init', async () => {

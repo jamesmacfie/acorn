@@ -48,6 +48,11 @@
 >   subscriptions and sinks, which used to leak. A committed instance's registrations made after
 >   `init`, such as a late `events.on`, now land in the host's list, because the host keeps the
 >   candidate's array instead of a copy.
+> - **A retired context can't subscribe a telemetry sink.** `ctx.core.telemetry.onBatch` was the one
+>   registration a revoked context still allowed. Before this change, the next teardown removed such a
+>   sink by plugin name. With per-registration undos, a sink from a failed reload attempt would land in
+>   a list nothing runs again and read every record for the life of the process. So it throws after
+>   revocation, like every other member, and the revocation test in `host.test.ts` checks it.
 > - **One failing undo doesn't stop the rest.** `clearRegistrations` logs it under the plugin's name
 >   and carries on. Before, a throw from the old undo loop skipped every clear after it.
 > - The reload commit-failure path no longer calls `clearRegistrations` before running the

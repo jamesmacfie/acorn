@@ -678,6 +678,12 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     }
   }
 
+  // The one registration on `core`, revoked like the members above. A revoked context's undo list is
+  // never run again, so a sink it subscribed would read every record for the life of the process.
+  // Never buffered: a sink starts reading when it subscribes. `withOwnedTelemetry` built this facet for
+  // this context alone, so replacing the member touches no other plugin's.
+  if (ctx.core.telemetry) ctx.core.telemetry.onBatch = guard(ctx.core.telemetry.onBatch, false)
+
   // `capabilities` is the one registration that hands the plugin something back, so it cannot go through
   // the loop above: the Disposable has to work before the replay, cancelling the pending registration,
   // and after it, disposing the real one. `get`, `require` and `ids` are reads and stay as they are.
