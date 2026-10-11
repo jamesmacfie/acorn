@@ -328,6 +328,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   conditions, bounded continuations, run inspection, and budgets on workflow agent steps.
 - [Workflow agent tools](./future/workflow-agent-tools.md): the implemented requirements for discovery,
   agent-authored drafts, approved invocation, run inspection, and cancellation through dedicated tools.
+- [Spawned agent notes](./future/spawned-agent-notes.md): proposed automatic note snapshots and parent
+  note inheritance in shared and worktree agent spawns.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): the original design for loading a plugin
