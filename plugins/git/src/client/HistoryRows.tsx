@@ -1,9 +1,11 @@
-import { createMemo, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { activeNodeId, openActionPicker, prefsOptions, PrefKeys, requestTaskLaunch } from '@acorn/plugin-api/client'
+import { activeNodeId, openActionPicker, prefsOptions, PrefKeys, requestTaskLaunch, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, HistoryMark, IconButton, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, FilterBar, historyLayout } from '@acorn/plugin-api/ui'
 import type { HistoryModel } from './historyModel'
 import { commitActionRequest, launchWorkflowAtCommit, sameGitActionScope } from './launchWorkflow'
+import { operationChoices } from './operationClient'
+import { OperationDialog, type OperationRequest } from './OperationDialog'
 
 const searchFields = [
   { value: 'message', label: 'Message', placeholder: 'Search messages…' },
@@ -11,7 +13,7 @@ const searchFields = [
   { value: 'hash', label: 'Full object ID', placeholder: 'Search commit hashes…' },
 ] as const
 
-export function HistoryRows(props: { projectId: string; model: HistoryModel; selected: string | null; onSelect: (id: string) => void; onChanges?: () => void; onRefresh?: () => void }) {
+export function HistoryRows(props: { projectId: string; model: HistoryModel; selected: string | null; onSelect: (id: string) => void; onChanges?: () => void; onRefresh?: () => void; task?: Task }) {
   const prefs = createQuery(() => prefsOptions(true))
   const graphVisible = () => prefs.data?.[PrefKeys.gitGraphVisible] !== 'false'
   const valid = (nodeId: string | null, projectId: string) => sameGitActionScope(nodeId, projectId, props.projectId)
@@ -21,15 +23,21 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
   const launchWorkflow = (nodeId: string | null, projectId: string, id: string, title: string) => {
     if (valid(nodeId, projectId)) launchWorkflowAtCommit(nodeId, projectId, id, title)
   }
+  const [operation, setOperation] = createSignal<OperationRequest | null>(null)
+  createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => setOperation(null), { defer: true }))
+  const operate = (commit: { id: string; subject: string }) => (kind: OperationRequest['operation']) =>
+    setOperation({ operation: kind, source: { id: commit.id, label: commit.subject } })
   const openActions = (id: string) => {
     const commit = commits().find((entry) => entry.id === id)
     if (!commit) return
-    openActionPicker(commitActionRequest(commit, activeNodeId(), props.projectId, () => props.projectId, props.onSelect))
+    openActionPicker(commitActionRequest(commit, activeNodeId(), props.projectId, () => props.projectId, props.onSelect, operate(commit)))
   }
   const commits = () => props.model.commits()
   const slots = createMemo(() => historyLayout(commits(), !props.model.filter().query, !!props.model.next(), props.model.dropped()))
   const items = createMemo(() => commits().map((commit) => ({ key: commit.id, label: `${commit.subject} ${commit.id}` })))
   return <Stack gap="none">
+    {/* First, because the terminal draws a dialog in place and the last row can be far below the fold. */}
+    <Show when={operation()}>{(request) => <OperationDialog {...request()} projectId={props.projectId} task={props.task} onClose={() => setOperation(null)} />}</Show>
     <SectionHeader count={commits().length} actions={<IconButton icon="refresh-cw" label="Refresh history" spin={props.model.first.isFetching} onPress={props.onRefresh ?? props.model.refresh} />}>History</SectionHeader>
     <FilterBar ariaLabel="History ref">
       <Select size="sm" label="Ref" value={props.model.ref() ?? ''} options={[{ value: '', label: 'All refs and HEAD' }, ...(props.model.first.data?.refs ?? []).map((ref) => ({ value: ref, label: ref }))]}
@@ -75,6 +83,8 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
                 <Menu.Item context={menu} onSelect={() => launchTask(nodeId, projectId, pinnedCommit.id, pinnedCommit.subject)}>Start task at {ref.slice(11)} tip</Menu.Item>
                 <Menu.Item context={menu} onSelect={() => launchWorkflow(nodeId, projectId, pinnedCommit.id, pinnedCommit.subject)}>Start workflow at {ref.slice(11)} tip</Menu.Item>
               </>}</For>
+              <For each={operationChoices(pinnedCommit.parents.length)}>{(choice) =>
+                <Menu.Item context={menu} onSelect={() => { if (valid(nodeId, projectId)) operate(pinnedCommit)(choice.operation) }}>{choice.label}</Menu.Item>}</For>
               <For each={pinnedCommit.parents}>{(parent, index) => <Menu.Item context={menu} onSelect={() => { if (valid(nodeId, projectId)) props.onSelect(parent) }}>Open parent {index() + 1} · {parent.slice(0, 8)}</Menu.Item>}</For>
             </>}
           </RowActions>}>

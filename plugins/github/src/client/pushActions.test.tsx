@@ -1,10 +1,10 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/plugin-api/client'
-import { CHANGES_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
+import { GIT_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
 
 // This plugin's one contribution into somebody else's surface: the button that turns a pushed branch
-// into a pull request, drawn under the Changes pane's branch bar (docs/plugins/cooperative-extension-points.md § Cooperative
+// into a pull request, drawn under the Changes tab's branch bar (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points).
 //
 // Three states worth pinning, and all three are decisions this side makes from facts the owner handed
@@ -20,7 +20,7 @@ const seams = vi.hoisted(() => ({
 vi.mock('@solidjs/router', () => ({ useNavigate: () => seams.navigate }))
 
 // The task query, answered from the array above. The component reads `pullNumber` and the mirrored
-// repository off this rather than out of the props, because the changes plugin does not know either
+// repository off this rather than out of the props, because the git plugin does not know either
 // word.
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: seams.tasks }) }))
 
@@ -122,7 +122,7 @@ describe('Open pull request', () => {
 describe('the point it fills', () => {
   // Spelled by hand on this side, because a plugin may not import another plugin. A drift in either
   // manifest is a contribution nobody delivers, silently, which is what this line exists to catch.
-  it('names the changes plugin out loud', () => {
-    expect(CHANGES_PUSH_ACTIONS_POINT).toBe('changes:push-actions')
+  it('names the git plugin out loud', () => {
+    expect(GIT_PUSH_ACTIONS_POINT).toBe('git:push-actions')
   })
 })

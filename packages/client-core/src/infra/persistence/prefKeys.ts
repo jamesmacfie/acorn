@@ -54,7 +54,7 @@ export const PrefKeys = {
   agentToolFold: 'agent_tool_fold',
   dockerPrefs: 'docker_prefs',
   // How the Changes pane draws its file list: list or tree, the sort inside a flat list, and what the
-  // rows are grouped by (plugins/changes/src/client/changesPrefs.ts). One JSON blob in one key, like
+  // rows are grouped by (plugins/git/src/client/changes/changesPrefs.ts). One JSON blob in one key, like
   // `docker_prefs`, because the list reads all three together.
   //
   // The device's, like `diff_view` beside it. It is about the person reading the list, not about the

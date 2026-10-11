@@ -66,7 +66,7 @@ import InvocationDialog from './InvocationDialog'
 // The editor: one definition as a list of nodes with an inspector, on both hosts
 // (docs/workflows/authoring.md § Authoring).
 //
-// The four regions of a list-detail layout from one file, as plugins/changes' pane does: header, list,
+// The four regions of a list-detail layout from one file, as the git pane does: header, list,
 // detail, footer. It is drawn by the Workflows rail source's detail region, which is where a
 // project-scoped surface lands on each host.
 

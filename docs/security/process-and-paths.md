@@ -128,10 +128,10 @@ only. Task listing and cleanup work out association without those hints.
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to HTTP
   and HTTPS URLs without userinfo.
 - **Force push uses `--force-with-lease`, never a bare `--force`** (`pushArgs` in
-  `plugins/changes/src/server/localDiff.ts`). The lease compares the remote ref with this Node's
+  `plugins/git/src/server/changes/localDiff.ts`). The lease compares the remote ref with this Node's
   remote-tracking ref, so a commit someone pushed since the last fetch fails the push instead of
   disappearing. The reader arms the menu item and presses it again, the lease holds, and no
-  `changes:before-push` handler vetoes. The payload carries `force`, so a branch-protection plugin can
+  `git:before-push` handler vetoes. The payload carries `force`, so a branch-protection plugin can
   refuse that push alone ([plugins.md](../plugins.md#hooks)).
 - The abort verb is offered only while the Node's status read says a merge or rebase is in flight, and
   which one to abort is read off the worktree rather than the request.

@@ -86,8 +86,8 @@ export const PUBLIC_EXTENSION_POINTS: readonly PublicExtensionPoint[] = [
     props: '{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }',
   },
   { id: 'agents:request-card', kind: 'remote', mode: 'stack', max: 2, props: '{ taskId, sessionId, requestId, kind, title }' },
-  { id: 'changes:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
-  { id: 'changes:push-actions', kind: 'remote', mode: 'stack', max: 2, props: '{ taskId, projectId, branch, upstream, ahead }' },
+  { id: 'git:diff-line', kind: 'annotation', key: ['file', 'line', 'side'], max: 4 },
+  { id: 'git:push-actions', kind: 'remote', mode: 'stack', max: 2, props: '{ taskId, projectId, branch, upstream, ahead }' },
   {
     id: 'context:section', kind: 'remote', mode: 'stack', max: 2,
     matches: 'the section id', props: '{ task, onChanged, onPendingChange }',

@@ -1,7 +1,7 @@
 import { createEffect, createSignal, For, Index, mergeProps, on, onCleanup, Show, type Component } from 'solid-js'
 import { agentToolTone } from '../../contract/toolTone'
 import { Button, CodeBlock, Fold, Inline, Stack, StackedDiff, StatusDot, Text } from '@acorn/plugin-api/ui'
-import { dispatchLayout, formatRelativeTime } from '@acorn/plugin-api/client'
+import { formatRelativeTime, openPane } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
@@ -150,7 +150,7 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
               </Show>}
             </Index>
             <Show when={props.fileChanges?.length}>
-              <Inline><Button variant="bare" size="sm" onPress={() => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })}>Open in Changes</Button></Inline>
+              <Inline><Button variant="bare" size="sm" onPress={() => openPane(props.taskId, 'git', { kind: 'plugin:select', item: 'changes' })}>Open in Changes</Button></Inline>
             </Show>
             <For each={(props.tool.paths ?? []).filter((path) => !props.fileChanges?.some((change) => change.path === path))}>
               {(path) => <Text emphasis="mono">{path}</Text>}

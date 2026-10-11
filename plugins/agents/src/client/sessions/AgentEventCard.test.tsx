@@ -24,7 +24,8 @@ vi.mock('./managedClient', () => ({
 }))
 
 const dispatchLayout = vi.fn()
-vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), dispatchLayout }))
+const openPane = vi.fn()
+vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), dispatchLayout, openPane }))
 
 const { default: AgentEventCard } = await import('./AgentEventCard')
 const { registerContextMenuItems } = await import('@acorn/plugin-api/client')
@@ -66,7 +67,7 @@ const openInChanges = (host: HTMLElement) =>
   [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Open in Changes'))
 
 it('opens a file change in place to show that step’s diff, and keeps the way to Changes', () => {
-  dispatchLayout.mockClear()
+  dispatchLayout.mockClear(); openPane.mockClear()
   const { host, dispose } = drawCard(fileChange({
     type: 'file_change', path: 'src/a.ts', patch: '@@ -3,2 +3,2 @@\n keep\n-old\n+new', changeId: 'toolu_1',
   }))
@@ -83,7 +84,7 @@ it('opens a file change in place to show that step’s diff, and keeps the way t
     // Read-only: no comment control on any line.
     expect(host.querySelector('.diff-add-btn')).toBeNull()
     openInChanges(host)!.click()
-    expect(dispatchLayout).toHaveBeenCalledWith('task', { type: 'show', pane: 'changes' })
+    expect(openPane).toHaveBeenCalledWith('task', 'git', { kind: 'plugin:select', item: 'changes' })
   } finally { dispose() }
 })
 
@@ -111,13 +112,13 @@ it('says a stored patch is too large, and still links to Changes', () => {
 })
 
 it('keeps a change with no patch as the link to Changes it always was', () => {
-  dispatchLayout.mockClear()
+  dispatchLayout.mockClear(); openPane.mockClear()
   const { host, dispose } = drawCard(fileChange({ type: 'file_change', summary: 'Codex updated files.' }))
   try {
     expect(host.querySelector('details')).toBeNull()
     expect(host.textContent).toContain('Changed files')
     host.querySelector<HTMLElement>('[role="button"], button')!.click()
-    expect(dispatchLayout).toHaveBeenCalledWith('task', { type: 'show', pane: 'changes' })
+    expect(openPane).toHaveBeenCalledWith('task', 'git', { kind: 'plugin:select', item: 'changes' })
   } finally { dispose() }
 })
 

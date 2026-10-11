@@ -3,7 +3,7 @@
 // tasksKey after.
 //
 // The review-note writes that used to sit alongside these moved to
-// plugins/changes/src/client/reviewNoteMutations.ts: they are the changes pane's, and keeping them
+// plugins/git/src/client/changes/reviewNoteMutations.ts: they are the Changes tab's, and keeping them
 // here meant core held that plugin's routes.
 import { postJson, writeJson } from '../../infra/node/apiClient'
 import {

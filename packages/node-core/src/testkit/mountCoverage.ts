@@ -16,3 +16,12 @@ export function mountCovers(mount: string, route: string): boolean {
   }
   return m.length === r.length
 }
+
+// The handler a route was registered with. Hono wraps every handler of a sub-router that has its own
+// `onError`, gates included, and keeps the original under `__COMPOSED_HANDLER`. Without unwrapping, a
+// `requireDevice` mount in such a router stops looking like a gate.
+export function registeredHandler(handler: unknown): unknown {
+  let current = handler
+  while (typeof current === 'function' && '__COMPOSED_HANDLER' in current) current = (current as { __COMPOSED_HANDLER: unknown }).__COMPOSED_HANDLER
+  return current
+}

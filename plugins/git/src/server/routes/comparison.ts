@@ -1,11 +1,11 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { BridgeError, requireDevice, type AppEnv, type CoreServices } from '@acorn/plugin-api/node'
+import { BridgeError, requireDevice, type CoreServices } from '@acorn/plugin-api/node'
+import { gitRouter } from './router'
 import { pinComparison } from '../comparison'
 
 const request = z.object({ source: z.string().min(1).max(256), destination: z.string().min(1).max(256), mode: z.enum(['direct', 'merge-base']) }).strict()
 export function comparisonRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'tasks'>) {
-  return new Hono<AppEnv>()
+  return gitRouter()
     .use('/projects/:projectId/comparison', requireDevice)
     .post('/projects/:projectId/comparison', async (c) => {
       const parsed = request.safeParse(await c.req.json().catch(() => null))

@@ -1,10 +1,37 @@
 # Phase 07: Git operations and editor resolution
 
-Date: October 7, 2026. Status: planned; implementation not started.
+Date: October 7, 2026. Status: implemented October 11, 2026. Shipped behavior is in
+[Git operations](../../git-client/operations.md).
 Depends on [phase 06](./06-refs-remotes-and-settings.md).
 Read the [full implementation context](./README.md), especially
 [operation handling](./README.md#operations-and-conflict-handling) and
 [checkout admission](./README.md#task-activity-and-admission).
+
+## Acceptance evidence: October 11, 2026
+
+The fixture is a disposable repository at `/tmp/acorn-ops-fixture/repo`. `main`, `feature`, and a
+later `tui-conflict` branch each change line one of `shared`, and `side` adds `side.txt`. Each
+session's task was a `tasks` row with a null branch, inserted into the session's `core.sqlite`.
+
+- `plugins/git/src/server/operations.test.ts` covers success, no-op, conflict, continue, skip, and
+  abort for each operation. It also covers a terminal rebase, the refusals, and a conflicted stash.
+  Its default editor always fails, so a command that waited on a prompt would fail the test.
+- Desktop, `pnpm dev:agent -- --session git-ops --project <fixture>`: **Merge into task…** on
+  `feature` stopped on `shared`. The banner opened the file in Editor, Changes **Mark resolved**
+  staged it, and **Continue** created the merge commit. A cherry-pick with an untracked file was
+  refused with the dirty-checkout message, and the same dialog succeeded after the file was removed.
+  A revert started in a terminal appeared after **Refresh history** and aborted from the banner.
+- Terminal, `pnpm dev:tui:agent -- --session git-ops-tui --project <fixture> --cols 120 --rows 40`:
+  the keyboard action picker opened **Merge into task…**, the dialog showed Git's conflict output,
+  the banner listed `shared`, and its row opened a `shared [!]` Editor tab. **Continue** created the
+  merge commit. The file was staged with `git add`, because the terminal Changes pane still read
+  "No changes" during the conflict and the driver can't show focus to press its refresh. The
+  terminal refusal and retry flow wasn't driven for the same reason. It renders through the same
+  dialog alert that showed the conflict output.
+
+Two defects surfaced and are fixed. Git routes answered every `BridgeError` refusal, including stash
+refusals, as a 500 `internal`. `plugins/git/src/server/routes/router.ts` maps them to their status. The
+terminal drew the history dialog below the last row, so the list mounts it first.
 
 ## Deliverable
 

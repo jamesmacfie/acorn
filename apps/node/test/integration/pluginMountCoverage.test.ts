@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from '@acorn/node-core/server/index.ts'
 import { requireDevice, requireProviderAccess, requireTaskScope } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { PLUGIN_NAMESPACE } from '@acorn/node-core/server/routes/registry.ts'
-import { mountCovers } from '@acorn/node-core/testkit'
+import { mountCovers, registeredHandler } from '@acorn/node-core/testkit'
 import { initCompiledPlugins } from '../helpers/compiledPlugins'
 
 // The compiled plugins' version of packages/node-core/src/server/mountCoverage.test.ts. A task's agent
@@ -75,7 +75,7 @@ describe('compiled plugin mount coverage', () => {
 
   const CORE_GATES = new Set<unknown>([requireDevice, requireProviderAccess, requireTaskScope])
   const table = () => {
-    const routes = createApp().routes.map((route, index) => ({ ...route, index }))
+    const routes = createApp().routes.map((route, index) => ({ ...route, handler: registeredHandler(route.handler), index }))
     const gates = routes.filter((r) => CORE_GATES.has(r.handler) || (r.method === 'ALL' && OWNERSHIP_GATES[r.path]))
     const pluginRoutes = routes.filter((r) => r.method !== 'ALL' && r.path.startsWith(`${PLUGIN_NAMESPACE}/`) && !CORE_GATES.has(r.handler))
     const gated = (route: { method: string; path: string; index: number }) => gates.some((gate) =>

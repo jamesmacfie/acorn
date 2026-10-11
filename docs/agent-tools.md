@@ -32,7 +32,7 @@ The registry is the authority on this list. These tools ship:
 | --- | --- |
 | Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `dataset_write`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request` |
 | `github` | `github_pull_create`, `pr_review_comments`, `pr_checks` |
-| `changes` | `local_changes`, `local_diff`, `git_log` |
+| `git` | `local_changes`, `local_diff`, `git_log` |
 | `notes` | `notes_list`, `notes_read`, `notes_write`, `notes_append` |
 | `memory` | `memory_list`, `memory_search`, `memory_get`, `memory_write`, `memory_delete` |
 | `terminal` | `run_targets`, `run_status`, `run_start`, `run_stop`, `run_restart`, in tasks with run targets |

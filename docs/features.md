@@ -30,10 +30,12 @@ integration](./github-integration.md) and [diff rendering](./diff-rendering.md).
 
 The Git source browses pinned commit history, read-only revision diffs, registered worktrees, and
 repository stashes for the selected project. A task's Git pane starts on its branch history, labels
-its checkout, and offers stash actions. **Explain commit** and **Explain stash** generate only when
+its checkout, and offers stash actions. It also merges, rebases, cherry-picks, or reverts a pinned
+commit in the task, and resolves a conflicted text file from its base, ours, and theirs versions. **Explain commit** and **Explain stash** generate only when
 selected, using the chosen model and bounded repository context. Working files, staging, and
 committing stay in Changes. See [Git history](./git-client/history.md),
-[Git worktrees](./git-client/worktrees.md), [Git stashes](./git-client/stashes.md), and
+[Git worktrees](./git-client/worktrees.md), [Git stashes](./git-client/stashes.md),
+[Git operations](./git-client/operations.md), [Git conflict resolution](./git-client/conflicts.md), and
 [Git explanations](./git-client/explanations.md).
 
 ## Task panes
@@ -42,8 +44,8 @@ Each task shows a row of panes. These ship with acorn:
 
 - `agents`: managed Claude Code and Codex sessions, requests, context, artifacts, and lifecycle.
 - `pr`: linked pull-request review.
-- `changes`: the uncommitted diff, staging, commit and push, and review notes.
-- `git`: branch history, revision files and diffs, and task checkout identity.
+- `git`: a Changes tab with the uncommitted diff, staging, commit and push, and review notes, then
+  tabs for branch history with revision diffs, stashes, and the task's worktrees.
 - `notes`: task, workspace, and global Markdown notes.
 - `context`: choose, preview, size, and send task context.
 - `editor`: worktree files, code editing, and ripgrep search.

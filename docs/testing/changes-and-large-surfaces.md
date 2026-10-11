@@ -3,7 +3,7 @@
 Run these checks for commit controls, large diffs, long transcripts, and task restoration.
 The numbers retain their original acceptance-check IDs.
 
-## Changes pane
+## Changes tab
 
 The next four are the Changes panel's ([diff-rendering.md](../diff-rendering/changes-pane.md) § One status read). The
 pane's own suites cover the parser, the routes, the checkbox, the editor's state and every remote state
@@ -11,7 +11,7 @@ of the bar against a bare repository in a temp directory. What they cannot see i
 swaps to when a checkbox moves, whether a keystroke in the message field reaches a command, and what a
 real remote with real credentials does.
 
-43. Open the Changes pane on a task with both staged and unstaged edits. Tick a row's checkbox: the
+43. Open the Changes tab on a task with both staged and unstaged edits. Tick a row's checkbox: the
     file moves, the group checkbox above it follows, and the diff column switches to the staged side
     of that file. Untick it and the column goes back. Tick a group checkbox that is showing the
     indeterminate mark and only the unstaged files under it move. Then check the rail: its dirty count
@@ -46,7 +46,7 @@ real remote with real credentials does.
 47. On a task in a GitHub-mirrored project whose branch has never been pushed, there is nothing under
     the branch bar. Press **Publish**, and **Open pull request** appears there; press that, and the
     create form opens with this branch already chosen as the head. Create the pull request and go back
-    to the Changes pane: the button is gone and the PR pane is in the switcher. Then disable the GitHub
+    to the Changes tab: the button is gone and the PR pane is in the switcher. Then disable the GitHub
     plugin in Settings and reopen the pane on a pushed branch: the footer is the same height it is with
     the plugin on, with no gap where the button was.
 
@@ -76,9 +76,9 @@ real remote with real credentials does.
     In split mode, scroll a long line sideways before its colour arrives: it stays scrolled when the
     colour lands. Find a match in split mode: the view lands on the band that holds it. With find
     open, expand a gap above the match: the view does not jump back to the match.
-    Then do the same in the Changes pane while an agent edits a file: only that file's segments
+    Then do the same in the Changes tab while an agent edits a file: only that file's segments
     reload, and the reader stays where they were. Run `git config diff.noprefix true` in the task's
-    worktree and reopen the Changes pane: every changed file still shows its diff. Unset it afterwards,
+    worktree and reopen the Changes tab: every changed file still shows its diff. Unset it afterwards,
     because the setting is the whole repository's.
 83. In that pull request, scroll to a place with a thread a screen above you and one below. Expand
     and collapse the one above, reply in it so the box grows, and resolve it: the line you are reading
@@ -91,7 +91,7 @@ real remote with real credentials does.
 84. Open that pull request's diff, scroll to the middle, and switch to another task and back: the
     rows you left are on screen, coloured, before any segment request, and the health snapshot's
     `resident.hits` rose. Open a dozen other large diffs one after another: `resident.rows` and
-    `resident.estimatedBytes` stay under `rowCeiling` and `byteCeiling`. In the Changes pane, let an
+    `resident.estimatedBytes` stay under `rowCeiling` and `byteCeiling`. In the Changes tab, let an
     agent save the same file several times: `resident.segments` does not grow with each save.
 85. Open the `canonical` fixture's Agent pane: it opens on the newest cards with **Show earlier** above
     them, and the health snapshot shows 200 mounted of about 3,400 turns. Scroll a little way up and

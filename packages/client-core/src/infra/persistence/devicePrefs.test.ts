@@ -38,7 +38,7 @@ describe('isDevicePref', () => {
   it('claims presentation and window state', () => {
     // `changes_view` is in here with `theme` and `diff_view`: how the Changes pane draws its file
     // list — flat or nested, sorted how, grouped by what — is about the person reading it, not about
-    // the worktree it is a list of (plugins/changes/src/client/changesPrefs.ts).
+    // the worktree it is a list of (plugins/git/src/client/changes/changesPrefs.ts).
     for (const key of [
       PrefKeys.theme, PrefKeys.style, PrefKeys.keybindings, PrefKeys.railOrder,
       PrefKeys.lastSource, PrefKeys.notices, PrefKeys.diffView, PrefKeys.changesView,

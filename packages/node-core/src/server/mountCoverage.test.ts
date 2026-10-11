@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createApp } from './index'
 import { requireDevice, requireProviderAccess, requireTaskScope } from './middleware/requireUser'
 import { CORE_NAMESPACE } from './routes/registry'
-import { mountCovers } from '../testkit/mountCoverage'
+import { mountCovers, registeredHandler } from '../testkit/mountCoverage'
 
 // Every core route is reachable by a task-scoped agent token unless something says otherwise, because
 // `requireUser` accepts either credential kind. Three route reviews in a row found the same shape of
@@ -48,7 +48,7 @@ const GATES = new Map<unknown, string>([
 ])
 
 describe('core mount coverage', () => {
-  const routes = createApp().routes
+  const routes = createApp().routes.map((route) => ({ ...route, handler: registeredHandler(route.handler) }))
   // `.use()` registers as ALL; nothing under /v1/core is registered with `app.all`, so the two are the
   // same set here.
   const gateMounts = routes.filter((r) => r.method === 'ALL' && GATES.has(r.handler))

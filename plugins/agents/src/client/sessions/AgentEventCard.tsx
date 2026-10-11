@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Index, Show } from 'solid-js'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentNormalizedEvent, AgentPlanEntry, AgentRequest, AgentTurn } from '../../contract/wire.ts'
 import AgentMarkdown from './ManagedAgentMarkdown'
-import { dispatchLayout, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
+import { dispatchLayout, openPane, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
   Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, StackedDiff, Text,
@@ -143,7 +143,8 @@ export default function AgentEventCard(props: {
   // Built only for a message card and a turn's closing line; every other card answers undefined.
   const messageTarget = createMemo(() => { const bound = scope(); return bound && messageMenuTarget(bound, props.item, props.turn) })
   const turnTarget = createMemo(() => { const bound = scope(); return bound && turnMenuTarget(bound, props.item, props.turn) })
-  const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
+  // The Git pane's Changes tab. Literal ids, because git depends on this plugin and not the reverse.
+  const openChanges = () => openPane(props.taskId, 'git', { kind: 'plugin:select', item: 'changes' })
   const [implementing, setImplementing] = createSignal(false)
   const [planError, setPlanError] = createSignal('')
   const implementPlan = async (itemId: string) => {

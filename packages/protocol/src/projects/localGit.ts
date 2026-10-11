@@ -28,6 +28,6 @@ export type LocalStatus = {
   pullPolicy?: 'ff-only' | 'rebase'
   ahead: number | null // null, not zero, when there is no upstream to count against
   behind: number | null
-  operation: 'merge' | 'rebase' | null // a merge or rebase is mid-flight
+  operation: 'merge' | 'rebase' | 'cherry-pick' | 'revert' | null // a Git operation has stopped part way
   changes: LocalChange[]
 }

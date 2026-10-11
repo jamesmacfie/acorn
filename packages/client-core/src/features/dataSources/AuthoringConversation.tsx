@@ -233,7 +233,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     <Button variant="solid" disabled={busy() || props.disabled || !instruction().trim() || !backendId()} busy={busy()} onPress={() => void submit()}>Send</Button>
   )
   // The model waits behind the sparkle beside Send, as it does for a commit message
-  // (plugins/changes/src/client/GenerateButton.tsx), so the request is the only thing in the way.
+  // (plugins/git/src/client/changes/GenerateButton.tsx), so the request is the only thing in the way.
   const modelPicker = () => (
     <Show when={backends().length}>
       <ModelPickerPopover label="Model for the edit" title="Choose who drafts the edit" tipSub={modelPickLabel(backends(), pick())} sparkle>

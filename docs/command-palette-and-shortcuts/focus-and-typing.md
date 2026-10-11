@@ -67,7 +67,7 @@ acts on a view you can't see, and no key typed in Settings reaches a terminal un
 
 A bare key belongs to whoever is typing, and a chord doesn't. While a text field has focus, a binding
 fires only if its chord has a command modifier: meta, ctrl, or alt. Nobody types Cmd+Enter into a
-message, so the changes pane's commit chord works from its message field, and every bare key stays
+message, so the Changes tab's commit chord works from its message field, and every bare key stays
 with the field. `typing-exempt` is the scope a bare-key binding declares to fire while typing.
 
 The sandboxed-frame SDK draws the same line: it forwards a modified chord out of a frame's own input

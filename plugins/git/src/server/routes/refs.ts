@@ -1,6 +1,6 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { BridgeError, requireDevice, type AppEnv, type CoreServices } from '@acorn/plugin-api/node'
+import { BridgeError, requireDevice, type CompiledCoreServices } from '@acorn/plugin-api/node'
+import { gitRouter } from './router'
 import { changeRef, refRoster } from '../refs'
 
 const id = z.string().regex(/^[0-9a-f]{40,64}$/)
@@ -14,8 +14,8 @@ const request = z.discriminatedUnion('action', [
   z.object({ action: z.literal('delete-tag'), name, expectedId: id }).strict(),
 ])
 
-export function refRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'tasks' | 'repositoryMetadata'>, changed: () => void = () => {}) {
-  return new Hono<AppEnv>()
+export function refRoutes(core: Pick<CompiledCoreServices, 'git' | 'projects' | 'tasks' | 'repositoryMetadata'>, changed: () => void = () => {}) {
+  return gitRouter()
     .use('/projects/:projectId/refs', requireDevice)
     .get('/projects/:projectId/refs', async (c) => c.json(await refRoster(core, c.req.param('projectId'))))
     .post('/projects/:projectId/refs', async (c) => {

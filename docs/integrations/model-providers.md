@@ -38,7 +38,7 @@ reader. An ID reaches saved workflow steps and device preferences, so renaming a
 `models.available(userId)` returns every connected model provider with text generation, in the order
 `/v1/core/integrations` serves them, then every one-shot profile whose command is on this machine.
 Connections come first because two paths take `available()[0]` without asking: the database plugin's
-palette route and the changes plugin's fallback. A CLI is chosen for you only when you hold no key.
+palette route and the Changes tab's fallback. A CLI is chosen for you only when you hold no key.
 
 CLI availability is probed with `which` on every read, because a cache would need invalidating when
 you install a CLI. The read first waits on `spawnsReady()`, the login-shell `PATH` probe in
@@ -143,7 +143,7 @@ Three routes use the seam, each with its own prompt:
 | Consumer | Route | Prompt | Answer |
 | --- | --- | --- | --- |
 | database | `POST /v1/p/database/tasks/:taskId/generate` | The live schema, the repository's schema notes, and saved queries picked as examples | SQL, with fences stripped |
-| changes | `POST /v1/p/changes/tasks/:id/local/commit-message` | The branch and the diff the next commit would take, capped at 12,000 characters, smallest files first | A commit message, into the draft |
+| changes | `POST /v1/p/git/tasks/:id/local/commit-message` | The branch and the diff the next commit would take, capped at 12,000 characters, smallest files first | A commit message, into the draft |
 | workflows | `POST /v1/p/workflows/defs/generate` | The step kinds from the Node's catalog and the workspace's valid definitions, capped at 90,000 characters | A definition, into the editor as one undo step |
 
 All three take a `backendId` from your pick or the plugin's fallback, and all three refuse any caller

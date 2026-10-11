@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import type { CoreServices } from '@acorn/plugin-api/node'
+import type { CompiledCoreServices } from '@acorn/plugin-api/node'
 import { beginTaskArchive, finishTaskArchive, makeTestCoreServices, makeTestDb, schema } from '@acorn/plugin-api/testkit'
 import { changeRef, refRoster } from './refs'
 
@@ -35,7 +35,7 @@ function core(root: string, tasks: { id: string; title: string; projectId: strin
       child.on('error', fail)
       child.on('close', (code) => done({ code: code ?? 1, stdout: Buffer.concat(stdout).toString(), stderr: Buffer.concat(stderr).toString() }))
     }) },
-  } as unknown as Pick<CoreServices, 'git' | 'projects' | 'tasks' | 'repositoryMetadata'>
+  } as unknown as Pick<CompiledCoreServices, 'git' | 'projects' | 'tasks' | 'repositoryMetadata'>
 }
 
 it('protects checked-out and task-reserved branches across project aliases', async () => {

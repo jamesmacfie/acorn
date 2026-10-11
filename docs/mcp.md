@@ -51,7 +51,7 @@ register for the addressed task. [Agent tools](./agent-tools.md) owns each tool'
 - Typed-source metadata, from core: `data_sources_list`, `data_sources_discover`,
   `data_source_describe`, and `data_source_options`.
 - Task script reads, from core: `task_scripts_status`, `task_scripts_wait`, and `task_scripts_logs`.
-- Local Git reads, from `changes`: `local_changes`, `local_diff`, and `git_log`.
+- Local Git reads, from `git`: `local_changes`, `local_diff`, and `git_log`.
 - Notes, from `notes`, and memory, from `memory`.
 - A repository's run targets, from `terminal`: `run_targets`, `run_start`, `run_stop`, `run_restart`,
   and `run_status`.

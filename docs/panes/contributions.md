@@ -121,7 +121,7 @@ the pane draws.
 Put the pane's first read in it, and only when that read is a row and not work. The editor warms the
 task's checkout path, the request its mount makes before it can draw. The agent pane warms the task's
 session list, which its model asks for on open and the store serves from a five-second window. The
-changes pane declares none, because its first read starts a `git` process.
+Changes tab declares none, because its first read starts a `git` process.
 
 A pane contribution has no `freshness` hook. A pane's query status can only be read reactively, so a
 plain value would draw a badge that never updates. The host draws the Node's connection state

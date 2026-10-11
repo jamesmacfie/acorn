@@ -165,7 +165,7 @@ export default function PanelLauncher(props: {
         <Text emphasis="muted" wrap>A panel shows live records from one of your sources. Say what you want and AI drafts it, or pick a source and build it yourself.</Text>
         <SectionHeader level="group">Describe it</SectionHeader>
         {/* The model sits beside Draft it behind the sparkle, as it does for a commit message
-            (plugins/changes/src/client/GenerateButton.tsx). */}
+            (plugins/git/src/client/changes/GenerateButton.tsx). */}
         <Composer value={request()} onInput={setRequest} placeholder="For example: my open pull requests that need a review, oldest first" submitLabel="Draft it" disabled={!pick()}
           onSubmit={value => props.onLaunch({ kind: 'describe', request: value.trim() })}
           secondary={<Show when={pick()}>{current =>

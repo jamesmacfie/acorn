@@ -72,7 +72,7 @@ Run with Node 26.8.1.
   `register.test.ts`, `paneSwitcherRemote.test.ts`, `manifest.test.ts`, `pluginAuthoring.test.ts`,
   and two terminal tests in `chrome.test.tsx`.
 - Suites: `@acorn/protocol` (301), `@acorn/client-core` (2,735), `@acorn/node-core` (1,761),
-  `@acorn/plugin-git` (96), `@acorn/plugin-changes` (326), `@acorn/plugin-api` (14), and
+  `@acorn/plugin-git` (96), `@acorn/plugin-git` (326), `@acorn/plugin-api` (14), and
   `acorn-plugin-types` (5) pass. `@acorn/tui` fails only the two known `chrome.test.tsx` task-marker
   tests, which fail the same way with this branch's terminal files reverted. `@acorn/arch-tests`
   fails only the 15 known dead links. `turbo run lint --continue`

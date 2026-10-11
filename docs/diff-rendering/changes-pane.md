@@ -1,12 +1,22 @@
-# The Changes pane
+# The Changes tab
 
-This page covers the Changes pane's side of the diff viewer: the one status read, how a working
+This page covers the Changes tab's side of the diff viewer: the one status read, how a working
 tree's document is built, the file list, discard, the branch bar, and what the panel refuses. It's
-part of [diff rendering](../diff-rendering.md). The plugin lives in `plugins/changes`.
+part of [diff rendering](../diff-rendering.md). Changes is the first tab of the Git pane, and its
+code lives in the `changes` folders of `plugins/git`.
 
-The pane is missing from a task's pane rail when the task's project isn't a Git repository. The pane
-shows while the project list is still loading, and in the terminal client, which doesn't load the
-list.
+The Git pane opens on Changes. Another pane opens it there with
+`openPane(taskId, 'git', { kind: 'plugin:select', item: 'changes' })`, which is also what
+`?pane=git&item=changes` does, so the request waits if the pane isn't mounted yet. The tab polls Git
+only while it's on screen.
+
+The Git pane is missing from a task's pane rail when the task's project isn't a Git repository. The
+pane shows while the project list is still loading, and in the terminal client, which doesn't load
+the list.
+
+Changes was its own plugin, `changes`, until 2026-10-11. Its routes, hooks, extension points, and
+review-notes database moved to `git` then. The Node moves an existing `plugins/changes.sqlite` to
+`plugins/git.sqlite` once at startup (`adoptRenamedPluginDb`).
 
 ## One status read
 
@@ -43,7 +53,7 @@ stamp, and entries of unknown identity fall back to refreshing the patch.
 ## Working-tree documents
 
 A working tree's document is diffed in batches of paths, not a process per file, and held in a
-process-local cache (`plugins/changes/src/server/localDocument.ts`). The Node refuses a segment
+process-local cache (`plugins/git/src/server/changes/localDocument.ts`). The Node refuses a segment
 request whose patch key isn't the one the last document gave that file, with `409 revision_conflict`.
 The Changes source refreshes its document when it sees one, so the viewer never draws one file from
 two states of the tree.
@@ -68,14 +78,14 @@ links in intermediate directories and dangling links. The pane carries the stagi
 document file's `sha`, which the viewer hands back through `fileText`. A deleted file has a null
 `sha`, so its gaps can't expand.
 
-Review-note writes publish `plugin:changes:review-notes-changed` only after a create, edit, delete,
+Review-note writes publish `plugin:git:review-notes-changed` only after a create, edit, delete,
 or sent-state change. The event carries `{ taskId, total, unsent }` and no note IDs, paths, or
 bodies, so badges and delivery gates react without receiving review content.
 
 ## The file list
 
 When the selected staging area contains a manifest, lockfile, or package policy change, the list
-shows an expandable dependency summary. `plugins/changes/src/server/dependencyReview.ts` reads HEAD
+shows an expandable dependency summary. `plugins/git/src/server/changes/dependencyReview.ts` reads HEAD
 against the index for staged review and the index against disk for unstaged review. It includes
 relevant untracked files. The report names its scope, format, analyzer version, and digest of both
 sets of bytes. A status refresh or stage operation requests a fresh report; the pane hides a report
@@ -123,7 +133,7 @@ no line counts, and no checkbox, because Git stages a conflict by marking it res
 overflow menu says so. A tracked file that was staged and then edited again is one row with an
 indeterminate checkbox, and checking it stages the rest.
 
-The pane stacks one staging area at a time (`stackFor` in `plugins/changes/src/client/model.ts`).
+The pane stacks one staging area at a time (`stackFor` in `plugins/git/src/client/changes/model.ts`).
 Git reports a file that was staged and then edited twice, once per area, and the row model keys a
 file by path, so a combined stack would hold two files with the same identity. The area on screen is
 the one the highlighted row's checkbox names: checked stacks the index, and partly checked or
@@ -137,7 +147,7 @@ file has nothing to restore from, so discard deletes it.
 ## The footer and freshness
 
 The footer reads top to bottom in the order things happen: the banner while a merge or rebase is in
-progress, the branch bar, the `changes:push-actions` slot where another plugin says what to do next
+progress, the branch bar, the `git:push-actions` slot where another plugin says what to do next
 ([plugins](../plugins.md) § Cooperative extension points), the commit editor, and the button row. The
 bar's primary button carries one verb, chosen from the status read: **Publish** with no upstream,
 **Pull** when behind, **Push** when ahead, and **Fetch** when level. Behind wins over ahead, because
@@ -168,11 +178,12 @@ Each of these is decided:
   rows. Force push has neither, because arming it is its prompt.
 - **A split button in the kit.** The footer draws **Commit** and its options chevron in
   `Toolbar.Group joined`, from nodes that exist ([the closed kit](../ui-design/closed-kit.md)).
-- **A separate Git pane.** It would split the staging checkbox from the diff it stages.
+- **Staging in another tab.** History, stashes, and worktrees are tabs of the same Git pane, but
+  staging stays in Changes, beside the diff it stages.
 - **A Git view on the rail.** The rail takes marker data only.
 - **Git write tools for agents.** Not built. `local_changes`, `local_diff`, and `git_log` are
-  read-only and share `plugins/changes/src/server/localDiff.ts` with the pane. An agent has a
+  read-only and share `plugins/git/src/server/changes/localDiff.ts` with the pane. An agent has a
   terminal ([agent tools](../agent-tools.md)).
-- **A commit history.** The pull request pane shows commits.
+- **A commit history in this tab.** The History tab shows commits.
 - **A warning on archive about unpushed commits.** Archiving removes the worktree, not the branch,
   so the commits survive.

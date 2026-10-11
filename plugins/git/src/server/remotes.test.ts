@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import type { CoreServices } from '@acorn/plugin-api/node'
+import type { CompiledCoreServices } from '@acorn/plugin-api/node'
 import { AutoFetcher } from './autoFetch'
 import { RemoteService, validRemoteName, validRemoteUrl } from './remotes'
 
@@ -33,7 +33,7 @@ function core(root: string) {
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
       child.on('error', fail)
       child.on('close', (code) => done({ code: code ?? 1, stdout: Buffer.concat(stdout).toString(), stderr: Buffer.concat(stderr).toString() }))
-    }) }, } as unknown as Pick<CoreServices, 'git' | 'projects' | 'repositoryMetadata'>
+    }) }, } as unknown as Pick<CompiledCoreServices, 'git' | 'projects' | 'repositoryMetadata'>
 }
 
 it('accepts explicit transports and rejects executable helper URLs', () => {
@@ -95,7 +95,7 @@ it('refuses a queued metadata write if the project maps to another repository', 
       await queued
       return action(realpathSync(path), realpathSync(resolve(path, git(path, 'rev-parse', '--path-format=absolute', '--git-common-dir'))))
     } },
-  } as unknown as Pick<CoreServices, 'git' | 'projects' | 'repositoryMetadata'>)
+  } as unknown as Pick<CompiledCoreServices, 'git' | 'projects' | 'repositoryMetadata'>)
   const write = service.change('project', { action: 'remove', name: 'origin', expectedUrl: bare })
   await atQueue
   path = next; release()
@@ -127,7 +127,7 @@ it('auto-fetch moves tracking but cannot make an observed force lease follow ano
   const fetcher = new AutoFetcher({ ...base,
     projects: { ...base.projects, checkouts: async () => [{ id: 'project', path: root }] },
     identity: { active: () => 'owner' }, prefs: { read: async () => 'true' },
-  } as unknown as CoreServices, service, () => 5000)
+  } as unknown as CompiledCoreServices, service, () => 5000)
   expect(await fetcher.tick()).toBe('1 remotes fetched, 0 failed')
   expect(git(root, 'rev-parse', `origin/${branch}`)).toBe(advanced)
   await expect(service.roster('project')).resolves.toMatchObject({ lastFetch: { origin: { successAt: 5000 } } })

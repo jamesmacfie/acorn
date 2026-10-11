@@ -8,7 +8,7 @@ import { githubShortcutsSlotContribution } from './slotContribution'
 import { githubContentLinkContributions } from './contentLinks'
 import { githubIntegrationFlow } from './integrationFlow'
 import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
-import { CHANGES_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
+import { GIT_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
 import { githubPullPromotion } from './pullTasks'
 
 // Two lazy chunks off one module, because the source declares its list and its detail separately and
@@ -86,14 +86,14 @@ export const githubClientPlugin: ClientPlugin = {
       id: 'summary-badges', label: 'Pull request summary', kind: 'remote', mode: 'stack', max: SUMMARY_BADGES_MAX,
     })
     // The one place this plugin comes into somebody else's surface: "Open pull request" under the
-    // Changes pane's branch bar, offered on a task whose branch has an upstream and no pull request
-    // yet (./pushActions.tsx). The changes plugin opened the point; this is the line that fills it.
+    // Changes tab's branch bar, offered on a task whose branch has an upstream and no pull request
+    // yet (./pushActions.tsx). The git plugin opened the point; this is the line that fills it.
     //
     // No `matches`, which in a `stack` point means every key: there is one box here and everybody who
     // has something to offer a pushed branch is in it.
     ctx.extensions.register({
       id: 'github.push-actions',
-      point: CHANGES_PUSH_ACTIONS_POINT,
+      point: GIT_PUSH_ACTIONS_POINT,
       label: 'Open pull request',
       order: 10,
       component: GithubPushActions,

@@ -87,7 +87,7 @@ state or scope to avoid an unneeded broad read.
 | `plugin:github:checks-changed` | Repository, pull, current head | GitHub mirror routes |
 | `plugin:github:pr-synced` | Repository, pull, current head | GitHub mirror routes |
 | `plugin:browser:captures-changed` | Task | `browser.captures` |
-| `plugin:changes:review-notes-changed` | Task, total count, unsent count | Task-confined review-note routes |
+| `plugin:git:review-notes-changed` | Task, total count, unsent count | Task-confined review-note routes |
 | `plugin:memory:memories-changed` | Project or private scope | `memory.library` |
 | `plugin:preview:url-changed` | Task, nullable URL, resolution source | `preview.urls` |
 

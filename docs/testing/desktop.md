@@ -93,7 +93,7 @@ These tests hold the fixture to its contract:
 - `largeDiff.test.ts` pins the small profile's digest, checks row counts, thread and note placement,
   and segment counts, and streams the canonical profile to check its size.
 - `largeSession.test.ts` seeds a session, reads it back page by page, and projects it into cards.
-- `plugins/changes/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
+- `plugins/git/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
   returns.
 - `kit/lib/telemetry/surfaceHealth.test.ts` covers the health registry and its privacy rule.
 - `apps/desktop/scripts/agent/flow.test.mjs` refuses a flow with an unknown action, a script, an
@@ -105,7 +105,7 @@ These suites are under `packages/client-core/src/` unless the path says otherwis
 
 - **The diff document.** `packages/diff-document/src/segment.test.ts` holds the segmenter to its rules
   over a generated corpus: rows kept in order, stable cuts, both limits honored, and keys that follow
-  the patch. `search.test.ts` pages across files. `plugins/changes/src/server/routes/localGit.test.ts`
+  the patch. `search.test.ts` pages across files. `plugins/git/src/server/changes/routes/localGit.test.ts`
   runs the Changes document over a real tree.
 - **The diff pane.** `features/diff/DiffPane.test.tsx` renders the real pane over the fixture with the
   jsdom layout model in `features/diff/layout.helper.ts`. That helper models a `ResizeObserver`, block

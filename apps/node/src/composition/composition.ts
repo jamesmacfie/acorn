@@ -6,7 +6,7 @@ import type { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capa
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
 import type { LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
 import { loadedPluginBinding, loadExternalPlugins, type InstalledPlugin, type PluginLoadFailure } from '@acorn/node-core/server/plugins'
-import { reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
+import { adoptRenamedPluginDb, reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
 import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/server/plugins'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
@@ -46,6 +46,9 @@ export type NodeComposition = {
 // A fresh install's empty directory gets exactly the static list. Anything extra arrived through the
 // installer, an owner-authenticated route (docs/plugins/loaded-plugins.md § Loaded plugins).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
+  // The changes plugin became part of git on 2026-10-11. Its review notes move with it, before any
+  // plugin opens a database.
+  if (dataDir && adoptRenamedPluginDb(dataDir, 'changes', 'git')) pluginLog.info('moved the changes plugin database to git')
   const builtins = nodePlugins(dataDir, deps)
   const { loaded, installed, failures } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
   // A loaded plugin may replace a built-in of the same id, which is how the loader gets dogfooded

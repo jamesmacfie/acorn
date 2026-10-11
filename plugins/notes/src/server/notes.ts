@@ -1,7 +1,7 @@
 // Workspace notes store (docs/notes-and-memory.md § Notes). Files are gitignored working state,
 // the kind of thing Conductor's .context-in-git bug warns against; durable knowledge gets promoted
 // into committed memory instead. Kinds are limited to scratch, plan, finding and handoff. An
-// anchored annotation is a review_notes row in the changes plugin, never a note kind. Writes are
+// anchored annotation is a review_notes row in the git plugin, never a note kind. Writes are
 // atomic (temp then rename) and slugs are validated at this boundary.
 import { mkdirSync } from 'node:fs'
 import { readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'

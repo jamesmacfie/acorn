@@ -1,11 +1,11 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeNodeId, tasksOptions, writeJson } from '@acorn/plugin-api/client'
-import { changesRemoteRoute } from '@acorn/plugin-changes/contract/remote.ts'
+import { localActionRoute } from '../shared/changes/api'
 import { Alert, Button, SectionHeader, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { sameGitActionScope } from './launchWorkflow'
 
-/** Task checkout writes stay with Changes, including its before-push hook. */
+/** Pull and push go through the Changes tab's route, so they keep its checkout checks and before-push hook. */
 export function TaskRemoteActions(props: { projectId: string }) {
   const tasks = createQuery(() => tasksOptions(true))
   const [taskId, setTaskId] = createSignal('')
@@ -24,16 +24,16 @@ export function TaskRemoteActions(props: { projectId: string }) {
     const current = () => own === generation && nodeId === activeNodeId() && projectId === props.projectId && task.id === taskId()
     setBusy(true); setFeedback('')
     try {
-      const result = await writeJson<{ ok: boolean; reason?: string }>(changesRemoteRoute(task.id, action), {
+      const result = await writeJson<{ ok: boolean; reason?: string }>(localActionRoute(task.id, action), {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(action === 'pull' && rebase !== undefined ? { rebase } : {}),
       })
-      if (current()) setFeedback(result.ok ? `${action === 'pull' ? 'Pulled' : 'Pushed'} ${task.title}.` : result.reason ?? 'Changes refused the operation.')
+      if (current()) setFeedback(result.ok ? `${action === 'pull' ? 'Pulled' : 'Pushed'} ${task.title}.` : result.reason ?? 'Git refused the operation.')
     } catch (error) { if (current()) setFeedback(error instanceof Error ? error.message : String(error)) }
     finally { if (current()) setBusy(false) }
   }
   return <Stack gap="section">
     <SectionHeader>Task pull and push</SectionHeader>
-    <Text>Changes runs these actions against the selected task checkout and applies its hooks.</Text>
+    <Text>These run against the selected task's checkout, with the same checks and hooks as the Changes tab.</Text>
     <Select label="Target task" value={taskId()} options={[{ value: '', label: 'Choose a task' }, ...choices().map((task) => ({ value: task.id, label: task.title }))]} onChange={selectTask} />
     <Button disabled={!selected() || busy()} busy={busy()} onPress={() => void run('pull')}>Pull using Git setting</Button>
     <Button disabled={!selected() || busy()} onPress={() => void run('pull', false)}>Pull fast-forward only</Button>

@@ -37,6 +37,14 @@ it('excludes writes after an admitted turn, including project aliases', async ()
   expect(await service.write('first', async () => 'written')).toBe('written')
 })
 
+it('reports activity on every task sharing the checkout without admitting anything', async () => {
+  const { service, busy } = fixture()
+  busy.add('alias')
+  expect(await service.activity('first')).toEqual([{ taskId: 'alias', description: 'queued turn' }])
+  busy.clear()
+  expect(await service.activity('first')).toEqual([])
+})
+
 it('holds a write before work admission and releases it after failure', async () => {
   const { service, busy } = fixture()
   const held = deferred()

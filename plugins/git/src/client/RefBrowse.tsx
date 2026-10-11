@@ -6,6 +6,7 @@ import { Alert, Button, ConfirmButton, EmptyState, Facts, Input, Modal, Row, Row
 import type { GitRef, RefChange } from '../shared/api'
 import { launchWorkflowAtCommit, sameGitActionScope } from './launchWorkflow'
 import { changeRef, refsKey, refsOptions } from './refsClient'
+import { OperationDialog, type OperationRequest } from './OperationDialog'
 
 type Action = RefChange['action']
 const base = (projectId: string) => `/p/${encodeURIComponent(projectId)}/x/git/refs`
@@ -45,6 +46,7 @@ export function RefDetail(props: { projectId: string; selected: string | null })
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [captured, setCaptured] = createSignal<{ nodeId: string | null; projectId: string; ref: GitRef | null } | null>(null)
+  const [operation, setOperation] = createSignal<OperationRequest | null>(null)
   let generation = 0
   const ref = createMemo(() => query.data?.refs.find((item) => refKey(item) === props.selected) ?? null)
   const open = (next: Action) => {
@@ -90,7 +92,11 @@ export function RefDetail(props: { projectId: string; selected: string | null })
     if (workflow) launchWorkflowAtCommit(nodeId, projectId, selected.commitId, selected.name)
     else requestTaskLaunch({ nodeId, projectId, title: selected.name, baseCommit: selected.commitId })
   }
-  createEffect(on(() => `${activeNodeId()}:${props.projectId}:${props.selected}`, () => { close(); setError('') }, { defer: true }))
+  const operate = (kind: OperationRequest['operation']) => {
+    const selected = ref()
+    if (selected?.commitId && sameGitActionScope(activeNodeId(), props.projectId, props.projectId)) setOperation({ operation: kind, source: { id: selected.commitId, label: selected.name } })
+  }
+  createEffect(on(() => `${activeNodeId()}:${props.projectId}:${props.selected}`, () => { close(); setOperation(null); setError('') }, { defer: true }))
   onCleanup(() => { generation++ })
   return <Stack gap="section">
     <SectionHeader>Refs</SectionHeader>
@@ -102,7 +108,8 @@ export function RefDetail(props: { projectId: string; selected: string | null })
           { label: 'Object', value: selected().objectId, mono: true }, { label: 'Commit', value: selected().commitId ?? 'Not a commit', mono: true },
           { label: 'Upstream', value: selected().upstream ?? 'None' }, { label: 'Checkout', value: selected().checkedOut ? 'Checked out' : 'Free' },
           { label: 'Tasks', value: selected().reservedBy.map((owner) => owner.title).join(', ') || 'None' }]} />
-        <Show when={selected().commitId}><Button onPress={() => launch(false)}>Start task here</Button><Button onPress={() => launch(true)}>Start workflow here</Button></Show>
+        <Show when={selected().commitId}><Button onPress={() => launch(false)}>Start task here</Button><Button onPress={() => launch(true)}>Start workflow here</Button>
+          <Button onPress={() => operate('merge')}>Merge into task…</Button><Button onPress={() => operate('rebase')}>Rebase task onto this…</Button></Show>
         <Show when={selected().kind === 'local'}>
           <Button disabled={selected().checkedOut || !!selected().reservedBy.length} onPress={() => open('rename-branch')}>Rename branch</Button>
           <Button disabled={selected().checkedOut || !!selected().reservedBy.length} onPress={() => open('set-upstream')}>Set upstream</Button>
@@ -111,6 +118,7 @@ export function RefDetail(props: { projectId: string; selected: string | null })
         <Show when={selected().kind === 'tag'}><Button onPress={() => open('delete-tag')}>Delete tag</Button></Show>
       </>}
     </Show>
+    <Show when={operation()}>{(request) => <OperationDialog {...request()} projectId={props.projectId} onClose={() => setOperation(null)} />}</Show>
     <Show when={action()}>{(kind) => <Modal title={kind().replace('-', ' ')} size="md" onDismiss={close}>
       <Modal.Body><Stack gap="section">
         <Text>Node {captured()?.nodeId ?? 'unavailable'} · Project {captured()?.projectId}</Text>

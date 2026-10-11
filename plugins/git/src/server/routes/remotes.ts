@@ -1,6 +1,6 @@
-import { Hono } from 'hono'
 import { z } from 'zod'
-import { BridgeError, requireDevice, type AppEnv } from '@acorn/plugin-api/node'
+import { BridgeError, requireDevice } from '@acorn/plugin-api/node'
+import { gitRouter } from './router'
 import { RemoteService } from '../remotes'
 
 const name = z.string().min(1).max(80)
@@ -13,7 +13,7 @@ const request = z.discriminatedUnion('action', [
 ])
 
 export function remoteRoutes(service: RemoteService) {
-  return new Hono<AppEnv>()
+  return gitRouter()
     .use('/projects/:projectId/remotes', requireDevice)
     .get('/projects/:projectId/remotes', async (c) => c.json(await service.roster(c.req.param('projectId'), c.req.raw.signal)))
     .post('/projects/:projectId/remotes', async (c) => {

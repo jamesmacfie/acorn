@@ -55,7 +55,7 @@ archive finishes or fails. On the rail row, teardown is the highest-priority mar
 ([status markers](../ui-design/shell-hierarchy.md#status-markers)). Markers it outranks keep their
 place in the row's tooltip.
 
-The same flag pauses the changes pane's Git reads during the archive. The pane stays mounted, so it
+The same flag pauses the Changes tab's Git reads during the archive. The pane stays mounted, so it
 can show a teardown failure, and it keeps its last status instead of showing the removal as deleted
 files. A failed archive clears the flag and triggers a fresh read.
 

@@ -1,7 +1,7 @@
 # Diff rendering
 
 The shared diff viewer lives in client-core. The GitHub pull request pane, the GitHub compare
-preview, and the Changes pane all use it. Read this page to find how a diff is described, loaded,
+preview, and the Git pane's Changes tab all use it. Read this page to find how a diff is described, loaded,
 colored, laid out, and annotated. All three callers hand the viewer the same thing: a document, laid
 out by a topology with no source text in it, and filled in segment by segment as you scroll near.
 
@@ -54,7 +54,7 @@ remembered view state, line drafts, and marks other plugins draw under a code ro
 
 <a id="what-the-changes-panel-refuses"></a>
 
-[The Changes pane](./diff-rendering/changes-pane.md) covers `LocalStatus`, the file list, staging,
+[The Changes tab](./diff-rendering/changes-pane.md) covers `LocalStatus`, the file list, staging,
 discard, the branch bar, and what the panel refuses.
 
 ## What large-surface rendering refuses

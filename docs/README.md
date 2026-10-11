@@ -101,6 +101,8 @@ the whole plugin system in one page.
 | [git-client/history.md](./git-client/history.md) | Pinned history pages, read-only revision diffs, limits, and routes in both clients. |
 | [git-client/stashes.md](./git-client/stashes.md) | Stash browsing and guarded task checkout writes in both clients. |
 | [git-client/refs-remotes-settings.md](./git-client/refs-remotes-settings.md) | Guarded refs and remotes, pinned comparison, scoped identity, and Node scheduled fetch. |
+| [git-client/operations.md](./git-client/operations.md) | Task merge, rebase, cherry-pick, and revert, with continue, skip, abort, and manual recovery. |
+| [git-client/conflicts.md](./git-client/conflicts.md) | Three-way conflict resolution that shares Editor's draft, with stale and unsupported refusals. |
 | [git-client/explanations.md](./git-client/explanations.md) | Explicit Git explanations and first-release replacement guidance. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
 | [schedules/plugin-schedules.md](./schedules/plugin-schedules.md) | How a plugin declares a schedule, overrides, lifecycle, and trust. |
@@ -151,7 +153,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/native-overlays.md](./testing/native-overlays.md) | Native overlay acceptance scenarios, test evidence, performance targets, and outstanding graphical checks. |
 | [testing/ui-extension-acceptance-2026-10-10.md](./testing/ui-extension-acceptance-2026-10-10.md) | Dated UI extension acceptance: regression commands, the host matrix, the example's real-host check, and open checks. |
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
-| [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
+| [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes tab, large diff, transcript, and task restoration checks. |
 | [testing/editor-phase06-2026-10-08.md](./testing/editor-phase06-2026-10-08.md) | Dated Editor phase 06 fixture and acceptance evidence. |
 | [testing/editor-phase06-follow-up-2026-10-08.md](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected desktop/terminal checks, and measured Editor acceptance. |
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
@@ -206,7 +208,7 @@ Each landing page in the tables above has topic pages in a folder of the same na
   [Palette data](./command-palette-and-shortcuts/palette-data.md),
   [The palette session](./command-palette-and-shortcuts/palette.md),
   [Shortcuts](./command-palette-and-shortcuts/shortcuts.md).
-- [diff-rendering.md](./diff-rendering.md): [The Changes pane](./diff-rendering/changes-pane.md),
+- [diff-rendering.md](./diff-rendering.md): [The Changes tab](./diff-rendering/changes-pane.md),
   [The diff document](./diff-rendering/document.md),
   [Diff row geometry and modes](./diff-rendering/geometry.md),
   [Diff loading and highlighting](./diff-rendering/loading.md),

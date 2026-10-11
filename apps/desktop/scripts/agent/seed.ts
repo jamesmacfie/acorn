@@ -13,7 +13,7 @@ import { createProject } from '@acorn/node-core/server/projects.ts'
 import { openDataRoot } from '@acorn/node-core/server/storage'
 import { makeTestNodeContext } from '@acorn/node-core/testkit'
 import { seedCommandRestart, seedDelegationCheckReport, seedLargeSession, seedUnattendedPolicy } from '@acorn/plugin-agents/testkit'
-import { seedReviewNotes } from '@acorn/plugin-changes/testkit'
+import { seedReviewNotes } from '@acorn/plugin-git/testkit'
 
 // Seeds an agent-automation data root before the window starts (docs/local-development/agent-drivers.md
 // § Drive the desktop). Without a fixture it adds one project. Fixtures put a generated Git
@@ -134,11 +134,11 @@ try {
       }
 
       const notes = [...largeDiffFiles(profile, seed)].flatMap((file) => file.notes)
-      const changes = makeTestNodeContext({ plugin: { name: 'changes' }, dataDir })
+      const git = makeTestNodeContext({ plugin: { name: 'git' }, dataDir })
       try {
-        await seedReviewNotes(changes.storage.open(), taskId, notes)
+        await seedReviewNotes(git.storage.open(), taskId, notes)
       } finally {
-        changes.cleanup()
+        git.cleanup()
       }
 
       const agents = makeTestNodeContext({ plugin: { name: 'agents' }, dataDir })

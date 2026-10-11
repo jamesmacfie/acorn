@@ -1,10 +1,9 @@
 import { BridgeError, type CoreServices } from '@acorn/plugin-api/node'
-import { GIT_PULL_POLICY_PREF } from '@acorn/plugin-changes/contract/remote.ts'
 import type { GitSettings, IdentityValue, IdentityWrite, IdentityWriteResult } from '../shared/api'
 import { repositoryFor } from './history'
 
 type Core = Pick<CoreServices, 'git' | 'projects' | 'prefs'>
-export const PULL_POLICY_PREF = GIT_PULL_POLICY_PREF
+export const PULL_POLICY_PREF = 'git.pullPolicy'
 export const AUTO_FETCH_PREF = 'git.autoFetch'
 const first = (text: string) => text.trim().split('\n')[0] || 'Git config failed.'
 

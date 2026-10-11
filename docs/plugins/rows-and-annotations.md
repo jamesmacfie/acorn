@@ -65,12 +65,12 @@ owner declares what its items are keyed by, and the contributor answers with mar
 screen:
 
 ```json
-// A: changes declares what can be annotated
+// A: git declares what can be annotated
 { "id": "diff-line", "kind": "annotation", "label": "Diff line",
   "key": { "file": "string", "line": "number", "side": "string" } }
 
 // B: coverage
-{ "id": "coverage-lines", "point": "changes:diff-line", "label": "Coverage",
+{ "id": "coverage-lines", "point": "git:diff-line", "label": "Coverage",
   "items": "/v1/p/coverage/lines" }
 ```
 
@@ -122,7 +122,7 @@ Editor's `editor:file` point works the same way for tree rows and document tabs,
 source descriptor, task pane, or compiled contribution sets `statusAnnotations: true`, and the host
 asks only about consenting ones it draws. The Node refuses the flag on any other surface. A source's
 `projectId` is the routed project, or `""` for a source that isn't `projectScoped`. The Node is the
-host's batch identity, not a key field. Git's source and the Changes pane consent.
+host's batch identity, not a key field. Git's source and the Changes tab consent.
 
 The host sends one request per contributor and visible key set, reads marks back only for keys it
 asked about, and clears them at once when the project, task, Node, owner registration, or contributor

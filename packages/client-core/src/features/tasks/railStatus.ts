@@ -6,7 +6,7 @@
 // "An agent is working here" is not in this list. That belongs to the agents plugin, which knows about
 // both managed sessions and terminal harnesses, and it publishes it through the same marker registry
 // (plugins/agents/src/client/railMarkerContribution.ts). Uncommitted changes are not here either: the
-// changes plugin publishes its added/removed dot (plugins/changes/src/client/railMarker.ts).
+// git plugin publishes its added/removed dot (plugins/git/src/client/changes/railMarker.ts).
 //
 // Priorities here sit above the range contributed markers are clamped to
 // (RAIL_MARKER_PLUGIN_MAX_PRIORITY), so a plugin marker can never push a core lifecycle state out of

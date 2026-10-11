@@ -110,8 +110,8 @@ failure looks like an unknown session and returns 404.
 | `/v1/p/terminal/sessions`, `/profiles` | Session roster, creation, and shell profiles |
 | `/v1/p/terminal/sessions/:sid/{send,resize,interrupt,kill,remove}` | Session control. The handler checks the owning task |
 | `/v1/p/terminal/tasks/:taskId/run-targets` | Run target options for a workflow step field |
-| `/v1/p/changes/tasks/:id/local/*` | Status, stage, unstage, discard, commit, fetch, pull, push, abort, the diff document, and a model-written commit message |
-| `/v1/p/changes/tasks/:id/review-notes[/:noteId][/sent]` | Review notes |
+| `/v1/p/git/tasks/:id/local/*` | Status, stage, unstage, discard, commit, fetch, pull, push, abort, the diff document, and a model-written commit message |
+| `/v1/p/git/tasks/:id/review-notes[/:noteId][/sent]` | Review notes |
 | `/v1/p/editor/tasks/:id/editor/*` | [Guarded file reads, writes, and file actions](./editor.md), listings, images, and line markers |
 | `/v1/p/editor/tasks/:id/search` | Search a task's files |
 | `/v1/p/docker/*` | Node inventory: containers, images, volumes, networks, compose, prune, and `info` |
@@ -120,8 +120,8 @@ failure looks like an unknown session and returns 404.
 The terminal plugin owns session control and stream attachment. Core owns worktrees and run-target
 execution. Global Docker actions require a device ([Docker](../docker.md)).
 
-The Changes pane reads its diff as a document, one staging area at a time, with types in
-`plugins/changes/src/shared/api.ts` ([diff-rendering.md](../diff-rendering/document.md#data-flow)):
+The Changes tab reads its diff as a document, one staging area at a time, with types in
+`plugins/git/src/shared/changes/api.ts` ([diff-rendering.md](../diff-rendering/document.md#data-flow)):
 
 | Route | Body | Answer |
 | --- | --- | --- |

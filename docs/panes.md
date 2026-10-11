@@ -13,7 +13,7 @@ These panes ship with acorn:
 | --- | ---: | --- |
 | `pr` | 10 | The linked GitHub pull request |
 | `agents` | 15 | The managed Agent pane |
-| `changes` | 20 | The worktree diff, staging, commit, and remote actions |
+| `git` | 20 | Tabs for the worktree diff with staging, commit, and remote actions; history; stashes; and worktrees |
 | `workflows` | 25 | Workflow runs on this task, their nodes, and the selected node's work, which for an agent node is its whole conversation |
 | `notes` | 30 | Task, workspace, and global notes |
 | `context` | 40 | Context selection and sync |

@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import type { CoreServices, TaskRef } from '@acorn/plugin-api/node'
+import type { CompiledCoreServices, TaskRef } from '@acorn/plugin-api/node'
 import { applyStash, createStash, dropStash, stashRoster } from './stashes'
 
 let folder = ''
@@ -32,7 +32,7 @@ function fixture(objectFormat?: 'sha256') {
       child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
       child.on('close', (code) => done({ code: code ?? 1, stdout: Buffer.concat(stdout).toString(), stderr: Buffer.concat(stderr).toString() }))
     }) },
-  } as unknown as Pick<CoreServices, 'git' | 'projects' | 'tasks' | 'checkoutAdmission'>
+  } as unknown as Pick<CompiledCoreServices, 'git' | 'projects' | 'tasks' | 'checkoutAdmission'>
   return { root, core, task }
 }
 
