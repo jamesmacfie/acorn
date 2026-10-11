@@ -6,7 +6,7 @@
 // only where a manifest cannot carry a function: `entry` resolves a path here and is a package-relative
 // string there, and `probeAuth` is a call here and a route there.
 import type { AgentCapability, AgentSession } from '../../contract/wire.ts'
-import type { AgentDriverLoopHooks } from './types'
+import type { AgentDriverLoopHooks, AgentDriverReadBlock } from './types'
 
 /** What the protocol cannot ask the agent, so the harness declares it. A quirk joins this list when a
  *  second harness needs it. See docs/plugin-authoring/harnesses.md § Harnesses. */
@@ -62,10 +62,14 @@ export type HarnessLaunchSpec = {
     skills: { folders: readonly string[]; plugins: readonly string[] },
     loopHooks?: AgentDriverLoopHooks,
     attendanceInstructions?: string,
+    readBlock?: AgentDriverReadBlock,
   ) => Record<string, unknown>
   /** Built-in only. Set when `acpSessionMeta` installs `loopHooks` in the harness's own hooks, so the
    *  lifecycle passes them and the descriptor reports the loop capabilities. */
   loopHooks?: true
+  /** Built-in only. Set when `acpSessionMeta` turns `readBlock` into the harness's own sandbox, so the
+   *  lifecycle passes it when the person switched the block on (docs/managed-agents/read-block.md). */
+  readBlock?: true
   /** Built-in only. Set when `acpSessionMeta` passes `skills.plugins` to the harness's own skill loader,
    *  so the lifecycle writes them (docs/managed-agents/native-skills.md § Native skills). */
   nativeSkills?: true

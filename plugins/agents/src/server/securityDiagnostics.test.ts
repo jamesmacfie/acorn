@@ -150,6 +150,18 @@ it('warns when the Node read its keys from files, or a plain key file is still i
   expect((await collectSecurityDiagnostics(ports(), 'node-1', 'owner', {}, new AbortController().signal)).findings.some((finding) => finding.id === 'host.keys')).toBe(false)
 })
 
+it("says whether agents are kept out of Acorn's data folder, and whether the selected one is", async () => {
+  const finding = async (block: boolean, providerId?: string) => (await collectSecurityDiagnostics(ports({
+    defaults: async () => ({ ...defaultAgentSessionDefaults(), blockDataRootReads: block }),
+    readBlockProviders: () => ['claude'],
+    ...(providerId ? { session: async () => ({ ...session({}), providerId }) } : {}),
+  }), 'node-1', 'owner', providerId ? { sessionId: 'session-1' } : {}, new AbortController().signal)).findings.find((item) => item.id === 'agents.read-block')
+  expect(await finding(false)).toMatchObject({ severity: 'attention', summary: expect.stringContaining('disabled') })
+  expect(await finding(true)).toMatchObject({ severity: 'info', summary: expect.stringContaining('harnesses that support it: claude') })
+  expect(await finding(true, 'claude')).toMatchObject({ severity: 'info', summary: expect.stringContaining('starts blocked') })
+  expect(await finding(true, 'codex')).toMatchObject({ severity: 'warning', summary: expect.stringContaining('is not blocked') })
+})
+
 it('does not inspect encrypted approval bodies during a passive project check', async () => {
   const report = await collectSecurityDiagnostics(ports(), 'node-1', 'owner', { projectId: 'project-1' }, new AbortController().signal)
   expect(report.findings.find((finding) => finding.id === 'instructions.approval')).toMatchObject({ state: 'unknown' })

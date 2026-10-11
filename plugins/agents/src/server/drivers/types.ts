@@ -73,6 +73,23 @@ export type AgentDriverMcpServer =
  *  `command args… <harness> <event>` and does what it prints. */
 export type AgentDriverLoopHooks = { command: string; args: string[]; beforeTool: boolean; afterTool: boolean }
 
+/** Keeps a session out of acorn's data root, for a driver with `readBlock` (./readBlock.ts,
+ *  docs/managed-agents/read-block.md). Paths are absolute. */
+export type AgentDriverReadBlock = {
+  dataDir: string
+  /** What the agent's commands still read inside the data root: its worktree, its own token file, the
+   *  Node's certificate, and its skill folders. */
+  readable: string[]
+  /** What its commands may write outside the worktree: the repository's shared git folder, so a commit
+   *  from a worktree works. */
+  writable: string[]
+  /** Top-level data root entries holding nothing the agent reads, for the harness's own file tools,
+   *  which its shell sandbox doesn't cover. */
+  hidden: string[]
+  /** `host:port` of the Node's loopback API, for the task CLI. */
+  loopback: string | null
+}
+
 export type AgentDriverStartOptions = {
   /** Local compiled-runtime cancellation. This signal never crosses plugin RPC. */
   signal?: AbortSignal
@@ -97,6 +114,8 @@ export type AgentDriverStartOptions = {
   /** acorn's harness bridge for this start, for a driver with `loopHooks`. Absent when no point has a
    *  handler, so a session nobody would gain from pays no process per tool call. */
   loopHooks?: AgentDriverLoopHooks
+  /** For a driver with `readBlock`, when the person switched the block on. Absent means unconfined. */
+  readBlock?: AgentDriverReadBlock
   noProviderExecutionHistory: boolean
   onEvent(event: AgentDriverEvent): void | Promise<void>
   onClosed(error?: Error): void | Promise<void>
@@ -144,6 +163,9 @@ export interface AgentDriver {
   readonly nativeSkills?: boolean
   /** The harness takes acorn's bridge, so the lifecycle passes `loopHooks` when a point has a handler. */
   readonly loopHooks?: boolean
+  /** The harness can keep its agent out of the data root, so the lifecycle passes `readBlock` when the
+   *  person switched it on. */
+  readonly readBlock?: boolean
   probe(): Promise<AgentProviderDescriptor>
   start(options: AgentDriverStartOptions): Promise<AgentDriverSession>
   classifyTurnFailure?(error: unknown): 'safe_transient' | 'uncertain' | 'permanent'

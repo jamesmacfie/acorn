@@ -40,6 +40,8 @@ export type SecurityDiagnosticPorts = {
   managedMcp(): Promise<AgentMcpServer[]>
   instructionObservation?(projectId: string | null, taskId: string | null): Promise<InstructionAdmissionObservation | null>
   observedProvider?(id: string): AgentProviderDescriptor | null
+  /** Harness ids that can keep their agent out of the data root (docs/managed-agents/read-block.md). */
+  readBlockProviders?(): string[]
   staticDependencyPolicy?(root: string, signal?: AbortSignal): Promise<StaticDependencyPolicy | undefined>
 }
 
@@ -179,6 +181,24 @@ export async function collectSecurityDiagnostics(
         facts: [
           { label: 'Hidden characters', value: defaults.checkInstructionFiles ? 'Checked before each turn' : 'Not checked' },
           { label: 'Instruction changes', value: defaults.reviewChangedInstructions ? 'Your approval required' : 'No approval required' },
+        ],
+      })
+    const blockers = ports.readBlockProviders?.() ?? []
+    const blocked = session ? defaults.blockDataRootReads && blockers.includes(session.providerId) : null
+    add('agents.read-block', 'agents', 'configured_only', blocked === false ? 'warning' : defaults.blockDataRootReads ? 'info' : 'attention',
+      'agents:session-defaults:v1',
+      `Data root read block ${defaults.blockDataRootReads ? 'enabled' : 'disabled'}; harnesses that support it: ${blockers.join(', ') || 'none'}.${blocked === null ? '' : ` Selected session ${blocked ? 'starts blocked' : 'is not blocked'}.`}`,
+      "Applies from each session's next start, so a session already running keeps how it started. Other harnesses can read the whole data root.",
+      'Settings > Security and backup > Agent access to Acorn data.', {
+        title: 'Agent access to Acorn data',
+        description: blocked === false
+          ? "This agent can read Acorn's data folder, including other sessions' tokens and the task database."
+          : defaults.blockDataRootReads
+            ? "Agents on harnesses that support it are kept out of Acorn's data folder from their next start."
+            : "Agents can read Acorn's data folder, including other sessions' tokens and the task database.",
+        facts: [
+          { label: 'Block', value: defaults.blockDataRootReads ? 'On' : 'Off' },
+          ...(blocked === null ? [] : [{ label: 'Selected agent', value: blocked ? 'Blocked from its next start' : 'Not blocked' }]),
         ],
       })
     const options = session?.config.configOptions

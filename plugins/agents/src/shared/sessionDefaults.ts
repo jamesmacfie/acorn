@@ -71,6 +71,9 @@ export type AgentSessionDefaults = {
   checkInstructionFiles: boolean
   /** Require an owner-approved snapshot of discovered instruction and skill files. */
   reviewChangedInstructions: boolean
+  /** Keep agents out of acorn's data root where the harness can, from each session's next start
+   *  (docs/managed-agents/read-block.md). Drawn on Settings > Security and backup. */
+  blockDataRootReads: boolean
   /**
    * Carry each change forward instead of using `pinned`. On, a model or effort switch inside a
    * session becomes the value the next session of that provider starts with.
@@ -97,6 +100,9 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   // Off, because it reads files before every turn and can stop work the owner didn't expect to stop.
   checkInstructionFiles: false,
   reviewChangedInstructions: false,
+  // Off, because the harness's sandbox also refuses writes outside the worktree, which breaks package
+  // installs and SSH pushes that work today.
+  blockDataRootReads: false,
   followLastSession: true,
   pinned: {},
   last: {},
@@ -192,6 +198,9 @@ export function validateAgentSessionDefaults(
   if (record.reviewChangedInstructions != null && typeof record.reviewChangedInstructions !== 'boolean') {
     errors.push('reviewChangedInstructions must be true or false.')
   }
+  if (record.blockDataRootReads != null && typeof record.blockDataRootReads !== 'boolean') {
+    errors.push('blockDataRootReads must be true or false.')
+  }
   const pinned = record.pinned == null ? undefined : values(record.pinned, 'pinned', errors)
   const last = record.last == null ? undefined : values(record.last, 'last', errors)
   const inlineRecord = record.inline
@@ -242,6 +251,7 @@ export function validateAgentSessionDefaults(
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
       ...(typeof record.checkInstructionFiles === 'boolean' ? { checkInstructionFiles: record.checkInstructionFiles } : {}),
       ...(typeof record.reviewChangedInstructions === 'boolean' ? { reviewChangedInstructions: record.reviewChangedInstructions } : {}),
+      ...(typeof record.blockDataRootReads === 'boolean' ? { blockDataRootReads: record.blockDataRootReads } : {}),
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),
       ...(inline ? { inline } : {}),

@@ -92,15 +92,16 @@ What stays readable to an agent:
 
 - Its own token. An agent can always read the token it was given, which reaches only its task.
 - Everything else in the data root, including other sessions' token files under
-  `internal-credentials/`, `core.sqlite` with task and transcript data, and the TLS private key. Acorn
-  starts no harness with a read block on the data root. Claude Code blocks a shell command's reads
-  only inside its sandbox, which also sends network traffic through an allowlist that starts empty
-  and limits writes to the working directory and a temporary directory.
+  `internal-credentials/`, `core.sqlite` with task and transcript data, and the TLS private key.
+  **Keep agents out of Acorn's data folder** closes this for Claude Code sessions, using its sandbox,
+  and also limits where they can write. It's off by default, and Codex and contributed harnesses
+  can't enforce it ([keeping agents out of the data folder](./managed-agents/read-block.md)).
 - The sealed keys, wherever the desktop's data key is a plain `data.key` file. That's every
   development build, and a packaged build whose keychain refused the item.
 - Every key on a standalone Node, which has no keychain and warns about this at boot.
 
-What it doesn't stop is an agent that plants a file and waits for a restart. It can delete
+What it doesn't stop, outside a blocked Claude Code session, is an agent that plants a file and waits
+for a restart. It can delete
 `node-keys.sealed` and leave its own `session.key`, which the next start treats as an upgrade, or
 write a `.env` into the data root, which the helper loads. That's persistence as the person's own
 user, which no desktop app can rule out. The audit trail records a key check that fails, and

@@ -1,7 +1,7 @@
 import { ProcessRetirementError } from '../processes/ownedProcess'
 import { awaitWithSignal } from '../processes/startCancellation'
 import type { AgentSession } from '../../contract/wire'
-import type { AgentDriver, AgentDriverEvent, AgentDriverLoopHooks, AgentDriverMcpServer, AgentDriverSession } from '../drivers/types'
+import type { AgentDriver, AgentDriverEvent, AgentDriverLoopHooks, AgentDriverMcpServer, AgentDriverReadBlock, AgentDriverSession } from '../drivers/types'
 import type { AgentDriverRegistry } from '../drivers/registry'
 import type { PluginTelemetry } from '@acorn/plugin-api/node'
 import type { AgentStartupPhase, MeasureAgentStartup } from '../drivers/startupTelemetry'
@@ -70,6 +70,8 @@ export type ProviderLifecyclePorts = {
   skillsDelivered(sessionId: string, report: SkillReport): Promise<void>
   /** The bridge for a start of a driver with `loopHooks`, or null when no loop point has a handler. */
   loopHooks(session: AgentSession): Promise<AgentDriverLoopHooks | null>
+  /** The read block for a start of a driver with `readBlock`, or null when the person left it off. */
+  readBlock(input: { worktree: string; env: Record<string, string>; skillPaths: readonly string[] }): Promise<AgentDriverReadBlock | null>
   event(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void>
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
@@ -264,12 +266,17 @@ export class ProviderSessionLifecycle {
       live.skills = skills
       live.skillsOwed = true
       const loopHooks = live.driver.loopHooks ? await read(() => this.ports.loopHooks(session)) : null
+      // Read at every start, like the hooks, so switching it applies from the next start.
+      const readBlock = live.driver.readBlock
+        ? await read(() => this.ports.readBlock({ worktree: cwd, env, skillPaths: [...skills.folders, ...skills.plugins] }))
+        : null
       const { attendanceInstructions } = await import('./attendanceInstructions')
       const instructions = attendanceInstructions(sessionAttendance(session))
       signal.throwIfAborted()
       const launch = (measureStartup?: MeasureAgentStartup) => live.driver.start({
         cwd, env, mcpServers: mcp.servers, skillFolders: skills.folders, skillPlugins: skills.plugins,
         ...(loopHooks ? { loopHooks } : {}),
+        ...(readBlock ? { readBlock } : {}),
         noProviderExecutionHistory, signal, session, measureStartup,
         ...(instructions ? { attendanceInstructions: instructions } : {}),
         onEvent: (event) => this.callback(live, () => {

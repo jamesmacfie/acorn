@@ -35,6 +35,10 @@ export class AcpDriver implements AgentDriver {
     return this.spec.nativeSkills === true
   }
 
+  get readBlock(): boolean {
+    return this.spec.readBlock === true
+  }
+
   // Only where this node has the bridge program to install. A standalone node has none.
   get loopHooks(): boolean {
     return this.spec.loopHooks === true && acornLoopHook() != null

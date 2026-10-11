@@ -60,6 +60,9 @@ Revision-specific dependency changes appear in [Changes](../diff-rendering/chang
 The plugin host reports counts of active executable grants, enabled development modes, enabled
 approved and unapproved skills, and pending changed packages. It does not expose package names or
 declarations.
+The `agents.read-block` finding says whether **Keep agents out of Acorn's data folder** is on, which
+harnesses enforce it, and whether a selected session starts blocked
+([read block](../managed-agents/read-block.md)).
 The `host.keys` finding says whether the desktop app delivered the Node's keys sealed, or the Node read
 them from files or its environment, and names any plain key file still in the data root. A standalone
 Node, or a plain file left behind, is a warning, because agents on the Node can read it

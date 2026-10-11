@@ -28,7 +28,7 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
   }))
   const save = createSettingSave()
 
-  const write = async (field: 'checkInstructionFiles' | 'reviewChangedInstructions', on: boolean) => {
+  const write = async (field: 'checkInstructionFiles' | 'reviewChangedInstructions' | 'blockDataRootReads', on: boolean) => {
     const selectedNode = nodeId()
     const selectedKey = queryKey()
     const saved = await writeJson<AgentSessionDefaults>(
@@ -39,7 +39,7 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
         body: JSON.stringify({ [field]: on }),
         nodeId: selectedNode,
       },
-      (response) => `instruction setting ${response.status}`,
+      (response) => `agent security setting ${response.status}`,
     )
     queryClient.setQueryData(selectedKey, saved)
     // The agents settings pages read the active node's copy of the same record.
@@ -79,6 +79,22 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
             onChange={(next) => save.run(() => write('reviewChangedInstructions', next))} />
         </SettingRow>
         <InstructionReviewPanel nodeId={props.nodeId} enabled={stored.data?.reviewChangedInstructions} preferredTaskId={activeTaskId()} />
+      </SettingsSection>
+      <SettingsSection
+        id="agent-data-access"
+        label="Agent access to Acorn data"
+        help="Acorn's data folder holds every session's access token, the task database, and the Node's private key."
+      >
+        <SettingRow
+          label="Keep agents out of Acorn's data folder"
+          description="Claude Code agents run in its sandbox. They can't read other sessions' tokens or the task database, and their commands can only write in their worktree, so package installs and SSH pushes may fail. Applies from each agent's next start."
+          error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
+        >
+          <Checkbox switch ariaLabel="Keep agents out of Acorn's data folder"
+            checked={stored.data?.blockDataRootReads ?? false}
+            disabled={!stored.isSuccess}
+            onChange={(next) => save.run(() => write('blockDataRootReads', next))} />
+        </SettingRow>
       </SettingsSection>
       <SettingsSection id="agent-security-check" label="Security check">
         <SecurityDiagnosticsPanel nodeId={props.nodeId} />

@@ -258,7 +258,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   surfaces](./managed-agents/client-surfaces.md), [The composer](./managed-agents/composer.md),
   [Custom agents](./managed-agents/custom-agents.md), [New-session
   defaults](./managed-agents/defaults.md), [Managed delegation](./managed-agents/delegation.md),
-  [Harnesses](./managed-agents/harnesses.md), [Harness bridges](./managed-agents/loop-hooks.md), [Archived agent
+  [Harnesses](./managed-agents/harnesses.md), [Harness bridges](./managed-agents/loop-hooks.md), [Keeping agents out of the data
+  folder](./managed-agents/read-block.md), [Archived agent
   history](./managed-agents/history-retention.md), [Operations](./managed-agents/operations.md), [Repeated tool
   calls](./managed-agents/repeated-tool-calls.md),
   [From the command palette](./managed-agents/palette.md), [Native

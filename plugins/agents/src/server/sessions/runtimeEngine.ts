@@ -319,6 +319,12 @@ export class ManagedAgentEngine {
         if (!before!.length && !after!.length) return null
         return { command: bridge.command, args: [...bridge.args, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION], beforeTool: before!.length > 0, afterTool: after!.length > 0 }
       },
+      // The person's switch on Settings > Security and backup (docs/managed-agents/read-block.md).
+      readBlock: async (input) => {
+        const userId = this.currentUserId()
+        if (!userId || !(await readAgentSessionDefaults(this.core.prefs, userId)).blockDataRootReads) return null
+        return (await import('../drivers/readBlock')).dataRootReadBlock({ dataDir: options.dataDir, ...input })
+      },
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
         message: `This session runs without ${names.join(', ')}. Check consent, stored credentials, and review availability in Settings → MCP servers.`,
@@ -425,6 +431,11 @@ export class ManagedAgentEngine {
   }
 
   /** Last already observed descriptor. Diagnostics must never trigger a provider probe. */
+  /** Harnesses that turn the person's read block into their own sandbox (../drivers/readBlock.ts). */
+  readBlockProviders(): string[] {
+    return this.registry.providers().filter((id) => this.registry.create(id)?.readBlock === true)
+  }
+
   observedProvider(id: string): AgentProviderDescriptor | null {
     return this.providerCache?.generation === this.registry.generation
       ? this.providerCache.descriptors.find((provider) => provider.id === id) ?? null : null

@@ -8,7 +8,7 @@ import { createRequire } from 'node:module'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { LOOP_HOOK_TIMEOUT_SECONDS, type AgentLoopHookEvent } from '../../contract/loopHook.ts'
 import type { HarnessLaunchSpec } from './harness'
-import type { AgentDriverLoopHooks } from './types'
+import type { AgentDriverLoopHooks, AgentDriverReadBlock } from './types'
 
 const nodeRequire = createRequire(import.meta.url)
 
@@ -28,6 +28,27 @@ export function claudeLoopHookSettings(bridge: AgentDriverLoopHooks): Record<str
   return {
     ...(bridge.beforeTool ? { PreToolUse: entry('PreToolUse') } : {}),
     ...(bridge.afterTool ? { PostToolUse: entry('PostToolUse') } : {}),
+  }
+}
+
+/** Claude Code's settings for a session kept out of the data root (docs/managed-agents/read-block.md).
+ *  The sandbox confines every shell command and the processes it starts. Claude's own Read and Edit
+ *  tools run outside it, so deny rules keep them out of the entries that hold nothing this session
+ *  reads. The Edit rules also stop the agent planting files there, such as a `.env` or a key file. */
+export function claudeReadBlockSettings(block: AgentDriverReadBlock): { sandbox: Record<string, unknown>; deny: string[] } {
+  return {
+    sandbox: {
+      enabled: true,
+      // Without this, the agent can rerun a refused command outside the sandbox, and in
+      // skip-permissions mode nothing asks first.
+      allowUnsandboxedCommands: false,
+      // A machine that can't run the sandbox refuses the session rather than running it unconfined.
+      failIfUnavailable: true,
+      filesystem: { denyRead: [block.dataDir], allowRead: block.readable, allowWrite: block.writable },
+      ...(block.loopback ? { network: { allowedDomains: [block.loopback] } } : {}),
+    },
+    // `//` anchors at the filesystem root, as the skill allow rules below do.
+    deny: block.hidden.flatMap((path) => [`Read(/${path})`, `Read(/${path}/**)`, `Edit(/${path})`, `Edit(/${path}/**)`]),
   }
 }
 
@@ -66,17 +87,21 @@ export const claudeHarness: HarnessLaunchSpec = {
   // person's own and never writes anywhere (claudeLoopHookSettings above, docs/managed-agents/loop-hooks.md).
   // Like the allow rules, flag settings follow each process, so a resume installs what has a handler now.
   loopHooks: true,
-  acpSessionMeta: (session, skills, loopHooks, attendanceInstructions) => {
+  // The read block goes in the same flag settings, so like the hooks it applies from each start.
+  readBlock: true,
+  acpSessionMeta: (session, skills, loopHooks, attendanceInstructions, readBlock) => {
     const append = [
       sessionCustomAgent(session.config)?.instructions,
       attendanceInstructions,
       typeof session.config.standingContext === 'string' ? session.config.standingContext : undefined,
     ].filter(Boolean).join('\n\n')
-    const permissions = skills.folders.length ? { permissions: { allow: skills.folders.map((dir) => `Read(/${dir}/**)`) } } : {}
+    const block = readBlock ? claudeReadBlockSettings(readBlock) : null
+    const allow = skills.folders.map((dir) => `Read(/${dir}/**)`)
+    const permissions = allow.length || block ? { permissions: { ...(allow.length ? { allow } : {}), ...(block ? { deny: block.deny } : {}) } } : {}
     const plugins = skills.plugins.length ? { plugins: skills.plugins.map((path) => ({ type: 'local', path })) } : {}
     const hooks = loopHooks ? { hooks: claudeLoopHookSettings(loopHooks) } : {}
     return {
-      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions, ...hooks }, ...plugins } },
+      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions, ...hooks, ...(block ? { sandbox: block.sandbox } : {}) }, ...plugins } },
       ...(append ? { systemPrompt: { append } } : {}),
     }
   },
