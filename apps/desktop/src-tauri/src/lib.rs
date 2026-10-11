@@ -59,7 +59,17 @@ const PACKAGED: bool = !cfg!(debug_assertions);
 /// The Vite dev server to proxy the renderer from, when there is one. See src/app_scheme.rs for why
 /// dev is proxied rather than loaded directly.
 fn dev_server() -> Option<String> {
-    std::env::var("ACORN_DEV_SERVER").ok().filter(|value| !value.is_empty())
+    dev_server_for(PACKAGED, || std::env::var("ACORN_DEV_SERVER").ok())
+}
+
+/// A release build never reads the variable. Otherwise anyone who can set a packaged app's
+/// environment could serve its privileged renderer from their own origin, with inline script
+/// allowed. Both dev launchers run debug builds, so they keep it.
+fn dev_server_for(packaged: bool, read: impl FnOnce() -> Option<String>) -> Option<String> {
+    if packaged {
+        return None;
+    }
+    read().filter(|value| !value.is_empty())
 }
 
 pub fn run() {
@@ -574,6 +584,18 @@ mod tests {
         assert_eq!(renderer_origin(false), APP_ORIGIN);
         assert_eq!(renderer_origin(true), "http://app.localhost");
         assert!(is_renderer_url_for(&renderer_origin(true).parse().unwrap(), true));
+    }
+
+    #[test]
+    fn a_release_build_ignores_the_dev_server_variable() {
+        let set = || Some("http://localhost:4319".to_string());
+        assert_eq!(dev_server_for(false, set), set());
+        assert_eq!(dev_server_for(false, || Some(String::new())), None);
+        let packaged = dev_server_for(true, || panic!("a release build must not read ACORN_DEV_SERVER"));
+        assert_eq!(packaged, None);
+        let csp = app_scheme::renderer_csp(51234, packaged.as_deref());
+        assert!(csp.contains("script-src 'self';"), "{csp}");
+        assert!(!csp.contains(":4319"), "{csp}");
     }
 
     #[test]

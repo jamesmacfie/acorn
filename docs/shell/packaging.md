@@ -156,8 +156,10 @@ action sets `toolchain: stable` explicitly, because pinning the action doesn't p
 
 `apps/desktop/src-tauri/Cargo.lock` pins the Rust graph. rustls through `ureq` is 0.23.45, which fixes
 [RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285.html). acorn calls `ureq` in
-`app_scheme.rs` and `dev_server.rs`, both against the `ACORN_DEV_SERVER` origin, which only the
-development launchers set. The helper owns Node HTTPS connections, separately from this client.
+`app_scheme.rs` and `dev_server.rs`, both against the `ACORN_DEV_SERVER` origin. Only debug builds
+read that variable, and both development launchers run debug builds. A release build ignores it and
+serves the renderer from its bundled assets. The helper owns Node HTTPS connections, separately from
+this client.
 
 The RustSec review on October 1, 2026, reported no vulnerabilities and seven informational warnings:
 
