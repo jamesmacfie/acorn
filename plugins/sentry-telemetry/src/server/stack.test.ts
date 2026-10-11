@@ -38,7 +38,22 @@ describe('parseStack', () => {
   })
 
   it('skips the message line and anything that is not a frame', () => {
-    expect(parseStack('Error: boom\nsomething else entirely')).toEqual([])
+    expect(parseStack('Error: boom\nsomething else entirely\nError: contact me@example.com')).toEqual([])
+  })
+
+  it('keeps WebKit renderer frames, including anonymous calls and native frames', () => {
+    const stack = [
+      'slotFor@app://acorn/assets/workerHost.js:1:153',
+      'mount@http://app.localhost/assets/RemoteTree.js:2:253',
+      '@app://acorn/assets/AgentPane.js:3:42',
+      'forEach@[native code]',
+    ].join('\n')
+    expect(parseStack(stack)).toEqual([
+      { function: 'forEach', in_app: false },
+      { filename: 'app://acorn/assets/AgentPane.js', abs_path: 'app://acorn/assets/AgentPane.js', lineno: 3, colno: 42, in_app: true },
+      { function: 'mount', filename: 'http://app.localhost/assets/RemoteTree.js', abs_path: 'http://app.localhost/assets/RemoteTree.js', lineno: 2, colno: 253, in_app: true },
+      { function: 'slotFor', filename: 'app://acorn/assets/workerHost.js', abs_path: 'app://acorn/assets/workerHost.js', lineno: 1, colno: 153, in_app: true },
+    ])
   })
 
   it('answers an empty list for an empty stack rather than throwing', () => {
